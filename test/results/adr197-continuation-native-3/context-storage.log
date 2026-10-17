@@ -1,0 +1,210 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 3429c3f3-e5c5-4d67-82b0-df593ea5791a image docker.io/library/asservat-context-worker@sha256:86db866fcc3a0eb19a2d419a6c9bdfcc12352208b06efbc9015ce92ef3f24e2d exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-hcynfu66-0", namespace "bootstrap-chain-10000000", installation "c4667f59-c69c-4920-b377-0b609ad4fb8a": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-1d3347fe0d78827c90cc28be23d26685a46df58f37b1ec036350538eb85abce0-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-1d3347fe0d78827c90cc28be23d26685a46df58f37b1ec036350538eb85abce0-audit-wrap
+        created: sys/policies/acl/asservat-configuration-1d3347fe0d78827c90cc28be23d26685a46df58f37b1ec036350538eb85abce0-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-1d3347fe0d78827c90cc28be23d26685a46df58f37b1ec036350538eb85abce0-audit-unwrap
+        created: sys/policies/acl/asservat-c4667f59c69c4920b3770b609ad4fb8a-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: applied phase 3 owner-provider:
+        Kubernetes context "kind-asservat-context-hcynfu66-0", namespace "bootstrap-chain-10000000", installation "c4667f59-c69c-4920-b377-0b609ad4fb8a": applying phase 3 owner-provider recipe.
+        created: sys/policies/acl/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-audit-wrap
+        created: auth/owner-auth/role/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-audit-wrap
+        created: sys/policies/acl/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-audit-unwrap
+        created: auth/owner-auth/role/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-audit-unwrap
+        created: sys/policies/acl/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-server-sign
+        created: auth/owner-auth/role/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-server-sign
+        created: sys/policies/acl/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-client-sign
+        created: auth/owner-auth/role/asservat-owner-4eb5beb381631a4817de0e5e06e9fc1b0853cb3a9c2fc7f68cc95274063a68cb-client-sign
+        created: owner-pki/roles/asservat-owner-pki-1061d015bdd3f6f96651b32982c8303f92f11882e942b8c1f05b70486d73e22e-server
+        created: owner-pki/roles/asservat-owner-pki-1061d015bdd3f6f96651b32982c8303f92f11882e942b8c1f05b70486d73e22e-client
+        created: sys/policies/acl/asservat-owner-public-27c7b2613ae3a701-browser-seal
+        created: auth/owner-auth/role/asservat-owner-public-27c7b2613ae3a701-browser-seal
+        created: sys/policies/acl/asservat-owner-public-27c7b2613ae3a701-browser-open
+        created: auth/owner-auth/role/asservat-owner-public-27c7b2613ae3a701-browser-open
+        created: sys/policies/acl/asservat-owner-public-27c7b2613ae3a701-work-sign
+        created: auth/owner-auth/role/asservat-owner-public-27c7b2613ae3a701-work-sign
+        created: sys/policies/acl/asservat-owner-public-27c7b2613ae3a701-worker-issue
+        created: auth/owner-auth/role/asservat-owner-public-27c7b2613ae3a701-worker-issue
+        created: public-transit-c4667f59/keys/asservat-c4667f59c69c4920b3770b609ad4fb8a-browser-sessions
+        created: public-transit-c4667f59/keys/asservat-c4667f59c69c4920b3770b609ad4fb8a-work-signing
+        created: worker-pki-c4667f59/roles/asservat-c4667f59c69c4920b3770b609ad4fb8a-download-worker
+        created: sys/policies/acl/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-audit-wrap
+        created: auth/owner-auth/role/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-audit-wrap
+        created: sys/policies/acl/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-audit-unwrap
+        created: auth/owner-auth/role/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-audit-unwrap
+        created: sys/policies/acl/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-client-sign
+        created: auth/owner-auth/role/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-client-sign
+        created: sys/policies/acl/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-server-sign
+        created: auth/owner-auth/role/asservat-federation-b8dda76209339486e62a91c59c6a44d0d3b8200306c76ecfe3158441e280f159-server-sign
+        created: connector-pki-c4667f59/roles/asservat-c4667f59c69c4920b3770b609ad4fb8a-connector-client
+        created: connector-pki-c4667f59/roles/asservat-c4667f59c69c4920b3770b609ad4fb8a-connector-server
+        created: bootstrap-chain-transit/keys/asservat-c4667f59c69c4920b3770b609ad4fb8a-federation-audit
+        created: sys/policies/acl/asservat-c4667f59c69c4920b3770b609ad4fb8a-owner-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: permission stream 59ab0710-d66b-4b19-91c9-ca3ca9940d7b fresh with 2 acknowledged authority audits
+    initial_bootstrap_chain_test.go:343: capacity source initialized for the permission root
+    initial_bootstrap_chain_test.go:343: federation projection published for the permission root
+    initial_bootstrap_chain_test.go:343: federation provider roles applied and verified
+    initial_bootstrap_chain_test.go:343: federation available with zero peers; regional offer published
+    initial_bootstrap_chain_test.go:343: owner native port reachable from outside under its bootstrap name
+    initial_bootstrap_chain_test.go:343: key service available; its configuration accepted at revision 1
+    initial_bootstrap_chain_test.go:343: key service serves the offered roots and refuses an unknown client chain: remote error: tls: unknown certificate authority
+    initial_bootstrap_chain_test.go:343: no Pod mounts the root key; only the key service mounts its logins
+    initial_bootstrap_chain_test.go:343: capacity root ReadyAt set for the permission root
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 2 with the baseline policy
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:343: baseline edit accepted and hub-worker restart Ready under a new epoch
+    initial_bootstrap_chain_test.go:343: promoted owner Ready with download sources, operator public Secret and observation on 9444
+    initial_bootstrap_chain_test.go:343: installer-cluster connector enrolled generation 1 and both leaves
+    initial_bootstrap_chain_test.go:343: join record printed and stored; its connector protection is the staged generation 1
+    initial_bootstrap_chain_test.go:343: regional executor composed from the settings it read by name
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle enroll took 4.06s, observer 82 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle client-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle server-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle registration took 1.4s, observer 28 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-observation-candidates took 20ms, observer 0 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+    initial_bootstrap_chain_test.go:343: installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+    initial_bootstrap_chain_test.go:343: hub-api restarted its process on the catalog change and is Ready with the joined entry
+    initial_bootstrap_chain_test.go:343: hub-api recorded the join's write-once capacity qualification
+    initial_bootstrap_chain_test.go:343: regional capacity standby composed
+    initial_bootstrap_chain_test.go:343: operator added the regional budget policy, pool slot, workload and maintainer binding
+    initial_bootstrap_chain_test.go:343: diagnostics: asservat-c4667f59c69c4920b3770b609ad4fb8a-worker pod asservat-c4667f59c69c4920b3770b609ad4fb8a-worker-6bcb9f59-4xtvf container worker ready true restarts 3 last "Error" exit 1
+    initial_bootstrap_chain_test.go:343: diagnostics: asservat-c4667f59c69c4920b3770b609ad4fb8a-worker-6bcb9f59-4xtvf previous=true log:
+        I1017 06:48:32.447265       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+        I1017 06:48:48.848568       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+        service stopped at capacity/run (unavailable): protected configuration, credentials or original deadline unavailable
+    initial_bootstrap_chain_test.go:343: diagnostics: asservat-c4667f59c69c4920b3770b609ad4fb8a-worker-6bcb9f59-4xtvf previous=false log:
+        I1017 06:50:04.455436       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+        I1017 06:50:23.248758       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+        capacity regional observation capacity-namespace-candidates: unavailable after 0s
+    initial_bootstrap_chain_test.go:343: diagnostics: asservat-c4667f59c69c4920b3770b609ad4fb8a-owner pod asservat-c4667f59c69c4920b3770b609ad4fb8a-owner-7f465df898bqnl4 container hub ready true restarts 3 last "Error" exit 1
+    initial_bootstrap_chain_test.go:343: diagnostics: asservat-c4667f59c69c4920b3770b609ad4fb8a-owner-7f465df898bqnl4 previous=true log:
+        owner startup failed: phase=accepted-configuration role=none reason=unavailable native=unspecified detail=unspecified sql=fleet-interval sql-reason=expired-interval
+    initial_bootstrap_chain_test.go:343: connector pod connector-5cf898cb8c-6j9fw ready=true restarts=0 waiting=false
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle enroll took 4.06s, observer 82 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle client-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle server-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle registration took 1.4s, observer 28 calls
+    initial_bootstrap_chain_test.go:343: regional: connector process credentials active
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby active
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-observation-candidates took 20ms, observer 0 calls
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional context start stopped: execution-process/source-close@5s after [source-open@700ms owned-process@2.1s process-proof@3.4s execution-account@3.45s settings-guard@3.75s settings-snapshot@3.9s workload@4.15s settings-guard-after@4.45s settings-snapshot-after@4.6s workload-guard-after@4.95s] (unavailable); attempt 5.1s, observer 102 calls 90ms, probe 30 calls 30ms
+    initial_bootstrap_chain_test.go:343: regional: regional context start active
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: unavailable
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (denied)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: connector enrollment pending: unavailable
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: unavailable
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (denied)
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: unavailable
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: unavailable
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: invalid
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-registration took 10ms, observer 1 calls
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: serve (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: serve (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: invalid
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: invalid
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: unavailable
+    initial_bootstrap_chain_test.go:343: regional: connector local source failed: invalid
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: serve (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: serve (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: serve (unavailable)
+    initial_bootstrap_chain_test.go:343: regional: regional capacity standby: open (unavailable)
+    initial_bootstrap_chain_test.go:343: regional workload did not reach ready_at with a fresh binding no rows in result set false false
+    installer_continuation_native_test.go:634: continuation produce 
+    installer_continuation_native_test.go:634: continuation continue installer continuation: resources/audit-secrets done in 12ms
+        installer continuation: resources/producer done in 680ms
+        installer continuation: resources/journal done in 2.1s
+        installer continuation: resources/advance done in 1m6.504s
+        installer continuation: resources/inventory done in 701ms
+        installer continuation: bridge/observer done in 18ms
+        installer continuation: bridge/protection done in 0s
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.234s
+        installer continuation: bridge/probe done in 3.449s
+        installer continuation: bridge/retained done in 4.901s
+        installer continuation: bridge/settle done in 6.017s
+        installer continuation: worker/configuration-documents done in 0s
+        installer continuation: worker/outbox done in 3ms
+        installer continuation: worker/inbox done in 2.003s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 3ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 8ms
+        installer continuation: worker/roles-provision done in 12.385s
+        installer continuation: worker/roles-projection done in 3.318s
+        installer continuation: worker/inputs done in 1ms
+        installer continuation: worker/inputs-complete done in 7.661s
+        installer continuation: worker/launch done in 7.75s
+        installer continuation: public/sources done in 6ms
+        installer continuation: owner/accepted-source done in 3.034s
+        installer continuation: public/roles-binding done in 31ms
+        installer continuation: public/roles-root done in 0s
+        installer continuation: public/roles-sql done in 8ms
+        installer continuation: public/roles-provision done in 3m32.236s
+        installer continuation: public/roles-projection done in 3.425s
+        installer continuation: owner/roles done in 3.412s
+        installer continuation: owner/roles-sql done in 7ms
+        installer continuation: owner/selection done in 0s
+        installer continuation: owner/selection-complete done in 10.533s
+        installer continuation: permission/guard done in 6ms
+        installer continuation: retention/guard done in 3ms
+        installer continuation: permission/projection done in 1.451s
+        installer continuation: capacity/sources done in 220ms
+        installer continuation: capacity/proofs done in 1.169s
+        installer continuation: capacity/qualification done in 1.951s
+        installer continuation: capacity/initialize done in 55.91s
+        installer continuation: federation/projection done in 3.944s
+        installer continuation: federation/identity done in 1.556s
+        installer continuation: public/download-sources done in 0s
+        installer continuation: public/sources done in 18ms
+        installer continuation: capacity/local-observation done in 3.577s
+        installer continuation: owner/outbox done in 7ms
+        installer continuation: owner/inbox done in 2.003s
+        installer continuation: owner/audit-secret done in 2ms
+        installer continuation: federation/audit-secret done in 2ms
+        installer continuation: federation/verify done in 21ms
+        installer continuation: public/readback done in 19ms
+        installer continuation: public/derive done in 1ms
+        installer continuation: public/observation-projection done in 1ms
+        installer continuation: public/operator-secret done in 2ms
+        installer continuation: owner/projection done in 2ms
+        installer continuation: owner/installation done in 1m44.307s
+        installer continuation: capacity/projection done in 2.257s
+        installer continuation: federation/serving done in 3ms
+        installer continuation: federation/workload done in 313ms
+        installer continuation: federation/settle done in 2.003s
+        installer continuation: federation/offer done in 0s
+        installer continuation: federation/owner-exposure done in 6ms
+        installer continuation: key-service/projection done in 2.959s
+        installer continuation: back up Secret bootstrap-chain-10000000-target/asservat-c4667f59c69c4920b3770b609ad4fb8a-key-service-root-v1; stored artifacts are unreadable without it
+        installer continuation: key-service/root done in 6ms
+        installer continuation: key-service/serving done in 1ms
+        installer continuation: key-service/workload done in 212ms
+        installer continuation: key-service/settle done in 2.005s
+        installer continuation: federation/executor-offer done in 2ms
+        installer continuation: retention/first-acceptance done in 5ms
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (1303.55s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.80s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (984.28s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.80s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1303.606s
+FAIL

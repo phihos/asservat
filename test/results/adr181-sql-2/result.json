@@ -1,0 +1,30 @@
+{
+  "name": "adr181-sql-2",
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "TestContextAdmissionWithRealServices/api-execution-one-preparation"
+  ],
+  "exit": 0,
+  "scope": "ADR-181 verification unwrap authority (ContextKeyUnwraps) and publication queue on real PostgreSQL at schema 63, under narrow NOINHERIT logins with the exact product grant lists; followed by the unchanged ContextPublisher publication",
+  "checks": [
+    "queue lists the stored unpublished capture with its attempt and copies",
+    "verifier unwrap allowed",
+    "acquisition role refused",
+    "unknown attempt refused",
+    "allowance shared across two verifier certificates; unwrap 13 refused",
+    "published capture leaves the queue and gets no further unwrap"
+  ],
+  "passedTestNames": [
+    "TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "sourceHashBefore": "5038feb50f0666f6c3a33a2859bcd4c8a3d1efcc2024ce1aeba1f42df2f6e859",
+  "sourceHashAfter": "5038feb50f0666f6c3a33a2859bcd4c8a3d1efcc2024ce1aeba1f42df2f6e859",
+  "previousAttempt": "adr181-sql-1 failed: the test fixture verifier peer spanned 61 minutes (key peers are at most one hour); the fixture was corrected, the product authorizer unchanged",
+  "status": "passed",
+  "diagnosticRuns": "Three unrecorded targeted reruns between attempts 1 and 2 used temporary println diagnostics in the authorizer and recovery guard to localize the denial; those prints were removed (files restored from pre-diagnostic copies) before this run."
+}

@@ -1,0 +1,298 @@
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/valid
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/parent-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/token-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-audience
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/unbound
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/duplicate-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/revoked-review
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-controller
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/two-controllers
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-template
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-after-read
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/scaled-down
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/deleted-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/lost-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/other-policy
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/late-final-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/original-expired
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/cancelled
+--- PASS: TestClusterObservationCallerExactNativeReadBoundary (3.15s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/valid (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/parent-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/token-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-audience (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/unbound (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-account (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/duplicate-group (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/revoked-review (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-account (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-pod (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-controller (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/two-controllers (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-template (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-after-read (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/scaled-down (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/deleted-pod (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/lost-guard (0.12s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/other-policy (0.08s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/late-final-guard (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/original-expired (0.07s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/cancelled (0.07s)
+=== RUN   TestOwnerEndpointBoundedDiscovery
+=== RUN   TestOwnerEndpointBoundedDiscovery/missing-controller
+=== RUN   TestOwnerEndpointBoundedDiscovery/host-network
+=== RUN   TestOwnerEndpointBoundedDiscovery/external-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/not-serving
+=== RUN   TestOwnerEndpointBoundedDiscovery/too-many-slices
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-reordered
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-account
+=== RUN   TestOwnerEndpointBoundedDiscovery/replacement-replicaset
+=== RUN   TestOwnerEndpointBoundedDiscovery/missing-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-namespace
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-slice-owner
+=== RUN   TestOwnerEndpointBoundedDiscovery/terminating
+=== RUN   TestOwnerEndpointBoundedDiscovery/loopback
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-missing
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-protocol
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/publish-not-ready
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-unknown-protocol
+=== RUN   TestOwnerEndpointBoundedDiscovery/manual-slice
+=== RUN   TestOwnerEndpointBoundedDiscovery/dual-stack
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-deployment
+=== RUN   TestOwnerEndpointBoundedDiscovery/unknown-readiness
+=== RUN   TestOwnerEndpointBoundedDiscovery/continuation-loop
+=== RUN   TestOwnerEndpointBoundedDiscovery/unavailable
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-number
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-target
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-ip
+=== RUN   TestOwnerEndpointBoundedDiscovery/valid
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-unopted
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-wrong-native-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/duplicate-observation
+=== RUN   TestOwnerEndpointBoundedDiscovery/deleted-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/named-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-family
+=== RUN   TestOwnerEndpointBoundedDiscovery/too-many-endpoints
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-unknown-profile
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-duplicate
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-target-version
+=== RUN   TestOwnerEndpointBoundedDiscovery/two-controllers
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-selector
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-extra
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-duplicate
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-number
+=== RUN   TestOwnerEndpointBoundedDiscovery/replacement-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/changed-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-controller
+=== RUN   TestOwnerEndpointBoundedDiscovery/not-ready
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-node
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-wrong-owner-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-extra
+=== RUN   TestOwnerEndpointBoundedDiscovery/changed-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/expired-observation
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-owner
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-missing
+=== RUN   TestOwnerEndpointBoundedDiscovery/omitted-target-version
+=== RUN   TestOwnerEndpointBoundedDiscovery/legacy-owner-alias
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-pod-account
+--- PASS: TestOwnerEndpointBoundedDiscovery (2.45s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/missing-controller (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/host-network (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/external-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/not-serving (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/too-many-slices (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-reordered (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-account (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/replacement-replicaset (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/missing-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-namespace (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-slice-owner (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/terminating (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/loopback (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-missing (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-protocol (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/publish-not-ready (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-unknown-protocol (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/manual-slice (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/dual-stack (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-deployment (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/unknown-readiness (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/continuation-loop (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/unavailable (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-number (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-target (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-ip (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/valid (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-unopted (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-wrong-native-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/duplicate-observation (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/deleted-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/named-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-family (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/too-many-endpoints (0.11s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-unknown-profile (0.03s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-duplicate (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-target-version (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/two-controllers (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-selector (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-extra (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-duplicate (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-number (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/replacement-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/changed-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-controller (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/not-ready (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-node (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-wrong-owner-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-extra (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/changed-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/expired-observation (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-owner (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-missing (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/omitted-target-version (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/legacy-owner-alias (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-pod-account (0.04s)
+=== RUN   TestOwnerObservationOperationRealBoundaries
+--- PASS: TestOwnerObservationOperationRealBoundaries (0.47s)
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/replica
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service-port
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/expired
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/namespace
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/controller
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/late-final
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/account
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/deployment
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/template
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/ready
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/unknown
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service
+--- PASS: TestOwnerObservationOperationFinalChangeIsTerminal (3.40s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/replica (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service-port (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint (0.12s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/expired (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/namespace (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/controller (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete (0.17s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/late-final (0.47s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/account (0.11s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/deployment (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/template (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/ready (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/unknown (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service (0.10s)
+=== RUN   TestOwnerObservationOperationCloseJoinsRead
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/close
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/caller-cancel
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/original-cancel
+--- PASS: TestOwnerObservationOperationCloseJoinsRead (0.31s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/close (0.10s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/caller-cancel (0.10s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/original-cancel (0.10s)
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/no-deadline
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/cancelled
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-root
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/expired
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/overlong
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/duplicate
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/empty
+--- PASS: TestOwnerObservationOperationRejectsWrongOriginal (0.07s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/no-deadline (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/cancelled (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-root (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/expired (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/overlong (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/duplicate (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/empty (0.00s)
+=== RUN   TestOwnerObservationOperationIdenticalIDsAreIndependent
+--- PASS: TestOwnerObservationOperationIdenticalIDsAreIndependent (1.17s)
+=== RUN   TestOwnerObservationOperationTwoExactProcesses
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/different-pods
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process
+--- PASS: TestOwnerObservationOperationTwoExactProcesses (1.24s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/different-pods (0.77s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process (0.47s)
+=== RUN   TestOwnerObservationOperationInitialReadChangesDeny
+--- PASS: TestOwnerObservationOperationInitialReadChangesDeny (0.09s)
+=== RUN   TestOwnerObservationOperationConcurrentFinalCannotReuse
+--- PASS: TestOwnerObservationOperationConcurrentFinalCannotReuse (0.10s)
+=== RUN   TestOwnerObservationOperationFinalCallerOnlyShortens
+--- PASS: TestOwnerObservationOperationFinalCallerOnlyShortens (0.47s)
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/valid
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-once
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-always
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-foreign
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-then-replaced
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-then-late
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/ordinary-rbac-denial
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/admin-probe
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/controller-probe
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-binding
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-policy
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/type-warning
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/missing-policy
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/foreign-deployment
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/namespace-replaced
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/namespace-replaced-after
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/late
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/wrong-cause
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/wrong-kind
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/accepted-dry-run
+=== RUN   TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-during-proof
+--- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial (1.69s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/valid (0.10s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-once (0.09s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-always (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-foreign (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-then-replaced (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-then-late (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/ordinary-rbac-denial (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/admin-probe (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/controller-probe (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-binding (0.07s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-policy (0.07s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/type-warning (0.07s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/missing-policy (0.07s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/foreign-deployment (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/namespace-replaced (0.07s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/namespace-replaced-after (0.09s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/late (0.09s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/wrong-cause (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/wrong-kind (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/accepted-dry-run (0.08s)
+    --- PASS: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/changed-during-proof (0.09s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	15.654s

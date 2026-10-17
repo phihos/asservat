@@ -1,0 +1,19 @@
+# Typed v2 owner/channel/coordinator checkpoint v3
+
+Seven new source paths in manifest.json; all bases absent. Live files remain untouched. Manifest SHA-256 26410dc3ea62ff4d354fdb9d4606581bbf1344e73a5e9b4741bc5f2cdad7d7da; runner 5b6eade9708769f2f439bb51db5b4ea003d19fadaf7487262c4e9a94e050941d; freeze 4eb76b8215e4f0f9f041284649ef7d691f07bfb7862b55995a3b433c7e847080.
+
+Handle 36918 exited 0. Compile 11.069s; selected races 15.861s; vet 1.891s; Go architecture 1.940s (53 packages, 298 internal edges). 35 top-level and 154 named PASS entries. All 1,937 dependencies, seven payloads, base/file sets and 1,944 mirror files unchanged before/after each phase. Exact commands and actual exits are in evidence/*.json; RESULT.json records their hashes.
+
+## Scope and contracts
+
+Explicit cluster-observation-exchange/v2 typed proof codecs, request-owned native owner proof, same-instance regional operation channel and hub coordinator. The borrowed original owner native handle is called Original once and Final once; retained final facts never reopen Original. All four regional values use one source/operation instance across independent SQL49 first/final pairs, with current exact leaf/key/SQL checks and final continuation required. Newly returned earlier cutoffs immediately constrain subsequent native, SQL, metadata and receipt I/O. Cancellation after locks and joined Close are enforced.
+
+Actual key/TLS1.3/h2/exporter component tests cover first/final native mutation, SQL/source-role revocation, pair substitution, wrong wire correlations, missing terminal EOF, original expiry/cancellation, Close joining pending final I/O, and constructor/final/post-metadata shorter cutoff propagation. Native/SQL/terminal ports are synthetic in these component tests. No deployed route or complete five-second critical-path result is claimed.
+
+## Preserved failures
+
+Sibling checkpoint-v1 was frozen but unrun. Checkpoint-v2 handle 97929 exited 1: compile passed, races failed at first regional proof; later vet/architecture were unrun. The failed new-v2 verifier incorrectly equated source-policy Configuration.ProtectionDigest and the independently pinned workload-guard ProtectionDigest. This candidate removes only that cross-equality; full configuration equality, issuer/current roots and workload/native pins remain separate checks. Its fixture explicitly asserts those digests differ. No v1/public predicate changed. Keep the immutable v2 evidence with this package.
+
+## Remaining work
+
+Actual framed v2 HTTP/2 client/executor/receiving holder and pending locator lifetime are next in regional-observation-v2-framed-20261013. The locator must remain the sole proof Close owner, exact holder sequence is spent before effects, and unknown GET/POST results cannot recreate proof or rebind standby. Runtime/profile selection and complete HWORK→B→A→R native timing under original five-second/shared20QPS bounds remain unqualified.

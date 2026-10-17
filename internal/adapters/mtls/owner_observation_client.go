@@ -1,0 +1,245 @@
+package mtls
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// OwnerObservationClient owns only finite own-server proof requests. The fixed
+// protected address is a dial hint; TLS uses the independently pinned Service
+// name, original candidate set and current registry. Results do not authorize
+// another connection or a metadata/effect request.
+type OwnerObservationClient struct {
+	root            context.Context
+	cancel          context.CancelFunc
+	pin             value.OwnerObservationPin
+	address, name   string
+	roots           *x509.CertPool
+	verifier        *OwnerPeerVerifier
+	connector       *ConnectorProcessCredentials
+	candidates      *app.OwnerObservationCandidateSelection
+	registry        app.OwnerCertificateRegistry
+	now             func() time.Time
+	mu              sync.Mutex
+	closed          bool
+	active, maximum int
+	joined          sync.WaitGroup
+}
+
+// NewOwnerObservationClient retains one installation-owned TCP dial endpoint.
+// Its port may differ from the original serving port (for example NodePort/NAT).
+// The endpoint selects only connectivity: TLS name/roots/candidates and HTTP
+// authority remain derived from pin, never from this address or a request.
+func NewOwnerObservationClient(ctx context.Context, pin value.OwnerObservationPin, address string, roots *x509.CertPool, connector *ConnectorProcessCredentials, candidates app.OwnerObservationCandidateSource, registry app.OwnerCertificateRegistry, maximum int, now func() time.Time) (*OwnerObservationClient, error) {
+	host, port, e := net.SplitHostPort(address)
+	number, pe := strconv.Atoi(port)
+	if ctx == nil || ctx.Err() != nil || !pin.Valid() || e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || roots == nil || len(roots.Subjects()) == 0 || connector == nil || candidates == nil || registry == nil || maximum < 1 || maximum > 16 || now == nil {
+		return nil, value.ErrInvalid
+	}
+	name, e := OwnerBootstrapServerName(pin.Pool)
+	if e != nil {
+		return nil, e
+	}
+	verifier, e := NewOwnerPeerVerifierForPool(roots, pin.Pool, now)
+	if e != nil {
+		return nil, e
+	}
+	selected, e := app.NewOwnerObservationCandidateSelection(pin.Pool, candidates)
+	if e != nil {
+		return nil, e
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &OwnerObservationClient{root: root, cancel: cancel, pin: pin, address: address, name: name, roots: roots.Clone(), verifier: verifier, connector: connector, candidates: selected, registry: registry, maximum: maximum, now: now}, nil
+}
+func (c *OwnerObservationClient) enter() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.root.Err() != nil || c.active >= c.maximum {
+		return false
+	}
+	c.active++
+	c.joined.Add(1)
+	return true
+}
+func (c *OwnerObservationClient) leave() { c.mu.Lock(); c.active--; c.mu.Unlock(); c.joined.Done() }
+func (c *OwnerObservationClient) Close() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.closed = true
+	c.cancel()
+	c.mu.Unlock()
+	c.joined.Wait()
+}
+
+func (c *OwnerObservationClient) ObserveOwner(ctx context.Context, request value.OwnerObservationRequest) (value.OwnerObservation, error) {
+	var zero value.OwnerObservation
+	if c == nil || ctx == nil || ctx.Err() != nil || !request.Valid(c.now()) || request.RootID != c.pin.RootID || !c.enter() {
+		return zero, value.ErrUnavailable
+	}
+	defer c.leave()
+	until := identity.Earlier(request.NotAfter, c.now().Add(5*time.Second))
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	joinedRoot := make(chan struct{})
+	stopRoot := context.AfterFunc(c.root, func() { cancel(); close(joinedRoot) })
+	defer func() {
+		if !stopRoot() {
+			<-joinedRoot
+		}
+	}()
+	local, e := c.connector.ObserveConnectorProcess(call)
+	if e != nil || local.Request.Process.Binding.InstallationID != c.pin.Pool.InstallationID || local.Request.Process.Binding.IssuerEpoch != c.pin.Pool.IssuerEpoch {
+		return zero, value.ErrUnavailable
+	}
+	until = identity.Earlier(until, local.ValidUntil)
+	localCall, stopLocal := context.WithDeadline(call, until)
+	defer stopLocal()
+	candidates, e := c.candidates.ReadOwnerObservationCandidates(localCall)
+	if e != nil || candidates.Pool != c.pin.Pool || !candidates.Valid(c.now()) || len(candidates.Owners) < 1 {
+		return zero, value.ErrUnavailable
+	}
+	candidates.Owners = append([]value.OwnerBinding(nil), candidates.Owners...)
+	until = identity.Earlier(until, candidates.ValidUntil)
+	bounded, stopBounded := context.WithDeadline(localCall, until)
+	defer stopBounded()
+	raw, e := (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext(bounded, "tcp", c.address)
+	if e != nil || raw == nil {
+		return zero, value.ErrUnavailable
+	}
+	defer raw.Close()
+	if raw.SetDeadline(until) != nil {
+		return zero, value.ErrUnavailable
+	}
+	joinedIO := make(chan struct{})
+	stopIO := context.AfterFunc(bounded, func() { _ = raw.Close(); close(joinedIO) })
+	defer func() {
+		if !stopIO() {
+			<-joinedIO
+		}
+	}()
+	expected := local.Registration.Certificate
+	config := &tls.Config{RootCAs: c.roots.Clone(), MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, ServerName: c.name, Time: c.now, SessionTicketsDisabled: true}
+	config.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		if bounded.Err() != nil {
+			return nil, value.ErrUnavailable
+		}
+		cert, e := c.connector.GetClientCertificate(info)
+		if e != nil || cert == nil || len(cert.Certificate) < 1 || artifact.Digest(sha256.Sum256(cert.Certificate[0])) != expected.Digest {
+			return nil, value.ErrDenied
+		}
+		return cert, nil
+	}
+	socket := tls.Client(raw, config)
+	if socket.HandshakeContext(bounded) != nil {
+		return zero, value.ErrDenied
+	}
+	state := socket.ConnectionState()
+	remote, e := c.verifier.VerifyBootstrapServer(&state, candidates)
+	if e != nil {
+		return zero, e
+	}
+	// The remote candidate is independently current before we transmit even the
+	// minimized own-peer request. The final reply check repeats this after I/O.
+	registered, e := c.registry.ReadOwnerRegistration(bounded, remote)
+	if e != nil || !registered.Valid(c.now()) || registered.Certificate != remote || registered.Enrollment.Pool != c.pin.Pool || registered.Enrollment.SourceUID != c.pin.SourceUID {
+		return zero, value.ErrUnavailable
+	}
+	current, e := c.verifier.currentVerifier(registered.Configuration)
+	if e != nil {
+		return zero, e
+	}
+	checked, e := current.VerifyBootstrapServer(&state, candidates)
+	if e != nil || checked != remote {
+		return zero, value.ErrDenied
+	}
+	until = identity.Earlier(until, registered.FreshUntil)
+	requestCall, stopRequest := context.WithDeadline(bounded, until)
+	defer stopRequest()
+	if socket.SetDeadline(until) != nil || requestCall.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	joinedRequest := make(chan struct{})
+	stopRequestIO := context.AfterFunc(requestCall, func() { _ = raw.Close(); close(joinedRequest) })
+	defer func() {
+		if !stopRequestIO() {
+			<-joinedRequest
+		}
+	}()
+	var used atomic.Bool
+	tr := &http.Transport{ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, MaxIdleConns: 0, MaxResponseHeaderBytes: 4096, TLSClientConfig: config, ResponseHeaderTimeout: 5 * time.Second, DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
+		if !used.CompareAndSwap(false, true) {
+			return nil, value.ErrUnavailable
+		}
+		return socket, nil
+	}}
+	defer tr.CloseIdleConnections()
+	b, e := contracts.EncodeOwnerObservationRequest(ownerObservationRequestWire(request))
+	if e != nil {
+		return zero, value.ErrInvalid
+	}
+	endpoint := "https://" + net.JoinHostPort(c.name, strconv.Itoa(c.pin.Pool.NativePort)) + contracts.OwnerObservationPath
+	req, e := http.NewRequestWithContext(requestCall, http.MethodPost, endpoint, io.NopCloser(bytes.NewReader(b)))
+	if e != nil {
+		return zero, value.ErrInvalid
+	}
+	req.ContentLength = int64(len(b))
+	req.Header.Set("Content-Type", contracts.OwnerObservationMedia)
+	req.Header.Set("Accept", contracts.OwnerObservationMedia)
+	// Direct RoundTrip has no redirects. No GetBody, fallback address or second
+	// socket is available, including after an unknown delivery outcome.
+	response, e := tr.RoundTrip(req)
+	if e != nil {
+		if response != nil && response.Body != nil {
+			response.Body.Close()
+		}
+		return zero, value.ErrUnavailable
+	}
+	defer response.Body.Close()
+	if response.TLS == nil || response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.ContentLength < 1 || response.ContentLength > contracts.OwnerObservationBytes || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.OwnerObservationMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
+		return zero, value.ErrUnavailable
+	}
+	rawReply, e := io.ReadAll(io.LimitReader(response.Body, contracts.OwnerObservationBytes+1))
+	if e != nil || len(rawReply) != int(response.ContentLength) || len(rawReply) > contracts.OwnerObservationBytes || requestCall.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	reply, e := contracts.DecodeOwnerObservationReply(rawReply)
+	if e != nil {
+		return zero, value.ErrDenied
+	}
+	peer := value.PeerCertificate{Binding: expected.Binding, Digest: expected.Digest, NotBefore: expected.NotBefore, NotAfter: expected.NotAfter}
+	out, e := checkOwnerObservation(requestCall, &state, c.verifier, c.registry, candidates, c.pin, request, peer, reply, c.now)
+	if e != nil {
+		return zero, e
+	}
+	last, e := c.connector.ObserveConnectorProcess(requestCall)
+	if e != nil || last.Request.Process != local.Request.Process || last.Registration.Process != local.Registration.Process || last.Registration.Certificate != expected || !last.Configuration.SameSource(local.Configuration) || requestCall.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	out.FreshUntil = identity.Earlier(out.FreshUntil, identity.Earlier(until, last.ValidUntil))
+	if !out.Valid(c.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return out, nil
+}

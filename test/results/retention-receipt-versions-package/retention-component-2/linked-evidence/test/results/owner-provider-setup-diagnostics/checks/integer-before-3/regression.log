@@ -1,0 +1,6 @@
+=== RUN   TestOwnerProviderSetupBindsExactIntegerGeneration
+    owner_provider_setup_test.go:162: distinct integer generation reused the setup observation
+--- FAIL: TestOwnerProviderSetupBindsExactIntegerGeneration (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/providerconfig	0.025s
+FAIL

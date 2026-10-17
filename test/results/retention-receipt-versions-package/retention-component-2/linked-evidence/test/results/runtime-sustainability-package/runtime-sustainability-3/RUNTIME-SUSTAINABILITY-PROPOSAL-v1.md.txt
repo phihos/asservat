@@ -1,0 +1,237 @@
+# Worker2 runtime sustainability after admission-4
+
+Source-only proposal; no implementation or passing availability claim.
+The immutable runtime-admission-4 candidate remains at its original 20 QPS,
+burst 20 and original request/source dates. Its failed stored-source case is
+preserved, along with the earlier refresh-4 failure.
+
+## What the measured failure establishes
+
+The initial/final pair now costs 40 shared observer requests and 9 probe
+requests. Both actual independent source loops cost 8 observer / 3 probe
+requests per pass and keep their one-second delay after completion. Under
+those exact clients, a first provider pair with 4.247920451 seconds left took
+2.857711565 seconds; the next selected persisted interval had only
+3.142409360 seconds and expired after 3.143706956 seconds. Provider HTTP and
+four real recovery reads were absent from this lower-bound test. Parallel GETs
+cannot remove this bucket demand. The first pair passing is insufficient.
+
+This failure also does not establish that all five effect purposes recur every
+five seconds. Five seconds is the maximum operation authority interval, not the
+token refresh cadence. The previously reported 162-request sum is a coincident
+burst, not a steady request rate.
+
+## Actual recurrence and independent clients
+
+| Work | Shared observer requests | Actual recurrence |
+| --- | ---: | --- |
+| Fleet source | 8 | Actual call then one-second delay, independently |
+| Owner source | 8 | Actual call then one-second delay, independently |
+| Wrap refresh | 40 when due, zero for a healthy scheduling check | One-second tick; renewal at min(last observed +120s, token expiry -30s) |
+| Unwrap refresh | 40 when due, zero for a healthy scheduling check | Same fixed token schedule, its own original dates |
+| Provider reauthentication | Included in that purpose's 40 | min(hard token end -120s, original projected JWT end -30s), or original expiry |
+| First/new owner audit | 40 | Only an unacknowledged configuration; acknowledged heartbeats add zero native audit work |
+| Pending capacity/cleanup hint | 1 each | Call then one second; stops after that child activates |
+| Active capacity source invocation | 21 outer requests | Invocation, including FIFO wait, then one second |
+| Cleanup lifecycle/history action | 21 per logical advance | Up to 16 IDs and 16 history keys, serial actions; one-second delay only after the page |
+| Empty cleanup schedule | 0 | Actual scoped SQL schedule reads, then one second |
+
+The token formulas are in owner_provider_control_validation.go. Normal 300s
+credentials reach the 120s renewal check first: two successful 40-request
+renewals per 120s contribute about 0.667 observer QPS averaged over that period.
+A provider may return an earlier allowed finite end; the implementation must
+retain it, so 0.667 is an example, not a universal maximum. Unknown failures use
+the existing finite 1/2/4/8/16/30s backoff and do not become healthy heartbeats.
+Provider I/O, original lookup/renewal rules and their finite inventory are unchanged.
+
+Capacity root reconciliation (call +1s) and workload discovery/enrollment
+(call +250ms) additionally use the existing capacity-control clients and real
+SQL. They are not contained in the shared-observer 21. The installed path has
+six existing REST clients: worker observer/probe, leader, capacity observer,
+capacity probe, and processing probe. Owner endpoint/protection readers reuse
+the capacity observer/probe. The installed remote observation path creates no
+remote Kubernetes client. Cleanup reuses the original worker projection reader.
+No additional client or bucket is proposed as a way around contention.
+
+For measured call durations Lf, Lo and actual completion periods Tc, a useful
+shared-observer demand equation is:
+
+    D = 8/(1+Lf) + 8/(1+Lo) + 21/Tc + 21*cleanup_advances_per_second
+        + 40*(wrap_due_rate + unwrap_due_rate + new_audit_rate) + pending_hint_rate
+
+This describes offered work, not availability. FIFO can throttle completion and
+make D look low while readiness expires or cleanup never catches up. Cleanup
+sustainability must also establish that completed version/history retirement
+keeps up with the admitted configured workload. A permanently growing backlog
+is not an acceptable successful rate.
+
+## A separate readiness constraint
+
+Let a capacity call's original beginning be t, and L its complete latency,
+including queueing. Its accepted end is at most t+5s; publication after latency
+L does not reset that end. With the unchanged one-second post-call delay, the
+next accepted result must finish before that prior original end. In the simple
+same-duration case, 2L+1 < 5 is necessary for uninterrupted readiness. Queue
+wait and earlier recovery/source bounds make the requirement stricter. The
+actual capacity observer, its control-client traffic and actual SQL must be in
+this measurement; a 21-request outer bracket alone is insufficient.
+
+Thus a finite FIFO that eventually returns success or error does not establish
+continuous capacity readiness. The rare coincident token-maintenance burst is
+still relevant: it can postpone the next capacity pass beyond the last accepted
+end even if average request demand is sustainable. Cleanup must also progress
+through that burst without changing the original deletion obligations.
+
+## Alternative A: bounded scheduling before authority selection
+
+This is an availability improvement to evaluate, not a complete solution claim.
+Keep all 40/21 request sets, current clients, source loops and SQL checks.
+
+A fixed bootstrap wrapper around the actual FleetObservation forwards unchanged
+ObserveAdministration/FenceAdministration calls. Only after a successful actual
+SQL observation and original expiry check does it emit a local scheduling
+notice containing the original source identity and original interval. Failed,
+unknown, changed or fenced source clears notices before blocking negative SQL
+work. The notice never implements RecoveryReader or supplies a proof. No SQL
+polling loop and no new Kubernetes observation loop is added.
+
+An unselected fixed-purpose ticket may wait on those independently generated
+notices for at most five seconds, bounded additionally by the original outer
+request/Lease cancellation. This scheduling interval is before any new recovery
+proof, provider permit, purge permit or audit candidate is selected. On grant,
+there is exactly one actual RecoveryState read beginning the effect's original
+interval. It can still fail or return a shorter end. There is no same-effect
+retry or reacquisition after that selection. A later independent controller
+iteration is a new operation and retains all original uncertainty/history.
+
+The candidate currently freezes owner audit before FIFO wait. Instead, acquire
+only the scheduling ticket first, then select the latest still-unselected
+same-revision mailbox candidate once. Pending notices may be replaced by a newer
+independent observation before selection; the selected observation, audit
+identity and all dates stay immutable through I/O/acknowledgement. Known source
+change/unavailability and expiry cancel selected work, including during blocked
+SQL fencing. No transition can revive a superseded revision. Ticket ownership
+must be explicitly bound to the concrete provider, avoiding a second nested
+owner-audit ticket or a forgeable current-proof port.
+
+A numerical minimum-start budget would only reject starts, not confer authority.
+For example 4s would leave 0.8s beyond 64 observer requests /20QPS =3.2s for
+provider/SQL/response work, but 64 is not a bound on continuous source overlap.
+Therefore that threshold is NOT selected here. It needs measured full-actor
+work and independent source phase offsets; a threshold with no reachable
+common source interval would merely starve the worker. A bounded attempt that
+finds no sufficient independent observation returns unavailable, never waits
+forever or converts a selected old proof into a fresh one.
+
+At most one ticket per purpose remains reserved, five total and one globally
+active. A head waiting for a source must release after its bounded scheduling
+end, so unavailable sources cannot monopolize admission. Waiting cancellation
+cannot release active I/O ownership; actual work still joins. Even so, no finite
+fairness proof can promise availability through an unbounded transport stall.
+This alternative alone cannot be claimed to solve the capacity readiness
+constraint above or the measured full backlog.
+
+## Alternative B: explicitly bounded worker-observer service capacity
+
+The API rate is an implementation resource bound, distinct from five-second
+authority, SQL role budgets, credential scope or retained processes. A separately
+reviewed fresh-worker2-only observer capacity of 40 QPS with burst still 20 is a
+concrete initial alternative to qualify. All probe, leader, capacity-control
+and unrelated clients stay at 20/20. There is still one original worker observer
+client and bucket, no per-operation creation and no separate effect buckets.
+The failed 20/20 candidate and test remain unchanged; a new candidate would
+record this as an intentional architecture/resource change rather than editing
+a test limiter to obtain green evidence.
+
+Forty observer requests have a drained 1s bucket floor at that capacity, rather
+than 2s. Source traffic and real latency remain additional. For illustration,
+source passes lasting 0.45s each contribute about11.03QPS; one capacity pass per
+2.5s contributes8.4QPS; two cleanup advances per2.5s contribute16.8QPS. That is
+36.23QPS before rare provider/audit work. These are explicit example durations,
+not measured or promised performance. It shows why rate, queue placement and
+configured cleanup demand must be measured together.
+
+Conservative HWORK client envelope: six current20-QPS/burst20 clients allow up
+to120QPS and120 aggregate burst tokens per process. Raising only the one worker
+observer gives140QPS, burst still120. Across the retained maximum two HWORK
+processes this changes240 to280QPS; burst stays240. Scheduling Lease exclusion
+is not fencing, so qualification must charge both retained/closing processes.
+This is only HWORK's client envelope, not the installation's total API budget;
+owner/runtime/installer clients remain separately accounted. The cluster API
+must be qualified with those other actors and its configured workload.
+
+No readiness promise follows from the rate change. Test provider maintenance
+bursts with capacity deadlines, cleanup backlog, delayed SQL/provider replies,
+all original current-read checks, and actual API pressure. If the bounded
+candidate still fails, retain that evidence and revise the architecture rather
+than incrementing rates until a test happens to pass. Changing burst, arbitrary
+operator-controlled rates or additional client creation is not proposed.
+
+ADR149 would document the fresh worker's exact private resource envelope.
+ADR148's original same-operation enforcement interval, all authorization and
+revocation/freshness bounds, current SQL, exact mounted-token equality and
+immutable identities would remain unchanged. Cluster-load qualification is a
+required new result; there is none yet.
+
+## Alternative C: a genuinely shared bounded observation operation
+
+This is an architectural alternative, not a callback cache to implement in the
+current proposal. A fixed worker observation episode could produce separately
+typed results for fleet, owner and full worker/material/activation facts from
+actual shared reads. Same exact account/token/namespace responses can be shared
+only inside that episode; each source's independent denial, complete original
+value and failure outcome remain explicit. Consumers retain the episode's
+original end. A later observation cannot extend an already selected consumer.
+
+For an effect, an original initial episode and a genuinely post-effect episode
+would both be required; the latter's reads must actually follow the effect,
+not be a cached result that merely remains younger than5s. Current SQL checks
+and side-effect-specific recovery/role/policy checks remain at their boundaries.
+Known change or source failure closes all affected active consumers; unrelated
+provider/material failure cannot stop the independent fleet source. No consumer
+can wait past its original earliest end for a convenient replacement episode.
+No new proof can be supplied by a public DTO or synthetic reader.
+
+This could remove repeated current reads across fixed concurrent consumers, but
+requires redesigning scheduling and typed result ownership. It changes ADR149's
+independent per-effect native-operation composition and the concrete source-loop
+implementation described in ADR091/148; the intended <=5s revocation/freshness
+bound must remain. Independence must be proven as failure isolation and original
+source acceptance, not asserted from a shared object. A slow optional material
+read must not stall fleet acceptance or overwrite another source's original
+interval. Counting a proposed common snapshot as both independent initial and
+post-effect reads would be invalid.
+
+A naive40-request observation every(call+1s) at20QPS cannot itself maintain
+continuous5s results under competing source traffic; it reproduces the same
+readiness problem. A concrete reduced episode graph, separate source completion
+points and post-effect boundaries must be counted before this option can be
+judged viable. No lower count or runtime success is claimed here.
+
+## Recommended next qualification boundary
+
+First review these alternatives and the actual cadence, then select one
+bounded candidate. Do not implement A alone as a claimed sustainability fix.
+The least intrusive candidate to investigate is explicit B plus the necessary
+pre-selection owner/provider ordering in A; it retains every current read and
+avoids introducing cross-consumer authority. It remains a hypothesis requiring
+actual graph qualification. C is a larger alternative if bounded cluster-load
+or full-actor results rule that out.
+
+Keep the old failing 20/20 stored-source test as an unchanged baseline. New
+mechanical tests must prove notice-after-commit only, unknown commit/no notice,
+source failure before blocked fence, one actual recovery selection, immutable
+active source, no selected-proof extension, bounded source wait, all-five ticket
+fairness and cancellation/join. Retain the two already-reproduced forwarding and
+phase-context counterexamples. Only changed scope and previously unrun gates
+need local execution; previous passing results remain separate evidence.
+
+The decisive tests use actual independent source observers at call+1s with
+persisted original SQL dates, both actual token owners/four recovery reads,
+first encrypted owner audit+exact-version verification, pending hints, current
+capacity source acceptance with measured gaps, and nonempty lifecycle/history
+cleanup throughput. Vary source phase offset and inject bounded provider/SQL
+latency without refreshing test timestamps. Stand-ins can prove ordering, never
+full availability. The next actual original generated-worker selector can prove
+startup/accepted SQL29 only; an active capacity/cleanup continuation and retained
+process/cluster-load run are still required before claiming sustainability.

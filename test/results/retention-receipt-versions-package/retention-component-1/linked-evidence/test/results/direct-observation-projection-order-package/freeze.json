@@ -1,0 +1,13 @@
+{
+  "PROPOSAL.md": "8a87500d7e9b943bbda4c8d6d999a5e13f56910e00dd8a382b82c83df2e06d18",
+  "SOURCE-READY.md": "2522c261a53991364bbf23069dcf0861e5a1d65215babdb84434160c1f5d6310",
+  "bases.json": "38433abf1928ae9a19436c97bdcf1841e22f11a0841a4d548b4de106dec03519",
+  "dependencies.json": "04959aa7d7646a06435f5b4542710af63c16c4fe3752db5e759043c096cb58e0",
+  "files/test/integration/direct_observation_native_fixture_test.go": "591e2ef59a0473ac788069144bd2c0c5a149184cedc2c73193f9db792a69dd30",
+  "files/test/integration/direct_observation_native_test.go": "f278ae8b5f4b45eb33f9421e5b3004d9add28ff373b4c952107a681d19f6ae74",
+  "manifest.json": "233f123b8a865fdda7442d431fc3569993c76ed618213e601bebe06638a07b77",
+  "patch.diff": "d4e8d03804b8b57abebc1003a8f6385492498a2d37030057795c040b1c8a5e88",
+  "payload.json": "5da99f16f7ec2f84095040b7a343945b0f834caf78481ee4f1dbea0a6cddb33e",
+  "run.py": "936a8b8a70430dd7448570db6b548dd088c67c313a0db9dc38c15101b65fd7b3",
+  "source-evidence.json": "828154f332569234036117c75efe1b05661687189525cac62f464495c47c8495"
+}

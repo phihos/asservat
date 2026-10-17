@@ -1,0 +1,26 @@
+=== RUN   TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads
+--- PASS: TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads (0.00s)
+=== RUN   TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects
+--- PASS: TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects (0.00s)
+=== RUN   TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation
+--- PASS: TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation (0.00s)
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option
+--- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option (0.00s)
+=== RUN   TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection
+--- PASS: TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.070s

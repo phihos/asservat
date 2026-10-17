@@ -1,0 +1,23 @@
+{
+  "basesSHA256": "10eb691f4c5363db164e5c02e8965c738309a4dc51f9a8a8c9f4084a8a725d85",
+  "commands": "One sequential compile/selected race/vet/unchanged Go architecture check, original120s test and240s phase caps",
+  "dependenciesSHA256": "92b8a7ee551bbebaa7b1df3911f35f81d76c00cd5c37165519ae2064cd2aea69",
+  "liveDependencies": 1894,
+  "mirrorSHA256": "f043540b73bb795a5d33a9a05b96911f36447a2bab888b3846bf3feba70a438c",
+  "next": "Wait parent allocation before launching run.py",
+  "overlaySHA256": "14e3cf2fd64faae4b2fb1ba18a7da811112a3109f464080230cefb0f0e9b9bc8",
+  "ownedPaths": 6,
+  "paths": [
+    "docs/architecture/cluster-observations.md",
+    "docs/decisions/144-cluster-local-observations.md",
+    "internal/contracts/cluster_observation_routing.go",
+    "internal/contracts/cluster_observation_routing_test.go",
+    "internal/domain/fleet/cluster_observation_routing.go",
+    "internal/domain/fleet/cluster_observation_routing_test.go"
+  ],
+  "payloadSHA256": "87a161c2aea5a5cad41f3ce4e13ee74479096269758c85464e24424e2f58313d",
+  "runnerSHA256": "55e5a4bd8c61236b4274ea81213a524f96a144d71bb9eb9e12c6aaa77f1b0f0a",
+  "scope": "Closed locator/claim routing values and codecs only; no receiving runtime, SQL/config field or v2 producer selection",
+  "status": "frozen source; checks unrun",
+  "syntheticScope": "Pure values/closed wire tests and existing digest/frame/order parity; no native authority or runtime route"
+}

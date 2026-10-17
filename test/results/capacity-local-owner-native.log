@@ -1,0 +1,224 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-zero-phase-sentinels
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/capture-backed-still-unreconciled
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ready-still-unreconciled
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-original-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewed-positive-predecessor-zero-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/maximum-valid-predecessor-bytes
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-cannot-have-predecessor
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewal-requires-predecessor
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/time-cannot-manufacture-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/digest-cannot-manufacture-reconciled-time
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-missing
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-object
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-short
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-long
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-boolean-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-negative-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-oversize-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-fractional-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-missing
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-object
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-short
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-long
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-boolean-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-negative-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-oversize-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-fractional-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-digest-parser-still-rejects-zero
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/whole-second
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/zero-offset
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/microsecond
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/fraction-zeroes
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/whole-zero-fraction
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/one-microsecond
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/negative-offset-next-day
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/positive-offset-previous-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/leap-day
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/minimum-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/maximum-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/whole-second
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/zero-offset
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/microsecond
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/fraction-zeroes
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/whole-zero-fraction
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/one-microsecond
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/negative-offset-next-day
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/positive-offset-previous-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/leap-day
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/minimum-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/maximum-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/null
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/empty-phase
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/malformed
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/infinity
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/negative-infinity
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/outside-go-year
+=== RUN   TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/bc
+=== RUN   TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:129: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: fixed_role_production_ms=1930
+=== RUN   TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt
+=== RUN   TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry
+    capacity_sql_matrix_test.go:94: owner_configuration_setup_ms=158
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-empty-current-owner-candidates
+    capacity_owner_registry_test.go:84: owner_candidates_read_ms=7 original_remaining_ms=4992 count=0
+=== NAME  TestCapacityProducerWithRealPostgres/capacity-current-owner-registry
+    capacity_sql_matrix_test.go:94: owner_enrollment_setup_ms=248
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-exact-current-owner-candidates
+    capacity_owner_registry_test.go:99: owner_candidates_read_ms=7 original_remaining_ms=4992 count=1
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-exact-active-leaf-registration
+    capacity_owner_registry_test.go:115: owner_registration_read_ms=11 original_remaining_ms=4988
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/capacity-owner-purpose-denials
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/capacity-capture-owner-purpose-denials
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-original-source-replacement-denied
+=== RUN   TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/original-owner-read-deadline-after-lock
+=== RUN   TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early
+    capacity_sql_matrix_test.go:127: root_three_phases_ms=170 original_remaining_ms=4655
+=== RUN   TestCapacityProducerWithRealPostgres/first-workload-unknown-capture-completion
+    capacity_sql_matrix_test.go:162: workload_three_phases_with_lookup_ms=545 original_remaining_ms=4724
+=== RUN   TestCapacityProducerWithRealPostgres/second-workload-concurrent-reserve-and-expired-phase
+=== RUN   TestCapacityProducerWithRealPostgres/current-binding-refresh-does-not-recharge
+=== RUN   TestCapacityProducerWithRealPostgres/held-source-original-caller-expiry
+=== RUN   TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session
+    capacity_sql_matrix_test.go:262: managed_policy_roundtrip exact=true non_time_fields=true same_cutoff=true
+=== RUN   TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/processing-read-rejects-uncovered-retention
+=== RUN   TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/managed-admission-rejects-uncovered-retention-without-charge
+=== RUN   TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/managed-admission-original-expiry-after-permission-wait
+=== NAME  TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session
+    capacity_sql_matrix_test.go:262: managed_admission_pair_ms=331 original_request_remaining_ms=4194
+    capacity_sql_matrix_test.go:262: managed_processing_lineage initialized=true current=true room=true action=true data=true capture=true artifact=true horizon=true
+=== RUN   TestCapacityProducerWithRealPostgres/fill-provisional-account-envelope-with-retained-spend
+    capacity_sql_matrix_test.go:275: account_index=2 elapsed_ms=221 original_remaining_ms=4651
+    capacity_sql_matrix_test.go:275: account_index=3 elapsed_ms=204 original_remaining_ms=4730
+    capacity_sql_matrix_test.go:275: account_index=4 elapsed_ms=213 original_remaining_ms=4738
+    capacity_sql_matrix_test.go:275: account_index=5 elapsed_ms=225 original_remaining_ms=4728
+    capacity_sql_matrix_test.go:275: account_index=6 elapsed_ms=300 original_remaining_ms=4652
+    capacity_sql_matrix_test.go:275: account_index=7 elapsed_ms=336 original_remaining_ms=4616
+    capacity_sql_matrix_test.go:275: account_index=8 elapsed_ms=258 original_remaining_ms=4693
+    capacity_sql_matrix_test.go:275: account_index=9 elapsed_ms=337 original_remaining_ms=4612
+    capacity_sql_matrix_test.go:275: account_index=10 elapsed_ms=274 original_remaining_ms=4677
+    capacity_sql_matrix_test.go:275: account_index=11 elapsed_ms=365 original_remaining_ms=4577
+    capacity_sql_matrix_test.go:275: account_index=12 elapsed_ms=299 original_remaining_ms=4652
+    capacity_sql_matrix_test.go:275: account_index=13 elapsed_ms=335 original_remaining_ms=4614
+    capacity_sql_matrix_test.go:275: account_index=14 elapsed_ms=403 original_remaining_ms=4544
+    capacity_sql_matrix_test.go:275: account_index=15 elapsed_ms=414 original_remaining_ms=4536
+=== RUN   TestCapacityProducerWithRealPostgres/expired-root-is-unavailable-despite-current-source
+=== RUN   TestCapacityProducerWithRealPostgres/failed-atomic-renewal-preserves-all-original-rows
+=== RUN   TestCapacityProducerWithRealPostgres/general-renewal-cannot-edit-capture-phase
+    capacity_sql_renewal_test.go:93: renewal_accounts=16 renewal_general_ms=182 original_remaining_ms=4781
+=== RUN   TestCapacityProducerWithRealPostgres/expired-renewal-observation-new-current-continuation
+=== RUN   TestCapacityProducerWithRealPostgres/ready-replay-is-read-only
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:150: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- PASS: TestCapacityProducerWithRealPostgres (74.48s)
+    --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state (0.06s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-zero-phase-sentinels (0.03s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/capture-backed-still-unreconciled (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ready-still-unreconciled (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-original-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewed-positive-predecessor-zero-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/maximum-valid-predecessor-bytes (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-cannot-have-predecessor (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewal-requires-predecessor (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/time-cannot-manufacture-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/digest-cannot-manufacture-reconciled-time (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-missing (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-object (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-short (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-long (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-boolean-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-negative-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-oversize-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-fractional-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-missing (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-object (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-short (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-long (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-boolean-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-negative-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-oversize-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-fractional-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-digest-parser-still-rejects-zero (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire (0.01s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/whole-second (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/zero-offset (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/microsecond (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/fraction-zeroes (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/whole-zero-fraction (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/one-microsecond (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/negative-offset-next-day (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/positive-offset-previous-year (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/leap-day (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/minimum-year (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/UTC/maximum-year (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/whole-second (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/zero-offset (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/microsecond (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/fraction-zeroes (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/whole-zero-fraction (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/one-microsecond (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/negative-offset-next-day (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/positive-offset-previous-year (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/leap-day (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/minimum-year (0.00s)
+            --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/America/St_Johns/maximum-year (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/null (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/empty-phase (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/malformed (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/infinity (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/negative-infinity (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/outside-go-year (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/lifecycle-policy-timestamp-wire/bc (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt (0.50s)
+    --- PASS: TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker (0.29s)
+    --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry (0.98s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-empty-current-owner-candidates (0.03s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-exact-current-owner-candidates (0.03s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-exact-active-leaf-registration (0.03s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/capacity-owner-purpose-denials (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/capacity-capture-owner-purpose-denials (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/role70-original-source-replacement-denied (0.02s)
+        --- PASS: TestCapacityProducerWithRealPostgres/capacity-current-owner-registry/original-owner-read-deadline-after-lock (0.42s)
+    --- PASS: TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early (0.34s)
+    --- PASS: TestCapacityProducerWithRealPostgres/first-workload-unknown-capture-completion (0.67s)
+    --- PASS: TestCapacityProducerWithRealPostgres/second-workload-concurrent-reserve-and-expired-phase (5.36s)
+    --- PASS: TestCapacityProducerWithRealPostgres/current-binding-refresh-does-not-recharge (0.14s)
+    --- PASS: TestCapacityProducerWithRealPostgres/held-source-original-caller-expiry (0.96s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session (3.02s)
+        --- PASS: TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/processing-read-rejects-uncovered-retention (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/managed-admission-rejects-uncovered-retention-without-charge (0.02s)
+        --- PASS: TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session/managed-admission-original-expiry-after-permission-wait (0.40s)
+    --- PASS: TestCapacityProducerWithRealPostgres/fill-provisional-account-envelope-with-retained-spend (4.97s)
+    --- PASS: TestCapacityProducerWithRealPostgres/expired-root-is-unavailable-despite-current-source (0.04s)
+    --- PASS: TestCapacityProducerWithRealPostgres/failed-atomic-renewal-preserves-all-original-rows (0.30s)
+    --- PASS: TestCapacityProducerWithRealPostgres/general-renewal-cannot-edit-capture-phase (0.22s)
+    --- PASS: TestCapacityProducerWithRealPostgres/expired-renewal-observation-new-current-continuation (8.88s)
+    --- PASS: TestCapacityProducerWithRealPostgres/ready-replay-is-read-only (0.08s)
+PASS
+ok  	asservat.local/asservat/test/integration	75.544s

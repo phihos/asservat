@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/domain/privacy	1.010s
+ok  	asservat.local/asservat/internal/application/privacy	1.007s
+ok  	asservat.local/asservat/internal/application/planning	1.030s
+?   	asservat.local/asservat/internal/application/capture	[no test files]

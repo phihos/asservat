@@ -1,0 +1,247 @@
+{
+  "started": 1791891828.106963,
+  "manifest": "b8c2e17945d9f77270b43bd5e2ebbc2486866a8276b860ed632ee8b197a48ba8",
+  "dependencies": "9a464b117c9e22e6b8af66b41d6919138ddee4ebdd848940066640a442277444",
+  "runner": "df18e7e3a534847200595bd604573fffb232bcec4c01a99e91c15735cf5369d0",
+  "native": false,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/domain/audit",
+        "./internal/application/fleet",
+        "./internal/bootstrap",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 19.50508403778076,
+      "log_sha256": "d5ccb5304a8ad8a9c146aedded4edec298c7b69ccda86191d922a6d2a2f14413",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "before-history",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/before-overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/domain/audit",
+        "./internal/application/fleet",
+        "-run=^TestOwner(CurrentAuditReceiptsRequireImmutableVersions|ConfigurationAcceptanceOrderingAndFailures)$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 1.500882863998413,
+      "log_sha256": "3c4b178c3df8b057ff3c496b184dc7a038adc32e5fdef73305a3468e97426a12",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 19,
+      "top_level_passes": 0,
+      "missing_required_passes": [],
+      "intended_assertion": true
+    },
+    {
+      "name": "owner-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/domain/audit",
+        "./internal/application/fleet",
+        "-run=^TestOwner"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 3.5013461112976074,
+      "log_sha256": "21d5c2cad6e10fd6fe7d2c8a0ce43a5f7036964ba471239908982f46380d2494",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 140,
+      "top_level_passes": 12,
+      "missing_required_passes": []
+    },
+    {
+      "name": "bootstrap-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/bootstrap",
+        "-run=^Test(ProviderOwnerAuditStorage|ProviderConfigurationAuditStorage|OwnerMounted|OwnerInput|OwnerStorage|OwnerProjected|OwnerObservationInput|OwnerObservationPins|OwnerDeployment|OwnerObservationDeployment|CaptureCleanup|HubWorker)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 22.00606632232666,
+      "log_sha256": "fcb8ec5c226da627e168e80516619c07a36d4f09eb81eaac83848dbbd0dc03ff",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 91,
+      "top_level_passes": 20,
+      "missing_required_passes": []
+    },
+    {
+      "name": "storage-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/objectstore",
+        "-run=^TestVersionedAudit"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 3.5012738704681396,
+      "log_sha256": "870581df72f15d370f2d2f7e2479edc48a79bb5b6fa7d4271f7a5b017d73ff9c",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 18,
+      "top_level_passes": 2,
+      "missing_required_passes": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/overlay.json",
+        "./internal/domain/audit",
+        "./internal/application/fleet",
+        "./internal/bootstrap",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 2.50109601020813,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 2,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 5.001558065414429,
+      "log_sha256": "82cdf81f7c16403ed76d5524a0e9ca571a1b004b80c7d0939413b8562bb80009",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    }
+  ],
+  "boot_id": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "excluded_live_paths": [
+    "docs/implementation-progress.md"
+  ],
+  "tmpdir": "/tmp/asservat-owner-audit-versions-2-ol5fdd6f",
+  "tmp_free_before": 16780025856,
+  "mirror_changed": [],
+  "exit": 2,
+  "ended": 1791891886.9464688,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": []
+  },
+  "tmpdir_removed": true
+}

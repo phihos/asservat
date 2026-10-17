@@ -1,0 +1,23 @@
+{
+  "format": "asservat-source-integration/v1",
+  "files": {
+    "internal/adapters/objectstore/framed/owner_configuration_epoch.go": {
+      "baseSHA256": null,
+      "sha256": "620c617557249a9fe90f04bd8f1dc3c7aae593efc0eb9f2a2bd11d588e1a17d5"
+    },
+    "internal/adapters/objectstore/framed/owner_configuration_epoch_test.go": {
+      "baseSHA256": null,
+      "sha256": "eba609542eb972d7578ba6f8c8324811198e303c8c71e3271a6b96e2c65f54f3"
+    }
+  },
+  "componentResult": "test/results/owner-epoch-codec-package/checks/component-1/result.json",
+  "componentResultSHA256": "546567b09c05556eee0e4a9b15a5ea85f2a7dbfd0a5f34b521679edfe2bfa879",
+  "qualification": "42 top-level and 99 named framed race passes; compile, vet and canonical gates; isolated synthetic key-provider component",
+  "runtimeSelected": false,
+  "remaining": [
+    "SQL and independent checkpoint/reserve production",
+    "actual provider/object version qualification",
+    "rollover and physical retirement",
+    "installed public investigation"
+  ]
+}

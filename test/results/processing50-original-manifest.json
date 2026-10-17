@@ -1,0 +1,577 @@
+{
+  "schema": 50,
+  "files": [
+    {
+      "path": "docs/architecture/download-authority.md",
+      "base_sha256": "86d08f6a2c5988e6f3f569f7cdc438fbd242817ca922bb59d8ea9d4158450261",
+      "sha256": "1dfe9eb52aa8ee4007a78fddb0e7089cad275065310554e74ac62fe46ea67fe3",
+      "base_source": "live48",
+      "bytes": 4368
+    },
+    {
+      "path": "docs/architecture/download-environment.md",
+      "base_sha256": null,
+      "sha256": "18c6b763a9b58662374141640c4243a193f1d4ea36c870cc1d90d4c5f0d9bbd7",
+      "base_source": "live48",
+      "bytes": 6660
+    },
+    {
+      "path": "docs/architecture/native-exchange.md",
+      "base_sha256": "4ffa1d5cc36f7e56b3f939ee80af8b16b669249ec6dbc5e991c536a10a362710",
+      "sha256": "cd881d519fdf1256d49f139de0b07162564ad1fcf260928eb0b9b57bef2f118c",
+      "base_source": "live48",
+      "bytes": 13145
+    },
+    {
+      "path": "docs/decisions/127-current-processing-and-download-placement.md",
+      "base_sha256": null,
+      "sha256": "9a59b53ec144df4940b9555d46c312f3dd139529120d00ccdf064cfb4056a51a",
+      "base_source": "live48",
+      "bytes": 4521
+    },
+    {
+      "path": "internal/adapters/kubernetes/download_environment.go",
+      "base_sha256": null,
+      "sha256": "fdfeac278d065b46e47702bfc7dc28a06afcaadf9940093133a45a10aa01c20b",
+      "base_source": "live48",
+      "bytes": 7469
+    },
+    {
+      "path": "internal/adapters/kubernetes/download_environment_test.go",
+      "base_sha256": null,
+      "sha256": "341f706f0317cd8b3b45bc6237d3a7cf6d890eda0c5aa38f9b8392604b702b8c",
+      "base_source": "live48",
+      "bytes": 5184
+    },
+    {
+      "path": "internal/adapters/mtls/native_forwarder.go",
+      "base_sha256": "85c7bfcf25744ccde2b69c0d02a2023807e75081cc46f5d45a9a3b5dfee08986",
+      "sha256": "904134ebb54d824931ad3476b6caab201159ce3217eb1f65c279341798a98cda",
+      "base_source": "live48",
+      "bytes": 10632
+    },
+    {
+      "path": "internal/adapters/mtls/native_peers.go",
+      "base_sha256": "5ccc986c995896f13934ff2f71b5da2dec5149af8d1e6bef3ecab3c9790831c7",
+      "sha256": "138ea6bc8eeed8d76e7d678ea61bf2bdba206691a1a457b4350d32de470dd4d0",
+      "base_source": "live48",
+      "bytes": 8670
+    },
+    {
+      "path": "internal/adapters/mtls/native_placement_test.go",
+      "base_sha256": null,
+      "sha256": "3e200f892a2a149c98f08eb51fde7e82679705395d507106fea676333a5f3ab1",
+      "base_source": "live48",
+      "bytes": 4657
+    },
+    {
+      "path": "internal/adapters/mtls/owner_serving.go",
+      "base_sha256": "068e9cb33cbc0dfa804970d1ff3311dd20e080c4e37afb2766049326d2b31e69",
+      "sha256": "69b0cd629d7a990625749e7b7914a9fbac1e0d8bcb1ce2dd18f4e84f68d5d646",
+      "base_source": "live48",
+      "bytes": 4707
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "base_sha256": "cb27b29c526f30d3aecaeffdc4e0dac065e965c86acbc483c2faf23120f46b11",
+      "sha256": "51e0854527f24b7566c384fe3ab9c828d22d72db79461bd03e2414a1a005b160",
+      "base_source": "live48",
+      "bytes": 16876
+    },
+    {
+      "path": "internal/adapters/postgres/download.go",
+      "base_sha256": "1df7f01a89794131194572507f4165e95d8630b1a7df7e0eb85f7b0ab283cb0c",
+      "sha256": "4652b64886359ef3a5a87f2bed635296384bcbbda5df6e33ab9621215fd8f80e",
+      "base_source": "live48",
+      "bytes": 26011
+    },
+    {
+      "path": "internal/adapters/postgres/download_workers.go",
+      "base_sha256": "14a42312ebb3ceb0fdd4366556e4337e7340cee4920eb8efd5a2cc2209c512e3",
+      "sha256": "c19bef21fd58d6703a719756c54f3965b9b5a140f15bac67388c54219f11227d",
+      "base_source": "live48",
+      "bytes": 18214
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_tables.go",
+      "base_sha256": "98f1fdb234d12a69d8c428f1890909643a5a168b0c065ccefed6b2cccfd7bcea",
+      "sha256": "af1abafeba62d6d5aa338c88b824e08fab42575519c0a70a9771e5865a14e7c7",
+      "base_source": "live48",
+      "bytes": 2348
+    },
+    {
+      "path": "internal/adapters/postgres/native_exchange.go",
+      "base_sha256": "f921cb7e3306333d39e933b24cb45e38127ed226d499b7d59f04485684debd21",
+      "sha256": "b8c16737995979931699b57b231e671471da87ba1616ac07f3575a06c873747e",
+      "base_source": "live48",
+      "bytes": 16025
+    },
+    {
+      "path": "internal/adapters/postgres/operation_audit.go",
+      "base_sha256": "a8e2fe85ec755e97e90a1c16732b1e533777e1cecd0ae8bae9aee48c6fa3b3a6",
+      "sha256": "b61077a9c28065c5ccf7a5df35e91222dd7e2ebbf35e1f1e093b68fa13f4e072",
+      "base_source": "live48",
+      "bytes": 15935
+    },
+    {
+      "path": "internal/adapters/postgres/processing.go",
+      "base_sha256": null,
+      "sha256": "16b4bd92772245feed44984cb6b91db0f587a2915602bad695bd2defe3a8844b",
+      "base_source": "live48",
+      "bytes": 8786
+    },
+    {
+      "path": "internal/adapters/postgres/processing_audit.go",
+      "base_sha256": null,
+      "sha256": "0b1fc0077aff91daf3a4eb37cd855ce65dccaaf5993277e3456bd613d201e478",
+      "base_source": "live48",
+      "bytes": 2881
+    },
+    {
+      "path": "internal/adapters/postgres/processing_configuration.go",
+      "base_sha256": null,
+      "sha256": "d03440d1c654e04a3ab0018245537944c70cbcafd370890bd3622b21193127f4",
+      "base_source": "live48",
+      "bytes": 5799
+    },
+    {
+      "path": "internal/adapters/postgres/processing_decisions.go",
+      "base_sha256": null,
+      "sha256": "6c584b40ec81700153fe7824b3ae99b180b28d304a2951ce01920cfbd458e01b",
+      "base_source": "live48",
+      "bytes": 10921
+    },
+    {
+      "path": "internal/application/audit/operation_mac.go",
+      "base_sha256": "c2d1b16b17782ffceed74020eaed3b4b7092a4a38960f4fdf167e59751776ca0",
+      "sha256": "2a88969189457d7442ac7aa1e40d3f3cb1917196b706d798f4092c3ea42d5bed",
+      "base_source": "frozen-audit-api-v2",
+      "bytes": 4871
+    },
+    {
+      "path": "internal/application/audit/processing_account_test.go",
+      "base_sha256": null,
+      "sha256": "0902a580e39fb2fb05f50b557081df44d417001bbe8e3c7522000bb32f7bc370",
+      "base_source": "live48",
+      "bytes": 1210
+    },
+    {
+      "path": "internal/application/authorization/download.go",
+      "base_sha256": "b00541a2b0dd9c973d2e4b73d8de338beb686b2a78156f9b9510b06a0527737f",
+      "sha256": "ad5d68edcd88cfa491c9840186d392a6d786f97710c836b9691258ae4d91d1da",
+      "base_source": "live48",
+      "bytes": 7479
+    },
+    {
+      "path": "internal/application/authorization/download_environment.go",
+      "base_sha256": null,
+      "sha256": "b17afcdc3346ac8886f2aa92d7eadd964b048f8b5c2b4d60dc81173ffd986338",
+      "base_source": "live48",
+      "bytes": 6456
+    },
+    {
+      "path": "internal/application/authorization/download_environment_test.go",
+      "base_sha256": null,
+      "sha256": "926e6895d929d90fd21c5ef9b485a46770b65f4df183fe09762bb6164deb836b",
+      "base_source": "live48",
+      "bytes": 7048
+    },
+    {
+      "path": "internal/application/authorization/download_test.go",
+      "base_sha256": "2486b7c8339da9edcbe711bfb2b080c27af45a57f24e0aeb7ac2f6fa5f22cec9",
+      "sha256": "e13c53822bd999ff2cd5bca7cc18eeae1eb37d37935f16a473221647cd548b52",
+      "base_source": "live48",
+      "bytes": 11105
+    },
+    {
+      "path": "internal/application/catalog/context.go",
+      "base_sha256": "1f27d9958283e79379baefc8852c5b0fd9e1da17bddf69128eeb9add5e781e73",
+      "sha256": "ecc3d4fe0881b0ed701da4d4fe3a290f22991168dcac50fb9d7fec5f005eb604",
+      "base_source": "live48",
+      "bytes": 8735
+    },
+    {
+      "path": "internal/application/catalog/context_test.go",
+      "base_sha256": "df6313ebbdcc3e97694aac07b5d42a383cdaa3c80ba71fc019431b852c02b592",
+      "sha256": "ff0b3ba6bd8a78dcf835fe19293a9032ce6fd546bf10b3ee3752a74020e3ba7c",
+      "base_source": "live48",
+      "bytes": 15678
+    },
+    {
+      "path": "internal/application/evidence/native_attachment.go",
+      "base_sha256": "76f139d26c0435c358c4c174ee9e300c4ebd60c01e1795d150b715cfac4cbb41",
+      "sha256": "c3ee433b797eb7c49383d20820199616cef8a4dab6155da5e215464f61aef931",
+      "base_source": "live48",
+      "bytes": 10254
+    },
+    {
+      "path": "internal/application/evidence/native_context.go",
+      "base_sha256": "bbe04d9f8b8ed83f9e0313ad4a8515aa17ac589ff2744af03317db06e60dad94",
+      "sha256": "617ac42a75ea4eb05c2df8d2cbdb011ad3239e9810b6921626feeaf001edc092",
+      "base_source": "live48",
+      "bytes": 9324
+    },
+    {
+      "path": "internal/application/evidence/native_context_test.go",
+      "base_sha256": "5556e1e19eec64ed71b303ca60307c48ae6e70628f7ec8b1bc9551d902b41af9",
+      "sha256": "c2dc48a2723e4c304657fe4980c7f94865da048e153171d470f42798b0307306",
+      "base_source": "live48",
+      "bytes": 5552
+    },
+    {
+      "path": "internal/application/evidence/native_exchange.go",
+      "base_sha256": "083d03b4d0aedf82adeb23e7086e289a88b1255f53e8953b27b9c046fc861db7",
+      "sha256": "be1f1f89aa237ea8843b761fc2b927c25a738348f08dccd28e29f7f1f7155e27",
+      "base_source": "live48",
+      "bytes": 5841
+    },
+    {
+      "path": "internal/application/evidence/native_exchange_test.go",
+      "base_sha256": "cd5fdc7958ac4548ccc4c6959273f38df154fdee93eb07498b003776e077cd1f",
+      "sha256": "b5895e1ebc780a2b1ad2a4775ef676d02a3fcea900b1ac6b188f50ed7e2f1358",
+      "base_source": "live48",
+      "bytes": 5029
+    },
+    {
+      "path": "internal/application/fleet/owner_authentication.go",
+      "base_sha256": "b245de683da0b0b8d707406934e0b7b0eac29b301a79a377da1ab47f250b6462",
+      "sha256": "41997470333637524bdad46ad5a4e6045bd972146d8d3ad8ca52f1abe3158864",
+      "base_source": "live48",
+      "bytes": 6688
+    },
+    {
+      "path": "internal/application/privacy/processing.go",
+      "base_sha256": null,
+      "sha256": "3ffc5ae5b37c32df657038059fe070328832594824c57edaa60cfae9fb33dd4d",
+      "base_source": "live48",
+      "bytes": 9974
+    },
+    {
+      "path": "internal/application/privacy/processing_decision_value.go",
+      "base_sha256": null,
+      "sha256": "1244f5d92edc48106dfd77607b2987626e21fc7a099844ffcde77c5e21b00a96",
+      "base_source": "live48",
+      "bytes": 1741
+    },
+    {
+      "path": "internal/application/privacy/processing_test.go",
+      "base_sha256": null,
+      "sha256": "fad5bdac7f47cdccbd093283cc9c7cdc8797353170cd26c6c7276802a8dc5e7e",
+      "base_source": "live48",
+      "bytes": 10159
+    },
+    {
+      "path": "internal/contracts/download_environment.go",
+      "base_sha256": null,
+      "sha256": "169f502c894383a35d2ebaa2bb618b298d2c2a026e757f3f87e66ae0e2c6d38e",
+      "base_source": "live48",
+      "bytes": 2613
+    },
+    {
+      "path": "internal/contracts/native_exchange.go",
+      "base_sha256": "a77bb511443e368f1ce5febd4e8b7e9b5e8ad7850d19eecacf96246ecfb92718",
+      "sha256": "456f11d6d3542e54beabd5e256c96d2c193d8fb7e0706278d0a12dcf122e6487",
+      "base_source": "live48",
+      "bytes": 6696
+    },
+    {
+      "path": "internal/domain/artifact/download_environment.go",
+      "base_sha256": "467f58744ccfa7b2b5e2c3c2a01cc4c97f063c0d51eac3b3a928ef2bf084af29",
+      "sha256": "dcbb2fa6a9a0821ffdae17bc2265dfd4715b35fab6d0e31409be7ded1039fac1",
+      "base_source": "live48",
+      "bytes": 2357
+    },
+    {
+      "path": "internal/domain/artifact/download_path.go",
+      "base_sha256": null,
+      "sha256": "a2074cd34ba68f970c589cde2756aff483f9fe6c2358c93f99ab4ff76ada7da5",
+      "base_source": "live48",
+      "bytes": 1141
+    },
+    {
+      "path": "internal/domain/artifact/download_processing.go",
+      "base_sha256": null,
+      "sha256": "a0f74f71d63e3eb5c87bbf6a9af707b64ccb5967c5619ce17c8b1f183289731d",
+      "base_source": "live48",
+      "bytes": 1123
+    },
+    {
+      "path": "internal/domain/audit/connector_operation.go",
+      "base_sha256": "6643be7db899640324144b6f157aa0c11de974b6bcd92503f0f44260f878a6e3",
+      "sha256": "6110e3f41d87a2caf58757d9c8ad384701a75d1a3ea2db1ce2c73d60113f5daf",
+      "base_source": "frozen-audit-api-v2",
+      "bytes": 4057
+    },
+    {
+      "path": "internal/domain/audit/operation.go",
+      "base_sha256": "d10f18d3e36b3c858e4937ef195064d548f3f5748f666a9d160734eec5117003",
+      "sha256": "d2060bd3ff916eb78d5a56818371064f20b86087a9805e71b1b642d9f6c14288",
+      "base_source": "frozen-audit-api-v2",
+      "bytes": 5510
+    },
+    {
+      "path": "internal/domain/audit/operation_lifecycle.go",
+      "base_sha256": "4ffbbabbe118cf7309a2869de8de7daf60e08770886b40368f264810991194fc",
+      "sha256": "bb3d28a0ace08737d4438088f53d24ec856f3b42a41f2726561d75e3772c28c7",
+      "base_source": "frozen-audit-api-v2",
+      "bytes": 15048
+    },
+    {
+      "path": "internal/domain/audit/processing_lifecycle_test.go",
+      "base_sha256": null,
+      "sha256": "bb715644b57ee56d51fec395bf2d72624d828a353c7e03f46cdb0c6ea1ee4570",
+      "base_source": "live48",
+      "bytes": 2201
+    },
+    {
+      "path": "internal/domain/audit/processing_operation.go",
+      "base_sha256": null,
+      "sha256": "f1a0a346c2fa2cdfb9fffffce4040380af26fb740101515926060af6e72a9a86",
+      "base_source": "live48",
+      "bytes": 252
+    },
+    {
+      "path": "internal/domain/authorization/native_exchange.go",
+      "base_sha256": "e452f0af3f5b9ea7cd581bd340bfa3fa64b9639ece7e87bfa5a719a412ffc6b3",
+      "sha256": "5f3f070bcd1d778f67e6f98bce947b6cf9cd28188f40714fe5fa487a37ea2e73",
+      "base_source": "live48",
+      "bytes": 5934
+    },
+    {
+      "path": "internal/domain/privacy/download_environment.go",
+      "base_sha256": null,
+      "sha256": "f76ffe7ec552da72e3118308b4b61e34d938d18d79f99494a526518155bf5e8d",
+      "base_source": "live48",
+      "bytes": 5276
+    },
+    {
+      "path": "internal/domain/privacy/download_environment_test.go",
+      "base_sha256": null,
+      "sha256": "cb57603ff79add2641c1cd0e96a6c6de42d6a2d5d37e654deadc9d2c11834205",
+      "base_source": "live48",
+      "bytes": 4451
+    },
+    {
+      "path": "internal/domain/privacy/processing.go",
+      "base_sha256": null,
+      "sha256": "81d7cd1a7fc55afb0e9ea934049b8f30ab76b4bf501d1e8ea0933dbb99cf6ecd",
+      "base_source": "live48",
+      "bytes": 5660
+    },
+    {
+      "path": "internal/domain/privacy/processing_backing.go",
+      "base_sha256": null,
+      "sha256": "6f7891097da0f87d7ddce6a6b3d8aeb3636d8d0d65d017452123f7cd7dfd5926",
+      "base_source": "live48",
+      "bytes": 3700
+    },
+    {
+      "path": "internal/domain/privacy/processing_backing_test.go",
+      "base_sha256": null,
+      "sha256": "df86c83467f513d2764ff702d60587331fa7c703e3c12f8da0fefbe8b74c85c9",
+      "base_source": "live48",
+      "bytes": 1481
+    },
+    {
+      "path": "internal/domain/privacy/processing_decision.go",
+      "base_sha256": null,
+      "sha256": "ceb910720ccf58a6bee8365c2470d8d6e81b92c64c9fdb95b9adde0a227b3b89",
+      "base_source": "live48",
+      "bytes": 2834
+    },
+    {
+      "path": "internal/domain/privacy/processing_test.go",
+      "base_sha256": null,
+      "sha256": "48b8f3cc91851d4e7d3eac5f271d8224e80963cd71b27b4a0cbdcd03d792fb0e",
+      "base_source": "live48",
+      "bytes": 4372
+    },
+    {
+      "path": "internal/transport/native/admission.go",
+      "base_sha256": "3f7b1a76896b85f26bdc327c9b27c7beb42227150067a2a0a581896495819146",
+      "sha256": "4daca1d110ab56624780d561bda38e61192d97e81d894b2ab26ee848ffa2cfe3",
+      "base_source": "live48",
+      "bytes": 6685
+    },
+    {
+      "path": "internal/transport/native/command_limits_test.go",
+      "base_sha256": "865b6e18a544cee10030cb2ff257fb624c19dc7f6c87e148fca4613a9d6736f0",
+      "sha256": "2c8f8e225386a7c81bcb2d61ffdde3c4cd453fb89f72797c3ee103ee7b6536cd",
+      "base_source": "live48",
+      "bytes": 7540
+    },
+    {
+      "path": "internal/transport/native/flow_test.go",
+      "base_sha256": "bce0dcc18c827fe5afc83d34035772bbf3663da6093dd866456d42eedbda3b75",
+      "sha256": "ea7febae0b22cc7ecfc5f20d89274f7539457b37cfdf8d3d35411ba1c0a4fc68",
+      "base_source": "live48",
+      "bytes": 13426
+    },
+    {
+      "path": "internal/transport/native/handler_test.go",
+      "base_sha256": "f16b45a7eaa998f99ebab1c5c17e6637c2405cee550782f8a179cdbe21ac5495",
+      "sha256": "1d75def898bdafeec10e3373efa5d141f953f5af1072a5bee19199c26c91db3b",
+      "base_source": "live48",
+      "bytes": 7350
+    },
+    {
+      "path": "internal/transport/native/processing_path_test.go",
+      "base_sha256": null,
+      "sha256": "530c40fd47bb1adeb43a7fc6ae0f12b1043cd6b59e06803ada064a5eb7173d0b",
+      "base_source": "live48",
+      "bytes": 1107
+    },
+    {
+      "path": "internal/transport/native/router_test.go",
+      "base_sha256": "b59cd1b8b567ea9b69a05600ae01bdcabca624942df567737a05ab8dfaef323f",
+      "sha256": "85eb729820e6c9ac69941609f5d31ffc1a289a66bb0c971405442aa6bda2da09",
+      "base_source": "live48",
+      "bytes": 6602
+    },
+    {
+      "path": "internal/transport/native/terminal_test.go",
+      "base_sha256": "7cb6272d1fc782462115287d928132ae6d480ca78b484e9cd0ebef0211855606",
+      "sha256": "f3e5317e45805830dea9c6599bdb680f6d5681fae17060933bbea1bc308dd5fb",
+      "base_source": "live48",
+      "bytes": 7452
+    },
+    {
+      "path": "migrations/00050_context_processing.sql",
+      "base_sha256": null,
+      "sha256": "684ed5a0ea9e8165b559c99880ff053782dfcf13b3d96cf10309eab3f57e3d87",
+      "base_source": "live48",
+      "bytes": 40166
+    },
+    {
+      "path": "migrations/queries/processing.sql",
+      "base_sha256": null,
+      "sha256": "52d0ae08ff2263a554a6fa318994f08bce3ae3ab08c30bceaac2c93273a5da65",
+      "base_source": "live48",
+      "bytes": 2535
+    },
+    {
+      "path": "specs/artifact-downloads.md",
+      "base_sha256": "314f147810aa706866d4c622a26742bf9535f8e2fdc32c3327998b4258a9129c",
+      "sha256": "55122ae60d35fa752f1e4e38676f2fa3948896dc4d75e0e6db8bd1dcfed6c66f",
+      "base_source": "live48",
+      "bytes": 21956
+    },
+    {
+      "path": "specs/contracts/download-environment.schema.json",
+      "base_sha256": null,
+      "sha256": "f14dc123722d7858fa0a9a3b88fa42bc533f4d4492e24e6eae5f55cb938dd4f8",
+      "base_source": "live48",
+      "bytes": 6699
+    },
+    {
+      "path": "specs/privacy.md",
+      "base_sha256": "b8608e705b9bb4c0e5002a00c178b436d799b5b6672278356ca1a37b721c62dc",
+      "sha256": "35bbc6172a3304dbdc9f111c7ee6ac0ab1102074abd71e8b1dab2d08478b26e0",
+      "base_source": "live48",
+      "bytes": 36652
+    },
+    {
+      "path": "test/fixtures/sql/runtime-roles.sql",
+      "base_sha256": "6cdbbf0edfb8ff006ac12ae8fc34120d58b5205a1055e195e3f171ece12ce52f",
+      "sha256": "9c5c0a4a78060372f7bad6774147d73dca3b8efe71dd6784ec6f4c39881870d3",
+      "base_source": "live48",
+      "bytes": 65388
+    },
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "base_sha256": "676c6d667d7d69c7d781f42f7613d03b1c40fa26cd95776811615e3b530c070e",
+      "sha256": "71535cd7e511dcc6142ad62c65de40f665b73759800981df2530501512b97ae7",
+      "base_source": "live48",
+      "bytes": 30751
+    },
+    {
+      "path": "test/integration/api_execution_test.go",
+      "base_sha256": "468a6743155016f20020e43321121c6bff22a3a1645d0415af4f385d4fcb9b7c",
+      "sha256": "67f6246514e4309a7cb98f7fb02e1c2f32a949d9cb6cd10b8524c315bb61d22b",
+      "base_source": "live48",
+      "bytes": 13238
+    },
+    {
+      "path": "test/integration/browser_refresh_owners_test.go",
+      "base_sha256": "7ebcbf5857db71431cbd12fdaa8e4cb4213968a72c19f40908cefc975966f4c2",
+      "sha256": "e430615553ab15a8f7700a29a4001b8d573daa0897df97cbe04a8b1577ae4605",
+      "base_source": "live48",
+      "bytes": 24034
+    },
+    {
+      "path": "test/integration/context_case_test.go",
+      "base_sha256": "3804cb8b63cea2bd5b1b82e390c7a3cc88008836d60aab0074368efaf6c820ff",
+      "sha256": "9ccd7f27b14a295c4d345274833f08708981bca707d8b105ac331425ecc66a88",
+      "base_source": "live48",
+      "bytes": 8603
+    },
+    {
+      "path": "test/integration/context_publication_test.go",
+      "base_sha256": "3b5dd7397c8182317c0bec1653f5dee8577f98a580a0a63ed44b648615c7b2a6",
+      "sha256": "6a7da5ecee6e33ce1665fc6eefc9cbfd6ed4cc4107875a632a0dc402b28eacf1",
+      "base_source": "live48",
+      "bytes": 22048
+    },
+    {
+      "path": "test/integration/download_control_test.go",
+      "base_sha256": "90e0f696af019207884d1ed2d9651c65648692e26d4e94ff96abc3c4b7488534",
+      "sha256": "b3ad8368bc25e3ae24036da7a2f106b6ed4789c83cb77c1a32fc4f8394006df0",
+      "base_source": "live48",
+      "bytes": 15509
+    },
+    {
+      "path": "test/integration/download_response_test.go",
+      "base_sha256": "711499503f00e126901614f39d9122daa0f14a0c0682f790ae2d5d2164f69d54",
+      "sha256": "e024381b2d480cf97744f3e99b0efd949eac1e63004a28568db8859c2bb3078f",
+      "base_source": "live48",
+      "bytes": 13058
+    },
+    {
+      "path": "test/integration/download_sessions_test.go",
+      "base_sha256": "14a459d090495abc51a83d0a4c8b50886a6f8bf259a28e4039c18a3bcedc268d",
+      "sha256": "c738a9dae6032a9405dedf934ad5aefcb628cc5af6d89cae3b7b5fae844614e1",
+      "base_source": "live48",
+      "bytes": 71404
+    },
+    {
+      "path": "test/integration/download_stop_lifecycle_test.go",
+      "base_sha256": "db60a26f30d8fae61ba42fe9525cb2ec54993f3c7b02b2bf3e44c5cb411b367f",
+      "sha256": "6acf66d5ede471c664df4858176626d4e398c8bb26bce22d3352a7d625977225",
+      "base_source": "live48",
+      "bytes": 23662
+    },
+    {
+      "path": "test/integration/download_stop_test.go",
+      "base_sha256": "658d2656ee8c392fd0d11e6515a824e25bb7b629bafe392a94688fd5c7775485",
+      "sha256": "5c1898b3f224390f025a86f42efe4cdd9f68d6baaf2ee8d16e6fdb4a2c731b26",
+      "base_source": "live48",
+      "bytes": 15213
+    },
+    {
+      "path": "test/integration/native_exchange_test.go",
+      "base_sha256": "7f96b068ac54a2160106df055c86f223c83992805f51a207e8ad4ac64c8e8073",
+      "sha256": "7924ac9b1b7f5dc3642ab1e736b4392cb420b9fab3efa190414356817a303715",
+      "base_source": "live48",
+      "bytes": 29214
+    },
+    {
+      "path": "test/integration/processing_fixture_test.go",
+      "base_sha256": null,
+      "sha256": "5e3673523982cabf78537bf04e8bbb883a025c0b9633c062738965f5032410a5",
+      "base_source": "live48",
+      "bytes": 12484
+    },
+    {
+      "path": "test/integration/processing_test.go",
+      "base_sha256": null,
+      "sha256": "4331f45973c6101daada2c68b4d7e20228c5cea8a2665df38f6192fe3bb1f27b",
+      "base_source": "live48",
+      "bytes": 20245
+    }
+  ],
+  "dependencies": {
+    "audit_api_v2_manifest_sha256": "b895d1b982efe710133a6d19f6040b02d6a8e2ad1fd3754a49839770eb5a75b6",
+    "sql49_shape_sha256": "62ec3144c74e010ba6acc73063f08b74d2fa0667aa140a62006f15a4346219fc"
+  },
+  "generated_sqlc_in_payload": false
+}

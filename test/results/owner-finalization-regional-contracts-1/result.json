@@ -1,0 +1,12 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 0,
+  "seconds": 8.72,
+  "logSHA256": "446280133d88c461e80b54c358019493f8b48da5550eeab992b6f2230363b7be"
+}

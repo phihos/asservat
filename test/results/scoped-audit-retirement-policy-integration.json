@@ -1,0 +1,46 @@
+{
+  "manifestSHA256": "e66f900f24b76edf27da0192cb9308f456853a8418221ba9f4fd31f3ec1400cd",
+  "dependenciesSHA256": "463cc40ad2a23415069225da882d86c83918cdb791fa5d819c6a65d70fc14d19",
+  "files": [
+    {
+      "path": "scripts/test-custody.py",
+      "baseSHA256": "aa5228b8180c81359cd067ba2db4fcd7dd74347b155e6de428c77603c828dc3c",
+      "payloadSHA256": "4c89db87a1e982082864335c687b66bf06d6987468154b3f8116d2b40be0dbe1"
+    },
+    {
+      "path": "test/integration/scoped_audit_storage_test.go",
+      "baseSHA256": "8b93664ea48f8782e93a0f0922e61dc33285c201a4f06083ca8666e1190c86eb",
+      "payloadSHA256": "8ab16fd8b4af066c82522dfb2118eb80a6e76507c27962fcabc3034bcd5200d4"
+    }
+  ],
+  "verification": {
+    "scope": "narrow exact-prefix retirement policy and negative matrix, compile/vet; native pending",
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-3/overlay.json",
+          "-run",
+          "^$",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 11.882
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-3/overlay.json",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 2.095
+      }
+    ],
+    "dependencies": 1934
+  }
+}

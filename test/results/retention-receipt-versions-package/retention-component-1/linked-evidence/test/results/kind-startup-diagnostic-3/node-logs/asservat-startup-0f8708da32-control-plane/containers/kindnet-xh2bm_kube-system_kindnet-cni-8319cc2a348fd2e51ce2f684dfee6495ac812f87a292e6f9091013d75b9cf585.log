@@ -1,0 +1,15 @@
+2026-10-13T08:09:35.715594606Z stderr F I1013 08:09:35.715508       1 main.go:413] probe TCP address asservat-startup-0f8708da32-control-plane:6443
+2026-10-13T08:09:35.71674495Z stderr F I1013 08:09:35.716699       1 main.go:114] connected to apiserver: https://asservat-startup-0f8708da32-control-plane:6443
+2026-10-13T08:09:35.716906141Z stderr F I1013 08:09:35.716866       1 main.go:144] hostIP = 172.18.0.3
+2026-10-13T08:09:35.716909511Z stderr F podIP = 172.18.0.3
+2026-10-13T08:09:35.716946861Z stderr F I1013 08:09:35.716931       1 main.go:153] setting mtu 1500 for CNI 
+2026-10-13T08:09:35.716948351Z stderr F I1013 08:09:35.716940       1 main.go:183] kindnetd IP family: "ipv4"
+2026-10-13T08:09:35.716963451Z stderr F I1013 08:09:35.716945       1 main.go:187] noMask IPv4 subnets: [10.244.0.0/16]
+2026-10-13T08:09:35.736866632Z stderr F I1013 08:09:35.736778       1 controller.go:173] "Starting controller" name="kube-network-policies"
+2026-10-13T08:09:35.736872402Z stderr F I1013 08:09:35.736798       1 controller.go:178] "Waiting for the policy engine to become ready..."
+2026-10-13T08:09:36.237581878Z stderr F I1013 08:09:36.237502       1 controller.go:185] "Policy engine is ready."
+2026-10-13T08:09:36.237588748Z stderr F I1013 08:09:36.237524       1 metrics.go:72] Registering metrics
+2026-10-13T08:09:36.237607698Z stderr F I1013 08:09:36.237591       1 controller.go:462] "Syncing nftables rules" logger="nftables-sync"
+2026-10-13T08:09:36.243588509Z stderr F I1013 08:09:36.243534       1 controller.go:465] "Syncing nftables rules" logger="nftables-sync" elapsed="5.925271ms"
+2026-10-13T08:09:45.737691396Z stderr F I1013 08:09:45.737597       1 main.go:320] Handling node with IPs: map[172.18.0.3:{}]
+2026-10-13T08:09:45.737698216Z stderr F I1013 08:09:45.737632       1 main.go:324] handling current node

@@ -1,0 +1,63 @@
+--- probe-1/README.md
++++ probe-2/README.md
+@@ -1,8 +1,9 @@
+ # PostgreSQL 18 fleet-view lock feasibility
+ 
+-Staged only. No service, query, build, migration or native test has run for this
+-probe. The parent must review the exact manifest and allocate the sole native
+-slot before invoking:
++The corrected probe-2 is staged only and has not run. Probe-1 stopped on a
++PostgreSQL application-name truncation NOTICE after the first renewal/block;
++its original evidence remains under `checks/probe-1`. The parent must review the
++exact manifest and allocate the sole native slot before invoking:
+ 
+ ```sh
+ python /home/phil/.cache/asservat-build/planning/fleet-freshness-lock-probe-20261014/probe.py --parent-exclusive-slot-allocated
+@@ -16,7 +17,7 @@
+ First signals are recorded, repeated signals cannot interrupt cleanup, and an
+ unknown create reply plus absence is a failed/uncertain cleanup result. All SQL,
+ logs, source snapshots, payloads, server/image identity and terminal checks are
+-retained under `checks/probe-1`. Do not rerun into or erase that directory.
++retained under `checks/probe-2`. Do not rerun into or erase either result directory.
+ 
+ `schema.sql` is a synthetic fixture, **not a migration or production producer**.
+ It copies the current base constraints and exact nine-column legacy view, then
+--- probe-1/probe.py
++++ probe-2/probe.py
+@@ -86,7 +86,7 @@
+         self.counter = 0
+         self.cleaning = False
+         self.started = time.monotonic()
+-        self.out = STAGE / 'checks' / 'probe-1'
++        self.out = STAGE / 'checks' / 'probe-2'
+         self.out.mkdir(parents=True, exist_ok=False)
+         self.manifest = json.loads((STAGE / 'manifest.json').read_text())
+         self.manifest_sha = sha(STAGE / 'manifest.json')
+@@ -159,7 +159,11 @@
+                 '-v', 'VERBOSITY=verbose']
+ 
+     def sql_start(self, label, text, role='postgres', interactive=False):
+-        app = self.run_id + ':' + label
++        # PostgreSQL truncates long application names and emits a NOTICE. Keep
++        # the descriptive label in command metadata; only the unique numeric
++        # command identity belongs in PGAPPNAME and backend matching predicates.
++        app = self.run_id + ':' + str(self.counter + 1)
++        assert app.isascii() and 0 < len(app.encode('ascii')) <= 63
+         # Statement ceilings bound this synthetic harness, not product proof life.
+         prefix = "SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';\n"
+         child = self.start(label, self.sql_argv(role, app), prefix + text, interactive)
+--- probe-1/manifest.json
++++ probe-2/manifest.json
+@@ -1,10 +1,10 @@
+ {
+   "scope": "Source-only staged PostgreSQL 18 view-lock feasibility; no migration or producer implementation",
+   "payloads": {
+-    "README.md": "fbfe3da0a456c035ed8ea7b586912a5501034e4f63ee8d99a4a6d85de5281e7a",
++    "README.md": "ce47b3fd2401c61fb55ab5f2478b78221d09940146793df64fa9519b012f5259",
+     "producer-review.md": "e7714c45a272c23216a232955f10d8dc96b41cf14f61ef23b714faafcff219e0",
+     "schema.sql": "4f2f424cb29d407e8b5ec5d2e68ebbe6572e3423877fab66c45a1f03bec80f2c",
+-    "probe.py": "71d623a0b4d0fb56a9c2f621240478981263f16da50702729a2bae0e543fa64a"
++    "probe.py": "05e45ead4a5aece6fabfc46836a1e232705f389f427bdd6b52d30eba14d0c073"
+   },
+   "sources": {
+     "migrations/00006_peer_identity.sql": "e4ac24e80ecf7332d3be31197d256f0931ca466776caa838d5dcfdb0b0ed0455",

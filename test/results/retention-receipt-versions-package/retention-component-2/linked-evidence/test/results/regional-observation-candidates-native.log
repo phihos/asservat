@@ -1,0 +1,8 @@
+=== RUN   TestOwnerObservationCandidatesWithRealServices
+=== RUN   TestOwnerObservationCandidatesWithRealServices/original-current-source-expires
+=== NAME  TestOwnerObservationCandidatesWithRealServices
+    owner_observation_candidates_test.go:133: separate configured observation reader and old fixed16 overflow; exact17 same-Pod processes retained,18 denied, retired leaves excluded; synthetic initial source/recovery/native proof
+--- PASS: TestOwnerObservationCandidatesWithRealServices (2.80s)
+    --- PASS: TestOwnerObservationCandidatesWithRealServices/original-current-source-expires (0.16s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.853s

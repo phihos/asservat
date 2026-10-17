@@ -1,0 +1,34 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/overlay.json",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 1.644,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "payload": {
+    "test/integration/context_native_content_test.go": "f2c128c36fb0225c1677d1cd3eaecb8def58318fcbb21aa85a7028d3d3e5b4ff",
+    "test/integration/context_native_interrupted_test.go": "a302ecb540d5eed2c6676532b301d879f46b2e3cab71051e80ba0e8626159377",
+    "test/integration/context_publication_test.go": "0d70078a3df8d918bfd1cebce5d031ecb254ba6207c553c964d5629ba43d7a27",
+    "test/integration/native_phase_diagnostic_test.go": "e118dc4af316d546f53445c13c2e7e917c09e122e3496a28a1a86fd543996a7e"
+  },
+  "dependencies_count": 1507,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/tmp"
+  }
+}

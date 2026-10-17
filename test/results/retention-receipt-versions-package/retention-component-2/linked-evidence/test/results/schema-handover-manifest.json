@@ -1,0 +1,37 @@
+[
+  {
+    "path": "Makefile",
+    "baseSHA256": "3d19b6a82b0b538948b4aa18831dc919275033afe90518bae9a0949f22b633b4",
+    "sha256": "79bf9abc2be154cff010d553b9c4f6bd1000b4160c60376bcaec3ffa3efc94e2"
+  },
+  {
+    "path": "docs/decisions/README.md",
+    "baseSHA256": "8ebf3250af1e4df0a1f5fcd8f3558d30df59d54d6aad1f1586facf8352509078",
+    "sha256": "41ca62f8fb07708439545b5a2972298b71de6e22ebe84a76d6a07be3caaf37c7"
+  },
+  {
+    "path": "docs/technology.md",
+    "baseSHA256": "8c61235e6a4ce04a73c4587d23a8b012d97f36229f04a8a1625cb8f9fee4d108",
+    "sha256": "f85897c31147e6d76ae722df15941d63ac59f665be19809efda1aa21a36a5933"
+  },
+  {
+    "path": "docs/validation.md",
+    "baseSHA256": "763c4bfe0bf1cbd1e3aaa0e0df4f081d1282aa1d7ef49708145319610d12c47e",
+    "sha256": "c34cc47a8c6f9cec2d69a3bae1618e194cf65217ab02a3d2813b04c74bc7d401"
+  },
+  {
+    "path": "scripts/test-context-storage.py",
+    "baseSHA256": "5670a6062f46626377d85af2f843447d94c5e004d25df7efc8f57b8da38efb01",
+    "sha256": "0680dbfcfc7898535fa20ebb1640aa07119609b38d3c2cd20b4e178e75a74df3"
+  },
+  {
+    "path": "test/integration/initial_preparer_handover_test.go",
+    "baseSHA256": "4259316c4fb2a4fd427926c72b8a479790e218920b45f43f28856ccbe6d25ccf",
+    "sha256": "9bd88c6e048468ea3040ba2699d079399faf2404ccae6012b8d804a0f1180c10"
+  },
+  {
+    "path": "test/integration/initial_schema_handover_test.go",
+    "baseSHA256": null,
+    "sha256": "8f027eea1dc672c3fcfe428ddc17138f7ed280844924759a9b97364a5ec385c7"
+  }
+]

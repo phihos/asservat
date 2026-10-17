@@ -1,0 +1,245 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+)
+
+// These results describe this one admitted phase, never a reusable effect grant.
+type OwnerProjectionAdvanceStatus string
+
+const (
+	OwnerProjectionAdvancePending      OwnerProjectionAdvanceStatus = "pending"
+	OwnerProjectionAdvanceAcknowledged OwnerProjectionAdvanceStatus = "acknowledged"
+	OwnerProjectionAdvanceComplete     OwnerProjectionAdvanceStatus = "complete"
+)
+
+type OwnerProjectionAdvance struct {
+	Status   OwnerProjectionAdvanceStatus
+	Snapshot contracts.InitialRuntimeResourceSnapshot
+}
+
+// The concrete PostgreSQL composition owns the role locks. This finite port is
+// separate from legacy role verification; it accepts no source DTO or callback.
+type OwnerProjectionOperationVerification interface {
+	AdvanceOwnerProjectionOperation(context.Context, *OwnerProjectionOperation) (OwnerProjectionAdvance, error)
+}
+
+type ProviderOwnerProjection struct {
+	projection      *OwnerIdentityProjection
+	verification    OwnerProjectionOperationVerification
+	receiptAttempts map[ownerProjectionStep]bool // original root serializes all access
+}
+
+func NewProviderOwnerProjection(root *OwnerIdentityRoleRoot, verification OwnerProjectionOperationVerification, input contracts.OwnerDeployment, setup *providerconfig.SetupReader) (*ProviderOwnerProjection, error) {
+	if root == nil || root.resources == nil || setup == nil || verification == nil || root.input.OwnerLayout != contracts.OwnerProviderInstalledLayout || input.ProviderAuthentication == nil || input.Observation == nil || input.Native != nil || !ownerProviderProjectionSelectionBound(root, input, root.resources.now()) || !ownerIdentityProjectionInputBound(root, input, root.resources.now()) {
+		return nil, cfg.ErrInvalid
+	}
+	raw, err := json.Marshal(input)
+	var cloned contracts.OwnerDeployment
+	if err != nil || json.Unmarshal(raw, &cloned) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	// No legacy verifier is fabricated. Only the explicit methods below may
+	// consume this private projection helper; its legacy Advance is unreachable.
+	p := &OwnerIdentityProjection{root: root, input: cloned, setup: setup}
+	return &ProviderOwnerProjection{projection: p, verification: verification, receiptAttempts: map[ownerProjectionStep]bool{}}, nil
+}
+
+type ownerProjectionStep uint8
+
+const (
+	ownerProjectionParent ownerProjectionStep = iota + 1
+	ownerProjectionCreateCredentials
+	ownerProjectionAcknowledgeCredentials
+	ownerProjectionCreateConfiguration
+	ownerProjectionAcknowledgeConfiguration
+	ownerProjectionAcknowledgeJoint
+	ownerProjectionReadComplete
+	ownerProjectionLaunch
+	ownerProjectionAcknowledgeLaunch
+	ownerProjectionReadLaunch
+	ownerProjectionInspect
+	ownerProjectionInspectLaunch
+)
+
+// OwnerProjectionOperation is minted only during one joined original root
+// call. Its private native handle owns phase admission and monotonically
+// narrowing deadlines; it cannot be constructed from a public journal.
+type OwnerProjectionOperation struct {
+	self             *OwnerProjectionOperation
+	owner            *OwnerIdentityOperation
+	projection       *OwnerIdentityProjection
+	controller       *ProviderOwnerProjection
+	provider         ownerIdentityProviderObservation
+	resources        contracts.InitialRuntimeResourceSnapshot
+	object           *core.Secret
+	input            contracts.OwnerDeployment
+	activation       contracts.OwnerIdentityActivation
+	data             map[string][]byte
+	digest           string
+	step             ownerProjectionStep
+	fresh            bool
+	claimedEffect    bool
+	effectDispatched bool
+	result           OwnerProjectionAdvanceStatus
+	failure          *ownerProjectionDiagnosticSlot
+}
+
+func (s *ProviderOwnerProjection) Advance(ctx context.Context) (OwnerProjectionAdvance, error) {
+	return s.advance(ctx, false, false)
+}
+func (s *ProviderOwnerProjection) Launch(ctx context.Context) (OwnerProjectionAdvance, error) {
+	return s.advance(ctx, true, false)
+}
+
+func (s *ProviderOwnerProjection) Inspect(ctx context.Context) (OwnerProjectionAdvance, error) {
+	return s.advance(ctx, false, true)
+}
+func (s *ProviderOwnerProjection) InspectLaunch(ctx context.Context) (OwnerProjectionAdvance, error) {
+	return s.advance(ctx, true, true)
+}
+
+func (s *ProviderOwnerProjection) advance(ctx context.Context, launch, inspect bool) (result OwnerProjectionAdvance, failure error) {
+	check := projectionCheckEnter
+	defer func() {
+		if failure != nil {
+			if _, ok := failure.(*ownerProjectionDiagnostic); !ok {
+				failure = projectionDiagnostic(check, failure)
+			}
+		}
+	}()
+	var out OwnerProjectionAdvance
+	if s == nil || s.projection == nil || s.verification == nil || ctx == nil || ctx.Err() != nil {
+		return out, cfg.ErrUnavailable
+	}
+	p := s.projection
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	check = projectionCheckProviderBorrow
+	call, release, err := p.borrowProviderCall(call)
+	if err != nil {
+		return out, err
+	}
+	defer release()
+	// All sixteen fixed provider GETs precede bridge/recovery and role locks.
+	// The already-aged accepted observation and returned provider end survive.
+	check = projectionCheckProviderObserve
+	proof, err := p.observeProvider(call)
+	if err != nil {
+		return out, err
+	}
+	call, narrow := context.WithDeadline(call, proof.until)
+	defer narrow()
+	check = projectionCheckOuterBridge
+	out, err = s.projectionOperation(call, proof, launch, inspect)
+	if err != nil {
+		return OwnerProjectionAdvance{}, err
+	}
+	return out, nil
+}
+
+// Only projectionOperation invokes this fixed continuation after completing the
+// actual source bracket and post-bridge checks. Its plan CAS, post-role-lock
+// current graph, effect and independent final proof keep their original order.
+func (s *ProviderOwnerProjection) advanceAdmitted(bounded context.Context, first ownerIdentityOperationNative, proof ownerIdentityProviderObservation, launch, inspect bool) (result OwnerProjectionAdvance, failure error) {
+	check := projectionCheckOriginalInput
+	defer func() {
+		if failure != nil {
+			if _, ok := failure.(*ownerProjectionDiagnostic); !ok {
+				failure = projectionDiagnostic(check, failure)
+			}
+		}
+	}()
+	p := s.projection
+	var out OwnerProjectionAdvance
+	var err error
+	bounded, stop := context.WithDeadline(bounded, identity.Earlier(first.until, proof.until))
+	defer stop()
+	check = projectionCheckOriginalInput
+	if err = p.originalOperationInput(bounded, first); err != nil {
+		return OwnerProjectionAdvance{}, err
+	}
+	check = projectionCheckProviderMaterial
+	if err = p.operationProviderMaterial(bounded, first, proof); err != nil {
+		return OwnerProjectionAdvance{}, err
+	}
+	a := contracts.OwnerIdentityActivation{Input: p.root.input, RoleRoot: contracts.WorkerObjectReference{Name: p.root.name(), UID: first.roles.UID}, RoleSetupID: first.roles.State.OperationID, ResourcesCreatedAt: first.retained.resources.State.CreatedAt, ResourcesUntil: first.retained.resources.State.Until}
+	check = projectionCheckProjectionMaterial
+	input, _, data, digest, err := ownerIdentityProjectionMaterial(p.input, a, first.roles, OwnerIdentityProviderMaterial{}, p.root.resources.now())
+	if err != nil {
+		return OwnerProjectionAdvance{}, err
+	}
+	defer clearRuntimeProjection(data)
+	live, cancel := context.WithDeadline(bounded, identity.Earlier(first.until, proof.until))
+	defer cancel()
+	owner := &OwnerIdentityOperation{root: p.root, cancel: cancel, phase: ownerIdentityOperationInitial, initial: first, current: first, expected: first.roles, original: first.until, until: identity.Earlier(first.until, proof.until)}
+	live = context.WithValue(live, ownerIdentityOperationContextKey{}, owner)
+	owner.ctx = live
+	op := &OwnerProjectionOperation{failure: &ownerProjectionDiagnosticSlot{}, owner: owner, projection: p, controller: s, provider: proof, resources: first.retained.resources, object: first.retained.object, input: input, activation: a, data: data, digest: digest}
+	op.self = op
+	check = projectionCheckOwnerClaim
+	p.root.mu.Lock()
+	if p.root.closed || !p.root.busy || p.root.ownerOperation != nil || p.root.ctx.Err() != nil {
+		p.root.mu.Unlock()
+		return OwnerProjectionAdvance{}, cfg.ErrUnavailable
+	}
+	p.root.ownerOperation = owner
+	p.root.mu.Unlock()
+	defer func() {
+		owner.closeAndJoin()
+		p.root.mu.Lock()
+		if p.root.ownerOperation == owner {
+			p.root.ownerOperation = nil
+		}
+		p.root.mu.Unlock()
+	}()
+	// A public claim can conservatively consume an attempt before the stronger
+	// role verification. It cannot authorize any projection/launch by itself.
+	check = projectionCheckPlan
+	if err = op.plan(live, launch, inspect); err != nil {
+		return OwnerProjectionAdvance{}, err
+	}
+	check = projectionCheckSqlOperation
+	out, err = s.verification.AdvanceOwnerProjectionOperation(live, op)
+	if err != nil {
+		detail := projectionDiagnostic(projectionCheckSqlOperation, err)
+		if fixed := op.failure.first.Load(); fixed != nil {
+			detail.inner = fixed
+		}
+		err = detail
+		if op.claimedEffect {
+			stop := OwnerInstallationUnverified
+			if !op.effectDispatched {
+				stop = OwnerInstallationSpent
+			}
+			id := op.resources.State.OwnerIdentity.OperationID
+			switch op.step {
+			case ownerProjectionCreateCredentials:
+				id = op.resources.State.OwnerIdentity.Credentials.OperationID
+			case ownerProjectionCreateConfiguration:
+				id = op.resources.State.OwnerIdentity.Configuration.OperationID
+			case ownerProjectionLaunch:
+				id = op.resources.State.OwnerLaunch.OperationID
+			}
+			return OwnerProjectionAdvance{}, &ownerInstallationPhaseError{stop: stop, operationID: id, cause: err}
+		}
+		return OwnerProjectionAdvance{}, err
+	}
+	check = projectionCheckOuterResult
+	owner.mu.Lock()
+	complete := owner.phase == ownerIdentityOperationProjectionComplete && !owner.active && live.Err() == nil && p.root.resources.now().Before(owner.until) && !out.Snapshot.ValidUntil.After(owner.until)
+	owner.mu.Unlock()
+	if !complete || out.Status != op.result || out.Snapshot.UID != op.resources.UID || out.Snapshot.ResourceVersion != op.resources.ResourceVersion || !equalJSON(out.Snapshot.State, op.resources.State) {
+		return OwnerProjectionAdvance{}, cfg.ErrUnavailable
+	}
+	check = projectionCheckOuterBridge
+	return out, nil
+}

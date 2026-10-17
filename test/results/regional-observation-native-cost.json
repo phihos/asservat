@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestOwnerObservationReceiverOriginalBudgetWithRealServices$"
+  ],
+  "exit": 0,
+  "seconds": 194.9
+}

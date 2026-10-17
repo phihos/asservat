@@ -1,0 +1,356 @@
+[
+  {
+    "path": "cmd/asservat/main.go",
+    "base_sha256": "b63b8a04297d9252fc08460e21c06be5fa49957756670d6d11bba914257def97",
+    "payload_sha256": "93f51c4136cd96a66e02fd0b5a86d38c7f6b5a0ac4bce934818ca91ec6139f5b",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "docs/architecture/configuration-reconciliation.md",
+    "base_sha256": "be4784c01f8abb1eac9d99c7c05a3285a1727bfcdcab7aa5f5dea67f72ce2b5a",
+    "payload_sha256": "55defabb7479b807a8cc78ce72976daf46e54adc229f115969b18ad75a41a03b",
+    "owner": "mcp-documentation"
+  },
+  {
+    "path": "docs/decisions/148-public-projection-enforcement.md",
+    "base_sha256": "ab4fd0abf3cab1a1a9c98e340c6b213e7fecef075e00709ba2cab2d1a441dbe9",
+    "payload_sha256": "315b3b60162480defdef9104efe91fad19551f6b9a1b245e0aea1eaa85f79590",
+    "owner": "mcp-documentation"
+  },
+  {
+    "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+    "base_sha256": "ca4e0d1a5ee8aac222e080d93f948ded5681b42f75be8101d391e86f4944cf07",
+    "payload_sha256": "09c70812b6eb32871aab358fcea581b073977b391cfde25cb2a3a2cd45310818",
+    "owner": "mcp-documentation"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_audit_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "14420ea3199639981c607a575e89902cfff0c4c966b93bacfa8f00d356ef5547",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_installed.go",
+    "base_sha256": "bee607a926d81d917ff1b6ae392d13942c7726aecf2b1e5d4387fc5eb64535aa",
+    "payload_sha256": "25d5910394de09964606af1484cc0dd29ef0e7f4e41f302ca0f8cabc7b8daa16",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_installed_test.go",
+    "base_sha256": "26e59b7af2f9179057008a4e4ad4a8707928145b40a6d8aef0a5d103f17fce6f",
+    "payload_sha256": "28bb4338c56ace0d4a1e83ac3b0dde05995344392389b0cb4e0d77eddc679f4d",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_refresh.go",
+    "base_sha256": null,
+    "payload_sha256": "366a00646a0a3d9e7fa44ce52cebb016535c894c85d946eae258a64c6a964587",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_refresh_test.go",
+    "base_sha256": null,
+    "payload_sha256": "bb4e0faaf49e6f23d110a5c7ce202d97611ea92539c7890f366e38675fa8c26e",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_lifetime.go",
+    "base_sha256": "eb5f7e4d7fcf9c842c7bfe7dc76e819a5167760c9c48d13e91cb0764ccd6ef9e",
+    "payload_sha256": "248ac35c03dfa452f1304b720fba08fb1908bc1d203b176acff560cc38cb2c34",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_contention_test.go",
+    "base_sha256": null,
+    "payload_sha256": "8b3bb764c26463248fc5889ca8138f072246e536234ec7801be43e7d5ffd5855",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "547f44cac28a0f95e9229633e61a3c407ccd85b9532805fd40a5cb0a36506841",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_native.go",
+    "base_sha256": null,
+    "payload_sha256": "ebe27f8a9e4a792ffbef45c6efd4c94c560a27217218f5cb55f8048cc516d579",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "bea6cfdfe29959412690e07d46a74988bf7fdaf3d0cb3b3f69e2d3e83977d3c3",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_operation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "698cbb6ff54a814e297cf1310b465121be3513236a2f972629edb118b68096bb",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_process.go",
+    "base_sha256": "66ec61e73f9ae1608c519902d8a8ea5ad004b7c4bb7f816405e574b877906db1",
+    "payload_sha256": "59ccd704b9f9d00a833461e4ef4a7f574318df2d77b65fb7fae8b21656414684",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_reader.go",
+    "base_sha256": "8602afa192265cddc29f4994e1f1f98ee717e3daa8a85b363c06bce7225d9bc9",
+    "payload_sha256": "b030998b62b624f48fbfa83836b6eef4f8b787ab5d53d8bd2fffa54bb6331bf6",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_source_readers.go",
+    "base_sha256": null,
+    "payload_sha256": "10402811cedab9cd92376de812cd15b5737e5066cfad31b1f41ff0ebac6b7e54",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_source_readers_test.go",
+    "base_sha256": null,
+    "payload_sha256": "fe36c9020c574722ee2246dad0cfb1ed12f322635f031a5ff6eca7160b3b24c4",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_tokens.go",
+    "base_sha256": null,
+    "payload_sha256": "3736d0ca4442409ab47aa5d725fd7bd93e13dc1c812011794b1eeb4073f0f23f",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_tokens_test.go",
+    "base_sha256": null,
+    "payload_sha256": "a54cbf9d88349533cdf30be2c863536d7c460c6295d571b3ee00502fcfdab797",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/permissions.go",
+    "base_sha256": "51c4b721516511a29aca90fce6dace091927518b83112cdb356cf2c7d15c87e4",
+    "payload_sha256": "dd56b869a7a2d9a1b710455e9c86c9ea47559b7bb1bdc460111d18f4e20118e4",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_projection_hint.go",
+    "base_sha256": null,
+    "payload_sha256": "36d27b23a6dbbbad0f977f4ad67ffa9b5834b6b93e6372f30d8023e7ce40e00b",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_projection_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "fff345ff48d6bb58d6fd4dedb0972bbf50b2362d06d12237dc51fb1b6ff7fed7",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_projection_operation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "ab5cc41194c1b05a84b014589eda1c764148db2886bcd69ae853d7cb5577285d",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/capacity/reconciliation.go",
+    "base_sha256": "ee11d5627a707f6da47496da01358e00d8d32f1dc84240ebc472fb458ca0eb37",
+    "payload_sha256": "04c081375ea5ada77e5af6f700e37271a63ad161652b72052b056b117430a4c8",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/owner_configuration.go",
+    "base_sha256": "b2f649a909bcd03a1c8d1daeb4dd189f8b7a8fcebdfdfae8cb8ab20955109d04",
+    "payload_sha256": "34e4e6ad9ef5b98b2ab99ba035414bc593c9f1515f8c2e3f9893817fcd20061d",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/owner_configuration_bounds_test.go",
+    "base_sha256": null,
+    "payload_sha256": "79e78c59083d8c3d5f280017a74456ba8245cba594ce8d79d545a1ed740e5475",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_owner_audit.go",
+    "base_sha256": null,
+    "payload_sha256": "d00b647a5971d980a741d310a22916cb6ae889d8bcaa5233683bd1d5c4a87c7e",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_owner_audit_test.go",
+    "base_sha256": null,
+    "payload_sha256": "79918d5e30873c3487c0fbac0a00db4fc8381ee59567663a28a2e27ed87b52ea",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_admission.go",
+    "base_sha256": null,
+    "payload_sha256": "fa5ec92df2da44caeacceeb4761ae4f43248bd934a5070b80fb3ab9b9d542838",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_admission_test.go",
+    "base_sha256": null,
+    "payload_sha256": "48b25ba93b8c4ec4441c28ea36eeab8efd4203fa73b92cccc9a5a02b28a1878f",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_source_notice.go",
+    "base_sha256": null,
+    "payload_sha256": "642bf29b029fc70cee4573b060d581e76fd86346115362ecb79497bf20b76292",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_source_notice_test.go",
+    "base_sha256": null,
+    "payload_sha256": "7b7f4ffdabe40a599eaa4453e1a455ba7d766bab7caa1971f7484048b522d196",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_hub_worker.go",
+    "base_sha256": "7b91c19ef91c81e68ddcf0801a9960e43af4b655e66c4477f11e5c0ff4d71601",
+    "payload_sha256": "6a3ce37236b45b7e2b7824d5d0f4cc742ca9c86f89f11d74e148dd1fcfe2d2a7",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_installed_worker.go",
+    "base_sha256": "033a9e7b4c425e93c0c81d9b8bffc17f3eb4c9215e617e162f013f74b69624c5",
+    "payload_sha256": "ef4795f6bb34170948ab1920a659f94a544c0e90dcf4103290d5057d066c45a0",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_projection_wait.go",
+    "base_sha256": "5dc59bd04d6515feb071f297636c6bbc08d1f745249a654f911d43ca1cad2877",
+    "payload_sha256": "56a98fad1ee7847f8d40aa0af8976ea942c731f4503cf34b4bd29b01bd46c43f",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_runtime_invocation.go",
+    "base_sha256": null,
+    "payload_sha256": "1baed2b23e278db17e3bb41f3ac0d2e868302e7f7c66a697efd0662bf51a90ff",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_runtime_invocation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "4f8a15bcbaf42b8b9b729c0f21bf5145ca89de2e6aa3b3621011d1c3e5bba2d1",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capacity_worker.go",
+    "base_sha256": "11df6e5852eb6061b06f524822cce602c824c45459567bff3427a52ed4945139",
+    "payload_sha256": "c9c4a0e0ae03b90bb5c499f41785d9c8d10d25419b9016fcf4f27d375d13c22e",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/capture_cleanup_worker.go",
+    "base_sha256": "3f6fe630e918ee305040754ae6f4ecae52216e022b6d0880cbd87cde53e6f184",
+    "payload_sha256": "acf9c78d6545a91f7b20cfc3260773fbb760d2e41c4aad0f0e7541feb650db45",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_audit.go",
+    "base_sha256": "d08c50da2ef80481c210304d9ad37da9c5847d9399a9368f05825f5df44cd29e",
+    "payload_sha256": "8b5701ef1ce2891aee7ff475dbfd4891677b6be5933d77a74a21947e9521ce0b",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_inputs.go",
+    "base_sha256": "866859744e1a83dbd3dd0911564c5f63d7923b10dd3af7b4978b61724ab0d81a",
+    "payload_sha256": "4359476c977b56ebf490acf2c8c896deb1bcfed1e5a75384d4fb61a5a149fcfe",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_runtime.go",
+    "base_sha256": "d95a453fba6ac3cd2bbc5f818ead6f1ffbc7790be3421b06a84e92abfd0718af",
+    "payload_sha256": "8244ebb3b9e9b45846306210905acb08537838d738f54479f4d0c1b4d8292d24",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/configuration_runtime_source_notice.go",
+    "base_sha256": null,
+    "payload_sha256": "81ca8ec4a2c8aff988fde6e40ff8d509c6df63cc84b890f0d77755257b3880ca",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "base_sha256": "fbd8708cf799a2cdacc1f4efdb10c8d692d809d2bd3b396f5151232679f983e9",
+    "payload_sha256": "03b0919c719b067a8cf8275cb528055f350e846a63c0a443d1db49029a29059e",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker_runtime_selection.go",
+    "base_sha256": null,
+    "payload_sha256": "b8c5b24623c818bfe0d2860e7c54836daf43a3ea8207115ac1cc2b35ed4ce99d",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker_runtime_selection_test.go",
+    "base_sha256": null,
+    "payload_sha256": "8de507322b0abf0130fd7f706879ea10cce290737400c6315c95cc75a4e6f0c4",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/installed_hub_worker.go",
+    "base_sha256": "5f8eb9970c608e5db8b5ad33b07e43c76d96bc6622f51c25f3cd5c7103f3d92d",
+    "payload_sha256": "3b8bc72b5e37ce3495125c46a07d3f8294760e3ebe5ce267a1e01c3117aa9a8f",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/provider_capacity_wait.go",
+    "base_sha256": null,
+    "payload_sha256": "4f7cb1f429be35a30aea893dd8be6814cee887f9cae22d331ceced899f68cd47",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/provider_cleanup_runtime.go",
+    "base_sha256": null,
+    "payload_sha256": "37089bc7b87c6ae0767066ad3417e1b6462e6567d6c5d9827e9c0931f1d4a919",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "internal/bootstrap/provider_cleanup_wait.go",
+    "base_sha256": null,
+    "payload_sha256": "928a9d61426f301bec211e8df93369610bde4a37acb2101a5874b77a1ab52855",
+    "owner": "mcp-sustainability"
+  },
+  {
+    "path": "scripts/test-context-storage.py",
+    "base_sha256": "c6ff03a5e077cd8c88b7659e0c3f9dbac61d9db98c08a63efd0a288a7a09bc2e",
+    "payload_sha256": "453a4949a6c6079b2805e2acfa0e0c52efac895c9c1e0308824963ea6871351f",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "scripts/test-initial-bootstrap-selection.py",
+    "base_sha256": "f79d5c20e6d74831f8cba3520cb050f39195a656f49f266e17ff3e820ac15722",
+    "payload_sha256": "5bed11f5f50cfbda76ae4de383d3b07c6eb424c22e0330a7b8f099dfdc19aff1",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "base_sha256": "18b61b669291f74201ccfb8630010c32dcc1fa1a3bfb35b5a9e697cc3f9c4975",
+    "payload_sha256": "8c6476fb571312894fc091d343450c90b548a0eb79f437e4f8a1fca26d35859a",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "test/integration/initial_runtime_bridge_native_test.go",
+    "base_sha256": "e52e552178b4776d9004751161e909cf5c83a25e6c5d634aa262dbcee66d244a",
+    "payload_sha256": "ce8fe939087c1ee2f13a835bc72da8a5bb9371e147dd504e9fcd53ce4a2a7700",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "test/integration/initial_runtime_provider_pair_native_test.go",
+    "base_sha256": "a5dd7c26901d8257bdc8e7453fea0ebf228f4b67e5861be1d8b93d402f0ccb46",
+    "payload_sha256": "42460662a40a7f1a7a09c860c4bc60bcc26bb2710945aa1ff9bcd14126bf15f6",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "test/integration/initial_runtime_worker_source_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "b9a79c03bfbb49a24f6de3cbf4d895965457807fdf0edeb91d64b2c673532973",
+    "owner": "console-fixture"
+  },
+  {
+    "path": "test/integration/initial_runtime_worker_witness_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "1a604688abe095997843fd363c80d2a97150633ad3f853dd544fbcc32b10d277",
+    "owner": "console-fixture"
+  }
+]

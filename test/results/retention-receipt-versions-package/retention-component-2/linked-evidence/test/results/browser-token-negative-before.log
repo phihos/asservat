@@ -1,0 +1,10 @@
+--- FAIL: TestBrowserIDAndLogoutProfiles (0.04s)
+    --- FAIL: TestBrowserIDAndLogoutProfiles/future_nbf#01 (0.00s)
+        browser_test.go:64: invalid logout accepted
+    --- FAIL: TestBrowserIDAndLogoutProfiles/access_used_as_logout (0.00s)
+        browser_test.go:64: invalid logout accepted
+    --- FAIL: TestBrowserIDAndLogoutProfiles/ID_used_as_logout (0.00s)
+        browser_test.go:64: invalid logout accepted
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/oidc	0.118s
+FAIL

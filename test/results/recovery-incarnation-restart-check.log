@@ -1,0 +1,2 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py --database-recovery
+Database-recovery integration exit: 0

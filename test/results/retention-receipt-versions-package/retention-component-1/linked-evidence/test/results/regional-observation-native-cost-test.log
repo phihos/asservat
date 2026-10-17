@@ -1,0 +1,6 @@
+=== RUN   TestOwnerObservationReceiverOriginalBudgetWithRealServices
+    owner_observation_native_cost_test.go:291: receiver admission cost: fixed-phase={FirstError:none LastError:unavailable FirstNanos:3715291901 LastNanos:1198731495 TotalNanos:4914030386 RemainingNanos:80703166 FirstNative:{Requests:[[22 16 16 6 8 4 14 6 2 0] [0 0 0 0 0 0 0 0 24 0]] HTTPFailures:8 TransportFailures:0 RoundTripNanos:252113862} Native:{Requests:[[28 20 20 7 10 6 17 7 3 0] [0 0 0 0 0 0 0 0 30 0]] HTTPFailures:10 TransportFailures:0 RoundTripNanos:283919222}} registry-port-calls=6 configuration-port-calls=6 registry-acquires=6 configuration-shared-acquires=10 registry-acquire-ns=15030 configuration-shared-acquire-ns=22490 source-owner-refreshes=4 transport=none
+    owner_observation_native_cost_test.go:315: expected original-bound denial reproduced with actual native APIs and current SQL; this PASS records an availability counterexample, not successful routing or installed workflow
+--- PASS: TestOwnerObservationReceiverOriginalBudgetWithRealServices (7.70s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.762s

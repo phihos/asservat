@@ -1,0 +1,7 @@
+[
+  {
+    "path": "internal/adapters/postgres/custodydb/worker_owners.sql.go",
+    "base_sha256": "37738bf4c35ef68c87255705d958ca881ae04d0199382504f54d2f1625d23f02",
+    "payload_sha256": "ec77e6049e07e3723e89aa4f4c207202dbae493fafc1971c769a5b8ef62566d1"
+  }
+]

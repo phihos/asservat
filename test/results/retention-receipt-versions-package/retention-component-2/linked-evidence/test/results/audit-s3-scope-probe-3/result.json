@@ -1,0 +1,495 @@
+{
+  "scope": "Owned synthetic S3 policy diagnostics only; private HTTP, no TLS, product runtime, durable storage or installation authority qualification",
+  "image": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "name": "asservat-audit-scope-8c8232c6d72f",
+  "prefix": "hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/",
+  "observations": [
+    {
+      "name": "create-bucket",
+      "actor": "admin",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "version": null,
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "enable-versioning",
+      "actor": "admin",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {
+        "versioning": ""
+      },
+      "conditional": null,
+      "status": 200,
+      "version": null,
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "versioned-conditional-create",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {},
+      "conditional": "*",
+      "status": 200,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": "\"dfdf68c20534296b333d85342d8c25cd\"",
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "versioned-conditional-conflict",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {},
+      "conditional": "*",
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "fb98352790a88c0e7b2ef032f27395f6ddb2a331c27f5374a690e364505afeb4",
+      "bodyBytes": 439
+    },
+    {
+      "name": "install-no-delete-policy",
+      "actor": "admin",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {
+        "policy": ""
+      },
+      "conditional": null,
+      "status": 204,
+      "version": null,
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "unconditional-put-adds-version",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "version": "67220796aba3a3e21e3551e7508a2404",
+      "etag": "\"f56ced13f9d869ea5fd5f4667664d6d0\"",
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "original-version-remains-readable",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 200,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": "\"dfdf68c20534296b333d85342d8c25cd\"",
+      "errorCode": null,
+      "bodySHA256": "9775ceb061a8d2a40c47064a2c6ca0e19f2564c7913b8e7876dfad1644e7932d",
+      "bodyBytes": 36
+    },
+    {
+      "name": "latest-key-is-new-version",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "version": "67220796aba3a3e21e3551e7508a2404",
+      "etag": "\"f56ced13f9d869ea5fd5f4667664d6d0\"",
+      "errorCode": null,
+      "bodySHA256": "1774b2a83866fedc2ee4840015b9101ea2add0d8601ff69c58babc29d153c9dc",
+      "bodyBytes": 23
+    },
+    {
+      "name": "supplied-original-version-cannot-overwrite",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 200,
+      "version": "67220796ab6a749c575538589848343f",
+      "etag": "\"bd9393ef4f876026da513015a0df647e\"",
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "original-version-after-supplied-id",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 200,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": "\"dfdf68c20534296b333d85342d8c25cd\"",
+      "errorCode": null,
+      "bodySHA256": "9775ceb061a8d2a40c47064a2c6ca0e19f2564c7913b8e7876dfad1644e7932d",
+      "bodyBytes": 36
+    },
+    {
+      "name": "runtime-delete-version-denied",
+      "actor": "writer",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "6bfa776c2eac47c5beda2477ce1d882cf9163e69dbff7a4c2de0d3caa0646f6a",
+      "bodyBytes": 386
+    },
+    {
+      "name": "runtime-delete-key-denied",
+      "actor": "writer",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "2369bd3f7babc98b985818df61a944410818ec4f3c2182f6f92188375f1398d2",
+      "bodyBytes": 386
+    },
+    {
+      "name": "runtime-versioning-suspension-denied",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {
+        "versioning": ""
+      },
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "8c6ee32c22e09da3d836a0849a9d94c5a1e7bed56514619cf9aafcb19cbea2f0",
+      "bodyBytes": 236
+    },
+    {
+      "name": "anonymous-version-read-denied",
+      "actor": "anonymous",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "97c86cdb86fc6224110a1611fe6540a8e6122d03c10165736d6721469db2aeac",
+      "bodyBytes": 386
+    },
+    {
+      "name": "foreign-version-read-denied",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/foreign/new",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "9f2be9cfe4838c5d1ee8f998526db91613cfab01ad330e3f7e7828c0b713904e",
+      "bodyBytes": 270
+    },
+    {
+      "name": "original-version-final-read",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 200,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": "\"dfdf68c20534296b333d85342d8c25cd\"",
+      "errorCode": null,
+      "bodySHA256": "9775ceb061a8d2a40c47064a2c6ca0e19f2564c7913b8e7876dfad1644e7932d",
+      "bodyBytes": 36
+    },
+    {
+      "name": "original-version-after-restart",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 500,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": null,
+      "errorCode": "InternalError",
+      "bodySHA256": "12a36cb388fc303083ed202ecb16116369cfca977a36c31d5a8f6526da9b8431",
+      "bodyBytes": 424
+    },
+    {
+      "name": "version-deletion-denied-after-restart",
+      "actor": "writer",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 403,
+      "version": null,
+      "etag": null,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "82c95097938a46b796e5bde9122bcec523280b154b5f3b6322b086fb6f4acacd",
+      "bodyBytes": 386
+    },
+    {
+      "name": "independent-retirement-version-delete",
+      "actor": "admin",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/concurrent",
+      "query": {
+        "versionId": "67220796aaec48d7673d6782bc82710f"
+      },
+      "conditional": null,
+      "status": 204,
+      "version": "67220796aaec48d7673d6782bc82710f",
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "independent-retirement-version-delete",
+      "actor": "admin",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796ab6a749c575538589848343f"
+      },
+      "conditional": null,
+      "status": 204,
+      "version": "67220796ab6a749c575538589848343f",
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "independent-retirement-version-delete",
+      "actor": "admin",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796aba3a3e21e3551e7508a2404"
+      },
+      "conditional": null,
+      "status": 204,
+      "version": "67220796aba3a3e21e3551e7508a2404",
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "independent-retirement-version-delete",
+      "actor": "admin",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 204,
+      "version": "67220796b806984ae3a54404db9134f4",
+      "etag": null,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "original-version-erased",
+      "actor": "admin",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "query": {
+        "versionId": "67220796b806984ae3a54404db9134f4"
+      },
+      "conditional": null,
+      "status": 404,
+      "version": null,
+      "etag": null,
+      "errorCode": "NoSuchVersion",
+      "bodySHA256": "ce3b7a751b6971db568824e43eab31eb10e1cc18a934094ecd73b30a229608a8",
+      "bodyBytes": 410
+    }
+  ],
+  "cleanupFailures": [],
+  "runnerSHA256": "382ca0d1117938a7913bd80daeaffc07c8c95eadfddb11c3e9f0c08ef9f727da",
+  "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "containerID": "7b88578c2235bcb04fda8bb24b59e0cc1599d79cc9d8a4eab3bd273cccd00937",
+  "versionImmutabilityObserved": true,
+  "conditionalRace": [
+    {
+      "status": 200,
+      "version": "67220796aaec48d7673d6782bc82710f",
+      "etag": "\"a849999acfd505aa188ec9e0e04a4432\"",
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "f27dfd89ff50b5ef62c8bfc5a11bd04747223461dbfaa2aec2ed5a98a762e01e",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "4976321ee958320c6008693dd0bf5ce7f9e98e02659e8e5201e563f5d4f4bbe7",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "d6c6d043bf02694fc2edf4ada22c56e2bdea896475bb91ef655157c7ca2202ba",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "5258675699c4a693529bea41547d94648668bf638579fd0cca9c0ac140f565d7",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "af803f3a8ed7e9d30965758f6b6406ae28187fde865c6a7c07836557fa6c438c",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "c79e5cfdd3c55f3d5287f8373bff124aa662e4fdc39f64136553285e34c74442",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "68c6f304179d77f08b554ecb19b501231002f20bcf1cee34e115b0b6f67fe9a8",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "ffb1c8c0e956011846e8145d99bbfee19cf19799afdede82d2c4bd61b099f622",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "4f8d30da27f8246bf06cd473134b27025ef9510f4503cf8ae439da7b6a8c3df9",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "34a95b0e9ad0be4b0caaa22874a966d84df25db1655c5730b91965388daedd44",
+      "bodyBytes": 443
+    },
+    {
+      "status": 412,
+      "version": null,
+      "etag": null,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "fc3f003913e6e5b5853449cd49df8db71e128797e48b894cd1ba4a2e2ba0769f",
+      "bodyBytes": 443
+    }
+  ],
+  "versionsBeforeCleanup": [
+    {
+      "key": "hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/concurrent",
+      "version": "67220796aaec48d7673d6782bc82710f",
+      "bytes": 18
+    },
+    {
+      "key": "hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "version": "67220796ab6a749c575538589848343f",
+      "bytes": 30
+    },
+    {
+      "key": "hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "version": "67220796aba3a3e21e3551e7508a2404",
+      "bytes": 23
+    },
+    {
+      "key": "hub-owner-enrollment/v1/96150597-794f-440b-9f39-0d743cc44676/original",
+      "version": "67220796b806984ae3a54404db9134f4",
+      "bytes": 36
+    }
+  ],
+  "versionsAfterCleanup": [],
+  "immutableVersionCandidateChecksPassed": false,
+  "qualificationPassed": false,
+  "remaining": "Does not enforce one logical version per key. Component diagnostics cover conditional concurrency, process restart and exact version deletion; product accounting/recovery, persistent power-loss behavior and the installed version-required audit profile remain unqualified.",
+  "completed": true,
+  "exit": 0
+}

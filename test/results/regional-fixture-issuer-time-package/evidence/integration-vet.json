@@ -1,0 +1,33 @@
+{
+  "CGO_ENABLED": "1",
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "beforeMarkers": 0,
+  "command": [
+    "go",
+    "vet",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "phase": "integration-vet",
+  "seconds": 1.373
+}

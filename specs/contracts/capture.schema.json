@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture.schema.json",
+  "title": "Asservat capture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "DebugCapture"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/target.schema.json"
+            },
+            "recipeRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "name",
+                "digest"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "caseID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "grantRef": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "deadline": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sharing": {
+              "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+            },
+            "resultAccess": {
+              "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
+            },
+            "retention": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "target",
+            "recipeRef",
+            "reason",
+            "idempotencyKey",
+            "deadline"
+          ]
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/preset-input.schema.json#/$defs/capture"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/target.schema.json"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "caseID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "grantRef": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "deadline": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sharing": {
+              "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+            },
+            "profileComposition": {
+              "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
+            },
+            "resultAccess": {
+              "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
+            },
+            "retention": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "target",
+            "profileComposition",
+            "reason",
+            "idempotencyKey",
+            "deadline"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

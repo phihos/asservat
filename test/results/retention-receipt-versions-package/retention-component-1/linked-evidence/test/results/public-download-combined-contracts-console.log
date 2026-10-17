@@ -1,0 +1,47 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 72 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 2702 local links, 608 rejected invalid examples (9422 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1186, "rejectedInvalidCases": 120}
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 49 domain entities, 73 browser operations, 49 MCP schema pairs, 337 resolved references.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-downloads.py
+PASS: {"scope": "Synthetic download DTO checks only; real streams/local tools NOT RUN", "positiveChecks": 32, "rejectedInvalidCases": 152}
+cd web && npm run check
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+Native ESM auth and all five capture operation validators passed positive and negative checks.
+Native ESM case and download validators passed positive and negative checks.
+Native ESM download terminal-only status and complete native metadata guards passed for all three operations.
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+
+ Test Files  8 passed (8)
+      Tests  118 passed (118)
+   Start at  01:34:27
+   Duration  2.00s (environment 38%, tests 26%, transform 20%, import 15%)
+
+cd web && npm run build
+npm notice run @asservat/console@0.0.0 build
+npm notice run npm run contracts && tsc --noEmit && vite build
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1350 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.51 kB │ gzip:   0.31 kB
+dist/assets/index-8wPE5Nwz.css               3.42 kB │ gzip:   1.26 kB
+dist/assets/EvidenceWorkspace-Ckn1uG8f.js  189.81 kB │ gzip:  22.69 kB
+dist/assets/index-B92r33H3.js              868.01 kB │ gzip: 147.47 kB
+
+✓ built in 211ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

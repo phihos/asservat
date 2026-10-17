@@ -1,0 +1,36 @@
+# Launch result ordering correction
+
+The immutable launch-1 run, handle96691, compiled and vetted successfully but
+failed two focused race cases. Its11 payload/base entries and1491 dependencies
+remained unchanged. The original launch completed in4.696s; recording its result
+failed unavailable. The original failure logs and result remain untouched.
+
+The result path performed four complete source/enforcement passes inside one
+original five-second operation: ReadLaunched entry and exit, then Record entry
+and its final effect check. Only two are needed at these actual boundaries.
+
+The staged correction retains the complete source observation after SQL locks,
+then reads the exact launched Deployment and immutable original inputs passively.
+Every blocking object read checks the original context/end locally. Record reads
+the exact retained root under that original proof, compares full original state,
+rechecks objects and performs the full fresh negative RBAC/admission, guard,
+source and workload check immediately before the receipt CAS. A shorter bound is
+intersected; neither observation start nor expiry changes. Standalone completed
+replay still performs its own complete current proof. There is no cross-request
+proof cache or new effect authorization.
+
+The lost-claim test had a separate fake endpoint mismatch: its custom Secret CAS
+handler omitted the response TypeMeta normalization already present in the base
+fake API. The fixture now supplies the core API's v1/Secret response. The product
+decoder remains strict; unknown claimed work still has zero Deployment PUTs and
+cannot be repeated.
+
+New tests change admission enforcement during object reads and block actual
+provider reads or the final receipt CAS until the original operation expires.
+They require the intended blocking point to have been reached and zero successful
+receipt mutation or extra launch. Existing exact identity/spec, unknown-write and
+unknown-claim cases remain.
+
+These changes are frozen as the separate launch-2 overlay. It has not been run;
+the build/native hold remains in force. This correction does not implement the
+remaining fixed object producer or namespace guard handoff.

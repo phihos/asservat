@@ -1,0 +1,182 @@
+{{- include "asservat.bootstrap.validate" . -}}
+{{- if and .Values.bootstrap.enabled .Values.bootstrap.continuation.enabled }}
+{{- $b := .Values.bootstrap }}
+{{- $c := $b.continuation }}
+{{- range $p := list $c.workerProvider $c.ownerProvider }}
+{{- if or (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMount)) (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMountAccessor)) }}{{ fail "bootstrap.continuation requires both operator-created provider auth mounts and accessors" }}{{ end }}
+{{- end }}
+{{- if not (contains "-----BEGIN CERTIFICATE-----" $c.ownerIssuerRootsPEM) }}{{ fail "bootstrap.continuation.ownerIssuerRootsPEM requires the owner PKI roots" }}{{ end }}
+{{- $input := include "asservat.bootstrap.continuation" . }}
+{{- $name := printf "%s-continuation.%s" $b.name (substr 0 32 (sha256sum $input)) }}
+{{- $role := printf "%s-%s-bootstrap-continuation" .Release.Namespace $b.name }}
+# ADR-183: the runtime resources the continuation creates and launches, plus
+# exactly the permissions of the runtime Roles it creates. RBAC admits a Role
+# only when its creator holds every rule, so this avoids escalate and bind.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $role }}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, create, update]
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, create]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, create, update]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list]
+  - apiGroups: [asservat.io]
+    resources: [evidencestoragepools, evidencebudgetpolicies]
+    verbs: [get, list, create]
+  # ADR-189: the hub-worker's permission reader and guard probe.
+  - apiGroups: [asservat.io]
+    resources: [accessbindings, permissionsources]
+    verbs: [get, list, watch, create]
+  # ADR-195: the hub-worker's retention reader and guard probe, and the
+  # installation administrator's baseline policy and its later edits.
+  - apiGroups: [asservat.io]
+    resources: [evidenceretentionpolicies]
+    verbs: [get, list, watch, create, update]
+  # ADR-190: the owner's hub-cluster capacity observation reads metadata.
+  - apiGroups: [""]
+    resources: [namespaces, pods]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $role }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $role }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-bootstrap-runner" $b.name }}
+---
+# ADR-183 public continuation input. No credential is part of it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+immutable: true
+data:
+  continuation.json: {{ $input | quote }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ printf "%s-continuation" $b.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    asservat.io/private-role: bootstrap-continuation
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: hook-succeeded
+    asservat.io/bootstrap-input: {{ include "asservat.bootstrap.inputDigest" . | quote }}
+spec:
+  serviceAccountName: {{ printf "%s-bootstrap-runner" $b.name }}
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  restartPolicy: Never
+  activeDeadlineSeconds: 1800
+  terminationGracePeriodSeconds: 15
+  {{- if $b.registrySecret }}
+  imagePullSecrets:
+    - name: {{ $b.registrySecret | quote }}
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  initContainers:
+    # Re-projects the preparer inputs from passive history; on a completed
+    # installation it changes nothing.
+    - name: produce
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, initial-bootstrap]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-bootstrap-work
+        - name: producer-input
+          mountPath: /run/asservat/initial-bootstrap
+          readOnly: true
+  containers:
+    - name: continue
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, installer-continue]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-preparer
+          subPath: projection/preparer
+          readOnly: true
+        - name: continuation-input
+          mountPath: /run/asservat/installer-continue
+          readOnly: true
+  volumes:
+    - name: scratch
+      emptyDir:
+        medium: Memory
+        sizeLimit: 8Mi
+    - name: producer-input
+      projected:
+        defaultMode: 0440
+        sources: {{ include "asservat.bootstrap.commonProjection" . | nindent 10 }}
+          - secret:
+              name: {{ $b.secrets.producer | quote }}
+              optional: true
+              items:
+                - key: postgres-administrator.json
+                  path: postgres-administrator.json
+    - name: continuation-input
+      projected:
+        defaultMode: 0440
+        sources:
+          - configMap:
+              name: {{ $name }}
+              optional: false
+              items:
+                - key: continuation.json
+                  path: continuation.json
+          - serviceAccountToken:
+              path: administrator-token
+              expirationSeconds: 600
+              {{- if $b.probeAudience }}
+              audience: {{ $b.probeAudience | quote }}
+              {{- end }}
+          - secret:
+              name: {{ $b.secrets.producer | quote }}
+              optional: false
+              items:
+                - key: postgres-administrator.json
+                  path: postgres-administrator.json
+{{- end }}

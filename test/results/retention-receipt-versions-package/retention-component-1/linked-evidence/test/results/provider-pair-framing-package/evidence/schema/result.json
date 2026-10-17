@@ -1,0 +1,30 @@
+{
+  "manifest_sha256": "65ab99a3f23adbd58eb6a98c61be05c03a37c885ff64daed7ef4c13ebcc25db6",
+  "dependencies_sha256": "0f810d576162129a4c55b8a61292eeefd559d8e32c5afac63e57fab203ccc7e6",
+  "runner_sha256": "fee2a944778c45a5fe5b54fdf1542a2ded434f11ae2267cdfd241854add87ad8",
+  "before": {
+    "live_dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "foundation": [],
+    "tree": []
+  },
+  "runtime_executed": false,
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check"
+  ],
+  "exit": 0,
+  "seconds": 8.873,
+  "after": {
+    "live_dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "foundation": [],
+    "tree": []
+  },
+  "terminal_exit": 0
+}

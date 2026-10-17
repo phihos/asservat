@@ -1,0 +1,794 @@
+{
+  "observed_at": "2026-10-09T18:21:44.921516+00:00",
+  "limits": "Public repository metadata and up to five recent commits for selected smaller dependencies; not a security audit or a measure of response time. pushed_at can include bots or non-default branches.",
+  "repositories": [
+    {
+      "repository": "jackc/pgx",
+      "source": "https://api.github.com/repos/jackc/pgx",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2013-03-30T19:06:26Z",
+      "pushed_at": "2026-10-05T13:32:57Z",
+      "updated_at": "2026-10-09T17:47:18Z",
+      "default_branch": "master",
+      "open_issues_count": 219,
+      "html_url": "https://github.com/jackc/pgx",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "User"
+    },
+    {
+      "repository": "sqlc-dev/sqlc",
+      "source": "https://api.github.com/repos/sqlc-dev/sqlc",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2019-06-21T21:11:35Z",
+      "pushed_at": "2026-10-09T16:35:40Z",
+      "updated_at": "2026-10-09T17:49:58Z",
+      "default_branch": "main",
+      "open_issues_count": 699,
+      "html_url": "https://github.com/sqlc-dev/sqlc",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "pressly/goose",
+      "source": "https://api.github.com/repos/pressly/goose",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2016-02-25T20:39:37Z",
+      "pushed_at": "2026-10-03T00:22:52Z",
+      "updated_at": "2026-10-09T17:48:25Z",
+      "default_branch": "main",
+      "open_issues_count": 139,
+      "html_url": "https://github.com/pressly/goose",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "coreos/go-oidc",
+      "source": "https://api.github.com/repos/coreos/go-oidc",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2015-06-29T23:06:33Z",
+      "pushed_at": "2026-09-09T11:32:40Z",
+      "updated_at": "2026-10-09T17:55:57Z",
+      "default_branch": "v3",
+      "open_issues_count": 23,
+      "html_url": "https://github.com/coreos/go-oidc",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "lestrrat-go/jwx",
+      "source": "https://api.github.com/repos/lestrrat-go/jwx",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2015-11-04T05:12:52Z",
+      "pushed_at": "2026-10-09T06:09:44Z",
+      "updated_at": "2026-10-09T06:09:42Z",
+      "default_branch": "develop/v4",
+      "open_issues_count": 4,
+      "html_url": "https://github.com/lestrrat-go/jwx",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization",
+      "recent_commits_source": "https://api.github.com/repos/lestrrat-go/jwx/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "03115b66302db8d92de432c6dc3213615acc5e0a",
+          "date": "2026-10-09T06:09:36Z",
+          "author_login": "lestrrat",
+          "subject": "Merge pull request #2413 from lestrrat-go/fix-v4-numericdate-decimal",
+          "url": "https://github.com/lestrrat-go/jwx/commit/03115b66302db8d92de432c6dc3213615acc5e0a"
+        },
+        {
+          "sha": "04a53f042a31d741f0fc28f502523d92146f451b",
+          "date": "2026-10-09T04:53:47Z",
+          "author_login": "lestrrat",
+          "subject": "test exact parsing with a positive decimal",
+          "url": "https://github.com/lestrrat-go/jwx/commit/04a53f042a31d741f0fc28f502523d92146f451b"
+        },
+        {
+          "sha": "983720a01f103b83bccd6794deae5741507c9e01",
+          "date": "2026-10-09T04:25:16Z",
+          "author_login": "lestrrat",
+          "subject": "add Changes entry for decimal NumericDate",
+          "url": "https://github.com/lestrrat-go/jwx/commit/983720a01f103b83bccd6794deae5741507c9e01"
+        },
+        {
+          "sha": "9bd57184e52a3c617e50623b372094756d82a68e",
+          "date": "2026-10-09T02:59:15Z",
+          "author_login": "lestrrat",
+          "subject": "parse decimal NumericDate values without float64",
+          "url": "https://github.com/lestrrat-go/jwx/commit/9bd57184e52a3c617e50623b372094756d82a68e"
+        },
+        {
+          "sha": "74219ee915e944bf2d1668a99bd79e6c77574cac",
+          "date": "2026-10-09T02:43:38Z",
+          "author_login": "lestrrat",
+          "subject": "[v4] jwt: parse negative NumericDate values (#2411)",
+          "url": "https://github.com/lestrrat-go/jwx/commit/74219ee915e944bf2d1668a99bd79e6c77574cac"
+        }
+      ]
+    },
+    {
+      "repository": "santhosh-tekuri/jsonschema",
+      "source": "https://api.github.com/repos/santhosh-tekuri/jsonschema",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2017-05-09T22:41:26Z",
+      "pushed_at": "2026-09-21T14:33:11Z",
+      "updated_at": "2026-10-08T20:23:57Z",
+      "default_branch": "boon",
+      "open_issues_count": 45,
+      "html_url": "https://github.com/santhosh-tekuri/jsonschema",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "User",
+      "recent_commits_source": "https://api.github.com/repos/santhosh-tekuri/jsonschema/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "044d629dc1cb70d1d8ae72bcd650cd16e742946e",
+          "date": "2026-09-21T14:33:10Z",
+          "author_login": "BattleRattle",
+          "subject": "perf: use type switch in isInteger(v)",
+          "url": "https://github.com/santhosh-tekuri/jsonschema/commit/044d629dc1cb70d1d8ae72bcd650cd16e742946e"
+        },
+        {
+          "sha": "ec6106e5f0a342f025769a4da8e2d56c2dc10321",
+          "date": "2026-08-06T09:21:48Z",
+          "author_login": "santhosh-tekuri",
+          "subject": ".sum: update with v6.0.3",
+          "url": "https://github.com/santhosh-tekuri/jsonschema/commit/ec6106e5f0a342f025769a4da8e2d56c2dc10321"
+        },
+        {
+          "sha": "031fe8fd6e4c96e2fce87bdcd78977c47637a3ef",
+          "date": "2026-08-06T09:02:35Z",
+          "author_login": "santhosh-tekuri",
+          "subject": "release: 6.0.3",
+          "url": "https://github.com/santhosh-tekuri/jsonschema/commit/031fe8fd6e4c96e2fce87bdcd78977c47637a3ef"
+        },
+        {
+          "sha": "b0fc661f4939578bc429f408c18202573dbafcc4",
+          "date": "2026-06-28T17:38:00Z",
+          "author_login": "santhosh-tekuri",
+          "subject": "ci: upgrade golangci/golangci-lint-action from v4 to v6",
+          "url": "https://github.com/santhosh-tekuri/jsonschema/commit/b0fc661f4939578bc429f408c18202573dbafcc4"
+        },
+        {
+          "sha": "3d8c98fc8f0deb2620f01ba22d5990c979150a1b",
+          "date": "2026-06-28T17:11:21Z",
+          "author_login": "santhosh-tekuri",
+          "subject": "ci: upgrade actions/setup-go from v3 to v6",
+          "url": "https://github.com/santhosh-tekuri/jsonschema/commit/3d8c98fc8f0deb2620f01ba22d5990c979150a1b"
+        }
+      ]
+    },
+    {
+      "repository": "cyberphone/json-canonicalization",
+      "source": "https://api.github.com/repos/cyberphone/json-canonicalization",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2018-03-11T17:55:53Z",
+      "pushed_at": "2024-12-13T10:21:49Z",
+      "updated_at": "2026-10-09T11:34:19Z",
+      "default_branch": "master",
+      "open_issues_count": 9,
+      "html_url": "https://github.com/cyberphone/json-canonicalization",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "owner_type": "User",
+      "recent_commits_source": "https://api.github.com/repos/cyberphone/json-canonicalization/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "19d51d7fe467d4706a3ff08adf8a748f29fc21e0",
+          "date": "2024-12-13T10:21:44Z",
+          "author_login": "cyberphone",
+          "subject": "Update .project",
+          "url": "https://github.com/cyberphone/json-canonicalization/commit/19d51d7fe467d4706a3ff08adf8a748f29fc21e0"
+        },
+        {
+          "sha": "ba74d44ecf5f39a0508561875584eb08f888e808",
+          "date": "2023-12-17T05:06:01Z",
+          "author_login": "cyberphone",
+          "subject": "Merge pull request #31 from caryoscelus/python-improvements",
+          "url": "https://github.com/cyberphone/json-canonicalization/commit/ba74d44ecf5f39a0508561875584eb08f888e808"
+        },
+        {
+          "sha": "1b5643774554e3315919c6855b7f3e548cff05b7",
+          "date": "2023-12-17T05:02:23Z",
+          "author_login": "cyberphone",
+          "subject": "Merge pull request #30 from caryoscelus/python-license",
+          "url": "https://github.com/cyberphone/json-canonicalization/commit/1b5643774554e3315919c6855b7f3e548cff05b7"
+        },
+        {
+          "sha": "134a0893248310dce9493de4eacbe8d4ced28d19",
+          "date": "2023-12-10T20:55:46Z",
+          "author_login": "caryoscelus",
+          "subject": "Mention PSF license in python/Canonicalize",
+          "url": "https://github.com/cyberphone/json-canonicalization/commit/134a0893248310dce9493de4eacbe8d4ced28d19"
+        },
+        {
+          "sha": "ba8049cb67516b2da03156438b2f7cf84cc8f398",
+          "date": "2023-11-26T14:04:13Z",
+          "author_login": "caryoscelus",
+          "subject": "Python module: code improvements",
+          "url": "https://github.com/cyberphone/json-canonicalization/commit/ba8049cb67516b2da03156438b2f7cf84cc8f398"
+        }
+      ]
+    },
+    {
+      "repository": "gowebpki/jcs",
+      "source": "https://api.github.com/repos/gowebpki/jcs",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2021-02-02T00:46:27Z",
+      "pushed_at": "2026-09-21T02:02:19Z",
+      "updated_at": "2026-09-21T01:59:46Z",
+      "default_branch": "master",
+      "open_issues_count": 0,
+      "html_url": "https://github.com/gowebpki/jcs",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization",
+      "recent_commits_source": "https://api.github.com/repos/gowebpki/jcs/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "f5011b64e085aad7a0501c2d615065832d252a36",
+          "date": "2026-09-21T01:59:38Z",
+          "author_login": "jordan2175",
+          "subject": "fixes for various bugs",
+          "url": "https://github.com/gowebpki/jcs/commit/f5011b64e085aad7a0501c2d615065832d252a36"
+        },
+        {
+          "sha": "f0756e969be35a656e60167c7bbf0ed9ed9f6d0a",
+          "date": "2026-09-20T20:39:57Z",
+          "author_login": "jordan2175",
+          "subject": "fix reported issue 6",
+          "url": "https://github.com/gowebpki/jcs/commit/f0756e969be35a656e60167c7bbf0ed9ed9f6d0a"
+        },
+        {
+          "sha": "4229183ddaa1621a75ce3e8844c2c65c30386bde",
+          "date": "2026-09-20T20:33:50Z",
+          "author_login": "jordan2175",
+          "subject": "fix reported issue 5",
+          "url": "https://github.com/gowebpki/jcs/commit/4229183ddaa1621a75ce3e8844c2c65c30386bde"
+        },
+        {
+          "sha": "8e79e5cafeacac753597aa617af8d4b0ae4a5b0a",
+          "date": "2026-09-20T20:28:07Z",
+          "author_login": "jordan2175",
+          "subject": "fix reported issue 4",
+          "url": "https://github.com/gowebpki/jcs/commit/8e79e5cafeacac753597aa617af8d4b0ae4a5b0a"
+        },
+        {
+          "sha": "63520b07f9ccc5173494665c27298bfb6cfc03d2",
+          "date": "2026-09-20T20:23:22Z",
+          "author_login": "jordan2175",
+          "subject": "fix reported issue 3",
+          "url": "https://github.com/gowebpki/jcs/commit/63520b07f9ccc5173494665c27298bfb6cfc03d2"
+        }
+      ]
+    },
+    {
+      "repository": "gopacket/gopacket",
+      "source": "https://api.github.com/repos/gopacket/gopacket",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2022-08-13T01:00:34Z",
+      "pushed_at": "2026-10-02T22:21:40Z",
+      "updated_at": "2026-10-01T10:15:45Z",
+      "default_branch": "master",
+      "open_issues_count": 16,
+      "html_url": "https://github.com/gopacket/gopacket",
+      "license": {
+        "key": "bsd-3-clause",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "spdx_id": "BSD-3-Clause",
+        "url": "https://api.github.com/licenses/bsd-3-clause",
+        "node_id": "MDc6TGljZW5zZTU="
+      },
+      "owner_type": "Organization",
+      "recent_commits_source": "https://api.github.com/repos/gopacket/gopacket/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "11ee6a1cc01002505992cd9e102c004878201b34",
+          "date": "2026-10-01T10:15:35Z",
+          "author_login": "mosajjal",
+          "subject": "Revert \"packet: set zeroCopy in NewZeroCopyPacketSource (#172)\"",
+          "url": "https://github.com/gopacket/gopacket/commit/11ee6a1cc01002505992cd9e102c004878201b34"
+        },
+        {
+          "sha": "3541dd18fe648f1e659152020514010fbdc6bbea",
+          "date": "2026-10-01T10:12:21Z",
+          "author_login": "mosajjal",
+          "subject": "layers/gtp2: require the spare byte before reading it",
+          "url": "https://github.com/gopacket/gopacket/commit/3541dd18fe648f1e659152020514010fbdc6bbea"
+        },
+        {
+          "sha": "583e398accf875c7ca38bb09b336b278a9bbdd17",
+          "date": "2026-10-01T10:10:32Z",
+          "author_login": "mosajjal",
+          "subject": "pcap: let Close return while a read is blocked",
+          "url": "https://github.com/gopacket/gopacket/commit/583e398accf875c7ca38bb09b336b278a9bbdd17"
+        },
+        {
+          "sha": "c39583a1e3dee49237f349b151ab74f63dedc581",
+          "date": "2026-10-01T10:08:01Z",
+          "author_login": "mosajjal",
+          "subject": "pcap: stop linking -lpcap twice on darwin",
+          "url": "https://github.com/gopacket/gopacket/commit/c39583a1e3dee49237f349b151ab74f63dedc581"
+        },
+        {
+          "sha": "f8c0188bea63d74971090ffca485ca98a5eb1ae8",
+          "date": "2026-10-01T09:40:21Z",
+          "author_login": "hsdfat",
+          "subject": "packet: set zeroCopy in NewZeroCopyPacketSource (#172)",
+          "url": "https://github.com/gopacket/gopacket/commit/f8c0188bea63d74971090ffca485ca98a5eb1ae8"
+        }
+      ]
+    },
+    {
+      "repository": "google/gopacket",
+      "source": "https://api.github.com/repos/google/gopacket",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2015-03-16T20:46:00Z",
+      "pushed_at": "2025-03-19T23:47:36Z",
+      "updated_at": "2026-10-09T07:41:23Z",
+      "default_branch": "master",
+      "open_issues_count": 370,
+      "html_url": "https://github.com/google/gopacket",
+      "license": {
+        "key": "bsd-3-clause",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "spdx_id": "BSD-3-Clause",
+        "url": "https://api.github.com/licenses/bsd-3-clause",
+        "node_id": "MDc6TGljZW5zZTU="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "tink-crypto/tink-go",
+      "source": "https://api.github.com/repos/tink-crypto/tink-go",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2022-05-12T12:16:24Z",
+      "pushed_at": "2026-10-08T09:24:58Z",
+      "updated_at": "2026-10-08T16:27:26Z",
+      "default_branch": "main",
+      "open_issues_count": 30,
+      "html_url": "https://github.com/tink-crypto/tink-go",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "klauspost/compress",
+      "source": "https://api.github.com/repos/klauspost/compress",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2015-07-21T20:25:36Z",
+      "pushed_at": "2026-10-08T07:50:19Z",
+      "updated_at": "2026-10-09T17:48:12Z",
+      "default_branch": "master",
+      "open_issues_count": 4,
+      "html_url": "https://github.com/klauspost/compress",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "owner_type": "User"
+    },
+    {
+      "repository": "google/cel-go",
+      "source": "https://api.github.com/repos/google/cel-go",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2026-09-03T22:41:59Z",
+      "pushed_at": "2026-09-10T01:50:55Z",
+      "updated_at": "2026-10-03T18:06:02Z",
+      "default_branch": "main",
+      "open_issues_count": 1,
+      "html_url": "https://github.com/google/cel-go",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "blevesearch/bleve",
+      "source": "https://api.github.com/repos/blevesearch/bleve",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2014-04-17T21:02:18Z",
+      "pushed_at": "2026-10-09T06:58:30Z",
+      "updated_at": "2026-10-09T06:58:36Z",
+      "default_branch": "master",
+      "open_issues_count": 300,
+      "html_url": "https://github.com/blevesearch/bleve",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "secure-systems-lab/go-securesystemslib",
+      "source": "https://api.github.com/repos/secure-systems-lab/go-securesystemslib",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2021-09-09T23:38:26Z",
+      "pushed_at": "2026-09-17T13:40:05Z",
+      "updated_at": "2026-09-17T13:40:03Z",
+      "default_branch": "main",
+      "open_issues_count": 6,
+      "html_url": "https://github.com/secure-systems-lab/go-securesystemslib",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization",
+      "recent_commits_source": "https://api.github.com/repos/secure-systems-lab/go-securesystemslib/commits?per_page=5",
+      "recent_commits": [
+        {
+          "sha": "2bdfda1553aeb4f67541cb8e6f5ec7b212f4503a",
+          "date": "2026-09-17T13:39:57Z",
+          "author_login": "patzielinski",
+          "subject": "Merge pull request #171 from secure-systems-lab/dependabot/go_modules/golang.org/x/crypto-0.57.0",
+          "url": "https://github.com/secure-systems-lab/go-securesystemslib/commit/2bdfda1553aeb4f67541cb8e6f5ec7b212f4503a"
+        },
+        {
+          "sha": "3162178afe284e832751ab7d29642f589eba1e17",
+          "date": "2026-09-17T10:02:47Z",
+          "author_login": "dependabot[bot]",
+          "subject": "chore(deps): bump golang.org/x/crypto from 0.56.0 to 0.57.0",
+          "url": "https://github.com/secure-systems-lab/go-securesystemslib/commit/3162178afe284e832751ab7d29642f589eba1e17"
+        },
+        {
+          "sha": "66157cf20d796d4a63243de1216401358f8359d8",
+          "date": "2026-09-16T11:31:24Z",
+          "author_login": "adityasaky",
+          "subject": "Merge pull request #169 from secure-systems-lab/dependabot/go_modules/golang.org/x/crypto-0.56.0",
+          "url": "https://github.com/secure-systems-lab/go-securesystemslib/commit/66157cf20d796d4a63243de1216401358f8359d8"
+        },
+        {
+          "sha": "4e14019438c68f56be0a19154d1c84cb526b3f84",
+          "date": "2026-09-10T19:24:42Z",
+          "author_login": "patzielinski",
+          "subject": "go 1.27",
+          "url": "https://github.com/secure-systems-lab/go-securesystemslib/commit/4e14019438c68f56be0a19154d1c84cb526b3f84"
+        },
+        {
+          "sha": "b696eee302dad8e852b27f7dcf9dd9b8ee0aec0f",
+          "date": "2026-09-10T17:48:23Z",
+          "author_login": "patzielinski",
+          "subject": "Merge pull request #170 from arpitjain099/fix/signerverifier-key-type-panics",
+          "url": "https://github.com/secure-systems-lab/go-securesystemslib/commit/b696eee302dad8e852b27f7dcf9dd9b8ee0aec0f"
+        }
+      ]
+    },
+    {
+      "repository": "prometheus/procfs",
+      "source": "https://api.github.com/repos/prometheus/procfs",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2014-12-22T18:16:52Z",
+      "pushed_at": "2026-10-01T20:02:47Z",
+      "updated_at": "2026-10-08T15:53:33Z",
+      "default_branch": "master",
+      "open_issues_count": 53,
+      "html_url": "https://github.com/prometheus/procfs",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "modelcontextprotocol/go-sdk",
+      "source": "https://api.github.com/repos/modelcontextprotocol/go-sdk",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2025-04-23T10:07:33Z",
+      "pushed_at": "2026-10-09T12:50:39Z",
+      "updated_at": "2026-10-09T17:52:06Z",
+      "default_branch": "main",
+      "open_issues_count": 130,
+      "html_url": "https://github.com/modelcontextprotocol/go-sdk",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "kubernetes-sigs/controller-runtime",
+      "source": "https://api.github.com/repos/kubernetes-sigs/controller-runtime",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2018-06-07T15:08:03Z",
+      "pushed_at": "2026-10-05T13:34:42Z",
+      "updated_at": "2026-10-05T19:34:15Z",
+      "default_branch": "main",
+      "open_issues_count": 65,
+      "html_url": "https://github.com/kubernetes-sigs/controller-runtime",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "inspektor-gadget/inspektor-gadget",
+      "source": "https://api.github.com/repos/inspektor-gadget/inspektor-gadget",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2019-04-16T16:11:48Z",
+      "pushed_at": "2026-10-09T13:22:46Z",
+      "updated_at": "2026-10-09T13:11:28Z",
+      "default_branch": "main",
+      "open_issues_count": 414,
+      "html_url": "https://github.com/inspektor-gadget/inspektor-gadget",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "facebook/react",
+      "source": "https://api.github.com/repos/facebook/react",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2013-05-24T16:15:54Z",
+      "pushed_at": "2026-10-09T17:09:46Z",
+      "updated_at": "2026-10-09T18:20:02Z",
+      "default_branch": "main",
+      "open_issues_count": 1427,
+      "html_url": "https://github.com/react/react",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "adobe/react-spectrum",
+      "source": "https://api.github.com/repos/adobe/react-spectrum",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2019-09-13T23:32:51Z",
+      "pushed_at": "2026-10-08T23:00:43Z",
+      "updated_at": "2026-10-09T14:51:47Z",
+      "default_branch": "main",
+      "open_issues_count": 621,
+      "html_url": "https://github.com/adobe/react-spectrum",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "TanStack/query",
+      "source": "https://api.github.com/repos/TanStack/query",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2019-09-10T19:23:58Z",
+      "pushed_at": "2026-10-09T17:11:09Z",
+      "updated_at": "2026-10-09T17:50:04Z",
+      "default_branch": "main",
+      "open_issues_count": 166,
+      "html_url": "https://github.com/TanStack/query",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "remix-run/react-router",
+      "source": "https://api.github.com/repos/remix-run/react-router",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2014-05-16T22:22:51Z",
+      "pushed_at": "2026-10-09T18:13:03Z",
+      "updated_at": "2026-10-09T17:50:02Z",
+      "default_branch": "main",
+      "open_issues_count": 221,
+      "html_url": "https://github.com/remix-run/react-router",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "vitejs/vite",
+      "source": "https://api.github.com/repos/vitejs/vite",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2020-04-21T05:03:57Z",
+      "pushed_at": "2026-10-09T16:29:16Z",
+      "updated_at": "2026-10-09T17:50:21Z",
+      "default_branch": "main",
+      "open_issues_count": 757,
+      "html_url": "https://github.com/vitejs/vite",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "openapi-ts/openapi-typescript",
+      "source": "https://api.github.com/repos/openapi-ts/openapi-typescript",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2018-12-13T20:28:01Z",
+      "pushed_at": "2026-09-25T15:43:01Z",
+      "updated_at": "2026-10-09T13:51:15Z",
+      "default_branch": "main",
+      "open_issues_count": 285,
+      "html_url": "https://github.com/openapi-ts/openapi-typescript",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "oapi-codegen/oapi-codegen",
+      "source": "https://api.github.com/repos/oapi-codegen/oapi-codegen",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2019-02-27T23:59:59Z",
+      "pushed_at": "2026-10-08T17:30:01Z",
+      "updated_at": "2026-10-09T17:49:50Z",
+      "default_branch": "main",
+      "open_issues_count": 314,
+      "html_url": "https://github.com/oapi-codegen/oapi-codegen",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "aws/aws-sdk-go-v2",
+      "source": "https://api.github.com/repos/aws/aws-sdk-go-v2",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2017-07-02T05:30:15Z",
+      "pushed_at": "2026-10-09T17:18:16Z",
+      "updated_at": "2026-10-09T17:49:08Z",
+      "default_branch": "main",
+      "open_issues_count": 156,
+      "html_url": "https://github.com/aws/aws-sdk-go-v2",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "owner_type": "Organization"
+    },
+    {
+      "repository": "openbao/openbao",
+      "source": "https://api.github.com/repos/openbao/openbao",
+      "archived": false,
+      "disabled": false,
+      "created_at": "2023-11-09T18:17:33Z",
+      "pushed_at": "2026-10-08T08:12:40Z",
+      "updated_at": "2026-10-09T17:47:27Z",
+      "default_branch": "main",
+      "open_issues_count": 338,
+      "html_url": "https://github.com/openbao/openbao",
+      "license": {
+        "key": "mpl-2.0",
+        "name": "Mozilla Public License 2.0",
+        "spdx_id": "MPL-2.0",
+        "url": "https://api.github.com/licenses/mpl-2.0",
+        "node_id": "MDc6TGljZW5zZTE0"
+      },
+      "owner_type": "Organization"
+    }
+  ]
+}

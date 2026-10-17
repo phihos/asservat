@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-passive-history.schema.json",
+  "title": "Original private history-only bootstrap bundle",
+  "description": "At most 128 KiB before Kubernetes Secret encoding. One immutable separately protected copy of original SELECT-only history login and public pins; no manager/provider/DDL credentials or effect authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "seed",
+    "configuration",
+    "observation",
+    "history"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bootstrap-passive-history/v1"
+    },
+    "seed": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "configuration": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparer.schema.json"
+    },
+    "observation": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap-observation.schema.json"
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "password"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "pattern": "^asservat_init_[0-9a-f]{32}_history$"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    }
+  }
+}

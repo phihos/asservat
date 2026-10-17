@@ -1,0 +1,6 @@
+Forbidden worker bootstrap dependencies: []
+Binary SHA256: 7d763d1e572d890beec0404d23c3f1a34f1412cc619b96e846a8a0856a20988f
+{"arguments": [], "exit": 2, "output": "usage: asservat download-worker [protected startup arguments]\n"}
+{"arguments": ["unimplemented-role"], "exit": 2, "output": "usage: asservat download-worker [protected startup arguments]\n"}
+{"arguments": ["download-worker", "--token", "synthetic-must-not-echo"], "exit": 1, "output": "download worker stopped: configuration, credentials or original deadline unavailable\n"}
+PASS: compiled executable rejects unknown/incomplete startup without echoing inputs. No acquisition attempted.

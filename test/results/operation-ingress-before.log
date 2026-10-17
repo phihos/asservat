@@ -1,0 +1,10 @@
+--- FAIL: TestInvalidResolutionCannotConsumeProtectedAuditPool (0.02s)
+    --- FAIL: TestInvalidResolutionCannotConsumeProtectedAuditPool/schema (0.01s)
+        operation_ingress_lane_test.go:30: rejection spent protected resolution backing: intents=1 outcomes=1 resolutions=0
+    --- FAIL: TestInvalidResolutionCannotConsumeProtectedAuditPool/read-scope (0.01s)
+        operation_ingress_lane_test.go:30: rejection spent protected resolution backing: intents=1 outcomes=1 resolutions=0
+--- FAIL: TestAuditedOperationsValidateIdentityBeforeSQLTimestampFloor (0.01s)
+    operation_ingress_lane_test.go:47: SQL rounding made current identity appear future: err=identity not eligible intents=0
+FAIL
+FAIL	asservat.local/asservat/internal/transport/presentation	0.027s
+FAIL

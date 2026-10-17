@@ -1,0 +1,27 @@
+=== RUN   TestCustodyWithRealServices
+=== RUN   TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge
+=== RUN   TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission
+=== RUN   TestCustodyWithRealServices/protected_backing_cannot_be_overallocated
+=== RUN   TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_register
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_store
+=== RUN   TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished
+=== RUN   TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting
+    custody_test.go:528: real S3: current and noncurrent versions, delete marker and multipart parts removed; neighbor preserved; writer barrier failure kept charge
+=== RUN   TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation
+=== RUN   TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166)
+    custody_test.go:580: release after verified object custody unavailable; retain the original attempt and charge
+--- FAIL: TestCustodyWithRealServices (9.63s)
+    --- PASS: TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge (5.05s)
+    --- PASS: TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission (0.47s)
+    --- PASS: TestCustodyWithRealServices/protected_backing_cannot_be_overallocated (0.04s)
+    --- PASS: TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks (0.01s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_register (0.50s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_store (0.49s)
+    --- PASS: TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished (0.09s)
+    --- PASS: TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting (2.09s)
+    --- PASS: TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation (0.23s)
+    --- FAIL: TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166) (0.63s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	9.701s
+FAIL

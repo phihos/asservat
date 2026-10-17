@@ -1,0 +1,15 @@
+{
+  "scope": "Documentation status only after actual component checks, no source changes",
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "before": "d47faf271f4591d75f4c528a23b9aa7b9a8ef0b8e5fac618a501f5cea6c7d716",
+      "after": "c73e2eebd39c9203e647d96df125882f5605308dbf51f30047339a723c9448a4"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "before": "1bd33735443e513340d4fb4753171ba75cffcf6c3f9fb5c1b0d75c4f97879790",
+      "after": "637066361de565905adad32eb2301570f7d7b19a1e5ae3a16f57e59598be0ef4"
+    }
+  ]
+}

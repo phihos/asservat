@@ -1,0 +1,49 @@
+# ADR144 digest ownership correction
+
+Seven-path immutable correction over the integrated conversation checkpoint.
+Move the unchanged deterministic digest from domain/fleet to C-04
+application/fleet, update all callers, and correct architecture wording.
+No gate allowlist, wire field, canonical struct/tag, domain separator, request
+identity, error result or authority/deadline behavior changes.
+
+The new function is `fleet.ClusterObservationRequestDigest(domainRequest)`.
+The previous domain helper is deleted: the null payload entry is intentional.
+`bases.json` records all original live hashes; `payload.json` records the final
+six files plus that deletion. All 1,833 current live dependencies are in
+`dependencies.json`. No callback, runtime route or library is added.
+
+- Manifest: `72a80b493b31ada39b0f8e497521637ea265f9c7e5d8c04846c0e78c69dfd5f1`.
+- Pre-run freeze: `383553f14ded4387b5eeb41c94343f14c88e84e830fa0575406be3b6aacaf5ce`.
+- Actual v2 job: exec81427, terminal exit0.
+
+Evidence remains separate from frozen pre-run inputs. The runner refused an
+existing evidence directory and used explicit TMPDIR, GOMAXPROCS2 and -p2.
+Every phase verified the dependency/base/payload, live Go file set and frozen
+input hashes before and after; all drift lists stayed empty.
+
+Actual results:
+
+1. Prior v1 exec19339 reproduced the exact live failure with actual
+   `make go-architecture-check`: exit2 in3.636s, identifying the prohibited domain
+   crypto/sha256 import. Its after-architecture gate passed, then race compilation
+   failed because the moved helper's local `value` variable shadowed the domain
+   import alias. Vet was not run. Those original logs/reports are retained under
+   `../regional-observation-digest-layer-20261013/evidence/`.
+2. V2 changes only that local identifier to `wire`. The canonical bytes and all
+   updated caller code remain exactly as in v1. The passing architecture gate
+   took2.634s; focused race tests took8.856s; four-package vet took3.551s.
+3. Tests compare all four purposes against the pre-extraction canonical wire
+   algorithm and cover field mutations, key ordering, nil/empty and partial
+   optional values. Existing local HTTP/TLS tests and the new exact channel,
+   late attachment, revocation and joined cancellation cases also pass. The
+   application package compiled but had no matching standalone tests; its
+   digest is exercised from the transport and mTLS tests.
+
+The exact commands are in `evidence/{after-architecture,race,vet}.json`.
+`result-files.json` pins both runs' report/log identities. Native/installed
+routing and the concrete stream remain pending; this is an ownership correction
+with focused component verification, not another native qualification claim.
+
+Parent may integrate this deletion/addition with the separately reviewed
+producer fixture package, then run combined static/native gates. No further
+build is active or scheduled here.

@@ -1,0 +1,12 @@
+{
+  "source": "/home/phil/.cache/asservat-build/planning/owner-audit-inventory-20261013/epoch-source-checkpoint-3",
+  "manifest": "e30abd008e800b13fe8e1f8c44469aa4f70cef8f40c43762e59e4cd29dcff99a",
+  "draftBeforePath": "internal/domain/fleet/owner_audit_epoch_observation.go",
+  "draftBeforeSHA256": "8e18c5dc6bc2766109e0847fb8dbe794001e5681860ea8f6f2832a34b9abf098",
+  "dependencyCount": 4367,
+  "dependencies": "d81bd06aeed463e7b68857ad8d3946dcfd465bc64dbcfbc984271ac8b99cb170",
+  "runner": "559cc0a3503ff2e692a8d781fd4b30869e6721577532a702eb165b23b00fe192",
+  "freezer": "745e5b195747b62409d9ad706634ff5baa364c8a39a350f0c3be370a6cd48212",
+  "native": false,
+  "scope": "Unselected values and complete affected package checks; no production epoch implementation or SQL/runtime qualification"
+}

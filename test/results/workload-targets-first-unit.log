@@ -1,0 +1,39 @@
+ok  	asservat.local/asservat/internal/domain/targets	1.006s
+--- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner (1.15s)
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/deployment (0.05s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/statefulset (0.05s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/expressions (0.05s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout%2Ctrack+in+%28stable%29&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/foreign-only (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/empty (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/namespace-replaced (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/workload-replaced (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/pod-replaced (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/node-rebooted (0.05s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-incomplete (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-oversized (0.08s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-wrong-label (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-duplicate-name (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-duplicate-uid (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/list-missing-rv (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/late-original (0.05s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+    --- FAIL: TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner/clock-rollback (0.04s)
+        workload_targets_test.go:120: unexpected candidate enumeration: labelSelector=app%3Dcheckout&limit=257&timeout=5s
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	1.225s
+FAIL

@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/investigation-access.schema.json",
+  "title": "Bounded same-human investigation access; service binds resolved scope to one capture",
+  "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "read_memory",
+              "debugger_command",
+              "pcap_query",
+              "syscall_query",
+              "download_artifact"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "clientIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "maxArtifacts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "maxOperations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "actionIds",
+        "operations",
+        "clientIDs",
+        "maxArtifacts",
+        "maxBytes",
+        "maxOperations",
+        "notAfter"
+      ]
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "read_memory",
+              "debugger_command",
+              "pcap_query",
+              "syscall_query",
+              "download_artifact"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "clientIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "maxArtifacts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "maxOperations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "actionIds",
+        "operations",
+        "clientIDs",
+        "maxArtifacts",
+        "maxBytes",
+        "maxOperations",
+        "notAfter",
+        "digest"
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parentGrantID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "captureUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "executionDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resultAccessDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "actionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "parentGrantID",
+        "captureUID",
+        "executionDigest",
+        "resultAccessDigest",
+        "actionID"
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "NotRequested",
+            "AwaitingReview",
+            "WaitingForArtifacts",
+            "Ready",
+            "Partial",
+            "Expired",
+            "Revoked",
+            "Unavailable"
+          ]
+        },
+        "scopeDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "grantIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uniqueItems": true,
+          "maxItems": 64
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifactsRegistered": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "bytesReserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "bytesSpent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "operationsReserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "operationsSpent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "artifactsRegistered",
+        "bytesReserved",
+        "bytesSpent",
+        "operationsReserved",
+        "operationsSpent"
+      ]
+    }
+  }
+}

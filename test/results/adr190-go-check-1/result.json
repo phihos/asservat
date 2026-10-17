@@ -1,0 +1,11 @@
+{
+  "name": "adr190-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-190 steps 1-5: capacity CRDs and check, capacity sources and live guard proofs, the qualification builder, continuation capacity initialization inside a role operation, InitializeCapacity stage labels, the bracketed capacity setup completion, and runtime audit profile selection (SelectedOperationAuditor, OwnerPublicDeployment.Capacity)",
+  "results": "55 full packages and 558 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip",
+  "sourceHashBefore": "b5aefa77940e4f86e3a284838ee8b817580849916400bb1b17b5ea0dde94fad5",
+  "sourceHashAfter": "b5aefa77940e4f86e3a284838ee8b817580849916400bb1b17b5ea0dde94fad5",
+  "log": "go-check.log"
+}

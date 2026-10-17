@@ -1,0 +1,15 @@
+=== RUN   TestDatabaseRecoveryAfterRestartAndRestore
+    database_recovery_test.go:114: verified database recovery phase: initial
+--- PASS: TestDatabaseRecoveryAfterRestartAndRestore (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.097s
+=== RUN   TestDatabaseRecoveryAfterRestartAndRestore
+    database_recovery_test.go:114: verified database recovery phase: restarted
+--- PASS: TestDatabaseRecoveryAfterRestartAndRestore (0.05s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.100s
+=== RUN   TestDatabaseRecoveryAfterRestartAndRestore
+    database_recovery_test.go:114: verified database recovery phase: restored
+--- PASS: TestDatabaseRecoveryAfterRestartAndRestore (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.095s

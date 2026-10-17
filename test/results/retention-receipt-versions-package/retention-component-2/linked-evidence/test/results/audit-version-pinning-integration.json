@@ -1,0 +1,52 @@
+{
+  "integratedAt": "2026-10-13T10:50:03.453957+00:00",
+  "manifest": "7d335bb812aa0bf0924af45bb3ca82dc88cb0bd01a162b184fc301e20ddb239b",
+  "result": "4ed38d7b15824914aa786eff03fee1a08521e998f3a2628f3eaefde3ba7ee854",
+  "files": [
+    {
+      "path": "internal/adapters/objectstore/audit_receipt.go",
+      "base": null,
+      "payload": "1fa0e68631fec1b58a78efb5ec9d7d431cb654684ce9d38ac6ca7051c68629ff"
+    },
+    {
+      "path": "internal/adapters/objectstore/audit_receipt_test.go",
+      "base": null,
+      "payload": "f62c7f0a36517de01915111e4d96b4a2038c13585d53ecdc41522f82c87eb35f"
+    },
+    {
+      "path": "internal/adapters/objectstore/download_stop_lifecycle.go",
+      "base": "657b34b14fe2b00cc55f378ee71883855107a223167b09e6a8bd84740b78b89e",
+      "payload": "d6b16e28c2e83a56da5080886c1a748f29b24b70341bee6ad3ebe53ad6824b8d"
+    },
+    {
+      "path": "internal/adapters/objectstore/initial_installation.go",
+      "base": "2a4df75d53944ef53b954260555329179c7210fe6921d3b29c673b4718516426",
+      "payload": "1259b60ec3150bfc2c31d9eb177e34425ec14910250722b9228f90dbf89c6cb1"
+    },
+    {
+      "path": "internal/adapters/objectstore/operation_lifecycle.go",
+      "base": "e54a03946dd51df74a961587c4f2d74d6887b55c55c929195f088e3cd13a4855",
+      "payload": "f4c989ba93abdf73b3c30cd6f81aef86aa8e58dd0bb354d5f36aa1425eab333d"
+    }
+  ],
+  "sourceDependenciesVerified": 3018,
+  "native": false,
+  "scope": "Exact known audit version readback; no change to existing-object reconciliation, writer claims or retirement authority",
+  "archive": {
+    "test/results/audit-version-pinning-package/dependencies.json": "9d4df755b125d847938797c7d725be2c0324e4fc23f87b8f20cff6f15643a3c2",
+    "test/results/audit-version-pinning-package/manifest.json": "7d335bb812aa0bf0924af45bb3ca82dc88cb0bd01a162b184fc301e20ddb239b",
+    "test/results/audit-version-pinning-package/overlay.json": "54bc1f5a071e7366774b5c33f5005cbdd3142614f0cae99a390a92c97268fed4",
+    "test/results/audit-version-pinning-package/before-overlay.json": "8143a7eb1423933314ed95fb2ffbd3f1463c3e3a4d4eadf92909c63191a8b83c",
+    "test/results/audit-version-pinning-package/compile.log": "19c1d677dd554f3456fe260d2c92d91efbdd12b7d71a5c68d414a2054d9ac533",
+    "test/results/audit-version-pinning-package/before.log": "53e9b0b18e60326e66f5c9506d24467e63e206506bc0ab4d13c4664cabeb5934",
+    "test/results/audit-version-pinning-package/races.log": "af45c38d25003c07e14100d471fab5374b4928751d584f2396160873f45492a5",
+    "test/results/audit-version-pinning-package/installer.log": "eeb79e11df2954304d24b589609faa3ce11add6d27e5dad348771766db23840a",
+    "test/results/audit-version-pinning-package/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test/results/audit-version-pinning-package/result.json": "4ed38d7b15824914aa786eff03fee1a08521e998f3a2628f3eaefde3ba7ee854",
+    "test/results/audit-version-pinning-package/payloads/internal/adapters/objectstore/audit_receipt.go.txt": "1fa0e68631fec1b58a78efb5ec9d7d431cb654684ce9d38ac6ca7051c68629ff",
+    "test/results/audit-version-pinning-package/payloads/internal/adapters/objectstore/audit_receipt_test.go.txt": "f62c7f0a36517de01915111e4d96b4a2038c13585d53ecdc41522f82c87eb35f",
+    "test/results/audit-version-pinning-package/payloads/internal/adapters/objectstore/download_stop_lifecycle.go.txt": "d6b16e28c2e83a56da5080886c1a748f29b24b70341bee6ad3ebe53ad6824b8d",
+    "test/results/audit-version-pinning-package/payloads/internal/adapters/objectstore/initial_installation.go.txt": "1259b60ec3150bfc2c31d9eb177e34425ec14910250722b9228f90dbf89c6cb1",
+    "test/results/audit-version-pinning-package/payloads/internal/adapters/objectstore/operation_lifecycle.go.txt": "f4c989ba93abdf73b3c30cd6f81aef86aa8e58dd0bb354d5f36aa1425eab333d"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "path": "test/integration/public_context_journey_test.go",
+  "before": "369827357cf4271384f7eb88297613d1d7cb78a0bb3ffead21a6079a8f131963",
+  "after": "047e024915c028373a6eb7c40ad14b4b9ed2add5bb4279485ba7b1434902318a",
+  "reason": "Independent review: require exact identity denial with no metadata and exact anonymous HTTP 401; reject arbitrary unavailable/empty outcomes."
+}

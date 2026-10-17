@@ -1,0 +1,463 @@
+package contextstart
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	executionapp "asservat.local/asservat/internal/application/execution"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+func leaseTestStream(t *testing.T, ctx context.Context, channel fleet.APIContextChannel, check ReceiverCheck) (*frameStream, func(contracts.APIContextFrame)) {
+	t.Helper()
+	read, write := io.Pipe()
+	s, e := newFrameStream(ctx, channel, check, read, io.Discard,
+		func(time.Time) error { return nil }, func(time.Time) error { return nil },
+		func() error { return nil }, func() { _ = read.Close() })
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = s.Close(); _ = write.Close() })
+	send := func(f contracts.APIContextFrame) {
+		t.Helper()
+		done := make(chan error, 1)
+		go func() { done <- contracts.WriteAPIContextFrame(write, f) }()
+		// Every producer is joined even when the consumer fails early.
+		t.Cleanup(func() { _ = read.Close(); _ = write.Close(); <-done })
+	}
+	return s, send
+}
+func leaseTestWork(t *testing.T, s *frameStream, write func(contracts.APIContextFrame), ctx context.Context) fleet.APIContextReceiver {
+	t.Helper()
+	write(contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")})
+	f, observed, e := s.AwaitWork(ctx)
+	clear(f.Payload)
+	if e != nil {
+		t.Fatal("initial complete work proof", e)
+	}
+	return observed
+}
+
+func TestContextStreamWorkLeaseExpiresBetweenFramesWithoutRefresh(t *testing.T) {
+	w, _ := identityFixture()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var calls atomic.Int32
+	check := func(context.Context) (fleet.APIContextReceiver, error) {
+		calls.Add(1)
+		now := time.Now()
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(150 * time.Millisecond)}, nil
+	}
+	s, write := leaseTestStream(t, ctx, w.Work.Channel, check)
+	first := leaseTestWork(t, s, write, ctx)
+	select {
+	case <-s.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("idle lease expiry did not cancel its original stream")
+	}
+	if time.Now().Before(first.ValidUntil) {
+		t.Fatal("lease canceled before its bound")
+	}
+	if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: []byte("request")}); !errors.Is(e, fleet.ErrUnavailable) {
+		t.Fatal("expired work resumed", e)
+	}
+	if _, _, e := s.AwaitWork(ctx); e == nil {
+		t.Fatal("same stream acquired replacement work")
+	}
+	if calls.Load() != 1 {
+		t.Fatal("expiry refreshed a stale observation", calls.Load())
+	}
+}
+
+func TestContextStreamWorkLeaseFinalObservationCannotExtendOriginal(t *testing.T) {
+	for _, shorter := range []bool{false, true} {
+		name := "later-final-proof"
+		if shorter {
+			name = "shorter-final-proof"
+		}
+		t.Run(name, func(t *testing.T) {
+			w, _ := identityFixture()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var calls atomic.Int32
+			var original, final time.Time
+			check := func(c context.Context) (fleet.APIContextReceiver, error) {
+				now := time.Now()
+				n := calls.Add(1)
+				until := now.Add(350 * time.Millisecond)
+				if n == 1 {
+					original = until
+				} else {
+					if d, ok := c.Deadline(); !ok || d.After(original) {
+						t.Error("final current read escaped original work proof")
+					}
+					until = now.Add(4 * time.Second)
+					if shorter {
+						until = now.Add(100 * time.Millisecond)
+					}
+					final = until
+				}
+				return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: until}, nil
+			}
+			s, write := leaseTestStream(t, ctx, w.Work.Channel, check)
+			first := leaseTestWork(t, s, write, ctx)
+			if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")}); e != nil {
+				t.Fatal(e)
+			}
+			got, _, e := s.observePeer(ctx, peerFrame)
+			if e != nil || got.ObservedAt != first.ObservedAt || got.Channel != first.Channel || got.ValidUntil.After(first.ValidUntil) {
+				t.Fatal("final proof replaced original lease", got, e)
+			}
+			bound := original
+			if shorter {
+				bound = final
+			}
+			if !got.ValidUntil.Equal(bound) {
+				t.Fatal("earliest original/current bound lost")
+			}
+			select {
+			case <-s.Context().Done():
+			case <-time.After(time.Second):
+				t.Fatal("minimum final bound did not cancel idle stream")
+			}
+			if calls.Load() != 2 {
+				t.Fatal("wrong boundary checks", calls.Load())
+			}
+		})
+	}
+}
+
+func TestContextStreamWorkLeaseFinalCurrentNegativeIsTerminal(t *testing.T) {
+	for _, endpoint := range []string{"regional-send", "hub-receive"} {
+		for _, reason := range []string{"private-error", "channel-change", "late-positive"} {
+			t.Run(endpoint+"/"+reason, func(t *testing.T) {
+				w, _ := identityFixture()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				var calls atomic.Int32
+				secret := &streamPrivateError{}
+				check := func(c context.Context) (fleet.APIContextReceiver, error) {
+					now := time.Now()
+					out := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+					if calls.Add(1) == 2 {
+						switch reason {
+						case "private-error":
+							return fleet.APIContextReceiver{}, secret
+						case "channel-change":
+							out.Channel.ConnectorLeaf[0]++
+						case "late-positive":
+							cancel()
+						}
+					}
+					return out, nil
+				}
+				s, write := leaseTestStream(t, ctx, w.Work.Channel, check)
+				if endpoint == "regional-send" {
+					leaseTestWork(t, s, write, ctx)
+				} else {
+					if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")}); e != nil {
+						t.Fatal(e)
+					}
+				}
+				var e error
+				if endpoint == "regional-send" {
+					e = s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")})
+				} else {
+					write(contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")})
+					var f contracts.APIContextFrame
+					f, e = s.Receive(ctx)
+					if len(f.Payload) != 0 {
+						t.Fatal("unverified final result escaped")
+					}
+				}
+				if !errors.Is(e, fleet.ErrUnavailable) {
+					t.Fatal("final negative accepted or normalization changed", e)
+				}
+				if s.Context().Err() == nil {
+					t.Fatal("known negative left lease usable")
+				}
+				if e = s.Send(context.Background(), contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: []byte("receipt")}); e == nil {
+					t.Fatal("known negative resumed receipt")
+				}
+				if calls.Load() != 2 {
+					t.Fatal("negative retried or refreshed", calls.Load())
+				}
+			})
+		}
+	}
+}
+
+func TestContextStreamWorkLeaseDoesNotCacheCurrentHumanIdentity(t *testing.T) {
+	// This uses the actual conversation and original HubIdentity. Only peer
+	// observations are reusable; each challenge still invokes its human owner.
+	w, i := identityFixture()
+	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+	defer cancel()
+	var peers, humans atomic.Int32
+	s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
+		peers.Add(1)
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+	})
+	firstHuman := make(chan struct{})
+	current := currentFunc(func(context.Context) (identity.Identity, error) {
+		if humans.Add(1) == 2 {
+			return identity.Identity{}, identity.ErrUnavailable
+		}
+		close(firstHuman)
+		return i, nil
+	})
+	done := make(chan error, 1)
+	go func() {
+		defer close(done)
+		_, e := ServeHub(ctx, s, w.Work, []byte("signed"), current, time.Now)
+		done <- e
+	}()
+	t.Cleanup(func() { cancel(); _ = s.Close(); <-done })
+	for sequence := 1; sequence <= 2; sequence++ {
+		q, e := contracts.EncodeAPIContextIdentityRequest(contracts.APIContextIdentityRequest{Format: contracts.APIContextExchangeFormat, ExchangeID: w.Work.Channel.ExchangeID, CaptureID: w.Work.CaptureID, Sequence: int64(sequence), Challenge: "33000000-0000-4000-8000-00000000000" + string(rune('0'+sequence))})
+		if e != nil {
+			t.Fatal(e)
+		}
+		write(contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: q})
+		if sequence == 1 {
+			select {
+			case <-firstHuman:
+			case <-ctx.Done():
+				t.Fatal("first original human call not reached")
+			}
+		}
+	}
+	select {
+	case e := <-done:
+		if e == nil {
+			t.Fatal("changed current identity accepted")
+		}
+	case <-time.After(time.Second):
+		cancel()
+		<-done
+		t.Fatal("current identity rejection blocked")
+	}
+	if humans.Load() != 2 || peers.Load() != 1 {
+		t.Fatal("identity was cached or peer work proof was repeated", humans.Load(), peers.Load())
+	}
+}
+
+func TestContextStreamWorkLeaseRejectsUnexpectedFrameOrder(t *testing.T) {
+	for _, regional := range []bool{false, true} {
+		for _, kind := range []contracts.APIContextFrameKind{contracts.APIContextWorkFrame, contracts.APIContextIdentityRequestFrame, contracts.APIContextIdentityResponseFrame, contracts.APIContextResultFrame, contracts.APIContextReceiptFrame} {
+			name := "hub"
+			if regional {
+				name = "regional"
+			}
+			t.Run(fmt.Sprintf("%s/inbound-%d", name, kind), func(t *testing.T) {
+				w, _ := identityFixture()
+				ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+				defer cancel()
+				calls := 0
+				s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
+					calls++
+					return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+				})
+				if regional {
+					leaseTestWork(t, s, write, ctx)
+				} else {
+					if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")}); e != nil {
+						t.Fatal(e)
+					}
+				}
+				if !regional && (kind == contracts.APIContextIdentityRequestFrame || kind == contracts.APIContextResultFrame) {
+					// One question is legal; another before its response is not.
+					write(contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: []byte("request")})
+					f, e := s.Receive(ctx)
+					clear(f.Payload)
+					if e != nil {
+						t.Fatal(e)
+					}
+				}
+				write(contracts.APIContextFrame{Kind: kind, Payload: []byte("unexpected")})
+				f, e := s.Receive(ctx)
+				if e == nil || len(f.Payload) != 0 || s.Context().Err() == nil || calls != 1 {
+					t.Fatal("unexpected inbound kind/order escaped or obtained another proof", e, calls)
+				}
+			})
+		}
+	}
+	t.Run("result-while-identity-pending", func(t *testing.T) {
+		w, _ := identityFixture()
+		ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+		defer cancel()
+		calls := 0
+		s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
+			calls++
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		})
+		leaseTestWork(t, s, write, ctx)
+		if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: []byte("request")}); e != nil {
+			t.Fatal(e)
+		}
+		if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")}); e == nil || calls != 1 || s.Context().Err() == nil {
+			t.Fatal("interleaved result acquired final proof", e, calls)
+		}
+	})
+}
+
+func TestContextStreamWorkLeaseCallerCancellationAndFinalJoin(t *testing.T) {
+	t.Run("already-canceled-frame", func(t *testing.T) {
+		w, _ := identityFixture()
+		ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+		defer cancel()
+		calls := 0
+		s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
+			calls++
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		})
+		leaseTestWork(t, s, write, ctx)
+		canceled, stop := context.WithCancel(ctx)
+		stop()
+		if e := s.Send(canceled, contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: []byte("request")}); e == nil || s.Context().Err() == nil || calls != 1 {
+			t.Fatal("canceled work retained reusable transport", e, calls)
+		}
+	})
+	t.Run("late-final-producer-joined", func(t *testing.T) {
+		w, _ := identityFixture()
+		ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+		defer cancel()
+		entered, canceled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		var once sync.Once
+		unblock := func() { once.Do(func() { close(release) }) }
+		defer unblock()
+		var calls atomic.Int32
+		s, write := leaseTestStream(t, ctx, w.Work.Channel, func(c context.Context) (fleet.APIContextReceiver, error) {
+			if calls.Add(1) == 2 {
+				close(entered)
+				<-c.Done()
+				close(canceled)
+				<-release
+			}
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		})
+		leaseTestWork(t, s, write, ctx)
+		result := make(chan error, 1)
+		go func() {
+			result <- s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")})
+		}()
+		select {
+		case <-entered:
+		case <-ctx.Done():
+			t.Fatal("final producer not entered")
+		}
+		joined := make(chan struct{})
+		go func() { _ = s.Close(); close(joined) }()
+		select {
+		case <-canceled:
+		case <-time.After(time.Second):
+			t.Fatal("close did not cancel original producer")
+		}
+		select {
+		case <-joined:
+			t.Fatal("close lost original producer handle")
+		default:
+		}
+		unblock()
+		select {
+		case <-joined:
+		case <-time.After(time.Second):
+			t.Fatal("released final producer did not join")
+		}
+		if e := <-result; e == nil || calls.Load() != 2 {
+			t.Fatal("late positive escaped or final producer retried", e, calls.Load())
+		}
+	})
+}
+
+func TestContextStreamWorkLeaseAwaitWorkExposesShorterCallerToVerifier(t *testing.T) {
+	w, _ := identityFixture()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	until, _ := ctx.Deadline()
+	proof := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+	if !proof.ValidUntil.After(until) {
+		t.Fatal("fixture lacks original shorter caller")
+	}
+	calls := 0
+	s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) { calls++; return proof, nil })
+	write(contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")})
+	verified, executed := 0, 0
+	e := ServeRegional(ctx, s, proof, s.check, streamDiagnosticVerifier(func(c context.Context, _ []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
+		verified++
+		if r.Channel != proof.Channel || r.ObservedAt != proof.ObservedAt || !r.ValidUntil.Equal(until) {
+			t.Error("verifier received a later cutoff than the work lease")
+		}
+		if d, ok := c.Deadline(); !ok || d.After(until) {
+			t.Error("verifier escaped original caller")
+		}
+		// Rejection intentionally prevents an effect; this regression qualifies
+		// the actual passive-read/verifier handoff, not signature authority.
+		return fleet.AuthenticatedAPIContextWork{}, fleet.ErrDenied
+	}), streamDiagnosticExecutor(func(context.Context, fleet.AuthenticatedAPIContextWork, identities.CurrentIdentity) (executionapp.ContextResult, error) {
+		executed++
+		return executionapp.ContextResult{}, nil
+	}), time.Now)
+	if e != fleet.ErrDenied || calls != 1 || verified != 1 || executed != 0 {
+		t.Fatal("wrong original handoff", e, calls, verified, executed)
+	}
+}
+
+func TestContextStreamWorkLeaseConcurrentCloseStopsAndJoinsOnce(t *testing.T) {
+	w, _ := identityFixture()
+	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+	defer cancel()
+	s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+	})
+	leaseTestWork(t, s, write, ctx)
+	s.mu.Lock()
+	bound := s.leaseBounds[0]
+	// Deterministically arrange the real AfterFunc "stopped before callback"
+	// outcome. No callback can close done. Expose the winning true result to
+	// the first cleanup, exactly as a stop winning its cancellation race does.
+	stopped := bound.stop()
+	var stops atomic.Int32
+	s.leaseBounds[0].stop = func() bool { return stops.Add(1) == 1 }
+	s.mu.Unlock()
+	if !stopped {
+		t.Fatal("live original lease callback already ran")
+	}
+	// Releases a broken pre-fix repeated join after timeout without leaking it.
+	var release sync.Once
+	unblock := func() { release.Do(func() { close(bound.done) }) }
+	defer unblock()
+	first := make(chan struct{})
+	go func() { _ = s.Close(); close(first) }()
+	select {
+	case <-first:
+	case <-time.After(time.Second):
+		t.Fatal("first close did not complete")
+	}
+	all := make(chan struct{})
+	var callers sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		callers.Add(1)
+		go func() { defer callers.Done(); _ = s.Close() }()
+	}
+	go func() { callers.Wait(); close(all) }()
+	select {
+	case <-all:
+	case <-time.After(time.Second):
+		unblock()
+		<-all
+		t.Fatal("repeated close waited for a callback already stopped by the first close")
+	}
+	if stops.Load() != 1 {
+		t.Fatal("callback cleanup repeated", stops.Load())
+	}
+}

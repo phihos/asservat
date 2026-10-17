@@ -1,0 +1,3 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-identity.py
+Owned TLS Keycloak ready; running provider qualification
+Provider test exit: 0

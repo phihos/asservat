@@ -1,0 +1,16 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-vet=off",
+    "-count=1",
+    "-timeout=30s",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/diagnostic-2/overlay.json",
+    "-run=^TestRecordSyntheticProviderSetupProbe$",
+    "./internal/adapters/providerconfig"
+  ],
+  "exit": 0,
+  "changed": [],
+  "seconds": 0.843
+}

@@ -1,0 +1,62 @@
+from pathlib import Path
+import hashlib,json,subprocess,os,time,signal,sys,tempfile,shutil
+c=Path(__file__).parent;live=Path('/home/phil/Projekte/asservat')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert h(c/'manifest.json')=='92586dc39d1d098a31c9f5805ff166c18cf56c05733489d8d17894e116a5df26'
+assert h(c/'dependencies.json')=='bbbf5d64da5e21a33797f48c16394c7b666d1e2b827edc93748a4c73b0d9f87c'
+m=json.loads((c/'manifest.json').read_text());deps=json.loads((c/'dependencies.json').read_text());prior=json.loads((c/'prior-evidence.json').read_text())
+args=['api','cmd','internal','migrations','test/integration','scripts','specs','docs','Makefile','README.md','go.mod','go.sum','requirements-spec.txt']
+def verify():
+ inventory=set(subprocess.check_output(['rg','--files',*args],cwd=live,text=True).splitlines())
+ return {'payloads':[x['path'] for x in m if h(c/'files'/x['path'])!=x['payload_sha256']], 'bases':[x['path'] for x in m if h(live/x['path'])!=x['base_sha256']], 'dependencies':[p for p,v in deps.items() if h(live/p)!=v], 'inventory':sorted(inventory^set(deps)), 'prior_evidence':[p for p,v in prior['files'].items() if h(Path(p))!=v]}
+assert not (c/'result.json').exists()
+r={'manifest':h(c/'manifest.json'),'dependencies':h(c/'dependencies.json'),'runner':h(Path(__file__)),'started':time.time(),'before':verify(),'phases':[],'native':False,'prior_evidence':json.loads((c/'prior-evidence.json').read_text())}
+if any(r['before'].values()):
+ (c/'preflight-failure.json').write_text(json.dumps(r,indent=2)+'\n');raise SystemExit(2)
+free=shutil.disk_usage('/tmp').free
+assert free>=4*1024**3, 'less than4GiB free in /tmp'
+owned_tmp=Path(tempfile.mkdtemp(prefix='asservat-owner-copy-1-',dir='/tmp'))
+r['tmpdir']=str(owned_tmp);r['tmpdir_free_before']=free
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(owned_tmp))
+for k in list(env):
+ if k.startswith('ASSERVAT_'): del env[k]
+packages=['./internal/adapters/kubernetes','./internal/adapters/postgres']
+overlay=str(c/'overlay.json')
+phases=[
+ ('compile',['go','test','-vet=off','-overlay',overlay,'-run=^$','-count=1',*packages],600,0),
+ ('before-copy',['go','test','-race','-vet=off','-overlay',str(c/'before-overlay.json'),'-count=1','-timeout=30s','-v','./internal/adapters/kubernetes','-run=^TestOwnerProjectionOperationRejectsCopiedOuterHandle$'],600,1),
+ ('copy-race',['go','test','-race','-vet=off','-overlay',overlay,'-count=1','-timeout=180s','-v','./internal/adapters/kubernetes','-run=^(TestOwnerProjectionOperation|TestProviderOwnerProjectionOperationCompleteAndLaunch$)'],600,0),
+ ('vet',['go','vet','-overlay',overlay,*packages],600,0)]
+
+code=1
+try:
+ probe=owned_tmp/'fsync-probe'
+ with probe.open('xb') as f:f.write(bytes(1048576));f.flush();os.fsync(f.fileno())
+ probe.unlink()
+ for name,cmd,maximum,expected in phases:
+  check=verify()
+  if any(check.values()):r['phase_preflight']=check;code=2;break
+  started=time.time();timeout=False;log=c/'evidence'/(name+'.log')
+  with log.open('x') as f:
+   phase_env=env.copy()
+   if name=='go-architecture': phase_env['GOFLAGS']='-p=2 -overlay='+overlay
+   p=subprocess.Popen(cmd,cwd=live,env=phase_env,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
+   print(json.dumps({'phase':name,'pid':p.pid,'started':started}),flush=True)
+   try:p.wait(timeout=maximum)
+   except subprocess.TimeoutExpired:
+    timeout=True;os.killpg(p.pid,signal.SIGTERM)
+    try:p.wait(timeout=10)
+    except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+  txt=log.read_text();entry={'name':name,'command':cmd,'exit':p.returncode,'expected_exit':expected,'timed_out':timeout,'seconds':time.time()-started,'log_sha256':h(log),'hashes':verify(),'pass_entries':sum(x.startswith('--- PASS:') or x.lstrip().startswith('--- PASS:') for x in txt.splitlines())}
+  required=json.loads((c/'required-tests.json').read_text()).get(name,[])
+  entry['missing_required_passes']=[test for test in required if expected==0 and ('--- PASS: '+test+' (') not in txt]
+  if expected==1:entry['intended_assertion']=txt.count('copied outer handle entered or poisoned original operation')==5 and '--- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle' in txt and '[build failed]' not in txt
+  r['phases'].append(entry);print(json.dumps(entry),flush=True)
+  code=0 if not timeout and p.returncode==expected and (expected!=1 or entry['intended_assertion']) and not any(entry['hashes'].values()) and not entry['missing_required_passes'] else (124 if timeout else p.returncode or 2)
+  if code:break
+finally:
+ shutil.rmtree(owned_tmp)
+ r.update(exit=code,ended=time.time(),after=verify(),tmpdir_removed=not owned_tmp.exists())
+ with (c/'result.json').open('x') as f:json.dump(r,f,indent=2);f.write('\n')
+ print(json.dumps(r,indent=2),flush=True)
+raise SystemExit(code if not any(r['after'].values()) else 2)

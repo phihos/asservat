@@ -1,0 +1,25 @@
+=== RUN   TestStandardLibraryJCS
+    canonical_test.go:32: Go standard-library RFC 8785 samples, UTF-16 key ordering, duplicate names and invalid Unicode; full contract numeric-domain corpus remains pending
+--- PASS: TestStandardLibraryJCS (0.00s)
+=== RUN   TestCanonicalContracts
+    contracts_test.go:77: compiled 41 canonical schemas offline; manifest positive, unknown property and UUID negatives
+--- PASS: TestCanonicalContracts (0.04s)
+=== RUN   TestStreamingEncryptionAndCompression
+=== RUN   TestStreamingEncryptionAndCompression/tampered
+=== RUN   TestStreamingEncryptionAndCompression/truncated
+=== NAME  TestStreamingEncryptionAndCompression
+    dependencies_test.go:89: plaintext=4650000 ciphertext=600; public reader io.Seeker=false io.ReaderAt=false
+--- PASS: TestStreamingEncryptionAndCompression (0.01s)
+    --- PASS: TestStreamingEncryptionAndCompression/tampered (0.00s)
+    --- PASS: TestStreamingEncryptionAndCompression/truncated (0.00s)
+=== RUN   TestExplicitEd25519JWS
+    dependencies_test.go:128: Explicit RFC 9864 alg works; peer authority and key rotation not tested
+--- PASS: TestExplicitEd25519JWS (0.00s)
+=== RUN   TestNativePCAPNGAndLibpcap
+    dependencies_test.go:174: libpcap version 1.11.0 (64-bit time_t, with TPACKET_V3); PCAPNG bytes=216; no interface opened
+--- PASS: TestNativePCAPNGAndLibpcap (0.00s)
+=== RUN   TestIndependentFramesForNativeRanges
+    ranges_test.go:102: native bytes=3145739 object bytes=3146135 frames=4 range bytes=1048558 ciphertext read=2097370; encrypted index, object store and authorization NOT tested
+--- PASS: TestIndependentFramesForNativeRanges (0.02s)
+PASS
+ok  	asservat.local/experiments/technology-selection	0.074s

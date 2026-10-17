@@ -1,0 +1,32 @@
+cd web && npm run build
+npm notice run @asservat/console@0.0.0 build
+npm notice run npm run contracts && tsc --noEmit && vite build
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1350 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.51 kB │ gzip:   0.31 kB
+dist/assets/index-8wPE5Nwz.css               3.42 kB │ gzip:   1.26 kB
+dist/assets/EvidenceWorkspace-Pdx68IUo.js  189.81 kB │ gzip:  22.69 kB
+dist/assets/index-0wgYOG42.js              871.33 kB │ gzip: 148.29 kB
+
+✓ built in 203ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="/home/phil/.cache/asservat-build/tmp" go test -count=1 -run '^TestConsoleBrowserWithBuiltPackage$' -v ./test/integration
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/12 10:06:31 http: TLS handshake error from 127.0.0.1:48250: remote error: tls: unknown certificate
+2026/10/12 10:06:31 http: TLS handshake error from 127.0.0.1:48270: remote error: tls: unknown certificate
+2026/10/12 10:06:43 http: TLS handshake error from 127.0.0.1:49296: remote error: tls: unknown certificate
+2026/10/12 10:06:43 http: TLS handshake error from 127.0.0.1:49304: remote error: tls: unknown certificate
+    console_test.go:132: Synthetic current identity, capture and C16 case data; actual Go TLS/static/session/operations and built React console:
+        Console browser checks passed: 19 journeys, 15 accessibility scans, no external requests or CSP/runtime errors.
+--- PASS: TestConsoleBrowserWithBuiltPackage (17.18s)
+PASS
+ok  	asservat.local/asservat/test/integration	17.195s

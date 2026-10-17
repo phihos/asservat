@@ -1,0 +1,473 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	admission "k8s.io/api/admissionregistration/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+)
+
+// Concrete TLS/native readers, synthetic API authority. No SQL/process key or
+// deployed regional observation availability is established by these tests.
+type connectorOperationFixture struct {
+	base                    *ownerOperationFixture
+	mu                      sync.Mutex
+	wire                    map[string]any
+	policy                  *admission.ValidatingAdmissionPolicy
+	binding                 *admission.ValidatingAdmissionPolicyBinding
+	reader                  *ConnectorObservationOperationReader
+	process                 value.ConnectorProcessIdentity
+	token                   []byte
+	gets, reviews           atomic.Int32
+	revoke, accept, missing bool
+	mutateDuringFinalGuard  bool
+	block                   bool
+	entered, exited         chan struct{}
+	once                    sync.Once
+}
+
+func newConnectorOperationFixture(t *testing.T) *connectorOperationFixture {
+	t.Helper()
+	f := &connectorOperationFixture{base: newOwnerOperationFixture(t)}
+	v := &f.base.v
+	now := f.base.start
+	peer := value.PeerBinding{InstallationID: v.pool.InstallationID, ClusterID: v.pool.ClusterID, IssuerEpoch: v.pool.IssuerEpoch, PeerID: ownerID(60), Role: value.ConnectorPeer}
+	f.process = value.ConnectorProcessIdentity{Binding: peer, PodUID: v.binding.PodUID, ProcessEpoch: v.binding.ProcessEpoch}
+	root := base64.StdEncoding.EncodeToString(ownerConfigurationTestRoot(t, now))
+	f.wire = map[string]any{"format": "asservat-connector-identity/v1", "rootID": ownerID(5), "installationID": peer.InstallationID, "clusterID": peer.ClusterID, "issuerEpoch": peer.IssuerEpoch, "peerID": peer.PeerID, "revision": 1, "retiring": false, "suspended": false, "serverName": "connector.example.invalid", "clientIssuerRoots": []string{root}, "serverIssuerRoots": []string{root}, "roles": map[string]any{"source": "connector_source", "journal": "connector_journal", "acknowledgement": "connector_ack", "cleanup": "connector_cleanup", "verifier": "connector_verifier", "finalizer": "connector_finalizer"}, "backing": connectorTestBacking(now, peer), "deployment": map[string]any{"namespace": v.pool.Namespace, "namespaceUID": v.pool.NamespaceUID, "serviceAccount": v.pool.ServiceAccount, "accountUID": v.pool.AccountUID, "deployment": v.pool.Deployment, "deploymentUID": v.pool.DeploymentUID, "servingSlots": 2, "retainedProcesses": 8}}
+	payload, _ := json.Marshal(map[string]int64{"iat": now.Add(-time.Second).Unix(), "exp": now.Add(time.Minute).Unix()})
+	f.token = []byte("e30." + base64.RawURLEncoding.EncodeToString(payload) + ".synthetic-signature")
+	plan := cfg.ConfigMapAdministration{Name: "connector-source", SourceName: "connector-identity", ControlNamespace: f.base.guard.plan.ControlNamespace, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}}
+	var err error
+	f.policy, f.binding, err = ConnectorIdentityAdmission(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourcePin := GuardPin{PolicyUID: ownerID(61), PolicyGeneration: 1, BindingUID: ownerID(62), BindingResourceVersion: "20"}
+	f.policy.UID, f.policy.Generation, f.policy.ResourceVersion = types.UID(sourcePin.PolicyUID), 1, "10"
+	f.policy.Status.ObservedGeneration = 1
+	f.policy.Status.TypeChecking = &admission.TypeChecking{}
+	f.binding.UID, f.binding.ResourceVersion = types.UID(sourcePin.BindingUID), sourcePin.BindingResourceVersion
+	server := httptest.NewTLSServer(http.HandlerFunc(f.serve))
+	t.Cleanup(server.Close)
+	roots := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	client := func(token string) *PermissionClient {
+		c, e := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: roots}, BearerToken: token}, v.pool.ClusterID, plan.ControlNamespace, func() time.Time { return time.Unix(0, f.base.clock.Load()).UTC() })
+		if e != nil {
+			t.Fatal(e)
+		}
+		return c
+	}
+	observer, probe := client("observer"), client("probe")
+	g, err := NewConnectorIdentityProtection(observer, probe, plan, sourcePin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workPlan := f.base.guard.plan
+	workPlan.ConfigurationProbes = []cfg.OwnerConfigurationProbe{{ConfigMap: plan.SourceName, ServiceAccount: "probe"}}
+	f.base.policy, f.base.binding, err = OwnerWorkloadAdmission(workPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workPin := f.base.guard.pin
+	f.base.policy.UID, f.base.policy.Generation, f.base.policy.ResourceVersion = types.UID(workPin.PolicyUID), 1, "10"
+	f.base.policy.Status.ObservedGeneration = 1
+	f.base.policy.Status.TypeChecking = &admission.TypeChecking{}
+	f.base.binding.UID, f.base.binding.ResourceVersion = types.UID(workPin.BindingUID), workPin.BindingResourceVersion
+	work, err := NewOwnerWorkloadProtection(observer, probe, workPlan, workPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := NewConnectorIdentitySource(observer, g, plan.SourceName, ownerID(63), ownerID(5), peer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, _, err := source.snapshotConfiguration(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := configuration.Source.Observation.Profile
+	profile.ProtectionDigest = g.digest
+	pin := value.ConnectorObservationPin{Profile: profile, Roles: configuration.Source.Roles, TemplateDigest: f.base.pin.TemplateDigest, ImageDigest: f.base.pin.ImageDigest, ProtectionDigest: work.digest}
+	f.reader, err = NewConnectorObservationOperationReader(observer, source, work, connectorTokenFunc(func(context.Context) ([]byte, error) { return bytes.Clone(f.token), nil }), pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.base.observer.Store(0)
+	f.base.probe.Store(0)
+	f.gets.Store(0)
+	return f
+}
+
+func (f *connectorOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	owned := path == "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/connector-source" || path == "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/connector-source" || path == "/api/v1/namespaces/owners/configmaps/connector-identity" || path == "/apis/authentication.k8s.io/v1/tokenreviews"
+	if !owned {
+		f.base.serve(w, r)
+		return
+	}
+	if r.Header.Get("Authorization") == "Bearer observer" {
+		f.base.observer.Add(1)
+	} else if r.Header.Get("Authorization") == "Bearer probe" {
+		f.base.probe.Add(1)
+	} else {
+		f.base.t.Error("unexpected native credential")
+	}
+	f.mu.Lock()
+	blocked := f.block && path == "/api/v1/namespaces/owners/configmaps/connector-identity" && r.Method == http.MethodGet
+	entered, exited := f.entered, f.exited
+	f.mu.Unlock()
+	if blocked {
+		f.once.Do(func() { close(entered) })
+		<-r.Context().Done()
+		close(exited)
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	switch path {
+	case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/connector-source":
+		if f.missing {
+			http.NotFound(w, r)
+			return
+		}
+		permissionReply(w, f.policy)
+	case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/connector-source":
+		permissionReply(w, f.binding)
+	case "/api/v1/namespaces/owners/configmaps/connector-identity":
+		body, _ := json.Marshal(f.wire)
+		cm := core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: "connector-identity", Namespace: "owners", UID: types.UID(ownerID(63)), ResourceVersion: "1"}, Data: map[string]string{"connector-identity.json": string(body)}}
+		if r.Method == http.MethodGet {
+			f.gets.Add(1)
+			permissionReply(w, cm)
+			return
+		}
+		if r.Method != http.MethodPut || r.URL.Query().Get("dryRun") != "All" {
+			f.base.t.Error("unexpected source effect")
+		}
+		if f.accept {
+			permissionReply(w, cm)
+			return
+		}
+		if f.mutateDuringFinalGuard && f.gets.Load() == 5 {
+			// The final source guard has read the old body. Mutation occurs
+			// before its denial returns; ordinal four must decode afterward.
+			f.wire["revision"] = 2
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(403)
+		_ = json.NewEncoder(w).Encode(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'connector-source' with binding 'connector-source' denied request: " + connectorIdentityDenial}}}})
+	case "/apis/authentication.k8s.io/v1/tokenreviews":
+		f.reviews.Add(1)
+		var q auth.TokenReview
+		if json.NewDecoder(r.Body).Decode(&q) != nil || q.Spec.Token != string(f.token) || len(q.Spec.Audiences) != 1 || q.Spec.Audiences[0] != ConnectorEnrollmentAudience(f.process.Binding.InstallationID) {
+			f.base.t.Error("wrong native token review")
+		}
+		permissionReply(w, auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Status: auth.TokenReviewStatus{Authenticated: !f.revoke, Audiences: q.Spec.Audiences, User: auth.UserInfo{Username: "system:serviceaccount:owners:hub", UID: f.base.v.pool.AccountUID, Extra: map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {f.base.v.pod.Name}, "authentication.kubernetes.io/pod-uid": {f.process.PodUID}}}}})
+	}
+}
+
+func (f *connectorOperationFixture) begin(t *testing.T) (*ConnectorObservationOperation, context.Context) {
+	t.Helper()
+	ctx, cancel := context.WithDeadline(context.Background(), f.base.start.Add(5*time.Second))
+	t.Cleanup(cancel)
+	r := value.OwnerObservationRequest{RootID: f.reader.pin.Profile.RootID, ID: ownerID(80), Challenge: ownerID(81), RequestedAt: f.base.start, NotAfter: f.base.start.Add(5 * time.Second)}
+	o, e := f.reader.Begin(ctx, r, f.process)
+	if e != nil {
+		t.Fatal("initial regional native bracket", e)
+	}
+	t.Cleanup(o.Close)
+	return o, ctx
+}
+
+func TestConnectorObservationOperationFourActualValues(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, ctx := f.begin(t)
+	if f.base.observer.Load() != 19 || f.base.probe.Load() != 6 || f.reviews.Load() != 2 {
+		t.Fatalf("initial bracket count %d/%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.reviews.Load())
+	}
+	for n := 1; n <= 4; n++ {
+		f.base.clock.Store(f.base.start.Add(time.Duration(n) * time.Millisecond).UnixNano())
+		v, e := o.Read(ctx, n)
+		if e != nil {
+			t.Fatal("source ordinal", n, e)
+		}
+		if v.Ordinal != n || v.Final != (n == 4) || !v.NativeStartedAt.Equal(f.base.start) || !v.NativeUntil.Equal(f.base.start.Add(5*time.Second)) || !v.ValueObservedAt.Equal(f.base.start.Add(time.Duration(n)*time.Millisecond)) {
+			t.Fatal("original bracket/source dates changed", n)
+		}
+		v.Source.Observation.Profile.ClientIssuerRoots[0][0] ^= 1
+	}
+	if f.gets.Load() != 6 || f.reviews.Load() != 4 || f.base.observer.Load() != 50 || f.base.probe.Load() != 12 {
+		t.Fatalf("four values plus two native brackets %d/%d gets%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.gets.Load(), f.reviews.Load())
+	}
+	before := f.base.observer.Load()
+	if _, e := o.Read(ctx, 4); e == nil || f.base.observer.Load() != before {
+		t.Fatal("final ordinal replay")
+	}
+}
+
+func TestConnectorObservationOperationSourceMutationCloses(t *testing.T) {
+	for _, mode := range []string{"roles", "backing", "revision", "roots", "suspended", "retiring", "deployment", "source-unknown"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newConnectorOperationFixture(t)
+			o, ctx := f.begin(t)
+			if _, e := o.Read(ctx, 1); e != nil {
+				t.Fatal(e)
+			}
+			f.mu.Lock()
+			switch mode {
+			case "roles":
+				f.wire["roles"].(map[string]any)["source"] = "changed_source"
+			case "backing":
+				b := f.wire["backing"].(app.ConnectorIdentityBacking)
+				b.Policy.BackingRevision++
+				f.wire["backing"] = b
+			case "revision":
+				f.wire["revision"] = 2
+			case "roots":
+				f.wire["clientIssuerRoots"] = []string{"AQ=="}
+			case "suspended":
+				f.wire["suspended"] = true
+			case "retiring":
+				f.wire["suspended"], f.wire["retiring"] = true, true
+			case "deployment":
+				f.wire["deployment"].(map[string]any)["accountUID"] = ownerID(90)
+			case "source-unknown":
+				f.wire["unexpected"] = true
+			}
+			f.mu.Unlock()
+			if _, e := o.Read(ctx, 2); e == nil {
+				t.Fatal("changed full source accepted")
+			}
+			before := f.base.observer.Load()
+			if _, e := o.Read(ctx, 2); e == nil || f.base.observer.Load() != before {
+				t.Fatal("failed source retried")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationOperationFinalNativeMutationCloses(t *testing.T) {
+	for _, mode := range []string{"source-guard", "source-denial", "workload-guard", "workload-denial", "account", "pod", "template", "review", "expiry"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newConnectorOperationFixture(t)
+			o, ctx := f.begin(t)
+			for n := 1; n <= 3; n++ {
+				if _, e := o.Read(ctx, n); e != nil {
+					t.Fatal(e)
+				}
+			}
+			f.mu.Lock()
+			f.base.mu.Lock()
+			switch mode {
+			case "source-guard":
+				f.missing = true
+			case "source-denial":
+				f.accept = true
+			case "workload-guard":
+				f.base.policy.UID = types.UID(ownerID(90))
+			case "workload-denial":
+				f.base.accept = true
+			case "account":
+				f.base.v.sa.UID = types.UID(ownerID(90))
+			case "pod":
+				f.base.v.pod.UID = types.UID(ownerID(90))
+			case "template":
+				f.base.v.deploy.Spec.Template.Spec.Containers[0].Args = []string{"changed"}
+			case "review":
+				f.revoke = true
+			case "expiry":
+				f.base.clock.Store(f.base.start.Add(5 * time.Second).UnixNano())
+			}
+			f.base.mu.Unlock()
+			f.mu.Unlock()
+			if _, e := o.Read(ctx, 4); e == nil {
+				t.Fatal("changed final native proof accepted")
+			}
+			before := f.base.observer.Load()
+			if _, e := o.Read(ctx, 4); e == nil || f.base.observer.Load() != before {
+				t.Fatal("failed final proof retried")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationOperationCloseJoinsValueRead(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, ctx := f.begin(t)
+	f.mu.Lock()
+	f.block = true
+	f.entered, f.exited = make(chan struct{}), make(chan struct{})
+	f.mu.Unlock()
+	done := make(chan error, 1)
+	go func() { _, e := o.Read(ctx, 1); done <- e }()
+	select {
+	case <-f.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("source read not admitted")
+	}
+	o.Close()
+	if e := <-done; e == nil {
+		t.Fatal("cancelled source returned")
+	}
+	select {
+	case <-f.exited:
+	case <-time.After(time.Second):
+		t.Fatal("native request not joined")
+	}
+}
+
+func TestConnectorObservationOperationFinalValueFollowsNativeBracket(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, ctx := f.begin(t)
+	for n := 1; n <= 3; n++ {
+		if _, err := o.Read(ctx, n); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.mu.Lock()
+	f.mutateDuringFinalGuard = true
+	f.mu.Unlock()
+	if _, err := o.Read(ctx, 4); err == nil {
+		t.Fatal("source mutation during final native bracket escaped the final full decode")
+	}
+	if f.gets.Load() != 6 || f.reviews.Load() != 4 {
+		t.Fatal("final actual source/native checks did not run")
+	}
+}
+
+func TestConnectorObservationOperationOrdinalCannotBeReused(t *testing.T) {
+	for _, ordinal := range []int{0, 2, 4, 5} {
+		t.Run(string(rune('0'+ordinal)), func(t *testing.T) {
+			f := newConnectorOperationFixture(t)
+			o, ctx := f.begin(t)
+			before := f.base.observer.Load()
+			if _, err := o.Read(ctx, ordinal); err == nil {
+				t.Fatal("out of order value admitted")
+			}
+			if _, err := o.Read(ctx, 1); err == nil || f.base.observer.Load() != before {
+				t.Fatal("closed sequence recreated")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationOperationCurrentCallerOnlyShortens(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, root := f.begin(t)
+	end := f.base.start.Add(2 * time.Second)
+	short, cancel := context.WithDeadline(root, end)
+	defer cancel()
+	a, err := o.Read(short, 1)
+	if err != nil || !a.NativeUntil.Equal(end) || !a.Workload.FreshUntil.Equal(end) {
+		t.Fatal("short caller lost", err)
+	}
+	b, err := o.Read(root, 2)
+	if err != nil || !b.NativeUntil.Equal(end) || !b.NativeStartedAt.Equal(a.NativeStartedAt) {
+		t.Fatal("later caller renewed original bound", err)
+	}
+}
+
+func TestConnectorObservationOperationCallerCancellationJoins(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, root := f.begin(t)
+	ctx, cancel := context.WithCancel(root)
+	defer cancel()
+	f.mu.Lock()
+	f.block = true
+	f.entered, f.exited = make(chan struct{}), make(chan struct{})
+	f.mu.Unlock()
+	done := make(chan error, 1)
+	go func() { _, err := o.Read(ctx, 1); done <- err }()
+	select {
+	case <-f.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("read not admitted")
+	}
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("cancelled value returned")
+	}
+	o.Close()
+	select {
+	case <-f.exited:
+	case <-time.After(time.Second):
+		t.Fatal("HTTP body was not joined")
+	}
+}
+
+func TestConnectorObservationOperationConcurrentReadClosesBoth(t *testing.T) {
+	f := newConnectorOperationFixture(t)
+	o, ctx := f.begin(t)
+	f.mu.Lock()
+	f.block = true
+	f.entered, f.exited = make(chan struct{}), make(chan struct{})
+	f.mu.Unlock()
+	done := make(chan error, 1)
+	go func() { _, err := o.Read(ctx, 1); done <- err }()
+	select {
+	case <-f.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("read not admitted")
+	}
+	if _, err := o.Read(ctx, 2); err == nil {
+		t.Fatal("concurrent read accepted")
+	}
+	o.Close()
+	if err := <-done; err == nil {
+		t.Fatal("original read survived known protocol failure")
+	}
+	select {
+	case <-f.exited:
+	case <-time.After(time.Second):
+		t.Fatal("admitted body not joined")
+	}
+}
+
+func TestConnectorObservationOperationWrongBeginHasNoIO(t *testing.T) {
+	for _, mode := range []string{"root", "process", "unbounded", "cancelled", "expired"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newConnectorOperationFixture(t)
+			ctx, cancel := context.WithDeadline(context.Background(), f.base.start.Add(5*time.Second))
+			defer cancel()
+			r := value.OwnerObservationRequest{RootID: f.reader.pin.Profile.RootID, ID: ownerID(80), Challenge: ownerID(81), RequestedAt: f.base.start, NotAfter: f.base.start.Add(5 * time.Second)}
+			process := f.process
+			switch mode {
+			case "root":
+				r.RootID = ownerID(90)
+			case "process":
+				process.Binding.PeerID = ownerID(90)
+			case "unbounded":
+				ctx = context.Background()
+			case "cancelled":
+				cancel()
+			case "expired":
+				f.base.clock.Store(r.NotAfter.UnixNano())
+			}
+			if op, err := f.reader.Begin(ctx, r, process); err == nil {
+				op.Close()
+				t.Fatal("invalid original accepted")
+			}
+			if f.base.observer.Load() != 0 || f.base.probe.Load() != 0 {
+				t.Fatal("invalid original caused I/O")
+			}
+		})
+	}
+}

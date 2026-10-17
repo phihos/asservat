@@ -1,0 +1,6 @@
+{
+  "internal/adapters/kubernetes/initial_runtime_bridge.go": "70a3f0412fec66c5ff7670b74ae648c25eebcf23586c6ca5f6b6568d04eeded5",
+  "internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go": "8cc5837211ad85c872d4f92115c1f88bde618eb2ec331235782ae183c46663f5",
+  "internal/adapters/kubernetes/owner_installed.go": "1513cf73b6bf852d25c0a4cd9493ac9fc301af4aa3e0bf0c64088ed32684d5f9",
+  "internal/adapters/kubernetes/owner_installed_template_test.go": "edc49b18310fcf147b643c6c79c304f5bd94d40d925768d98daff60d22ac91e3"
+}

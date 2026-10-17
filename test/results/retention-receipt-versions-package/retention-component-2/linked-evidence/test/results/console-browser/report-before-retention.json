@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview",
+    "same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial",
+    "settings outage hides workspace and still permits local logout",
+    "returning tab uses CSRF and permitted POST refresh for expired access",
+    "revoked session cannot display workspace",
+    "fixed expiry clears visible workspace",
+    "unknown API path is not an HTML shell"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "authority": "synthetic session and typed capture services; real HTTPS Go handlers, canonical operations and built React; not IdP/SQL/collection/deployment qualification"
+}

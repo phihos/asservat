@@ -1,0 +1,12 @@
+=== RUN   TestInitialBootstrapManagerWithRealServices
+=== RUN   TestInitialBootstrapManagerWithRealServices/unknown-completion-preserves-original-role
+=== RUN   TestInitialBootstrapManagerWithRealServices/flags-alone-do-not-close-existing-session
+=== RUN   TestInitialBootstrapManagerWithRealServices/restrict-revoke-needs-exact-history-transfer
+=== NAME  TestInitialBootstrapManagerWithRealServices
+    initial_bootstrap_manager_test.go:331: actual generated finite manager, original schema, child/history roles, encrypted activation, measured history grant transfer and old-session termination; Kubernetes seed/witness/read authority synthetic
+--- PASS: TestInitialBootstrapManagerWithRealServices (7.98s)
+    --- PASS: TestInitialBootstrapManagerWithRealServices/unknown-completion-preserves-original-role (0.06s)
+    --- PASS: TestInitialBootstrapManagerWithRealServices/flags-alone-do-not-close-existing-session (0.01s)
+    --- PASS: TestInitialBootstrapManagerWithRealServices/restrict-revoke-needs-exact-history-transfer (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	9.029s

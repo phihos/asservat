@@ -1,0 +1,103 @@
+--- a/internal/adapters/diagnostics/go_profile.go
++++ b/internal/adapters/diagnostics/go_profile.go
+@@ -77,12 +77,6 @@
+ 		return out, value.ErrDenied
+ 	}
+ 	watch = c.watch(ctx, cancel, r, observation)
+-	var channelCancel context.CancelFunc
+-	defer func() {
+-		if channelCancel != nil {
+-			channelCancel()
+-		}
+-	}()
+ 	defer func() {
+ 		watch.stop()
+ 		// Joining the original observer and closing sockets are part of this
+@@ -107,10 +101,11 @@
+ 	if !validProfileChannel(channel) || !c.now().Before(channel.ValidUntil) || channel.ValidUntil.After(r.Deadline) || ctx.Err() != nil || !watch.valid(c.now()) {
+ 		return out, value.ErrDenied
+ 	}
+-	ctx, channelCancel = context.WithDeadline(ctx, channel.ValidUntil)
++	channelCtx, channelCancel := context.WithDeadline(ctx, channel.ValidUntil)
++	defer channelCancel()
+ 	// Preserve the earliest original caller, action and channel cutoff. A
+ 	// longer channel lifetime cannot make an unfinishable recording admissible.
+-	channelDeadline, hasDeadline = ctx.Deadline()
++	channelDeadline, hasDeadline = channelCtx.Deadline()
+ 	if !hasDeadline {
+ 		return out, value.ErrExpired
+ 	}
+@@ -120,7 +115,7 @@
+ 	// Interrupt a blocked Read/Write at current-observation loss too, not just
+ 	// at the original action deadline. Join the callback before returning.
+ 	closed := make(chan struct{})
+-	stopClose := context.AfterFunc(ctx, func() { _ = channel.Connection.Close(); close(closed) })
++	stopClose := context.AfterFunc(channelCtx, func() { _ = channel.Connection.Close(); close(closed) })
+ 	defer func() {
+ 		if !stopClose() {
+ 			<-closed
+@@ -130,7 +125,7 @@
+ 	transport := &http.Transport{
+ 		Proxy: nil,
+ 		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
+-			if network != "tcp" || address != "profile.invalid:80" || !taken.CompareAndSwap(false, true) || dialCtx.Err() != nil || ctx.Err() != nil || !watch.valid(c.now()) {
++			if network != "tcp" || address != "profile.invalid:80" || !taken.CompareAndSwap(false, true) || dialCtx.Err() != nil || channelCtx.Err() != nil || !watch.valid(c.now()) {
+ 				return nil, value.ErrDenied
+ 			}
+ 			return channel.Connection, nil
+@@ -141,7 +136,7 @@
+ 	defer transport.CloseIdleConnections()
+ 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+ 	path, query := goProfilePath(r.Parameters)
+-	request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, (&url.URL{Scheme: "http", Host: "profile.invalid", Path: path, RawQuery: query}).String(), nil)
++	request, requestErr := http.NewRequestWithContext(channelCtx, http.MethodGet, (&url.URL{Scheme: "http", Host: "profile.invalid", Path: path, RawQuery: query}).String(), nil)
+ 	if requestErr != nil {
+ 		return out, value.ErrInvalid
+ 	}
+@@ -154,7 +149,7 @@
+ 	}
+ 	// Dial/setup may have consumed the admitted margin. Do not contact the
+ 	// application unless its fixed requested duration still fits.
+-	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channelDeadline) {
++	if channelCtx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channelDeadline) {
+ 		return out, value.ErrExpired
+ 	}
+ 	out.Outcome = value.GoProfileOutcome{Format: r.Parameters.Format(), StartedAt: c.now().UTC(), MayHaveStarted: true}
+@@ -163,10 +158,10 @@
+ 		defer response.Body.Close()
+ 	}
+ 	if responseErr != nil || response == nil {
+-		return out, profileOperationError(ctx, value.ErrProfileUnavailable)
++		return out, profileOperationError(channelCtx, value.ErrProfileUnavailable)
+ 	}
+ 	if response.StatusCode != http.StatusOK {
+-		return out, classifyProfileStatus(ctx, response, r.Parameters)
++		return out, classifyProfileStatus(channelCtx, response, r.Parameters)
+ 	}
+ 	media, _, mediaErr := mime.ParseMediaType(response.Header.Get("Content-Type"))
+ 	if mediaErr != nil || media != value.GoProfileMediaType {
+@@ -178,19 +173,19 @@
+ 	if response.ContentLength > r.NativeLimit {
+ 		return out, value.ErrProfileLimit
+ 	}
+-	body := &profileBody{ctx: ctx, source: response.Body, remaining: r.NativeLimit}
+-	layout, sinkErr := sink.ConsumeGoProfile(ctx, r, body)
++	body := &profileBody{ctx: channelCtx, source: response.Body, remaining: r.NativeLimit}
++	layout, sinkErr := sink.ConsumeGoProfile(channelCtx, r, body)
+ 	out.Outcome.NativeBytes = r.NativeLimit - body.remaining
+ 	if body.failure != nil {
+-		return out, profileOperationError(ctx, body.failure)
++		return out, profileOperationError(channelCtx, body.failure)
+ 	}
+ 	if sinkErr != nil {
+-		return out, profileOperationError(ctx, value.ErrProfileOutput)
++		return out, profileOperationError(channelCtx, value.ErrProfileOutput)
+ 	}
+ 	if !body.eof || out.Outcome.NativeBytes == 0 || layout.Validate() != nil || layout.Binding != r.Binding || layout.NativeBytes != out.Outcome.NativeBytes {
+ 		return out, value.ErrProfileOutput
+ 	}
+-	if ctx.Err() != nil || !watch.valid(c.now()) {
++	if channelCtx.Err() != nil || !watch.valid(c.now()) {
+ 		return out, value.ErrExpired
+ 	}
+ 	out.Outcome.CompletedAt = c.now().UTC()

@@ -1,0 +1,23 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+    "-run",
+    "^$",
+    "./internal/adapters/kms"
+  ],
+  "exit": 0,
+  "seconds": 2.557,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

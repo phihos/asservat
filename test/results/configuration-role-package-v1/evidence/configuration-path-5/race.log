@@ -1,0 +1,8 @@
+=== RUN   TestConfigurationRoleRootCompleteOriginalOperation
+    configuration_role_operation_test.go:65: purpose=configuration-fleet elapsed=4.551993804s requests=118 negative_probes=9
+    configuration_role_operation_test.go:65: purpose=configuration-source elapsed=4.550681374s requests=118 negative_probes=9
+    configuration_role_operation_test.go:65: purpose=configuration-audit elapsed=4.551830073s requests=118 negative_probes=9
+    configuration_role_operation_test.go:105: final inventory/projection elapsed=4.650914493s requests=120 negative_probes=9
+--- PASS: TestConfigurationRoleRootCompleteOriginalOperation (20.97s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	22.019s

@@ -1,0 +1,10 @@
+=== RUN   TestConfigurationProviderRuntimeCopyAndForeignReaderDoNotConsumeOriginal
+--- PASS: TestConfigurationProviderRuntimeCopyAndForeignReaderDoNotConsumeOriginal (0.67s)
+=== RUN   TestConfigurationProviderRuntimeInitialProbeStillRequiresOriginalAccount
+--- PASS: TestConfigurationProviderRuntimeInitialProbeStillRequiresOriginalAccount (0.20s)
+=== RUN   TestConfigurationWorkerTokensObserveActualBearerAndOriginalClients
+--- PASS: TestConfigurationWorkerTokensObserveActualBearerAndOriginalClients (0.23s)
+=== RUN   TestConfigurationWorkerObserverHasOneExplicitFixedCapacity
+--- PASS: TestConfigurationWorkerObserverHasOneExplicitFixedCapacity (0.16s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.303s

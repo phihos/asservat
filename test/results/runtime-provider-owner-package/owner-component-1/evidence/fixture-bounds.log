@@ -1,0 +1,4 @@
+=== RUN   TestInitialBootstrapAggregateDeadlineSelection
+--- PASS: TestInitialBootstrapAggregateDeadlineSelection (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	0.012s

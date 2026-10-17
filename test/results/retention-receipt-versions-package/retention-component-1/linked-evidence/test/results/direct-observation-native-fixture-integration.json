@@ -1,0 +1,96 @@
+{
+  "manifestSHA256": "01e5758042dadbb04d25e83af52742eb43cb3f6537b6be3138ba35091ab2d356",
+  "dependencyCount": 2198,
+  "paths": [
+    {
+      "action": "replace",
+      "baseSHA256": "bd5bee6927bda363287e8cbcd636dba4cf88b16654f00932b4497c91162659ae",
+      "path": "scripts/test-context-storage.py",
+      "payloadSHA256": "c6ff03a5e077cd8c88b7659e0c3f9dbac61d9db98c08a63efd0a288a7a09bc2e"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/data.go",
+      "payloadSHA256": "30f4c2c852a9094895113b02a43058de61499305dd3aa791f0222eb7efefc0fe"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/enrollment.go",
+      "payloadSHA256": "8777702ab6a6091d58012bd4a1f513f426121cfe02659dfbc9ce389cfd4fd860"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/inputs.go",
+      "payloadSHA256": "68532a84d757cbb02e2a108976984d58f3baeb94ce6711a70d9202543ece92c3"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/main.go",
+      "payloadSHA256": "3b79b56a3b7a384030efa18a48cce69def3d053516a7e321e5c874f9056c3a6e"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/metrics.go",
+      "payloadSHA256": "363acac5d1729376f75ddf68a648b799c8b99d9ff8b4984b46e7f787826d71f5"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/fixtures/observation-native/runtime.go",
+      "payloadSHA256": "9171a3448cad7b359e24cc48149eba44b8510326203cde8410b9b279bc86cece"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_access_test.go",
+      "payloadSHA256": "50facf397403a543755923eb8d66373d0af6736de25817845e92791f2c593dfe"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_data_test.go",
+      "payloadSHA256": "fe24efddd35d28c753109c0a1c379964a083b04eb755a913660ca1b27e28e004"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_fixture_test.go",
+      "payloadSHA256": "4bc69d49a5bcc7069d06c8bf199e2117f97c25ee803dd63b25a64a8b2cfd7c9d"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_source_test.go",
+      "payloadSHA256": "6a0d94dacd95d663954a242e85fd274c72a1b8825932d4bfb5008cfc443fee96"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_sql_test.go",
+      "payloadSHA256": "f12ca85f6dc5cf50e55291657e7ee88e5b0ddad5776300c0304b3f8f9baf4fcd"
+    },
+    {
+      "action": "add",
+      "baseSHA256": null,
+      "path": "test/integration/direct_observation_native_test.go",
+      "payloadSHA256": "8d1a98328905452b8a6ce97982186dc03f552277471f96b555d55e5fecf27cd5"
+    }
+  ],
+  "componentResultSHA256": "eea06329b7b045ba5e593a1cf30184ce961518cf8e14972226141002ab80c631",
+  "componentTerminal": 0,
+  "nativeQualified": false,
+  "publicRuntimeSelected": false,
+  "archive": "test/results/direct-observation-native-fixture-package",
+  "nativeFirstAttempt": {
+    "report": "test/results/direct-observation-native-1/result.json",
+    "exit": 1,
+    "reached": "helper setup, before any observation request",
+    "fixturePositiveRegionalJoin": false,
+    "dockerTeardownFailures": []
+  }
+}

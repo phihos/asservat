@@ -1,0 +1,27 @@
+[
+  {
+    "path": "internal/adapters/objectstore/audit_receipt.go",
+    "base": null,
+    "payload": "1fa0e68631fec1b58a78efb5ec9d7d431cb654684ce9d38ac6ca7051c68629ff"
+  },
+  {
+    "path": "internal/adapters/objectstore/audit_receipt_test.go",
+    "base": null,
+    "payload": "f62c7f0a36517de01915111e4d96b4a2038c13585d53ecdc41522f82c87eb35f"
+  },
+  {
+    "path": "internal/adapters/objectstore/download_stop_lifecycle.go",
+    "base": "657b34b14fe2b00cc55f378ee71883855107a223167b09e6a8bd84740b78b89e",
+    "payload": "d6b16e28c2e83a56da5080886c1a748f29b24b70341bee6ad3ebe53ad6824b8d"
+  },
+  {
+    "path": "internal/adapters/objectstore/initial_installation.go",
+    "base": "2a4df75d53944ef53b954260555329179c7210fe6921d3b29c673b4718516426",
+    "payload": "1259b60ec3150bfc2c31d9eb177e34425ec14910250722b9228f90dbf89c6cb1"
+  },
+  {
+    "path": "internal/adapters/objectstore/operation_lifecycle.go",
+    "base": "e54a03946dd51df74a961587c4f2d74d6887b55c55c929195f088e3cd13a4855",
+    "payload": "f4c989ba93abdf73b3c30cd6f81aef86aa8e58dd0bb354d5f36aa1425eab333d"
+  }
+]

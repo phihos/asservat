@@ -1,0 +1,268 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+    authority_test.go:54: run make custody-integration for owned real-service fixtures
+--- SKIP: TestPermissionAuthorityWithRealServices (0.00s)
+=== RUN   TestBootstrapChannelWithRealOpenBao
+    bootstrap_channel_test.go:23: run make fleet-integration
+--- SKIP: TestBootstrapChannelWithRealOpenBao (0.00s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+    bootstrap_issuance_test.go:33: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapIssuanceWithRealServices (0.00s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+    bootstrap_reservation_test.go:25: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapReservationsWithRealServices (0.00s)
+=== RUN   TestContextAdmissionWithRealServices
+    capture_admission_test.go:52: run make custody-integration
+--- SKIP: TestContextAdmissionWithRealServices (0.00s)
+=== RUN   TestContextCommitWithRealServices
+=== RUN   TestContextCommitWithRealServices/cluster-1
+    context_commit_test.go:225: native=353, encrypted manifest=4707, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+=== RUN   TestContextCommitWithRealServices/cluster-2
+    context_commit_test.go:225: native=353, encrypted manifest=4707, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+--- PASS: TestContextCommitWithRealServices (20.08s)
+    --- PASS: TestContextCommitWithRealServices/cluster-1 (10.01s)
+    --- PASS: TestContextCommitWithRealServices/cluster-2 (10.01s)
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:314: nativeBytes=353 dataBytes=325 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:314: nativeBytes=353 dataBytes=327 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.59s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.40s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.17s)
+=== RUN   TestCustodyWithRealServices
+    custody_test.go:111: run make custody-integration for owned real-service fixtures
+--- SKIP: TestCustodyWithRealServices (0.00s)
+=== RUN   TestDownloadJobsWithRealKubernetes
+    download_jobs_kube_test.go:173: actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs
+    download_jobs_kube_test.go:366: restricted real Job creation, immutable image/config pins, projected token, exact Pod binding and confirmed termination/foreground cleanup passed; compiled credential-phase executable and OpenBao-issued process credential; dispatch authority/registry and issuance audit remain fixture inputs, no native transfer
+--- PASS: TestDownloadJobsWithRealKubernetes (30.59s)
+=== RUN   TestDownloadWorkerProofWithRealKubernetesTLS
+    download_peer_kube_test.go:306: real dedicated-audience TokenReview, pod binding, live Job/account/spec checks, verified mTLS identity, API role separation and deleting-pod rejection passed; dispatch and certificate issuance remain fixtures
+--- PASS: TestDownloadWorkerProofWithRealKubernetesTLS (1.81s)
+=== RUN   TestEnrollmentSigningWithRealServices
+    enrollment_signing_test.go:77: run make custody-integration
+--- SKIP: TestEnrollmentSigningWithRealServices (0.00s)
+=== RUN   TestEnrollmentWithRealServices
+    enrollment_test.go:33: run make custody-integration
+--- SKIP: TestEnrollmentWithRealServices (0.00s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+    fleet_observation_test.go:22: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentFleetObservationWithRealPostgres (0.00s)
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:151: run make identity-integration
+--- SKIP: TestKeycloakProvider (0.00s)
+=== RUN   TestLocalKeyServiceTLSIsolationAndRevocation
+    key_service_test.go:250: real TLS wrap/read; exact binding and authority; collector/publisher/hub unwrap denial; current revocation on existing TLS connection
+--- PASS: TestLocalKeyServiceTLSIsolationAndRevocation (0.08s)
+=== RUN   TestLocalKeyServicePurposeAndSigning
+=== RUN   TestLocalKeyServicePurposeAndSigning/audit
+=== RUN   TestLocalKeyServicePurposeAndSigning/browser-credentials
+=== RUN   TestLocalKeyServicePurposeAndSigning/policy-submission
+--- PASS: TestLocalKeyServicePurposeAndSigning (0.10s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/audit (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/browser-credentials (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/policy-submission (0.04s)
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/null-input
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/unknown
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/alias
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/duplicate
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/trailing
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/oversized
+--- PASS: TestLocalKeyServiceRejectsWireSubstitution (0.06s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/null-input (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/unknown (0.00s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/alias (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/duplicate (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/trailing (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/oversized (0.01s)
+=== RUN   TestLocalKeyClientRejectsMalformedResponses
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/digest
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/expired
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/operation
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/unknown
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/duplicate
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/oversized
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/redirect
+--- PASS: TestLocalKeyClientRejectsMalformedResponses (0.16s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/digest (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/expired (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/operation (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/unknown (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/duplicate (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/oversized (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/redirect (0.02s)
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue
+--- PASS: TestLocalKeyServiceBoundsAndCurrentTLS (0.05s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection (0.02s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue (0.03s)
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/ready
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/upgrade
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/other-error
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/forbidden
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/malformed
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/deadline
+--- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup (0.10s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/ready (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/upgrade (0.05s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/other-error (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/forbidden (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/malformed (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/deadline (0.04s)
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/changed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/removed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked
+=== NAME  TestLocalKeyLifecycleWithRealKubernetesSQL
+    local_key_lifecycle_test.go:408: real Kubernetes named RBAC, immutable Secret pins, SQL rotation history, mTLS wrap/unwrap, old-process fencing, retained-key reads, rollback/suspension, lock expiry and recovery denial passed; operation approvals remain synthetic
+--- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL (5.93s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/changed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/removed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock (0.81s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked (0.01s)
+=== RUN   TestLocalKeysWithRealStorage
+    local_keys_storage_test.go:159: local wrapping, encrypted manifest reload and TLS S3: exact 8389341-byte native file/hash and cross-frame range
+--- PASS: TestLocalKeysWithRealStorage (1.15s)
+=== RUN   TestLocalStartWithRealKubernetes
+    local_start_test.go:36: run make permission-integration
+--- SKIP: TestLocalStartWithRealKubernetes (0.00s)
+=== RUN   TestEnrollmentOwnerConfigurationWithRealServices
+    owner_configuration_sql_test.go:123: run make custody-integration for owned SQL/S3
+--- SKIP: TestEnrollmentOwnerConfigurationWithRealServices (0.00s)
+=== RUN   TestOwnerEndpointsWithRealKubernetes
+    owner_endpoints_test.go:149: actual EndpointSlice, restricted Pod, ReplicaSet, Deployment, Service and account identities resolved with read-only role
+    owner_endpoints_test.go:197: mounted scoped SQL/Kubernetes/S3/OpenBao providers established pre-Ready owner identity, current token loss/recovery and joined catalog-failure shutdown; initial recovery and mount delivery remain fixture-owned
+    owner_endpoints_test.go:197: process-owned separate keys enrolled/activated through native proof and real providers; actual mutual TLS callbacks passed; replacement key rejected before provider signing
+    owner_endpoints_test.go:197: native Pod/token/CSR, protected accepted configuration, SQL spend, real scoped OpenBao signing/audit and activation composed before Ready; source suspension fenced activation and resume reused the exact leaf
+    owner_endpoints_test.go:197: real Pod-bound token/CSR + audited configuration + native workload guard proved enrollment before readiness; routing waited, then succeeded; foreign/unbound/deleted tokens denied
+    owner_endpoints_test.go:196: native workload guard denied namespace-writer credential/workload/exec injection, preserved real controller replacement and rejected missing protection; dry-runs made no persisted change
+    owner_endpoints_test.go:195: protected owner configuration, audited SQL acceptance and routing passed: pinned admission, separate probe, no dry-run writes, suspension/resume, and missing-protection rejection
+    owner_endpoints_test.go:208: missing rights, foreign identity, readiness override, Pod deletion and forbidden credential/mutation checks passed
+--- PASS: TestOwnerEndpointsWithRealKubernetes (82.15s)
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:115: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:171: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerPKIWithRealServices (12.00s)
+=== RUN   TestPeerRegistryWithRealServices
+    peer_registry_test.go:23: run make custody-integration
+--- SKIP: TestPeerRegistryWithRealServices (0.00s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+    permission_admission_test.go:29: run make permission-integration
+--- SKIP: TestPermissionAdmissionWithRealKubernetes (0.00s)
+=== RUN   TestPermissionsWithRealKubernetes
+    permissions_test.go:28: owned Kubernetes fixture required; run make permission-integration
+--- SKIP: TestPermissionsWithRealKubernetes (0.00s)
+=== RUN   TestConnectorPKIWithRealOpenBao
+=== RUN   TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate
+=== RUN   TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit
+=== RUN   TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS
+=== RUN   TestConnectorPKIWithRealOpenBao/provider-role-and-revocation
+--- PASS: TestConnectorPKIWithRealOpenBao (0.71s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS (0.67s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/provider-role-and-revocation (0.00s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+    policy_authority_test.go:43: run make custody-integration
+--- SKIP: TestPermissionAuthorityPoliciesWithRealServices (0.00s)
+=== RUN   TestRetentionWithRealKubernetes
+    retention_test.go:30: run make permission-integration
+--- SKIP: TestRetentionWithRealKubernetes (0.00s)
+=== RUN   TestWorkerChannelRenewalAndProcessKey
+--- PASS: TestWorkerChannelRenewalAndProcessKey (0.02s)
+=== RUN   TestWorkerChannelActualMutualTLS
+--- PASS: TestWorkerChannelActualMutualTLS (0.02s)
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/key
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/pod
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/expiry
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/old-start
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/installation
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/role
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/dns
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/server-usage
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/expired
+--- PASS: TestWorkerChannelRejectsCertificateSubstitution (0.09s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/key (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/pod (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/expiry (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/old-start (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/installation (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/role (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/dns (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/server-usage (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/expired (0.01s)
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/nonce
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/worker
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/unknown
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/null-chain
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/duplicate
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/oversize
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/redirect
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/encoding
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/media
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/trailer
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/lost-reply
+--- PASS: TestWorkerChannelResponseFramingAndNoRedirect (0.10s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/nonce (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/worker (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/unknown (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/null-chain (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/duplicate (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/oversize (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/redirect (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/encoding (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/media (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/trailer (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/lost-reply (0.01s)
+=== RUN   TestWorkerChannelCancellationAndSingleFlight
+--- PASS: TestWorkerChannelCancellationAndSingleFlight (0.01s)
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/http
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/cookie
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/duplicate-auth
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/unknown
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/missing
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/token-space
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/install
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/principal
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/query
+--- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs (0.06s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/http (0.00s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/cookie (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/duplicate-auth (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/unknown (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/missing (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/token-space (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/install (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/principal (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/query (0.01s)
+=== RUN   TestWorkerChannelFailedRenewalKeepsOnlyOriginalCredential
+--- PASS: TestWorkerChannelFailedRenewalKeepsOnlyOriginalCredential (0.02s)
+=== RUN   TestWorkerChannelPinnedTrustAndEndpoint
+2026/10/11 00:38:39 http: TLS handshake error from 127.0.0.1:51378: remote error: tls: bad certificate
+--- PASS: TestWorkerChannelPinnedTrustAndEndpoint (0.02s)
+=== RUN   TestWorkerChannelRechecksExpiredServerAtRenewal
+2026/10/11 00:38:39 http: TLS handshake error from 127.0.0.1:60524: remote error: tls: bad certificate
+--- PASS: TestWorkerChannelRechecksExpiredServerAtRenewal (0.01s)
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry
+--- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite (0.10s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel (0.00s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry (0.10s)
+PASS
+ok  	asservat.local/asservat/test/integration	157.105s

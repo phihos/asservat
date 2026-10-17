@@ -1,0 +1,9 @@
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 47 files match sqlc v1.31.1
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 53 packages, 296 internal import edges; catalog ownership and layer/dependency rules checked
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 112 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 3258 local links, 620 rejected invalid examples (10341 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1215, "rejectedInvalidCases": 120}

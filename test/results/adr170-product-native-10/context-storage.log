@@ -1,0 +1,5 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:158: product federation/regional enrollment: hub roles=8 synthetic-setup-roots=true installer=false
+--- PASS: TestFederationRegionalProductWithRealKubernetes (21.09s)
+PASS
+ok  	asservat.local/asservat/test/integration	22.148s

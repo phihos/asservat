@@ -1,0 +1,41 @@
+# Local hub holder checkpoint v1
+
+The exact local holder, receiving HTTP/2 stream/handler, four-proof coordinator and fixed-profile SQL49 registry wrapper compile and pass their selected component checks. No production listener, runtime route, distributed forwarding or installed regional workflow is enabled.
+
+## Frozen sources
+
+Twelve owned paths: ten new Go files plus the existing ADR144 and architecture document. `manifest.json`, `bases.json`, `payload.json`, `dependencies.json`, `overlay.json` and `freeze.json` describe exact original/payload hashes. All 1,866 dependencies and the complete live Go file set matched before and after every command. The source-time manifest and documentation say checks were unrun/source-only; this handoff records the subsequent result without rewriting tested bytes.
+
+- Manifest SHA256: `893012be940cf76b2c67bdd954f4f9b00dbbfe2d414cbc7ea0eec393337fdf82`
+- Dependencies SHA256: `21651ab4cfab3dea7e95543e83f32398ab7d8ac7545daf86aeb5d9e0a3d31ac0`
+- Runner SHA256: `d52740a520ab0bfcdfcce400fa1ee16ccc7ccc02334a823c6ff7ac2534d238d1`
+- Freeze SHA256: `2afb2b7bf709055c2363c378ec3f7320190e5d639276b6bf7ca42039e3181eb7`
+
+## Behavior and boundaries
+
+The handler reserves a process slot before Hello/factory work. Setup, idle, claimed, failed and closing work remain charged until admitted work joins. An exact claim includes root, cluster, exchange UUID and a monotonic local registration sequence; overflow denies. Repeated wire UUID and delayed old cleanup cannot claim or delete a replacement. Later distributed forwarding must additionally bind exact holder Pod/process.
+
+Both handler and coordinator require the original finite socket context (at most 30 seconds); neither creates fallback residency. The request, locator, owner/connector proofs, certificate expiry, holder parent and caller only shorten this bound. No cache, signing/enrollment fallback, new frame, SQL table or credential is introduced.
+
+The purpose-fixed bootstrap factory binds the actual receiving TLS stream to original installed profile, concrete owner ingress and separately scoped registry. The registry wrapper delegates to unchanged SQL49 current-leaf logic. Two registry reads obtain all four new numbered same-channel source replies, around one metadata exchange. Every own-owner proof retains current registry/route/native guard/workload reads. Revocation or changed source after metadata withholds Receipt/result.
+
+Positive completion removes the exact entry from routing before Receipt, requires clean request EOF and joins coordinator/stream work before handler completion. Extra bytes, missing EOF, unknown final delivery or cancellation fail. The separate listener still owns and must join its actual raw socket; handler cleanup is not evidence of remote acknowledgement or socket closure. This checkpoint deliberately does not select that listener.
+
+## Commands and actual results
+
+Parent allocated one slot. `python3 run.py` ran as exec session **74247**, terminal **exit 0**, sequentially with `GOMAXPROCS=2`, `GOFLAGS=-p=2`, and this checkpoint's `tmp` directory. Existing evidence destinations are rejected.
+
+| Phase | Actual result |
+| --- | --- |
+| Four-package compile-only | exit 0, 4.371 s |
+| Selected races, count=1, timeout=120s | exit 0, 13.681 s; 111 named passing entries |
+| Four-package vet | exit 0, 0.761 s |
+| `make go-architecture-check` with overlay | exit 0, 1.212 s; 53 packages, 297 edges |
+
+Packages: `internal/application/fleet`, `internal/adapters/postgres`, `internal/adapters/mtls`, `internal/transport/clusterobservation`. The selected expression is in `run.py` and each recorded command. The 111 entries include 49 new holder/coordinator/registry entries plus retained channel/stream/framing regressions; this is not a full package suite. Every preflight/postflight live/base/payload/file-set/freeze mismatch list is empty. Exact logs, commands, durations and exits are in `evidence/`; `result-files.json` pins them.
+
+The tests cover real loopback HTTP/2/mutual TLS, actual process-owned keys/exporter, four fresh source exchanges around metadata, revocation/change/final-delivery failures, original deadline retention, missing/overlong stream bounds, exact claim/no-repeat, stale locator/cleanup/repeated Hello, overflow, setup/claimed cancellation, joined cleanup, request EOF/extra-byte/missing EOF and wrong SNI/authority/credential headers. Native source/template/registry facts and the HTTP handler's coordinator remain explicitly synthetic in their respective fixtures. The PostgreSQL wrapper tests prove pre-I/O profile/leaf binding only; no native SQL role result is claimed.
+
+## Remaining work and next package
+
+Compose the purpose-fixed receiving listener with original accept-time socket slots and joined closure; then add bounded current-owner locator lookup and exact-holder forwarding over existing exact-owner TLS primitives, never forwarding the HWORK token or replaying a selected POST. The original finite candidate bound comes from accepted configured/retained owner limits, not an assumed 16 owners. Regional settings/receipt/runtime wiring and installed two-cluster native qualification remain required. Measure actual per-leg latency and API-call counts under the unchanged five-second request interval; synthetic loopback speed does not establish availability. Regional capacity writer delivery remains separate from read-only observation.

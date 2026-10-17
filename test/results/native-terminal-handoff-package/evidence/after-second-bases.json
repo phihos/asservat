@@ -1,0 +1,18 @@
+{
+  "internal/application/evidence/native_exchange.go": "be1f1f89aa237ea8843b761fc2b927c25a738348f08dccd28e29f7f1f7155e27",
+  "internal/application/evidence/native_attachment.go": "c3ee433b797eb7c49383d20820199616cef8a4dab6155da5e215464f61aef931",
+  "internal/transport/native/operation.go": "a75fcb88c4b99ffda213d278fe551b2874ccdfbbb7a7dd0511a3c903097b5518",
+  "internal/transport/native/registration.go": "76dc5804045bbb0fe261a8eb21c15f8fe6c736ffd580d56bd20d56ee9a7df141",
+  "internal/transport/native/handler.go": "a48335bd147ff8512a5c902e5f7bb766d1a506563147d83203990cbe1cc6927c",
+  "internal/transport/native/flow_test.go": "ea7febae0b22cc7ecfc5f20d89274f7539457b37cfdf8d3d35411ba1c0a4fc68",
+  "internal/transport/native/router_test.go": "85eb729820e6c9ac69941609f5d31ffc1a289a66bb0c971405442aa6bda2da09",
+  "docs/architecture/native-exchange.md": "cd881d519fdf1256d49f139de0b07162564ad1fcf260928eb0b9b57bef2f118c",
+  "docs/decisions/116-context-native-exchange.md": "ec5e75b4a432a89a21f81d6513a199d22be2cc564143c74d84ef363196221035",
+  "docs/architecture/worker-startup.md": "6a3d7a3f7430c146e84f11429fd2612ca6499dee01c4219ba9524573c146a8e5",
+  "specs/artifact-downloads.md": "2943a5abd6ce804dfd0e43d9590c95f6cb794b2442533fb41bf84be56aa3d339",
+  "internal/adapters/postgres/native_completion.go": null,
+  "internal/adapters/postgres/native_completion_test.go": null,
+  "internal/application/evidence/native_completion_test.go": null,
+  "internal/transport/native/terminal_handoff_compat_test.go": null,
+  "internal/transport/native/terminal_handoff_test.go": null
+}

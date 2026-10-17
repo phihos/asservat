@@ -1,0 +1,4 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py
+Custody integration exit: 0
+/tmp/asservat-openapi-validation/bin/python scripts/test-permissions.py
+Permission Kubernetes component exit: 0

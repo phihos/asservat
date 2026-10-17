@@ -1,0 +1,23 @@
+# Native helper startup diagnostics
+
+Source-only five-path diagnostic follow-up to direct-observation-native-1. No build or external run has been performed for this candidate. This is not a fix or a native route qualification.
+
+The first run failed its original 60-second helper readiness wait, but the original error omitted the mode. Its only positive-join failure named regional. These are separate observations; neither proves the mode that first timed out. The complete original run remains archived by the parent with 175.387 seconds harness, 75.096 seconds Go, 2,196 unchanged source hashes and empty external cleanup failures. Positive helper join nevertheless failed, and no H/A/R request qualified.
+
+## Diagnostic boundaries
+
+- All five payloads are fixture/test files. Production code, caller/source/authority/socket deadlines, SQL permissions/pools, API clients/rates, retry behavior and original readiness duration remain unchanged.
+- The helper emits fixed setup begin/end labels with monotonic elapsed durations for original input loading, each already-allowed SQL purpose, native client construction, owner read constructor, owner/regional enrollment and backend composition.
+- The input projection is an optional Secret, not a ConfigMap. Original Pods are created before the exact immutable Secret containing input.json and probe.token. Existing helper setup waits up to two minutes for that original projected file; its unchanged 100-ms read-only loop now emits at most three fixed missing-projection events at 30/60/90 seconds. This diagnostic neither adopts a replacement nor repeats effects.
+- Composition/control errors are emitted before joined cleanup can conceal the failed phase. Failed-composition join has separate begin/end events. A successful return from Close is a local joined observation; no signal or unknown reply is promoted to remote completion.
+- At original helper timeout/loss/termination, read the exact original Pod and at most current plus previous bounded helper logs before shutdown. The independent five-second diagnostic context is read-only and begins after the original readiness decision; it cannot extend operation authority or retry setup.
+- Diagnostic output is limited to fixed mode/phase/category/event labels, original-Pod equality boolean, closed Pod status values, readiness/restart/exit numbers and bounded durations. At most 32 lines/16 KiB per current or previous stream. Raw errors, object IDs, inputs, tokens, credentials, SQL and addresses are never printed.
+- The pure closed-label regression includes unknown labels/formats/events, negative/overlong/overflow durations, non-JSON and overlong lines, and proves an extra synthetic private field is discarded. It is not external workflow coverage.
+
+## Next verification
+
+After a parent-provided stable dependency boundary and build allocation, capture fresh exact dependencies and an immutable checkpoint. Run explicit-file helper compile, integration compile, the closed-label plus existing DTO-parity tests, helper/integration vet and Go architecture sequentially under GOMAXPROCS=2 and GOFLAGS=-p=2 with owned TMPDIR. No containers or native services. Parent then owns any exact selected native rerun and terminal cleanup.
+
+## Unresolved cause
+
+The missing projection, SQL connection/constructor phase, enrollment and cleanup concealment are distinguishable possibilities. Existing logs contain no runtime PostgreSQL ERROR/FATAL beyond expected initial migration setup. Do not infer a cause, raise deadlines or classify the route as available before the next measured result.

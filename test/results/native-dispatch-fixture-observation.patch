@@ -1,0 +1,45 @@
+--- test/integration/download_sessions_test.go
++++ test/integration/download_sessions_test.go
+@@ -493,6 +493,25 @@
+ 				}
+ 				return
+ 			}
++			refresh := func(call context.Context) error {
++				batch := f.s.batch
++				batch.Initial = nil
++				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
++				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
++				if e := f.s.p.RefreshPermissions(call, batch); e != nil {
++					return e
++				}
++				return observer.Observe(call)
++			}
++			if strings.HasPrefix(mode, "native-") {
++				// Schema/role/publication setup can outlast the first observation.
++				// Observe the same explicitly synthetic protected fixture sources
++				// before dispatch, as the native loop also does subsequently.
++				// This does not renew a human/operation observation or a permit.
++				if e = refresh(ctx); e != nil {
++					t.Fatal("native fixture observations before dispatch", e)
++				}
++			}
+ 			jobs := &syntheticDownloadJobs{loseCreate: mode == "coordinator-recovery"}
+ 			countedAudit := &countedWorkerAudit{writer: objectAudit}
+ 			service := &evidence.DownloadDispatcher{Ledger: ledger, Jobs: jobs, Audit: countedAudit, Acknowledgements: ack, Authority: f.gate, Profile: profile, Now: time.Now}
+@@ -654,16 +673,6 @@
+ 			}
+ 			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, f.guards, store, keys, f.gate)
+ 			if strings.HasPrefix(mode, "native-") {
+-				refresh := func(call context.Context) error {
+-					batch := f.s.batch
+-					batch.Initial = nil
+-					batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+-					batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
+-					if e := f.s.p.RefreshPermissions(call, batch); e != nil {
+-						return e
+-					}
+-					return observer.Observe(call)
+-				}
+ 				var content *nativeContextFixture
+ 				if mode != "native-exchange" {
+ 					service.CurrentAuthority = f.gate

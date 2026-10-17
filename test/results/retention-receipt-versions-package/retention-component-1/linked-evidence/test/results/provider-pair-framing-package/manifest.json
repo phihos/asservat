@@ -1,0 +1,1150 @@
+[
+  {
+    "path": "internal/adapters/kms/configuration_provider_control.go",
+    "base": null,
+    "payload": "e423135e7e02901933d71abd7c1e54219e353ce9508b4de61158e9b46b2ad42f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/configuration_provider_control.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_control_test.go",
+    "base": null,
+    "payload": "4047b422108f2e746b4f01269fda103b8e2207b1c7f52817a2acfdbeb1cb8002",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/configuration_provider_control_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_effects.go",
+    "base": null,
+    "payload": "9680d9281f69e8bb0c4cde7f67f5ca39217a890aa459a395d65dc4fdcc8302c4",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/configuration_provider_effects.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_installed.go",
+    "base": null,
+    "payload": "870e2d46c3e031255530b20ebbdf623b4dec9ff14b755ab5e6cef83e025d6464",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/configuration_provider_installed.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/configuration_provider_installed_test.go",
+    "base": null,
+    "payload": "26e59b7af2f9179057008a4e4ad4a8707928145b40a6d8aef0a5d103f17fce6f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/configuration_provider_installed_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_installed.go",
+    "base": null,
+    "payload": "96be1beca7be7a6a2eb436bdc5fef622480ece2b0e0c644be543b84bef1315e2",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/owner_provider_installed.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_installed_constructor_test.go",
+    "base": null,
+    "payload": "80899070f74b987bc804627ff772f4f84e0ef8645517c29327e53a65a3ffc2d1",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/owner_provider_installed_constructor_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_installed_test.go",
+    "base": null,
+    "payload": "1683c15680ef0ddb876de31a0917dc21bf15890aba7fbb2a6e0e2d5f0a6d9ca9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kms/owner_provider_installed_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capacity_local_owner.go",
+    "base": "7cfbed8ffabc490fa4a7bc8f6d2d4bd86a4f1a2739a7c41dd5a98a5cfa8f817e",
+    "payload": "2713d5a80f2a6a8c74f9530c722aceafd8486c7097e708c4862ad64be9bf1e44",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capacity_local_owner.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capacity_local_owner_binding.go",
+    "base": "d19967f8c246b2c915e0d79ce96c97c09e045f8d40ab79dd477b331901dd2ee5",
+    "payload": "54709fb95f83b457601b13e9af87e342af8e066fbf7a99e324f8c4dc7eacaf20",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capacity_local_owner_binding.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capacity_projection.go",
+    "base": "43a0482c86eab5cd64469ad5f46c5f787ee7fb7eeda52e2eac06a7e87ddba224",
+    "payload": "a75ad7e9efb6f6750f38a26bfd386916ce2caffe6a0dc5d8500a3bca565ad991",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capacity_projection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capacity_projection_state.go",
+    "base": "17d2001a2c987fe3a9de464f0ff9094dcc2f17c5f3b49b792f9ac5c181c1ea33",
+    "payload": "f2bc9d44bc5f1d46ceeec75e9d4b21fdb380ab0d086e53f858c4401db48d0d87",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capacity_projection_state.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capacity_projection_workload.go",
+    "base": "30fe4fcccd5a4aa3362bb5f34e6f2d4cadd72fcd9a7ca124b826c6351ca19d71",
+    "payload": "3ce4bb047eeaafe60ff585c0ec27f0d625ac13019d983e3d78febcf172acab97",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capacity_projection_workload.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/capture_cleanup_projection.go",
+    "base": "aa9d9487eb12e1834f7e97146fb017168cfcdcc5aacea5f42b4d36ac606750df",
+    "payload": "e3e42844f2ea172d52657f24272bfc89e328707e7aa9d5dc1dca3d4b2e3b7a14",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/capture_cleanup_projection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configmap_protection.go",
+    "base": "ffc0cdf7d1a14f052e4b2ee037c580d6a612c49053d4fcaebc4a9c1f940bca1e",
+    "payload": "47e7d4a539cab99113cfc597452846326e5b9a8bc3fb5a76acd6012551bce834",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configmap_protection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_operation.go",
+    "base": "1cb417f43e1ac5b756dc6960190bb7408189a4b435b49a2bedf132663c57b95a",
+    "payload": "f793532fe058b682ba1750c0ff32dcaf4d43aaee042d915cda92f56ca877d4ce",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_role_operation.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source.go",
+    "base": "6d150969c227f70fdee2a9df39431af5ad5757f32b917dca322ded641b78e24b",
+    "payload": "9a7715dfc822a532b2aacdc31d9c57346c075fc89151bf4297e061ff35ad181b",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_role_source.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+    "base": "b2d155b1f9edebcf0b3aafd4249031eaf3f36ee1acc9d3190536a763e15e988e",
+    "payload": "35c98551ce4e34834d1dad936db66998409c62a97f956869f6c219e899be5ec0",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_role_source_path_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_runtime_launch.go",
+    "base": "97057a77b9c4d135268744907528ffe174744c363c1edd09ae10531709a99179",
+    "payload": "7e66e13acc9da57d5b4133fd5e517d79f8905856fb831d53287c429549224726",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_runtime_launch.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_activation.go",
+    "base": null,
+    "payload": "4eab7668d7054cc599e63b385dcd706e5a2a1bcebd8b5602f93f9b5bd633ee52",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_activation.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_advance.go",
+    "base": null,
+    "payload": "93a16a825df49eeae9f9e1f9fa4dbd24faee53852f8513f984406034b3c1b790",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_advance.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_advance_contract.go",
+    "base": null,
+    "payload": "72b826a5165e2bccf6ce47286a5b7956f4d52e7e4691804645970cce6febdf8d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_advance_contract.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_advance_driver.go",
+    "base": null,
+    "payload": "267100c9b154db4a3425d906f17dbe469b3bf9c445d5bbf357ed8167056de080",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_advance_driver.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_advance_driver_test.go",
+    "base": null,
+    "payload": "bc6895493c798e5263a81d9e109311ee96b79047b13dd9b421d40934acc12b23",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_advance_driver_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_binding.go",
+    "base": null,
+    "payload": "61fccb60fdd74e0020f037a109119ba1e78a3331638b3f365d966777f2786d67",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_binding.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_current.go",
+    "base": null,
+    "payload": "d28356af077fa9e8a832ffd045f7b2c1cf5f3069c24633f021f91d75dd064b42",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_current.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_input_current.go",
+    "base": null,
+    "payload": "30b34af0e318b395a922f78d6dc7b273911e1cee0d6cb3e40af06d365b6b72bf",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_input_current.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_input_read.go",
+    "base": null,
+    "payload": "013c6aeb01581eb9ed3c636a654fd37412eaac24308153931bfbe66439e29b33",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_input_read.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs.go",
+    "base": null,
+    "payload": "21acf3f3175500d7fbd59ca8976f84081076e5eda0f68178e1fbd29ff400bdbd",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_current.go",
+    "base": null,
+    "payload": "19f90538252a0c3c6444a41a425f8412355726bed2eae9f1136e1b892b64cc6d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_current.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_material.go",
+    "base": null,
+    "payload": "65a0f620aed097288ade813480b5e8b2b8201d09206db5f40b66f3bd7c20c698",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_material.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_objects.go",
+    "base": null,
+    "payload": "10446f16ae3dce492935a1223c8b5f897e546bd1b19c1da6bbb0f1d1632f335f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_objects.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_publish.go",
+    "base": null,
+    "payload": "4daf02cf679503e9e2d43e898c3224697b184d61a5c8133ee4c2a2d6d60347d9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_publish.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_state.go",
+    "base": null,
+    "payload": "7bddb931018c4ce4b290f278c4531e6e33706f1a7258459aba87bf5bc54cfeb5",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_state.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_state_test.go",
+    "base": null,
+    "payload": "72eb85e4ca4bfa183451d8435d7b9e0a83c938a2e331d76c9677084e4655e304",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_state_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_transition.go",
+    "base": null,
+    "payload": "a405da7e8606ae2a4af085aadd79fc77df3bacafa8531200d17b83910dfedb1f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_transition.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_inputs_transition_test.go",
+    "base": null,
+    "payload": "927a8cf2e82bd17be1acbfb032b908aaa3748a71e89aaaea6f4740774fa1acba",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_inputs_transition_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_launch.go",
+    "base": null,
+    "payload": "69183cab7ab4fa25733232f40decc45fc6157d97c3689c431de7508571956c9f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_launch.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_launch_read.go",
+    "base": null,
+    "payload": "115de8d78c872923f2c5bbd8bfcf1f3d0baa7c21b0573ace796fc54a4c6cba1d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_launch_read.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_launch_test.go",
+    "base": null,
+    "payload": "454df3e5029ba8946467a8bdf4aa4983d4f1afb6b8cb2a744c879c9915e6e666",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_launch_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_material_test.go",
+    "base": null,
+    "payload": "41357477906b126f21d75285acb17475ebf4fc57245ac518f93ccbaf18b9b1a2",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_material_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_native.go",
+    "base": null,
+    "payload": "1b3240c715d3b5cb708d3b1c4a5c8dc55db20a1285865695cf9ab183304e4819",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_native.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_native_responses.go",
+    "base": null,
+    "payload": "0aacc9d5a902b9c0c0afc20308a8025d8d33c0986e0e632112c3308ad84f8397",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_native_responses.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_native_responses_test.go",
+    "base": null,
+    "payload": "43352cd849b40ee1b4318dcaa80b30acd553e3bada16d706cc5e40f1eb9174f9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_native_responses_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_native_test.go",
+    "base": null,
+    "payload": "a92dcd5d910827a692bd9a3fc1351707e9253492d027b9262598282bd95b433d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_native_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_boundaries.go",
+    "base": null,
+    "payload": "85a2554eccdbb346cbb8bf99ac1434305642b23602d9fa9c06f7a7c3a017afc4",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_operation_boundaries.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_effect.go",
+    "base": null,
+    "payload": "8b7b9d59d9d5aad47a7c2d06ebe66e09989c24a0762f9877dbcf5e02094b07b6",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_operation_effect.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_final.go",
+    "base": null,
+    "payload": "e0cd991825bbc5563e4c1fb7a2717789f11f141542d08fe271b7502845e17db2",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_operation_final.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_test.go",
+    "base": null,
+    "payload": "71d40acd355d259883507d68a299e1f72cf64511c89ddee338e54f93b7c99cbc",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_operation_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_values.go",
+    "base": null,
+    "payload": "a5efd501a169f7b15318573243c9e5e6d99aaeb84c8b350c7125af17c3adba50",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_operation_values.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_objects.go",
+    "base": null,
+    "payload": "b90f1eff38ca496249c801a7572abf5352d8d3fc2b1ce3db4f49ec4fd259e2e0",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_objects.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_objects_test.go",
+    "base": null,
+    "payload": "9fd0134bb01ea618a333fdefaec90e2b11af6038df773bf2638749b5123fc14f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_objects_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_process.go",
+    "base": null,
+    "payload": "66ec61e73f9ae1608c519902d8a8ea5ad004b7c4bb7f816405e574b877906db1",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_process.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_reader.go",
+    "base": null,
+    "payload": "8602afa192265cddc29f4994e1f1f98ee717e3daa8a85b363c06bce7225d9bc9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_reader.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_startup.go",
+    "base": null,
+    "payload": "cde2c49343558c5f22247c2a281f9396b8b5107e926474a78d392a3498d34f74",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_startup.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_startup_test.go",
+    "base": null,
+    "payload": "c5fb2ff0ad313cc814c37f8a9ab231e9efe11642080edea73725498fb275bfb4",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_provider_startup_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_receipt_cas_test.go",
+    "base": null,
+    "payload": "e4071439e6adfeaf31f38717c743239c85ae5c80933ce9be4f8a0a1c39893f81",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_receipt_cas_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_receipt_test.go",
+    "base": null,
+    "payload": "be9fd6788f8d9d2947e47a5cb980ae0c1a451fd300143e2c1364faca11f20cdb",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_receipt_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_seed.go",
+    "base": null,
+    "payload": "e24f95d12a5fe92432499728ee0ff480a20b1fcd98a5131dc962e520ca4d3fb1",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_seed.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_source_decode_test.go",
+    "base": null,
+    "payload": "5a37ca2e9abc6a5b277ebdf4e3e9e7c32ca768b7060d20b84824e712783c1b59",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/configuration_worker_source_decode_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/fleet_settings.go",
+    "base": "c52b57e01f168ab58a2d03b2309f53acc39af3d1e8405b6f966485108ac4f99b",
+    "payload": "5e71b5225986d6b59815e321f1d524af30f946f5c4d75c57b5dcca09052c18e8",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/fleet_settings.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/hub_worker_activation.go",
+    "base": "646d0c1a51426ad00e4b62602c426f6a3a02b9c0f74d89106923195d2ade5c48",
+    "payload": "ef649d5f3c1da4ee7d83753ef81a25efef130c177e240c0c41f10d839f222aba",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/hub_worker_activation.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/hub_worker_provider.go",
+    "base": "24e7c4feac55aa5b4c8a0dc150359bed09a79f827f22c825ed270532d470bb4f",
+    "payload": "5b2d1f58d8969cfe56622c01edad4bb2d810ce8a648881fa2158d59929f2f159",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/hub_worker_provider.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/hub_worker_provider_test.go",
+    "base": "045e37550db65caa5fb66e95bdb7daf7343c67107c4140f2effa4c31fc14f793",
+    "payload": "481782a63b467fa608a8c8a677cc799ccd95a06beefd9f22dee1e411c1a8055a",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/hub_worker_provider_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_provider_resources.go",
+    "base": null,
+    "payload": "edf9a541e16a4d9b187c18a977ba453680e038039f082377a2320c8ee3db8c97",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_provider_resources.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_provider_resources_test.go",
+    "base": null,
+    "payload": "4dcc5214b111d22d4b0854d19d7f6f807ad74d2ddddf410278b5707e2196b67c",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_provider_resources_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resource_inventory.go",
+    "base": "657408355107d82e3e09981363e13da4797366af087f44dc35a6a597db75e90b",
+    "payload": "1c16525cc69b77e343e8ed0286688290ac26a189eb00125aba2fd06655727b54",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_resource_inventory.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resource_objects.go",
+    "base": "3fd8ed1e6c84f26a5f62359207756ce009233ae69530e9ccd2484bff3ccf18c8",
+    "payload": "2b3b280b673fbe33a121fd4856a15f2633c647cb96a8b5ea33e239a695c66b96",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_resource_objects.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+    "base": "c0d36f56c478abcf07926f5069bc0b4123afed2c3ae7faab6d25b4506be06458",
+    "payload": "92db4db255cefa8d5c56329f915610b5daefcd8180b7370663eeff0ebf7b21c9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_resources.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_retained_resources.go",
+    "base": null,
+    "payload": "1c18786ce271101e1b094be5ca09b11a0922f73c11dd7eb3bdf397b93ca1dca2",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/initial_runtime_retained_resources.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/installation_config.go",
+    "base": "15f7b49ad26e4f7d5770fb12acda1d571a89388162eafbf6bcdc69e4cbd19c34",
+    "payload": "26bb42d49c63c3e5bbc5c35ed2f18c992219625b3cc12cc7257058b9d99d7986",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/installation_config.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_configuration.go",
+    "base": "d9378ba29d6332697311fc73e749a037848e2b169ac108b36d4f9324469b4611",
+    "payload": "b852ce649cc1f64fb3d80ef69aa0a1c6e9de6ceba8434ee38897973016017db9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_configuration.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_activation.go",
+    "base": "1ccd8b59f984dc7cafb22a28681e02aada21ba40853d1ce3f776106a519ec7e0",
+    "payload": "51dcf3c61701a15244137a661b036ec6969a47055b4dc6b0362d3dc7d81b4c08",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_activation.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_launch.go",
+    "base": "947f0dfdc9e6561954ea99ebaca245d960ccb670ba8d338fad6ccfb380998301",
+    "payload": "d41065da184c5ffa42b130502a96ac8ee4d9efbb171c4228d143eeaa543e62aa",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_launch.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_objects.go",
+    "base": "64b724d11f50e3620140c9db5d3edd1dc275c86cdd2ddc40b590f1903a280d4b",
+    "payload": "34c911b8e629b6ff9eab20e35bd1cfc33b58b3b0a9580283f8bf8d9c623bef58",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_objects.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+    "base": "cec7a2e94fd969d4221ab2a61e11cad822e636578dc48d7f8aa1f7fade211b6b",
+    "payload": "3121f8b87c1850f475b65ab6a48fd17367a1ad4bb98342f5c532bb2665b1caac",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_projection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input.go",
+    "base": "ad6d1a44cc68b4732eaf90957ec4a59b2be0922fcbe8c289e56ee6da226761b1",
+    "payload": "00afa761e626b567d5ae88f107ee826c86b8d10b4a543aa6c3fc7def0af87a2c",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_projection_input.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_material.go",
+    "base": "869feff9058dfcf5c849fc2ac421d471a237c451c1314a22d6a36bba6ef7a285",
+    "payload": "b8b59f9856080a4375ac572f24b8c7bf6c10dad0741e287f232e34ae3d600086",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_projection_material.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_reader.go",
+    "base": "f4e23174d4a9da0304adc1f493d1ba94b5aa810e5b05e4deb42cdb488e037370",
+    "payload": "39c8ee1d0d97d940f5a0339d95dc1497e245edc69e51d2aeabfde9140ea49e06",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_reader.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_role_source.go",
+    "base": "cd50ec9d39a0e46d5ea0a95fe760ef277a3aaed8710eb90bf7e792a2de89515e",
+    "payload": "e3390fa3ae855bd8010a5925d9119c7240f8aefe16142bde1e8c568e10deeab3",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_identity_role_source.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_binding.go",
+    "base": null,
+    "payload": "9a8fb040b3d87b407b01ca3643ae67b2ecbe307bc81a2f248c6ce1276c79053e",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_binding.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_installed.go",
+    "base": null,
+    "payload": "c78381a7d69324f66fea7a58c61487f2632cb8d3b122974b01d816c6c777b0bf",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_installed.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_installed_test.go",
+    "base": null,
+    "payload": "0fe586365618a1b432f5490607246b7f6227ba35c223586a9212b390dd3a628e",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_installed_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_material_reader.go",
+    "base": null,
+    "payload": "ec971c18c1e0c04ec32c6cb22aae9298c3d284dbc3d076ae75fb173dfd691d1a",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_material_reader.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_material_reader_test.go",
+    "base": null,
+    "payload": "01bdf8fb4d044feb054142dc95b330f99d6cb0f8a64b8270339c314711b4291f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_material_reader_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_objects_test.go",
+    "base": null,
+    "payload": "100f7207da6767ab869e6009efada8264565b33596b8353d142bb42041dc818c",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_objects_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_projection.go",
+    "base": null,
+    "payload": "19cc614d5b7e1a9ae0efddbb0a874763293a9b174153a8b26149916b9175cc6a",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_projection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_provider_projection_test.go",
+    "base": null,
+    "payload": "75f2652249c6b5531d5ef23e5ecf9f17c5a1ed7edef66f616ea6ee7055e8f091",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_provider_projection_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+    "base": "f43606513f8ec1b8b6fde6f28add3e8973921d1f24ac09d1f98e5b9c786762d0",
+    "payload": "56998ec98bf56c08b54208487655e81fd09e04112ba6cc90cf7f4f4cff109680",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/owner_workload_guard.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_runtime_worker.go",
+    "base": "4d2194f146618d25c03adec5936fc2001332e5577c9233499211f564c4f21e2b",
+    "payload": "2ca12f71fd22f299806116c234300eb115ad81e65b4aada894a76f797a1388df",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/public_runtime_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_projection_resources.go",
+    "base": "52e8ee3ee6731154a48c9b8279fb02196ae844c61a5ba334bc5c914b78bdd4e2",
+    "payload": "35539dfabed6236afa7f7af9e5503d2dc5076efd39f908751676134734197502",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/worker_projection_resources.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_projection_state.go",
+    "base": "98a7c23503c79d5e44b8f689bcabd8ff41d267dd459f317b33de2fa21581c5aa",
+    "payload": "dd8ddea80475ede7d65bad9859b7df208a8a5d8b03dd55cfea8069022636e85e",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/kubernetes/worker_projection_state.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/postgres/capture_cleanup_credential.go",
+    "base": "3b7d0052a7837ee5dbf34cce042a348c03722a14e662f2ad92f798aab20974ea",
+    "payload": "23033b6de71abe8d8894b011a7f5936f7c4de168dbaff9278a21b10063b8d866",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/postgres/capture_cleanup_credential.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_worker_operation.go",
+    "base": null,
+    "payload": "7c84f4089b57fef315e6dd45b4c7371cd3c86279ff20dd1b31ee6ff66da6b4ee",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/postgres/configuration_worker_operation.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_credential.go",
+    "base": "83aa880543f35e2bf88af34a6b368d26eee84cf33e2be078aac607e4116616aa",
+    "payload": "5d060885391aff39a70446acd126a2bb42613e742456125e65bf23875a055882",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/postgres/owner_identity_credential.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_artifact.go",
+    "base": "2ce9e5abdf7eb88ac888090998c0bcc6bc4e6b8cff6c4b2a96d46041e0f5a014",
+    "payload": "adf4eecaa2d81375466c6b7d50998e0242f63395a91f50d53053ba9a782e9b3f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/configuration_provider_artifact.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_installed_artifact_test.go",
+    "base": null,
+    "payload": "5c639e617de25ca73e6a310ec8eb99f97ce8761cb0ffa1fcbcb82cb07af6a34b",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/configuration_provider_installed_artifact_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_setup.go",
+    "base": null,
+    "payload": "3644766a79da939c2e541558473adb675b7868290379e8ed4acf28eecf32e2e0",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/configuration_provider_setup.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_setup_binding_test.go",
+    "base": null,
+    "payload": "83499a2eb08681609435f38324cbad3d4da665efa40021fe46ead6d1e7d43e5b",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/configuration_provider_setup_binding_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_setup_test.go",
+    "base": null,
+    "payload": "45bc4002a9acfa33b4b367b2450f075c9aa57c1db93cd966b8a1b44e662b8f17",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/configuration_provider_setup_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_artifact.go",
+    "base": null,
+    "payload": "c86a7fccc69eb8d07e48a731fb364504ce8cc2b3de90e1f4ad37a1431e65435e",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/owner_provider_artifact.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_artifact_test.go",
+    "base": null,
+    "payload": "99cf41d31e54c979bc40d6ab638fcd8718d0a1fab2fdd59eea1541f9c2b61916",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/owner_provider_artifact_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_selection.go",
+    "base": null,
+    "payload": "c6f7bd9d2b9c5b721688a61ff94a79fb4d5bbbe27dc4a09cd3968bf90570b478",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/adapters/providerconfig/owner_provider_selection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/capacity_hub_worker.go",
+    "base": "84b0a240e56000c722ad8b62262ccdce62d9a577ddad227f4b641fcd047b5a20",
+    "payload": "7b91c19ef91c81e68ddcf0801a9960e43af4b655e66c4477f11e5c0ff4d71601",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/capacity_hub_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_audit.go",
+    "base": null,
+    "payload": "d08c50da2ef80481c210304d9ad37da9c5847d9399a9368f05825f5df44cd29e",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/configuration_provider_audit.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_audit_storage_test.go",
+    "base": null,
+    "payload": "fd90c94f83f6fe40cc80a29debbd5c160a9f428267be474bb7890f308a89bd4a",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/configuration_provider_audit_storage_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_inputs.go",
+    "base": null,
+    "payload": "866859744e1a83dbd3dd0911564c5f63d7923b10dd3af7b4978b61724ab0d81a",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/configuration_provider_inputs.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_runtime.go",
+    "base": null,
+    "payload": "d95a453fba6ac3cd2bbc5f818ead6f1ffbc7790be3421b06a84e92abfd0718af",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/configuration_provider_runtime.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_runtime_test.go",
+    "base": null,
+    "payload": "1c83fabf176f5341e5657716d8181f41b10d726ff5388f5b2bf51032352a4ddd",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/configuration_provider_runtime_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "base": "e01407ba819e97364f1cb18028cb841dc81436fec22e3c096a5627a4fc529994",
+    "payload": "e0e1ad00326d929aacae460e9d35d55798266dcd0d97e48bc1506c0387babecf",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/hub_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/installed_hub_worker.go",
+    "base": "8761de997a121c225e134d2ff2c7e889406dfd5ecf33424b1f39d5c4f7076ed7",
+    "payload": "5f8eb9970c608e5db8b5ad33b07e43c76d96bc6622f51c25f3cd5c7103f3d92d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/installed_hub_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_identity_inputs.go",
+    "base": "548e0fbd037902a93070ee47c17067717f26ecd9e7ffd228dddda617442dbb4b",
+    "payload": "c195c49298615ba7c2fb1aaf1aebc2d2f1e026fc72a7517b83ef7c617a429f4b",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_identity_inputs.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_inputs.go",
+    "base": "b57fb628593e89121e984441dbdd1384ce0454bea6212ba080b450ca864872b6",
+    "payload": "92627a6288f0dc3802a5f35cf39948d8538f2ade965cfb4eb662decd12a8d8b6",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_inputs.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_deployment.go",
+    "base": "7c7a5a79d340c2473fbed0daa3820786b3e29333c64f1226df8942dffb1b2615",
+    "payload": "e1bd89fbf38cd272bc1a0089c7e1f45ccfdb3925b802f494154f035b28ab1992",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_observation_deployment.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_provider_audit.go",
+    "base": null,
+    "payload": "dc458d732d57c0aa3c9e3e2283acadd92ee40a80e0e6515c53bca0aca5f73229",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_provider_audit.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_provider_audit_storage_test.go",
+    "base": null,
+    "payload": "4142cd297fb802594293fdc01fadcd308ad749bf591f6af0b507a5ece5c16381",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_provider_audit_storage_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/bootstrap/owner_provider_inputs_test.go",
+    "base": null,
+    "payload": "7403f203ccfe48fde0ccbb95e4e94d5974e2c1ac4121e956e6723f6dbca1df18",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/bootstrap/owner_provider_inputs_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/configuration_worker_binding.go",
+    "base": null,
+    "payload": "af8c39ae66ff2ac962e42243cfe618c80dc7c7477f74577fbafe745eb4933b48",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/configuration_worker_binding.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/configuration_worker_inputs.go",
+    "base": null,
+    "payload": "24bc712df618dd7adc3c0b22ca308d54e524292b06fe6301a32472e0a77d4862",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/configuration_worker_inputs.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/hub_worker.go",
+    "base": "f16ab0574baf4dbce0d97d06462045998e963d687884d36664171d9c7de51fcd",
+    "payload": "9cd98304c849149f4953997d93efe68cbe95bb8a9524a1d0d9942d682128aaec",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/hub_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/initial_runtime_provider_layout.go",
+    "base": null,
+    "payload": "e0cb385dd4e4fe2b57b8f181b32319662af66fb7d79fc9945869701faa62a3ea",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/initial_runtime_provider_layout.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/initial_runtime_provider_layout_test.go",
+    "base": null,
+    "payload": "975b4e3fd1d498af6e296cd6e6079953d7c943d873336f7f275e69498a5cdf3f",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/initial_runtime_provider_layout_test.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/initial_runtime_resources.go",
+    "base": "0b1fbbdb3ef862b7436eb918e22163d950878d89785dab7fcd0e356614cee019",
+    "payload": "fd2103310d43b1282e5a8ef5b8e7156b0782e7d01918efb09c286c9b584f4bd7",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/initial_runtime_resources.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/owner_configuration.go",
+    "base": "6bdb5beb28d8f9b6a52c0f071511e973ea072d98481b3c51580bc605a4ff9307",
+    "payload": "320443d84af89e3503004fea96ce5aed29495a74f8b1b0fbe96ec31cc52421c6",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/owner_configuration.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/owner_deployment.go",
+    "base": "a5b3b2ba63727c3c243489d48841652a6a2e336aa700caacd07756dd89e30491",
+    "payload": "2105a02acaf51700e0eaaa0282dae5ee60accf674314b085be04158c16e539ee",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/owner_deployment.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/owner_provider_selection.go",
+    "base": null,
+    "payload": "90b5898809c61b8791b69f29a7d08a6c0cff0c170b4f2de0531b5a6d37f63d9c",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/owner_provider_selection.go",
+    "set": "worker"
+  },
+  {
+    "path": "internal/contracts/public_runtime_worker.go",
+    "base": "83b84a7812d4fd9e999c95a579b2cdcd6953312cfb273ede38ae9f870718e13b",
+    "payload": "65bbddc746f0310b25d4ecb5d120e60c7e58ebb69f69077eecc175b8fc1760d9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/internal/contracts/public_runtime_worker.go",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/configuration-provider-auth.schema.json",
+    "base": null,
+    "payload": "faa8c09ca02cd42c72c4e33eaaf871168729b27581aaa30a934fd8b84a5924b0",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/configuration-provider-auth.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/configuration-provider-selection.schema.json",
+    "base": null,
+    "payload": "85bf436c3f275b09c774187a3ddd58d0152de8eed34b4ac3becd892e096f71f1",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/configuration-provider-selection.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-input-claim.schema.json",
+    "base": null,
+    "payload": "0539964630414d6bec0c06c06f6715035a87dd04374c6937acaf37c499b5a79c",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/configuration-worker-input-claim.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-input-provenance.schema.json",
+    "base": null,
+    "payload": "73752b741b563a46728a6993e4ed2c55e488c10ff9480df4dd09e72331597e40",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/configuration-worker-input-provenance.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-provider-binding.schema.json",
+    "base": null,
+    "payload": "c99a93dfc0ca3a923df8e6996feea5baf40b232620635c5ceded3811ce3cf3b9",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/configuration-worker-provider-binding.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/hub-worker-activation.schema.json",
+    "base": "bbd7162fb359aeecd986b21123b3942e755729e27f8c3889398eb60dac2633db",
+    "payload": "269fd7f50298829bc885ee27bf21409e2446493427dc3711dfd322b506986a40",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/hub-worker-activation.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/hub-worker-deployment.schema.json",
+    "base": "bbb2685866ab0b6ff90e15c8e08907f78e0fa4d573c6c4f76868dc2b425dea48",
+    "payload": "bd3c2bcfed970ae9294a074d8617a5f1c92fd1c9e95bc47027c867355b025f62",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/hub-worker-deployment.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/initial-runtime-resources.schema.json",
+    "base": "ecaf0e1b5aba82b4ffc8ed79663dc9ed1ccc657cbdc3232fe156f80922f74f40",
+    "payload": "f143d977aa83032f8c037b0634932e285fb1f8ba6add1e4eb67c1d294c918be1",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/initial-runtime-resources.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/owner-configuration.schema.json",
+    "base": "54f2c88ea5145fa0aef1d075254a00b0ff75952110b2facb64534eea973dcf0c",
+    "payload": "23c76f4c8e07a4af07b512f03ed664641f69c1a3a40fb38e338ee59fc3924ca3",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/owner-configuration.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/owner-deployment.schema.json",
+    "base": "cb5cac7afe7d0db52ad91417b3b71ee7e5524d6d4f0ab6a4258607c7956022ce",
+    "payload": "ca95d2209cb2cc6b025d2f58f55a696b29f8019fc2a891416b24b04aebedac00",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/owner-deployment.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/owner-identity-roles.schema.json",
+    "base": "185d37d9888708c98bbbff079de977b39e8a60c88f15618f9bf0c1fb35a08f23",
+    "payload": "ea2233f95a58193270de24711c83f16903fcbd5f4ea175c97cb2777566be1617",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/owner-identity-roles.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "specs/contracts/owner-provider-selection.schema.json",
+    "base": null,
+    "payload": "561c513f4a38df765a90c3c4effa4d7f6580e63648468a3ca856c0ba610f56ea",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/decision-handoff-2/files/specs/contracts/owner-provider-selection.schema.json",
+    "set": "decision"
+  },
+  {
+    "path": "specs/contracts/public-runtime-roles.schema.json",
+    "base": "bb03c2ad80c90096bb9cad39945fa52a8848517d7a04d3a5d10b08cf2f69e0d7",
+    "payload": "1716800b1aa9ec318ff9e496920d049f266338a841b3a5bea21e951ee298eb2d",
+    "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/files/specs/contracts/public-runtime-roles.schema.json",
+    "set": "worker"
+  },
+  {
+    "path": "scripts/check-specs.py",
+    "base": "dbcc9e2a1c36b3f9f0aacb507493bc7d4cbb46ff5b80a9fc6925a01f75439efa",
+    "payload": "18203ef3306b69254d3ca7143a24080adb82afb93e562dd48c6b8ffe07dc261f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/decision-handoff-2/files/scripts/check-specs.py",
+    "set": "decision"
+  },
+  {
+    "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+    "base": null,
+    "payload": "fcf56365055e9b1629a2ec3ae950f085025e42366ac2fb37b1e9ac180f1bd3f6",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/decision-handoff-2/files/docs/decisions/149-fresh-provider-installed-pair.md",
+    "set": "decision"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_channel.go",
+    "base": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "payload": "8b2d38209e433c1e9359c9ccf96188af095be17663355dbbf2b8f8b3a55be752",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/connector_operation_channel.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_client.go",
+    "base": null,
+    "payload": "9110d59cfab8fa3ace533b721594d86fea1f39eb3b89ceb721da7c569e6c9b60",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/connector_operation_client.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_connection.go",
+    "base": null,
+    "payload": "1e77d0f168fb84a26badd54fbd9e92ca96e5089910465241cd6400ee14b8871a",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/connector_operation_connection.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_connection_test.go",
+    "base": null,
+    "payload": "3da8d4278d5fbac5a8a311483c88b7a257e59206e046c565508a0d4244eae177",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/connector_operation_connection_test.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_hub.go",
+    "base": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "payload": "b25d412835a7f6229a7dd2609a7292301f3be5a33ffd1c706806f6487152dd7a",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/connector_operation_hub.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/observation_operation_wire.go",
+    "base": "3798ea0f15245bf4748bab342d003386e1a5df22f1e28907cc5ca789127c563c",
+    "payload": "0b9dbb03e386bc43d03cd7c1fde49f0a44a1ff3162cb4a9e3fa75d6230b27cda",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/observation_operation_wire.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/adapters/mtls/owner_operation_wire.go",
+    "base": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333",
+    "payload": "f7a46377500e982c5f17b028da7e9abd768caf286356c4349682eedb01cd285e",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/adapters/mtls/owner_operation_wire.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/bootstrap/regional_observation_operation_framed_test.go",
+    "base": null,
+    "payload": "a528fde400e57a383e623c137c65f10cd4704e509f63c287b6b5e6e304b8e52b",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/bootstrap/regional_observation_operation_framed_test.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/bootstrap/regional_observation_operation_holder.go",
+    "base": null,
+    "payload": "04bdb4331c5747a2fc91dc20a928fb51c4fe3a36b0644bb04d936a364f6dbcd5",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/bootstrap/regional_observation_operation_holder.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/contracts/observation_operation_exchange.go",
+    "base": null,
+    "payload": "e0817f2de3f121f8ec38b2c5c088fdb9db4fe33e2fcf4c7a2a2a614697ee44bb",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/contracts/observation_operation_exchange.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_handler.go",
+    "base": null,
+    "payload": "4334914c0e03c4146acee552431b90d02ea989d132f4876726637ab1444df44f",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/hub_operation_handler.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_handler_test.go",
+    "base": null,
+    "payload": "500de10fb77f67d112fa850d26a930aaac33fcc05976b73250196cb00a6ef600",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/hub_operation_handler_test.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_holder.go",
+    "base": null,
+    "payload": "865d618c59e9a00cff9a1b59c6e528b6fed1fc21baacee8361481b9801006c27",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/hub_operation_holder.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_holder_test.go",
+    "base": null,
+    "payload": "2a352a66a26a3e53610da606f8eba45bc831edd43f77000dfa684fc6021afbf6",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/hub_operation_holder_test.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_stream.go",
+    "base": null,
+    "payload": "599831754fe122b406468300ef0d62a681f7e0cce3ab978a0ba522bc93addba0",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/hub_operation_stream.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_operation_exchange.go",
+    "base": null,
+    "payload": "b3d21e4454300ba1c688357ad0ed64720f90a826ca336ae3f3c428efc17f84ed",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/regional_operation_exchange.go",
+    "set": "framed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_operation_exchange_test.go",
+    "base": null,
+    "payload": "38443006843d6b87a3d6a6e3a03cb825657365832f26c0aad9b22299af6c20a0",
+    "source": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/files/internal/transport/clusterobservation/regional_operation_exchange_test.go",
+    "set": "framed"
+  },
+  {
+    "path": "scripts/test-context-storage.py",
+    "base": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311",
+    "payload": "c19ddd1ffab65ef24387f4896d190a5bd81da47a8b0ce7be35d12a9943a7add7",
+    "source": "/home/phil/.cache/asservat-build/planning/provider-pair-native-20261013/files/scripts/test-context-storage.py",
+    "set": "native"
+  },
+  {
+    "path": "scripts/test-initial-bootstrap-selection.py",
+    "base": "19a7bd1aed4e9229d7ea9936e60e2a232e9ed19f06a23ed672431205cb73058a",
+    "payload": "f79d5c20e6d74831f8cba3520cb050f39195a656f49f266e17ff3e820ac15722",
+    "source": "/home/phil/.cache/asservat-build/planning/provider-pair-native-20261013/files/scripts/test-initial-bootstrap-selection.py",
+    "set": "native"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "base": "0590278c8ca52deaceee9c3cb686f9c30281a5b85f684e409f5bb511ab5eefd9",
+    "payload": "88c2c2796e015e9b5f37535e79170ced3d99baeb1a79731e4ff4b558d89f1421",
+    "source": "/home/phil/.cache/asservat-build/planning/provider-pair-native-20261013/files/test/integration/initial_bootstrap_chain_test.go",
+    "set": "native"
+  },
+  {
+    "path": "test/integration/initial_runtime_bridge_native_test.go",
+    "base": "07c16ced94ce5d67f5004555f8749e6ec271ad85fbbc249bf80673edce0beb29",
+    "payload": "1a09983a4bdb78d48eaadf3ce6dab634a710dcde3e3a01a34e473fcbc3be1f09",
+    "source": "/home/phil/.cache/asservat-build/planning/provider-pair-native-20261013/files/test/integration/initial_runtime_bridge_native_test.go",
+    "set": "native"
+  },
+  {
+    "path": "test/integration/initial_runtime_provider_pair_native_test.go",
+    "base": null,
+    "payload": "fd0180a0efc2a8475b2a13fcdd804e6918724ff090cebcea9eb49240dbbceaec",
+    "source": "/home/phil/.cache/asservat-build/planning/provider-pair-native-20261013/files/test/integration/initial_runtime_provider_pair_native_test.go",
+    "set": "native"
+  }
+]

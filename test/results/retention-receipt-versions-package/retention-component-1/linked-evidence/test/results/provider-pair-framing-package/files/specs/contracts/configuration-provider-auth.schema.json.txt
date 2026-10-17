@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-provider-auth.schema.json",
+  "title": "Original configuration-worker Kubernetes-auth profile",
+  "description": "Private public configuration, at most 8 KiB. Exactly audit wrap and unwrap roles with role-specific 300-second and 900-second maximum bounds. No owner signing purpose, shared mount TTL requirement, credential or current authorization. Actual recipe, independent protected source and backend capability are checked separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "authMount",
+    "authMountAccessor",
+    "serviceAccount",
+    "auditCredentials",
+    "recipeSHA256"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-configuration-kubernetes-auth/v1"
+    },
+    "authMount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])",
+      "not": {
+        "const": "token"
+      }
+    },
+    "authMountAccessor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])"
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "auditCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^asservat-[0-9a-f]{32}-worker-providers(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "recipeSHA256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

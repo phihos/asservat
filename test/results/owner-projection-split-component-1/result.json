@@ -1,0 +1,67 @@
+{
+  "runnerSHA256": "94a6308fb229e51615bc315719a8d3a68b2152a73bb6f17c172cdbc3677c1c15",
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "pid": 812611,
+      "processGroup": 812611,
+      "exit": 1,
+      "seconds": 1.002,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    }
+  ],
+  "sourceCount": 3056,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "failed",
+  "reviewedPayloads": {
+    "internal/adapters/kubernetes/owner_projection_operation.go": "902932ff1398a1abf35b472bd91689954b67c8e8dc5e6634c1e48ee8668ed0b0",
+    "internal/adapters/kubernetes/owner_projection_preflight.go": "0f0c21dd0e0b9178213cae42fd461d7393867a8b1aa4cb4c77bc368090c210d4",
+    "internal/adapters/kubernetes/owner_projection_preflight_source.go": "9093158fe389e6c703843e27534210e9f7f82fbb96f6d67d2d490994aa49245e",
+    "internal/adapters/kubernetes/owner_projection_preflight_test.go": "a31ea928d3110fd53840177ace2851af80b23a961021475fb3150d2f9e1785f4"
+  },
+  "selections": {
+    "race-kubernetes-split": [
+      "./internal/adapters/kubernetes",
+      "^(TestOwnerProjectionSplitBridgeWaitChangesDenyBeforeFirstClaim|TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches|TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate|TestOwnerProjectionSplitExactGraphsAndPrivateAdmission|TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge|TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay|TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait|TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection|TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect|TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared)$"
+    ],
+    "race-kubernetes-projection": [
+      "./internal/adapters/kubernetes",
+      "^(TestOwnerProjectionDiagnosticClosedCodesKeepOriginalErrorsIs|TestOwnerProjectionDiagnosticPreservesFirstAdvanceAndInspection|TestOwnerProjectionDiagnosticSlotRejectsCopiedAndLaterFailures|TestOwnerProjectionDiagnosticUnknownEnumsRemainFixed|TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext|TestOwnerProjectionOperationRejectsCopiedOuterHandle|TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect|TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce|TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork|TestProviderOwnerInstallationRunsFiniteOriginalSequence|TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling|TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection|TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe|TestProviderOwnerProjectionOperationCompleteAndLaunch|TestProviderOwnerProjectionOperationLostCreateIsInspectOnly|TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent|TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof|TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS|TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects)$"
+    ],
+    "race-kubernetes-owner": [
+      "./internal/adapters/kubernetes",
+      "^(TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization|TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause|TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect|TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex|TestOwnerIdentityOperationCloseJoinsAdmittedRead|TestOwnerIdentityOperationFinalCannotSkipActualCurrentPhase|TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls|TestOwnerIdentityOperationRetainsShorterAdmittedPhaseDeadline|TestOwnerIdentityOperationRoleAttemptIsSingleUse|TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads|TestOwnerOperationDiagnosticsNeverRenderDriverValues|TestOwnerOriginalDiagnosticDoesNotCompareObservationDates|TestOwnerOriginalDiagnosticKeepsExactFieldsAndFirstDifference|TestOwnerPreflightAcceptedFailurePrecedesPrivateJournal|TestOwnerPreflightActualGraphsAndLockOrder|TestOwnerPreflightActualSelectionWriteRemainsLocked|TestOwnerPreflightCallerCancellationBeforeLockDeniesEffects|TestOwnerPreflightCloseJoinsInitialRead|TestOwnerPreflightNoLegacyFallback|TestOwnerPreflightOriginalAgeNotReplacedAfterLockWait|TestOwnerPreflightPostLockChangesDenyBeforeSelectionClaims|TestOwnerPreflightRoleAbsenceCannotAdoptAppearingOrLostRoot|TestOwnerPreflightShortParentDeadlineSurvivesBothAdmissions|TestProviderOwnerAcceptedObservationDoesNotRefreshOnRead|TestProviderOwnerOperationClaimBeforePostLockDenialStaysSpent|TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks|TestProviderOwnerOperationOpenAndFourOriginalRolePhases|TestProviderOwnerOperationUnknownEffectOnlyReconcilesOriginalResult|TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls)$"
+    ],
+    "race-kubernetes-source": [
+      "./internal/adapters/kubernetes",
+      "^(TestBrowserSettingsProtectedConfig|TestCapacityGuardsRequireExactIndependentCurrentDenial|TestConfigurationRoleDeploymentUsesItsOwnTwoProcessBound|TestConfigurationRoleInertClaimCanCompleteWithoutLaunchingPod|TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound|TestConfigurationRoleOperationChecksGuardAroundNegativeProbes|TestConfigurationRoleOperationCloseCancelsAndJoins|TestConfigurationRoleOperationDoesNotEscapeOrRenew|TestConfigurationRoleOperationRechecksChangedEnforcementAndSources|TestConfigurationRoleRootCompleteOriginalOperation|TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath|TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds|TestConfigurationRoleSourceOriginalFiveSecondPath|TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement|TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation|TestConfigurationWorkerAliasedDepletedLimiterCannotInventAvailability|TestConfigurationWorkerBlockedPostLockReadRetainsOriginalEnd|TestConfigurationWorkerDiagnosticBlockedReadKeepsOriginalDeadline|TestConfigurationWorkerDiagnosticCodesSurviveNormalizedProjection|TestConfigurationWorkerDiagnosticFinalPredicatesKeepClockOrder|TestConfigurationWorkerDiagnosticGuardSubcode|TestConfigurationWorkerDiagnosticMutationKeepsActualGraph|TestConfigurationWorkerDiagnosticProbeDetailsAndJoinedPriority|TestConfigurationWorkerFinalBracketNeedsNewNativeEnforcement|TestConfigurationWorkerFleetDecoderCannotRenewOriginalInterval|TestConfigurationWorkerNativeAndPostLockReadsAreExplicit|TestConfigurationWorkerNativeConstructorKeepsExactClientsAndPins|TestConfigurationWorkerNativeResponsesRequireEveryOriginalProbe|TestConfigurationWorkerOwnerDecoderKeepsCompleteBodyWithoutIO|TestConfigurationWorkerPostLockRejectsChangedCompleteValues|TestConfigurationWorkerReadsSourceAfterFinalGuard|TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension|TestConfigurationWorkerSourceReadersUseActualEightReadBrackets|TestFleetAdministrationProtectedConfig|TestGuardProofPreservesStructuredAdmissionCause|TestOwnerConfigurationClosedSnapshot|TestOwnerSchedulingLeasePlanRejectsAmbiguousScope|TestOwnerWorkloadProbePlanRejectsAmbiguousScope|TestOwnerWorkloadProtectionRequiresActualCurrentDenial|TestRetentionGuardCurrentEnforcementAndNegativeControls|TestWorkerConfigurationClosedSnapshot)$"
+    ]
+  },
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "e635526f6aaa666019d29067c4d00789e2790dffc399914144556cba7118a348",
+    "runner.py": "94a6308fb229e51615bc315719a8d3a68b2152a73bb6f17c172cdbc3677c1c15",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "compile.log": "e06ea7082ad7ae116735166bca29cb8d78baf0a885740a9179325623e7ac5cde",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation.go.txt": "902932ff1398a1abf35b472bd91689954b67c8e8dc5e6634c1e48ee8668ed0b0",
+    "payloads/internal/adapters/kubernetes/owner_projection_preflight.go.txt": "0f0c21dd0e0b9178213cae42fd461d7393867a8b1aa4cb4c77bc368090c210d4",
+    "payloads/internal/adapters/kubernetes/owner_projection_preflight_source.go.txt": "9093158fe389e6c703843e27534210e9f7f82fbb96f6d67d2d490994aa49245e",
+    "payloads/internal/adapters/kubernetes/owner_projection_preflight_test.go.txt": "a31ea928d3110fd53840177ace2851af80b23a961021475fb3150d2f9e1785f4"
+  }
+}

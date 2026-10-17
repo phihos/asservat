@@ -1,0 +1,241 @@
+package bootstrap
+
+import (
+	"context"
+	"errors"
+
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	captureapp "asservat.local/asservat/internal/application/capture"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/authorization"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
+	execution "asservat.local/asservat/internal/domain/execution"
+	fleetvalue "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/contextstart"
+)
+
+// RegionalAPIContextStart is the hub half of the synchronous Start port. It
+// runs the API context runner with the hub's own SQL/authority ports
+// (ADR-171); the attached regional exchange supplies only cluster-local
+// operations. It holds no collector, wrapper, evidence reader or provider key.
+// Historical Request replay never calls this port; explicit fresh-current
+// Continue remains a caller decision.
+type RegionalAPIContextStart struct {
+	Runner executionapp.APIContextRunner // hub ports; cluster-local ports are per exchange
+	Signer fleetapp.APIContextWorkSigner
+	Router *contextstart.Router
+	Now    func() time.Time
+}
+
+var _ captureapp.ContextAcceptedStart = RegionalAPIContextStart{}
+
+func (s RegionalAPIContextStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
+	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
+		return execution.ErrInvalid
+	}
+	started := s.Now().UTC().Truncate(time.Microsecond)
+	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer cancel()
+	until, _ := call.Deadline()
+	var cancels []context.CancelFunc
+	defer func() {
+		for i := len(cancels) - 1; i >= 0; i-- {
+			cancels[i]()
+		}
+	}()
+	narrow := func(d time.Time) {
+		until = identity.Earlier(until, d)
+		var stop context.CancelFunc
+		call, stop = context.WithDeadline(call, until)
+		cancels = append(cancels, stop)
+	}
+	caller, e := current.ResolveIdentity(call)
+	if e != nil || !caller.Valid(s.Now()) {
+		return execution.ErrDenied
+	}
+	narrow(caller.ValidUntil)
+	recovery, e := s.Runner.Recovery.RecoveryState(call)
+	if e != nil || !recovery.Valid(s.Now()) {
+		return execution.ErrUnavailable
+	}
+	narrow(recovery.FreshUntil)
+	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller, recovery)
+	if e != nil {
+		return e
+	}
+	a := accepted.Accepted
+	if accepted.Actor != caller.Principal || a.CaptureID != id || a.State != capturevalue.IntentAudited || accepted.Target.ClusterID != a.Expectation.Registration.Location.ClusterID {
+		return execution.ErrDenied
+	}
+	narrow(a.Deadline)
+	narrow(a.Expectation.Registration.WriteUntil)
+	target := authorization.Target{ClusterID: accepted.Target.ClusterID, NamespaceUID: accepted.Target.Namespace.UID, WorkloadUID: accepted.Target.Workload.UID, PodUID: accepted.Target.PodUID}
+	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
+	if e != nil || !capability.Valid(s.Now()) {
+		return execution.ErrUnavailable
+	}
+	narrow(capability.FreshUntil)
+	// Reservation happens before signing/attachment. A closing old exchange stays
+	// charged until its original socket and human owner have actually joined.
+	attachment, e := s.Router.Attach(call, target.ClusterID, id)
+	if e != nil {
+		return execution.ErrUnavailable
+	}
+	defer attachment.Close()
+	receiver, e := attachment.Receiver(call)
+	if e != nil {
+		return execution.ErrUnavailable
+	}
+	narrow(receiver.ValidUntil)
+	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
+		return execution.ErrDenied
+	}
+	work, e := executionapp.NewAPIContextWork(accepted, receiver.Channel, capability, started, until, s.Now())
+	if e != nil {
+		return e
+	}
+	signed, e := s.Signer.SignAPIContextWork(call, work)
+	if e != nil {
+		return e
+	}
+	defer clear(signed)
+	// Signing and every prior blocking read retain their original bounds. The
+	// same retained CurrentIdentity answers regional requests on this attachment.
+	if call.Err() != nil || !s.Now().Before(until) {
+		return execution.ErrUnavailable
+	}
+	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
+		r := s.Runner
+		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
+		result, err := r.Execute(ctx, current, id)
+		switch {
+		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
+			return result.State, nil
+		case errors.Is(err, execution.ErrPreparationUncertain):
+			return "PreparationUncertain", err
+		}
+		return "Unavailable", err
+	})
+	if e != nil && state == "" {
+		return execution.ErrUnavailable
+	}
+	switch state {
+	case "StoredPendingVerification", "AlreadyStarted":
+		return nil
+	case "PreparationUncertain":
+		return capturevalue.ErrPreparationUncertain
+	default:
+		return execution.ErrUnavailable
+	}
+}
+
+// ServeRegionalAPIContextExchange owns one outbound exchange until all regional
+// operations and stream I/O join. It does not reconnect or retry uncertain
+// work. It answers only cluster-local operations for the verified work.
+func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifier fleetapp.APIContextWorkVerifier, local contextstart.RegionalLocal) error {
+	if exchange == nil || verifier == nil || local.Now == nil {
+		return execution.ErrInvalid
+	}
+	defer exchange.Close()
+	response, writer, connection, e := exchange.IO()
+	if e != nil {
+		return e
+	}
+	receiver := exchange.Receiver()
+	stream, e := contextstart.NewOutboundStream(exchange.Context(), receiver.Channel, exchange.Check, local.Source, local.Targets, response, writer, connection, exchange.Close)
+	if e != nil {
+		return e
+	}
+	defer stream.Close()
+	return contextstart.ServeRegionalOperations(exchange.Context(), stream, receiver, verifier, local, local.Now)
+}
+
+// RegionalContextStartConnections supervises only outbound standby exchanges.
+// Each new conversation starts empty under fresh route/peer checks. It cannot
+// retain or resubmit a capture ID, signed work or human CurrentIdentity. An
+// uncertain attached conversation therefore never becomes an automatic retry.
+type RegionalContextStartConnections struct {
+	Candidates fleetapp.APIContextOwnerCandidatesReader
+	Client     *mtls.ContextStartClient
+	Verifier   fleetapp.APIContextWorkVerifier
+	Local      contextstart.RegionalLocal
+}
+
+func (s RegionalContextStartConnections) Run(ctx context.Context) error {
+	if ctx == nil || ctx.Err() != nil || s.Candidates == nil || s.Client == nil || s.Verifier == nil || s.Local.Now == nil {
+		return execution.ErrInvalid
+	}
+	defer s.Client.Close()
+	type connection struct{ cancel context.CancelFunc }
+	active := make(map[fleetvalue.OwnerBinding]connection)
+	next := make(map[fleetvalue.OwnerBinding]time.Time)
+	ended := make(chan fleetvalue.OwnerBinding, 16)
+	defer func() {
+		for _, c := range active {
+			c.cancel()
+		}
+		for len(active) > 0 {
+			delete(active, <-ended)
+		}
+	}()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	poll := func() {
+		observed, e := s.Candidates.ReadContextStartOwners(ctx)
+		if e != nil || !observed.Valid(s.Local.Now()) || ctx.Err() != nil {
+			return
+		}
+		contains := func(b fleetvalue.OwnerBinding) bool {
+			for _, candidate := range observed.Owners {
+				if b == candidate {
+					return true
+				}
+			}
+			return false
+		}
+		for b, c := range active {
+			if !contains(b) {
+				c.cancel()
+			}
+		}
+		for b := range next {
+			if !contains(b) {
+				delete(next, b)
+			}
+		}
+		for _, owner := range observed.Owners {
+			if _, exists := active[owner]; exists || len(active) >= 16 || s.Local.Now().Before(next[owner]) {
+				continue
+			}
+			call, cancel := context.WithTimeout(ctx, 30*time.Second)
+			active[owner] = connection{cancel}
+			owner := owner
+			go func() {
+				defer cancel()
+				defer func() { ended <- owner }()
+				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
+				if e == nil {
+					_ = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local)
+				}
+			}()
+		}
+	}
+	poll()
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case owner := <-ended:
+			delete(active, owner)
+			next[owner] = s.Local.Now().Add(time.Second)
+		case <-ticker.C:
+			poll()
+		}
+	}
+	return ctx.Err()
+}

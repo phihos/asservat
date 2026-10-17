@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-12T15:32:47.992520+00:00",
+  "manifestSHA256": "5910abf2313957abb91cdf9b054382ef1aab1bbc827da082686e1f6363d07fad",
+  "verifiedDependencies": 1504,
+  "files": [
+    {
+      "path": "test/integration/context_native_content_test.go",
+      "base_sha256": "669476a65447579fb52ec63e6d6266f12fcbbf98e43b43fd1665878beb90c9ff",
+      "sha256": "c22f1dc23b7b0790dfa55d81c888ab22e5a257fd192105312db241bcf2b92510",
+      "bytes": 36344
+    },
+    {
+      "path": "test/integration/context_native_interrupted_test.go",
+      "base_sha256": "4ead0cac80f138c7e2faa0bcd1a263970ea47b5b32e1a909bc6900dc5a7a57e0",
+      "sha256": "dfb9d7d5127f8729e0d700e89d3374573a46201d8674e21b34439ac7813dce5b",
+      "bytes": 13270
+    },
+    {
+      "path": "test/integration/native_admission_trace_test.go",
+      "base_sha256": null,
+      "sha256": "aa5a042dd5371001321526f51ea2e27da2ed415b455aa47a9567ad2fd309872e",
+      "bytes": 4475
+    },
+    {
+      "path": "test/integration/native_exchange_test.go",
+      "base_sha256": "95fee4c62a74cc3110f2991e07ede64cfa68b638008d0c641cf83d140403b18e",
+      "sha256": "c2cce8b96befa6e08cd2e822226525d02a0d115441e74710b82646b654e45b97",
+      "bytes": 33502
+    }
+  ],
+  "scope": "Test-only native-content outer lab interval correction and bounded native registrar callback timing. Compile-only verified; native diagnosis pending. No production change."
+}

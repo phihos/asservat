@@ -1,0 +1,16 @@
+{
+  "terminal": 1,
+  "phases": [],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [
+      "core.4751"
+    ]
+  },
+  "payloads": 32,
+  "dependencies": 3001,
+  "scratchRemoved": true,
+  "freeAfter": 16751697920
+}

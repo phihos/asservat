@@ -1,0 +1,453 @@
+//go:build ignore
+
+package main
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"os"
+	"slices"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/bootstrap"
+	wire "asservat.local/asservat/internal/transport/clusterobservation"
+	"asservat.local/asservat/internal/transport/native"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/client-go/rest"
+)
+
+// One instance lives for the complete fixture process. In particular neither
+// SQL nor API clients/rate limiters are recreated for successive requests.
+type fixtureRuntime struct {
+	input                   fixtureInput
+	root                    context.Context
+	cancel                  context.CancelFunc
+	metrics                 metrics
+	pools                   map[string]*pgxpool.Pool
+	observer, probe         *kube.PermissionClient
+	guard                   *kube.OwnerWorkloadProtection
+	owners                  *postgres.OwnerEnrollments
+	hwork                   *bootstrap.DirectHolderObservationClient
+	holder                  *wire.HubObservationOperationHolder
+	regional                *mtls.ConnectorObservationOperationClient
+	mu                      sync.Mutex
+	stream                  *mtls.ConnectorObservationOperationConnection
+	streamCancel            context.CancelFunc
+	streamDone              chan error
+	streamResult            error
+	streamJoined            bool
+	cleanups                []func()
+	closeOnce               sync.Once
+	shutdownRequested       atomic.Bool
+	diagnosticMu            sync.Mutex
+	lastPhase, lastCategory string
+	lastElapsed             int64
+	regionalFinished        bool
+	regionalCategory        string
+}
+
+func newRuntime(ctx context.Context, in fixtureInput) (r *fixtureRuntime, err error) {
+	root, cancel := context.WithDeadline(ctx, in.Until)
+	r = &fixtureRuntime{input: in, root: root, cancel: cancel, pools: map[string]*pgxpool.Pool{}}
+	defer func() {
+		if err != nil {
+			r.Close()
+		}
+	}()
+	allowed := map[string][]string{
+		"hwork":    {"owner-read"},
+		"owner":    {"owner-read", "owner-write", "owner-ack", "owner-activate", "connector-read"},
+		"regional": {"owner-read", "connector-journal", "connector-ack", "connector-read", "recovery-read"},
+	}[in.Mode]
+	if len(allowed) == 0 || len(in.SQL) != len(allowed) {
+		return r, errFixture
+	}
+	for purpose, configuration := range in.SQL {
+		if !slices.Contains(allowed, purpose) {
+			return r, errFixture
+		}
+		pool, e := newPool(root, configuration)
+		if e != nil {
+			return r, e
+		}
+		r.pools[purpose] = pool
+		r.cleanups = append(r.cleanups, pool.Close)
+	}
+	makeAPI := func(path string, probe bool) (*kube.PermissionClient, error) {
+		if path != "/fixture/observer.token" && path != "/fixture/probe.token" {
+			return nil, errFixture
+		}
+		config := &rest.Config{Host: in.API.Host, BearerTokenFile: path, TLSClientConfig: rest.TLSClientConfig{CAData: in.API.CA}, WrapTransport: r.metrics.wrap(probe)}
+		return kube.NewPermissionClient(config, in.API.ClusterID, in.API.Control, time.Now)
+	}
+	r.observer, err = makeAPI(in.API.ObserverTokenFile, false)
+	if err != nil {
+		return r, err
+	}
+	r.probe, err = makeAPI(in.API.ProbeTokenFile, true)
+	if err != nil {
+		return r, err
+	}
+	r.guard, err = kube.NewOwnerWorkloadProtection(r.observer, r.probe, in.API.Workload, in.API.WorkloadPin)
+	if err != nil {
+		return r, err
+	}
+	p := in.Owner.Pool
+	r.owners, err = postgres.NewOwnerEnrollments(root, r.pools["owner-read"], p.InstallationID, p.ClusterID, p.NamespaceUID, in.Owner.SourceUID, uuid.NewString)
+	if err != nil {
+		return r, err
+	}
+	ownerRoots, err := rootsFromDER([][]byte{in.OwnerCA.DER})
+	if err != nil {
+		return r, err
+	}
+	switch in.Mode {
+	case "hwork":
+		if in.CallerTokenFile != "/fixture/caller.token" {
+			return r, errFixture
+		}
+		endpoints, e := kube.NewOwnerEndpoints(r.observer, p)
+		if e != nil {
+			return r, e
+		}
+		proof, e := kube.NewOwnerObservationOperationReader(r.observer, r.guard, in.Owner)
+		if e != nil {
+			return r, e
+		}
+		r.hwork, err = bootstrap.NewDirectHolderObservationClient(root, in.Owner, in.PodUID, ownerRoots, r.owners, endpoints, proof, fileToken(in.CallerTokenFile), 2, time.Now)
+		if err != nil {
+			return r, err
+		}
+		r.cleanups = append(r.cleanups, r.hwork.Close)
+	case "owner":
+		if err = r.startOwner(ownerRoots); err != nil {
+			return r, phaseError{"owner-composition", err}
+		}
+	case "regional":
+		if err = r.startRegional(ownerRoots); err != nil {
+			return r, phaseError{"regional-composition", err}
+		}
+	default:
+		return r, errFixture
+	}
+	if root.Err() != nil {
+		return r, root.Err()
+	}
+	return r, nil
+}
+
+func newPool(ctx context.Context, in fixtureSQL) (*pgxpool.Pool, error) {
+	if in.DSN == "" || len(in.DSN) > 16384 || in.ServerName == "" {
+		return nil, errFixture
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(in.Roots) {
+		return nil, errFixture
+	}
+	config, err := pgxpool.ParseConfig(in.DSN)
+	if err != nil {
+		return nil, errFixture
+	}
+	if config.ConnConfig.User == "" || config.ConnConfig.User == "postgres" || config.ConnConfig.Tracer != nil {
+		return nil, errFixture
+	}
+	config.MaxConns = 1
+	config.MinConns = 0
+	config.ConnConfig.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, ServerName: in.ServerName}
+	config.ConnConfig.Fallbacks = nil
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, errFixture
+	}
+	if err = pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, errFixture
+	}
+	return pool, nil
+}
+func rootsFromDER(ders [][]byte) (*x509.CertPool, error) {
+	if len(ders) < 1 || len(ders) > 8 {
+		return nil, errFixture
+	}
+	roots := x509.NewCertPool()
+	for _, der := range ders {
+		c, e := x509.ParseCertificate(der)
+		if e != nil || !c.IsCA {
+			return nil, errFixture
+		}
+		roots.AddCert(c)
+	}
+	return roots, nil
+}
+
+type fileToken string
+
+func (f fileToken) read(ctx context.Context) ([]byte, error) {
+	if ctx == nil || ctx.Err() != nil {
+		return nil, errFixture
+	}
+	file, e := os.Open(string(f))
+	if e != nil {
+		return nil, errFixture
+	}
+	defer file.Close()
+	b, e := io.ReadAll(io.LimitReader(file, 16385))
+	if e != nil || len(b) == 0 || len(b) > 16384 || ctx.Err() != nil {
+		clear(b)
+		return nil, errFixture
+	}
+	return b, nil
+}
+func (f fileToken) ReadOwnerPodToken(c context.Context) ([]byte, error)           { return f.read(c) }
+func (f fileToken) ReadConnectorPodToken(c context.Context) ([]byte, error)       { return f.read(c) }
+func (f fileToken) ReadClusterObservationToken(c context.Context) ([]byte, error) { return f.read(c) }
+
+func (r *fixtureRuntime) startOwner(roots *x509.CertPool) error {
+	server, err := r.enrollOwner(roots)
+	if err != nil {
+		return err
+	}
+	r.cleanups = append(r.cleanups, server.Close)
+	r.holder, err = wire.NewHubObservationOperationHolder(r.root, 2, time.Now)
+	if err != nil {
+		return err
+	}
+	r.cleanups = append(r.cleanups, r.holder.Close)
+	proof, err := kube.NewOwnerLocalObservationOperationReader(r.observer, r.guard, r.input.Owner, r.input.Caller)
+	if err != nil {
+		return err
+	}
+	receiver, err := bootstrap.NewOwnerLocalObservationReceiver(r.root, r.input.Owner, server, r.owners, proof, r.holder, 2, time.Now)
+	if err != nil {
+		return err
+	}
+	r.cleanups = append(r.cleanups, receiver.Close)
+	peers := []mtls.OwnerObservationPeer{{Binding: r.input.Regional.Profile.Binding, Roots: r.input.Regional.Profile.ClientIssuerRoots}}
+	ingress, err := mtls.NewOwnerObservationOperationIngress(r.input.Owner, server, peers, time.Now)
+	if err != nil {
+		return err
+	}
+	registry, err := postgres.NewConnectorObservationOperationRegistry(r.root, r.pools["connector-read"], r.input.Regional)
+	if err != nil {
+		return err
+	}
+	handler, err := bootstrap.NewRegionalObservationOperationHandler(receiver.CommonAuthority(), r.holder, r.input.Regional, ingress, registry, time.Now)
+	if err != nil {
+		return err
+	}
+	serving, err := mtls.NewOwnerBootstrapServing(server, r.input.Owner.Pool)
+	if err != nil {
+		return err
+	}
+	peerRoots, err := rootsFromDER(r.input.Regional.Profile.ClientIssuerRoots)
+	if err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", ":9444")
+	if err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() {
+		err := native.ServeOwnerObservationOperation(r.root, listener, peerRoots, serving, receiver, handler, 2, 2)
+		if err != nil && r.root.Err() == nil {
+			emitFailure("native-listener", err)
+			r.cancel()
+		}
+		done <- err
+	}()
+	r.cleanups = append(r.cleanups, func() { _ = listener.Close(); <-done })
+	return nil
+}
+
+func (r *fixtureRuntime) startRegional(ownerRoots *x509.CertPool) error {
+	if r.input.ConnectorTokenFile != "/fixture/connector.token" {
+		return errFixture
+	}
+	protection, err := kube.NewConnectorIdentityProtection(r.observer, r.probe, r.input.ConnectorSourcePlan, r.input.ConnectorSourcePin)
+	if err != nil {
+		return err
+	}
+	source, err := kube.NewConnectorIdentitySource(r.observer, protection, r.input.ConnectorSourceName, r.input.ConnectorSourceUID, r.input.Regional.Profile.RootID, r.input.Regional.Profile.Binding)
+	if err != nil {
+		return err
+	}
+	credentials, err := r.enrollConnector(source)
+	if err != nil {
+		return err
+	}
+	r.cleanups = append(r.cleanups, credentials.Close)
+	nativeReader, err := kube.NewConnectorObservationOperationReader(r.observer, source, r.guard, fileToken(r.input.ConnectorTokenFile), r.input.Regional)
+	if err != nil {
+		return err
+	}
+	producer, err := mtls.NewConnectorObservationOperationProducer(r.input.Regional, credentials, nativeReader, time.Now)
+	if err != nil {
+		return err
+	}
+	guard, err := kube.NewCapacityNamespaceGuard(r.observer, r.probe, r.input.CapacityPlan, r.input.CapacityPin)
+	if err != nil {
+		return err
+	}
+	metadata, err := kube.NewClusterObservationMetadata(r.observer, guard, r.input.Owner.RootID)
+	if err != nil {
+		return err
+	}
+	r.regional, err = mtls.NewConnectorObservationOperationClient(r.root, r.input.Owner, r.input.RegionalDial, ownerRoots, producer, r.owners, r.owners, metadata, 1, time.Now)
+	if err != nil {
+		return err
+	}
+	r.cleanups = append(r.cleanups, r.regional.Close)
+	return nil
+}
+
+func (r *fixtureRuntime) Close() {
+	if r == nil {
+		return
+	}
+	r.closeOnce.Do(func() {
+		r.cancel()
+		r.closeStream()
+		for i := len(r.cleanups) - 1; i >= 0; i-- {
+			r.cleanups[i]()
+		}
+	})
+}
+
+// No result or error contains an authority value reconstructed from an ID.
+// Explicit status only reads holder/socket routing availability.
+func (r *fixtureRuntime) command(ctx context.Context, q controlRequest) controlResult {
+	start := time.Now()
+	out := controlResult{Phase: q.Command}
+	var err error
+	switch q.Command {
+	case "status":
+		r.diagnosticMu.Lock()
+		out.LastPhase, out.LastCategory, out.LastElapsedNanos = r.lastPhase, r.lastCategory, r.lastElapsed
+		out.RegionalFinished, out.RegionalCategory = r.regionalFinished, r.regionalCategory
+		r.diagnosticMu.Unlock()
+		if r.holder != nil {
+			_, out.Available, err = r.holder.LookupAvailable(ctx, r.input.Owner.RootID, r.input.Regional.Profile.Binding.ClusterID)
+		} else {
+			out.Available = r.root.Err() == nil
+		}
+	case "observe":
+		if r.hwork == nil || !q.Request.Valid(time.Now()) {
+			err = errFixture
+			break
+		}
+		call, cancel := context.WithDeadline(ctx, q.Request.NotAfter)
+		result, e := r.hwork.ObserveCluster(call, q.Request)
+		cancel()
+		err = e
+		if e == nil {
+			out.Result = &result
+		}
+		out.RemainingNanos = time.Until(q.Request.NotAfter).Nanoseconds()
+	case "open":
+		err = r.openStream(ctx, q.ExchangeID)
+		out.ExchangeID = q.ExchangeID
+	case "join":
+		err = r.joinStream(ctx)
+	case "close":
+		r.closeStream()
+	case "shutdown":
+		r.shutdownRequested.Store(true)
+		r.Close()
+	default:
+		err = errFixture
+	}
+	out.OK = err == nil
+	out.Category = errorCategory(err)
+	out.ElapsedNanos = time.Since(start).Nanoseconds()
+	out.CompletedAt = time.Now().UTC()
+	if q.Command != "status" {
+		r.diagnosticMu.Lock()
+		r.lastPhase, r.lastCategory, r.lastElapsed = q.Command, out.Category, out.ElapsedNanos
+		r.diagnosticMu.Unlock()
+	}
+	out.Metrics = r.metrics.snapshot(r.pools)
+	return out
+}
+
+func (r *fixtureRuntime) openStream(ctx context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.regional == nil || r.stream != nil || ctx.Err() != nil {
+		return errFixture
+	}
+	// The control request only initiates setup. The original finite process
+	// root retains the admitted socket after the command reply, with its own
+	// original thirty-second maximum; closing a CLI does not relabel it.
+	root, cancel := context.WithTimeout(r.root, 30*time.Second)
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { cancel(); close(done) })
+	stream, err := r.regional.Open(root, id)
+	if !stop() {
+		<-done
+	}
+	if err != nil || ctx.Err() != nil {
+		cancel()
+		if stream != nil {
+			_ = stream.Close()
+		}
+		return errFixture
+	}
+	r.stream = stream
+	r.streamCancel = cancel
+	r.streamDone = make(chan error, 1)
+	r.streamJoined = false
+	r.streamResult = nil
+	joined := r.streamDone
+	r.diagnosticMu.Lock()
+	r.regionalFinished, r.regionalCategory = false, ""
+	r.diagnosticMu.Unlock()
+	go func() {
+		err := wire.ServeRegionalObservationOperation(stream.Context(), stream, time.Now)
+		r.diagnosticMu.Lock()
+		r.regionalFinished, r.regionalCategory = true, errorCategory(err)
+		r.diagnosticMu.Unlock()
+		joined <- err
+	}()
+	return nil
+}
+func (r *fixtureRuntime) joinStream(ctx context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stream == nil {
+		return errFixture
+	}
+	if !r.streamJoined {
+		select {
+		case r.streamResult = <-r.streamDone:
+			r.streamJoined = true
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return r.streamResult
+}
+func (r *fixtureRuntime) closeStream() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stream == nil {
+		return
+	}
+	r.streamCancel()
+	_ = r.stream.Close()
+	if !r.streamJoined {
+		r.streamResult = <-r.streamDone
+		r.streamJoined = true
+	}
+	r.stream = nil
+	r.streamCancel = nil
+}

@@ -1,0 +1,563 @@
+--- a/internal/adapters/kms/owner_provider_effects.go
++++ b/internal/adapters/kms/owner_provider_effects.go
+@@ -147,3 +147,14 @@
+ 	}
+ 	return t.next.RoundTrip(r)
+ }
++
++func (s *ownerProviderEffects) joinClosed() {
++	if s == nil || s.lifetimes == nil {
++		return
++	}
++	s.lifetimes.joinClosed()
++	s.seal.Close()
++	s.open.Close()
++	s.server.Close()
++	s.client.Close()
++}
+--- a/internal/adapters/kms/owner_provider_installed.go
++++ b/internal/adapters/kms/owner_provider_installed.go
+@@ -21,7 +21,8 @@
+ // InstalledOwnerProviderEffects owns only the fixed four provider lifetimes.
+ // The authority path is composed here from concrete installed adapters; neither
+ // a public callback, caller timestamp nor arbitrary transport can replace it.
+-// The caller retains files and SQL/native adapters until Close has joined.
++// The caller retains files and SQL/native adapters until Close succeeds or
++// CloseAndJoin returns after actual completion, including on a bounded error.
+ type InstalledOwnerProviderEffects struct {
+ 	input           contracts.OwnerDeployment
+ 	files           *os.Root
+@@ -289,6 +290,20 @@
+ 	}
+ }
+ 
++// CloseAndJoin preserves Close's original bounded result, but never hands
++// dependency ownership back while a cancelled native read or provider body is
++// still admitted. After Close's interval, finalization is local only: no new
++// provider request, retry, revocation claim or effect deadline is introduced.
++func (s *InstalledOwnerProviderEffects) CloseAndJoin(ctx context.Context) error {
++	if s == nil || ctx == nil {
++		return ErrKeyService
++	}
++	result := s.Close(ctx)
++	<-s.closeDone
++	s.effects.joinClosed()
++	return result
++}
++
+ // ReadAuditCredentials returns only the original protected storage material,
+ // independently re-observed after kubelet rotation. No provider auth token or
+ // SQL/admin credential enters the object-store client.
+--- /dev/null
++++ b/internal/adapters/kms/owner_provider_installed_join_test.go
+@@ -0,0 +1,206 @@
++package kms
++
++import (
++	"context"
++	"net/http"
++	"sync"
++	"testing"
++	"time"
++)
++
++func TestInstalledOwnerProviderCloseAndJoinRetainsCancelledNativeRead(t *testing.T) {
++	s, f := installedProviderSupervisorFixture(t)
++	read, release, err := s.borrow(context.Background(), 5*time.Second)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var once sync.Once
++	finish := func() { once.Do(release) }
++	defer finish()
++	original, _ := read.Deadline()
++	short, end := context.WithTimeout(context.Background(), 30*time.Millisecond)
++	defer end()
++	done := make(chan error, 1)
++	joined := make(chan struct{})
++	go func() { done <- s.CloseAndJoin(short); close(joined) }()
++	defer func() { finish(); <-joined }()
++	<-short.Done()
++	if read.Err() == nil {
++		t.Fatal("shutdown did not cancel the original native read")
++	}
++	select {
++	case <-done:
++		t.Fatal("bounded close error returned before native work joined")
++	case <-time.After(50 * time.Millisecond):
++	}
++	if got, _ := read.Deadline(); !got.Equal(original) {
++		t.Fatal("joining widened the native read interval")
++	}
++	finish()
++	select {
++	case err := <-done:
++		if err == nil {
++			t.Fatal("join discarded the original bounded Close failure")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("released read did not join")
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if f.logins != 0 || f.lookups != 0 || f.revokes != 0 || len(f.calls) != 0 {
++		t.Fatal("local finalization created provider traffic")
++	}
++}
++
++func TestInstalledOwnerProviderCloseAndJoinRetainsBodyAfterOriginalBound(t *testing.T) {
++	s, f := installedProviderSupervisorFixture(t)
++	if err := s.Prime(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	body := &ownerLeaseBlockingClose{entered: make(chan struct{}), finish: make(chan struct{})}
++	var once sync.Once
++	finish := func() { once.Do(func() { close(body.finish) }) }
++	defer finish()
++	var original context.Context
++	transport := &ownerProviderLeaseTransport{source: s.effects.lifetimes.auditWrap.borrow, now: time.Now, base: ownerLeaseRoundTrip(func(r *http.Request) (*http.Response, error) {
++		original = r.Context()
++		return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
++	})}
++	request, _ := http.NewRequest(http.MethodPost, "https://provider.invalid/v1/audit/encrypt/owner", nil)
++	response, err := transport.RoundTrip(request)
++	if err != nil {
++		t.Fatal(err)
++	}
++	closed := make(chan struct{})
++	go func() { _ = response.Body.Close(); close(closed) }()
++	defer func() { finish(); <-closed }()
++	<-body.entered
++	short, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
++	defer cancel()
++	done := make(chan error, 1)
++	joined := make(chan struct{})
++	go func() { done <- s.CloseAndJoin(short); close(joined) }()
++	defer func() { finish(); <-joined }()
++	<-short.Done()
++	select {
++	case <-done:
++		t.Fatal("CloseAndJoin detached an original provider body")
++	case <-time.After(50 * time.Millisecond):
++	}
++	if original.Err() == nil {
++		t.Fatal("provider body was not cancelled")
++	}
++	slot := s.effects.lifetimes.auditWrap
++	slot.mu.Lock()
++	retained := slot.borrows == 1 && slot.current != nil && len(slot.current.value.token) != 0 && !slot.finished
++	slot.mu.Unlock()
++	if !retained {
++		t.Fatal("bounded failure lost token/body ownership")
++	}
++	finish()
++	select {
++	case err := <-done:
++		if err == nil {
++			t.Fatal("post-deadline local completion reinterpreted bounded failure")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("released provider body did not join")
++	}
++	for _, slot := range s.slots() {
++		slot.mu.Lock()
++		complete := slot.finished && slot.current == nil && slot.draining == nil && slot.borrows == 0 && !slot.active
++		slot.mu.Unlock()
++		if !complete {
++			t.Fatal("joined finalization retained an active local slot")
++		}
++	}
++	if err := s.CloseAndJoin(context.Background()); err != nil {
++		t.Fatal("already joined close did not remain idempotent", err)
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if f.logins != 4 || f.lookups != 4 || f.revokes != 0 || len(f.calls) != 0 {
++		t.Fatal("local finalization retried provider I/O after the original interval")
++	}
++}
++
++func TestInstalledOwnerProviderCloseAndJoinRetainsOriginalControlProof(t *testing.T) {
++	s, f := installedProviderSupervisorFixture(t)
++	entered, cancelled, release := make(chan context.Context, 1), make(chan struct{}), make(chan struct{})
++	var once sync.Once
++	finish := func() { once.Do(func() { close(release) }) }
++	defer finish()
++	slot := s.effects.lifetimes.auditWrap
++	slot.currentProof = func(ctx context.Context) (time.Time, error) {
++		entered <- ctx
++		<-ctx.Done()
++		close(cancelled)
++		<-release
++		return time.Time{}, ctx.Err()
++	}
++	control := make(chan error, 1)
++	go func() { control <- slot.refresh(context.Background()) }()
++	defer func() { finish(); <-control }()
++	var original context.Context
++	select {
++	case original = <-entered:
++	case <-time.After(time.Second):
++		t.Fatal("control did not enter its original native proof")
++	}
++	until, ok := original.Deadline()
++	if !ok || time.Until(until) > 5*time.Second {
++		t.Fatal("control lost its original five-second maximum")
++	}
++	short, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
++	defer cancel()
++	done := make(chan error, 1)
++	joined := make(chan struct{})
++	go func() { done <- s.CloseAndJoin(short); close(joined) }()
++	defer func() { finish(); <-joined }()
++	select {
++	case <-cancelled:
++	case <-time.After(time.Second):
++		t.Fatal("shutdown did not cancel the original control proof")
++	}
++	<-short.Done()
++	select {
++	case <-done:
++		t.Fatal("bounded close detached its active control proof")
++	case <-time.After(50 * time.Millisecond):
++	}
++	if got, _ := original.Deadline(); !got.Equal(until) {
++		t.Fatal("joining changed the original control deadline")
++	}
++	finish()
++	select {
++	case err := <-done:
++		if err == nil {
++			t.Fatal("joined control discarded the bounded shutdown error")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("released control proof did not join")
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if f.logins != 0 || f.lookups != 0 || f.revokes != 0 || len(f.calls) != 0 {
++		t.Fatal("cancelled control dispatched provider I/O")
++	}
++}
++
++func TestInstalledOwnerProviderCloseAndJoinKeepsSuccessfulRetirement(t *testing.T) {
++	s, f := installedProviderSupervisorFixture(t)
++	if err := s.Prime(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	if err := s.CloseAndJoin(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	if err := s.CloseAndJoin(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if f.revokes != 4 || f.logins != 4 || f.lookups != 4 || len(f.calls) != 0 {
++		t.Fatal("successful bounded retirement was skipped or repeated")
++	}
++}
+--- a/internal/adapters/kms/owner_provider_lifetimes.go
++++ b/internal/adapters/kms/owner_provider_lifetimes.go
+@@ -63,3 +63,17 @@
+ 	}
+ 	return result
+ }
++
++// joinClosed preserves every original operation's deadline while retaining
++// ownership until all four cancelled compartments have positively joined.
++func (s *ownerProviderLifetimes) joinClosed() {
++	if s == nil {
++		return
++	}
++	s.cancel()
++	for _, slot := range []*ownerProviderLifetime{s.auditWrap, s.auditUnwrap, s.serverSign, s.clientSign} {
++		if slot != nil {
++			slot.joinClosed()
++		}
++	}
++}
+--- a/internal/bootstrap/owner_observation_deployment.go
++++ b/internal/bootstrap/owner_observation_deployment.go
+@@ -5,7 +5,6 @@
+ 	"net"
+ 	"os"
+ 	"sync"
+-	"sync/atomic"
+ 	"time"
+ 
+ 	"asservat.local/asservat/internal/adapters/kms"
+@@ -29,8 +28,12 @@
+ 	Runtime   *OwnerObservationRuntime
+ 	base      *OwnerDeployment
+ 	providers *kms.InstalledOwnerProviderEffects
++	mu        sync.Mutex
++	closed    bool
++	running   bool
++	owners    sync.WaitGroup
+ 	once      sync.Once
+-	running   atomic.Bool
++	closeErr  error
+ }
+ 
+ func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerObservationDeployment, error) {
+@@ -259,34 +262,54 @@
+ 	return out, nil
+ }
+ 
++// Close disables admission and cancels first. It retains every dependency until
++// the admitted Run and its native/readiness/provider children have actually
++// joined. In particular, a bounded provider Close failure cannot release files
++// or SQL pools still owned by a cancelled operation.
+ func (d *OwnerObservationDeployment) Close() {
+ 	if d == nil {
+ 		return
+ 	}
+-	if d.base != nil {
+-		d.base.cancel()
+-	}
+-	if d.Runtime != nil {
+-		d.Runtime.Close()
+-	}
+-	if d.providers != nil {
+-		// Preserve dependency ownership if bounded cancellation has not joined.
+-		// The Run path reports the failure; a later Close may finish it.
+-		if d.providers.Close(context.Background()) != nil {
+-			return
+-		}
+-	}
+ 	d.once.Do(func() {
++		d.mu.Lock()
++		d.closed = true
++		d.mu.Unlock()
++		if d.base != nil && d.base.cancel != nil {
++			d.base.cancel()
++		}
++		if d.Runtime != nil {
++			d.Runtime.Close()
++		}
++		d.owners.Wait()
++		if d.providers != nil {
++			d.closeErr = d.providers.CloseAndJoin(context.Background())
++		}
+ 		if d.base != nil {
+ 			d.base.Close()
+ 		}
+ 	})
+ }
+-func (d *OwnerObservationDeployment) Run(listener net.Listener) error {
+-	if d == nil || d.Runtime == nil || listener == nil || !d.running.CompareAndSwap(false, true) {
++func (d *OwnerObservationDeployment) Run(listener net.Listener) (result error) {
++	if d == nil || d.Runtime == nil || d.base == nil || d.base.root == nil || listener == nil {
+ 		return mounts.ErrUnavailable
+ 	}
+-	defer d.Close()
++	d.mu.Lock()
++	if d.closed || d.running || d.base.root.Err() != nil {
++		d.mu.Unlock()
++		return mounts.ErrUnavailable
++	}
++	d.running = true
++	d.owners.Add(1)
++	d.mu.Unlock()
++	defer func() {
++		// The body has already joined both children. Release this registration
++		// before Close waits, including when an external Close owns shutdown.
++		d.owners.Done()
++		d.Close()
++		if d.closeErr != nil {
++			result = d.closeErr
++		}
++	}()
+ 	if d.providers == nil {
+ 		return d.Runtime.Run(listener)
+ 	}
+@@ -298,7 +321,6 @@
+ 	runtimeDone := make(chan error, 1)
+ 	go func() { providerDone <- d.providers.Run(d.base.root) }()
+ 	go func() { runtimeDone <- d.Runtime.Run(listener) }()
+-	var result error
+ 	select {
+ 	case result = <-runtimeDone:
+ 		d.base.cancel()
+@@ -309,8 +331,5 @@
+ 		d.Runtime.Close()
+ 		<-runtimeDone
+ 	}
+-	if err := d.providers.Close(context.Background()); err != nil {
+-		return err
+-	}
+ 	return result
+ }
+--- /dev/null
++++ b/internal/bootstrap/owner_observation_deployment_join_test.go
+@@ -0,0 +1,169 @@
++package bootstrap
++
++import (
++	"context"
++	"errors"
++	"net"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	value "asservat.local/asservat/internal/domain/fleet"
++)
++
++// This is an existing consumer port, not a production authority substitute.
++// A readiness operation retains its original context until explicitly released.
++type observationJoinProof struct {
++	entered   chan context.Context
++	cancelled chan struct{}
++	release   chan struct{}
++	once      sync.Once
++}
++
++func (p *observationJoinProof) ReadOwnerEnrollmentProof(ctx context.Context, _ value.OwnerEnrollmentRequest) (value.OwnerEnrollmentProof, error) {
++	p.once.Do(func() { p.entered <- ctx })
++	<-ctx.Done()
++	close(p.cancelled)
++	<-p.release
++	return value.OwnerEnrollmentProof{}, ctx.Err()
++}
++
++func observationDeploymentJoinFixture(t *testing.T, closed func()) (*OwnerObservationDeployment, *observationJoinProof, net.Listener, *runtimeFixture) {
++	t.Helper()
++	base, c := observationRuntimeConfig(t)
++	listener, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = listener.Close() })
++	base.configuration.Pool.NativePort = listener.Addr().(*net.TCPAddr).Port
++	c.Pin.Pool = base.configuration.Pool
++	// Reuse the independently scoped two-SAN test issuer. Real process keys,
++	// supervisor and readiness run below; its CA/registry remain synthetic.
++	issuer := &observationForwardFixture{t: t, base: base, pin: c.Pin, bound: time.Now().Add(time.Minute), identities: map[value.OwnerCertificate]value.OwnerEnrollment{}}
++	c.ServerEnrollment, c.ClientEnrollment, c.Registry = issuer, issuer, issuer
++	proof := &observationJoinProof{entered: make(chan context.Context, 1), cancelled: make(chan struct{}), release: make(chan struct{})}
++	c.Proofs = proof
++	root, cancel := context.WithCancel(context.Background())
++	t.Cleanup(cancel)
++	runtime, err := NewOwnerObservationRuntime(root, c)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return &OwnerObservationDeployment{Runtime: runtime, base: &OwnerDeployment{root: root, cancel: cancel, closers: []func(){closed}}}, proof, listener, base
++}
++
++func TestOwnerObservationDeploymentExternalCloseJoinsReadinessBeforeDependencies(t *testing.T) {
++	var closes atomic.Int32
++	resources := make(chan struct{})
++	d, proof, listener, _ := observationDeploymentJoinFixture(t, func() { closes.Add(1); close(resources) })
++	var releaseOnce sync.Once
++	release := func() { releaseOnce.Do(func() { close(proof.release) }) }
++	runDone, closeDone := make(chan struct{}), make(chan struct{})
++	var result error
++	go func() { result = d.Run(listener); close(runDone) }()
++	defer func() { release(); d.Close(); <-runDone }()
++	var original context.Context
++	select {
++	case original = <-proof.entered:
++	case <-time.After(3 * time.Second):
++		t.Fatal("actual readiness did not enter its native proof read")
++	}
++	originalUntil, ok := original.Deadline()
++	if !ok || time.Until(originalUntil) > 5*time.Second {
++		t.Fatal("readiness lost its original five-second bound")
++	}
++	go func() { d.Close(); close(closeDone) }()
++	select {
++	case <-proof.cancelled:
++	case <-time.After(time.Second):
++		t.Fatal("external Close did not cancel readiness")
++	}
++	select {
++	case <-closeDone:
++		t.Error("Close returned before the admitted readiness read joined")
++	case <-resources:
++		t.Error("provider dependencies closed while readiness retained them")
++	case <-time.After(100 * time.Millisecond):
++	}
++	if d.Runtime.Ready() || d.Run(listener) == nil {
++		t.Error("closing deployment retained readiness or admitted another Run")
++	}
++	if _, _, err := d.Runtime.server.ReadinessRequest(); err == nil {
++		t.Error("cancelled owner retained serving key authority")
++	}
++	if until, _ := original.Deadline(); !until.Equal(originalUntil) {
++		t.Error("shutdown changed the original readiness deadline")
++	}
++	release()
++	select {
++	case <-runDone:
++		if !errors.Is(result, context.Canceled) {
++			t.Error("Run lost its cancellation result", result)
++		}
++	case <-time.After(2 * time.Second):
++		t.Fatal("Run did not join after proof release")
++	}
++	select {
++	case <-closeDone:
++	case <-time.After(time.Second):
++		t.Fatal("external Close did not join after proof release")
++	}
++	d.Close()
++	if closes.Load() != 1 {
++		t.Fatal("dependencies were not closed exactly once")
++	}
++}
++
++func TestOwnerObservationDeploymentRunCancellationJoinsBeforeDeferredClose(t *testing.T) {
++	var closes atomic.Int32
++	d, proof, listener, _ := observationDeploymentJoinFixture(t, func() { closes.Add(1) })
++	var releaseOnce sync.Once
++	release := func() { releaseOnce.Do(func() { close(proof.release) }) }
++	done := make(chan struct{})
++	var result error
++	go func() { result = d.Run(listener); close(done) }()
++	defer func() { release(); d.Close(); <-done }()
++	select {
++	case <-proof.entered:
++	case <-time.After(3 * time.Second):
++		t.Fatal("readiness did not enter")
++	}
++	d.base.cancel()
++	select {
++	case <-proof.cancelled:
++	case <-time.After(time.Second):
++		t.Fatal("parent cancellation did not reach readiness")
++	}
++	select {
++	case <-done:
++		t.Error("Run returned before its child joined")
++	case <-time.After(100 * time.Millisecond):
++	}
++	if closes.Load() != 0 {
++		t.Error("deferred shutdown released dependencies before child completion")
++	}
++	release()
++	select {
++	case <-done:
++		if !errors.Is(result, context.Canceled) || closes.Load() != 1 {
++			t.Error("Run did not preserve its result and dependency lifetime", result)
++		}
++	case <-time.After(2 * time.Second):
++		t.Fatal("Run's deferred Close waited for its own registration")
++	}
++}
++
++func TestOwnerObservationDeploymentCloseBeforeRunPreventsEnrollment(t *testing.T) {
++	var closes atomic.Int32
++	d, _, listener, fixture := observationDeploymentJoinFixture(t, func() { closes.Add(1) })
++	d.Close()
++	if d.Run(listener) == nil {
++		t.Fatal("closed deployment accepted Run")
++	}
++	d.Close()
++	if d.Runtime.started.Load() || fixture.signings.Load() != 0 || closes.Load() != 1 {
++		t.Fatal("closed deployment admitted work or released dependencies twice")
++	}
++}

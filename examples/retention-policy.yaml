@@ -1,0 +1,28 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRetentionPolicy
+metadata:
+  name: user-evidence
+  namespace: asservat-system
+spec:
+  scope: {}
+  purposeRef: production-incident-investigation
+  defaults:
+    evidenceSeconds: 86400
+    caseMetadataSeconds: 604800
+    auditMetadataSeconds: 7776000
+  maxima:
+    evidenceSeconds: 86400
+    caseMetadataSeconds: 604800
+    auditMetadataSeconds: 7776000
+  rules:
+  - name: user-evidence
+    privacyClasses:
+    - potentialPersonalData
+    maxAgeSeconds: 86400
+  - name: core-and-heap
+    evidenceTypes:
+    - coreDump
+    - heapDump
+    maxAgeSeconds: 21600
+  deletionBudgetSeconds: 300
+  legalExceptions: disabled

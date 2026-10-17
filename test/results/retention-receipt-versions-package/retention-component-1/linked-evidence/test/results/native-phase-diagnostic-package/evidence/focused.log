@@ -1,0 +1,6 @@
+=== RUN   TestNativePhaseDiagnosticPreservesOriginalCallAndDeadline
+--- PASS: TestNativePhaseDiagnosticPreservesOriginalCallAndDeadline (0.00s)
+=== RUN   TestNativePhaseDiagnosticKeepsIndependentBoundedStages
+--- PASS: TestNativePhaseDiagnosticKeepsIndependentBoundedStages (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.060s

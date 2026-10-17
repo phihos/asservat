@@ -1,0 +1,17 @@
+[
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "base": "acedbc87463749d4e2bdd112557159a60c56d6e3624370d6f5a29f0a361954c8",
+    "payload": "dbf8aa11ab675737e07410c4fa6318b67fbb3d8af06bec1c19ec9cb2cabe2043"
+  },
+  {
+    "path": "test/integration/context_publication_test.go",
+    "base": "06aa8f615af0528864276203d3500e0b63527059ae4d8ddc61cef4bdbae3e698",
+    "payload": "f0631c60250d4b0a9993b041f36fbd7a00b9385388fb6bb8a3a7aadb3977ffb6"
+  },
+  {
+    "path": "scripts/test-custody.py",
+    "base": "4c89db87a1e982082864335c687b66bf06d6987468154b3f8116d2b40be0dbe1",
+    "payload": "211c00787a2396412bd343ac60a0613a632dc9a6c11ee8aeecc7e12d16826ad1"
+  }
+]

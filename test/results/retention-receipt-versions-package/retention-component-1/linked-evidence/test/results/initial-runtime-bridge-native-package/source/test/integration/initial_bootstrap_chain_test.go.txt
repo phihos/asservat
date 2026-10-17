@@ -1,0 +1,650 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/objectstore/framed"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/bootstrap"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
+)
+
+// This selector owns a pristine database. Only upstream services, a trusted
+// bootstrap namespace/administrator and explicit operator input credentials are
+// fixture-supplied. The product must create every manager/plan/root/proof,
+// initialize SQL, activate its original Pod, retire its manager and replay.
+func TestInitialBootstrapChainWithRealServices(t *testing.T) {
+	if os.Getenv("ASSERVAT_CONTEXT_FIXTURES") == "" || os.Getenv("ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE") != "1" {
+		t.Skip("run owned --initial-bootstrap-chain with empty SQL")
+	}
+	var f fixture
+	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
+	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
+		t.Fatal("owned single-cluster/native services unavailable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	admin, err := pgxpool.New(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	var pristine bool
+	if err = admin.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public') AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')`).Scan(&pristine); err != nil || !pristine {
+		t.Fatal("product must initialize actually empty SQL")
+	}
+	kc, err := clientcmd.BuildConfigFromFlags("", f.Clusters[0].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api, err := kubernetes.NewForConfig(kc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	self, err := api.AuthenticationV1().SelfSubjectReviews().Create(ctx, &auth.SelfSubjectReview{}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	namespace := "bootstrap-chain-" + custodyID()[:8]
+	ns, err := api.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired := initialBootstrapGuardDesired(t, kc, namespace, self.Status.UserInfo.Username)
+	desired.Image = f.WorkerImage
+	// Use the same reachable, certificate-covered origin from host and original
+	// activation Pod. This is the existing owned node fixture, never discovery
+	// authority imported into product state.
+	node, err := api.CoreV1().Nodes().Get(ctx, f.Clusters[0].Pod.NodeName, meta.GetOptions{})
+	if err != nil || string(node.UID) != f.Clusters[0].NodeUID {
+		t.Fatal("owned node identity unavailable")
+	}
+	for _, a := range node.Status.Addresses {
+		if a.Type == core.NodeInternalIP {
+			desired.Kubernetes.Endpoint = "https://" + net.JoinHostPort(a.Address, "6443")
+			break
+		}
+	}
+	if desired.Kubernetes.Endpoint == kc.Host {
+		t.Fatal("shared API origin missing")
+	}
+	direct := rest.CopyConfig(kc)
+	direct.Host = desired.Kubernetes.Endpoint
+	directAPI, err := kubernetes.NewForConfig(direct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := directAPI.CoreV1().Nodes().Get(ctx, node.Name, meta.GetOptions{})
+	if err != nil || actual.UID != node.UID {
+		t.Fatal("shared exact API origin invalid", err)
+	}
+	host, portText, err := net.SplitHostPort(f.NativeProviders.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired.Postgres = contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: "custody_test", MaxConnections: 2, Roots: [][]byte{f.NativeProviders.Root}}
+	desired.AuditStore = contracts.OwnerAuditStore{Endpoint: f.NativeProviders.S3, Roots: [][]byte{f.NativeProviders.Root}, Region: "us-east-1", Bucket: "initial-bootstrap-chain"}
+	desired.KeyService = contracts.ConfigurationKeyService{Endpoint: f.NativeProviders.KMS, Roots: [][]byte{f.NativeProviders.Root}, AuditMount: "bootstrap-chain-transit", AuditKey: "audit"}
+	desired.Providers = contracts.InitialBootstrapProviders{IssuerPolicy: "bootstrap-chain-issuer", WrapRole: "bootstrap-chain-wrap", WrapPolicy: "bootstrap-chain-encrypt", UnwrapRole: "bootstrap-chain-unwrap", UnwrapPolicy: "bootstrap-chain-decrypt"}
+	account, err := api.CoreV1().ServiceAccounts(namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "trusted-runner"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	desired.Administrators = append(desired.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + namespace + ":" + account.Name})
+	// Explicit initial administrator trust, not product runtime RBAC. Same finite
+	// resource union as the qualified original preparation fixture.
+	role, err := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: namespace + "-administrator"}, Rules: []rbac.PolicyRule{
+		{APIGroups: []string{""}, Resources: []string{"namespaces", "serviceaccounts", "serviceaccounts/token", "configmaps", "secrets", "pods"}, Verbs: []string{"get", "create", "update", "delete"}},
+		// New closure effects use metadata-only JSON PATCH on three exact managed
+		// Secrets. This belongs only to the trusted initial administrator.
+		{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{desired.Name + "-bootstrap-state", desired.Name + "-sql-material", desired.Name + "-provider-material"}, Verbs: []string{"patch"}},
+		{APIGroups: []string{rbac.GroupName}, Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"}, Verbs: []string{"get", "create", "update"}},
+		{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, Verbs: []string{"get", "create", "update"}},
+		{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews", "tokenreviews"}, Verbs: []string{"create"}},
+	}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: namespace, Name: account.Name}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { initialBootstrapChainCleanup(t, api, desired, ns.UID, role.UID, binding.UID) })
+	// Read the actual default API audience without treating decoded claims as
+	// authentication; the runner and producer still use real API authentication.
+	audience, err := api.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600))}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(audience.Status.Token, ".")
+	if len(parts) != 3 {
+		t.Fatal("API audience missing")
+	}
+	claims, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aud struct {
+		Audience []string `json:"aud"`
+	}
+	if json.Unmarshal(claims, &aud) != nil || len(aud.Audience) != 1 {
+		t.Fatal("API audience profile unsupported")
+	}
+	clear(claims)
+	desired.ProbeAudience = aud.Audience[0]
+	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(rootCert)
+	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}}
+	defer transport.CloseIdleConnections()
+	providerHTTP := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	issuer := initialBootstrapChainProvider(t, ctx, f, desired)
+	store := s3.New(s3.Options{Region: desired.AuditStore.Region, BaseEndpoint: aws.String(desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providerHTTP})
+	if _, err = store.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &desired.AuditStore.Bucket}); err != nil {
+		t.Fatal(err)
+	}
+	public, err := json.Marshal(desired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = api.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "operator-bootstrap"}, Immutable: ptr.To(true), Data: map[string]string{"bootstrap.json": string(public)}}, meta.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	sql := admin.Config().ConnConfig
+	credentialsJSON, _ := json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
+	defer clear(credentialsJSON)
+	providerJSON, _ := json.Marshal(contracts.InitialBootstrapMaterial{Format: contracts.InitialBootstrapMaterialFormat, IssuerToken: issuer, Storage: contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}, StorageUseUntil: time.Now().UTC().Add(time.Hour)})
+	defer clear(providerJSON)
+	for name, data := range map[string]map[string][]byte{"operator-producer": {"postgres-administrator.json": credentialsJSON, "provider-material.json": providerJSON}, "operator-ddl": {"postgres-ddl.json": credentialsJSON}, "operator-retirement": {"postgres-administrator.json": credentialsJSON}} {
+		if _, err = api.CoreV1().Secrets(namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}, meta.CreateOptions{}); err != nil {
+			t.Fatal("explicit operator input", err)
+		}
+	}
+	// The watch starts before any product target CREATE. It retains the actual
+	// original terminal Pod even after the supervisor's positive cleanup deletes it.
+	watch, err := api.CoreV1().Pods("").Watch(ctx, meta.ListOptions{FieldSelector: "metadata.name=" + desired.Name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminals := make(chan *core.Pod, 1)
+	joined := make(chan struct{})
+	go func() {
+		defer close(joined)
+		for event := range watch.ResultChan() {
+			p, ok := event.Object.(*core.Pod)
+			if ok && p.Namespace == desired.TargetNamespace && (p.Status.Phase == core.PodSucceeded || p.Status.Phase == core.PodFailed) {
+				select {
+				case terminals <- p.DeepCopy():
+				default:
+				}
+				return
+			}
+		}
+	}()
+	defer func() { watch.Stop(); <-joined }()
+	retirement := initialBootstrapWatchRetirement(t, ctx, api, desired)
+	defer retirement.Close()
+	first := initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-first", false)
+	var terminal *core.Pod
+	select {
+	case terminal = <-terminals:
+	case <-ctx.Done():
+		t.Fatal("original activation terminal missing")
+	}
+	originalSeed := retirement.Take(t, ctx)
+	state, configuration, root := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
+	if root.Schema == nil || root.Schema.CompletedAt == nil || state.Manager == nil || state.Manager.Receipt == nil || state.Manager.RetiredAt == nil {
+		t.Fatal("product schema/manager lifecycle incomplete")
+	}
+	if root.Schema.Manager != *state.Manager.Receipt || configuration.Plan.HistoryManager == nil || *configuration.Plan.HistoryManager != *state.Manager.Receipt {
+		t.Fatal("manager was replaced or fixture-injected")
+	}
+	bundle, err := postgres.EmbeddedInitialSchema()
+	if err != nil || bundle.Digest != root.Schema.BundleDigest || bundle.Head != root.Schema.Head {
+		t.Fatal("compiled schema binding differs")
+	}
+	if root.Activation == nil || root.Activation.Pod == nil || root.Activation.Pod.Receipt == nil || string(terminal.UID) != root.Activation.Pod.Receipt.UID {
+		t.Fatal("wrong original activation Pod")
+	}
+	initialBootstrapChainImage(t, terminal, f.WorkerImage)
+	if root.Activation.Handover == nil || root.Activation.Handover.Cleanup == nil || len(root.Activation.Handover.Cleanup.Steps) != 8 {
+		t.Fatal("actual handover cleanup incomplete")
+	}
+	if _, err = api.CoreV1().Pods(desired.TargetNamespace).Get(ctx, desired.Name, meta.GetOptions{}); !apierrors.IsNotFound(err) {
+		t.Fatal("product did not remove original activation Pod", err)
+	}
+	initialBootstrapChainAudit(t, ctx, admin, store, providerHTTP, f, desired, state, root)
+	var login, create bool
+	var sessions int
+	if err = admin.QueryRow(ctx, "SELECT rolcanlogin,rolcreaterole FROM pg_roles WHERE oid=$1 AND rolname=$2", state.Manager.Receipt.OID, state.Manager.Receipt.Name).Scan(&login, &create); err != nil || login || create {
+		t.Fatal("original manager not retired", err)
+	}
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE usesysid=$1", state.Manager.Receipt.OID).Scan(&sessions); err != nil || sessions != 0 {
+		t.Fatal("original manager sessions remain", err)
+	}
+	denied, err := pgx.ParseConfig(f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	denied.User = state.Manager.Receipt.Name
+	denied.Password = state.Passwords.Manager
+	attempt, stop := context.WithTimeout(ctx, 2*time.Second)
+	connection, e := pgx.ConnectConfig(attempt, denied)
+	stop()
+	if e == nil {
+		connection.Close(context.Background())
+		t.Fatal("original retired manager still logs in")
+	}
+	state.Passwords.Manager = ""
+	originalSeed.State.Passwords.Manager = ""
+	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, desired, originalSeed)
+	// Remove only operator fixture inputs. Product copies must already have
+	// positively closed; a fresh runner receives no setup SQL/provider inputs.
+	for _, name := range []string{"operator-producer", "operator-ddl", "operator-retirement"} {
+		object, e := api.CoreV1().Secrets(namespace).Get(ctx, name, meta.GetOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = api.CoreV1().Secrets(namespace).Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &object.UID, ResourceVersion: &object.ResourceVersion}}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	request(t, f.KMS, "synthetic-root", "auth/token/revoke", map[string]any{"token": issuer}, 204)
+	t.Run("all-four-commands-passive-without-setup-files", func(t *testing.T) {
+		second := initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-replay", true)
+		if second.UID == first.UID {
+			t.Fatal("replay reused old runner result")
+		}
+		after, configAfter, rootAfter := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
+		afterSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, desired, originalSeed)
+		if afterSeed.UID != finalSeed.UID || afterSeed.ResourceVersion != finalSeed.ResourceVersion || !equalJSONForBootstrap(finalSeed.Annotations, afterSeed.Annotations) {
+			t.Fatal("completed replay changed original copy closure")
+		}
+		a, _ := json.Marshal(state)
+		b, _ := json.Marshal(after)
+		defer clear(a)
+		defer clear(b)
+		ra, _ := json.Marshal(root)
+		rb, _ := json.Marshal(rootAfter)
+		ca, _ := json.Marshal(configuration)
+		cb, _ := json.Marshal(configAfter)
+		if !bytes.Equal(a, b) || !bytes.Equal(ra, rb) || !bytes.Equal(ca, cb) {
+			t.Fatal("passive fixed commands changed original identities/progress")
+		}
+		var count int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&count); err != nil || count != 1 {
+			t.Fatal("passive replay repeated activation", err)
+		}
+	})
+	if os.Getenv("ASSERVAT_INITIAL_RUNTIME_BRIDGE") == "1" {
+		t.Run("runtime-resources-guard-bridge", func(t *testing.T) {
+			qualifyInitialRuntimeBridgeNative(t, ctx, direct, api, admin, f, desired, configuration)
+		})
+	}
+	initialBootstrapCopyGuardRBAC(t, ctx, api, desired, originalSeed)
+	t.Run("administrator-removal-detected-without-recreation", func(t *testing.T) {
+		initialBootstrapCopyAdministratorBoundary(t, ctx, directAPI, direct, desired)
+	})
+	t.Log("actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim")
+}
+
+func initialBootstrapChainProvider(t *testing.T, ctx context.Context, f fixture, d contracts.InitialBootstrap) string {
+	if ctx.Err() != nil {
+		t.Fatal("original provider setup deadline expired")
+	}
+	t.Helper()
+	profile := contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: d.Name + "-provider-material", UID: custodyID()}, IssuerPolicy: d.Providers.IssuerPolicy, WrapRole: d.Providers.WrapRole, WrapPolicy: d.Providers.WrapPolicy, UnwrapRole: d.Providers.UnwrapRole, UnwrapPolicy: d.Providers.UnwrapPolicy}
+	// Material UID is required structurally by the policy builder but is not a
+	// policy input or passed to product. The real producer obtains its own UID.
+	policies, err := kms.InitialProviderPolicies(profile, d.KeyService.AuditMount, d.KeyService.AuditKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request(t, f.KMS, "synthetic-root", "sys/mounts/"+d.KeyService.AuditMount, map[string]any{"type": "transit"}, 204)
+	request(t, f.KMS, "synthetic-root", d.KeyService.AuditMount+"/keys/"+d.KeyService.AuditKey, map[string]any{"type": "aes256-gcm96"}, 200)
+	for name, policy := range policies {
+		request(t, f.KMS, "synthetic-root", "sys/policies/acl/"+name, map[string]any{"policy": policy}, 204)
+	}
+	for role, policy := range map[string]string{d.Providers.WrapRole: d.Providers.WrapPolicy, d.Providers.UnwrapRole: d.Providers.UnwrapPolicy} {
+		request(t, f.KMS, "synthetic-root", "auth/token/roles/"+role, map[string]any{"allowed_policies": []string{policy}, "orphan": false, "renewable": false, "token_type": "service", "token_no_default_policy": true, "token_explicit_max_ttl": 900}, 204)
+	}
+	issued := request(t, f.KMS, "synthetic-root", "auth/token/create", map[string]any{"policies": []string{d.Providers.IssuerPolicy}, "no_default_policy": true, "no_parent": false, "renewable": false, "type": "service", "ttl": "15m", "explicit_max_ttl": "15m"}, 200)
+	return issued["auth"].(map[string]any)["client_token"].(string)
+}
+
+func initialBootstrapChainPod(d contracts.InitialBootstrap, name string, replay bool) *core.Pod {
+	mode := int32(0440)
+	public := core.VolumeProjection{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "operator-bootstrap"}, Items: []core.KeyToPath{{Key: "bootstrap.json", Path: "bootstrap.json"}}}}
+	token := core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "administrator-token", Audience: d.ProbeAudience, ExpirationSeconds: ptr.To(int64(600))}}
+	inputs := func(secret string) core.VolumeSource {
+		sources := []core.VolumeProjection{public, token}
+		if !replay {
+			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: secret}}})
+		}
+		return core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: &mode, Sources: sources}}
+	}
+	memory := resource.MustParse("8Mi")
+	volumes := []core.Volume{
+		{Name: "scratch", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &memory}}},
+		{Name: "producer-input", VolumeSource: inputs("operator-producer")},
+		{Name: "retirement-input", VolumeSource: inputs("operator-retirement")},
+	}
+	if !replay {
+		volumes = append(volumes, core.Volume{Name: "ddl-input", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: "operator-ddl", DefaultMode: &mode}}})
+	}
+	scratch := core.VolumeMount{Name: "scratch", MountPath: bootstrap.InitialBootstrapScratchRoot}
+	container := func(name, command string, mounts ...core.VolumeMount) core.Container {
+		return core.Container{Name: name, Image: d.Image, ImagePullPolicy: core.PullNever, Command: []string{"/asservat", command}, VolumeMounts: mounts, SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}, Resources: core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("20m"), core.ResourceMemory: resource.MustParse("32Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("1"), core.ResourceMemory: resource.MustParse("256Mi")}}}
+	}
+	producer := container("produce", "initial-bootstrap", scratch, core.VolumeMount{Name: "producer-input", MountPath: bootstrap.InitialBootstrapRoot, ReadOnly: true})
+	schema := container("schema", "initial-bootstrap-schema", core.VolumeMount{Name: "scratch", MountPath: bootstrap.InitialSchemaRoot, SubPath: "projection/schema", ReadOnly: true})
+	if !replay {
+		schema.VolumeMounts = append(schema.VolumeMounts, core.VolumeMount{Name: "ddl-input", MountPath: bootstrap.InitialBootstrapSchemaPrivateRoot, ReadOnly: true})
+	}
+	prepare := container("prepare", "initial-bootstrap-prepare", core.VolumeMount{Name: "scratch", MountPath: bootstrap.InitialPreparerRoot, SubPath: "projection/preparer", ReadOnly: true})
+	retire := container("retire", "initial-bootstrap-retire", scratch, core.VolumeMount{Name: "retirement-input", MountPath: bootstrap.InitialBootstrapRoot, ReadOnly: true})
+	return &core.Pod{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: d.BootstrapNamespace}, Spec: core.PodSpec{ServiceAccountName: "trusted-runner", AutomountServiceAccountToken: ptr.To(false), RestartPolicy: core.RestartPolicyNever, ActiveDeadlineSeconds: ptr.To(int64(300)), TerminationGracePeriodSeconds: ptr.To(int64(15)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), RunAsGroup: ptr.To(int64(65532)), FSGroup: ptr.To(int64(65532)), FSGroupChangePolicy: ptr.To(core.FSGroupChangeOnRootMismatch), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Volumes: volumes, InitContainers: []core.Container{producer, schema, prepare}, Containers: []core.Container{retire}}}
+}
+
+func initialBootstrapChainRun(t *testing.T, ctx context.Context, api kubernetes.Interface, d contracts.InitialBootstrap, name string, replay bool) *core.Pod {
+	t.Helper()
+	pod, err := api.CoreV1().Pods(d.BootstrapNamespace).Create(ctx, initialBootstrapChainPod(d, name, replay), meta.CreateOptions{})
+	if err != nil {
+		t.Fatal("actual Restricted runner admission", err)
+	}
+	original := pod.UID
+	limit, stop := context.WithTimeout(ctx, 310*time.Second)
+	defer stop()
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+		diagnostics, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		current, e := api.CoreV1().Pods(d.BootstrapNamespace).Get(diagnostics, name, meta.GetOptions{})
+		if e != nil || current.UID != original {
+			return
+		}
+		for _, status := range append(current.Status.InitContainerStatuses, current.Status.ContainerStatuses...) {
+			// Only fixed product errors are emitted; never log projected file contents.
+			logs, e := api.CoreV1().Pods(d.BootstrapNamespace).GetLogs(name, &core.PodLogOptions{Container: status.Name, LimitBytes: ptr.To(int64(8192))}).DoRaw(diagnostics)
+			if e == nil {
+				t.Log("runner", status.Name, "phase", current.Status.Phase, "output", string(logs))
+			}
+		}
+	}()
+	for {
+		if limit.Err() != nil {
+			t.Fatal("actual fixed-command runner deadline", limit.Err())
+		}
+		pod, err = api.CoreV1().Pods(d.BootstrapNamespace).Get(limit, name, meta.GetOptions{})
+		if err != nil || pod.UID != original {
+			t.Fatal("original runner lost/replaced", err)
+		}
+		if pod.Status.Phase == core.PodFailed {
+			t.Fatal("actual fixed-command runner failed")
+		}
+		if pod.Status.Phase == core.PodSucceeded {
+			break
+		}
+		select {
+		case <-limit.Done():
+			t.Fatal("runner did not finish original interval")
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	if len(pod.Status.InitContainerStatuses) != 3 || len(pod.Status.ContainerStatuses) != 1 {
+		t.Fatal("runner phase dispositions incomplete")
+	}
+	for _, s := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+		if s.State.Terminated == nil || s.State.Terminated.ExitCode != 0 || s.RestartCount != 0 || !strings.HasSuffix(s.ImageID, strings.Split(d.Image, "@")[1]) {
+			t.Fatal("runner used wrong image/restarted/failed phase", s.Name)
+		}
+	}
+	return pod
+}
+
+func initialBootstrapChainImage(t *testing.T, p *core.Pod, image string) {
+	t.Helper()
+	if p == nil || p.Status.Phase != core.PodSucceeded || len(p.Status.ContainerStatuses) != 1 {
+		t.Fatal("original activation did not succeed")
+	}
+	s := p.Status.ContainerStatuses[0]
+	parts := strings.Split(image, "@")
+	if len(parts) != 2 || !strings.HasSuffix(s.ImageID, parts[1]) || s.RestartCount != 0 || s.State.Terminated == nil || s.State.Terminated.ExitCode != 0 {
+		t.Fatal("wrong original activation executable/image")
+	}
+	t.Log("original activation", p.UID, "image", s.ImageID, "exit", s.State.Terminated.ExitCode)
+}
+
+func initialBootstrapChainState(t *testing.T, ctx context.Context, api kubernetes.Interface, d contracts.InitialBootstrap, original bootstrapRetirementEvidence) (contracts.InitialBootstrapState, contracts.InitialPreparer, contracts.InitialPreparationRoot) {
+	t.Helper()
+	seed, err := api.CoreV1().Secrets(d.BootstrapNamespace).Get(ctx, d.Name+"-bootstrap-state", meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := original.State
+	for _, b := range seed.Data {
+		defer clear(b)
+	}
+	if seed.Immutable == nil || !*seed.Immutable || len(seed.Data) != 1 || string(seed.Data["retired"]) != "true" || string(seed.UID) != original.UID || seed.ResourceVersion == original.ResourceVersion || state.SeedUID != string(seed.UID) || state.Projection == nil || state.PassiveHistory == nil || state.PassiveHistory.Receipt == nil {
+		t.Fatal("actual original seed/locator incomplete", err)
+	}
+	projection, err := api.CoreV1().ConfigMaps(d.BootstrapNamespace).Get(ctx, state.Projection.Name, meta.GetOptions{})
+	if err != nil || string(projection.UID) != state.Projection.UID {
+		t.Fatal("original public projection replaced", err)
+	}
+	c, err := contracts.DecodeInitialPreparer(strings.NewReader(projection.Data["deployment.json"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootCM, err := api.CoreV1().ConfigMaps(d.BootstrapNamespace).Get(ctx, c.Plan.RootName, meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := contracts.DecodeInitialPreparationRoot(strings.NewReader(rootCM.Data["root.json"]))
+	if err != nil || root.RootUID != string(rootCM.UID) || root.InstallationID != state.InstallationID || root.RequestID != state.RequestID {
+		t.Fatal("actual original preparation root differs", err)
+	}
+	return state, c, root
+}
+
+func initialBootstrapChainAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool, store *s3.Client, httpClient *http.Client, f fixture, d contracts.InitialBootstrap, state contracts.InitialBootstrapState, root contracts.InitialPreparationRoot) {
+	t.Helper()
+	var recordJSON, receiptJSON []byte
+	var activated, blocked bool
+	if err := admin.QueryRow(ctx, "SELECT record_json,audit_receipt_json,activated_at IS NOT NULL FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&recordJSON, &receiptJSON, &activated); err != nil || !activated {
+		t.Fatal("actual independent activation absent", err)
+	}
+	if err := admin.QueryRow(ctx, "SELECT recovery_blocked FROM fleet_current_trust WHERE installation_id=$1", state.InstallationID).Scan(&blocked); err != nil || blocked {
+		t.Fatal("actual incarnation not activated", err)
+	}
+	var record audit.InitialInstallation
+	var receipt audit.Receipt
+	if json.Unmarshal(recordJSON, &record) != nil || json.Unmarshal(receiptJSON, &receipt) != nil || !record.Valid() || !receipt.ValidInitialInstallation(state.InstallationID, record.Claim.ID) || root.Activation.Handover.Cleanup.ActivatedClaimID != record.Claim.ID || record.Scope.ClusterID != state.ClusterID {
+		t.Fatal("original encrypted activation scope invalid")
+	}
+	object, err := store.GetObject(ctx, &s3.GetObjectInput{Bucket: &d.AuditStore.Bucket, Key: &receipt.Key, VersionId: &receipt.Version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertext, err := io.ReadAll(io.LimitReader(object.Body, (128<<10)+1))
+	object.Body.Close()
+	defer clear(ciphertext)
+	if err != nil || len(ciphertext) > 128<<10 || int64(len(ciphertext)) != receipt.Bytes || sha256.Sum256(ciphertext) != [32]byte(receipt.SHA256) {
+		t.Fatal("actual immutable audit bytes differ")
+	}
+	opener, err := kms.NewOpener(d.KeyService.Endpoint, "synthetic-root", d.KeyService.AuditMount, d.KeyService.AuditKey, httpClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = framed.VerifyInitialInstallation(ctx, opener, record, ciphertext); err != nil {
+		t.Fatal("independent retained audit cannot verify", err)
+	}
+}
+
+func initialBootstrapChainCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, bootstrapUID, roleUID, bindingUID types.UID) {
+	t.Helper()
+	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
+	defer end()
+	installation := ""
+	if seed, err := api.CoreV1().Secrets(d.BootstrapNamespace).Get(ctx, d.Name+"-bootstrap-state", meta.GetOptions{}); err == nil {
+		if state, decodeErr := contracts.DecodeInitialBootstrapState(bytes.NewReader(seed.Data["state.json"])); decodeErr == nil {
+			installation = state.InstallationID
+		} else if locator, decodeErr := contracts.DecodeInitialBootstrapPassiveLocator(strings.NewReader(seed.Annotations["asservat.io/bootstrap-passive-history"])); decodeErr == nil && locator.SeedUID == string(seed.UID) {
+			installation = locator.InstallationID
+		}
+		for _, data := range seed.Data {
+			clear(data)
+		}
+	}
+	// Stop and join only this test's runners before removing public protections.
+	for _, name := range []string{"bootstrap-first", "bootstrap-replay"} {
+		p, e := api.CoreV1().Pods(d.BootstrapNamespace).Get(ctx, name, meta.GetOptions{})
+		if e == nil {
+			e = api.CoreV1().Pods(d.BootstrapNamespace).Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &p.UID}})
+		}
+		if e != nil && !apierrors.IsNotFound(e) {
+			t.Error("owned runner cleanup", e)
+			return
+		}
+		for ctx.Err() == nil {
+			current, readErr := api.CoreV1().Pods(d.BootstrapNamespace).Get(ctx, name, meta.GetOptions{})
+			if apierrors.IsNotFound(readErr) {
+				break
+			}
+			if readErr != nil || p == nil || current.UID != p.UID {
+				t.Error("original runner cleanup observation failed", readErr)
+				return
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+		if ctx.Err() != nil {
+			t.Error("original runner cleanup did not join")
+			return
+		}
+	}
+	for _, name := range []string{d.BootstrapNamespace + "-" + d.Name + "-bootstrap", d.BootstrapNamespace + "-" + d.Name + "-copy-tombstone", d.BootstrapNamespace + "-" + d.Name + "-continuity", d.TargetNamespace + "-" + d.Name + "-staging", d.TargetNamespace + "-" + d.Name + "-witness", d.TargetNamespace + "-" + d.Name + "-fleet", d.TargetNamespace + "-" + d.Name + "-workload"} {
+		b, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, name, meta.GetOptions{})
+		if e == nil {
+			e = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &b.UID}})
+		}
+		if e != nil && !apierrors.IsNotFound(e) {
+			t.Error("owned guard binding cleanup", e)
+		}
+		p, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, name, meta.GetOptions{})
+		if e == nil {
+			e = api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &p.UID}})
+		}
+		if e != nil && !apierrors.IsNotFound(e) {
+			t.Error("owned guard cleanup", e)
+		}
+	}
+	for _, name := range []string{d.TargetNamespace, d.BootstrapNamespace} {
+		n, e := api.CoreV1().Namespaces().Get(ctx, name, meta.GetOptions{})
+		if apierrors.IsNotFound(e) {
+			continue
+		}
+		if e != nil {
+			t.Error(e)
+			continue
+		}
+		if name == d.TargetNamespace && (installation == "" || n.Annotations["asservat.io/installation-id"] != installation) {
+			t.Error("refuse unbound target namespace cleanup")
+			continue
+		}
+		if name == d.BootstrapNamespace && n.UID != bootstrapUID {
+			t.Error("refuse replaced bootstrap namespace")
+			continue
+		}
+		for {
+			e = api.CoreV1().Namespaces().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &n.UID}})
+			if e == nil || apierrors.IsNotFound(e) {
+				break
+			}
+			if !initialBootstrapChainRemovedGuard(e, d) || ctx.Err() != nil {
+				t.Error("owned namespace deletion", e)
+				break
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+		for ctx.Err() == nil {
+			_, e = api.CoreV1().Namespaces().Get(ctx, name, meta.GetOptions{})
+			if apierrors.IsNotFound(e) {
+				break
+			}
+			if e != nil {
+				t.Error(e)
+				break
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+	}
+	name := d.BootstrapNamespace + "-administrator"
+	if e := api.RbacV1().ClusterRoleBindings().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &bindingUID}}); e != nil && !apierrors.IsNotFound(e) {
+		t.Error(e)
+	}
+	if e := api.RbacV1().ClusterRoles().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &roleUID}}); e != nil && !apierrors.IsNotFound(e) {
+		t.Error(e)
+	}
+	if ctx.Err() != nil {
+		t.Error("owned bootstrap cleanup did not converge")
+	}
+}
+
+func initialBootstrapChainRemovedGuard(err error, d contracts.InitialBootstrap) bool {
+	for _, name := range []string{d.BootstrapNamespace + "-" + d.Name + "-bootstrap", d.BootstrapNamespace + "-" + d.Name + "-copy-tombstone", d.BootstrapNamespace + "-" + d.Name + "-continuity", d.TargetNamespace + "-" + d.Name + "-staging", d.TargetNamespace + "-" + d.Name + "-witness", d.TargetNamespace + "-" + d.Name + "-fleet", d.TargetNamespace + "-" + d.Name + "-workload"} {
+		if initialPreparerCleanupDenial(err, name) || initialBootstrapGuardDenial(err, name) {
+			return true
+		}
+	}
+	return false
+}

@@ -1,0 +1,2 @@
+NOTICE:  identifier "asservat-fleet-lock-f3896909557748f9:share-all-semantic-blocking" will be truncated to "asservat-fleet-lock-f3896909557748f9:share-all-semantic-blockin"
+[{"pid" : 279, "role" : "probe_semantic", "state" : "active", "waitType" : "Lock", "waitEvent" : "transactionid", "blockers" : [237]}]

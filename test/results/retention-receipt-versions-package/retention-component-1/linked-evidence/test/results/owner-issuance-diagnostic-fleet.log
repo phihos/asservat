@@ -1,0 +1,6 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:107: fixture owner-pki/sign/server status 400, want 200
+--- FAIL: TestEnrollmentOwnerPKIWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.082s
+FAIL

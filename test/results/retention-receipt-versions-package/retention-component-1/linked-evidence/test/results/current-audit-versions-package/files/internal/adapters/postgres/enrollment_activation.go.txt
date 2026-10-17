@@ -1,0 +1,119 @@
+package postgres
+
+import (
+	"bytes"
+	"context"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	port "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type EnrollmentActivation struct{ claims *EnrollmentClaims }
+
+var _ port.EnrollmentActivator = (*EnrollmentActivation)(nil)
+
+func NewEnrollmentActivation(ctx context.Context, pool *pgxpool.Pool, installation string) (*EnrollmentActivation, error) {
+	c, err := NewEnrollmentClaims(ctx, pool, installation)
+	if err != nil {
+		return nil, err
+	}
+	return &EnrollmentActivation{c}, nil
+}
+func (a *EnrollmentActivation) ActivateConnector(ctx context.Context, c value.EnrollmentClaim, issueID string) (value.IssuedCertificate, error) {
+	var out value.IssuedCertificate
+	if !c.Valid() || c.InstallationID != a.claims.installation || !authorization.UUID(issueID) {
+		return out, value.ErrInvalid
+	}
+	err := a.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		out = value.IssuedCertificate{}
+		root, err := q.LockFleetTrust(ctx, id(c.InstallationID))
+		if err != nil {
+			return err
+		}
+		slot, err := q.LockBootstrap(ctx, custodydb.LockBootstrapParams{InstallationID: root.InstallationID, ID: id(c.BootstrapID)})
+		if err != nil {
+			return err
+		}
+		rows, err := q.ReadCertificateIssues(ctx, custodydb.ReadCertificateIssuesParams{InstallationID: slot.InstallationID, BootstrapID: slot.ID})
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 || len(rows) > 2 {
+			return value.ErrDenied
+		}
+		row := rows[len(rows)-1]
+		if uid(row.ID) != issueID || !row.AuditAcknowledgedAt.Valid || !row.AuditObjectVersion.Valid || row.AuditObjectVersion.String == "null" || !identity.Text(row.AuditObjectVersion.String, 1024) {
+			return value.ErrDenied
+		}
+		frozen, err := certificateAudit(row, slot)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(row.AuditDigest, digest(frozen)) || row.AuditObjectKey.String != audit.EnrollmentCertificateKey(c.InstallationID, issueID) {
+			return value.ErrDenied
+		}
+		out, err = issuedCertificate(row, frozen.Attempt)
+		if err != nil {
+			return err
+		}
+		now, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if err = checkClaimedEnrollment(root, slot, c, now.Time); err != nil {
+			return err
+		}
+		if trustRevision(root) != frozen.Attempt.Permit.TrustRevision || !out.Certificate.Valid(now.Time) {
+			return value.ErrDenied
+		}
+		if row.ActivatedAt.Valid {
+			// Replaying the activation may deliver the original certificate, but it
+			// cannot re-enable a revoked peer or reinstall a retired certificate.
+			peer, err := q.LockEnrolledPeer(ctx, custodydb.LockEnrolledPeerParams{InstallationID: root.InstallationID, PeerID: slot.PeerID})
+			if err != nil {
+				return err
+			}
+			certs, err := q.ReadEnrolledCertificates(ctx, custodydb.ReadEnrolledCertificatesParams{InstallationID: root.InstallationID, PeerID: slot.PeerID})
+			if err != nil {
+				return err
+			}
+			if !peer.Enabled || peer.ClusterID != slot.ClusterID || peer.IssuerEpoch != root.IssuerEpoch || peer.Role != string(value.ConnectorPeer) || peer.AuditID != row.ID || peer.AuditObjectKey != row.AuditObjectKey || peer.AuditObjectVersion != row.AuditObjectVersion || !bytes.Equal(peer.AuditObjectSha256, row.AuditObjectSha256) || !peer.NotAfter.Time.Equal(out.Certificate.NotAfter) || len(certs) != 1 || !bytes.Equal(certs[0].CertificateSha256, out.Certificate.Digest[:]) || !certs[0].NotBefore.Time.Equal(out.Certificate.NotBefore) || !certs[0].NotAfter.Time.Equal(out.Certificate.NotAfter) {
+				return value.ErrDenied
+			}
+		} else {
+			if err = q.InsertEnrolledPeer(ctx, custodydb.InsertEnrolledPeerParams{InstallationID: root.InstallationID, PeerID: slot.PeerID, ClusterID: slot.ClusterID, IssuerEpoch: root.IssuerEpoch, NotAfter: row.CertificateNotAfter, AuditID: row.ID, AuditObjectKey: row.AuditObjectKey, AuditObjectVersion: row.AuditObjectVersion, AuditObjectSha256: row.AuditObjectSha256}); err != nil {
+				return err
+			}
+			if err = q.InsertEnrolledCertificate(ctx, custodydb.InsertEnrolledCertificateParams{InstallationID: root.InstallationID, PeerID: slot.PeerID, CertificateSha256: row.CertificateSha256, NotBefore: row.CertificateNotBefore, NotAfter: row.CertificateNotAfter}); err != nil {
+				return err
+			}
+			n, err := q.ActivateCertificateIssue(ctx, custodydb.ActivateCertificateIssueParams{InstallationID: root.InstallationID, ID: row.ID})
+			if err != nil {
+				return err
+			}
+			if n != 1 {
+				return value.ErrDenied
+			}
+		}
+		now, err = q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if err = checkClaimedEnrollment(root, slot, c, now.Time); err != nil {
+			return err
+		}
+		if !out.Certificate.Valid(now.Time) {
+			return value.ErrDenied
+		}
+		return nil
+	})
+	if err != nil {
+		return value.IssuedCertificate{}, err
+	}
+	return out, nil
+}

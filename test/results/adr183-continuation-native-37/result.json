@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-37",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure. The launched owner process exited once with 'owner startup failed: phase=provider-prime reason=other'. Prime ended the process on the first failed provider-slot refresh; each refresh runs the owner's current proof twice within five seconds, now concurrent with the continuation's post-launch capacity projection reads. Run 35's owner/installation stop is consistent with the same exit. Prime now waits for the slot's own backoff inside its original 30-second bound. The continuation log limit (8 KiB) also cut the final stop line; raised to 64 KiB.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

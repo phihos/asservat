@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/prepaid-download-stop-no-read-and-original-replay
+--- PASS: TestContextAdmissionWithRealServices (1.69s)
+    --- PASS: TestContextAdmissionWithRealServices/prepaid-download-stop-no-read-and-original-replay (1.34s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.742s

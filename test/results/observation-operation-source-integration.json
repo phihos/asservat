@@ -1,0 +1,108 @@
+{
+  "scope": "V2 exact-integer wire values and same-stream source/producer component; actual framed exchange/coordinator/native routing remain pending",
+  "dependenciesVerifiedBeforeMutation": 1929,
+  "manifestSHA256": "5f31989cc99a39cc303c6bec43b282e3824d63bcbc8c3f33631c5ccbfce158f9",
+  "paths": [
+    {
+      "path": "internal/adapters/mtls/connector_operation_producer.go",
+      "base": null,
+      "payload": "f6938a9fea24fd298f0733aa10b91071ad32c51f55b22e2239758ef3f60c10ee"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_operation_source.go",
+      "base": null,
+      "payload": "0f7f0ee3303b3fe8bb95ee67b857fdf4be45b17765e159bb006750fb6db78b0d"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_operation_test.go",
+      "base": null,
+      "payload": "943e9e28c9726c0d3a9636486813344f0ba43fa758536c1cbb12b73ac21517bb"
+    },
+    {
+      "path": "internal/adapters/mtls/observation_operation_wire.go",
+      "base": null,
+      "payload": "3798ea0f15245bf4748bab342d003386e1a5df22f1e28907cc5ca789127c563c"
+    },
+    {
+      "path": "internal/adapters/mtls/observation_operation_wire_test.go",
+      "base": null,
+      "payload": "56877fded331f4df88976be50dad0ce69baad63a752e33e801de81d23cbefa64"
+    },
+    {
+      "path": "internal/contracts/observation_operation.go",
+      "base": null,
+      "payload": "4a2f619b52ca0d8552b1f1b3c8797498e2c95ea24986a09b0e6e05887a9655d0"
+    },
+    {
+      "path": "internal/contracts/observation_operation_test.go",
+      "base": null,
+      "payload": "24d6b2f37a31d9beef9395b1fce154c5a3141c702aa6beab2e88efa9a25903b4"
+    }
+  ],
+  "qualification": {
+    "terminal": 0,
+    "handle": 62662,
+    "nativeQualification": false,
+    "runtimeSelection": false,
+    "gates": [
+      {
+        "phase": "exact-integer",
+        "exit": 0,
+        "seconds": 2.49
+      },
+      {
+        "phase": "compile",
+        "exit": 0,
+        "seconds": 8.971
+      },
+      {
+        "phase": "race",
+        "exit": 0,
+        "seconds": 7.845
+      },
+      {
+        "phase": "vet",
+        "exit": 0,
+        "seconds": 2.285
+      },
+      {
+        "phase": "go-architecture",
+        "exit": 0,
+        "seconds": 1.633
+      }
+    ],
+    "tests": {
+      "topLevel": 15,
+      "named": 90
+    },
+    "dependencies": 1929,
+    "mirrorPaths": 1936,
+    "payloadPaths": 7,
+    "manifestSHA256": "5f31989cc99a39cc303c6bec43b282e3824d63bcbc8c3f33631c5ccbfce158f9",
+    "freezeSHA256": "57cf942aabe89eae4a06ffa0719d0552a7e4586e9f27576b71914d7d8ed0c6b4",
+    "allBeforeAfterHashesUnchanged": true,
+    "preservedFailures": [
+      "checkpoint-v1 compile test-variable scope error",
+      "checkpoint-v2 exact-integer race: default canonicalization rounded backingRevision=(1<<60)-1"
+    ],
+    "evidence": {
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v1/evidence/compile.json": "5dfcefc9747784bef9ba0052dad494e8082dd761d3b5b58e4a31d6a192555e53",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v1/evidence/compile.log": "13cf1c14afd975660338f4d01ce35d16584351a92330ae76bbf0f45ef38208fd",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v2/evidence/compile.json": "8f18432093e3ee72428557b18708307dee8c83932ddfe63d1c2afff8be8782ba",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v2/evidence/compile.log": "c1920a5edbe953c92a38354620445d04eb34025e73821d8cc095f9f95d9c9c1c",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v2/evidence/race.json": "27a67ed3e08a50bcd2e104458f9ffd77a88c754c2b504ea0b20a18983585bf30",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v2/evidence/race.log": "e2bbec83a9d687197815c1ed4029bdbe7aab230e4f33bca7297399a55c45eda1",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/exact-integer.json": "7b216781e059fc9aefb103aae3849d8a9b8b62ce44c3fcb5f73e141ce0147dc1",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/exact-integer.log": "d780364fe0e743194199d70551829519e714a42f31895a3b05df2a650a3d7f33",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/compile.json": "c89a0886c6794160c5bcb8af8f87d342d473eb652ce16f9dafe4dbfcce850fa0",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/compile.log": "964aecd4d5f51d1443e604c80ccd86883f54d0a417396ec66b1764f78f61bca1",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/race.json": "1fe492336c954b743effa96fbf167d96fa3ba40172b7ee99a01817f78431ca2e",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/race.log": "b83d57093c942df12d423d6fcb911f023da3c89b40beaf209d6dc7cd2c33de0e",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/vet.json": "074a0c3cc00dc0bf5fdee9bef2030f6c3740c0a3ec0c0e399b824db9a343a6a7",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/go-architecture.json": "e086a15d5774fb20dffa6318b16d386c9bf31c7f0deca75e2898412d6435cccd",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v3/evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc"
+    }
+  },
+  "archive": "test/results/observation-operation-source-package"
+}

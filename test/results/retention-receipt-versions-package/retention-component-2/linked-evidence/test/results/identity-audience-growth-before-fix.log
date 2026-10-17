@@ -1,0 +1,5 @@
+--- FAIL: TestFreshnessAndAudienceBounds (0.00s)
+    eligibility_test.go:138: current assignment growth blocked old evidence before lookup
+FAIL
+FAIL	asservat.local/asservat/internal/domain/authorization	0.002s
+FAIL

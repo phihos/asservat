@@ -1,0 +1,46 @@
+package audit
+
+import (
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// EnrollmentClaim binds the consumed bootstrap to its public key and original
+// administrator issuance audit. It contains no bootstrap secret or CSR content.
+type EnrollmentClaim struct {
+	BootstrapID                                             string
+	Binding                                                 fleet.PeerBinding
+	PublicKeyDigest, IssueAuthorityDigest, IssueAuditDigest artifact.Digest
+	IssueAuditID                                            string
+	IssuedAt, ClaimedAt, NotAfter                           time.Time
+}
+
+func (r EnrollmentClaim) Valid() bool {
+	return authorization.UUID(r.BootstrapID) && r.Binding.Valid() && r.Binding.Role == fleet.ConnectorPeer && authorization.UUID(r.IssueAuditID) && r.PublicKeyDigest != (artifact.Digest{}) && r.IssueAuthorityDigest != (artifact.Digest{}) && r.IssueAuditDigest != (artifact.Digest{}) && !r.IssuedAt.IsZero() && !r.ClaimedAt.Before(r.IssuedAt) && r.ClaimedAt.Before(r.NotAfter) && !r.NotAfter.After(r.IssuedAt.Add(5*time.Minute))
+}
+func EnrollmentClaimKey(installation, bootstrap string) string {
+	return "enrollment-claim/v1/" + installation + "/" + bootstrap + "/record"
+}
+func (r Receipt) ValidEnrollmentClaim(installation, bootstrap string) bool {
+	return authorization.UUID(installation) && authorization.UUID(bootstrap) && r.Key == EnrollmentClaimKey(installation, bootstrap) && (r.Version != "null" && identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
+}
+
+type EnrollmentCertificate struct {
+	Attempt     fleet.SigningAttempt
+	Certificate fleet.PeerCertificate
+}
+
+func (r EnrollmentCertificate) Valid() bool {
+	a := r.Attempt
+	return a.Valid(a.Permit.CheckedAt) && r.Certificate.Valid(a.Permit.CheckedAt) && r.Certificate.Binding == a.Permit.Enrollment.Binding && r.Certificate.NotAfter.Equal(a.Permit.CertificateNotAfter()) && !r.Certificate.NotBefore.Before(a.Permit.Enrollment.ClaimedAt.Add(-time.Minute))
+}
+func EnrollmentCertificateKey(installation, issue string) string {
+	return "enrollment-certificate/v1/" + installation + "/" + issue + "/record"
+}
+func (r Receipt) ValidEnrollmentCertificate(installation, issue string) bool {
+	return authorization.UUID(installation) && authorization.UUID(issue) && r.Key == EnrollmentCertificateKey(installation, issue) && (r.Version != "null" && identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
+}

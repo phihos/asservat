@@ -1,0 +1,28 @@
+[
+  {
+    "name": "compile",
+    "command": [
+      "go",
+      "test",
+      "-overlay=/home/phil/.cache/asservat-build/planning/owner-operation-native-20261013/overlay.json",
+      "-run",
+      "^$",
+      "./test/integration"
+    ],
+    "exit": 0,
+    "seconds": 16.206,
+    "changedSources": []
+  },
+  {
+    "name": "vet",
+    "command": [
+      "go",
+      "vet",
+      "-overlay=/home/phil/.cache/asservat-build/planning/owner-operation-native-20261013/overlay.json",
+      "./test/integration"
+    ],
+    "exit": 0,
+    "seconds": 1.469,
+    "changedSources": []
+  }
+]

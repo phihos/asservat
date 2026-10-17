@@ -1,0 +1,27 @@
+[
+  {
+    "path": "internal/adapters/kms/initial_provider_retirement.go",
+    "base_sha256": "32826f0b5c5b4dfb86b126d19e28fbbf876d9880a8247ccedfd7487be784ad38",
+    "sha256": "65f0c8ed06b2fa11134dd732379630da71d57a1e58ab9f705b53784aa3cfb1b2"
+  },
+  {
+    "path": "internal/adapters/kms/initial_provider_test.go",
+    "base_sha256": "1135f5addf44a3aa3c47659b5752f686b560c490c733ba93f5f3f3b2ece4497d",
+    "sha256": "ee3b611a453a005d4871fe09141125f0f1a263a368b7e5fd195c9218d113d558"
+  },
+  {
+    "path": "internal/adapters/kms/initial_provider_retirement_encoding_test.go",
+    "base_sha256": null,
+    "sha256": "93dc53048feaa2137741de22324e475241bb9d255710a4d442e0ec28abaac371"
+  },
+  {
+    "path": "test/integration/initial_provider_issuer_test.go",
+    "base_sha256": "b7a4af3f0d2c5346d71213f4401b2bb126257c46ec249a8d753b5711e6fc4ba4",
+    "sha256": "1b52cace4b40d229f264d8e4b334eb3981331083fdd3baaa42694a63835bd0e4"
+  },
+  {
+    "path": "docs/architecture/initial-provider-provisioning.md",
+    "base_sha256": "b10fc927c4c7816013828de1d9fb2e94238361c6d452fb46985b7091eee808e2",
+    "sha256": "870d63755f3283f871d532ff3bd65dd39efe892518f30639e855aeda14596c72"
+  }
+]

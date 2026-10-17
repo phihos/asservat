@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 1,
+      "seconds": 1.24,
+      "processJoined": true
+    }
+  ],
+  "status": "failed",
+  "scope": "Fixture compilation, vet and documentation checks only; no native execution.",
+  "sourceUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "71a79c6017455a350250d630ec61d62ff0054b6c53dd98fab43585bb3167fc32",
+    "compile.log": "56451aa4c72a14f8d7b91f0cf9d6b2bd058aba8e35b822056207752b94a7a115"
+  }
+}

@@ -1,0 +1,315 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "accessbindings.asservat.io"
+  },
+  "spec": {
+    "group": "asservat.io",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "accessbindings",
+      "singular": "accessbinding",
+      "kind": "AccessBinding",
+      "categories": [
+        "asservat"
+      ]
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "subresources": {
+          "status": {}
+        },
+        "additionalPrinterColumns": [
+          {
+            "name": "Phase",
+            "type": "string",
+            "jsonPath": ".status.phase"
+          },
+          {
+            "name": "Observed",
+            "type": "integer",
+            "jsonPath": ".status.observedGeneration"
+          },
+          {
+            "name": "Age",
+            "type": "date",
+            "jsonPath": ".metadata.creationTimestamp"
+          }
+        ],
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "required": [
+              "spec"
+            ],
+            "properties": {
+              "apiVersion": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "effect": {
+                    "type": "string",
+                    "enum": [
+                      "Allow",
+                      "Deny"
+                    ]
+                  },
+                  "subjects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "User",
+                            "Group",
+                            "Workload"
+                          ]
+                        },
+                        "issuer": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "issuer",
+                        "id"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "x-kubernetes-list-type": "map",
+                    "x-kubernetes-list-map-keys": [
+                      "kind",
+                      "issuer",
+                      "id"
+                    ]
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "evidence-reader",
+                        "workload-maintainer",
+                        "evidence-owner",
+                        "action-approver"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "x-kubernetes-list-type": "set"
+                  },
+                  "scope": {
+                    "type": "object",
+                    "properties": {
+                      "clusterID": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "namespaceRef": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 63
+                          },
+                          "uid": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "uid"
+                        ]
+                      },
+                      "workloads": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "Deployment",
+                                "StatefulSet"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253
+                            },
+                            "uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "uid"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "x-kubernetes-list-type": "map",
+                        "x-kubernetes-list-map-keys": [
+                          "uid"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "clusterID",
+                      "namespaceRef"
+                    ]
+                  },
+                  "notAfter": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "automation": {
+                    "type": "object",
+                    "properties": {
+                      "allowedActions": {
+                        "type": "array",
+                        "items": {
+                          "enum": [
+                            "kubernetesSnapshot",
+                            "logs",
+                            "processSnapshot",
+                            "fileRead",
+                            "packetCapture",
+                            "networkSnapshot",
+                            "runtimeDiagnostic",
+                            "kernelCore",
+                            "liveCore",
+                            "command",
+                            "httpDiagnostic",
+                            "artifactCollect",
+                            "profile",
+                            "syscallTrace"
+                          ],
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "maxItems": 14,
+                        "x-kubernetes-list-type": "set"
+                      },
+                      "maxLifetimeSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 31536000
+                      },
+                      "maxExecutions": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "maxBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1099511627776
+                      },
+                      "maxObservedBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1099511627776
+                      }
+                    },
+                    "required": [
+                      "allowedActions",
+                      "maxLifetimeSeconds",
+                      "maxExecutions",
+                      "maxBytes",
+                      "maxObservedBytes"
+                    ]
+                  }
+                },
+                "required": [
+                  "effect",
+                  "subjects",
+                  "roles",
+                  "scope",
+                  "reason"
+                ],
+                "x-kubernetes-validations": [
+                  {
+                    "rule": "!has(self.automation) || (self.effect == \"Allow\" && self.subjects.all(s, s.kind == \"Group\") && \"workload-maintainer\" in self.roles)",
+                    "message": "Automation requires an Allow binding for groups with the workload-maintainer role."
+                  }
+                ],
+                "description": "Desired permission configuration. A successful write does not activate access; inspect current-generation status."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Ready",
+                      "Disabled",
+                      "Stale",
+                      "UnsafeSource",
+                      "Rejected"
+                    ]
+                  },
+                  "observedGeneration": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "lastVerifiedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "maxItems": 16
+                  }
+                },
+                "required": [
+                  "phase",
+                  "observedGeneration"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

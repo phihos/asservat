@@ -1,0 +1,33 @@
+{
+  "phase": "after",
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/overlay-after.json",
+    "./internal/transport/native",
+    "-count=1",
+    "-timeout=60s"
+  ],
+  "exit": 0,
+  "seconds": 21.999,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "dependenciesCount": 1505,
+  "dependencySHA256": "21a6459857e46236ccd66c625ab735e43ce5df567de9e9641c71c80bc9d11c25",
+  "payloadSHA256": "ee1f3ce852ebc0075273cd8aa1e03b330690c31373a266188a0095294006581d",
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/tmp"
+  }
+}

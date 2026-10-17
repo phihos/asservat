@@ -1,0 +1,27 @@
+# Worker launch, earliest deadline and joined provider cleanup
+
+Session11266 terminal0. This immutable19-path package is based on the parent's integrated final140 source. All seven existing bases exactly matched their original predecessor payloads; twelve files are new. The one console-owned dependency is the qualified owner_provider_lifetime.go private no-I/O joinClosed payload eb5f7e4d; no other owner shutdown file is copied. The complete current-tree dependency delta is recorded separately, including the combined164 integration and fixture-only pre-authority startup correction. No live source changed during qualification.
+
+Manifest b79bd741ff056cdc40396351f7f6f67532fb7596a63a415182dadf3eceeb5063;2,551 dependencies0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38; runner7dbf49661afabd23267b043dda768d2ea1f58cbf5cb14225f0e4189af21ba1f0; resultf5ce2415c344cdc0e39930bdf331e1c1874c0d9825048833426396fd5ce268db.
+
+## Behavior
+
+The private fresh-pair AdvanceLaunch/CompleteLaunch path now uses the concrete original-root operation and actual PostgreSQL role verifier. The initial native/retained bracket precedes role locks; complete current native values follow them; exactly three original SQL role/provenance/ACL checks precede one effect; a genuine final native bracket and current SQL/incarnation/source checks precede completion. The final snapshot immediately narrows the SQL tail context. Provider inspection occurs before locks. No command selects this path yet.
+
+One positively acknowledged original launch intent can dispatch one sole replicas0-to1 Deployment PUT. The phase returns pending. Independently current later phases inspect that exact running body and persist only the first receipt without extending the old launch claim or parent end. The finite driver has at most three calls with the original clients, no sleep, replacement bucket, new role or general queue. Unknown PUT never authorizes another PUT; unknown receipt CAS permits only one inspection during that run, even if the journal is still pending. Actual GET absence, unavailability or changed body never becomes acknowledgement.
+
+The shared worker handle now irreversibly narrows its stored cutoff to every shorter admitted child context and rechecks cancellation after the admission locks. This corrects the earlier test expectation that permitted stored-end reextension; it does not change the fixed five-second maximum.
+
+Worker provider shutdown uses one bounded Close followed by actual local joining, reusing console's qualified lifetime finalizer. It waits for admitted native/control/body owners without fresh provider revocation work after the original close interval. HubWorker's old repeated-close-context loop is replaced by one CloseAndJoin call.
+
+## Actual verification
+
+Five-package compile including native integration exited0 in21.998s. Three controlled before checks each exited1 at the intended assertion, without compiler or cleanup-timeout failure: original handle's later-phase reextension12.381s; uncertain-receipt selection reversal11.530s; provider join reversal13.032s. Corrected races passed47 top-level/121 named entries: Kubernetes28/89 in88.912s (includes legacy launch behavior), provider14/19 in5.949s, PostgreSQL2/2 in8.265s and bootstrap3/11 in7.474s. Affected vet2.689s and Go architecture1.165s passed.
+
+All19 payload/base and2,551 dependency/inventory plus controlled-before auxiliary hash sets stayed unchanged before, between and after every phase. GOMAXPROCS2/-p2; fresh owned tmpfs scratch checked for at least4GiB free and removed after terminal. Build wrapper600s; tests retained3m package ceiling and original runtime deadlines. No native/generation/live edits occurred.
+
+The TLS effect tests exercise actual strict PUT/CAS/readback and real eight-GET SetupReader over synthetic provider responses. Prior native/SQL/final phase facts in those tests are explicit synthetic fixtures. The pure PostgreSQL tests check original-source/receipt comparisons; they do not establish actual SQL transaction availability. No full AdvanceLaunch/native/installed readiness or sustained drained-bucket success is claimed. The parent's next actual original-root native fixture targets input CompleteInputs only. Static launch/receipt/inspection S78/77/76 request targets retain narrow unmeasured headroom.
+
+## Required tiny follow-up
+
+Post-check source review found that copying the exported Launch wrapper aliases its private core pointer. The core phase machine still prevents double effects, but the wrapper itself did not enforce the stated no-copy contract. Preserve this passing checkpoint unchanged; the separate worker-launch-2 delta adds an original-wrapper self pin and copied/positive-original regression. Apply that exact two-path layer with this package before considering the Launch handle complete. Parent separately owns the remaining six console owner shutdown paths.

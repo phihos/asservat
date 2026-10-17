@@ -1,0 +1,1312 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-reset-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-reset-null
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-initial-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-initial-null
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-assignment-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-assignment-null
+=== RUN   TestPermissionAuthorityWithRealServices/foreign-audit-root-disables-allow-without-hiding-deny
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication
+=== RUN   TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry
+=== RUN   TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect
+=== RUN   TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles
+=== RUN   TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec
+=== RUN   TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version
+=== RUN   TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit
+=== RUN   TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit
+=== RUN   TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart
+=== RUN   TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock
+--- PASS: TestPermissionAuthorityWithRealServices (1.91s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-reset-empty (0.32s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-reset-null (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-initial-empty (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-initial-null (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-assignment-empty (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-assignment-null (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/foreign-audit-root-disables-allow-without-hiding-deny (0.08s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry (0.08s)
+    --- PASS: TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles (0.11s)
+    --- PASS: TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec (0.07s)
+    --- PASS: TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version (0.07s)
+    --- PASS: TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart (0.13s)
+    --- PASS: TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock (0.26s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-empty
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-empty
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-empty
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-literal-null
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-literal-null
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-literal-null
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/actor
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/request
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt
+--- PASS: TestEnrollmentBootstrapIssuanceWithRealServices (1.46s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-empty (0.35s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-empty (0.06s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-empty (0.07s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-literal-null (0.05s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-literal-null (0.06s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-literal-null (0.05s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit (0.04s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token (0.12s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit (0.04s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/suspended (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/recovery (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/epoch (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/revision (0.04s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/actor (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/request (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock (0.33s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt (0.04s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record
+--- PASS: TestEnrollmentBootstrapReservationsWithRealServices (0.60s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry (0.12s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot (0.03s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot (0.02s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/suspended (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/revision (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-lock (0.31s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record (0.02s)
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/control-migration-adopts-all-history-without-free-capacity
+=== RUN   TestContextAdmissionWithRealServices/control-capacity-concurrent-replay-charged-once
+=== RUN   TestContextAdmissionWithRealServices/distinct-concurrent-requests-cannot-overdraw-control-slots
+=== RUN   TestContextAdmissionWithRealServices/control-replay-slot-exhaustion-is-independent-of-full-records
+=== RUN   TestContextAdmissionWithRealServices/same-root-workload-retains-protected-capacity
+=== RUN   TestContextAdmissionWithRealServices/control-expiry-renewal-and-independent-suspension-preserve-spend
+=== RUN   TestContextAdmissionWithRealServices/control-configuration-CAS-and-original-observation-survive-locks
+=== RUN   TestContextAdmissionWithRealServices/control-role-cannot-refund-rewrite-delete-or-bypass-charges
+=== RUN   TestContextAdmissionWithRealServices/capture-charge-is-a-deferred-database-invariant
+=== RUN   TestContextAdmissionWithRealServices/backing-cannot-overbook-root-or-adopt-another-root-storage
+=== RUN   TestContextAdmissionWithRealServices/retirement-facts-never-release-uncertain-or-deleted-history
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-new-context-admission
+=== RUN   TestContextAdmissionWithRealServices/database-change-invalidates-already-read-recovery-proof
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-original-backing-deadline-after-account-lock
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-original-deadline-after-lock
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:429: ADR-168 cluster enrollment credential: enroll, admission, rotation, replay, fork fence, append-only guard, reenrollment and revocation on real PostgreSQL
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:494: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-real-time-retirement
+    connector_retirement_test.go:161: explicit --connector-retirement owns the real minimum-time cleanup gate
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-verifier-migration-preserves-history-and-spend
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/deferred-retirement-role-isolation
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-binding-lock-without-allocation-or-freshness-writes
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-lock-outage-is-unavailable-not-changed
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/missing-storage-binding-remains-changed
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation
+    capture_intent_lifecycle_test.go:328: SQL admission plus encrypted pair acknowledged in 169.011621ms under original caller bound; collector acquisition is outside this SQL/S3 fixture
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-overdue-original-no-history
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-overdue-original-backed-history
+=== RUN   TestContextAdmissionWithRealServices/resolution-requires-read-scope-before-negative-fence
+=== RUN   TestContextAdmissionWithRealServices/closed-review-cannot-be-reopened-by-create-or-cached-admission
+=== RUN   TestContextAdmissionWithRealServices/missing-review-fence-blocks-delayed-create-without-other-actor-effects
+=== RUN   TestContextAdmissionWithRealServices/another-client-close-cannot-discover-or-close-original-preview
+=== RUN   TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows
+=== RUN   TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows/false
+=== RUN   TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows/true
+=== RUN   TestContextAdmissionWithRealServices/concurrent-admission-and-close-have-one-serialized-outcome
+=== RUN   TestContextAdmissionWithRealServices/negative-fences-share-human-preview-cap-across-clients
+=== RUN   TestContextAdmissionWithRealServices/closure-after-original-expiry-reclaims-without-reopening
+=== RUN   TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work
+=== RUN   TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work/false
+=== RUN   TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work/true
+=== RUN   TestContextAdmissionWithRealServices/resolution-role-cannot-rewrite-identity-or-admit-work
+=== RUN   TestContextAdmissionWithRealServices/resolution-lock-wait-cannot-extend-caller-deadline
+=== RUN   TestContextAdmissionWithRealServices/current-context-placement-is-scoped-read-only-and-preserves-original-freshness
+=== RUN   TestContextAdmissionWithRealServices/preview-principal-cap-is-atomic-across-clients
+=== RUN   TestContextAdmissionWithRealServices/preview-immutable-owner-bound-and-independent-of-observation-age
+=== RUN   TestContextAdmissionWithRealServices/expired-previews-reclaim-capacity-without-capture-side-effects
+=== RUN   TestContextAdmissionWithRealServices/accepted-replay-survives-preview-expiry-and-deletion
+=== RUN   TestContextAdmissionWithRealServices/accepted-replay-checks-current-denies-before-conflict
+=== RUN   TestContextAdmissionWithRealServices/accepted-replay-does-not-renew-identity-after-lock-wait
+=== RUN   TestContextAdmissionWithRealServices/accepted-replay-does-not-renew-deny-completeness-after-lock-wait
+=== RUN   TestContextAdmissionWithRealServices/progress-roles-cannot-mutate-lifecycle-or-privileged-function
+=== RUN   TestContextAdmissionWithRealServices/api-only-admission-preserves-class-and-original-replay
+=== RUN   TestContextAdmissionWithRealServices/progress-current-access-does-not-follow-shares-or-admission
+=== RUN   TestContextAdmissionWithRealServices/progress-does-not-renew-identity-after-blocking-lock
+=== RUN   TestContextAdmissionWithRealServices/overdue-observation-is-durable-once-and-never-refunds
+=== RUN   TestContextAdmissionWithRealServices/revision-overflow-does-not-block-retention-or-deletion
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-reset-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-reset-null
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-initial-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-initial-null
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-capture-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-capture-null
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-verification-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-verification-null
+=== RUN   TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release
+=== RUN   TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output
+=== RUN   TestContextAdmissionWithRealServices/ordinary-case-metadata-navigation-and-private-routing
+=== RUN   TestContextAdmissionWithRealServices/progress-revisions-follow-durable-verification-audit-and-publication
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-verification
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-publication
+=== RUN   TestContextAdmissionWithRealServices/retention-source-fences-verification
+=== RUN   TestContextAdmissionWithRealServices/retention-source-fences-publication
+=== RUN   TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable
+=== RUN   TestContextAdmissionWithRealServices/verification-audit-failure-stays-invisible
+=== RUN   TestContextAdmissionWithRealServices/generic-custody-cannot-publish
+=== RUN   TestContextAdmissionWithRealServices/publication-rechecks-locked-authority-and-expiry
+=== RUN   TestContextAdmissionWithRealServices/download-permission-reset-empty
+=== RUN   TestContextAdmissionWithRealServices/download-permission-reset-null
+=== RUN   TestContextAdmissionWithRealServices/download-permission-initial-empty
+=== RUN   TestContextAdmissionWithRealServices/download-permission-initial-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-retention-observation
+    native_exchange_test.go:469: native fixture observation longest-refresh=0s widest-completion-gap=0s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    download_sessions_test.go:760: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.870706ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:760: native context pending metadata read completed
+    download_sessions_test.go:760: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.250310125s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.195410468s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 539.154727ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 728.542428ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 2
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.381681ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 3
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.563293ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 4
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.366742ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 5
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 24.037317ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 6
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.290875ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 7
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.470516ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 8
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.880294ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 9
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.106935ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 10
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.913628ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 11
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.571748813s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.519877414s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 543.51295ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 736.667939ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 11 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 11 Joined <nil>
+    download_sessions_test.go:760: actual authenticated HTTPS native GET bytes=351; conditional request disclosed no bytes/reservation and both preflight audit pairs completed
+    download_sessions_test.go:760: actual bounded runtime and GET completed; synthetic session, Job, Pod, issuer and accepted installation/backing inputs remain explicit
+    native_exchange_test.go:469: native fixture observation longest-refresh=69.643695ms widest-completion-gap=1.041659907s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    download_sessions_test.go:760: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 27.699381ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:760: native context pending metadata read completed
+    download_sessions_test.go:760: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.114305889s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.054339373s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 581.519003ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 771.513854ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 2
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 36.159619ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 3
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 27.54377ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 4
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.894959ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 5
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.217827ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 6
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.801149ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 7
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.480427ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 8
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.452424ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 9
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 27.516851ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 10
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 4.396438317s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 4.31863428s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 585.828435ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 768.635199ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 10 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 10 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 11
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.144106ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 11 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 12
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.259987ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 12 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 13
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.197227ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 13 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 14
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.686079ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 14 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 15
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 39.19794ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 15 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 16
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.933735804s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.872672882s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 525.254305ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 717.210293ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 16 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 16 Joined <nil>
+    download_sessions_test.go:760: actual h2 ranges reconstructed 352 original native bytes after expired observation; four Joined worker conversations, one original preparation and two content key bindings (nine individual unwrap slots), no budget refill
+    native_exchange_test.go:469: native fixture observation longest-refresh=175.724345ms widest-completion-gap=1.106434161s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:95: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 24.314211ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:95: native context pending metadata read completed
+    native_exchange_test.go:95: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.121266022s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.065910707s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 559.111277ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 757.70433ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 2
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.248768ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 3
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.675439ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 4
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 24.04729ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 5
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.334788ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 6
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 24.981714ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 7
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 27.261172ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 8
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 31.486906ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 9
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.279915ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 10
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.537546ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 11
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.409346355s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.356272127s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 567.963474ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 748.614732ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 11 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 11 Uncertain native exchange unavailable
+    native_exchange_test.go:284: worker terminal uncertain original native conversation: native exchange unavailable
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:106: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.718401ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:106: native context pending metadata read completed
+    native_exchange_test.go:106: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.934120955s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.878350796s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 534.365528ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 719.487974ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 2
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.778031ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 3
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.334129ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 4
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 29.084739ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 5
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.438736ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 6
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.205475ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 7
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 23.938612ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 8
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 25.805688ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 9
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 30.556154ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 10
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 4.281269699s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 4.229092181s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 561.734266ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 750.247429ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 10 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 10 Joined <nil>
+    native_exchange_test.go:106: actual h2 client cancellation retained old uncertainty; explicit fresh audited preparation and new content path reconstructed Range/If-Match bytes with unchanged artifact SHA; synthetic authority/bootstrap inputs remain explicit
+=== NAME  TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+    native_exchange_test.go:469: native fixture observation longest-refresh=167.781288ms widest-completion-gap=1.141940685s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-races
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    download_sessions_test.go:760: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 26.556551ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:760: native context pending metadata read completed
+    download_sessions_test.go:760: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.151417726s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.094645312s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 576.886526ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 771.368962ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:760: already-closed exact native operation denied within original current lease, charges unchanged
+    download_sessions_test.go:760: wrong fence/sequence and held-row original-deadline completion denied, owner and charges unchanged
+    download_sessions_test.go:760: incomplete closed response denies both concurrent admissions, all prior spend retained
+    native_exchange_test.go:469: native fixture observation longest-refresh=191.810638ms widest-completion-gap=1.11344843s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-admission-race
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    download_sessions_test.go:760: native context initial session resolved
+    native_exchange_test.go:489: native diagnostic connector admission terminal 27.642506ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:760: native context pending metadata read completed
+    download_sessions_test.go:760: native context initial source resolved
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.208357418s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.151218701s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 607.232766ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 811.900662ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:760: fresh independently prepared session admits exactly one concurrent Observe/response, original budgets and loser spend preserved
+    native_exchange_test.go:469: native fixture observation longest-refresh=127.794191ms widest-completion-gap=1.063898033s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-preparation-race
+    native_exchange_test.go:469: native fixture observation longest-refresh=65.917449ms widest-completion-gap=1.034275428s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    download_sessions_test.go:760: native diagnostic preparation started
+    native_exchange_test.go:583: native diagnostic worker opening 0
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:489: native diagnostic connector admission terminal 29.651263ms no native command admitted
+    native_exchange_test.go:585: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:583: native diagnostic worker opening 1
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.232095461s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.176506168s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 604.419999ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 797.367429ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:760: native diagnostic preparation terminal <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 2
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.74782871s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.696406331s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 528.006528ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 705.836606ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:583: native diagnostic worker opening 3
+    native_exchange_test.go:488: native diagnostic connector admission entered
+    native_exchange_test.go:515: native diagnostic connector origin accepted 3.12851288s
+    native_exchange_test.go:488: native diagnostic hub admission entered
+    native_exchange_test.go:504: native diagnostic hub origin accepted 3.077303131s
+    native_exchange_test.go:489: native diagnostic hub admission terminal 579.323819ms <nil>
+    native_exchange_test.go:489: native diagnostic connector admission terminal 755.729704ms <nil>
+    native_exchange_test.go:585: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:592: native diagnostic worker conversation terminal 3 Joined <nil>
+    download_sessions_test.go:760: actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=352; synthetic identity/issuer/Pod/bootstrap facts
+    native_exchange_test.go:469: native fixture observation longest-refresh=151.547499ms widest-completion-gap=1.102896221s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-routing-two-clusters
+=== RUN   TestContextAdmissionWithRealServices/download-worker-request-owners
+    download_sessions_test.go:768: request-owner pre-race connection occupancy [{"role": "authority_runtime", "state": "idle", "connections": 2}, {"role": "capture_audit_runtime", "state": "idle", "connections": 1}, {"role": "capture_runtime", "state": "idle", "connections": 1}, {"role": "cluster_credential_runtime", "state": "idle", "connections": 1}, {"role": "context_catalog_read_runtime", "state": "idle", "connections": 2}, {"role": "context_control_config_runtime", "state": "idle", "connections": 1}, {"role": "context_publish_runtime", "state": "idle", "connections": 1}, {"role": "context_verification_audit_runtime", "state": "idle", "connections": 1}, {"role": "context_verify_runtime", "state": "idle", "connections": 1}, {"role": "custody_runtime", "state": "idle", "connections": 1}, {"role": "download_audit_runtime", "state": "idle", "connections": 1}, {"role": "download_config_runtime", "state": "idle", "connections": 1}, {"role": "download_runtime", "state": "idle", "connections": 2}, {"role": "download_worker_audit_runtime", "state": "idle", "connections": 1}, {"role": "download_worker_identity_runtime", "state": "idle", "connections": 1}, {"role": "download_worker_runtime", "state": "idle", "connections": 1}, {"role": "peer_read_runtime", "state": "idle", "connections": 2}, {"role": "postgres", "state": "active", "connections": 1}, {"role": "postgres", "state": "idle", "connections": 1}, {"role": "retention_source_read_runtime", "state": "idle", "connections": 1}, {"role": "retention_source_runtime", "state": "idle", "connections": 1}, {"role": "worker_configuration_audit_runtime", "state": "idle", "connections": 1}, {"role": "worker_configuration_read_runtime", "state": "idle", "connections": 1}, {"role": "worker_configuration_runtime", "state": "idle", "connections": 1}, {"role": "worker_enrollment_activate_runtime", "state": "idle", "connections": 1}, {"role": "worker_enrollment_audit_runtime", "state": "idle", "connections": 1}, {"role": "worker_enrollment_runtime", "state": "idle", "connections": 1}, {"role": "worker_owner_read_runtime", "state": "idle", "connections": 1}, {"role": "worker_owner_runtime", "state": "idle", "connections": 2}]
+    download_sessions_test.go:768: request-owner pool=0 total=1 idle=1 acquired=0
+    download_sessions_test.go:768: request-owner pool=1 total=1 idle=1 acquired=0
+    download_sessions_test.go:768: request-owner pool=2 total=1 idle=1 acquired=0
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-channel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-current-request
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/wrong-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/zero-digest
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-null
+=== NAME  TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions
+    native_exchange_test.go:469: native fixture observation longest-refresh=45.04632ms widest-completion-gap=1.031503163s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-replay
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-budget
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-parallel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-change-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock
+=== RUN   TestContextAdmissionWithRealServices/download-worker-missing-configuration
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-mutated
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fence-order
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-rollback
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-suspended
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fenced
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-short-runtime
+=== RUN   TestContextAdmissionWithRealServices/download-worker-parallel-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-binding-replacement
+=== RUN   TestContextAdmissionWithRealServices/download-worker-capacity-held
+=== RUN   TestContextAdmissionWithRealServices/download-worker-expired-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-blocked-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-suspended-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-epoch-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-revision-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-expired-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-waiter-expiry-and-installation-binding
+=== RUN   TestContextAdmissionWithRealServices/download-retention-source-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-retention-shortening-fences-an-active-transfer
+=== RUN   TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart
+=== RUN   TestContextAdmissionWithRealServices/download-audit-native-read-cancel-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/download-key-three-slots
+=== RUN   TestContextAdmissionWithRealServices/download-key-parallel-slot
+=== RUN   TestContextAdmissionWithRealServices/download-key-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-key-peer-mismatch
+=== RUN   TestContextAdmissionWithRealServices/download-key-foreign-artifact
+=== RUN   TestContextAdmissionWithRealServices/download-key-cancelled
+=== RUN   TestContextAdmissionWithRealServices/download-key-recovery-blocked
+=== RUN   TestContextAdmissionWithRealServices/download-key-permission-changed
+=== RUN   TestContextAdmissionWithRealServices/download-key-retention-shortened
+=== RUN   TestContextAdmissionWithRealServices/download-key-crypto-failure-keeps-spend
+=== RUN   TestContextAdmissionWithRealServices/download-key-expired-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-missing-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-expired-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-different-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-worker-expired-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-worker-expired-after-child-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-legacy-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3
+    download_sessions_test.go:1488: local service: actual TLS, SQL authority and S3 nativeBytes=351; two batches, three unwraps each
+    native_exchange_test.go:469: native fixture observation longest-refresh=31.674527ms widest-completion-gap=1.033666327s
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+=== RUN   TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-principal-limit-spans-clients-cancellation-does-not-free-writer
+=== RUN   TestContextAdmissionWithRealServices/download-allocation-isolation-and-current-revocation
+=== RUN   TestContextAdmissionWithRealServices/download-installation-stream-cap-and-late-generation
+=== RUN   TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation
+=== RUN   TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01
+=== RUN   TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity
+    browser_refresh_owners_test.go:390: actual SQL publication-backed owner replay, exact pending/settled response pause, one-use claims, delayed admission closure, logout/retained capacity and joined close; process authority is explicitly synthetic; no external provider or byte transfer in this case
+=== RUN   TestContextAdmissionWithRealServices/prepaid-download-stop-no-read-and-original-replay
+=== RUN   TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers
+=== RUN   TestContextAdmissionWithRealServices/retention-shortening-is-concurrent-monotonic-and-signed
+=== RUN   TestContextAdmissionWithRealServices/overdue-shortening-blocks-read-and-commit-before-audit
+=== RUN   TestContextAdmissionWithRealServices/closed-readable-interval-preserves-hard-deadline-and-cleanup
+=== RUN   TestContextAdmissionWithRealServices/retention-waiter-rechecks-freshness-after-lock
+=== RUN   TestContextAdmissionWithRealServices/retention-ready-requires-watermark-catchup-and-audit
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-earliest-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-earliest-null
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-latest-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-latest-null
+=== RUN   TestContextAdmissionWithRealServices/retention-source-bootstrap-and-eight-way-idempotency
+=== RUN   TestContextAdmissionWithRealServices/retention-source-restart-preserves-shortening-before-relaxation
+=== RUN   TestContextAdmissionWithRealServices/retention-source-expiry-rechecked-after-root-lock
+=== RUN   TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-admitted-effect-null
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt
+=== RUN   TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission
+=== RUN   TestContextAdmissionWithRealServices/missing-recovery-proof
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-installation
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-epoch
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-revision
+=== RUN   TestContextAdmissionWithRealServices/wrong-target
+=== RUN   TestContextAdmissionWithRealServices/forged-audience
+=== RUN   TestContextAdmissionWithRealServices/wrong-store
+=== RUN   TestContextAdmissionWithRealServices/wrong-allocation
+=== RUN   TestContextAdmissionWithRealServices/missing-membership
+=== RUN   TestContextAdmissionWithRealServices/expired-identity
+=== RUN   TestContextAdmissionWithRealServices/different-permission-revision
+=== RUN   TestContextAdmissionWithRealServices/plaintext-native-ceiling
+=== RUN   TestContextAdmissionWithRealServices/capture-retention-proof-required-and-current
+=== RUN   TestContextAdmissionWithRealServices/source-restart-invalidates-old-proof-without-new-approval-scope
+=== RUN   TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation
+=== RUN   TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait
+=== RUN   TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission
+=== RUN   TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable
+=== RUN   TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry
+=== RUN   TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority
+--- PASS: TestContextAdmissionWithRealServices (666.38s)
+    --- PASS: TestContextAdmissionWithRealServices/control-migration-adopts-all-history-without-free-capacity (2.65s)
+    --- PASS: TestContextAdmissionWithRealServices/control-capacity-concurrent-replay-charged-once (0.31s)
+    --- PASS: TestContextAdmissionWithRealServices/distinct-concurrent-requests-cannot-overdraw-control-slots (0.23s)
+    --- PASS: TestContextAdmissionWithRealServices/control-replay-slot-exhaustion-is-independent-of-full-records (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/same-root-workload-retains-protected-capacity (0.26s)
+    --- PASS: TestContextAdmissionWithRealServices/control-expiry-renewal-and-independent-suspension-preserve-spend (0.69s)
+    --- PASS: TestContextAdmissionWithRealServices/control-configuration-CAS-and-original-observation-survive-locks (0.48s)
+    --- PASS: TestContextAdmissionWithRealServices/control-role-cannot-refund-rewrite-delete-or-bypass-charges (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/capture-charge-is-a-deferred-database-invariant (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/backing-cannot-overbook-root-or-adopt-another-root-storage (0.32s)
+    --- PASS: TestContextAdmissionWithRealServices/retirement-facts-never-release-uncertain-or-deleted-history (0.21s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-new-context-admission (0.18s)
+    --- PASS: TestContextAdmissionWithRealServices/database-change-invalidates-already-read-recovery-proof (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write (0.43s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-original-backing-deadline-after-account-lock (0.84s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-original-deadline-after-lock (0.35s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast (3.16s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.72s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.83s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation (8.59s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs (0.98s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change (0.97s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change (0.99s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs (0.96s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs (0.98s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs (0.96s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source (1.02s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait (1.73s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast (32.40s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused (15.52s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort (0.95s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation (15.93s)
+    --- SKIP: TestContextAdmissionWithRealServices/connector-identity-real-time-retirement (0.00s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-verifier-migration-preserves-history-and-spend (15.61s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend (29.75s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend (30.83s)
+    --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair (111.15s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/deferred-retirement-role-isolation (0.05s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-binding-lock-without-allocation-or-freshness-writes (0.24s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-lock-outage-is-unavailable-not-changed (0.21s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/missing-storage-binding-remains-changed (0.20s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial (0.25s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation (30.28s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads (0.29s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline (0.59s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion (5.41s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0 (30.34s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2 (43.27s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-overdue-original-no-history (25.73s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-overdue-original-backed-history (26.77s)
+    --- PASS: TestContextAdmissionWithRealServices/resolution-requires-read-scope-before-negative-fence (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/closed-review-cannot-be-reopened-by-create-or-cached-admission (0.22s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-review-fence-blocks-delayed-create-without-other-actor-effects (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/another-client-close-cannot-discover-or-close-original-preview (0.21s)
+    --- PASS: TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows (0.40s)
+        --- PASS: TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows/false (0.20s)
+        --- PASS: TestContextAdmissionWithRealServices/accepted-preview-wins-alternate-key-close-including-legacy-rows/true (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/concurrent-admission-and-close-have-one-serialized-outcome (0.71s)
+    --- PASS: TestContextAdmissionWithRealServices/negative-fences-share-human-preview-cap-across-clients (0.23s)
+    --- PASS: TestContextAdmissionWithRealServices/closure-after-original-expiry-reclaims-without-reopening (0.47s)
+    --- PASS: TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work (0.40s)
+        --- PASS: TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work/false (0.20s)
+        --- PASS: TestContextAdmissionWithRealServices/revoked-target-rights-allow-own-passive-close-but-hide-accepted-work/true (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/resolution-role-cannot-rewrite-identity-or-admit-work (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/resolution-lock-wait-cannot-extend-caller-deadline (0.36s)
+    --- PASS: TestContextAdmissionWithRealServices/current-context-placement-is-scoped-read-only-and-preserves-original-freshness (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/preview-principal-cap-is-atomic-across-clients (0.39s)
+    --- PASS: TestContextAdmissionWithRealServices/preview-immutable-owner-bound-and-independent-of-observation-age (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/expired-previews-reclaim-capacity-without-capture-side-effects (1.18s)
+    --- PASS: TestContextAdmissionWithRealServices/accepted-replay-survives-preview-expiry-and-deletion (1.20s)
+    --- PASS: TestContextAdmissionWithRealServices/accepted-replay-checks-current-denies-before-conflict (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/accepted-replay-does-not-renew-identity-after-lock-wait (0.49s)
+    --- PASS: TestContextAdmissionWithRealServices/accepted-replay-does-not-renew-deny-completeness-after-lock-wait (0.50s)
+    --- PASS: TestContextAdmissionWithRealServices/progress-roles-cannot-mutate-lifecycle-or-privileged-function (0.04s)
+    --- PASS: TestContextAdmissionWithRealServices/api-only-admission-preserves-class-and-original-replay (0.19s)
+    --- PASS: TestContextAdmissionWithRealServices/progress-current-access-does-not-follow-shares-or-admission (0.24s)
+    --- PASS: TestContextAdmissionWithRealServices/progress-does-not-renew-identity-after-blocking-lock (0.35s)
+    --- PASS: TestContextAdmissionWithRealServices/overdue-observation-is-durable-once-and-never-refunds (1.23s)
+    --- PASS: TestContextAdmissionWithRealServices/revision-overflow-does-not-block-retention-or-deletion (0.23s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (1.89s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-reset-empty (0.71s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-reset-null (0.67s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-initial-empty (0.67s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-initial-null (0.66s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-capture-empty (0.81s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-capture-null (0.82s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-verification-empty (0.85s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-verification-null (0.99s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release (1.59s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output (1.61s)
+    --- PASS: TestContextAdmissionWithRealServices/ordinary-case-metadata-navigation-and-private-routing (1.48s)
+    --- PASS: TestContextAdmissionWithRealServices/progress-revisions-follow-durable-verification-audit-and-publication (0.88s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-verification (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-publication (0.67s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-fences-verification (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-fences-publication (0.70s)
+    --- PASS: TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable (1.65s)
+    --- PASS: TestContextAdmissionWithRealServices/verification-audit-failure-stays-invisible (0.89s)
+    --- PASS: TestContextAdmissionWithRealServices/generic-custody-cannot-publish (0.76s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-rechecks-locked-authority-and-expiry (0.91s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-reset-empty (1.22s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-reset-null (0.83s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-initial-empty (0.86s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-initial-null (0.80s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-retention-observation (5.20s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content (18.92s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-resume (26.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (37.31s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session (19.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session (16.36s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-control-races (11.69s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-control-admission-race (6.78s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-preparation-race (3.08s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-exchange (12.40s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-routing-two-clusters (2.33s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-request-owners (4.98s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-channel (3.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-current-request (3.97s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions (7.39s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty (0.31s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null (0.31s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty (0.35s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-null (0.32s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-empty (0.33s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-null (0.35s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-empty (0.34s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-null (0.32s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/wrong-key (0.24s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/zero-digest (0.26s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-empty (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-null (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-empty (0.16s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-null (0.14s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-replay (3.30s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited (2.73s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-budget (2.65s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-parallel (2.08s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-change-key (2.84s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-roles (2.75s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse (3.18s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock (2.00s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-missing-configuration (0.91s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-mutated (0.94s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout (0.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-roles (1.05s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse (0.97s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fence-order (0.96s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired (3.14s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-rollback (1.06s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-suspended (1.07s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fenced (1.06s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired (1.33s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (3.00s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (3.28s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-short-runtime (1.04s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-parallel-claim (1.41s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-unaudited (1.12s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-binding-replacement (2.87s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-capacity-held (1.45s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-expired-claim (1.59s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (2.71s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-blocked-fences-prepaid-output (0.97s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-suspended-fences-prepaid-output (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-epoch-fences-prepaid-output (0.94s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-revision-fences-prepaid-output (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-expired-fences-prepaid-output (0.98s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-waiter-expiry-and-installation-binding (1.05s)
+    --- PASS: TestContextAdmissionWithRealServices/download-retention-source-fences-prepaid-output (0.96s)
+    --- PASS: TestContextAdmissionWithRealServices/download-retention-shortening-fences-an-active-transfer (1.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart (1.09s)
+    --- PASS: TestContextAdmissionWithRealServices/download-audit-native-read-cancel-uncertain-spend (1.05s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-three-slots (1.16s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-parallel-slot (1.08s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-unaudited (0.88s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-peer-mismatch (1.02s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-foreign-artifact (0.98s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-cancelled (1.03s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-recovery-blocked (1.00s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-permission-changed (1.00s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-retention-shortened (1.07s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-crypto-failure-keeps-spend (1.06s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-expired-after-lock (1.92s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-missing-worker-proof (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-expired-worker-proof (0.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-different-worker-proof (0.91s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-worker-expired-after-lock (1.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-worker-expired-after-child-lock (1.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-legacy-worker-proof (1.02s)
+    --- PASS: TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3 (1.68s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.68s)
+    --- PASS: TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock (1.15s)
+    --- PASS: TestContextAdmissionWithRealServices/download-principal-limit-spans-clients-cancellation-does-not-free-writer (0.91s)
+    --- PASS: TestContextAdmissionWithRealServices/download-allocation-isolation-and-current-revocation (1.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-installation-stream-cap-and-late-generation (1.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation (1.06s)
+    --- PASS: TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata (16.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (2.76s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01 (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01 (0.07s)
+    --- PASS: TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity (2.61s)
+    --- PASS: TestContextAdmissionWithRealServices/prepaid-download-stop-no-read-and-original-replay (1.46s)
+    --- PASS: TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers (64.07s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-shortening-is-concurrent-monotonic-and-signed (1.03s)
+    --- PASS: TestContextAdmissionWithRealServices/overdue-shortening-blocks-read-and-commit-before-audit (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/closed-readable-interval-preserves-hard-deadline-and-cleanup (0.74s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-waiter-rechecks-freshness-after-lock (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-ready-requires-watermark-catchup-and-audit (0.60s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-earliest-empty (0.15s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-earliest-null (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-latest-empty (0.12s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-latest-null (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-bootstrap-and-eight-way-idempotency (0.14s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-restart-preserves-shortening-before-relaxation (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-expiry-rechecked-after-root-lock (0.21s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty (0.22s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-admitted-effect-null (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising (0.75s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt (0.03s)
+    --- PASS: TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission (0.29s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-recovery-proof (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-installation (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-epoch (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-revision (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-target (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/forged-audience (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-store (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-allocation (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-membership (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/expired-identity (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/different-permission-revision (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/plaintext-native-ceiling (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/capture-retention-proof-required-and-current (0.23s)
+    --- PASS: TestContextAdmissionWithRealServices/source-restart-invalidates-old-proof-without-new-approval-scope (0.22s)
+    --- PASS: TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation (0.35s)
+    --- PASS: TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait (0.47s)
+    --- PASS: TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable (0.26s)
+    --- PASS: TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry (5.07s)
+    --- PASS: TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority (0.17s)
+=== RUN   TestCustodyWithRealServices
+=== RUN   TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge
+=== RUN   TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission
+=== RUN   TestCustodyWithRealServices/protected_backing_cannot_be_overallocated
+=== RUN   TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_register
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_store
+=== RUN   TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished
+=== RUN   TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting
+    custody_test.go:528: real S3: current and noncurrent versions, delete marker and multipart parts removed; neighbor preserved; writer barrier failure kept charge
+=== RUN   TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation
+=== RUN   TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166)
+    custody_test.go:580: ADR-166 streaming: 20 MiB in three parts, create-only completion, full ciphertext verification, exact charge release and abort inventory on real PostgreSQL/S3
+--- PASS: TestCustodyWithRealServices (13.84s)
+    --- PASS: TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge (5.05s)
+    --- PASS: TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission (0.47s)
+    --- PASS: TestCustodyWithRealServices/protected_backing_cannot_be_overallocated (0.04s)
+    --- PASS: TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks (0.01s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_register (0.49s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_store (0.50s)
+    --- PASS: TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished (0.09s)
+    --- PASS: TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting (2.09s)
+    --- PASS: TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation (0.23s)
+    --- PASS: TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166) (4.82s)
+=== RUN   TestEnrollmentSigningWithRealServices
+=== RUN   TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-empty
+=== RUN   TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-literal-null
+=== RUN   TestEnrollmentSigningWithRealServices/claim-audit-required
+=== RUN   TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning
+=== RUN   TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume
+=== RUN   TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result
+=== RUN   TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign
+=== RUN   TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds
+=== RUN   TestEnrollmentSigningWithRealServices/missing-certificate-audit
+=== RUN   TestEnrollmentSigningWithRealServices/revoked-bootstrap
+=== RUN   TestEnrollmentSigningWithRealServices/changed-trust
+=== RUN   TestEnrollmentSigningWithRealServices/new-epoch
+=== RUN   TestEnrollmentSigningWithRealServices/recovery
+=== RUN   TestEnrollmentSigningWithRealServices/expiry-while-activation-waits
+=== RUN   TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history
+--- PASS: TestEnrollmentSigningWithRealServices (12.27s)
+    --- PASS: TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-empty (0.34s)
+    --- PASS: TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-literal-null (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/claim-audit-required (0.02s)
+    --- PASS: TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning (0.17s)
+    --- PASS: TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume (0.02s)
+    --- PASS: TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result (0.10s)
+    --- PASS: TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign (0.11s)
+    --- PASS: TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds (10.09s)
+    --- PASS: TestEnrollmentSigningWithRealServices/missing-certificate-audit (0.04s)
+    --- PASS: TestEnrollmentSigningWithRealServices/revoked-bootstrap (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/changed-trust (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/new-epoch (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/recovery (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/expiry-while-activation-waits (1.02s)
+    --- PASS: TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history (0.07s)
+=== RUN   TestEnrollmentWithRealServices
+=== RUN   TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing
+=== RUN   TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable
+=== RUN   TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart
+=== RUN   TestEnrollmentWithRealServices/competing-keys-have-one-winner
+=== RUN   TestEnrollmentWithRealServices/secret
+=== RUN   TestEnrollmentWithRealServices/replacement-key
+=== RUN   TestEnrollmentWithRealServices/revocation-after-claim
+=== RUN   TestEnrollmentWithRealServices/epoch
+=== RUN   TestEnrollmentWithRealServices/recovery
+=== RUN   TestEnrollmentWithRealServices/stale-trust
+=== RUN   TestEnrollmentWithRealServices/expired
+=== RUN   TestEnrollmentWithRealServices/expiry-during-lock
+--- PASS: TestEnrollmentWithRealServices (0.85s)
+    --- PASS: TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing (0.32s)
+    --- PASS: TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable (0.00s)
+    --- PASS: TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart (0.10s)
+    --- PASS: TestEnrollmentWithRealServices/competing-keys-have-one-winner (0.02s)
+    --- PASS: TestEnrollmentWithRealServices/secret (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/replacement-key (0.02s)
+    --- PASS: TestEnrollmentWithRealServices/revocation-after-claim (0.02s)
+    --- PASS: TestEnrollmentWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/stale-trust (0.02s)
+    --- PASS: TestEnrollmentWithRealServices/expired (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/expiry-during-lock (0.31s)
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-fences-existing-root-without-observation-backfill
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-table
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-table SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-column
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-column SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-public
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-public SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-inherited
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-inherited SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-references
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-references SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal retained-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-foreign-key
+    fleet_freshness_native_test.go:838: actual migration59 refusal retained-foreign-key SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-global-writer-member
+    fleet_freshness_native_test.go:838: actual migration59 refusal global-writer-member SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-table
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-table SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-references
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-references SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-function
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-function SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-preserves-unrelated-reader-and-lock-grants
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/missing-root-never-seeds-current-observation
+    fleet_freshness_native_test.go:165: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/actual-activation-seeds-once-and-replay-never-renews
+    fleet_freshness_native_test.go:188: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/pristine-inventory-rejects-unactivated-observation-row
+    fleet_freshness_native_test.go:208: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/unchanged-renewal-coexists-with-current-share
+    fleet_freshness_native_test.go:229: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/restrictive-source-waits-for-current-share
+    fleet_freshness_native_test.go:246: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/failure-fence-waits-for-current-share
+    fleet_freshness_native_test.go:263: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/initial-activation-table-order-does-not-invert-semantic-row
+    fleet_freshness_native_test.go:280: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-table
+    fleet_freshness_native_test.go:310: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-authority
+    fleet_freshness_native_test.go:310: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-observation
+    fleet_freshness_native_test.go:310: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/adapter-confirms-only-unchanged-authority-contention
+    fleet_freshness_native_test.go:345: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/original-basis-expiry-survives-lock-wait
+    fleet_freshness_native_test.go:357: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/expired-positive-basis-still-fences-original-semantic-root
+    fleet_freshness_native_test.go:388: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/aba-and-repeated-fence-never-revive-old-basis
+    fleet_freshness_native_test.go:406: custody unavailable; retain the original attempt and charge
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/runtime-cannot-write-base-or-positive-row
+    fleet_freshness_native_test.go:438: custody unavailable; retain the original attempt and charge
+--- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres (2.44s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-fences-existing-root-without-observation-backfill (0.02s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-table (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-column (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-public (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-inherited (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-trigger (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-references (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-trigger (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-foreign-key (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-global-writer-member (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-table (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-trigger (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-references (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-function (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-preserves-unrelated-reader-and-lock-grants (0.01s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/missing-root-never-seeds-current-observation (0.02s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/actual-activation-seeds-once-and-replay-never-renews (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/pristine-inventory-rejects-unactivated-observation-row (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/unchanged-renewal-coexists-with-current-share (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/restrictive-source-waits-for-current-share (0.02s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/failure-fence-waits-for-current-share (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/initial-activation-table-order-does-not-invert-semantic-row (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-table (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-authority (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-observation (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/adapter-confirms-only-unchanged-authority-contention (0.02s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/original-basis-expiry-survives-lock-wait (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/expired-positive-basis-still-fences-original-semantic-root (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/aba-and-repeated-fence-never-revive-old-basis (0.00s)
+    --- FAIL: TestEnrollmentFleetFreshnessWithRealPostgres/runtime-cannot-write-base-or-positive-row (0.00s)
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/explicit-seed-retains-original-dates-and-binding
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/duplicate-seed-is-not-renewal
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-version
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-issuer
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-uid
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-generation
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-digest
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-suspension
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-recovery
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-postmaster
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-database
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/missing-observation-never-auto-seeded
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/ongoing-expiry-denies-explicit-lifecycle-refresh-retains-binding
+=== RUN   TestEnrollmentSyntheticFleetObservationBinding/explicit-reactivation-cannot-be-hidden-in-renewal
+--- PASS: TestEnrollmentSyntheticFleetObservationBinding (0.03s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/explicit-seed-retains-original-dates-and-binding (0.01s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/duplicate-seed-is-not-renewal (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-version (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-issuer (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-uid (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-generation (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-source-digest (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-suspension (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-recovery (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-postmaster (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/renew-rejects-database (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/missing-observation-never-auto-seeded (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/ongoing-expiry-denies-explicit-lifecycle-refresh-retains-binding (0.00s)
+    --- PASS: TestEnrollmentSyntheticFleetObservationBinding/explicit-reactivation-cannot-be-hidden-in-renewal (0.00s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/epoch
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/source-uid
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/regressed-generation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/expired-lock
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer
+--- PASS: TestEnrollmentFleetObservationWithRealPostgres (0.55s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database (0.05s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline (0.03s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/epoch (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/source-uid (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/regressed-generation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/expired-lock (0.31s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer (0.03s)
+=== RUN   TestEnrollmentOwnerConfigurationWithRealServices
+    owner_configuration_sql_test.go:389: real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles/history bound, suspension/recovery/issuer changes, and expiry after proven lock wait
+--- PASS: TestEnrollmentOwnerConfigurationWithRealServices (0.94s)
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:27: run make fleet-integration or context-integration
+--- SKIP: TestEnrollmentOwnerPKIWithRealServices (0.00s)
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices
+    owner_pki_test.go:31: run make fleet-integration or context-integration
+--- SKIP: TestEnrollmentOwnerBootstrapPKIWithRealServices (0.00s)
+=== RUN   TestPeerRegistryWithRealServices
+=== RUN   TestPeerRegistryWithRealServices/read-role-cannot-mint-authority
+=== RUN   TestPeerRegistryWithRealServices/active
+=== RUN   TestPeerRegistryWithRealServices/revocation
+=== RUN   TestPeerRegistryWithRealServices/root-suspended
+=== RUN   TestPeerRegistryWithRealServices/recovery
+=== RUN   TestPeerRegistryWithRealServices/database-process-changed
+=== RUN   TestPeerRegistryWithRealServices/database-recreated
+=== RUN   TestPeerRegistryWithRealServices/epoch
+=== RUN   TestPeerRegistryWithRealServices/cluster
+=== RUN   TestPeerRegistryWithRealServices/missing-audit
+=== RUN   TestPeerRegistryWithRealServices/empty-audit-version
+=== RUN   TestPeerRegistryWithRealServices/null-audit-version
+=== RUN   TestPeerRegistryWithRealServices/expired-trust
+=== RUN   TestPeerRegistryWithRealServices/invalid-trust-revision
+=== RUN   TestPeerRegistryWithRealServices/expired-peer
+=== RUN   TestPeerRegistryWithRealServices/unknown-certificate
+=== RUN   TestPeerRegistryWithRealServices/rotation
+=== RUN   TestPeerRegistryWithRealServices/blocked-read
+--- PASS: TestPeerRegistryWithRealServices (5.36s)
+    --- PASS: TestPeerRegistryWithRealServices/read-role-cannot-mint-authority (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/active (0.03s)
+    --- PASS: TestPeerRegistryWithRealServices/revocation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/root-suspended (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/recovery (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/database-process-changed (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/database-recreated (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/epoch (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/cluster (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/missing-audit (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/empty-audit-version (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/null-audit-version (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-trust (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/invalid-trust-revision (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-peer (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/unknown-certificate (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/rotation (0.03s)
+    --- PASS: TestPeerRegistryWithRealServices/blocked-read (5.02s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-empty
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-null
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-empty
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-null
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/deleted
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expired-source
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/scope-tamper
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/actor-substitution
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/removed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/team-deny
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/role-boundaries
+--- PASS: TestPermissionAuthorityPoliciesWithRealServices (3.32s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency (0.46s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-empty (0.16s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-null (0.15s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-empty (0.14s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-null (0.14s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance (0.19s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner (0.11s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority (0.11s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement (0.13s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/deleted (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expired-source (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/scope-tamper (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/actor-substitution (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/removed-envelope (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/team-deny (0.09s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope (0.31s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust (0.30s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation (0.06s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/role-boundaries (0.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	710.028s
+FAIL

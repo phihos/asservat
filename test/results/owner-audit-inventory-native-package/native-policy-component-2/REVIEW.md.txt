@@ -1,0 +1,18 @@
+# Inventory policy follow-up (source only)
+
+The six-file combined source preserves the four unchanged production/regression/harness payloads from native-source-checkpoint-1. Only the integration test changes and one new test-only transport trace is added. Live bases remain the originals; no live integration occurred.
+
+One new native child must first reproduce original reader calls versions200/uploads403/current-unissued and retain all five exact known entries. A fixture administrator then grants only s3:ListBucketMultipartUploads to the exact inventory principal/bucket/s3:prefix. The coarse role remains List-only. Missing/neighbor prefixes, the new multipart-list action against the foreign bucket, ListParts on the known original upload, ordinary/version body GET and all previous mutation denials must fail. These negative probes use the independent inspector client and add no product-reader calls. The same reader's next independently bounded operation must make versions200/uploads200/current200 and preserve all original null/zero/version/marker/upload assertions. Independent before/after counts and bytes remain unchanged.
+
+The test-only dedicated TLS reverse proxy records fixed method labels and actual response statuses using ModifyResponse/ErrorHandler. The product client retains the original httptest *http.Transport accepted by objectstore.New. Requests/responses are forwarded without body/credential/key logging, retries or deadline changes. The added local TestOwnerAuditInventoryTraceUsesActualConstructor constructs the real Store/reader and verifies one failed partial-read operation then a successful operation through the real TLS proxy, including isolated trace ownership. Native94247 failed before any child because the prior client transport wrapper violated the production constructor; that failure remains exact and the constructor is unchanged.
+
+Next allocated component: compile and vet changed integration fixtures, the named actual-constructor/trace race, and exact opt-in skip. Reuse unchanged 11-top/47-named objectstore races, original mismatch failure, selectors and architecture evidence only with matching payload/dependency provenance. No native claim until actual exact mode returns all six names below with source/cleanup verified:
+
+- TestOwnerAuditInventoryWithRealServices
+- TestOwnerAuditInventoryWithRealServices/list-only-retains-versions-before-multipart-denial
+- TestOwnerAuditInventoryWithRealServices/multipart-policy-rejects-other-prefixes
+- TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies
+- TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory
+- TestOwnerAuditInventoryWithRealServices/inventory-preserves-all-physical-obligations
+
+Command remains python3 scripts/test-custody.py --owner-audit-inventory; result prefix owner-audit-inventory. Any changed provider behavior fails rather than broadening Read or dropping an assertion. No native/build has run for this follow-up.

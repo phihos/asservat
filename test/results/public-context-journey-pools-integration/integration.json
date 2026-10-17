@@ -1,0 +1,26 @@
+{
+  "scope": "Source-only journey SQL connection ownership correction; no build or native result",
+  "paths": [
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "base_sha256": "0320e0ee88fe9af3e2cc7d3e16a5afa36f4f980de468f303641bb41a12eba7db",
+      "payload_sha256": "b739d7cdabd74ded0ab358725928ef74e855b9474e939a8296cce703bce26a75"
+    },
+    {
+      "path": "test/integration/context_native_content_test.go",
+      "base_sha256": "2f93b3ce9868bd620ac8830d2ea812b9df1414cb92330badc6b541a0a9cba405",
+      "payload_sha256": "ef3cfcddd9b8279b23cd8bbb24799eb30f3b4a0c5bdde963e4c349c719276138"
+    },
+    {
+      "path": "test/integration/public_context_journey_pools_test.go",
+      "base_sha256": null,
+      "payload_sha256": "46b73f6b90b2f1032b54674a6ed65f7ae426237bf58e58b610b7101ed8729826"
+    },
+    {
+      "path": "test/integration/public_context_journey_test.go",
+      "base_sha256": "1ded4db47f6418579296f7f201b155dfbb8a3fa4a0aeb8de863017ae906b4680",
+      "payload_sha256": "7041aff3dc7edb44d7f6ee53f4f85d50994e1a35b0e324100358db4112b5f8c5"
+    }
+  ],
+  "qualification": "pending"
+}

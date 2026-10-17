@@ -1,0 +1,7 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/enrollment_signing_test.go:270:84: too many arguments in call to postgres.NewPeerRegistry
+	have ("context".Context, *pgxpool.Pool, string, "asservat.local/asservat/internal/domain/fleet".PeerRole)
+	want ("context".Context, *pgxpool.Pool, string)
+test/integration/enrollment_signing_test.go:274:24: registry.CurrentPeer undefined (type *postgres.PeerRegistry has no field or method CurrentPeer)
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

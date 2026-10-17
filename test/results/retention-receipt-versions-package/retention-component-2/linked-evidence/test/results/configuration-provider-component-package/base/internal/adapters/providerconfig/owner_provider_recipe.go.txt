@@ -1,0 +1,152 @@
+package providerconfig
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+// The four entries are fixed, purpose-separated provider roles. Generation is
+// pure: it never adopts a provider mount, configures a role or issues a token.
+// Exact provider setup, workload provenance and runtime leases are independent.
+type OwnerProviderRoleRecipe struct {
+	Purpose string          `json:"purpose"`
+	Name    string          `json:"name"`
+	Role    json.RawMessage `json:"role"`
+	Policy  json.RawMessage `json:"policy"`
+}
+
+type OwnerProviderRecipe struct {
+	Profile contracts.OwnerProviderAuthentication
+	Roles   [4]OwnerProviderRoleRecipe
+}
+
+// This is the exact generated request body, not the provider response decoder.
+// The independently qualified adapter must handle only supported response
+// fields and compare effective role semantics, including server defaults.
+type OwnerKubernetesAuthRole struct {
+	Accounts          []string `json:"bound_service_account_names"`
+	Namespaces        []string `json:"bound_service_account_namespaces"`
+	NamespaceSelector string   `json:"bound_service_account_namespace_selector"`
+	Audience          string   `json:"audience"`
+	AliasSource       string   `json:"alias_name_source"`
+	TTL               int      `json:"token_ttl"`
+	MaxTTL            int      `json:"token_max_ttl"`
+	ExplicitMaxTTL    int      `json:"token_explicit_max_ttl"`
+	Policies          []string `json:"token_policies"`
+	NoDefault         bool     `json:"token_no_default_policy"`
+	Type              string   `json:"token_type"`
+	Period            int      `json:"token_period"`
+	Uses              int      `json:"token_num_uses"`
+	BoundCIDRs        []string `json:"token_bound_cidrs"`
+}
+
+// OwnerProviderRecipeFor binds the original public owner input to one verified
+// auth mount and one selected scoped audit Secret. Callers still must prove that
+// account and Secret identities are original/current; this only validates shape
+// and derives immutable public bytes. Tokens and secret data are never inputs.
+func OwnerProviderRecipeFor(in contracts.OwnerDeployment, mount, accessor string, account, auditCredentials contracts.WorkerObjectReference, now time.Time) (OwnerProviderRecipe, error) {
+	var out OwnerProviderRecipe
+	if in.Format != contracts.OwnerDeploymentFormat || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.ClusterID) || !authorization.UUID(in.Namespace.UID) || len(validation.IsDNS1123Label(in.Namespace.Name)) != 0 || !authorization.UUID(account.UID) || len(validation.IsDNS1123Subdomain(account.Name)) != 0 || !authorization.UUID(auditCredentials.UID) || len(validation.IsDNS1123Subdomain(auditCredentials.Name)) != 0 || account.UID == auditCredentials.UID || !providerName.MatchString(mount) || mount == "token" || !providerName.MatchString(accessor) || ValidateOwner(in.Kubernetes, in.Postgres, in.AuditStore, in.KeyService, now) != nil {
+		return out, cfg.ErrInvalid
+	}
+	out.Profile = contracts.OwnerProviderAuthentication{Format: contracts.OwnerProviderAuthenticationFormat, AuthMount: mount, AuthMountAccessor: accessor, ServiceAccount: account, AuditCredentials: auditCredentials}
+	scope, e := ownerProviderCanonical(struct {
+		Format         string                          `json:"format"`
+		InstallationID string                          `json:"installationID"`
+		ClusterID      string                          `json:"clusterID"`
+		Namespace      contracts.WorkerObjectReference `json:"namespace"`
+		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
+	}{"asservat-owner-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, account})
+	if e != nil {
+		return OwnerProviderRecipe{}, e
+	}
+	nameDigest := sha256.Sum256(scope)
+	prefix := "asservat-owner-" + hex.EncodeToString(nameDigest[:]) + "-"
+	audience := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
+	purposes := [4]string{"audit-wrap", "audit-unwrap", "server-sign", "client-sign"}
+	paths := [4]string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey, in.KeyService.PKIMount + "/sign/" + in.KeyService.ServerRole, in.KeyService.PKIMount + "/sign/" + in.KeyService.ClientRole}
+	for i, purpose := range purposes {
+		name := prefix + purpose
+		role := OwnerKubernetesAuthRole{Accounts: []string{account.Name}, Namespaces: []string{in.Namespace.Name}, Audience: audience, AliasSource: "serviceaccount_uid", TTL: contracts.OwnerProviderTokenTTLSeconds, MaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, ExplicitMaxTTL: contracts.OwnerProviderTokenMaxTTLSeconds, Policies: []string{name}, NoDefault: true, Type: "service", BoundCIDRs: []string{}}
+		// Default policy is excluded; the three finite self-management paths are
+		// explicit. Recipe inspection belongs to protected setup, never every
+		// key operation. No runtime mount/role/policy read or mutation is granted.
+		acl := ownerProviderACL{Path: map[string]ownerProviderACLRule{
+			"auth/token/lookup-self": {Capabilities: []string{"read"}},
+			"auth/token/renew-self":  {Capabilities: []string{"update"}},
+			"auth/token/revoke-self": {Capabilities: []string{"update"}},
+			paths[i]:                 {Capabilities: []string{"update"}},
+		}}
+		r, e := ownerProviderCanonical(role)
+		if e != nil {
+			return OwnerProviderRecipe{}, e
+		}
+		p, e := ownerProviderCanonical(acl)
+		if e != nil {
+			return OwnerProviderRecipe{}, e
+		}
+		out.Roles[i] = OwnerProviderRoleRecipe{Purpose: purpose, Name: name, Role: r, Policy: p}
+	}
+	// Profile.RecipeSHA256 is intentionally empty in the preimage. All selected
+	// public scope, original UIDs, endpoints/roots and generated role bodies are
+	// included; no provider credential or caller observation enters this digest.
+	body := struct {
+		Format         string                                `json:"format"`
+		InstallationID string                                `json:"installationID"`
+		ClusterID      string                                `json:"clusterID"`
+		Namespace      contracts.WorkerObjectReference       `json:"namespace"`
+		Kubernetes     contracts.OwnerProviderEndpoint       `json:"kubernetes"`
+		KeyService     contracts.OwnerKeyService             `json:"keyService"`
+		AuditStore     contracts.OwnerAuditStore             `json:"auditStore"`
+		Profile        contracts.OwnerProviderAuthentication `json:"profile"`
+		Roles          [4]OwnerProviderRoleRecipe            `json:"roles"`
+	}{"asservat-owner-provider-recipe/v1", in.InstallationID, in.ClusterID, in.Namespace, in.Kubernetes, in.KeyService, in.AuditStore, out.Profile, out.Roles}
+	raw, e := ownerProviderCanonical(body)
+	if e != nil {
+		return OwnerProviderRecipe{}, e
+	}
+	d := sha256.Sum256(raw)
+	out.Profile.RecipeSHA256 = hex.EncodeToString(d[:])
+	return out, nil
+}
+
+// ValidateOwnerProviderAuthentication recomputes the exact public recipe. This
+// is binding validation only, not proof that a provider has installed it.
+func ValidateOwnerProviderAuthentication(in contracts.OwnerDeployment, p contracts.OwnerProviderAuthentication, now time.Time) error {
+	if p.Format != contracts.OwnerProviderAuthenticationFormat || len(p.RecipeSHA256) != 64 {
+		return cfg.ErrInvalid
+	}
+	want, e := OwnerProviderRecipeFor(in, p.AuthMount, p.AuthMountAccessor, p.ServiceAccount, p.AuditCredentials, now)
+	if e != nil || want.Profile != p {
+		return cfg.ErrInvalid
+	}
+	return nil
+}
+
+func ownerProviderCanonical(v any) (json.RawMessage, error) {
+	b, e := json.Marshal(v)
+	if e != nil || len(b) > 64<<10 {
+		return nil, cfg.ErrInvalid
+	}
+	canonical := jsontext.Value(b)
+	if canonical.Canonicalize() != nil {
+		return nil, cfg.ErrInvalid
+	}
+	return json.RawMessage(canonical), nil
+}
+
+// Provider request shape; no product authority or runtime token material.
+type ownerProviderACLRule struct {
+	Capabilities []string `json:"capabilities"`
+}
+type ownerProviderACL struct {
+	Path map[string]ownerProviderACLRule `json:"path"`
+}

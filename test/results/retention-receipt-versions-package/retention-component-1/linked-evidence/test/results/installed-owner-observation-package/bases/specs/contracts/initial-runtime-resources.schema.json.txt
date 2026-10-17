@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-runtime-resources.schema.json",
+  "title": "Original fixed inert runtime resource creation",
+  "description": "Private installation journal for the compiled inert inventory. Application validation requires original order, unique operation and object identities, predecessor receipts and exact generated public template digests. No credentials, arbitrary bodies, launch, source acceptance or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "bindingDigest",
+    "setupID",
+    "createdAt",
+    "until",
+    "objects"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-runtime-resources/v1"
+    },
+    "bindingDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "objects": {
+      "type": "array",
+      "maxItems": 19,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item",
+          "operationID",
+          "templateDigest",
+          "claimedAt",
+          "until"
+        ],
+        "properties": {
+          "item": {
+            "enum": [
+              "owner-account",
+              "worker-account",
+              "owner-role",
+              "owner-binding",
+              "owner-cluster-role",
+              "owner-cluster-binding",
+              "worker-role",
+              "worker-binding",
+              "worker-cluster-role",
+              "worker-cluster-binding",
+              "owner-deployment",
+              "worker-deployment",
+              "owner-service",
+              "worker-lease",
+              "owner-source",
+              "owner-source-policy",
+              "owner-source-binding",
+              "owner-workload-policy",
+              "owner-workload-binding"
+            ]
+          },
+          "operationID": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+          },
+          "templateDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "resourceVersion",
+              "generation"
+            ],
+            "properties": {
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "resourceVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      }
+    },
+    "workerLayout": {
+      "const": "asservat-hub-worker-installed/v1"
+    },
+    "cleanupProjection": {
+      "$ref": "https://asservat.io/spec/v1/capture-cleanup-projection-claim.schema.json"
+    },
+    "capacityProjection": {
+      "$ref": "https://asservat.io/spec/v1/capacity-runtime-projection-claim.schema.json"
+    }
+  }
+}

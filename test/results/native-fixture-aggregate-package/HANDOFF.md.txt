@@ -1,0 +1,29 @@
+# Content fixture lifetime and bounded native admission trace
+
+This is a four-file test-only package. It makes no production authority, transport, SQL, wire, allocation, grant or retry change.
+
+The ordinary `native-content` fixture now receives the same once-created two-minute outer lab context already used by range/interruption. This replaces its twenty-second setup-plus-assertions cancellation only. All forty current warm reads remain. The previously admitted session, one-minute worker maximum, source/proof, five-second call, native operation and socket deadlines remain unchanged. Control-races and native-exchange retain their original twenty-second aggregate contexts.
+
+The temporary registrar decorator records callback duration and original deadline margins without extra API/SQL traffic. Every original callback executes exactly once with its original context/values. It reports only the first failure and last sixteen fixed/numeric events after joined phase cleanup. The new source has no production constructor or authority.
+
+## Evidence and limits
+
+The original native run 80949 exited 1 with 1,499 unchanged hashes and clean cleanup. Its preserved logs are copied under `evidence/prior/`. Content failed after its outer twenty-second context; range passed; interrupted new-session and exchange failed with their original short native admission leases expiring. The control preparation also failed before its completion predicates. These are separate failure modes; the aggregate change does not claim to fix admission expiry. See `REVIEW.md` for exact durations and source interpretation.
+
+Approved compile-only verification, handle **60058**, exited **0** in 7.503 seconds:
+
+```
+GOMAXPROCS=2 GOFLAGS=-p=2 TMPDIR=<stage>/tmp go test -overlay <stage>/overlay.json ./test/integration -run '^$' -count=1 -timeout=60s
+```
+
+`evidence/compile.json` records the exact absolute command/environment, real exit, and unchanged before/after checks for 1,504 dependency paths, three original files and four payloads. No test was selected, and no external/native service was launched. The diagnostic has not yet been exercised against real services.
+
+## Integration and next qualification
+
+Verify `manifest.json`, `bases.json`, `payload-hashes.json`, and `dependencies.json` before copying the four paths from `files/`. All mutations are under `test/integration/`; the helper is new. Parent-owned native execution should diagnose the first failing callback and retained original worker/outer/caller/lease margins. Use the existing exact selection as needed:
+
+```
+^TestContextAdmissionWithRealServices$/^download-worker-native-(content|content-resume|content-interrupted|control-races|exchange)$
+```
+
+Do not interpret successful compilation as native qualification. Remove this temporary diagnostic after the root cause is established. Any production optimization requires a separate review; no deadline extension, unknown-effect retry or authority caching is included here.

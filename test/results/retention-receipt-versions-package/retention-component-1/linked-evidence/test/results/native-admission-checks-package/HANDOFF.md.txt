@@ -1,0 +1,27 @@
+# Native same-call admission checks
+
+This seven-path package removes exactly two duplicate full current checks from synchronous constructor/attachment plumbing. It does not claim to resolve the whole native preparation availability issue.
+
+`RegisterNativeExchange` retains the initial gate check and the existing Before callback, including all its current/effect checks. Its full post-Before check now passes a private, one-use checked value into the local constructor instead of immediately repeating the same authority traversal inside that constructor. `NativeRegistration.attach` still performs its full current check and compares the exact original operation, certificate, sequence and deadline; its private attachment consumes that same-call value instead of performing a second immediate traversal.
+
+The unexported checked value retains its actual gate, original caller context and original lease. It is not stored on an operation, serialized, or reused across I/O. Local construction and attachment revalidate the clock, context, exact operation/certificate/sequence, known gate closure and monotonic shortening, including after the attachment lock. The existing gate snapshot only vetoes or restricts a newly performed Check; it cannot mint a checked value, renew its deadline or authorize a frame/effect. Context interface values are never compared.
+
+Both public constructors and public `Attach` continue to invoke full `gate.Check`. Final handler admission, every pre/post-frame check, Before/key binding, final SQL completion and application final authorization are unchanged. No SQL, wire, authority lifetime, budget, worker delay or retry changes are included. The unrelated cached release-helper hardening remains outside this package.
+
+## Verification
+
+Sequential job **22419** is terminal. All **1,505 dependency paths** and base/payload hashes were unchanged before/after each command. `GOMAXPROCS=2`, `GOFLAGS=-p=2` and the explicit stage TMPDIR were used.
+
+- **BEFORE: exit 1 as intended.** The actual registrar/router could not finish admission within its unchanged two-second caller deadline when each synthetic current-authority traversal consumed 500ms. It entered four checks and failed with `duplicate admission checks exhausted original bounded call` after 2.00s. The test uses existing public APIs and runs against unchanged production source.
+- **AFTER: exit 0.** The full `internal/transport/native` race suite passed, 18.933s Go time (21.999s command wall time). The original-budget regression succeeds with three distinct checks: gate creation, post-Before and exact attachment.
+- **Vet: exit 0.** Native transport and application evidence packages passed.
+
+Focused regressions reject missing, different-gate, changed-operation/certificate/sequence, expired, cancelled, closed and already-consumed private values at both constructor/attachment entry points. They retain the original caller through a blocked attachment lock, reject known shortening, cover a noncomparable concrete Context, and prove both public constructors and public Attach still consult current authority. Existing actual h2/mTLS, revocation, cancellation, final-delivery uncertainty, exact-close ordering and routing tests run in the full affected native race suite.
+
+These component tests use explicit synthetic source/authority. They do not qualify current real SQL latency, five-second native workflow availability or installed operation. The preceding native diagnostic is motivation: it measured full callback costs and original lease exhaustion while the worker/outer fixture remained current. It is not after-change evidence.
+
+## Integration
+
+Verify `manifest.json`, `bases.json`, `payload-hashes.json` and `dependencies.json`, then copy the seven `files/` paths. This package changes no integration fixture and preserves the parent's temporary bounded callback trace for the next real-service comparison. The application file has only the approved restrictive-veto comment change. `evidence/` retains exact commands, actual exits, original before failure and prior native motivation. All stage artifacts remain outside the repository.
+
+The next task is parent-owned native qualification with original operation/proof deadlines and unchanged authority checks. Remaining query/pool/lock latency and the pre-registration budget must be assessed from measured evidence; two removed traversals are not a basis for claiming the whole issue fixed.

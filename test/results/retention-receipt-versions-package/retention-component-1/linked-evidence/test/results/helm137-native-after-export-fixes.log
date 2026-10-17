@@ -1,0 +1,8 @@
+=== RUN   TestHelmBootstrapWithRealServices
+    helm_bootstrap_test.go:192: Helm command: exit status 1: Release "asservat" does not exist. Installing it now.
+        Error: failed post-install: resource Pod/bootstrap-helm-10000000/install-bootstrap not ready. status: Failed, message: pod install-bootstrap failed
+        
+--- FAIL: TestHelmBootstrapWithRealServices (187.67s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	187.791s
+FAIL

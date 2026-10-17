@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/adapters/postgres	1.013s
+ok  	asservat.local/asservat/internal/adapters/jose	1.494s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.700s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.325s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.349s
+ok  	asservat.local/asservat/internal/application/privacy	1.012s
+ok  	asservat.local/asservat/internal/domain/privacy	1.016s

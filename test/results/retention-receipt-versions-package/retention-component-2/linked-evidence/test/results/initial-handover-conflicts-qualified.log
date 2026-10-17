@@ -1,0 +1,33 @@
+=== RUN   TestInitialPreparationHandoverWithRealServices
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/pod-status-only-conflict-wire
+    initial_handover_admission_test.go:157: actual HTTP=409 API Status={"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"Operation cannot be fulfilled on pods \"installer\": the object has been modified; please apply your changes to the latest version and try again","reason":"Conflict","details":{"name":"installer","kind":"pods"},"code":409}
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/policy-status-only-conflict-wire
+    initial_handover_admission_test.go:196: actual HTTP=409 API Status={"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"Operation cannot be fulfilled on validatingadmissionpolicies.admissionregistration.k8s.io \"initial-admission-conflict-wire\": the object has been modified; please apply your changes to the latest version and try again","reason":"Conflict","details":{"name":"initial-admission-conflict-wire","group":"admissionregistration.k8s.io","kind":"validatingadmissionpolicies"},"code":409}
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/premature-retirement-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/terminal-delete-without-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-change-spec
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-original-uid-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-be-removed
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-kubelet-node
+    initial_handover_admission_test.go:320: native NodeRestriction rejected the wrong node before Asservat policy evaluation
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/delayed-original-create-stays-occupied
+=== NAME  TestInitialPreparationHandoverWithRealServices
+    initial_preparer_handover_test.go:343: actual original activation Pod f3e5a76c-c0e1-4e2b-bcff-da74c8d4029a image docker.io/library/asservat-context-worker@sha256:1f7871f78a1ca4e406288bc4eba45bda49be30eb08ec3006ea32af7dbaf47d19 exit 0
+=== RUN   TestInitialPreparationHandoverWithRealServices/passive-reopen-after-credential-retirement
+=== NAME  TestInitialPreparationHandoverWithRealServices
+    initial_preparer_handover_test.go:423: actual original loader-to-Pod activation, exact compiled image and immutable encrypted audit; passive restart with setup credentials unavailable. Fixture supplies bootstrap/provider roots only; no public investigation runtime enabled
+--- PASS: TestInitialPreparationHandoverWithRealServices (120.78s)
+    --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission (14.62s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/pod-status-only-conflict-wire (0.01s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/policy-status-only-conflict-wire (0.07s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/premature-retirement-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/terminal-delete-without-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-change-spec (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-original-uid-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-be-removed (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-kubelet-node (0.00s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/delayed-original-create-stays-occupied (0.40s)
+    --- PASS: TestInitialPreparationHandoverWithRealServices/passive-reopen-after-credential-retirement (3.58s)
+PASS
+ok  	asservat.local/asservat/test/integration	121.836s

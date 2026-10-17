@@ -1,0 +1,2 @@
+npm notice run @asservat/console@0.0.0 generate
+npm notice run node scripts/contracts.mjs --write

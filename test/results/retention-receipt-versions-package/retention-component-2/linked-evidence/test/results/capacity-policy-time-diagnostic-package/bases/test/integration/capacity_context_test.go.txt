@@ -1,0 +1,143 @@
+package integration
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	app "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+)
+
+// This path consumes the actual managed enrollment. It never inserts or
+// replaces custody/control/capture pools, an allocation, or its storage binding.
+// Only the initial human and Kubernetes target observations are synthetic.
+func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, capturevalue.Accepted) {
+	t.Helper()
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	target := capacityNativeTarget(f.input.ControlClusterID, f.namespace, f.workloads[0], n)
+	retention := newRetentionEffectFixtures(t, f.ctx, f.fixturePool, f.store, f.keys)(t, f.input.PermissionRootID, target.Target())
+	recovery := &recoveryEffectFixture{installation: f.input.InstallationID}
+	var err error
+	recovery.reader, err = postgres.NewRecoveryReader(f.ctx, f.fixturePool("peer_read_runtime", "synthetic-peer-read"), f.input.InstallationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recovery.guard, err = postgres.NewRecoveryTransactionGuard(f.input.PermissionRootID, f.input.InstallationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	material := f.root.value.State.MAC
+	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	guards := postgres.EffectTransactionGuards{Retention: retention.guard, Recovery: recovery.guard}
+	admission, err := postgres.NewAuditedContextAdmissions(f.ctx, f.roles["capture-admit"], f.input.PermissionRootID, mac, guards)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := f.qualification.RootBacking.Capture.Policy
+	policy.ValidUntil = root.PlannedUntil
+	policy.BackingRevision = root.Revision
+	journal, err := postgres.NewCaptureAuditJournal(f.ctx, f.roles["capture-journal"], policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ack, err := postgres.NewCaptureAuditAcknowledgements(f.ctx, f.roles["capture-ack"], policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := postgres.NewCaptureOperationIntents(f.ctx, f.roles["capture-intent-read"], f.input.PermissionRootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := objectstore.NewClosedOperationAuditObjects(f.store, policy.StoreID, f.keys, f.keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := auditapp.CaptureOperationPublication{RootID: f.input.PermissionRootID, Completed: completed, Journal: journal, Acknowledgements: ack, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, MAC: mac, Now: time.Now}
+	// Refresh the actual independently accepted sources before this NEW request.
+	// Nothing rewrites a capture, session, or prior phase to get more time.
+	observation := f.workloadObservation(t, 0)
+	if err = f.enrollments.RefreshCapacityEnrollment(f.ctx, observation, enrollment); err != nil {
+		t.Fatal(err)
+	}
+	policies, err := retention.policies(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n = time.Now().UTC().Truncate(time.Microsecond)
+	target.ObservedAt, target.FreshUntil = n, n.Add(5*time.Second)
+	retained, err := privacy.Resolve(policies, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: n, RequestedSeconds: 3600}, n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "capacity-developer", ClientID: "console", Kind: identity.Human}, Scopes: []string{"evidence:capture"}, Groups: []string{"maintainers"}, Policy: identity.Revision{UID: "synthetic-identity", Generation: 1, Digest: artifact.Digest{21}}, VerifiedAt: n, ValidUntil: n.Add(5 * time.Second)}
+	projection, err := f.permission.Permissions(f.ctx, target.Target())
+	if err != nil {
+		t.Fatal(err)
+	}
+	eligibility := authorization.ContextEligibility(actor, projection, target.Target(), time.Now())
+	if !eligibility.Eligible {
+		t.Fatal("managed context ordinary eligibility", eligibility.Reason)
+	}
+	plan, err := planning.CompileContext(capacityNativeContextInput(target, retained, actor.Principal, custodyID(), n), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage, err := postgres.NewContextStorageReader(f.ctx, f.roles["storage-read"], f.input.PermissionRootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := storage.ContextStorage(f.ctx, target.Target())
+	if err != nil {
+		t.Fatal("managed storage selection", err)
+	}
+	if selected.Selection.AllocationID != enrollment.AllocationID {
+		t.Fatal("request selected another workload account")
+	}
+	r := artifact.Registration{Location: artifact.Location{ClusterID: f.input.ControlClusterID, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: selected.Selection.StoreID, AllocationID: selected.Selection.AllocationID, PoolRevision: selected.Selection.PoolRevision, AllocationRevision: selected.Selection.AllocationRevision, NativeLimit: 4096, AnchorAt: retained.AnchorAt, WriteUntil: plan.Input.Deadline, ExpiresAt: retained.ExpiresAt, DeleteBy: retained.DeleteBy}
+	proof, err := recovery.reader.RecoveryState(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := capturevalue.Admission{Recovery: proof, RootID: f.input.PermissionRootID, IdempotencyKey: "capacity-managed-session", SubmissionDigest: artifact.Digest{24}, Plan: plan, Eligibility: eligibility, Storage: selected.Binding, Registration: r, CaseID: custodyID(), OccurrenceID: custodyID()}
+	start := time.Now()
+	accepted, err := admission.AdmitContext(f.ctx, request)
+	if err != nil {
+		t.Fatal("actual managed SQL52 admission", err)
+	}
+	if _, err = publisher.AcknowledgedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
+		t.Fatal("actual managed encrypted intent pair", err)
+	}
+	t.Logf("managed_admission_pair_ms=%d original_request_remaining_ms=%d", time.Since(start).Milliseconds(), time.Until(actor.ValidUntil).Milliseconds())
+	return captureAdmissionScenario{p: f.permission, s: admission, batch: f.batch, a: request, poolID: f.qualification.Backends[0].PoolID, retention: retention, recovery: recovery}, accepted
+}
+
+func (f *capacitySQLFixture) currentManagedPublication(ctx context.Context, s captureAdmissionScenario, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
+	p, err := s.p.Permissions(ctx, s.a.Eligibility.Target)
+	if err != nil {
+		return artifact.PublicationAuthority{}, err
+	}
+	retained, err := s.retention.policies(ctx)
+	if err != nil {
+		return artifact.PublicationAuthority{}, err
+	}
+	recovery, err := s.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		return artifact.PublicationAuthority{}, err
+	}
+	n := time.Now().UTC()
+	return artifact.PublicationAuthority{Recovery: recovery, Retention: retained.Proof, RootID: s.a.RootID, CaptureID: e.CaptureUID, PermissionEpoch: p.Revision.UID, PermissionSequence: p.Revision.Generation, ProjectionDigest: artifact.Digest(p.Revision.Digest), ExpectationDigest: evidence.ContextExpectationDigest(e), AuthorityDigest: artifact.Digest{25}, CheckedAt: n, ValidUntil: identity.Earlier(retained.Proof.ValidUntil, identity.Earlier(p.FreshUntil, recovery.FreshUntil))}, nil
+}

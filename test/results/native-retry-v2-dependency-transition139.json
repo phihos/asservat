@@ -1,0 +1,89 @@
+{
+  "note": "Checks ran before parent integrated ADR139. Payload paths do not overlap. Dependencies are pinned after integration; this is a source checkpoint, not a post139 retest. Parent owns integrated gates.",
+  "changes": [
+    {
+      "path": "docs/decisions/139-shared-native-context-start-listener.md",
+      "pre139_sha256": null,
+      "current_sha256": "64f8fe6d4304e44a6b57bce5bdf00aa6da26f191a78e8891e2d4efcf57ce3ba8",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/bootstrap/owner_native.go",
+      "pre139_sha256": "f835176ad7ed3c66d560bdc80c73cedeb5ec62fb2506d059619f772d33b3bc2c",
+      "current_sha256": "57d83d5b6ae8bfb159e284705fc84adc2eb2c0b2ce684578c81c352eab91c948",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/bootstrap/owner_runtime.go",
+      "pre139_sha256": "0ac43579130a0e1f250e333388b111ebd14449dcda58e960d82ff1170b1d8da1",
+      "current_sha256": "4981f15280d247ea6660de1c490bfb3cfbbfd4b8a7b80e1930e0154021f2d4d2",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/bootstrap/owner_runtime_join_test.go",
+      "pre139_sha256": null,
+      "current_sha256": "a189ff9d0fb1f94cb96cb6c46a1fae71e20d2d1ec99c69e0d40ff457b7011bb3",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/transport/native/server.go",
+      "pre139_sha256": "24533aba0acc2fb5df8b095ebdb2a651d4a2228663efd351bbf32103c3d5f66b",
+      "current_sha256": "99dd01ade75449065b667412daf8a4f71e5e1ce4038c05f341cfaf93831f7cd2",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/transport/native/server_context_test.go",
+      "pre139_sha256": null,
+      "current_sha256": "e68d4e21d2f287cc5292f8761686840638a0baeba4f4205356407f151d46382e",
+      "tested_again_after139": false
+    },
+    {
+      "path": "internal/transport/native/server_lifetime_test.go",
+      "pre139_sha256": null,
+      "current_sha256": "68ee81c81e0ba12791d756869a3574ab152021fa60e66d7be73ea3e268c3ba85",
+      "tested_again_after139": false
+    },
+    {
+      "path": "scripts/test-context-storage.py",
+      "pre139_sha256": "c3920def48228ebc11484d226e03f4db2294c70c54dc181363704672adaf608f",
+      "current_sha256": "eac50ccfd26e8bc3ec41b4cf66f8774a49501864de459487723e8b2b9fc13d96",
+      "tested_again_after139": false
+    },
+    {
+      "path": "scripts/test-regional-context-selection.py",
+      "pre139_sha256": null,
+      "current_sha256": "f065fb66b09ef75358fe567c37572566c02fff99b32f489407dec3c4c02843a5",
+      "tested_again_after139": false
+    },
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "pre139_sha256": "752964ed5e69bdd8713397226dca3fa16fa76d444a5f6078ade5b0d0f12d242f",
+      "current_sha256": "24c6e5e1631ecad072c08b12df5b4d9e9eca6b85b3fccb6bdce152afbf141489",
+      "tested_again_after139": false
+    },
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "pre139_sha256": "dc5bfddb1bf5a0be118626dc3a85856f96848c51a42f9b4aa6465a324760b3b0",
+      "current_sha256": "15ca662972e4a4b1bca68081ddc4b81618c278c8f318609f2b59d560c8a97ebc",
+      "tested_again_after139": false
+    },
+    {
+      "path": "test/integration/context_continuation_native_test.go",
+      "pre139_sha256": "b5ddd1f53a4d528e11a03345b730e87b74b90331ae420bb36bdb5b9bfb6823ea",
+      "current_sha256": "686ff205dbaf0829736495cd98429ac25550637e2a87ada247490b4a795c22b8",
+      "tested_again_after139": false
+    },
+    {
+      "path": "test/integration/context_start_exchange_test.go",
+      "pre139_sha256": null,
+      "current_sha256": "a563af78c191a3737ac470a4053101aabb3f8b223203d0430f808f7fea1d9c85",
+      "tested_again_after139": false
+    },
+    {
+      "path": "test/integration/context_start_owners_test.go",
+      "pre139_sha256": null,
+      "current_sha256": "bc192f96ad99adea9612d72f3e9adb1d86d36e42d7afbd3b1b99608de8e34a23",
+      "tested_again_after139": false
+    }
+  ]
+}

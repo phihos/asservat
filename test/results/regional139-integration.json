@@ -1,0 +1,11 @@
+{
+  "integratedAt": "2026-10-12T11:22:21.576169+00:00",
+  "manifestSHA256": "b777e779f94d46421120645299455ade598280baabfea589fba3bf1f45b25cc7",
+  "payloads": 14,
+  "dependencies": 1461,
+  "allBasesMatched": true,
+  "allDependenciesMatched": true,
+  "allPayloadsMatched": true,
+  "scope": "ADR139 closed same-port listener, joined shutdown and real-service qualification source; no public enablement",
+  "nativeQualification": "pending"
+}

@@ -1,0 +1,140 @@
+[
+  {
+    "path": "docs/architecture/download-stop-lifecycle.md",
+    "base_sha256": null,
+    "sha256": "68c0fffa27dda34371614baae9c38fe9565b5687394a2b4b4f0e7b188a2f0037",
+    "bytes": 9524
+  },
+  {
+    "path": "docs/decisions/124-prepaid-stop-retirement.md",
+    "base_sha256": null,
+    "sha256": "97d9c10e3ad77ce7342b52c5d874376a61d73a02c85f2c6a72c67f966566f21b",
+    "bytes": 3791
+  },
+  {
+    "path": "internal/adapters/jose/download_stop_retirement.go",
+    "base_sha256": null,
+    "sha256": "2d15438944ba84ba4890a2c73627c18f4675d9af031e71d0c4dc6c8e05236dba",
+    "bytes": 5104
+  },
+  {
+    "path": "internal/adapters/objectstore/download_stop_lifecycle.go",
+    "base_sha256": null,
+    "sha256": "657b34b14fe2b00cc55f378ee71883855107a223167b09e6a8bd84740b78b89e",
+    "bytes": 10102
+  },
+  {
+    "path": "internal/adapters/objectstore/download_stop_lifecycle_test.go",
+    "base_sha256": null,
+    "sha256": "f8825bd03e1434f70a777af7578c9ff47ffeb1cf9c8b23694f58ff8eaad6a63c",
+    "bytes": 7876
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/download_stop_retirement.go",
+    "base_sha256": null,
+    "sha256": "a11903b570f648470008b5787d440af3847154b7159a0689b4d67d6f11f18837",
+    "bytes": 2309
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/download_stop_retirement_test.go",
+    "base_sha256": null,
+    "sha256": "79867f57e686c448b7bc60ff9ca56ef35f824980d9c566c70fb5e8ea2345f788",
+    "bytes": 2451
+  },
+  {
+    "path": "internal/adapters/postgres/custody.go",
+    "base_sha256": "5c881662ffa2f9e540843061c244100f17bc5ff159634f1f2aae66ce9d9fbebf",
+    "sha256": "f712e68d0cacf620625afceab4a72c3b8d90cc5abc45a4d18dec678b626c7b93",
+    "bytes": 16876
+  },
+  {
+    "path": "internal/adapters/postgres/download_stop_lifecycle.go",
+    "base_sha256": null,
+    "sha256": "0ec014a5645027c28066760cc859ff658f2710d5ac1219ff03230634119ff291",
+    "bytes": 30070
+  },
+  {
+    "path": "internal/adapters/postgres/initial_installation_tables.go",
+    "base_sha256": "dc6daef0f56d5a11c9d4235b1a7087563687fe6c04963709291be4045b264ca1",
+    "sha256": "eb09dda43af4571788840e9effe8e78d034d67be2ddfa3d9e1912143fac1b32b",
+    "bytes": 2164
+  },
+  {
+    "path": "internal/application/evidence/download_stop.go",
+    "base_sha256": "83eeb6c07d8c32b21645de3c5d15414119df8bd6d4cf8c2337f55de9feb1aacd",
+    "sha256": "06ba77fb125242a3a9e6318b06b891fed489405e5fb21b2c303800eab90e61b1",
+    "bytes": 6572
+  },
+  {
+    "path": "internal/application/evidence/download_stop_lifecycle.go",
+    "base_sha256": null,
+    "sha256": "27eda2998c2bd7183c5833a9f14dae852dc2258a047d5ec58e1eb78217164bd5",
+    "bytes": 9391
+  },
+  {
+    "path": "internal/application/evidence/download_stop_lifecycle_test.go",
+    "base_sha256": null,
+    "sha256": "7b4b7429f687d071d0c095f93d5ae546860425cc389beb86b597f7e64834638e",
+    "bytes": 9065
+  },
+  {
+    "path": "internal/application/evidence/download_stop_pending_test.go",
+    "base_sha256": null,
+    "sha256": "f4d980c7144e2de14487bbb74f44888e725804ccc6b7bbecdbb4e66c342b8b3b",
+    "bytes": 2361
+  },
+  {
+    "path": "internal/domain/audit/download_stop_lifecycle.go",
+    "base_sha256": null,
+    "sha256": "bc2c706e6d2cae9b7656cbc85388fdea2b1c93d39228bd507e16dfe49c6862ee",
+    "bytes": 9620
+  },
+  {
+    "path": "internal/domain/audit/download_stop_lifecycle_test.go",
+    "base_sha256": null,
+    "sha256": "e3ab0c559bc4ab0fb8d461a389c7662ca64f02f2f034a084a1b1ad9ae429bdcf",
+    "bytes": 3427
+  },
+  {
+    "path": "migrations/00047_download_stop_lifecycle.sql",
+    "base_sha256": null,
+    "sha256": "f5306606259b615b71aa3f6eff1abeef1e5bbf66dddfecea4f2256b98bd06312",
+    "bytes": 42279
+  },
+  {
+    "path": "migrations/queries/download_stop.sql",
+    "base_sha256": "591c9303d454be455d89740519625583a4e72f1a0b991519c716fe06a9115bc4",
+    "sha256": "26b785d71dc17004c73b4fe3cf3e925d271876657d8b3d663d63e8623d8c3dc2",
+    "bytes": 2580
+  },
+  {
+    "path": "migrations/queries/download_stop_lifecycle.sql",
+    "base_sha256": null,
+    "sha256": "6c771b21a166fd8f79d65b0a9388c854f351d3b18be9af9632c4a97b715ab2fe",
+    "bytes": 3188
+  },
+  {
+    "path": "specs/artifact-downloads.md",
+    "base_sha256": "7cbca5d7cd393e738fae700a62453eea87f405e37abc4a247918ab7ace3c5419",
+    "sha256": "314f147810aa706866d4c622a26742bf9535f8e2fdc32c3327998b4258a9129c",
+    "bytes": 20847
+  },
+  {
+    "path": "test/fixtures/sql/runtime-roles.sql",
+    "base_sha256": "a17b756ac45146edfb40b215bbd89d1e8862cc2b8dddc3cfe9409e19a409fde2",
+    "sha256": "9625cc11576de3c55e5a1cfb3211db71d5c7cba6c974a70f5b7454727eba4ed6",
+    "bytes": 62678
+  },
+  {
+    "path": "test/integration/context_publication_test.go",
+    "base_sha256": "f0205de22f360fc205fe193c07d0d5e8d0047151438e4e2aad22b13df655fac4",
+    "sha256": "3b5dd7397c8182317c0bec1653f5dee8577f98a580a0a63ed44b648615c7b2a6",
+    "bytes": 20937
+  },
+  {
+    "path": "test/integration/download_stop_lifecycle_test.go",
+    "base_sha256": null,
+    "sha256": "db60a26f30d8fae61ba42fe9525cb2ec54993f3c7b02b2bf3e44c5cb411b367f",
+    "bytes": 23660
+  }
+]

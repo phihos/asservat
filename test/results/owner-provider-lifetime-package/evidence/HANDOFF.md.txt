@@ -1,0 +1,24 @@
+# Provider lifetime component handoff
+
+Handle 45792 completed exit 0. The six-path manifest, two existing bases and all 1,976 current dependencies remained unchanged before/after every command. No native lab ran and no live file was edited.
+
+- `go test -overlay=overlay.json -run '^$' ./internal/adapters/kms`: exit 0, 2.557 seconds.
+- `go test -overlay=overlay.json -race -count=1 -timeout=180s -v -run '^TestOwnerProvider' ./internal/adapters/kms`: exit 0, 4.607 seconds, 25 top-level PASS. The actual provider native test skipped because its explicit opt-in was absent. Nine new lifetime/group tests cover single-flight controls, finite unknown-login backoff, lost-renewal reconciliation, final current proof, original expiry, two-credential bounds, shutdown timeout, actual blocked Body.Close ownership, and cancellation of independent purposes before join.
+- `go vet -overlay=overlay.json ./internal/adapters/kms`: exit 0, 0.549 seconds.
+
+Environment: GOMAXPROCS=2, GOFLAGS=-p=2, checkpoint-owned TMPDIR; sequential owned commands. Exact commands/results are in result.json and evidence/. No elapsed provider JWT expiry or timed kubelet rotation is inferred from accelerated component clocks. No deliberate before variant was used: this is a new private component, not a correction to an installed lifetime owner.
+
+## Change and review boundary
+
+New files implement one private lifetime owner, its fixed four-purpose composition, and meaningful tests. The existing private lease transport gains a cancellation-only owner context; its three positional test literals become named fields without changing their assertions. No public wire, profile selection, SQL, schema or installed layout changes.
+
+The private current-proof callback must be supplied by the eventual concrete installed constructor using existing current native/source/recovery authority. Callback timestamps and fake TLS provider replies in these tests are not production authority. Both proof observations and the caller's original control end remain binding. Effects consume only an acknowledged immutable lease and perform no login/renew/lookup. A successful close means local I/O and borrows joined; it does not assert successful provider deletion or refund after an unknown revoke.
+
+The four-purpose group is not yet exposed to existing BaoSealer/BaoOpener/OwnerIssuer constructors or a scheduled runtime supervisor. Those constructors currently require unleased TokenSource and concrete *http.Transport; passing only a TokenSource would drop response-body ownership. Next is a narrow selected effect-adapter composition preserving their existing encoders/current application guards and explicit fresh installed-layout profile. Parent owns the shared v2 layout/version coordination; no selector should be added independently.
+
+## Immutable identities
+
+- Manifest: 2a6c40e8e772cbd186e287cc83588ebb431b2d12b2600070eb27682052628c64
+- Dependencies: 2690dc0782649e13a9856f5b79858f8c7332a926a4de43485f843cb9ba01dd28
+- Runner: 1eb4298ffbb784a301ee8f9d6b7935b4e2ad3a4382d3941674690fcaf32b2991
+- Result: 380dedf5516e745bfc0f4aa8ecf4fb5ef47b1e1b9cd4e0c6ad4a482ffe9eb745

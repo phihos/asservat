@@ -1,0 +1,12 @@
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/12 13:57:39 http: TLS handshake error from 127.0.0.1:50892: remote error: tls: unknown certificate
+2026/10/12 13:57:39 http: TLS handshake error from 127.0.0.1:50910: remote error: tls: unknown certificate
+2026/10/12 13:57:41 http: TLS handshake error from 127.0.0.1:50950: remote error: tls: unknown certificate
+2026/10/12 13:57:41 http: TLS handshake error from 127.0.0.1:50960: remote error: tls: unknown certificate
+2026/10/12 13:57:41 http: TLS handshake error from 127.0.0.1:50982: remote error: tls: unknown certificate
+2026/10/12 13:57:41 http: TLS handshake error from 127.0.0.1:46326: remote error: tls: unknown certificate
+    console_native_restart_test.go:183: Synthetic C14/session/file source; actual built React, HTTPS, CSRF, canonical operations and browser download failure:
+        Built native-restart checks passed: 4 boundaries,2 accessibility scans, actual failed browser attachment and explicit fresh full-file download.
+--- PASS: TestConsoleNativeRestartWithBuiltPackage (2.92s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.981s

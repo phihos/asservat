@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/domain/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.010s [no tests to run]
+ok  	asservat.local/asservat/internal/application/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/evidence	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.012s [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.012s [no tests to run]

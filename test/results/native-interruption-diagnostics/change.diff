@@ -1,0 +1,86 @@
+--- before
++++ after
+@@ -73,16 +73,16 @@
+ 		origin := "https://" + state.server.Listener.Addr().String()
+ 		operations, e := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: custodyID}, coordinator)
+ 		if e != nil {
+-			t.Fatal(e)
++			t.Fatal("interruption operations constructor", e)
+ 		}
+ 		inner, e := presentation.NewInvestigationOperations(nil, nil, operations)
+ 		if e != nil {
+-			t.Fatal(e)
++			t.Fatal("interruption investigation constructor", e)
+ 		}
+ 		state.shared = nativeContentAuditFixture(t, ctx, f, inner)
+ 		initial, e := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+ 		if e != nil {
+-			t.Fatal(e)
++			t.Fatal("interruption initial identity", e)
+ 		}
+ 		state.sessions = &nativeResumeSessions{nativeContentSessions: nativeContentSessions{workerBrowserSession{initial, session.Deadline, 5 * time.Second}}}
+ 		state.interrupt.Store(true)
+@@ -98,11 +98,11 @@
+ 	origin := state.server.URL
+ 	initial, e := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("interruption current identity", e)
+ 	}
+ 	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: state.sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, state.shared, runtime, transfer)
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("interruption content handler", e)
+ 	}
+ 	state.handler.Store(handler)
+ 	request := func(call context.Context, offset int64) (*http.Response, error) {
+@@ -124,7 +124,7 @@
+ 		}
+ 		response, e := request(ctx, int64(len(state.prefix)))
+ 		if e != nil {
+-			t.Fatal(e)
++			t.Fatal("fresh-session range request", e)
+ 		}
+ 		suffix, e := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
+ 		response.Body.Close()
+@@ -141,7 +141,7 @@
+ 		}
+ 		old, e := f.runtime.LookupDownload(ctx, state.original.ID, state.original.Scope.Principal)
+ 		if e != nil {
+-			t.Fatal(e)
++			t.Fatal("read original session after reconstruction", e)
+ 		}
+ 		requireNativeResumeOriginal(t, state.original, old)
+ 		oldFixture := f
+@@ -175,7 +175,7 @@
+ 	response, e := request(clientCtx, 0)
+ 	if e != nil {
+ 		cancel()
+-		t.Fatal(e)
++		t.Fatal("initial interrupted HTTP request", e)
+ 	}
+ 	if response.StatusCode != http.StatusOK || response.ProtoMajor != 2 {
+ 		cancel()
+@@ -203,7 +203,7 @@
+ 	state.interrupt.Store(false)
+ 	stopped, e := f.runtime.LookupDownload(ctx, session.ID, session.Scope.Principal)
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("read interrupted session", e)
+ 	}
+ 	requireNativeResumeOriginal(t, session, stopped)
+ 	if stopped.State != artifact.DownloadInterrupted || stopped.ChargedRead != 8<<20 || stopped.ChargedOutput != m.Size || stopped.EmittedBytes > int64(len(state.prefix)) {
+@@ -222,11 +222,11 @@
+ 	defer p.Close()
+ 	ledger, e := postgres.NewDownloads(ctx, p, f.allocation.RootID, f.guards)
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("independent interrupted-session ledger", e)
+ 	}
+ 	first, e := postgres.NewFirstContextResponses(ledger)
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("independent interrupted-session response facet", e)
+ 	}
+ 	retry := artifact.DownloadResponse{ID: custodyID(), SessionID: session.ID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Offset: int64(len(state.prefix)), Length: m.Size - int64(len(state.prefix)), Partial: true}, WindowReadLimit: evidence.ContextDownloadReadWork}, Until: session.Deadline}
+ 	if _, e = first.BeginDownloadResponse(ctx, session.ID, f.authority(), retry); e == nil {

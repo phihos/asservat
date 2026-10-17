@@ -1,0 +1,72 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+    "before": null,
+    "after": "f68904df666f016fc63c3af471bf58bdebc172f6226ab28ab9bd87f689b89873"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_runtime_roles.go",
+    "before": null,
+    "after": "7fd8f9276e7c270ce4af151fd71805a397bb44b4ee089ba404358c415805296e"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_runtime_roles.go",
+    "before": null,
+    "after": "928dc60903a3086d79c6899285028d97a6932be10265a19fd01401fe7613cc2f"
+  },
+  {
+    "path": "internal/application/evidence/native_exchange.go",
+    "before": "9520254a39a515f868edf3e12e755a173d7584019e04afc8fbd117d4e0724b36",
+    "after": "40e221f66b8aca2b6496d1890c87f24bfd36d59bbab4c89bd4be4e8cadf978c1"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_inputs.go",
+    "before": null,
+    "after": "51b06ddd852438f5760769bbf048debf7b1c5b5c7022a65f247c783b24d1e663"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_installer.go",
+    "before": null,
+    "after": "6a93d189b8a37f18eb135fe7b794820574d98cf713abc24a80e969e7417226d7"
+  },
+  {
+    "path": "internal/contracts/configuration_role_installer.go",
+    "before": null,
+    "after": "6f4da5a8ccdd75c34dca547be9129ae0de1a27e766641ad17a46c2605a181b57"
+  },
+  {
+    "path": "internal/contracts/configuration_runtime_roles.go",
+    "before": null,
+    "after": "32eac2ee070d594d595df49279d37a414bc06218c53f911ca12f95cfd3ce87a1"
+  },
+  {
+    "path": "internal/transport/native/admission_budget_test.go",
+    "before": null,
+    "after": "2adaf1f495ca721c696d978cdea488401286ca40baa3c722747d5f0029d06cdb"
+  },
+  {
+    "path": "internal/transport/native/admission_check.go",
+    "before": null,
+    "after": "75d36d7b0c22f6da903e0202d25786d2312e7579ca348ab8f8facb5b00c31336"
+  },
+  {
+    "path": "internal/transport/native/admission_check_test.go",
+    "before": null,
+    "after": "71119c6fcaf72773510384ba472687d7b7b8b96f055c580e188f264fec629ccd"
+  },
+  {
+    "path": "internal/transport/native/operation.go",
+    "before": "dcc871ca7e3a9d37c1e4315b2cfad5b039da4ca5d0dc974b9ba6dac315216815",
+    "after": "5039122f2b18bd01a2491e471f98d5b25f423d9852a33d4b09289442794481fd"
+  },
+  {
+    "path": "internal/transport/native/registration.go",
+    "before": "aac903fde4097fb5e00a1c1d372701443861dbd75a33a6d361b8ff96dd518ca4",
+    "after": "ec180da35b5c52db51a707e7faff687262ddbfae932ea12e03fc1ff7679b2d13"
+  },
+  {
+    "path": "internal/transport/native/router.go",
+    "before": "6421fa677e1621193750bd5a29adff2d0b110d43039e3c5a15b9eece9e15e81c",
+    "after": "8cc7888b57d852df6b4b2a728042fc4f86fda17c8dd942b473b4f8872f994070"
+  }
+]

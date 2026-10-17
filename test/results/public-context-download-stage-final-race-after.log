@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/transport/presentation	(cached)
+ok  	asservat.local/asservat/internal/transport/browser	(cached)
+ok  	asservat.local/asservat/internal/transport/mcp	9.765s
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	(cached)
+ok  	asservat.local/asservat/internal/contracts	(cached)

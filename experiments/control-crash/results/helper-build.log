@@ -1,0 +1,7 @@
+    Updating crates.io index
+     Locking 1 package to latest Rust 1.96.1 compatible version
+ Downloading crates ...
+  Downloaded libc v0.2.190
+   Compiling libc v0.2.190
+   Compiling asservat-crash-spike v0.0.0 (/home/phil/Projekte/asservat/experiments/control-crash/helper)
+    Finished `release` profile [optimized] target(s) in 1.65s

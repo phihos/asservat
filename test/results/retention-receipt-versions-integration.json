@@ -1,0 +1,109 @@
+{
+  "at": "2026-10-13T15:14:48.183680+00:00",
+  "manifest": "270f9f6cd02572b92a7c9497d71690b2c50d5715584251efd639c7a3c44df46d",
+  "result": "bb37c97cdaf0fc7ebe0642dfffb030bdd1050706314babb50eff527ac1892898",
+  "paths": [
+    {
+      "path": "docs/architecture/retention-catchup.md",
+      "base_sha256": "e8c5f5759adb91ba50f305e92783061059be4cc365f738449604ee456a64d3d2",
+      "payload_sha256": "8af3255daf37f673741f06be6a3cd97d75f20dec8e4a84fae323fc766765c124"
+    },
+    {
+      "path": "docs/architecture/retention-checkpoints.md",
+      "base_sha256": "84a6755476695fb8116d4d3b857116e60b9ca975c5bfa7a16e9a2daa9aa20f5c",
+      "payload_sha256": "a784467071327a96cbf0df5390fdcd1ab7018473b3d2d35f1fcfb4b87d5f9958"
+    },
+    {
+      "path": "docs/decisions/152-retention-current-audit-receipts.md",
+      "base_sha256": null,
+      "payload_sha256": "9f9fa7fc630f41af41fc656c39a17a39b91bbdf7ddaf9f49848ae58d037a0808"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base_sha256": "b94b741cfcfd6e6e2eb08f8dbb78b83c781877b9ce07e87c0bab4fc18ec5e679",
+      "payload_sha256": "6ad7f2859154ab14c564548692477f7a32593b8619dfe221c137b2ca03f3ca51"
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "base_sha256": "0e18cb59d8ef232790adf4faed7b88305b17d674ec4a92c867fb24244ce8ea03",
+      "payload_sha256": "d0232903e062a23aa0b21308bd5704fca1991af8da22c2b026949e08cfb0d383"
+    },
+    {
+      "path": "internal/adapters/postgres/retention_observation.go",
+      "base_sha256": "1f84488065bbb02d8c2e38206653c71ff16eae1b5da2d52f9c2fa39366f96638",
+      "payload_sha256": "ea0198ebf9c6d0e3712896c1a2766217cb145704d96bf8d6121b4f51def51a44"
+    },
+    {
+      "path": "internal/adapters/postgres/retention_sources.go",
+      "base_sha256": "45b17c0e371834d00e22fa0bcd270894d0f3639931dc241e7e2091c5a40251d9",
+      "payload_sha256": "aa68877d112b02b031a00bce7f6532349fab8e79f9a329dec3641743e1b625f6"
+    },
+    {
+      "path": "internal/domain/audit/lifecycle.go",
+      "base_sha256": "4b8b7590516b7b898ef5f336f7240dab3af1d18985846908fcd696dc2e28d8b2",
+      "payload_sha256": "fdc5149eeae66a8c009ccd81bc3d0b87deb617a47af408752b2f9fe4b3b92809"
+    },
+    {
+      "path": "internal/domain/audit/retention_acceptance.go",
+      "base_sha256": "07244e50a1eed128af1403a2ea344d79c00b686a3b3fd1a9a4d37e0a3212514e",
+      "payload_sha256": "725f72371088326830e612fed452bf104079afb123ec3ff8cdd1623f51462315"
+    },
+    {
+      "path": "internal/domain/audit/retention_historical_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0770002d9a1fb50cec2b5cd21b21911028270ca973e9326f2c0b59fb51402982"
+    },
+    {
+      "path": "internal/domain/audit/retention_versions_test.go",
+      "base_sha256": null,
+      "payload_sha256": "08118607528c4cb656ca4fa25b6bbe15633c57d90249db66fc9aacb46231d655"
+    },
+    {
+      "path": "migrations/00057_retention_receipt_versions.sql",
+      "base_sha256": null,
+      "payload_sha256": "267f3a3f4e63a3e64145be7be55896076e0b06031b6d4a644ff3f1fccf0d211e"
+    },
+    {
+      "path": "migrations/queries/retention_sources.sql",
+      "base_sha256": "47f3e4a8a343db98333691e8fa4853af078e23cbf09caa81bba9eb1ee01af511",
+      "payload_sha256": "5c5e7d99be70685102558fe674d5c069447d57f6e96bec43618ee0013339978e"
+    },
+    {
+      "path": "test/integration/retention_catchup_test.go",
+      "base_sha256": "4dc8662de2c5e505f4e5ac01bb4932d7b59b17ba9357569b99d11217fd8f6ec1",
+      "payload_sha256": "3fe7fa82f89d94b81b3ecb71cb49fc871f1e7c2e4f6e8015b6dde4cb3ecfadd5"
+    },
+    {
+      "path": "test/integration/retention_receipt_history_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0c73d4e97615b6bcba526e9b650ae5ec3f9f74bc9b17a7ff500fbd03d346b76c"
+    },
+    {
+      "path": "test/integration/retention_receipt_plan_test.go",
+      "base_sha256": null,
+      "payload_sha256": "74c74639c69afec43a1f431897fc386a26f1f990dc7cec2bc5512270ab274eac"
+    },
+    {
+      "path": "test/integration/retention_receipt_sql_test.go",
+      "base_sha256": null,
+      "payload_sha256": "cb9bc0e63ef3d1292f88da57c9f5c3ebb5bede395a05c72e733159649ef792cc"
+    },
+    {
+      "path": "test/integration/retention_reconciler_test.go",
+      "base_sha256": "5e91c78d442f4eee50bf2d2d14a924ab35ba1c0e947a90ff71eb828be6810901",
+      "payload_sha256": "99d5b32f50cea410e206262bfaf7cd05bbbdbec8decc1a5eae885c61485cd947"
+    },
+    {
+      "path": "test/integration/retention_sources_test.go",
+      "base_sha256": "3acdf62399b79c842fcda5eff2466cc1d295753d114890ac7a0a679fc6b7f6d7",
+      "payload_sha256": "9613025835c3cb34ad73cefd24cf842ae77e8e259d4ca8c06808be1969413dac"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/retention_sources.sql.go",
+      "base_sha256": "904d63c7ac588b2d8d38ae492b9467e92ac2d94dd8ac4f2836e1a4361579c4f7",
+      "payload_sha256": "89e60331ca42eedf9ae9da4185fb2ed575faa0b437311b5e2ee275419010d9ff"
+    }
+  ],
+  "schema": 57,
+  "nativeQualified": false
+}

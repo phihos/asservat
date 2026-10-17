@@ -1,0 +1,16 @@
+{
+  "status": "integrated; qualification pending",
+  "manifestSHA256": "908d099a23a5775ea4c759e343aa271ecff0f093e9a144110a4c8ae81c5e5317",
+  "files": [
+    {
+      "path": "test/integration/public_context_journey_native_test.go",
+      "baseSHA256": "001420f3430669509b79b541db545fc4839f5e3f6e50d05b0df568d281f6e829",
+      "sha256": "7c7cad316addd3c643d70be6ed3eece03b8d54aa81f3bad1d75dfc2c0364b46b"
+    },
+    {
+      "path": "test/integration/public_context_owner_claim_test.go",
+      "baseSHA256": null,
+      "sha256": "42a3e23224c10f6a7608b094f923e2c6a293293e1b74c87108d3b07e1c8eabb1"
+    }
+  ]
+}

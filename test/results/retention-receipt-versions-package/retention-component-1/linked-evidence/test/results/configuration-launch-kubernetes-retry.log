@@ -1,0 +1,21 @@
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/matrix
+    configuration_launch_kube_test.go:59: native launch original operation: 4.689812369s; mode=matrix
+    configuration_launch_kube_test.go:59: actual Kubernetes source/guard/Secret/CAS and joined controller cleanup; synthetic SQL receipts/provider material and gated nonexecuting Pod; no initial guard bridge or installed runtime qualification
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/lost-claim
+    configuration_launch_kube_test.go:59: object is being deleted: namespaces "configuration-launch-100000000000" already exists
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/lost-launch
+    configuration_launch_kube_test.go:59: object is being deleted: namespaces "configuration-launch-100000000000" already exists
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/changed-enforcement
+    configuration_launch_kube_test.go:59: object is being deleted: namespaces "configuration-launch-100000000000" already exists
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/changed-input
+    configuration_launch_kube_test.go:59: object is being deleted: namespaces "configuration-launch-100000000000" already exists
+--- FAIL: TestConfigurationRuntimeLaunchWithRealKubernetes (29.76s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/matrix (29.71s)
+    --- FAIL: TestConfigurationRuntimeLaunchWithRealKubernetes/lost-claim (0.01s)
+    --- FAIL: TestConfigurationRuntimeLaunchWithRealKubernetes/lost-launch (0.01s)
+    --- FAIL: TestConfigurationRuntimeLaunchWithRealKubernetes/changed-enforcement (0.02s)
+    --- FAIL: TestConfigurationRuntimeLaunchWithRealKubernetes/changed-input (0.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	29.812s
+FAIL

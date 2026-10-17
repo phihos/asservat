@@ -1,0 +1,72 @@
+schemaVersion: grant/v1
+id: 00000000-0000-4000-8000-000000000040
+kind: AccessGrant
+spec:
+  requester:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  grantType: policy
+  target:
+    kind: policy
+    clusterID: 00000000-0000-4000-8000-000000000001
+    workloadUID: workload-ledger-uid
+    recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
+    policyUID: policy-ledger-memory-uid
+    executionDigest: 127313099fe43d953ffa3fe105c810c1de91122cdc8b80705fd91ac667e830b3
+  operations:
+  - runtimeDiagnostic
+  - command
+  - liveCore
+  reason: Capture a bounded diagnostic bundle on sustained memory pressure.
+  notAfter: '2026-11-08T12:00:00Z'
+  limits:
+    maxBytes: 8623489024
+    maxExecutions: 12
+    maxDuration: 60s
+  approver:
+    issuer: https://identity.example.invalid/realms/company
+    subject: incident-approver-456
+    clientID: asservat-browser
+    identityType: human
+  issuedAt: '2026-10-09T12:00:00Z'
+  approvalPolicyRef:
+    name: installation-default
+    digest: 7408dc1c2a95a5aa56803b5e4487dcc664d71b24143c680a99f4914f35b7ec51
+    maxAgeSeconds: 2592000
+  policyAuthority:
+    mode: team
+    installationID: 00000000-0000-4000-8000-000000000098
+    delegation:
+      uid: binding-payments-automation
+      generation: 1
+      digest: ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676
+    ownerAssignments:
+    - subject:
+        kind: Group
+        issuer: https://identity.example.invalid/realms/company
+        id: team-payments
+      role: workload-maintainer
+      basisKind: AccessBinding
+      basisUID: binding-payments-automation
+      basisDigest: ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676
+      assignmentID: 00000000-0000-4000-8000-000000000097
+    issuedAt: '2026-10-09T12:00:00Z'
+    notAfter: '2026-11-08T12:00:00Z'
+    limits:
+      maxExecutions: 100
+      maxBytes: 1099511627776
+      maxObservedBytes: 1099511627776
+  policyExecutor:
+    issuer: urn:asservat:installation:00000000-0000-4000-8000-000000000098
+    subject: policy:policy-ledger-memory-uid
+    clientID: policy-executor
+    identityType: workload
+status:
+  phase: Approved
+  revision: 1
+  reservedBytes: 0
+  spentBytes: 0
+  executionsSpent: 0
+  executionsReserved: 0

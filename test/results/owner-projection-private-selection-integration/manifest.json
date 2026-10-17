@@ -1,0 +1,15 @@
+{
+  "status": "source-only; frozen for review; actual old-test failure retained",
+  "scope": "single fixture callback adapts selected execution/finalization split; no production change",
+  "paths": {
+    "internal/adapters/kubernetes/owner_projection_preflight_test.go": {
+      "beforeSHA256": "5dd91497bd32a8526a22de5655c2b16b77de2123dc77090091cc9c8f9d78591e",
+      "afterSHA256": "3f7b1a546d41405c0926a59559688c481076ffc30c74e1abf905d686e03f196a"
+    }
+  },
+  "patchSHA256": "d37dd6b6067210839404f6798aec7a5a6bee18a01c16ac6f8ccc2de8450da68f",
+  "observedBeforeSHA256": "6123ba07da029d7a3918d744862f8ab8a4ce3d144c45f0d3af26b6789df708e3",
+  "cause": "Advance now executes then finalizes through two independent authority-lock callbacks; old callback asserted zero cumulative private reads on both entries, despite execution completing two reads before finalization. It erroneously failed the otherwise positive acknowledgement.",
+  "fixedAssertion": "First lock: zero private reads then exact synthetic RV mutation. Second lock: successful private-version case only, exactly two prior reads, no second mutation. Final positive result: exactly two bridge entries/four total private reads/zero unlocked reads. Existing replaced/missing/unpinned zero-effect denials retained.",
+  "qualificationRequired": "rerun full TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection with all four children under original15m race ceiling; actual production full Go and native follow later"
+}

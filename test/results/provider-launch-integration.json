@@ -1,0 +1,23 @@
+{
+  "scope": "Qualified original worker/owner phase and joined-shutdown components. Native qualification and runtime selection remain pending.",
+  "paths": 55,
+  "dependenciesVerified": {
+    "worker": 2551,
+    "owner": 2551,
+    "worker-self": 2551
+  },
+  "layers": [
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_launch_operation.go",
+      "previous": "6c83259ac7a8f6cb1908b780c9a57cb7d77b1895853937b69a7763d078551750",
+      "selected": "c0a0dabba9bfc70b6ba6933464d39320f2a8edf86c680e77bd0a7e905c9bf8c7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_launch_operation_test.go",
+      "previous": "4a3ae3ec5d8f8e15fc82ced21218a65a315e86cbe366e116e36890b472f68bd8",
+      "selected": "5bc93a1e3df6fd0db0f5c0226d062bae0490947ae38c6fa83eb454f34d51ee42"
+    }
+  ],
+  "manifest": "test/results/provider-launch-package/manifest.json",
+  "manifestSHA256": "9b066d7c657cc9049ea9ab5a06adcf7137770a9126e4f7378daf27ae7b659b30"
+}

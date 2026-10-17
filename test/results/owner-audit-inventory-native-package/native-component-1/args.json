@@ -1,0 +1,16 @@
+[
+  "api",
+  "cmd",
+  "internal",
+  "migrations",
+  "test/integration",
+  "test/fixtures",
+  "web",
+  "go.mod",
+  "go.sum",
+  "sqlc.yaml",
+  "Makefile",
+  "scripts/check-go-architecture.py",
+  "scripts/test-custody.py",
+  "docs/architecture/catalog.yaml"
+]

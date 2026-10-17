@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/domain/artifact	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.263s
+ok  	asservat.local/asservat/internal/transport/browser	(cached)

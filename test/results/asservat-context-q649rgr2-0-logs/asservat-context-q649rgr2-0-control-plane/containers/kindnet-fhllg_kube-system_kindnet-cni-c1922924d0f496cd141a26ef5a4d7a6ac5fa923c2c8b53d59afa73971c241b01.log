@@ -1,0 +1,33 @@
+2026-10-15T14:53:46.832666282Z stderr F I1015 14:53:46.832578       1 main.go:413] probe TCP address asservat-context-q649rgr2-0-control-plane:6443
+2026-10-15T14:53:46.833613788Z stderr F I1015 14:53:46.833522       1 main.go:114] connected to apiserver: https://asservat-context-q649rgr2-0-control-plane:6443
+2026-10-15T14:53:46.833682518Z stderr F I1015 14:53:46.833659       1 main.go:144] hostIP = 172.18.0.2
+2026-10-15T14:53:46.833685838Z stderr F podIP = 172.18.0.2
+2026-10-15T14:53:46.83400738Z stderr F I1015 14:53:46.833954       1 main.go:153] setting mtu 1500 for CNI 
+2026-10-15T14:53:46.83401143Z stderr F I1015 14:53:46.833974       1 main.go:183] kindnetd IP family: "ipv4"
+2026-10-15T14:53:46.83402667Z stderr F I1015 14:53:46.833997       1 main.go:187] noMask IPv4 subnets: [10.244.0.0/16]
+2026-10-15T14:53:46.855542909Z stderr F I1015 14:53:46.855492       1 controller.go:173] "Starting controller" name="kube-network-policies"
+2026-10-15T14:53:46.855547169Z stderr F I1015 14:53:46.855506       1 controller.go:178] "Waiting for the policy engine to become ready..."
+2026-10-15T14:53:47.356468194Z stderr F I1015 14:53:47.356380       1 controller.go:185] "Policy engine is ready."
+2026-10-15T14:53:47.356482144Z stderr F I1015 14:53:47.356401       1 metrics.go:72] Registering metrics
+2026-10-15T14:53:47.356568495Z stderr F I1015 14:53:47.356536       1 controller.go:462] "Syncing nftables rules" logger="nftables-sync"
+2026-10-15T14:53:47.363344856Z stderr F I1015 14:53:47.363305       1 controller.go:465] "Syncing nftables rules" logger="nftables-sync" elapsed="6.75224ms"
+2026-10-15T14:53:56.856409502Z stderr F I1015 14:53:56.856306       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:53:56.856415393Z stderr F I1015 14:53:56.856364       1 main.go:324] handling current node
+2026-10-15T14:54:06.86238706Z stderr F I1015 14:54:06.862303       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:06.86239357Z stderr F I1015 14:54:06.862325       1 main.go:324] handling current node
+2026-10-15T14:54:16.863343174Z stderr F I1015 14:54:16.863238       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:16.863350134Z stderr F I1015 14:54:16.863263       1 main.go:324] handling current node
+2026-10-15T14:54:26.862100583Z stderr F I1015 14:54:26.862041       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:26.862106153Z stderr F I1015 14:54:26.862060       1 main.go:324] handling current node
+2026-10-15T14:54:36.865199579Z stderr F I1015 14:54:36.865076       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:36.865204909Z stderr F I1015 14:54:36.865095       1 main.go:324] handling current node
+2026-10-15T14:54:46.858584421Z stderr F I1015 14:54:46.858500       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:46.858590281Z stderr F I1015 14:54:46.858522       1 main.go:324] handling current node
+2026-10-15T14:54:56.863364527Z stderr F I1015 14:54:56.863302       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:54:56.863370027Z stderr F I1015 14:54:56.863322       1 main.go:324] handling current node
+2026-10-15T14:55:06.860777498Z stderr F I1015 14:55:06.860691       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:55:06.860785198Z stderr F I1015 14:55:06.860712       1 main.go:324] handling current node
+2026-10-15T14:55:16.863409741Z stderr F I1015 14:55:16.863309       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:55:16.863417171Z stderr F I1015 14:55:16.863335       1 main.go:324] handling current node
+2026-10-15T14:55:26.864379266Z stderr F I1015 14:55:26.864305       1 main.go:320] Handling node with IPs: map[172.18.0.2:{}]
+2026-10-15T14:55:26.864384777Z stderr F I1015 14:55:26.864324       1 main.go:324] handling current node

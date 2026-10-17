@@ -1,0 +1,466 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication
+=== RUN   TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry
+=== RUN   TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect
+=== RUN   TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles
+=== RUN   TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec
+=== RUN   TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version
+=== RUN   TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit
+=== RUN   TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit
+=== RUN   TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart
+=== RUN   TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock
+--- PASS: TestPermissionAuthorityWithRealServices (1.35s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable (0.31s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication (0.07s)
+    --- PASS: TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles (0.11s)
+    --- PASS: TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec (0.07s)
+    --- PASS: TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart (0.13s)
+    --- PASS: TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock (0.26s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/actor
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/request
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt
+--- PASS: TestEnrollmentBootstrapIssuanceWithRealServices (1.07s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit (0.34s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token (0.09s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit (0.04s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/suspended (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/recovery (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/epoch (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/revision (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/actor (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/request (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock (0.33s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt (0.05s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record
+--- PASS: TestEnrollmentBootstrapReservationsWithRealServices (0.54s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry (0.09s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot (0.03s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot (0.02s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/suspended (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/revision (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-lock (0.31s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record (0.01s)
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-new-context-admission
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-verification
+=== RUN   TestContextAdmissionWithRealServices/recovery-blocks-publication
+=== RUN   TestContextAdmissionWithRealServices/retention-source-fences-verification
+=== RUN   TestContextAdmissionWithRealServices/retention-source-fences-publication
+=== RUN   TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable
+=== RUN   TestContextAdmissionWithRealServices/verification-audit-failure-stays-invisible
+=== RUN   TestContextAdmissionWithRealServices/generic-custody-cannot-publish
+=== RUN   TestContextAdmissionWithRealServices/publication-rechecks-locked-authority-and-expiry
+=== RUN   TestContextAdmissionWithRealServices/download-worker-request-owners
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-channel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-replay
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-budget
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-parallel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-change-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock
+=== RUN   TestContextAdmissionWithRealServices/download-worker-missing-configuration
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-mutated
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fence-order
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-rollback
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-suspended
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fenced
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-short-runtime
+=== RUN   TestContextAdmissionWithRealServices/download-worker-parallel-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-binding-replacement
+=== RUN   TestContextAdmissionWithRealServices/download-worker-capacity-held
+=== RUN   TestContextAdmissionWithRealServices/download-worker-expired-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-blocked-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-suspended-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-epoch-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-revision-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-expired-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-recovery-waiter-expiry-and-installation-binding
+=== RUN   TestContextAdmissionWithRealServices/download-retention-source-fences-prepaid-output
+=== RUN   TestContextAdmissionWithRealServices/download-retention-shortening-fences-an-active-transfer
+=== RUN   TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart
+=== RUN   TestContextAdmissionWithRealServices/download-audit-native-read-cancel-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/download-key-three-slots
+=== RUN   TestContextAdmissionWithRealServices/download-key-parallel-slot
+=== RUN   TestContextAdmissionWithRealServices/download-key-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-key-peer-mismatch
+=== RUN   TestContextAdmissionWithRealServices/download-key-foreign-artifact
+=== RUN   TestContextAdmissionWithRealServices/download-key-cancelled
+=== RUN   TestContextAdmissionWithRealServices/download-key-recovery-blocked
+=== RUN   TestContextAdmissionWithRealServices/download-key-permission-changed
+=== RUN   TestContextAdmissionWithRealServices/download-key-retention-shortened
+=== RUN   TestContextAdmissionWithRealServices/download-key-crypto-failure-keeps-spend
+=== RUN   TestContextAdmissionWithRealServices/download-key-expired-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-missing-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-expired-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-different-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/download-key-worker-expired-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-worker-expired-after-child-lock
+=== RUN   TestContextAdmissionWithRealServices/download-key-legacy-worker-proof
+=== RUN   TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3
+    download_sessions_test.go:1215: local service: actual TLS, SQL authority and S3 nativeBytes=352; two batches, three unwraps each
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+=== RUN   TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-principal-limit-spans-clients-cancellation-does-not-free-writer
+=== RUN   TestContextAdmissionWithRealServices/download-allocation-isolation-and-current-revocation
+=== RUN   TestContextAdmissionWithRealServices/download-installation-stream-cap-and-late-generation
+=== RUN   TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation
+=== RUN   TestContextAdmissionWithRealServices/retention-shortening-is-concurrent-monotonic-and-signed
+=== RUN   TestContextAdmissionWithRealServices/overdue-shortening-blocks-read-and-commit-before-audit
+=== RUN   TestContextAdmissionWithRealServices/closed-readable-interval-preserves-hard-deadline-and-cleanup
+=== RUN   TestContextAdmissionWithRealServices/retention-waiter-rechecks-freshness-after-lock
+=== RUN   TestContextAdmissionWithRealServices/retention-ready-requires-watermark-catchup-and-audit
+=== RUN   TestContextAdmissionWithRealServices/retention-source-bootstrap-and-eight-way-idempotency
+=== RUN   TestContextAdmissionWithRealServices/retention-source-restart-preserves-shortening-before-relaxation
+=== RUN   TestContextAdmissionWithRealServices/retention-source-expiry-rechecked-after-root-lock
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising
+=== RUN   TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission
+=== RUN   TestContextAdmissionWithRealServices/missing-recovery-proof
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-installation
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-epoch
+=== RUN   TestContextAdmissionWithRealServices/wrong-recovery-revision
+=== RUN   TestContextAdmissionWithRealServices/wrong-target
+=== RUN   TestContextAdmissionWithRealServices/forged-audience
+=== RUN   TestContextAdmissionWithRealServices/wrong-store
+=== RUN   TestContextAdmissionWithRealServices/wrong-allocation
+=== RUN   TestContextAdmissionWithRealServices/missing-membership
+=== RUN   TestContextAdmissionWithRealServices/expired-identity
+=== RUN   TestContextAdmissionWithRealServices/different-permission-revision
+=== RUN   TestContextAdmissionWithRealServices/plaintext-native-ceiling
+=== RUN   TestContextAdmissionWithRealServices/capture-retention-proof-required-and-current
+=== RUN   TestContextAdmissionWithRealServices/source-restart-invalidates-old-proof-without-new-approval-scope
+=== RUN   TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation
+=== RUN   TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait
+=== RUN   TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission
+=== RUN   TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable
+=== RUN   TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry
+=== RUN   TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority
+--- PASS: TestContextAdmissionWithRealServices (71.18s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-new-context-admission (0.47s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-verification (0.34s)
+    --- PASS: TestContextAdmissionWithRealServices/recovery-blocks-publication (0.32s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-fences-verification (0.28s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-fences-publication (0.32s)
+    --- PASS: TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable (1.06s)
+    --- PASS: TestContextAdmissionWithRealServices/verification-audit-failure-stays-invisible (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/generic-custody-cannot-publish (0.35s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-rechecks-locked-authority-and-expiry (0.54s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-request-owners (2.86s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-channel (1.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-replay (1.37s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited (1.40s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-budget (1.88s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-parallel (1.26s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-change-key (1.22s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-roles (1.20s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse (1.31s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock (1.30s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-missing-configuration (0.47s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-mutated (0.55s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-roles (0.63s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fence-order (0.55s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired (1.59s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-rollback (0.62s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-suspended (0.78s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fenced (0.59s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (1.26s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (1.33s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-short-runtime (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-parallel-claim (0.82s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-unaudited (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-binding-replacement (1.17s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-capacity-held (0.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-expired-claim (1.12s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (1.14s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-blocked-fences-prepaid-output (0.53s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-suspended-fences-prepaid-output (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-epoch-fences-prepaid-output (0.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-revision-fences-prepaid-output (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-expired-fences-prepaid-output (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/download-recovery-waiter-expiry-and-installation-binding (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-retention-source-fences-prepaid-output (0.51s)
+    --- PASS: TestContextAdmissionWithRealServices/download-retention-shortening-fences-an-active-transfer (0.59s)
+    --- PASS: TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart (0.55s)
+    --- PASS: TestContextAdmissionWithRealServices/download-audit-native-read-cancel-uncertain-spend (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-three-slots (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-parallel-slot (0.60s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-unaudited (0.48s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-peer-mismatch (0.55s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-foreign-artifact (0.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-cancelled (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-recovery-blocked (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-permission-changed (0.64s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-retention-shortened (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-crypto-failure-keeps-spend (0.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-expired-after-lock (1.43s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-missing-worker-proof (0.48s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-expired-worker-proof (0.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-different-worker-proof (0.48s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-worker-expired-after-lock (1.44s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-worker-expired-after-child-lock (1.44s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-legacy-worker-proof (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3 (1.09s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock (0.69s)
+    --- PASS: TestContextAdmissionWithRealServices/download-principal-limit-spans-clients-cancellation-does-not-free-writer (0.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-allocation-isolation-and-current-revocation (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/download-installation-stream-cap-and-late-generation (0.82s)
+    --- PASS: TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-shortening-is-concurrent-monotonic-and-signed (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/overdue-shortening-blocks-read-and-commit-before-audit (0.41s)
+    --- PASS: TestContextAdmissionWithRealServices/closed-readable-interval-preserves-hard-deadline-and-cleanup (0.39s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-waiter-rechecks-freshness-after-lock (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-ready-requires-watermark-catchup-and-audit (0.59s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-bootstrap-and-eight-way-idempotency (0.12s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-restart-preserves-shortening-before-relaxation (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-source-expiry-rechecked-after-root-lock (0.21s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising (0.52s)
+    --- PASS: TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-recovery-proof (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-installation (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-epoch (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-recovery-revision (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-target (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/forged-audience (0.13s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-store (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-allocation (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-membership (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/expired-identity (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/different-permission-revision (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/plaintext-native-ceiling (0.12s)
+    --- PASS: TestContextAdmissionWithRealServices/capture-retention-proof-required-and-current (0.18s)
+    --- PASS: TestContextAdmissionWithRealServices/source-restart-invalidates-old-proof-without-new-approval-scope (0.16s)
+    --- PASS: TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation (0.24s)
+    --- PASS: TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait (0.42s)
+    --- PASS: TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission (0.13s)
+    --- PASS: TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable (0.20s)
+    --- PASS: TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry (5.07s)
+    --- PASS: TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority (0.13s)
+=== RUN   TestCustodyWithRealServices
+=== RUN   TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge
+=== RUN   TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission
+=== RUN   TestCustodyWithRealServices/protected_backing_cannot_be_overallocated
+=== RUN   TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_register
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_store
+=== RUN   TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished
+=== RUN   TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting
+    custody_test.go:528: real S3: current and noncurrent versions, delete marker and multipart parts removed; neighbor preserved; writer barrier failure kept charge
+=== RUN   TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation
+--- PASS: TestCustodyWithRealServices (8.83s)
+    --- PASS: TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge (5.04s)
+    --- PASS: TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission (0.30s)
+    --- PASS: TestCustodyWithRealServices/protected_backing_cannot_be_overallocated (0.04s)
+    --- PASS: TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks (0.01s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_register (0.50s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_store (0.50s)
+    --- PASS: TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished (0.09s)
+    --- PASS: TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting (2.10s)
+    --- PASS: TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation (0.22s)
+=== RUN   TestEnrollmentSigningWithRealServices
+=== RUN   TestEnrollmentSigningWithRealServices/claim-audit-required
+=== RUN   TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning
+=== RUN   TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume
+=== RUN   TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result
+=== RUN   TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign
+=== RUN   TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds
+=== RUN   TestEnrollmentSigningWithRealServices/missing-certificate-audit
+=== RUN   TestEnrollmentSigningWithRealServices/revoked-bootstrap
+=== RUN   TestEnrollmentSigningWithRealServices/changed-trust
+=== RUN   TestEnrollmentSigningWithRealServices/new-epoch
+=== RUN   TestEnrollmentSigningWithRealServices/recovery
+=== RUN   TestEnrollmentSigningWithRealServices/expiry-while-activation-waits
+=== RUN   TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history
+--- PASS: TestEnrollmentSigningWithRealServices (12.09s)
+    --- PASS: TestEnrollmentSigningWithRealServices/claim-audit-required (0.10s)
+    --- PASS: TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning (0.36s)
+    --- PASS: TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume (0.01s)
+    --- PASS: TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result (0.10s)
+    --- PASS: TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign (0.08s)
+    --- PASS: TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds (10.09s)
+    --- PASS: TestEnrollmentSigningWithRealServices/missing-certificate-audit (0.04s)
+    --- PASS: TestEnrollmentSigningWithRealServices/revoked-bootstrap (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/changed-trust (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/new-epoch (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/recovery (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/expiry-while-activation-waits (1.02s)
+    --- PASS: TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history (0.06s)
+=== RUN   TestEnrollmentWithRealServices
+=== RUN   TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing
+=== RUN   TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable
+=== RUN   TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart
+=== RUN   TestEnrollmentWithRealServices/competing-keys-have-one-winner
+=== RUN   TestEnrollmentWithRealServices/secret
+=== RUN   TestEnrollmentWithRealServices/replacement-key
+=== RUN   TestEnrollmentWithRealServices/revocation-after-claim
+=== RUN   TestEnrollmentWithRealServices/epoch
+=== RUN   TestEnrollmentWithRealServices/recovery
+=== RUN   TestEnrollmentWithRealServices/stale-trust
+=== RUN   TestEnrollmentWithRealServices/expired
+=== RUN   TestEnrollmentWithRealServices/expiry-during-lock
+--- PASS: TestEnrollmentWithRealServices (0.78s)
+    --- PASS: TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing (0.32s)
+    --- PASS: TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable (0.00s)
+    --- PASS: TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart (0.06s)
+    --- PASS: TestEnrollmentWithRealServices/competing-keys-have-one-winner (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/secret (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/replacement-key (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/revocation-after-claim (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/stale-trust (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/expired (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/expiry-during-lock (0.32s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/epoch
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/source-uid
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/regressed-generation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/expired-lock
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer
+--- PASS: TestEnrollmentFleetObservationWithRealPostgres (0.42s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear (0.04s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/epoch (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/source-uid (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/regressed-generation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/expired-lock (0.31s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer (0.01s)
+=== RUN   TestPeerRegistryWithRealServices
+=== RUN   TestPeerRegistryWithRealServices/read-role-cannot-mint-authority
+=== RUN   TestPeerRegistryWithRealServices/active
+=== RUN   TestPeerRegistryWithRealServices/revocation
+=== RUN   TestPeerRegistryWithRealServices/root-suspended
+=== RUN   TestPeerRegistryWithRealServices/recovery
+=== RUN   TestPeerRegistryWithRealServices/epoch
+=== RUN   TestPeerRegistryWithRealServices/cluster
+=== RUN   TestPeerRegistryWithRealServices/missing-audit
+=== RUN   TestPeerRegistryWithRealServices/expired-trust
+=== RUN   TestPeerRegistryWithRealServices/invalid-trust-revision
+=== RUN   TestPeerRegistryWithRealServices/expired-peer
+=== RUN   TestPeerRegistryWithRealServices/unknown-certificate
+=== RUN   TestPeerRegistryWithRealServices/rotation
+=== RUN   TestPeerRegistryWithRealServices/blocked-read
+--- PASS: TestPeerRegistryWithRealServices (5.21s)
+    --- PASS: TestPeerRegistryWithRealServices/read-role-cannot-mint-authority (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/active (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/revocation (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/root-suspended (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/recovery (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/epoch (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/cluster (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/missing-audit (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-trust (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/invalid-trust-revision (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-peer (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/unknown-certificate (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/rotation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/blocked-read (5.01s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/deleted
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expired-source
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/scope-tamper
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/actor-substitution
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/removed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/team-deny
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/role-boundaries
+--- PASS: TestPermissionAuthorityPoliciesWithRealServices (2.77s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency (0.45s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance (0.13s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner (0.12s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority (0.11s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement (0.11s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/deleted (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expired-source (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/scope-tamper (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/actor-substitution (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/removed-envelope (0.20s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/team-deny (0.20s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope (0.30s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust (0.30s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance (0.06s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope (0.04s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation (0.04s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/role-boundaries (0.07s)
+PASS
+ok  	asservat.local/asservat/test/integration	105.315s

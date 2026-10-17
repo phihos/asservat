@@ -1,0 +1,27 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    native_exchange_test.go:536: native diagnostic worker opening 0
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    download_sessions_test.go:683: native context initial session resolved
+    native_exchange_test.go:442: native diagnostic connector admission terminal 74.500107ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:683: native context pending metadata read completed
+    download_sessions_test.go:683: native context initial source resolved
+    native_exchange_test.go:536: native diagnostic worker opening 1
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 34.95472ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 2
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 76.328909ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 3
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 666.468743ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 3 no native command admitted
+    download_sessions_test.go:683: original preparation continuation {false} download unavailable
+--- FAIL: TestContextAdmissionWithRealServices (11.45s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-resume (11.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	11.497s
+FAIL

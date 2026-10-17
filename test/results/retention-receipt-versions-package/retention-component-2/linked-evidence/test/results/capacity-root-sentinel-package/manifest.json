@@ -1,0 +1,20 @@
+{
+  "scope": "SQL54 root phase sentinel validation only, unchanged positive digest helper and original phase/revision semantics",
+  "files": [
+    {
+      "path": "migrations/00054_protected_capacity.sql",
+      "base_sha256": "c7d0d5b14128903bf137907388aa8f0c9181be245aac22b6900496a33a567fb5",
+      "payload_sha256": "5844e911703801290593c8df205975bafad7811f99323597e962e8d4919ae3b5"
+    },
+    {
+      "path": "test/integration/capacity_root_configuration_test.go",
+      "base_sha256": null,
+      "payload_sha256": "296735ce078f30e5b6ca154d44c35fb62c0144dc2eff18908220e6fabaad70b5"
+    },
+    {
+      "path": "test/integration/capacity_sql_matrix_test.go",
+      "base_sha256": "2c4ffe50961c6de9460af5b1b74a116cb15061d6403b332fa7c279fee62094bb",
+      "payload_sha256": "6854eaf76adf815f1f04c8d39a0ceeb65afd3204bde939452eee49715b1570fd"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "integration_report_sha256": "7df6dc407f0a2ce6de873e1e7de84a7a6c8c03e1276c2d67eda0b1b73dab958e",
+  "delta": {
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/audit-key.json": {
+      "before": null,
+      "after": "167d3932f4ba571d17261731d9c56da926068d0a4a295ede407c788a977d7fae"
+    },
+    "internal/adapters/kms/owner_provider_recipe_compatibility_test.go": {
+      "before": null,
+      "after": "2047b8a3300b8024ee94eb30186acc37e7f47bedea4f47fef319524b97bbdca7"
+    },
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/account-uid.json": {
+      "before": null,
+      "after": "f4eb0a5f558b782d0ae28959e670f0b6d924d714b264ebca2cbfd3668a89417b"
+    },
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json": {
+      "before": null,
+      "after": "df0c6caf6c69521f2c3fd6de9e6dc2dd80b1fd3e403b86ea1996619a11cf63f7"
+    },
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/server-role.json": {
+      "before": null,
+      "after": "c8232fb0f796d1550c358b6e5db9effa660051501db3f2e583568e12a4802af4"
+    },
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/namespace-uid.json": {
+      "before": null,
+      "after": "7b090166738beee6638e1da8f36f6d62b9b2fa25b35929a23147aa07d9216938"
+    },
+    "internal/adapters/kms/owner_provider_recipe.go": {
+      "before": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+      "after": "f43e76d9a624b4db66c2165a70ff84f840a4593d6203498aa486062fbc2eaf0d"
+    },
+    "internal/adapters/kms/testdata/owner-provider-recipe-v1/original.json": {
+      "before": null,
+      "after": "76f010cf3d52023b2b5a80f104ee076e62177566fb1bc68620048f4c3538b051"
+    },
+    "internal/adapters/providerconfig/owner_provider_recipe.go": {
+      "before": null,
+      "after": "b0a4852552ecfbfd9826310000417c99c7ef92ad8d9111cf3803ce49e49c765f"
+    }
+  }
+}

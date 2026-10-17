@@ -1,0 +1,263 @@
+{
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile-helper",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-buildvcs=false",
+        "-o",
+        "/tmp/asservat-direct-har-k3xddyq8/observation-native",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/data.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/enrollment.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/inputs.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/main.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/metrics.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/runtime.go"
+      ],
+      "exit": 0,
+      "seconds": 11.045,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "compile-integration",
+      "command": [
+        "go",
+        "test",
+        "-c",
+        "-vet=off",
+        "-o",
+        "/tmp/asservat-direct-har-k3xddyq8/integration.test",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 17.855,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "wire-parity",
+      "command": [
+        "/tmp/asservat-direct-har-k3xddyq8/integration.test",
+        "-test.run=^TestDirectNativeFixtureWireParity$",
+        "-test.v",
+        "-test.timeout=60s"
+      ],
+      "exit": 0,
+      "seconds": 0.181,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 1,
+      "skips": 0
+    },
+    {
+      "phase": "vet-helper",
+      "command": [
+        "go",
+        "vet",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/data.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/enrollment.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/inputs.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/main.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/metrics.go",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/runtime.go"
+      ],
+      "exit": 0,
+      "seconds": 1.729,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "vet-integration",
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.23,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "python3",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror/scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "seconds": 0.976,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "harness-offline",
+      "command": [
+        "python3",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/check_harness.py",
+        "/tmp/asservat-direct-har-k3xddyq8/mirror"
+      ],
+      "exit": 0,
+      "seconds": 0.226,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 16748658688
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

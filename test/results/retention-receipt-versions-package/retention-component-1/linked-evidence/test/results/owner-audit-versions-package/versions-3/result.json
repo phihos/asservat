@@ -1,0 +1,64 @@
+{
+  "started": 1791891973.7643871,
+  "manifest": "b8c2e17945d9f77270b43bd5e2ebbc2486866a8276b860ed632ee8b197a48ba8",
+  "dependencies": "9a464b117c9e22e6b8af66b41d6919138ddee4ebdd848940066640a442277444",
+  "runner": "ee071eb8d2fe7116c459c031e9456be20f6be49ca6653c31d774334d9111e839",
+  "native": false,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": [],
+    "pinned_progress": [],
+    "prior_evidence": []
+  },
+  "phases": [
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 2,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 4.001328468322754,
+      "log_sha256": "353298f4358d4db85e391f887f891ee240aaf5cd0e0271cea7c72d5317875935",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": [],
+        "pinned_progress": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    }
+  ],
+  "boot_id": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "excluded_live_paths": [
+    "docs/implementation-progress.md"
+  ],
+  "tmpdir": "/tmp/asservat-owner-audit-versions-3-_thncby6",
+  "tmp_free_before": 16780025856,
+  "mirror_changed": [],
+  "exit": 2,
+  "ended": 1791891978.324843,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": [],
+    "pinned_progress": [],
+    "prior_evidence": []
+  },
+  "tmpdir_removed": true
+}

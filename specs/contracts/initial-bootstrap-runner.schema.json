@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-runner.schema.json",
+  "title": "Fixed Helm runner source references",
+  "description": "At most 2 KiB, stable Secret names only. Never private material or generated installation pins. All four commands use the independently protected canonical input and original effect journals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "producerSecret",
+    "schemaSecret",
+    "retirementSecret"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bootstrap-runner/v1"
+    },
+    "producerSecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "schemaSecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "retirementSecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "registrySecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    }
+  }
+}

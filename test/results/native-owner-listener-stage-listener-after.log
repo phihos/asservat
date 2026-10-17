@@ -1,0 +1,12 @@
+=== RUN   TestNativeServeActualH2AndJoinedCancellation
+--- PASS: TestNativeServeActualH2AndJoinedCancellation (0.01s)
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/http1
+    server_test.go:119: unsupported handshake admitted <nil> 0
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose
+--- FAIL: TestNativeServeRejectsHTTP1AndClientOnlyServer (0.01s)
+    --- FAIL: TestNativeServeRejectsHTTP1AndClientOnlyServer/http1 (0.01s)
+    --- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	0.042s
+FAIL

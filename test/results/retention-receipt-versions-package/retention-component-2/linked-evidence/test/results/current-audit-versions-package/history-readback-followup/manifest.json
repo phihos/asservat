@@ -1,0 +1,7 @@
+[
+  {
+    "path": "test/integration/worker_audit_history_versions_test.go",
+    "base_sha256": "53a5529e2acf4ba9ba86155a4c41510fba51ecefc7dd7411b563eca32fdcb66c",
+    "payload_sha256": "a7ffe9465c2b3a68990d2ceba7ac5e31b8b346d5e3714085274ab1c18c4b0c03"
+  }
+]

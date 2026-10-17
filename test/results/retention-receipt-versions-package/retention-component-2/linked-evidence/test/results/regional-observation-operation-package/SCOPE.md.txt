@@ -1,0 +1,9 @@
+# Regional native operation — unbuilt source
+
+This follow-up uses the reviewed ADR150 operation-owned v2 semantics. It depends on the separately frozen owner primitive's private proveObject extraction. It does not modify that checkpoint, v1 general readers, shared deployment carriers, wire codecs, SQL49 or runtime selection.
+
+Owned new paths: internal/adapters/kubernetes/connector_observation_operation.go, connector_observation_operation_native.go, connector_observation_operation_test.go. The concrete constructor owns the installed source/workload guard plans and complete regional pin. Begin performs independent source/native workload guards plus online Pod-token/account/Pod/RS/Deployment/template checks; Read admits exactly four ordered actual full source decodes, with a final independent bracket at ordinal four followed by its last actual full source decode. Thus a changed source seen during final guard probing is compared after the bracket, with all original and final deadlines preserved. Unknown/change/expiry/cancellation is terminal; Close joins actual reads.
+
+Native values are explicitly v2 observations. They do not implement old full-proof ports or establish current SQL activation, cryptographic channel binding or process key ownership. The future purpose-specific application port and mtls adapter must add unchanged current process/leaf/root checks at every ordinal and retain four numbered challenges. No activation from file presence or capability inference.
+
+No build or native result exists for this stage. Complete two-cluster <=5s availability remains required.

@@ -1,0 +1,34 @@
+{
+  "phase": "go-architecture",
+  "command": [
+    "python3",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v3/architecture-mirror/scripts/check-go-architecture.py"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "expectedExit": 0,
+  "expectedFailureOccurrences": null,
+  "seconds": 2.651,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "reusedEvidence": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "reusedEvidence": [],
+    "freeze": []
+  }
+}

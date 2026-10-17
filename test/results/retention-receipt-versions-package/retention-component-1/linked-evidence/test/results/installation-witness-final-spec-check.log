@@ -1,0 +1,3 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 64 schemas, 48 MCP tools, 165 examples, 176 requirements, 176 scenarios, 11 tasks, 2136 local links, 526 rejected invalid examples (8648 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.

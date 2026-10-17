@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/capture_cleanup_projection.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/capture_cleanup_projection.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_bootstrap.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/initial_bootstrap.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_bootstrap_observation.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/initial_bootstrap_observation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_bootstrap_state.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/initial_bootstrap_state.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/initial_runtime_bridge.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/legacy_input_ownership_test.go": "/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/files/internal/adapters/kubernetes/legacy_input_ownership_test.go"
+  }
+}

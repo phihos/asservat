@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-39",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure. The hub-worker restarted 5 times with 'service stopped at capacity/open (unavailable)'. The nested stage was lost because the fixed-step wrapper did not compose inner steps; it now does.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

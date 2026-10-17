@@ -1,0 +1,12 @@
+{
+  "docs/architecture/cluster-observations.md": "2db3e728076073788c315ff6cdff3d6d789b192f582f5cff5b3f82d506073323",
+  "docs/decisions/144-cluster-local-observations.md": "267b5859ab8983e261af7f6c37bb449b2f2988bcb173d45ed507f0058b850166",
+  "internal/adapters/mtls/owner_observation_routing.go": "7792261f4f6d7444d308a881bde632fc1a8d38b6abb72f5d388f7abd645a3f6f",
+  "internal/adapters/mtls/owner_observation_routing_test.go": "7773f71632b5799892b2fbd681a523fc587e81f3604c73a10b0beeab679b8b1b",
+  "internal/domain/fleet/cluster_observation_routing_peers.go": "6b6e666b30fe860f6057e309ef5d15dab70eb95fa8f8a1f2948aa30a7390d11e",
+  "internal/domain/fleet/cluster_observation_routing_peers_test.go": "3bd9a34042c210de5a2476f8f8fdbb8d23ff9436d2e37a6f3f672c631a054854",
+  "internal/domain/fleet/owner.go": "520746b190ce9fcaa2be82f3053070a2e3cfa3568067488f467a35f727694c07",
+  "internal/transport/clusterobservation/routing_handler.go": "3b8ed71db45b2d633c0ac46cfd18a629f5067b65b55d96efc765c96b3017cf31",
+  "internal/transport/clusterobservation/routing_handler_test.go": "a90d158cb881706c75efdb9d9c99b24264e9b919c0f435295fc2d985137734d4",
+  "internal/transport/clusterobservation/routing_wire.go": "e1d6271a0ed1db22eb70e735742aa585691afd0ba20ebc22f0516eabc99c1e90"
+}

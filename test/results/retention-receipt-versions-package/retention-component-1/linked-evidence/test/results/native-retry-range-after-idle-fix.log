@@ -1,0 +1,33 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    native_exchange_test.go:520: native diagnostic worker opening 0
+    native_exchange_test.go:425: native diagnostic connector admission entered
+    download_sessions_test.go:672: native context initial session resolved
+    native_exchange_test.go:426: native diagnostic connector admission terminal 45.60326ms no native command admitted
+    native_exchange_test.go:522: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:672: native context pending metadata read completed
+    download_sessions_test.go:672: native context initial source resolved
+    native_exchange_test.go:520: native diagnostic worker opening 1
+    native_exchange_test.go:425: native diagnostic connector admission entered
+    native_exchange_test.go:426: native diagnostic connector admission terminal 38.429538ms no native command admitted
+    native_exchange_test.go:522: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:520: native diagnostic worker opening 2
+    native_exchange_test.go:425: native diagnostic connector admission entered
+    native_exchange_test.go:426: native diagnostic connector admission terminal 41.066617ms no native command admitted
+    native_exchange_test.go:522: native diagnostic worker open terminal 2 no native command admitted
+    native_exchange_test.go:520: native diagnostic worker opening 3
+    native_exchange_test.go:425: native diagnostic connector admission entered
+    native_exchange_test.go:452: native diagnostic connector origin accepted 1.890712793s
+    native_exchange_test.go:425: native diagnostic hub admission entered
+    native_exchange_test.go:441: native diagnostic hub origin accepted 1.806733225s
+    native_exchange_test.go:426: native diagnostic hub admission terminal 1.447651195s <nil>
+    native_exchange_test.go:426: native diagnostic connector admission terminal 1.807927551s <nil>
+    native_exchange_test.go:522: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:529: native diagnostic worker conversation terminal 3 Uncertain native exchange unavailable
+    download_sessions_test.go:672: original preparation continuation {false} download unavailable
+    native_exchange_test.go:283: worker terminal uncertain original native conversation: native exchange unavailable
+--- FAIL: TestContextAdmissionWithRealServices (10.58s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-resume (10.05s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	10.666s
+FAIL

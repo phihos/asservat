@@ -1,0 +1,64 @@
+{
+  "started": 1791908868.98219,
+  "manifest": "ad86f1ff0754ca0c768415517c8115dfd96b79427916b476138e3539b1ac2408",
+  "dependencies": "363d320c4f0fe2edb96383ce175492d01f4c93f9e9c3a990bce2de02f65106a1",
+  "native_dependencies": "61e57e97e9f13ec5f1dfa419277d6fef7a1338948607fac247bd018a62456393",
+  "runner": "1e532435476ba346a059ed72ec3c52423889a3aa0edfee0399588e710fee28e1",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [
+    {
+      "name": "actual-sql",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--fleet",
+        "--run",
+        "^TestInitialInstallationWithRealServices$/^owner-identity-roles-constructor-(expired-source|bridge-contention)$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 43.01115584373474,
+      "stop_reason": null,
+      "log_sha256": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0,
+      "native": {
+        "testExit": 0,
+        "cleanupFailures": [],
+        "sourceUnchangedDuringTest": true,
+        "source_count": 2246,
+        "passedTestNames": [
+          "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention"
+        ],
+        "required_present": true
+      }
+    }
+  ],
+  "runtime_enablement": false,
+  "boot_id": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-owner-prerequisite-14xnlc8c",
+  "tmp_free_before": 16731344896,
+  "mirror_changed": [],
+  "exit": 0,
+  "ended": 1791908912.5442734,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "scratch_removed": true
+}

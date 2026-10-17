@@ -1,0 +1,8 @@
+{"command": ["go", "test", "-race", "-count=1", "-run", "^TestConnector", "./internal/adapters/kubernetes"]}
+ok  	asservat.local/asservat/internal/adapters/kubernetes	14.181s
+{"exit": 0}
+{"command": ["go", "test", "-run", "^$", "./test/integration"]}
+ok  	asservat.local/asservat/test/integration	0.012s [no tests to run]
+{"exit": 0}
+{"command": ["go", "vet", "./internal/domain/audit", "./internal/domain/fleet", "./internal/application/audit", "./internal/application/fleet", "./internal/adapters/mtls", "./internal/adapters/kms", "./internal/adapters/kubernetes", "./internal/adapters/postgres", "./test/integration"]}
+{"exit": 0}

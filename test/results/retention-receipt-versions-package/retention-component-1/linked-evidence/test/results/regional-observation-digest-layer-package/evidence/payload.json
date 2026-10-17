@@ -1,0 +1,9 @@
+{
+  "docs/architecture/cluster-observations.md": "dde55f95eb0aaca24cd7b9f0a2d8d56f3e698b8a194c293481eff3d3821d80f8",
+  "internal/adapters/mtls/connector_observation_channel.go": "57233bbe7f77509acc07b09f10b36d7cb6e23e85021baa8d47fe2691018cfde1",
+  "internal/adapters/mtls/connector_observation_channel_test.go": "b7ba978b5497af7f7f43e56e63d93d70775465a8fd622380141a31eef550a3f2",
+  "internal/application/fleet/cluster_observation_digest.go": "f21614d334ecfadea85809593d9075fc027372660bfc8687b6471b4820564d71",
+  "internal/domain/fleet/cluster_observation_digest.go": null,
+  "internal/transport/clusterobservation/digest_parity_test.go": "2f69344cf65cdad9f1d99a2a6a9d5103d1cb7fd40c85addf08d02430b9631c65",
+  "internal/transport/clusterobservation/wire.go": "ff93ecf4809540a115467667c938524e712ea6de601329f8b86af7e12a61cd0f"
+}

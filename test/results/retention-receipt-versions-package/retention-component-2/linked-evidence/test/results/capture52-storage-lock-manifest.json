@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "internal/adapters/postgres/capture.go",
+      "base_sha256": "4f1846efa517568363da8e0e5a5fbb97a52dd9a34b3d9a7deab8f9163ec39859",
+      "sha256": "1e4325f1b28b433b833b637f3469e511e6030e80b4efc49d30cfb750ef902837"
+    },
+    {
+      "path": "test/fixtures/sql/runtime-roles.sql",
+      "base_sha256": "d0cf471f129477938c57f64561635dce7b999643eb5b7bcb3f56ba47e4c4a6e3",
+      "sha256": "f16f44dd7ec9d04fc05cd24e7258d45de07d2d03cb047b0043a09ff8c083c2ad"
+    },
+    {
+      "path": "test/integration/capture_intent_lifecycle_test.go",
+      "base_sha256": "61399530e7264a815ae6f6c0a680a45000ff3b33a13b65e689c00c154333f9cc",
+      "sha256": "2e7e25923ff98fb8d7d03f3f73e9bfc9910a70e53db2049848e6bc8172cbee76"
+    }
+  ]
+}

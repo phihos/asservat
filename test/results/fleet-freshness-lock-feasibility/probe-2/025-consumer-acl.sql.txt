@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+SELECT current_user,rolsuper,rolcreaterole,rolbypassrls,has_table_privilege(current_user,'public.fleet_trust','SELECT'),has_table_privilege(current_user,'public.fleet_observation','SELECT'),has_column_privilege(current_user,'public.fleet_current_trust','installation_id','UPDATE'),has_column_privilege(current_user,'public.fleet_current_trust','suspended','UPDATE') FROM pg_roles WHERE rolname=current_user;

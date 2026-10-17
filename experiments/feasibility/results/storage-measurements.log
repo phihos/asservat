@@ -1,0 +1,4 @@
+=== RUN   TestStorageMeasurements
+--- PASS: TestStorageMeasurements (5.01s)
+PASS
+ok  	asservat.local/experiments/feasibility	5.035s

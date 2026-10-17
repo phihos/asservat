@@ -1,0 +1,155 @@
+{{- if .Values.cluster.enabled }}
+{{- $c := .Values.cluster }}
+{{- if ne .Values.mode "cluster" }}{{ fail "cluster.enabled requires mode=cluster" }}{{ end }}
+{{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) }}{{ fail "cluster.namespace must be a dedicated connector namespace distinct from the release namespace" }}{{ end }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "cluster.image requires the exact verified product repository@sha256 digest" }}{{ end }}
+{{- if or (eq $c.bootstrapSecret "") (eq $c.offer "") }}{{ fail "cluster.enabled requires the hub's offer and the operator's bootstrap Secret reference" }}{{ end }}
+{{- $offer := fromJson $c.offer }}
+{{- if or (hasKey $offer "Error") (ne (get $offer "format") "asservat-regional-offer/v1") }}{{ fail "cluster.offer must be the hub's regional-offer.json" }}{{ end }}
+{{- $executor := and (hasKey $offer "owners") (hasKey $offer "keyService") (hasKey $offer "workKey") (hasKey $offer "evidenceStore") }}
+{{- if and $executor (eq ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret is required when the offer names the regional executor" }}{{ end }}
+{{- if and (not $executor) (ne ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret requires an offer naming the regional executor" }}{{ end }}
+{{- $name := printf "%s-cluster-installer" .Release.Name }}
+{{- $role := printf "%s-%s" .Release.Namespace $name }}
+# The release-scoped installer account: the connector guards' explicit trusted
+# initial administrator (like the hub bootstrap runner). It holds every
+# permission it grants the connector account.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $role }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, create, update]
+  - apiGroups: [""]
+    resources: [serviceaccounts, configmaps, secrets]
+    verbs: [get, create, update]
+  - apiGroups: [""]
+    resources: [serviceaccounts/token]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments, deployments/scale]
+    verbs: [get, create, update]
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, create]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingadmissionpolicies, validatingadmissionpolicybindings]
+    verbs: [get, create]
+  - apiGroups: [authentication.k8s.io]
+    resources: [selfsubjectreviews, tokenreviews]
+    verbs: [create]
+  - apiGroups: [authorization.k8s.io]
+    resources: [selfsubjectaccessreviews]
+    verbs: [create]
+  # ADR-196 decision 4: the executor's and capacity account's reservations.
+  - apiGroups: [asservat.io]
+    resources: [capacityreservations]
+    verbs: [get, create]
+  - apiGroups: [asservat.io]
+    resources: [capacityreservations/status]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $role }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $role }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ $name }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-cluster-offer" .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+immutable: true
+data:
+  regional-offer.json: {{ $c.offer | quote }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      serviceAccountName: {{ $name }}
+      # The hook alone uses the in-cluster account; the CLI never does.
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      restartPolicy: Never
+      {{- if $c.registrySecret }}
+      imagePullSecrets:
+        - name: {{ $c.registrySecret }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        # The projected inputs are 0440; the group makes them readable.
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: installer
+          image: {{ $c.image }}
+          imagePullPolicy: IfNotPresent
+          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          volumeMounts:
+            - name: inputs
+              mountPath: /run/asservat/cluster
+              readOnly: true
+      volumes:
+        - name: inputs
+          projected:
+            defaultMode: 0440
+            sources:
+              - configMap:
+                  name: {{ printf "%s-cluster-offer" .Release.Name }}
+                  items: [{key: regional-offer.json, path: regional-offer.json}]
+              - secret:
+                  name: {{ $c.bootstrapSecret }}
+                  items: [{key: bootstrap.json, path: bootstrap.json}]
+              {{- if $executor }}
+              - secret:
+                  name: {{ $c.evidenceSecret }}
+                  items: [{key: evidence-storage.json, path: evidence-storage.json}]
+              {{- end }}
+{{- end }}

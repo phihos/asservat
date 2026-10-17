@@ -1,0 +1,14 @@
+{
+  "name": "adr183-continuation-native-10",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices", "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files", "TestInitialBootstrapChainWithRealServices/installer-continuation", "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"],
+  "result": "First native pass of ADR-183 from a completed product bootstrap with only product commands plus operator prerequisites: the actual installer-continue Pod (compiled product image, produce init + continue) ran under the runner account with exactly the chart's continuation rules. Phase 1 published the worker2 artifact; the actual installer-provider-apply created the two ACL policies and auth roles plus the inspection policy and wrote the inbox. The continuation inspected the provider, filled the empty audit Secret, provisioned the three configuration roles (with in-process replay of an overrun role operation), completed worker inputs and launch. Phase 3 published the owner artifact; the applier created four policies/auth roles and two PKI roles plus the inspection policy. The continuation completed owner selection, projection and launch. The journal holds acknowledged worker inputs, owner identity and owner launch; both Deployments run one Pod each on the exact compiled image; the consumed inbox was deleted. Subtest 236.6 s inside the original 30-minute journal.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The test acts only as operator: provider auth mounts/reviewer and owner PKI root, scoped S3 principals via the SeaweedFS shell, and the applier's BAO_TOKEN. No public workflow, promoted hub-api, rerun-after-bridge or helm upgrade replay claim.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

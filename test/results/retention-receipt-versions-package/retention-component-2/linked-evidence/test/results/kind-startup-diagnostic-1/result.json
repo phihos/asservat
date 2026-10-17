@@ -1,0 +1,28 @@
+{
+  "name": "asservat-startup-596525d017",
+  "image": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+  "scope": "Owned fixture-only startup diagnostic; startup API timeout 180s, no product tests.",
+  "sourceCount": 2105,
+  "cleanupErrors": [],
+  "command": [
+    "kind",
+    "create",
+    "cluster",
+    "--name",
+    "asservat-startup-596525d017",
+    "--image",
+    "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+    "--config",
+    "/home/phil/Projekte/asservat/test/results/kind-startup-diagnostic-1/kind.json",
+    "--kubeconfig",
+    "/home/phil/Projekte/asservat/test/results/kind-startup-diagnostic-1/kubeconfig",
+    "--wait",
+    "90s",
+    "--retain"
+  ],
+  "createExit": 1,
+  "createSeconds": 191.0,
+  "sourcesUnchanged": true,
+  "elapsedSeconds": 257.06,
+  "exit": 1
+}

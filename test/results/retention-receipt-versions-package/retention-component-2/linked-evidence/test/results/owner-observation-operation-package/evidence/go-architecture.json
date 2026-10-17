@@ -1,0 +1,28 @@
+{
+  "phase": "go-architecture",
+  "command": [
+    "env",
+    "GOFLAGS=-p=2 -overlay=/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+    "python3",
+    "scripts/check-go-architecture.py"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 1.312,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  }
+}

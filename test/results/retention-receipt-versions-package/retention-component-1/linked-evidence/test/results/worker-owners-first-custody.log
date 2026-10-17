@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-request-owners
+--- PASS: TestContextAdmissionWithRealServices (3.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-request-owners (2.69s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.071s

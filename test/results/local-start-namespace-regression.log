@@ -1,0 +1,30 @@
+=== RUN   TestLocalStartWithRealKubernetes
+=== RUN   TestLocalStartWithRealKubernetes/requires-prepaid-ready
+=== RUN   TestLocalStartWithRealKubernetes/one-real-cas-and-restart
+=== RUN   TestLocalStartWithRealKubernetes/no-reset-mutation-or-delete
+=== RUN   TestLocalStartWithRealKubernetes/schema-bounds-and-owner-gc
+=== RUN   TestLocalStartWithRealKubernetes/pinned-work-trust-read-only-role
+=== RUN   TestLocalStartWithRealKubernetes/admission-pins-control-namespace-uid
+    local_start_test.go:302: admission accepted a different control namespace UID
+--- FAIL: TestLocalStartWithRealKubernetes (21.11s)
+    --- PASS: TestLocalStartWithRealKubernetes/requires-prepaid-ready (0.02s)
+    --- PASS: TestLocalStartWithRealKubernetes/one-real-cas-and-restart (0.30s)
+    --- PASS: TestLocalStartWithRealKubernetes/no-reset-mutation-or-delete (0.26s)
+    --- PASS: TestLocalStartWithRealKubernetes/schema-bounds-and-owner-gc (0.01s)
+    --- PASS: TestLocalStartWithRealKubernetes/pinned-work-trust-read-only-role (0.06s)
+    --- FAIL: TestLocalStartWithRealKubernetes/admission-pins-control-namespace-uid (19.58s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+=== RUN   TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema
+=== RUN   TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status
+=== RUN   TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only
+=== RUN   TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation
+=== RUN   TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation/guarded-reconciliation-with-SQL-and-encrypted-audit
+--- PASS: TestPermissionAdmissionWithRealKubernetes (7.78s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema (0.02s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status (0.58s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only (0.21s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation (6.30s)
+        --- PASS: TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation/guarded-reconciliation-with-SQL-and-encrypted-audit (6.19s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	28.943s
+FAIL

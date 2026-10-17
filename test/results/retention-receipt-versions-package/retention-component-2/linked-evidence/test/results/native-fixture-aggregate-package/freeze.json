@@ -1,0 +1,23 @@
+{
+  "files": {
+    "HANDOFF.md": "caafcd695a59e86a09a73d2b356187b0229b728e1fb8c8eb69b056900cfc9872",
+    "REVIEW.md": "bdc73ef433d24552943483477946a098353a8bad697072296458d0a993164176",
+    "bases.json": "30bfd1735f738cc0c40480311d8e57d673fba6462decc5797c0e1e82f6b0ead2",
+    "changes.patch": "1c95025d3f6924c9b5ccc48bf044f0bef32fb8585ccdf9939d81415a68b8805f",
+    "dependencies.json": "2779b830c2c6b757657f80109d2f9d95e31b46e7f2445b19a99b59cf10f8d396",
+    "evidence/compile.json": "8a496d7debe8585bd74cfe85de99faa2e86d691c321cd7b0aaac62b5b5d10ea3",
+    "evidence/compile.log": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+    "evidence/prior/native-terminal-handoff-qualified-check.log": "c60ed2e9bbc2002e2e74fbf315256ce29e86c6614584a5ed3f09b2ce54f0d84d",
+    "evidence/prior/native-terminal-handoff-qualified-environment.json": "b930a3cd6eaf4cc3f907c6efbecb821513c882cec14be02fc508a4ae55df843b",
+    "evidence/prior/native-terminal-handoff-qualified-postgres.log": "7dcd266dcb390efcaf0d365cfe2f7440114ac64a149ce3ebd5b40c0aa9610446",
+    "evidence/prior/native-terminal-handoff-qualified.log": "ea48ae9a365147936dd910b32e9669245631da658da9a201d355bb85b3cb71b5",
+    "evidence/run_compile.py": "63d5e1bd1563c8acf45372691a4d71d1c36af706b40702bfe2b70a4dc5a1b462",
+    "files/test/integration/context_native_content_test.go": "c22f1dc23b7b0790dfa55d81c888ab22e5a257fd192105312db241bcf2b92510",
+    "files/test/integration/context_native_interrupted_test.go": "dfb9d7d5127f8729e0d700e89d3374573a46201d8674e21b34439ac7813dce5b",
+    "files/test/integration/native_admission_trace_test.go": "aa5a042dd5371001321526f51ea2e27da2ed415b455aa47a9567ad2fd309872e",
+    "files/test/integration/native_exchange_test.go": "c2cce8b96befa6e08cd2e822226525d02a0d115441e74710b82646b654e45b97",
+    "manifest.json": "5910abf2313957abb91cdf9b054382ef1aab1bbc827da082686e1f6363d07fad",
+    "overlay.json": "f690648115b726b80172cd760d245b4fd9e9ae669236639c8ee3be8edfafb1fa",
+    "payload-hashes.json": "6a6db20c2d9b3e1e8df71926da3efdd225313a4d89eeb6b173704459b0aad0a2"
+  }
+}

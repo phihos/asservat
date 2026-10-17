@@ -1,0 +1,302 @@
+[
+  {
+    "path": "cmd/asservat/main.go",
+    "base": "4527f65c3a73efaad12b7fb7751dd2c72b4c812219ae1f144c663a6b9ab4dae2",
+    "live_at_snapshot": "4527f65c3a73efaad12b7fb7751dd2c72b4c812219ae1f144c663a6b9ab4dae2",
+    "sha256": "2809932e8e9d4d9ef741600dd7463d0c79d711d53f1c25c0ada685fe9d30b813"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_operation.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "1cb417f43e1ac5b756dc6960190bb7408189a4b435b49a2bedf132663c57b95a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_operation_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "a77ad61681b47fbb6010352f586c9d65ea169b94967c5c02e735fcea72cc17db"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_recheck.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "e9de8c125f4b65c451cb919449d6aa40b658df7d5aef84fa649ec12a5034cde8"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "3d6e5c961b5d097a14ec9d5869199afc4017ce0ff4b9ca9936689d08ef13c914"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "f016f927096932a183a4165825cb0c446cb2c833e6cf2e47515105843a0adf3d"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_role_source_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "b252bb9bff55ce844e65ec24ba1ce155cb54f86be86b4d389bc57c6f7de0cd52"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_runtime_projection.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "f1068e2d7fa7856f70f59856037856c8bfaae5b1b5edd8bd2f102847700e99ab"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "7fd8f9276e7c270ce4af151fd71805a397bb44b4ee089ba404358c415805296e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_identity_sources.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "b9e813d50329ff88673ee61f05e3195247513aa77ecb3d4e2970d088fece6dc3"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_identity_sources_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "888e28ec35fe1f5589daedfa08b03a8f0049a6a1774a676215b1e31113fa9c07"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_runtime_projection.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "fe86b35293592b613608d0235cbaeba84eeba3dcce5de8978dfa0218796e68d4"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "47f782d0014628572a7ca826906fe83d506a436f5767d57b885fd4f5cfbcd075"
+  },
+  {
+    "path": "internal/adapters/kubernetes/public_runtime_roles_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "8e2fec43abb2082e758097f620f05da5bdf2536c3f5c08051ab3e92fdd52b88d"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_role_current.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "24104cd616eb4c69cdfd1e21049679177b6fe7d696d6fafa389c480fda57d480"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_runtime_credential.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "e3319f24bdba0cf71b9c16b390db130250fc3fcb98b4738629106736bf939638"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_runtime_role_plan.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_runtime_role_plan_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "f240e58c09857c460b153f6fb05bf42c9dd477bca6934f2b6afcc9f5d9faf1f1"
+  },
+  {
+    "path": "internal/adapters/postgres/configuration_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "928dc60903a3086d79c6899285028d97a6932be10265a19fd01401fe7613cc2f"
+  },
+  {
+    "path": "internal/adapters/postgres/current_owner_configuration_audit.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "546dc6ea51839de0ad6a5dc930e496e21231084afe042e7547d58c5d262c9139"
+  },
+  {
+    "path": "internal/adapters/postgres/public_runtime_credential.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "aaf8a7a405b67b61260bc29968dbd47cee89eba6565e8d7ae3a15ba755660f66"
+  },
+  {
+    "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "815788ef05b7fa734e7bab8b2da978780b037df0423622bde623c0308f5a430e"
+  },
+  {
+    "path": "internal/adapters/postgres/public_runtime_role_plan_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "0cf8d676159d2649ee8bdbbaf930b420d3f138ce6ab8549fcaa570e8c14136bd"
+  },
+  {
+    "path": "internal/adapters/postgres/public_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "2aaed5b2d0e52f2ff71ce8206c8f7e8c913da57ff8eea3da18f67828753a3003"
+  },
+  {
+    "path": "internal/application/audit/capture_account_mac.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "19fadaff5404d7081225025681fa4929c14875e75533481328a8721148d03192"
+  },
+  {
+    "path": "internal/application/audit/capture_account_mac_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "83f60995ddfbb87f574581d79b6ac3dfb11106366f87ef2f106c5bfceeae4141"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_installer.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "6a93d189b8a37f18eb135fe7b794820574d98cf713abc24a80e969e7417226d7"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "base": "8a2c17592ab4d1e20e1be113e6ed25ffd683ff7d9d41aa6cc211e69244072758",
+    "live_at_snapshot": "8a2c17592ab4d1e20e1be113e6ed25ffd683ff7d9d41aa6cc211e69244072758",
+    "sha256": "2bcda0d14b4ca7d56706aaee65f62a716e47911635cd42a9c3e3237086d79c9f"
+  },
+  {
+    "path": "internal/bootstrap/public_context_download_reads.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "a97a8c08679d4f33c8b444350e89c3bed35a20250b73a075a442a864ef58b9c1"
+  },
+  {
+    "path": "internal/bootstrap/public_context_identity.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "834e40591b592f80ada328649ba6eba6354a147127a329ede8d29f5fbd681839"
+  },
+  {
+    "path": "internal/bootstrap/public_context_inputs.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "d309a188dbcdd36990fd940ba97fc5fb2c3c8e663a893d72a4e532b4202dcd9f"
+  },
+  {
+    "path": "internal/bootstrap/public_context_mac.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "8c4670a197cc1984d8835537ff164cae1ccbbfe1ae1a0771aff7e4473c4db1b0"
+  },
+  {
+    "path": "internal/bootstrap/public_context_mac_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "a57c189dbd830b3ba9ae41826c870ddb8a735100e1278cd29224bfcd37e46edd"
+  },
+  {
+    "path": "internal/bootstrap/public_context_reads.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "34e086d01fbf47c35bf748e1221cfcaefd0c1d9a31f19b31f500a10c00f46411"
+  },
+  {
+    "path": "internal/bootstrap/public_context_server.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "e34f5e170738536dc098a5289075403ad41573220efaf48b09ea976381d4305c"
+  },
+  {
+    "path": "internal/bootstrap/public_context_sql.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "28e0fa4f2f8aee5a7affdb1626b876f6ff470a48df27740fff20b8e17e581c92"
+  },
+  {
+    "path": "internal/bootstrap/public_context_tls.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "33a1a922fc5d4c336d4ca995050863b74ca4823cc589cff83b216176fe1c69db"
+  },
+  {
+    "path": "internal/bootstrap/public_context_tls_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "4127fd75fef5119971e2266428816444747de4546eea5fd0770c9a986c47d1a8"
+  },
+  {
+    "path": "internal/bootstrap/public_role_installer.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "1a8bc548a8c5bd7cb050641fec37f62eda92c49e6b8352598c2291c991dbdd76"
+  },
+  {
+    "path": "internal/bootstrap/public_role_installer_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "f16bd2eee3d940530cb4cc97de6cc3bec5b38ead2c10e2d05979b9254309605a"
+  },
+  {
+    "path": "internal/contracts/configuration_role_installer.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "6f4da5a8ccdd75c34dca547be9129ae0de1a27e766641ad17a46c2605a181b57"
+  },
+  {
+    "path": "internal/contracts/configuration_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "32eac2ee070d594d595df49279d37a414bc06218c53f911ca12f95cfd3ce87a1"
+  },
+  {
+    "path": "internal/contracts/public_audit_keys.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "beea54547db346ba97a9dcc90015d61cbb30cb40f6afa73cda44072484b7ab01"
+  },
+  {
+    "path": "internal/contracts/public_context_deployment.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "ae477ab16a41c2e7aac1206642b0f58708a82a1545f0c34bafcf560c6a472457"
+  },
+  {
+    "path": "internal/contracts/public_role_installer.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "9a274aae8d58a6dc06b4297eab0b38283e617262fe6f065ef40fb937f234dee6"
+  },
+  {
+    "path": "internal/contracts/public_runtime_roles.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "0c19a81d252a5e8b7872022ae20910e2747c673e0a95c89571d58eee052912fa"
+  },
+  {
+    "path": "test/integration/configuration_role_reconciliation_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "4e14b1262ee77fe409659c14e4dcdc1ae348a9dfe4ff8d6951b3b1ccb8e568d9"
+  },
+  {
+    "path": "test/integration/configuration_runtime_roles_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "84cc9d129767a03cb5bd7ac3d2165936223379b68c447ffc7b67f7df0277fa75"
+  },
+  {
+    "path": "test/integration/initial_installation_test.go",
+    "base": "91f307f7574f10cc59c9ae791f4305f5500fa2cb4a33bd4dca17c04f1b7b922f",
+    "live_at_snapshot": "91f307f7574f10cc59c9ae791f4305f5500fa2cb4a33bd4dca17c04f1b7b922f",
+    "sha256": "04566bdb0e564f7b15574669a4b034ea78afcb9b6903002b91b35a5b58828252"
+  },
+  {
+    "path": "test/integration/public_runtime_roles_test.go",
+    "base": null,
+    "live_at_snapshot": null,
+    "sha256": "3810a01e1491a6c37c9cb19170412a82c15631dfb9f036df36a0a0f2289ce9ef"
+  }
+]

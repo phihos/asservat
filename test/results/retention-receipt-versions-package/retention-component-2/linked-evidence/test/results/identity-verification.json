@@ -1,0 +1,52 @@
+{
+  "recordedAt": "2026-10-09T22:04:26.122579+00:00",
+  "scope": "Identity and ordinary eligibility components; synthetic TLS/JWKS and test-only authority projections; no production provider, accepted execution, audit or disclosure",
+  "sourceInventoryTiming": "Captured after final passing checks; not a replacement for earlier external integration source records",
+  "goVersion": "go version go1.27.2 linux/amd64",
+  "sourceHashes": {
+    "go.mod": "a9d180362dfe174d67829b5357b0c3405467f2acac8299e13587f9498b2cff93",
+    "go.sum": "6b2ff39e43968dacd6b3339fd369b1f5d8a4a57b93a8a8cc56655edc37d04f04",
+    "internal/domain/identity/identity.go": "a37a85bc03db1f1ab763fef3719cfdfe55ef209f931a14e4e9069c6a7cff572e",
+    "internal/domain/identity/identity_test.go": "062789f11ecb5649346ec6397cb33d1ebb3770ececd2e964d45e9c7fcf2fba8f",
+    "internal/domain/authorization/eligibility.go": "925941a8891546cd86f1da40a59734bc7f634e3d6b628f5d425349cc518d4be9",
+    "internal/domain/authorization/eligibility_test.go": "57a34d155ed7b39dcbd7ad1bc3a3a1068a9c93d809e7a21109f54933085e242c",
+    "internal/application/identity/service.go": "466f7bcc9ebf47cf2cd8e1f3768c4cb49d413bf6f75838fa46546bcac08ef781",
+    "internal/application/identity/service_test.go": "bee7204e4c00eb91cc5a90c80f4707a2f973840c68b4939dc6a9b72357e36c26",
+    "internal/application/authorization/eligibility.go": "641794bd628d29bfa7c4cef5dc6a23f0c5f9777ee95277afec6ea596f38fb4d5",
+    "internal/application/authorization/eligibility_test.go": "4cf9675061ec0c6d0b0cd64aa5a3720c8a73ab15e172a426fff895b8d33e7c93",
+    "internal/adapters/oidc/access.go": "35bfacef4c2ea7194ff75eeefd11b59e591d10aa1e16a802fa62dce438d129a2",
+    "internal/adapters/oidc/access_test.go": "425ff94b6714aabade5da5ad035f2b31c32f0ee61737df5c60ea6e385a1e4843",
+    "internal/adapters/oidc/eligibility_flow_test.go": "54afb49b51e8167a4ef655b7d2a2d66888645d38678a03e323dc930845ec690c"
+  },
+  "logs": {
+    "identity-go-check.log": "700fd14dea613a44fce5478d2ffc3779a7fee489f70f4cf971d6e3531705124f",
+    "identity-fuzz.log": "31392171067b5969ba8f3aa9d91db0c876afcb2fe142bdcafa7559e72d8116b3",
+    "identity-vuln-check.log": "9a2a37f579dc050aff96baeef57abb4624625b97bfd59cb6423010e04d8d1a35",
+    "identity-design-checks.log": "8a8d9f955e2ea599806cc892855cad0207f2e86a7c180653897ca7ff0b871568",
+    "identity-documentation-final.log": "52b312c08615fe5a7937ed973283f5fd46b5f4d259cd39dd8f71009013f9e639"
+  },
+  "observedCommandExits": {
+    "make go-check go-architecture-check sql-check": 0,
+    "make go-vuln-check": 0,
+    "go test fuzz FuzzAccessTokenSyntax for 15s": 0,
+    "seven design gates": 0,
+    "final spec-check architecture-check": 0
+  },
+  "fuzzExecutions": 313665,
+  "previousContextInputChanges": [
+    "go.mod",
+    "go.sum"
+  ],
+  "externalFixturesRerun": false,
+  "createdExternalResources": [],
+  "originalBriefSHA256": "af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20",
+  "unimplemented": [
+    "production IdP qualification",
+    "accepted Kubernetes identity and permission projections",
+    "namespace and SAR source adapters",
+    "signed accepted execution",
+    "durable object audit",
+    "authorized publication",
+    "UI/MCP/native-download runtime"
+  ]
+}

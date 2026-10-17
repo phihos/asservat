@@ -1,0 +1,5 @@
+Recorded error excerpt from the initial dependency-resolution attempt (exit 1):
+Found: typescript@7.0.2
+Could not resolve dependency:
+peer typescript@"^5.x" from openapi-typescript@7.13.0
+Resolution: pin compatible TypeScript 5.9.3; npm install then exited 0 without force/legacy-peer-deps.

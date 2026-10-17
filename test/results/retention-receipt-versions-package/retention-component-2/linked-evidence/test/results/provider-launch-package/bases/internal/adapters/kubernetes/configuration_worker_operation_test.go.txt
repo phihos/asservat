@@ -1,0 +1,151 @@
+package kubernetes
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+// Phase ownership only: this helper supplies no native, SQL or provider proof.
+func configurationWorkerOperationFixture(t *testing.T) (*ConfigurationWorkerInputs, *ConfigurationWorkerOperation) {
+	t.Helper()
+	life, cancel := context.WithCancel(context.Background())
+	owner := &ConfigurationWorkerInputs{ctx: life, cancel: cancel, roles: &ConfigurationRuntimeRoleRoot{}, resources: &InitialRuntimeResources{preparer: &InitialPreparer{protection: &configMapProtection{observer: &PermissionClient{now: time.Now}}}}}
+	call, finish, err := owner.enter(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := newConfigurationWorkerOperation(owner, call)
+	if err != nil {
+		finish()
+		owner.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { p.close(); finish(); owner.Close() })
+	return owner, p
+}
+
+func TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder(t *testing.T) {
+	for _, mode := range []string{"zero", "root", "detached context", "other operation", "order", "expired", "already closed", "owner marked closed", "owner released call"} {
+		t.Run(mode, func(t *testing.T) {
+			owner, p := configurationWorkerOperationFixture(t)
+			call, root, from := p.ctx, owner.roles, configurationWorkerPhaseUninitialized
+			switch mode {
+			case "zero":
+				p = &ConfigurationWorkerOperation{}
+			case "root":
+				root = &ConfigurationRuntimeRoleRoot{}
+			case "detached context":
+				call = context.Background()
+			case "other operation":
+				_, other := configurationWorkerOperationFixture(t)
+				call = other.ctx
+			case "order":
+				from = configurationWorkerPhaseIntent
+			case "expired":
+				p.until = time.Now().Add(-time.Millisecond)
+			case "already closed":
+				p.close()
+			case "owner marked closed":
+				// Model the instant after Close's admission fence and before its
+				// asynchronous cancellation callback has run.
+				owner.mu.Lock()
+				owner.closed = true
+				owner.mu.Unlock()
+			case "owner released call":
+				owner.mu.Lock()
+				owner.busy = false
+				owner.mu.Unlock()
+			}
+			if _, done, err := p.enterPhase(call, root, from, configurationWorkerPhaseInitial); err == nil || done != nil {
+				if done != nil {
+					done(context.Canceled)
+				}
+				t.Fatal("unowned or out-of-order native/SQL phase accepted")
+			}
+			if mode != "zero" {
+				if _, done, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial); err == nil || done != nil {
+					if done != nil {
+						done(context.Canceled)
+					}
+					t.Fatal("failed call reacquired an original phase")
+				}
+			}
+		})
+	}
+}
+
+func TestConfigurationWorkerOpaquePhasePreservesOriginalDeadline(t *testing.T) {
+	owner, p := configurationWorkerOperationFixture(t)
+	original := p.until
+	call, finish, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if until, _ := call.Deadline(); !until.Equal(original) {
+		t.Fatal("initial phase changed original operation end")
+	}
+	finish(nil)
+	child, stop := context.WithDeadline(p.ctx, original.Add(-time.Second))
+	defer stop()
+	call, finish, err = p.enterPhase(child, owner.roles, configurationWorkerPhaseInitial, configurationWorkerPhaseIntent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if until, _ := call.Deadline(); !until.Equal(original.Add(-time.Second)) || !p.until.Equal(original) {
+		t.Fatal("child cancellation renewed original operation")
+	}
+	finish(nil)
+	if p.phase != configurationWorkerPhaseIntent {
+		t.Fatal("positive joined phase lost")
+	}
+}
+
+func TestConfigurationWorkerOpaqueCloseCancelsAndJoinsBlockedPhase(t *testing.T) {
+	owner, p := configurationWorkerOperationFixture(t)
+	call, finish, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := make(chan struct{})
+	go func() { p.close(); close(closed) }()
+	select {
+	case <-call.Done():
+	case <-time.After(time.Second):
+		t.Fatal("close did not cancel active phase")
+	}
+	select {
+	case <-closed:
+		t.Fatal("close returned with active work")
+	default:
+	}
+	finish(call.Err())
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("close did not join completed phase")
+	}
+	if p.phase != configurationWorkerPhaseFailed {
+		t.Fatal("closed operation retained an effect phase")
+	}
+}
+
+func TestConfigurationWorkerConcurrentPhasePoisonsAndJoinsOriginal(t *testing.T) {
+	owner, p := configurationWorkerOperationFixture(t)
+	call, finish, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, done, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial); err == nil || done != nil {
+		t.Fatal("simultaneous native/SQL phase admitted")
+	}
+	select {
+	case <-call.Done():
+	case <-time.After(time.Second):
+		t.Fatal("invalid concurrent use did not cancel admitted phase")
+	}
+	finish(call.Err())
+	if p.phase != configurationWorkerPhaseFailed {
+		t.Fatal("concurrent misuse restored an earlier phase")
+	}
+}

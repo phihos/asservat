@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/contracts	0.004s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.010s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.012s [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.013s [no tests to run]

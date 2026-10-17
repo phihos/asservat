@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-sql-material.schema.json",
+  "title": "Private initial SQL material v1",
+  "description": "Immutable bootstrap Secret payload, at most 2048 bytes. Three independent canonical unpadded base64url 32-byte values. No SQL authority or validity interval; the producer must separately persist the original public interval and exact startup binding before provisioning. Never log, put in a ConfigMap, or hash into public provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "installationID", "requestID", "preparationPassword", "auditPassword", "activationPassword"],
+  "properties": {
+    "format": {"const": "asservat-initial-sql-material/v1"},
+    "installationID": {"$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"},
+    "requestID": {"$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"},
+    "preparationPassword": {"$ref": "https://asservat.io/spec/v1/initial-sql-material.schema.json#/$defs/password"},
+    "auditPassword": {"$ref": "https://asservat.io/spec/v1/initial-sql-material.schema.json#/$defs/password"},
+    "activationPassword": {"$ref": "https://asservat.io/spec/v1/initial-sql-material.schema.json#/$defs/password"}
+  },
+  "$defs": {
+    "password": {"type": "string", "minLength": 43, "maxLength": 43, "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048](?![\\s\\S])"}
+  }
+}

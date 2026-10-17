@@ -1,0 +1,2 @@
+internal/adapters/diagnostics/go_profile.go:110:2: the channelCancel function is not used on all paths (possible context leak)
+internal/adapters/diagnostics/go_profile.go:115:3: this return statement may be reached without using the channelCancel var defined on line 110

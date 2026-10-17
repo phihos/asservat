@@ -1,0 +1,73 @@
+# ADR-147 — Standard owner provider authentication
+
+Status: selected under continued implementation authorization. Requirements:
+REQ-DEP-001, REQ-DEP-003 and REQ-DEP-005. This source-stage component fixes the
+public profile and generated authentication recipes; actual provider setup,
+login/renewal, transport lifetime and installed qualification remain pending.
+
+The private owner needs sustained audit wrap/unwrap and paired certificate
+signing. The original finite installation issuer has different purposes,
+parent-revocation and lifetime rules. Keep it unchanged. Select standard OpenBao
+Kubernetes authentication for ongoing owner credentials, with four generated
+roles/policies for those exact effects. Bind the original account/namespace,
+dedicated projected audience, verified auth mount and original provider recipes.
+Keep all native workload, accepted source/recovery, SQL and signing-attempt checks
+independent and current. A provider credential does not activate a process.
+
+The new closed [public profile](../../specs/contracts/owner-provider-auth.schema.json)
+contains only the original ServiceAccount and selected audit Secret identities,
+auth mount/accessor and public recipe digest. Role/policy names, audience,
+filenames and timing are generated. Role/policy names use the full SHA-256 of
+a canonical domain-separated original installation/cluster/namespace/account
+scope, including original UIDs, so separate owner scopes do not share them; there is no caller-selected purpose or TTL.
+The first service-token profile has at most 300-second leases and an original
+900-second hard maximum, no period/default policy and no identity-policy grant.
+Only self lookup/renew/revoke accompanies each exact provider effect. Runtime
+has no provider administration, token-creation or accessor-discovery privilege.
+
+Protected setup verifies complete mount, auth-role, canonical ACL and Transit/PKI
+recipes, including accepted roots and leaf constraints. Verify direct and
+effective token policy sets at login, positive renewal and exact same-token
+reconciliation. Do not add policy, role or self-lookup requests to every crypto
+effect. Provider administrators are trusted; these observations do not promise
+instantaneous provider-policy drift detection or an atomic fence against their
+edits. Finite acknowledged credential leases and current application authority
+remain binding. Unknown login responses consume their bounded attempt and are
+not automatically replayed. They do not prove no token was created.
+
+A concrete four-purpose process owner must serialize each purpose's control
+calls, retain only current/draining credentials, use finite failure backoff and
+cancel/join all owned calls. Renewal changes only subsequent observations; it
+cannot extend an admitted operation's original expiry. The existing bytes-only
+TokenSource is insufficient to convey this bound, so runtime integration must
+retain a private lease through HTTP response closure. No per-revision cache or
+custom ongoing token-issuer journal is introduced. Provider-wide quotas remain
+external policy, not a claimed global product token counter.
+
+Bao in Kubernetes can use its own rotating reviewer token. External Bao requires
+provider-owned reviewer rotation and API/CA reachability; the owner never gains
+TokenReview merely to authenticate to Bao. No fallback to caller-as-reviewer or
+offline JWT authentication is part of this profile. Already issued provider
+tokens are not claimed to revoke instantly when a Pod or its JWT disappears.
+
+For S3, select an explicit operator-managed scoped Secret. Asservat documents and
+qualifies the required owner audit operations without administering external IAM.
+Credential rotation belongs to the separately protected original Secret/provider;
+endpoint, bucket and purpose remain pinned. A future workload-identity profile
+requires separate review. Local-key deployments remain independent of Bao and
+retain their existing protected key-service and issuer prerequisites.
+
+Keep this DTO standalone until its actual receipt-bound projection and runtime
+selection are implemented together. Merely adding an optional recognized field
+to OwnerDeployment would let the old loader ignore it and use legacy token files.
+The current closed decoder must continue rejecting it. Later integration must
+reject unqualified or mixed legacy/new selections before any effect, use a fresh
+explicit installed layout, and preserve omitted legacy bytes. Component recipe
+checks, actual provider qualification and deployed owner execution are distinct;
+none enables public serving or the Helm runtime on its own.
+
+Mechanism references: [Kubernetes auth](https://openbao.org/docs/auth/kubernetes/),
+[role API](https://openbao.org/docs/api/auth/kubernetes/),
+[token lifecycle](https://openbao.org/docs/concepts/tokens/),
+[policy behavior](https://openbao.org/docs/concepts/policies/). Consulted current
+documentation is not evidence for the repository's exact pinned provider image.

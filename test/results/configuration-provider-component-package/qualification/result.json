@@ -1,0 +1,96 @@
+{
+  "manifest": "c2b4b14a83ad9aa79374be5fac56094af3551a980771bc408bd85c45b0d330f3",
+  "dependencies": "5b42fd41f822a7da7acd3603a7ade83c456ccd35fb6dbfe6b8c08645f4d0805c",
+  "runner": "9fae78d08c858d55fe3ec04b19281d11fa78cbbfbcb5baa744edf1d30430e947",
+  "started": 1791856603.7569544,
+  "before": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/overlay.json",
+        "-run=^$",
+        "./internal/contracts",
+        "./internal/adapters/providerconfig",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 7.825251579284668,
+      "log_sha256": "e53744b9eb5cca23d93f03eb4ab3a4593635d403c779f8bbb9e6b2fa6664bb34"
+    },
+    {
+      "name": "contracts-provider-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/overlay.json",
+        "-count=1",
+        "-timeout=2m",
+        "-v",
+        "./internal/contracts",
+        "./internal/adapters/providerconfig"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 4.219736337661743,
+      "log_sha256": "a691711a81b2eece4754e71b97822ef67dd446c55f27ca3f763ef0f07641fbc5"
+    },
+    {
+      "name": "worker-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/overlay.json",
+        "-count=1",
+        "-timeout=2m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^(TestProviderWorker|TestInstalledWorkerOriginalTemplate|TestInstalledWorkerActivation)"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 11.980892658233643,
+      "log_sha256": "191fa8dfad5b4e5b4c8b720a0d03e25600e989874b4cc3922c2d69c7f3f559af"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/providerconfig",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 1.9763500690460205,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "exit": 0,
+  "ended": 1791856629.8188658,
+  "after": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "inventory": []
+  }
+}

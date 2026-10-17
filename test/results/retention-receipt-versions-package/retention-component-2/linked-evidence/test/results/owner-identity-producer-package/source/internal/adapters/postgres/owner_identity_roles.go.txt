@@ -1,0 +1,438 @@
+package postgres
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"slices"
+	"strconv"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Implemented by the native protected installer Secret, never runtime ingress.
+// Only the positive boolean from its first CAS can start SQL creation.
+type OwnerIdentityRoleRoot interface {
+	OpenOwnerIdentityRoles(context.Context) (contracts.OwnerIdentityRoleSnapshot, error)
+	ReadOwnerIdentityRoles(context.Context) (contracts.OwnerIdentityRoleSnapshot, error)
+	ClaimOwnerIdentityRole(context.Context, string, uint32, time.Time) (contracts.OwnerIdentityRoleSnapshot, bool, error)
+	CompleteOwnerIdentityRole(context.Context, contracts.OwnerIdentityRoleSnapshot, string, contracts.PublicRuntimeRoleReceipt) error
+}
+
+type OwnerIdentitySQLRoles struct {
+	pool          *pgxpool.Pool
+	root          OwnerIdentityRoleRoot
+	input         contracts.OwnerIdentityRoles
+	administrator uint32
+	ctx           context.Context
+	cancel        context.CancelFunc
+	mu            sync.Mutex
+	closed, busy  bool
+	work          sync.WaitGroup
+}
+
+func NewOwnerIdentitySQLRoles(ctx context.Context, c *pgx.ConnConfig, root OwnerIdentityRoleRoot, input contracts.OwnerIdentityRoles) (*OwnerIdentitySQLRoles, error) {
+	if ctx == nil || ctx.Err() != nil || c == nil || root == nil || !validOwnerIdentityRoleInput(input) {
+		return nil, cfg.ErrInvalid
+	}
+	if c.User == "" || c.Database == "" || c.TLSConfig == nil || c.TLSConfig.InsecureSkipVerify || c.TLSConfig.ServerName == "" || c.TLSConfig.MinVersion < tls.VersionTLS13 || len(c.Fallbacks) != 0 || c.Tracer != nil || c.ValidateConnect != nil || c.AfterConnect != nil {
+		return nil, cfg.ErrInvalid
+	}
+	c = c.Copy()
+	c.RuntimeParams = map[string]string{"application_name": "asservat-owner-identity-provisioner", "search_path": "pg_catalog,public", "timezone": "UTC", "lock_timeout": "1000ms", "statement_timeout": "5000ms", "idle_in_transaction_session_timeout": "5000ms", "synchronous_commit": "on", "row_security": "off"}
+	c.ConnectTimeout = 5 * time.Second
+	config, err := pgxpool.ParseConfig("")
+	if err != nil {
+		return nil, cfg.ErrInvalid
+	}
+	config.ConnConfig = c
+	config.MaxConns = 1
+	config.MinConns = 0
+	life, cancel := context.WithCancel(ctx)
+	pool, err := pgxpool.NewWithConfig(life, config)
+	if err != nil {
+		cancel()
+		return nil, cfg.ErrUnavailable
+	}
+	out := &OwnerIdentitySQLRoles{pool: pool, root: root, input: input, ctx: life, cancel: cancel}
+	current, end := context.WithTimeout(life, 5*time.Second)
+	defer end()
+	var valid bool
+	err = pool.QueryRow(current, `SELECT oid,rolsuper AND rolcanlogin AND current_user=session_user AND NOT pg_is_in_recovery() FROM pg_roles WHERE rolname=session_user`).Scan(&out.administrator, &valid)
+	if err != nil || !valid {
+		out.Close()
+		return nil, cfg.ErrDenied
+	}
+	if _, _, err = out.current(current, pool); err != nil {
+		out.Close()
+		return nil, err
+	}
+	return out, nil
+}
+func (s *OwnerIdentitySQLRoles) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.work.Wait()
+	s.pool.Close()
+}
+func (s *OwnerIdentitySQLRoles) enter(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.work.Add(1)
+	s.mu.Unlock()
+	life, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	return life, func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.work.Done()
+	}, nil
+}
+
+// Every effect uses actual current accepted recovery, independently from the
+// Kubernetes source. Recheck after locks and immediately before COMMIT.
+func (s *OwnerIdentitySQLRoles) current(ctx context.Context, q publicRoleQuery) (uint32, time.Time, error) {
+	var database, administrator uint32
+	var postmaster time.Time
+	var valid bool
+	err := q.QueryRow(ctx, `SELECT (SELECT oid FROM pg_database WHERE datname=current_database()),pg_postmaster_start_time(),p.oid,
+ p.rolsuper AND p.rolcanlogin AND current_user=session_user AND NOT pg_is_in_recovery()
+ AND COALESCE((SELECT version_id=$3 AND is_applied FROM public.goose_db_version ORDER BY id DESC LIMIT 1),false)
+ AND EXISTS(SELECT 1 FROM public.fleet_initial_activation a JOIN public.fleet_current_trust t ON t.installation_id=a.installation_id
+ WHERE a.installation_id=$1 AND a.claim_id=$2 AND a.audit_receipt_json IS NOT NULL AND a.activated_at IS NOT NULL
+ AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until AND t.fresh_until-t.observed_at<=interval '30 seconds')
+ FROM pg_roles p WHERE p.rolname=session_user`, s.input.InstallationID, s.input.InitialClaimID, currentSchemaVersion).Scan(&database, &postmaster, &administrator, &valid)
+	if err != nil || !valid || administrator != s.administrator || ctx.Err() != nil {
+		return 0, time.Time{}, cfg.ErrUnavailable
+	}
+	return database, postmaster.UTC(), nil
+}
+
+func (s *OwnerIdentitySQLRoles) provenance(snapshot contracts.OwnerIdentityRoleSnapshot, purpose string, claim contracts.PublicRuntimeRoleClaim) ownerIdentityRoleProvenance {
+	return ownerIdentityProvenance(s.input, snapshot.UID, snapshot.State.OperationID, purpose, claim)
+}
+
+// Provision processes the closed inventory sequentially. Every distinct first
+// role claim has its own original five-second interval. Replay never grants,
+// repairs, resets a password, or creates a role absent after an unknown result.
+func (s *OwnerIdentitySQLRoles) Provision(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	check, cancel := context.WithTimeout(ctx, 5*time.Second)
+	_, _, err = s.current(check, s.pool)
+	cancel()
+	if err != nil {
+		return zero, err
+	}
+	snapshot, err := s.root.OpenOwnerIdentityRoles(ctx)
+	if err != nil || snapshot.State.Input != s.input {
+		return zero, cfg.ErrUnavailable
+	}
+	for _, purpose := range contracts.OwnerIdentityRolePurposes() {
+		if ctx.Err() != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		observation, finish := context.WithTimeout(ctx, 5*time.Second)
+		database, postmaster, err := s.current(observation, s.pool)
+		if err != nil {
+			finish()
+			return zero, err
+		}
+		claimed, fresh, err := s.root.ClaimOwnerIdentityRole(observation, purpose, database, postmaster)
+		if err != nil || claimed.State.Input != s.input {
+			finish()
+			return zero, cfg.ErrUnavailable
+		}
+		n := slices.Index(contracts.OwnerIdentityRolePurposes(), purpose)
+		if len(claimed.State.Roles) != len(contracts.OwnerIdentityRolePurposes()) || claimed.State.Roles[n].Claim == nil {
+			finish()
+			return zero, cfg.ErrUnavailable
+		}
+		material := claimed.State.Roles[n]
+		until := claimed.ValidUntil
+		if fresh && material.Claim.Until.Before(until) {
+			until = material.Claim.Until
+		}
+		call, short := context.WithDeadline(observation, until)
+		receipt, err := s.role(call, claimed, material, fresh)
+		if err == nil {
+			err = s.authenticate(call, material, receipt)
+		}
+		// Authentication and closure retain the same interval; a lost receipt can
+		// be independently rediscovered, without repeating the create transaction.
+		if err == nil && call.Err() == nil {
+			err = s.root.CompleteOwnerIdentityRole(call, claimed, purpose, receipt)
+		}
+		short()
+		finish()
+		if err != nil {
+			return zero, err
+		}
+	}
+	return s.verifiedSnapshot(ctx)
+}
+
+// Verify the whole inventory together before returning a projection candidate.
+// Earlier per-role successes do not let a later role's observation silently
+// renew their checks. This final interval is retained by credential delivery.
+func (s *OwnerIdentitySQLRoles) verifiedSnapshot(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	life, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	until, _ := life.Deadline()
+	snapshot, err := s.root.ReadOwnerIdentityRoles(life)
+	if err != nil || snapshot.State.Input != s.input || len(snapshot.State.Roles) != len(contracts.OwnerIdentityRolePurposes()) {
+		return zero, cfg.ErrUnavailable
+	}
+	if snapshot.ValidUntil.Before(until) {
+		until = snapshot.ValidUntil
+	}
+	bounded, stop := context.WithDeadline(life, until)
+	defer stop()
+	tx, err := s.pool.BeginTx(bounded, pgx.TxOptions{})
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	defer func() {
+		c, e := context.WithTimeout(context.WithoutCancel(bounded), time.Second)
+		defer e()
+		_ = tx.Rollback(c)
+	}()
+	var locked string
+	if err = tx.QueryRow(bounded, `SELECT installation_id::text FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, s.input.InstallationID).Scan(&locked); err != nil || locked != s.input.InstallationID {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, err = tx.Exec(bounded, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, _, err = s.current(bounded, tx); err != nil {
+		return zero, err
+	}
+	// The installation lock may block. Re-read the exact native root after it,
+	// retaining the first result's original bound and all immutable claims.
+	currentRoot, err := s.root.ReadOwnerIdentityRoles(bounded)
+	if err != nil || currentRoot.UID != snapshot.UID || !ownerIdentitySnapshotStateEqual(currentRoot.State, snapshot.State) {
+		return zero, cfg.ErrUnavailable
+	}
+	if currentRoot.ValidUntil.Before(until) {
+		until = currentRoot.ValidUntil
+	}
+	bounded, narrowed := context.WithDeadline(bounded, until)
+	defer narrowed()
+	if bounded.Err() != nil || !time.Now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	for _, material := range snapshot.State.Roles {
+		if material.Claim == nil || material.Receipt == nil {
+			return zero, cfg.ErrUnavailable
+		}
+		b, err := json.Marshal(s.provenance(snapshot, material.Purpose, *material.Claim))
+		if err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = s.verify(bounded, tx, material, b); err != nil {
+			return zero, err
+		}
+	}
+	if _, _, err = s.current(bounded, tx); err != nil || bounded.Err() != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	if err = tx.Commit(bounded); err != nil || bounded.Err() != nil || !time.Now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	snapshot.ValidUntil = until
+	return snapshot, nil
+}
+
+func (s *OwnerIdentitySQLRoles) role(ctx context.Context, snapshot contracts.OwnerIdentityRoleSnapshot, material contracts.PublicRuntimeRoleMaterial, fresh bool) (contracts.PublicRuntimeRoleReceipt, error) {
+	var zero contracts.PublicRuntimeRoleReceipt
+	name, ok := OwnerIdentityRoleName(s.input.InstallationID, material.Purpose)
+	if !ok || material.Claim == nil {
+		return zero, cfg.ErrInvalid
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	defer func() {
+		rollback, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer end()
+		_ = tx.Rollback(rollback)
+	}()
+	// Recovery is locked before the installation role lock; it stays held
+	// through all role effects and the final original-deadline check.
+	var locked string
+	if err = tx.QueryRow(ctx, `SELECT installation_id::text FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, s.input.InstallationID).Scan(&locked); err != nil || locked != s.input.InstallationID {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	database, postmaster, err := s.current(ctx, tx)
+	if err != nil {
+		return zero, err
+	}
+	// Blocking SQL locks cannot detach creation from the actual current guarded
+	// workload. The independent root read uses its own read connection, preserves
+	// this original deadline and cannot renew or replace the persisted claim.
+	currentRoot, err := s.root.ReadOwnerIdentityRoles(ctx)
+	n := slices.Index(contracts.OwnerIdentityRolePurposes(), material.Purpose)
+	if err != nil || currentRoot.UID != snapshot.UID || currentRoot.State.Input != snapshot.State.Input || currentRoot.State.OperationID != snapshot.State.OperationID || n < 0 || n >= len(currentRoot.State.Roles) || currentRoot.State.Roles[n].Claim == nil || !ownerIdentityClaimEqual(*currentRoot.State.Roles[n].Claim, *material.Claim) || currentRoot.State.Roles[n].Password != material.Password {
+		return zero, cfg.ErrUnavailable
+	}
+	ctx, narrower := context.WithDeadline(ctx, currentRoot.ValidUntil)
+	defer narrower()
+	if ctx.Err() != nil || !time.Now().Before(currentRoot.ValidUntil) {
+		return zero, cfg.ErrUnavailable
+	}
+	if fresh && (database != material.Claim.DatabaseOID || !postmaster.Equal(material.Claim.PostmasterAt) || !time.Now().Before(material.Claim.Until) || !time.Now().Before(snapshot.State.Until)) {
+		return zero, cfg.ErrUnavailable
+	}
+	connections := contracts.OwnerIdentityRoleConnections
+	expected := s.provenance(snapshot, material.Purpose, *material.Claim)
+	encoded, err := json.Marshal(expected)
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	var oid uint32
+	err = tx.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname=$1`, name).Scan(&oid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if !fresh {
+			return zero, cfg.ErrUnavailable
+		}
+		verifier, err := initialPasswordVerifier(InitialSQLLogin{Username: name, Password: material.Password})
+		if err != nil {
+			return zero, err
+		}
+		if _, _, err = s.current(ctx, tx); err != nil || ctx.Err() != nil || !time.Now().Before(material.Claim.Until) {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = tx.Exec(ctx, "CREATE ROLE "+pgx.Identifier{name}.Sanitize()+" LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT "+strconv.Itoa(connections)+" PASSWORD '"+verifier+"'"); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		grants, _ := ownerIdentityRoleGrants(material.Purpose)
+		for _, g := range grants {
+			if _, err = tx.Exec(ctx, g.sql(name)); err != nil {
+				return zero, cfg.ErrUnavailable
+			}
+		}
+		// Superuser creation does not need membership. Explicitly remove any
+		// creator grant so a future non-superuser creator cannot retain a SET path.
+		if _, err = tx.Exec(ctx, "REVOKE "+pgx.Identifier{name}.Sanitize()+" FROM "+pgx.Identifier{s.pool.Config().ConnConfig.User}.Sanitize()); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = tx.Exec(ctx, "COMMENT ON ROLE "+pgx.Identifier{name}.Sanitize()+" IS "+quoteSQLLiteral(string(encoded))); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+	} else if err != nil {
+		return zero, cfg.ErrUnavailable
+	} else if fresh {
+		// A first claim cannot adopt a preexisting role even if a caller copied its
+		// comment. Only a previously spent exact claim enters independent lookup.
+		return zero, cfg.ErrChanged
+	}
+	receipt, err := s.verify(ctx, tx, material, encoded)
+	if err != nil {
+		return zero, err
+	}
+	if _, _, err = s.current(ctx, tx); err != nil || ctx.Err() != nil || fresh && !time.Now().Before(material.Claim.Until) {
+		return zero, cfg.ErrUnavailable
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return receipt, nil
+}
+func (s *OwnerIdentitySQLRoles) authenticate(ctx context.Context, material contracts.PublicRuntimeRoleMaterial, receipt contracts.PublicRuntimeRoleReceipt) error {
+	c := s.pool.Config().ConnConfig.Copy()
+	c.User = receipt.RoleName
+	c.Password = material.Password
+	c.RequireAuth = "scram-sha-256"
+	c.ValidateConnect = nil
+	c.AfterConnect = nil
+	connection, err := pgx.ConnectConfig(ctx, c)
+	if err != nil {
+		return cfg.ErrUnavailable
+	}
+	defer func() {
+		closeCtx, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer end()
+		_ = connection.Close(closeCtx)
+	}()
+	var valid bool
+	err = connection.QueryRow(ctx, `SELECT oid=$1 AND current_user=session_user FROM pg_roles WHERE rolname=session_user`, receipt.RoleOID).Scan(&valid)
+	if err != nil || !valid || ctx.Err() != nil {
+		return cfg.ErrUnavailable
+	}
+	return nil
+}
+
+func (s *OwnerIdentitySQLRoles) verify(ctx context.Context, q publicRoleQuery, material contracts.PublicRuntimeRoleMaterial, provenance []byte) (contracts.PublicRuntimeRoleReceipt, error) {
+	name, known := OwnerIdentityRoleName(s.input.InstallationID, material.Purpose)
+	grants, fixed := ownerIdentityRoleGrants(material.Purpose)
+	connections := contracts.OwnerIdentityRoleConnections
+	if !known || !fixed {
+		return contracts.PublicRuntimeRoleReceipt{}, cfg.ErrInvalid
+	}
+	return verifyFixedRuntimeRole(ctx, q, name, connections, s.input.LayoutDigest, material.Receipt, provenance, grants)
+}
+
+func ownerIdentityClaimEqual(a, b contracts.PublicRuntimeRoleClaim) bool {
+	return a.OperationID == b.OperationID && a.DatabaseOID == b.DatabaseOID && a.PostmasterAt.Equal(b.PostmasterAt) && a.ClaimedAt.Equal(b.ClaimedAt) && a.Until.Equal(b.Until)
+}
+
+// VerifyOwnerIdentityRoles performs no creation. Projection admission consumes
+// its original finite result and separately rechecks the native role root.
+func (s *OwnerIdentitySQLRoles) VerifyOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	call, finish, err := s.enter(ctx)
+	if err != nil {
+		return contracts.OwnerIdentityRoleSnapshot{}, err
+	}
+	defer finish()
+	return s.verifiedSnapshot(call)
+}
+
+func ownerIdentitySnapshotStateEqual(a, b contracts.OwnerIdentityRoleState) bool {
+	// Compare the canonical persisted wire state, including exact private material.
+	x, e := json.Marshal(a)
+	if e != nil {
+		return false
+	}
+	defer clear(x)
+	y, e := json.Marshal(b)
+	if e != nil {
+		return false
+	}
+	defer clear(y)
+	return bytes.Equal(x, y)
+}

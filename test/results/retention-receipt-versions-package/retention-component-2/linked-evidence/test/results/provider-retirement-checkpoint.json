@@ -1,0 +1,32 @@
+{
+  "scope": "Initial provider compatibility and prepared gated installer; no activation or public workflow qualification",
+  "integratedPaths": 5,
+  "checks": [
+    {
+      "command": "make go-check go-architecture-check",
+      "exit": 0,
+      "log": "provider-retirement-integrated-code.log"
+    },
+    {
+      "command": "make spec-check architecture-check",
+      "exit": 0,
+      "log": "provider-retirement-integrated-contracts.log"
+    },
+    {
+      "command": "fleet --run ^TestInitialProviderIssuerWithRealOpenBao$",
+      "exit": 0,
+      "report": "initial-provider-retirement-corrected-environment.json",
+      "namedPassingEntries": 4,
+      "unchangedSourceHashes": 1123,
+      "cleanupFailures": []
+    },
+    {
+      "command": "context --run ^TestInitialPreparationProvidersWithRealServices$",
+      "exit": 0,
+      "report": "initial-provider-loader-qualified-environment.json",
+      "namedPassingEntries": 19,
+      "unchangedSourceHashes": 1123,
+      "cleanupFailures": []
+    }
+  ]
+}

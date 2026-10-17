@@ -1,0 +1,220 @@
+ok  	asservat.local/asservat/internal/bootstrap	4.392s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.438s
+--- FAIL: TestBrowserSettingsProtectedConfig (0.00s)
+    --- FAIL: TestBrowserSettingsProtectedConfig/valid (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/suspended (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/replacement (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/wrong-root (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/zero-epoch (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/insecure-issuer (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/origin-path (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/origin-query (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/origin-user (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/origin-default-port (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/origin-case (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/lifetime (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/capacity (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/unknown (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/alias (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/extra-data (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+    --- FAIL: TestBrowserSettingsProtectedConfig/expired-read (0.00s)
+        browser_settings_test.go:18: open ../../../examples/browser-settings.json: no such file or directory
+E1012 00:43:14.081242 2079395 request.go:1198] "Unexpected error when reading response body" err="bounded pod status unavailable"
+--- FAIL: TestFleetAdministrationProtectedConfig (0.00s)
+    --- FAIL: TestFleetAdministrationProtectedConfig/valid (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/no-operators (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/suspended (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/installation (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/bad-epoch (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/untrusted-issuer (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/duplicate-subject (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/unbounded (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/history (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/unknown (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/case-alias (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/replacement (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/extra-data (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+    --- FAIL: TestFleetAdministrationProtectedConfig/expired-read (0.00s)
+        fleet_settings_test.go:18: open ../../../examples/fleet-settings.json: no such file or directory
+--- FAIL: TestIdentityPolicyPinnedConfigAndCurrentRevocation (0.03s)
+    identity_policy_test.go:41: open ../../../examples/identity-settings.json: no such file or directory
+--- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings (0.00s)
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unknown (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/case-alias (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-client (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-client (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-groups (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/empty-eligible (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/overlong-age (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/control-character (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-issuer (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/null-groups (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-json (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/oversize (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/binary-data (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-namespace (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/deleting (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/expired-io (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+    --- FAIL: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/clock-rollback (0.00s)
+        identity_policy_test.go:91: open ../../../examples/identity-settings.json: no such file or directory
+2026/10/12 00:44:17 http: TLS handshake error from 127.0.0.1:57640: remote error: tls: bad certificate
+--- FAIL: TestPermissionSchemaMatchesReviewedExamples (0.03s)
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/access-binding (0.00s)
+        permissions_test.go:356: open ../../../examples/access-binding.yaml: no such file or directory
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/access-binding-owners (0.00s)
+        permissions_test.go:356: open ../../../examples/access-binding-owners.yaml: no such file or directory
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/permission-source-namespace (0.00s)
+        permissions_test.go:356: open ../../../examples/permission-source-namespace.yaml: no such file or directory
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/permission-source-workload (0.00s)
+        permissions_test.go:356: open ../../../examples/permission-source-workload.yaml: no such file or directory
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/permission-source-rbac (0.00s)
+        permissions_test.go:356: open ../../../examples/permission-source-rbac.yaml: no such file or directory
+    --- FAIL: TestPermissionSchemaMatchesReviewedExamples/permission-source-exec (0.00s)
+        permissions_test.go:356: open ../../../examples/permission-source-exec.yaml: no such file or directory
+--- FAIL: TestPolicySourceBoundedObservationAndIntent (0.00s)
+    policy_source_test.go:89: open ../../../examples/policy-deployment.yaml: no such file or directory
+--- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin (0.00s)
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/hub-local (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/hub-only-explicit (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/missing-local (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/wrong-local-cluster (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/duplicate-source (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/missing-hub (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/wrong-root (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/wrong-content-pin (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/replaced-object (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/replaced-namespace (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/mutable (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/extra-data (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/unknown (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/case-alias (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/zero-digest (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/bad-hex (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/expired (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/different-target (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+    --- FAIL: TestRetentionTopologyRequiresIndependentExactImmutablePin/missing-object (0.00s)
+        retention_topology_test.go:23: open ../../../examples/retention-topology.json: no such file or directory
+--- FAIL: TestSubmissionTrustProtectedConfig (0.00s)
+    --- FAIL: TestSubmissionTrustProtectedConfig/valid (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/root (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/installation (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/epoch (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/replacement (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/duplicate-key (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/unknown (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/alias (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/key-encoding (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/empty (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+    --- FAIL: TestSubmissionTrustProtectedConfig/expired-read (0.00s)
+        submission_trust_test.go:18: open ../../../examples/submission-trust.json: no such file or directory
+--- FAIL: TestWorkTrustProtectedConfig (0.00s)
+    --- FAIL: TestWorkTrustProtectedConfig/valid (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/cluster (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/epoch (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/duplicate-key (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/unknown (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/case-alias (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/padded-key (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/offset (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/expiry (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/replaced (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/extra-data (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/expired-read (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+    --- FAIL: TestWorkTrustProtectedConfig/stale-receiver (0.00s)
+        work_trust_test.go:20: open ../../../examples/work-trust.json: no such file or directory
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	78.506s
+--- FAIL: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection (0.05s)
+    case_schema_test.go:26: open ../../examples/mcp-shared-case-notice-result.json: no such file or directory
+--- FAIL: TestPodStatusOutputRequiresSubmissionRetentionAnchor (0.04s)
+    investigation_schema_test.go:68: open ../../examples/mcp-pod-status-preview-result.json: no such file or directory
+--- FAIL: TestCaptureRequestResolutionHasStrictAcknowledgedDisposition (0.04s)
+    investigation_schema_test.go:106: open ../../examples/mcp-resolve-capture-accepted.json: no such file or directory
+FAIL
+FAIL	asservat.local/asservat/internal/contracts	0.201s
+FAIL

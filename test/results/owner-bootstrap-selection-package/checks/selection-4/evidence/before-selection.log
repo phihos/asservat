@@ -1,0 +1,7 @@
+=== RUN   TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim
+    owner_bootstrap_selection_test.go:342: caller permission root reached original projection claim
+    owner_identity_operation_fixture_test.go:405: private-root fixture: creates=1 object=true api="v1" kind="Secret" namespace=true name=true fields=1 decoded=true valid=true
+--- FAIL: TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim (5.69s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	5.735s
+FAIL

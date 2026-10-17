@@ -1,0 +1,8 @@
+=== RUN   TestHubConfigurationWorkerInRestrictedPod
+    hub_worker_test.go:282: native worker image docker.io/library/asservat-context-worker@sha256:de27464110e97187cef8188e868032c746c1929802e3ea49cb7ca49a9bb0e117 Deployment 9cb48274-5e24-4b60-9c33-4de45dd28599 Restricted Pod with projected API tokens; native timed token renewal not measured
+    hub_worker_test.go:385: nativePod=true; mounted reconciliation used real protected sources, scheduling Lease and scoped SQL/S3/OpenBao; missing root stayed recovery-blocked, one fixture recovery acceptance enabled automatic audited observation, guard removal fenced reads and lease loss joined shutdown
+    hub_worker_native_test.go:155: native worker Pods did not terminate
+--- FAIL: TestHubConfigurationWorkerInRestrictedPod (41.21s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	41.277s
+FAIL

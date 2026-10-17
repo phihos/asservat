@@ -1,0 +1,34 @@
+--- a/internal/adapters/kubernetes/initial_bootstrap_plan.go
++++ b/internal/adapters/kubernetes/initial_bootstrap_plan.go
+@@ -156,7 +156,7 @@
+ 	probeToken := key("", "serviceaccounts", n.account) + " && variables.sub == 'token' && request.operation == 'CREATE' && has(object.spec) && has(object.spec.audiences) && object.spec.audiences == [" + ownerCELString(d.ProbeAudience) + "] && has(object.spec.expirationSeconds) && object.spec.expirationSeconds == 600 && has(object.spec.boundObjectRef) && object.spec.boundObjectRef.apiVersion == 'v1' && object.spec.boundObjectRef.kind == 'Secret' && object.spec.boundObjectRef.name == " + ownerCELString(n.anchor) + " && has(object.spec.boundObjectRef.uid) && object.spec.boundObjectRef.uid.matches('^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$')"
+ 	allowed = "(" + allowed + ") || (" + admin + " && " + probeToken + ")"
+ 	fail, equivalent, scope := admission.Fail, admission.Equivalent, admission.AllScopes
+-	policy := &admission.ValidatingAdmissionPolicy{TypeMeta: meta.TypeMeta{APIVersion: admission.SchemeGroupVersion.String(), Kind: "ValidatingAdmissionPolicy"}, ObjectMeta: meta.ObjectMeta{Name: n.guard, Annotations: map[string]string{initialBootstrapAnnotation: bootstrapDigest(d)}}, Spec: admission.ValidatingAdmissionPolicySpec{FailurePolicy: &fail, Variables: []admission.Variable{{Name: "group", Expression: "has(request.resource.group) ? request.resource.group : ''"}, {Name: "sub", Expression: "has(request.subResource) ? request.subResource : ''"}, {Name: "namespace", Expression: "has(request.namespace) ? request.namespace : ''"}, {Name: "name", Expression: "has(request.name) ? request.name : ''"}}, MatchConstraints: &admission.MatchResources{MatchPolicy: &equivalent, ResourceRules: []admission.NamedRuleWithOperations{{RuleWithOperations: admission.RuleWithOperations{Operations: []admission.OperationType{admission.Create, admission.Update, admission.Delete, admission.Connect}, Rule: admission.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}, Scope: &scope}}}}}, MatchConditions: []admission.MatchCondition{{Name: "initial-bootstrap-continuity", Expression: strings.Join(keys, " || ")}}, Validations: []admission.Validation{{Expression: allowed, Message: initialBootstrapDenial}}}}
++	policy := &admission.ValidatingAdmissionPolicy{TypeMeta: meta.TypeMeta{APIVersion: admission.SchemeGroupVersion.String(), Kind: "ValidatingAdmissionPolicy"}, ObjectMeta: meta.ObjectMeta{Name: n.guard, Annotations: map[string]string{initialBootstrapAnnotation: bootstrapDigest(d)}}, Spec: admission.ValidatingAdmissionPolicySpec{FailurePolicy: &fail, Variables: []admission.Variable{{Name: "sub", Expression: "has(request.subResource) ? request.subResource : ''"}}, MatchConstraints: &admission.MatchResources{MatchPolicy: &equivalent, ResourceRules: []admission.NamedRuleWithOperations{{RuleWithOperations: admission.RuleWithOperations{Operations: []admission.OperationType{admission.Create, admission.Update, admission.Delete, admission.Connect}, Rule: admission.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}, Scope: &scope}}}}}, MatchConditions: []admission.MatchCondition{{Name: "initial-bootstrap-continuity", Expression: strings.Join(keys, " || ")}}, Validations: []admission.Validation{{Expression: allowed, Message: initialBootstrapDenial}}}}
+ 	binding := &admission.ValidatingAdmissionPolicyBinding{TypeMeta: meta.TypeMeta{APIVersion: admission.SchemeGroupVersion.String(), Kind: "ValidatingAdmissionPolicyBinding"}, ObjectMeta: meta.ObjectMeta{Name: n.guard, Annotations: map[string]string{initialBootstrapAnnotation: bootstrapDigest(d)}}, Spec: admission.ValidatingAdmissionPolicyBindingSpec{PolicyName: n.guard, ValidationActions: []admission.ValidationAction{admission.Deny}}}
+ 	return policy, binding, nil
+ }
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_bootstrap_variables_test.go
+@@ -0,0 +1,20 @@
++package kubernetes
++
++import "testing"
++
++// The actual API rejected namespace as a reserved CEL identifier. Matching is
++// request-only now, so these unused declarations must not reach Kubernetes.
++func TestInitialBootstrapAdmissionHasNoReservedCELVariable(t *testing.T) {
++	p, _, err := InitialBootstrapAdmission(bootstrapAdmissionFixture(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, v := range p.Spec.Variables {
++		if v.Name == "namespace" {
++			t.Fatal("namespace is a reserved CEL identifier")
++		}
++	}
++	if len(p.Spec.Variables) != 1 || p.Spec.Variables[0].Name != "sub" {
++		t.Fatal("unexpected unused bootstrap variables")
++	}
++}

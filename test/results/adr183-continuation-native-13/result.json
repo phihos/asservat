@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-13",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Stopped at public/roles-provision/complete:browser-settings 2/66 (changed) after about 250 s of bounded replays: the first public role completed, the second repeatedly overran. Unit measurement: a public role claim costs 53 API requests, a root read 35 and a completion 53 (about 141 per role; six full proofs), roughly six seconds at the fixed 20 QPS, more than the five-second claim window. ADR-186 scopes one proof to each role operation (about 56 requests per role).",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

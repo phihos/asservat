@@ -1,0 +1,6 @@
+{
+  "name": "adr181-sql-1",
+  "exit": 1,
+  "status": "failed",
+  "cause": "fixture KeyPeer NotBefore..NotAfter exceeded one hour; KeyPeer.Valid refused it (api_execution_test.go:483 verifier unwrap denied)"
+}

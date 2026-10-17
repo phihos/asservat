@@ -1,0 +1,151 @@
+{
+  "recordedUTC": "2026-10-09T19:37:39.935676+00:00",
+  "scope": "Two isolated SQL/crash spikes; no production TASK or full EXP gate complete.",
+  "outcomes": {
+    "sqlRaceSuitePass": 14,
+    "explicitPostRestartSkip": 1,
+    "postRestartPass": 1,
+    "vmCasesPass": 14,
+    "vmOriginalSettingsRestored": true,
+    "sourceChecks": "Python AST and Go formatting pass; final SQL/crash input hashes match retained sources"
+  },
+  "runs": {
+    "sql": "sql-test.json",
+    "restart": "sql-restart.json",
+    "crash": "crash-execution.json"
+  },
+  "cleanup": {
+    "finishedUTC": "2026-10-09T19:31:48.997299+00:00",
+    "commands": [
+      {
+        "command": [
+          "python3",
+          "experiments/control-crash/vm/lab.py",
+          "down"
+        ],
+        "exit": 0,
+        "output": "Stopped only this lab VM",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "python3",
+          "experiments/control-crash/postgres.py",
+          "down"
+        ],
+        "exit": 0,
+        "output": "Removed only owned PostgreSQL container, anonymous volume and network",
+        "stderr": ""
+      }
+    ],
+    "checks": {
+      "vmStopped": true,
+      "container:27d43945bfbe62f6f1a770d755a32de10daa30b4c4bbd9994f9e5a8807765618": "absent",
+      "network:asservat-control-crash-20261009": "absent",
+      "volume:8123b89e902a2732f9cf1a816be09ca6e070dd16742060cdd698cd89a4439e05": "absent",
+      "privateCacheAndSSHKeysRemoved": true,
+      "hostCrashSettingsUnchanged": true
+    },
+    "hostAfter": {
+      "corePattern": "core\n",
+      "corePipeLimit": "16\n"
+    },
+    "scope": "Only this lab VM/private cache/keys and labelled PostgreSQL container/anonymous volume/internal network removed. Shared image/build caches untouched. No physical-media erasure claim."
+  },
+  "originalBriefSHA256": "af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20",
+  "notQualified": [
+    "Production authority/audit/schema/roles",
+    "HA/standby/PITR/failover fencing",
+    "Kubernetes/CRI/LSM/managed-node crash attribution",
+    "Durable KMS-wrapped crash keys and artifact commit/recovery",
+    "Large cores, real pressure and workload fairness",
+    "Helper 5.15/arm64 compatibility",
+    "Production UI/MCP/native core download journey"
+  ],
+  "inputSHA256": {
+    "experiments/control-crash/README.md": "a11be4dddf0554c9396220c285b7febb8da0ea0706ebbe20082698690fbf340f",
+    "experiments/control-crash/go/admission.go": "e7012a6c4c12e90867d25431304c9eb33dbdeed09ef565bd382fc2379531ae22",
+    "experiments/control-crash/go/admission_test.go": "3ebbb21726d04f8710e393c131f5e984bfa7d6e9e1207ea7c79922fdac8278ac",
+    "experiments/control-crash/go/cmd/receiver/main.go": "08a72b26d4d1ef88376a55d29d4144a6960ad37cbddcc8b9bd5f0ffa2e2481b0",
+    "experiments/control-crash/go/go.mod": "84b9c68cb5ffe0603f5846c1605cd8ac37eeeb37503f164362ce8c1ff68f146a",
+    "experiments/control-crash/go/go.sum": "ce39a7bb086113e949dd1fdec8005ca0559e222b1f027d9da98417182760c0fa",
+    "experiments/control-crash/go/schema.sql": "903e2081c133cedb5198f6bb30b30d4c36b4f7b39b512ab1e86d56d3d037017d",
+    "experiments/control-crash/helper/Cargo.lock": "ed93948c923c48c9c6ae45bb97b83206cd74cf77bac87954c295be1e240bb084",
+    "experiments/control-crash/helper/Cargo.toml": "44bbc5c6cf3802e3c5961dec9483b02b8c70d12096629cdf5e18981c2c1c9a5a",
+    "experiments/control-crash/helper/src/main.rs": "fed21d6a28cb0a52826ce12910d24dbfc45c9e7aa0bc6b5fe74b3995fe14425b",
+    "experiments/control-crash/postgres.py": "afc90f387d1ebc490170cd7d5ffc882869fb47f430c5b5e74d273b34dfb6ccdc",
+    "experiments/control-crash/run-sql.py": "6fffaf2875bd7cc242a3eb2c5026f2dd50d7efd0177177ca5952a3577edffa76",
+    "experiments/control-crash/vm/README.md": "7d644c29aab64cffa1429d363edf44a249106fd9ca1e967ebfbc2f5b894e7b7d",
+    "experiments/control-crash/vm/fixture.c": "b1d632a35ed5d6b352b46fb974fe979661334ab4f024b12190e528e7157a5aa4",
+    "experiments/control-crash/vm/lab.py": "920d5557b985212be6dbb494e8918f43f2e9d57ecda20999d6d270ddd168926e",
+    "experiments/control-crash/vm/run.py": "dfa0191d21ce12debfb892e70fa8d89b3b0b54e97cf8b568e41a916839389740"
+  },
+  "resultsSHA256": {
+    "before-final-outcome-crash-execution.json": "ecdde56ed0f718d58e79839ab9c4a94b512b641498fa9e0c2754f71a2d02c957",
+    "before-final-outcome-crash-results.json": "f11b9d9c683caa3874b6d40c0bf440612e427ff2b11945441110f34100dae5e0",
+    "before-final-outcome-crash-run.log": "bfc49efbceaec204a810a9244ca706bbcf74a4d600c8695a3869d55e2261e015",
+    "cleanup.json": "856da1eaeaae870f00fa90fab29b2ab8a2282f33d59b6fe503d61271517c90b7",
+    "crash-execution.json": "dee022b4078ad27b25d2702f98106f903775dc4d9b0a57ad4c75d68524019e27",
+    "crash-initial-pid1.json": "f294151dd4871cb735487d7b9311d54ef55236e741482af502d98d8a0eff425e",
+    "crash-initial-pid1.log": "7ecc1557fcc7eebeca97d2f80173310be9e2a415433b8a45d72e13196b9527a3",
+    "crash-results.json": "b3edfe5cb0ba53fc94f1ea5589d7b6a06cb947d1bd0fb1a66dc1f14ed5dad46c",
+    "crash-run-2.json": "ceb41111daaccdfaaf84f7238d64820855dd31e375e19d3c9704bf6797c279b2",
+    "crash-run-2.log": "ceaecd525241700eafe87563f726a1ace348d4e5645c5b6cb35effd4637fb621",
+    "crash-run.log": "0162aa84a9d26ecf20d46937c406d2e6607ca42af1e39b34c2e6f30d626bf775",
+    "documentation-checks.log": "9521cbcba343bc888ced171800e3c0b5c0b2b3c2e488c1047a71b654ae79731e",
+    "helper-build.log": "b2ae48c467474c99d658fe798120011ab11bfe9ef2faea023b0e1f5f370f5988",
+    "host-before.json": "4836bae12a46e5839df0226f70803ca125e8c5e079d01f43e3403fe6fd991941",
+    "host-toolchain.json": "298748dd28e9d9b8af88f460661edf170727d2a87e7ca1a37eddc43293500436",
+    "postgres-fixture.json": "3afdf3eaa31370f1cba658c233c5be8aa9201263c9cbbd027944f525b57ab42e",
+    "postgres-pull.log": "f81244d1eeb4864b590c6d6ce91e0a265d6b28464f45ac09d7a358d40fca1d34",
+    "postgres-version.txt": "fe21578835b4f920bc323d112ecc5de3968707bcba48815ba3118c70f4f088c1",
+    "publication-expiry-before-fix.log": "aaa65b1600cd6383452b19849c6020673a99b053e61a9502f070dc80b8a8264c",
+    "sql-initial-race.json": "46ba48dc3b21b78dd45a88fb5151b99ee1a574f0de9b21ec1a858bf6d6979dcc",
+    "sql-initial-race.log": "1dc2576880594103be99b005fe23de89fd3ead0a956f67a65f91bb882ddbb53f",
+    "sql-restart.json": "434cbb4a4e24295be01f71512588c1601788e21b08e04437c4ac8d57761c65fe",
+    "sql-restart.log": "37c6b31afc3d56f401b9a3a2e1b7f035fa4d2df33ace6dc21423f5508b061357",
+    "sql-test.json": "373125232551aa1347dee690d04b2254f8b36ed8bad12f6aafb559c9df24ce78",
+    "sql-test.log": "2a2f7c9501cc500fb3afb6444dbf3f85ad9dea17f84a675c32b8aa74d6134542",
+    "vm-environment.txt": "0b448688f6b1abd1b3b05954d03e6d7800f18afe4f2a50d00a04559c5eb5a9c5",
+    "vm-image.json": "4fa20a30e5e272dbd11cf6080ba2090d0acdce04725e9f88cbb939fd6b6aa460",
+    "vm-kernel-tail.txt": "f1c23ef9fdec31a311bf5f73bb8b2506531e2bc1f6b219ec170850a3f6469ac6",
+    "vm-packages.log": "9cdfd03c2dd628e132d88a6baf5da0ace94890f9046e93a3683be363ccd3abd6",
+    "vm-start.log": "2eb451a8a6b2c5f8dbe5c97bcc4421857ecf2f1e8dd1f2952ecd9c95384897fe"
+  },
+  "documentationChecks": {
+    "command": [
+      "make",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "openapi-check",
+      "download-check",
+      "investigation-check",
+      "live-check",
+      "PYTHON=/tmp/asservat-openapi-validation/bin/python"
+    ],
+    "exit": 0,
+    "log": "documentation-checks.log",
+    "specAssertions": 7006,
+    "localLinks": 798,
+    "scope": "Offline design/contract validation; GUI unchanged and browser sweep not repeated"
+  },
+  "planningDocumentsSHA256": {
+    "README.md": "81b5918d79735fcc30e0c1a382892e262176517f2e3fc03bb0d4377666db16a9",
+    "AGENTS.md": "74d172065508eec92b710a331de2ce8711b1e7267dae4f64c41530210d75e582",
+    "specs/persistence.md": "d65c1dbfdd5eb39c86bb2c759303c06de413efe72e54d1e1ec3ef929d6a35d5b",
+    "specs/actions.md": "74f776612b155fb0b29364143f6f753cd6556d94985f39c3bae9436d8fd89c94",
+    "specs/investigation-approval.md": "023d408ce518adbe1f6b345f2fbf260a995fb66892956b860150b19f255cec6c",
+    "docs/architecture.md": "047605311a5180deb57d47d92f12f07bbedb5dd73e62300c89c61e935d37ef18",
+    "docs/architecture/README.md": "cd6df26cf5b42e3af72add8c8ebe2adc85d66ca7e8f323f8824fe671e80098cd",
+    "docs/architecture/implementation-slices.md": "622fc50ec84584115d8a04467e8956d43251849cfbd2fab39373477d5b703179",
+    "docs/implementation-plan.md": "d248f0b206d501a3ca79ebf3d4b472e322d60e412cf35e8f02ad88c7573c0365",
+    "docs/technology.md": "b25f94d88f17eebbae680ad6576d41063a6f90f5d7d0163a87665ace48d40fdf",
+    "docs/validation.md": "56f1beef1a75f38006eedc766fe7ad61588eba0c40c1ae0c7c93eb50ff301c79",
+    "docs/research/feasibility-control-crash.md": "a483490ad83fe5d31ef8d9c9dbe0881630cf1b28b87c815c4520f283f45b0076",
+    "docs/research/feasibility-packet-downloads.md": "d304718eae7a037b68fdeb4c8ef649dc57c1c28b55300ab72723d91ee2591820",
+    "docs/research/findings.md": "77ba2a9b7380873c4b36e8d00be9e92f87647eb2369048fd364063fc858892d2",
+    "docs/research/technology-selection.md": "6154a3e9475b9eacf5a8c4ab87c1c813a48cd2a55c2fda1f1dbc7902093e3986",
+    "docs/research/spec-validation.txt": "79dc7688c839083d1f59f6ec9ab0115b189f0b2d38ef07226fcba1bfd4a441c3"
+  }
+}

@@ -1,0 +1,5 @@
+# asservat.local/asservat/internal/transport/native_test [asservat.local/asservat/internal/transport/native.test]
+../../.cache/asservat-build/planning/context-native-outcome-20261012/changes/internal/transport/native/content_uncertainty_test.go:75:95: invalid operation: out.state.Reference != op.Reference (mismatched types contracts.NativeReference and "asservat.local/asservat/internal/domain/authorization".NativeReference)
+ok  	asservat.local/asservat/internal/adapters/postgres	1.047s
+FAIL	asservat.local/asservat/internal/transport/native [build failed]
+FAIL

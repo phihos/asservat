@@ -1,0 +1,79 @@
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/download-terminal-contract-20261011/work/web
+
+ ❯ src/evidence/evidence.test.ts (11 tests | 2 failed) 571ms
+   × bounds terminal status by the existing managed read interval when native metadata is present=true 55ms
+   × bounds terminal status by the existing managed read interval when native metadata is present=false 51ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/evidence/evidence.test.ts > bounds terminal status by the existing managed read interval when native metadata is present=true
+AssertionError: expected { …(15) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "artifact_id": "00000000-0000-4000-8000-000000000003",
+  "coverage_notice": "Selected pod-status metadata only; no logs or workload configuration.",
+  "download_id": "00000000-0000-4000-8000-000000000004",
+  "emitted_bytes": 0,
+  "etag": "\"v1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"",
+  "expires_at": "2026-10-11T18:51:28.314Z",
+  "filename": "artifact-3.json",
+  "handling_notice": "Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.",
+  "local_copy_managed": false,
+  "managed_read_until": "2026-10-11T18:51:30.314Z",
+  "native_format": "pod-status/v1",
+  "resume_available": false,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "size_bytes": 512,
+  "state": "Completed",
+}
+
+ ❯ src/evidence/evidence.test.ts:122:42
+    120|   expect(controller.snapshot().download?.sha256).toBe(includeMetadata …
+    121|   await vi.advanceTimersByTimeAsync(1001);
+    122|   expect(controller.snapshot().download).toBeUndefined();
+       |                                          ^
+    123|   expect(client.calls.map(c => c.name)).toEqual(['get_case', 'prepare_…
+    124|   await vi.advanceTimersByTimeAsync(60_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/evidence/evidence.test.ts > bounds terminal status by the existing managed read interval when native metadata is present=false
+AssertionError: expected { …(9) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "artifact_id": "00000000-0000-4000-8000-000000000003",
+  "download_id": "00000000-0000-4000-8000-000000000004",
+  "emitted_bytes": 0,
+  "expires_at": "2026-10-11T18:51:28.368Z",
+  "handling_notice": "Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.",
+  "local_copy_managed": false,
+  "managed_read_until": "2026-10-11T18:51:30.368Z",
+  "resume_available": false,
+  "state": "Completed",
+}
+
+ ❯ src/evidence/evidence.test.ts:122:42
+    120|   expect(controller.snapshot().download?.sha256).toBe(includeMetadata …
+    121|   await vi.advanceTimersByTimeAsync(1001);
+    122|   expect(controller.snapshot().download).toBeUndefined();
+       |                                          ^
+    123|   expect(client.calls.map(c => c.name)).toEqual(['get_case', 'prepare_…
+    124|   await vi.advanceTimersByTimeAsync(60_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 passed (11)
+   Start at  20:51:28
+   Duration  1.13s (tests 54%, environment 34%, transform 10%, import 2%)
+

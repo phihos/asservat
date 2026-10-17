@@ -1,0 +1,26 @@
+=== RUN   TestCapacityPolicyTimestampVectors
+=== RUN   TestCapacityPolicyTimestampVectors/whole-second
+=== RUN   TestCapacityPolicyTimestampVectors/zero-offset
+=== RUN   TestCapacityPolicyTimestampVectors/microsecond
+=== RUN   TestCapacityPolicyTimestampVectors/fraction-zeroes
+=== RUN   TestCapacityPolicyTimestampVectors/whole-zero-fraction
+=== RUN   TestCapacityPolicyTimestampVectors/one-microsecond
+=== RUN   TestCapacityPolicyTimestampVectors/negative-offset-next-day
+=== RUN   TestCapacityPolicyTimestampVectors/positive-offset-previous-year
+=== RUN   TestCapacityPolicyTimestampVectors/leap-day
+=== RUN   TestCapacityPolicyTimestampVectors/minimum-year
+=== RUN   TestCapacityPolicyTimestampVectors/maximum-year
+--- PASS: TestCapacityPolicyTimestampVectors (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/whole-second (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/zero-offset (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/microsecond (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/fraction-zeroes (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/whole-zero-fraction (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/one-microsecond (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/negative-offset-next-day (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/positive-offset-previous-year (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/leap-day (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/minimum-year (0.00s)
+    --- PASS: TestCapacityPolicyTimestampVectors/maximum-year (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.057s

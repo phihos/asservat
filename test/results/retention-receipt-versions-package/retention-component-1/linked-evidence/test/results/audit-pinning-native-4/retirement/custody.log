@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers
+--- PASS: TestContextAdmissionWithRealServices (64.42s)
+    --- PASS: TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers (64.07s)
+PASS
+ok  	asservat.local/asservat/test/integration	65.473s

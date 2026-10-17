@@ -1,0 +1,5 @@
+--- FAIL: TestLiveReaderShortenedObservationExpiryDoesNotTerminateGET (0.00s)
+    live_reader_test.go:151: observation expiry incorrectly terminated GET identity not eligible
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.005s
+FAIL

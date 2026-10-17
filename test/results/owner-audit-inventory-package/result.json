@@ -1,0 +1,193 @@
+{
+  "pins": {
+    "manifest.json": "ecfa23db4b82a5400a6a8bb7717e31f592818ea45b37a31e9bed319b3026c53e",
+    "dependencies.json": "7686b652d43ea65b307c05dd4cdaea3e16fe948c637f3288dd2b64036e831e22",
+    "args.json": "a7329bf9cae9580d4ea62e0212c95a930649955cfdb82903ec166bfce9952b4a",
+    "before.go.txt": "c237647ea53dd826aa6272b34ed315c616e36e62f5beb07e3e3a57e3e819f71e",
+    "run.py": "1f0493fde446d6b341fce12bb82ef4fb8a5408b45efa0ca0c635a51ca1c63759"
+  },
+  "native": false,
+  "beforeVariant": "Prior unrun draft only; no prior production vulnerability claim.",
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "seconds": 10.380075195000245,
+      "logSHA256": "fbeb4942fe6ecb22320687bfee4f85724f0ce3761054c1e2541358c24a300598",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "passedTests": [],
+      "failedTests": []
+    },
+    {
+      "name": "prior-draft-negative",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-vet=off",
+        "-count=1",
+        "-timeout=30s",
+        "-run=^TestOwnerAuditInventoryRetainsFactsBeforeFailure$/(uploads|current)/(unavailable|malformed-tail)$",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 1,
+      "seconds": 1.5156880419999652,
+      "logSHA256": "e6996f05519f5e613c14f5983ddbf0edd623eda5f82a55e25007b6312960eb1f",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "passedTests": [],
+      "failedTests": [
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/unavailable",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/malformed-tail",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/unavailable",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/malformed-tail",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure"
+      ]
+    },
+    {
+      "name": "races",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-race",
+        "-count=1",
+        "-timeout=90s",
+        "-run=^TestOwnerAuditInventory",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "seconds": 21.3438516669994,
+      "logSHA256": "a0a8a45fed667499a35a94b2b5e2ba7550a2aed20fede4a33a73764376cad114",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "passedTests": [
+        "TestOwnerAuditInventoryExpiredIssuerAndDeletedSourceAreHistoricalOnly",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/nil-store",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-store",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-store-id",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/empty-configuration",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-generation",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-original-root",
+        "TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO",
+        "TestOwnerAuditInventoryPreservesOversizedPhysicalVersion",
+        "TestOwnerAuditInventoryPreservesPhysicalKindsAndHistoricalScope",
+        "TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/versions",
+        "TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/uploads",
+        "TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/current",
+        "TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete",
+        "TestOwnerAuditInventoryDoesNotInventVersionFromCurrentKey",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-truncation",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/foreign-key",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-version",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/control-version",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/negative-size",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-version",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/marker-alias",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/two-latest",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-upload",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-current",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/over-page",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/denied",
+        "TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows",
+        "TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/false",
+        "TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/true",
+        "TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/unavailable",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/missing-truncation",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/malformed-tail",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/unavailable",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/missing-truncation",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/malformed-tail",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/unavailable",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/missing-truncation",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/malformed-tail",
+        "TestOwnerAuditInventoryRetainsFactsBeforeFailure",
+        "TestOwnerAuditInventoryLatestMarkerNeverInventsDataVersion"
+      ],
+      "failedTests": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "seconds": 1.3656447469984414,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "passedTests": [],
+      "failedTests": []
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 0.8147897780017956,
+      "logSHA256": "fb0c723e14658486cc6eff1e3521388a89971fcdbb01c53a613bf9935ad9b273",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "passedTests": [],
+      "failedTests": []
+    }
+  ],
+  "before": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-owner-inventory-vt7np83v",
+  "mirrorChanges": [],
+  "after": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "exit": 0,
+  "scratchRemoved": true
+}

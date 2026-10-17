@@ -1,0 +1,27 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/hub_workload.go",
+    "base_sha256": "b186b61a4f0af5dc94f4b759f8adf75fb552ca38a7c6fee9ee55336682dd7fef",
+    "payload_sha256": "b882e6830c020db4146e187863f16d72c25b6c9a99b67b47ab5c5bea6d412e12"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_object_defaults_test.go",
+    "base_sha256": null,
+    "payload_sha256": "ed5f0ba211cae463817a30bc3250d9d582aa88a220682a140672087a456af1e3"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "45e89a2fd66ed8384a0a2918acb90ad762f89aa2daf192adbae7180ff78a76a4"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+    "base_sha256": "97c1da037cdfd85142c61fc009ccb7775c647254e02c7eaf4945664724629c35",
+    "payload_sha256": "37320f753a49d35cc0f96bef9a99b698831a2f729d48e609f07da43f074039af"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_workload.go",
+    "base_sha256": "018af3c13c3b31a0f68d63978f76a678fc18ac5ca64b228b4d2d0ff57770924c",
+    "payload_sha256": "61502ee00703cd5bce976f97d443f241ef24579ad2b05d2c927213ef10d45fa5"
+  }
+]

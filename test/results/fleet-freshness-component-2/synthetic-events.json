@@ -1,0 +1,132 @@
+{
+  "execution": {
+    "expected": {
+      "p": [
+        "Example_demo",
+        "FuzzA",
+        "TestA",
+        "TestNative"
+      ],
+      "empty": []
+    },
+    "events": [
+      {
+        "Package": "p",
+        "Action": "start"
+      },
+      {
+        "Package": "empty",
+        "Action": "start"
+      },
+      {
+        "Package": "empty",
+        "Action": "skip"
+      },
+      {
+        "Package": "p",
+        "Action": "run",
+        "Test": "TestA"
+      },
+      {
+        "Package": "p",
+        "Action": "pause",
+        "Test": "TestA"
+      },
+      {
+        "Package": "p",
+        "Action": "cont",
+        "Test": "TestA"
+      },
+      {
+        "Package": "p",
+        "Action": "pass",
+        "Test": "TestA"
+      },
+      {
+        "Package": "p",
+        "Action": "run",
+        "Test": "FuzzA"
+      },
+      {
+        "Package": "p",
+        "Action": "run",
+        "Test": "FuzzA/seed#0"
+      },
+      {
+        "Package": "p",
+        "Action": "pass",
+        "Test": "FuzzA/seed#0"
+      },
+      {
+        "Package": "p",
+        "Action": "pass",
+        "Test": "FuzzA"
+      },
+      {
+        "Package": "p",
+        "Action": "run",
+        "Test": "Example_demo"
+      },
+      {
+        "Package": "p",
+        "Action": "pass",
+        "Test": "Example_demo"
+      },
+      {
+        "Package": "p",
+        "Action": "run",
+        "Test": "TestNative"
+      },
+      {
+        "Package": "p",
+        "Action": "output",
+        "Test": "TestNative",
+        "Output": "    fixture_test.go:9: owned fixture required\n"
+      },
+      {
+        "Package": "p",
+        "Action": "skip",
+        "Test": "TestNative"
+      },
+      {
+        "Package": "p",
+        "Action": "pass"
+      }
+    ]
+  },
+  "discovery": {
+    "expected": {
+      "p": [
+        "Example_demo",
+        "FuzzA",
+        "TestA",
+        "TestNative"
+      ],
+      "empty": []
+    },
+    "events": [
+      {
+        "Package": "p",
+        "Action": "start"
+      },
+      {
+        "Package": "p",
+        "Action": "output",
+        "Output": "Example_demo\nFuzzA\nTestA\nTestNative\n"
+      },
+      {
+        "Package": "p",
+        "Action": "pass"
+      },
+      {
+        "Package": "empty",
+        "Action": "start"
+      },
+      {
+        "Package": "empty",
+        "Action": "skip"
+      }
+    ]
+  },
+  "source": "package synthetic\nfunc TestA(t *testing.T) {\n}\nfunc FuzzA(f *testing.F) {\n}\nfunc TestOneLine(t *testing.T) { t.Log(\"one line\") }\nfunc TestMain(m *testing.M) {\n}\nfunc Example_demo() {\n // Output: example\n}\nfunc Example_compileOnly() {\n}\n"
+}

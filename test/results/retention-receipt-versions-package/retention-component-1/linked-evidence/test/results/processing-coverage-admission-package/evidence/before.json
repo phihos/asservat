@@ -1,0 +1,7 @@
+{
+  "path": "internal/application/capture/context_investigation.go",
+  "live_body_sha256": "1a0d90b90696b9e00e432c39ecee4f925b579430a04c889e8296fb38d669fb40",
+  "scaffold_sha256": "0c9000e6897b7ea395003e808e264aef954d385a67c85008160189fb47f00590",
+  "compatibility_only": "add the new Processing field so unchanged old Preview/Request bodies compile against new fixtures; no coverage call or new condition",
+  "expected_failure": "TestContextProcessingCoveragePrecedesPreviewAndAdmission must fail on known short coverage reaching preview/admission"
+}

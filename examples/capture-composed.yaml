@@ -1,0 +1,44 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugCapture
+metadata:
+  name: composed-ledger
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      name: ledger
+      uid: workload-ledger-uid
+    maxPods: 1
+    selection: lowestOrdinal
+    adoption: pinUID
+    ordinals:
+    - 0
+  reason: Investigate a synthetic ledger stall.
+  idempotencyKey: composed-ledger-001
+  deadline: '2026-10-09T12:05:00Z'
+  profileComposition:
+    components:
+    - id: http
+      profileRef:
+        catalog: builtin
+        name: http-headers
+        version: v1
+      overrides:
+      - actionID: http
+        field: packetFilter
+        value: tcp port 8080
+    - id: calls
+      profileRef:
+        catalog: builtin
+        name: syscall-activity
+        version: v1
+    - id: context
+      profileRef:
+        catalog: builtin
+        name: process-context
+        version: v1
+    maxTotalBytes: 100663296
+    maxDuration: 120s

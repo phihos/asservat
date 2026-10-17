@@ -1,0 +1,56 @@
+# ADR140 fixed configuration-reconciler provisioning
+
+Source-only proposed refinement. The existing public-role creator is not a bootstrap path for its own configuration prerequisites. No production source behavior or live authority has been changed for this proposal.
+
+## Concrete cycle and ordered boundary
+
+The public role root consumes accepted `OwnerConfigurations`, and its SQL producer requires fresh `fleet_current_trust`. `NewHubWorkerDeployment` needs three credentials before it can create either current projection. Supplying those credentials with the public producer therefore forms a cycle. The original completed initial activation remains historical provenance and a current database-incarnation fence; it is not a new source observation.
+
+Add one separate, fixed post-activation **configuration-role installation** step before normal `hub-worker` starts. It consumes the actual original activation claim, independently current administrator identity, native protected namespace/workload proof, and the existing protected fleet and owner ConfigMap readers. It does not read accepted `OwnerConfigurations` and never writes a fleet observation on the installer's behalf. The normal reconciler subsequently observes fleet state, independently audits/accepts the owner configuration, and only then permits the existing stronger public-role producer.
+
+The three permanent role identities are `configuration-fleet`, `configuration-source`, and `configuration-audit`, with a separate `_cfg_00..02` SQL namespace. They never enter `public-runtime` or a regional worker projection. Existing hub-worker filenames stay `sql-fleet.json`, `sql-configuration.json`, and `sql-audit.json`; a separate immutable `configuration-roles.json` carries their original retained receipts. This avoids changing existing public role ordinal identities or injecting another caller-selectable purpose.
+
+## Exact authority and recovery check
+
+The installer has actual Kubernetes administrator and SQL administrator credentials in its own compartment. Its native proof binds the already guarded control namespace, exact reconciler Deployment/account and protected fleet/owner source UIDs. Both actual source observations must be complete, nonsuspended, internally current and match the protected installation/cluster/namespace and the same original issuer epoch. The original five-second overlap is retained through every lock and effect. Source mutation or shortening after a wait denies; no synthesized `Administration`, accepted configuration or renewed deadline is permitted.
+
+SQL locks the exact `fleet_current_trust` row before the installation role lock. It checks the original `fleet_initial_activation` claim has its immutable encrypted audit acknowledgement and positive activation, and checks the current effective recovery flag, issuer epoch, database OID and postmaster identity. It rejects stored suspension/recovery and recovery-mode PostgreSQL. **Only this fixed credential-bootstrap step does not use the stored fleet observation expiry as present configuration proof**: it has the independently current protected source observation above, and creates no serving/collection/certificate/accepted-source authority. This distinction is explicit and cannot be selected through a public-role constructor or JSON flag. The existing public-role step continues requiring the actual reconciler's fresh projection.
+
+A restored or restarted database with an unaccepted incarnation still denies. No credential step writes recovery/activation fields, sets observation dates, clears suspension, invokes the retired initial manager, or creates an absent schema/trust root. Current proof is rechecked after blocking SQL locks and before the commit with the earliest retained interval.
+
+The independently current fleet proof must also respect the retained SQL
+source watermark: it cannot decrease the source generation or alter the
+digest at an already observed generation. A higher protected generation can
+be used solely for these fixed credential effects; provisioning does not
+write it into the accepted SQL projection. The stale-observation distinction
+cannot erase known contrary source history.
+
+## Closed grants
+
+All three roles get schema USAGE and schema-version reads. Grants are compiled constants derived from actual production facet queries, independently verified against actual catalog state; fixture SQL is comparison evidence only.
+
+- `configuration-fleet`: SELECT `fleet_trust` and `fleet_current_trust`; INSERT only installation/issuer/source UID/generation/digest/observation fields needed by `FleetObservation`'s blocked-root insertion; UPDATE only installation lock key, source generation/digest, suspended/observation fields. No recovery, activation, issuer or source-UID rewrite. Although the existing facet can insert a blocked missing root, this provisioning transaction itself requires the original activated root to exist.
+- `configuration-source`: SELECT current trust plus owner configuration/revision; immutable installation/source-key lock columns; INSERT configuration and original revision fields; UPDATE only generation/observed_at/fresh_until. No audit receipt or certificate activation.
+- `configuration-audit`: SELECT owner configuration/revision, source-key lock column and UPDATE only the immutable exact revision's audit receipt. No source observation, fleet write or certificate issuance. Existing encrypted audit ports remain unchanged; the signing/wrapping provider projection is independently scoped.
+
+Direct/ambient PUBLIC privileges, membership, role/default settings, grant option, ownership and unplanned SECURITY DEFINER calls are checked with the existing role-verification machinery. There is no general role manager or arbitrary SQL list. Private shared DDL/verification mechanics may be extracted inside the adapter; constructors and inventory remain purpose-fixed. Actual role/readback OID and original provenance remain mandatory.
+
+## One-use persistence and projections
+
+Use a distinct bounded Secret name derived from the installation, fixed three entries and original thirty-minute setup interval. It uses the existing one-use private-claim pattern: generate/store each password before SQL; only positively acknowledged first claim authorizes CREATE; uncertain claim/SQL responses allow exact named lookup/verification only; no repair/adoption or reset. The configuration role root contains no HMAC or evidence keys. Its own immutable runtime projection contains only the three credentials and retained proof manifest. The privileged administrator and mutable root are never mounted into hub-worker.
+
+This root's immutable identity includes original installation/activation, namespace, reconciler Deployment/account, protected fleet/owner source UIDs, and compiled layout digest. Individual claims retain the exact complete original source observations and original deadline without persisting credentials/tokens from Kubernetes. The initial setup cannot be restarted under another name when spent.
+
+## Connection accounting and qualification
+
+Each configuration pool must be explicitly MaxConns=1. Its role-wide allowance is calculated from the separately protected reconciler Deployment/rollout ceiling, plus one exact verification connection; it is not inferred from the public hub's four-process ceiling. ADR141's two capacity pools remain separate and use its accepted reconciler ceiling. Before any provisioning, one compiled aggregate includes public roles, six owner roles, these three configuration roles, all capacity purposes, bounded retained process counts, role-verification headroom and both installer administrative connections. PostgreSQL reserved/maintenance connections are outside that ordinary runtime allocation. The final count is pending the remaining concrete role inventory; the partial eighteen-role count is not a complete budget.
+
+Required tests include initially absent accepted owner configuration and expired historical fleet observation with fresh native source proof (only these three credential effects succeed), changed source/recovery while blocked, denial after database-incarnation change, public-role bootstrap bypass denial, each exact role's positive queries and prohibited activation/other-purpose writes, uncertain claim/commit replay and role-OID/privilege mutation. Native Secret and SQL matrices remain separate until the actual composed installed run. No runtime listener is enabled by this step.
+
+## Current source call graph and qualification boundary
+
+The straightforward staged path is `configuration-role-install` → concrete native administrator/probe and the three existing protection adapters → `ConfigurationRoleSource` → private Secret root → fixed SQL role producer → immutable three-credential projection → `NewProvisionedHubWorkerDeployment`. The producer locks recovery then the installation role key, re-reads the concrete protected root and checks its original source interval before each SQL effect and final commit. It never runs the retired initial manager. Normal public-role provisioning retains its stronger fresh accepted SQL gate.
+
+`ReadConfigurationRoleSource` currently checks native namespace enforcement (including a non-administrator dry-run denial), actual administrator, fleet/owner guarded values, exact reconciler Deployment/account, repeated source/workload reads and final enforcement. Secret read/CAS and post-lock producer reads retain the earliest interval. This deliberately straightforward implementation has not yet been measured. It may repeat enough API work to exhaust the original five seconds; the next tests must expose that rather than increasing the interval or API rate. Any later bounded reuse would need current RBAC/dry-run enforcement as well as exact original object identities/generation/digests, original expiry, current cancellation and invalidation on every error/change. No cache currently replaces those checks.
+
+The current acknowledgement adapter separately locks recovery before owner configuration and retains the shortest source bound through the transaction commit. Historical acknowledgement remains unchanged; only the provisioned runtime selects the current adapter. A proof, projection or receipt alone remains insufficient for activation.

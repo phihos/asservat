@@ -1,0 +1,9 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_client.go": "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_observation_client.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_connection.go": "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_observation_connection.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_connection_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_observation_connection_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/regional_exchange.go": "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/files/internal/transport/clusterobservation/regional_exchange.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/regional_exchange_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/files/internal/transport/clusterobservation/regional_exchange_test.go"
+  }
+}

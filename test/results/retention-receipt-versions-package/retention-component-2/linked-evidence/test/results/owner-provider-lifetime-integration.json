@@ -1,0 +1,132 @@
+{
+  "manifestSHA256": "2a6c40e8e772cbd186e287cc83588ebb431b2d12b2600070eb27682052628c64",
+  "dependenciesSHA256": "2690dc0782649e13a9856f5b79858f8c7332a926a4de43485f843cb9ba01dd28",
+  "dependencyCount": 1976,
+  "files": [
+    {
+      "path": "internal/adapters/kms/owner_provider_lease.go",
+      "base_sha256": "a320c8c9df1f1a3fb5dfd861063a378ad718b6058586618c4cc739bd199d817d",
+      "payload_sha256": "f5904b1e51f7f8b84946a56c499c55a3e0c05031c7eca49a921ed67d9f45b99d",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lease.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lease_test.go",
+      "base_sha256": "8a9fb7cf4920e9fc314c11e7a06a9497e702ba598178ceb21534e6e9044ab8ee",
+      "payload_sha256": "178197814a28b83f9946f483d837386ab2aa38a0503f13c56b6d655a3de72a67",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lease_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lifetime.go",
+      "base_sha256": null,
+      "payload_sha256": "2526990d27ec6e8b91408ba78dba114e85270a697b83219fd466cf11cc6aa856",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lifetime.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lifetime_rotation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "fbc4f012e44b7daa22d5b83e47626a0fbd97f8b219aefbf5745dad19b074bfce",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lifetime_rotation_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lifetime_test.go",
+      "base_sha256": null,
+      "payload_sha256": "53452aa4725f50a0bc1ed03cf370eabeea56f04c8884aabb6ff1a46392acce1b",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lifetime_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lifetimes.go",
+      "base_sha256": null,
+      "payload_sha256": "0242b818fba3fc676f64457ff58a3a8b21ee4c8e454b3c36a84635eea2b33f0c",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/lifecycle/changes/internal/adapters/kms/owner_provider_lifetimes.go"
+    }
+  ],
+  "qualification": {
+    "manifest_sha256": "2a6c40e8e772cbd186e287cc83588ebb431b2d12b2600070eb27682052628c64",
+    "dependencies_sha256": "2690dc0782649e13a9856f5b79858f8c7332a926a4de43485f843cb9ba01dd28",
+    "runner_sha256": "1eb4298ffbb784a301ee8f9d6b7935b4e2ad3a4382d3941674690fcaf32b2991",
+    "paths": 6,
+    "dependencies": 1976,
+    "native_executed": false,
+    "commands": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 2.557,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        }
+      },
+      {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=180s",
+          "-v",
+          "-run",
+          "^TestOwnerProvider",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 4.607,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 0.549,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        }
+      }
+    ],
+    "terminal_exit": 0,
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": []
+    }
+  },
+  "integratedAt": 1791854682.5372336,
+  "scope": "Private unselected credential lifetime components; real installed composition remains pending. Native provider fixture skipped in this scoped race run."
+}

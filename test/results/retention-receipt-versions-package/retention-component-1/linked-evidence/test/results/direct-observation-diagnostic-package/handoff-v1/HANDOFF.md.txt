@@ -1,0 +1,41 @@
+# Direct native startup diagnostic handoff
+
+Frozen checkpoint: `/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/diagnostic/checkpoint-v1`.
+Runner session **63254 terminated with exit 0**. No build remains. Live sources were never edited. The five payloads replace their exact original test/helper bases; this is diagnostic-only, with no production changes.
+
+## Scope and unchanged bounds
+
+Use `manifest.json`, `bases.json`, `payload.json`, `dependencies.json`, `overlay.json` and `freeze.json` in the checkpoint for exact integration. There are five replacement paths and 2,210 current dependency files. All before/after hash and file-set checks passed, including the exact temporary architecture mirror. The original native failure is preserved separately; `prior-native-evidence.json` records its current archived hashes.
+
+Fixed helper setup phases distinguish input projection, existing SQL purpose/constructor, native clients, enrollment and backend composition. They record only monotonic durations and closed categories. Input waiting remains the original two-minute/100-ms read-only loop, with at most three 30/60/90-second wait messages. The original helper readiness wait remains 60 seconds. Error emission precedes joined cleanup; shutdown begin/end surrounds the actual first Close's cleanup, not an idempotent later call. Host failure capture verifies the original Pod UID and records closed status fields plus at most 32 lines/16 KiB of current and previous helper output under a separate five-second read-only diagnostic context after the readiness decision.
+
+Every original operation/source/authority/socket bound, pool/client/rate/grant and retry rule is unchanged. No credentials, request content, object identity, arbitrary error text or SQL enter diagnostic output. Unknown output is discarded by a closed classifier. This patch does not claim to fix the original startup failure.
+
+## Actual qualification
+
+| Phase | Exit | Seconds | Result |
+|---|---:|---:|---|
+| Explicit six-source helper compile | 0 | 2.789 | Actual helper builds; no importable test package |
+| Integration package compile | 0 | 18.661 | Compile only; external fixtures unrun |
+| Closed-label and DTO parity tests | 0 | 0.176 | 14 named PASS, no skips |
+| Explicit helper vet | 0 | 1.779 | Passed |
+| Integration vet | 0 | 1.230 | Passed |
+| Go architecture | 0 | 0.976 | Passed, gate unchanged |
+
+Commands and real exits are in `evidence/*.json`; logs are adjacent. No race suite, native fixture or full test suite was run or claimed. Commands used GOMAXPROCS=2, GOFLAGS=-p=2 and an owned tmpfs TMPDIR. `/tmp/asservat-direct-diagnostic-bud4y2h7` was removed only after all children joined; free space afterward was 16,748,658,688 bytes.
+
+## Preserved native failure and next task
+
+Native1 failed at original helper readiness and separately failed positive regional helper join. The old readiness error omitted mode, so its cause/mode is not inferred from the join error. Its archived kubelet log shows regional Running in 703 ms, which does not prove the optional input Secret was projected. No runtime PostgreSQL ERROR/FATAL appears beyond expected initial goose table setup. No H/A/R operation qualified. External cleanup was complete but does not erase the helper join failure.
+
+Parent should integrate exactly these five paths after verification, then run the same selected owned native fixture with all relevant sources/builds frozen. Observe the first closed setup phase before proposing a correction. No deadline expansion, replay, pool expansion or runtime selection is proposed. Continue into complete H/A/R timing only after startup actually succeeds.
+
+## Key hashes
+
+- Manifest: `7c1c660878d3b0f745e35c7d2d78ceadb479fd3ba7f353b50e53ad9038dece96`
+- Dependencies: `87ed8193ad1d25310e1fa3641dbe7285f48536a302c634a1b1ac427d00cbf368`
+- Payload: `29a815a1e5e495514f80d42a61331f425d73a929319aed6a220bff34a0c00e4a`
+- Bases: `6f9dce3e9d0fdc83409f79ffe53d208fecff815fa14e5c8de9fd02874c38f600`
+- Runner: `dbaff9bd1380fbd3522486dbd3123d2ded7a6ede534515ba5eba4a8b08c257a6`
+- Freeze: `bab6ab24b85b3ebb06bc474e2f8aa1dc81d35cabdfc9124d5cc74611c47c9433`
+- Result: `237c4f6d48afcae14b5965311bfbdc4504e5e22e1d7138acb5360e39fbb846c4`

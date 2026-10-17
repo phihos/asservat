@@ -1,0 +1,45 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: api-cpu-profile
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: api
+    maxPods: 1
+    selection: triggeringPod
+    adoption: pinUID
+  detectors:
+  - id: cpu-high
+    kind: resource
+    options:
+      metric: cpuQuotaRatio
+      operator: gte
+      threshold: 0.9
+      sampleInterval: 5s
+  when:
+    for:
+      expression:
+        detector: cpu-high
+      duration: 20s
+  recipeRef:
+    name: go-pprof-incident
+    digest: 4c0fd9e8e31ab1b5d3476e1e9b1e96a84322a33b27a2de1075d887d89d012a85
+  grantRef: 00000000-0000-4000-8000-000000000043
+  budgets:
+    cooldown: 10m
+    burst: 1
+    maxOccurrencesPerHour: 6
+    maxConcurrentActions: 1
+  retention: 72h
+  suspended: false
+  observation:
+    mode: allAuthorized
+  evaluation:
+    scope: pod
+    fireOnActivation: true
+    rearmFor: 10s

@@ -1,0 +1,272 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+	"testing"
+	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	permissions "asservat.local/asservat/internal/application/authorization"
+	captureapp "asservat.local/asservat/internal/application/capture"
+	catalogapp "asservat.local/asservat/internal/application/catalog"
+	"asservat.local/asservat/internal/application/evidence"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/contextstart"
+	"asservat.local/asservat/internal/transport/presentation"
+)
+
+// Intentionally nil embedded ports panic on any unexpected dependency call.
+// These constructor tests supply no authority and do not manufacture successful
+// evidence. Identity rejection must precede every dependency below.
+type publicContextOperationPorts struct {
+	captureapp.ContextPreviewStore
+	captureapp.ContextAdmissionReplay
+	captureapp.ReviewedAdmissionTransaction
+	captureapp.ContextRequestResolution
+	captureapp.ContextTargets
+	captureapp.ContextEligibilityReader
+	captureapp.ContextCapabilityReader
+	captureapp.ContextRetentionResolver
+	captureapp.ContextStorageReader
+	captureapp.ContextProcessingCoverageReader
+	fleetapp.RecoveryReader
+	auditapp.CaptureOperationIntentReader
+	auditapp.CaptureOperationJournal
+	auditapp.CaptureOperationAcknowledgements
+	auditapp.ClosedOperationObjects
+	auditapp.CaptureOperationReader
+	executionapp.APIExecutionReader
+	executionapp.APIExecutionPreparer
+	executionapp.APIExecutionRecorder
+	fleetapp.APIContextWorkSigner
+	captureapp.ContextProgressReader
+	catalogapp.ContextCaseRoutes
+	permissions.ProjectionReader
+	permissions.ContextDownloadCatalog
+	permissions.DownloadRetentionResolver
+	permissions.DownloadProcessingReader
+	evidence.ContextDownloadRoutes
+	evidence.ContextDownloadSources
+	evidence.CurrentDownloadAuthority
+	evidence.ContextDownloadControlLedger
+	evidence.ContextDownloadPlans
+	evidence.DownloadStopLedger
+	evidence.DownloadStopAcknowledgements
+	evidence.DownloadStopObjects
+}
+
+func publicContextOperationFixture(t *testing.T) (PublicContextOperationsConfig, PublicContextOperationServices) {
+	t.Helper()
+	const root = "10000000-0000-4000-8000-000000000001"
+	const installation = "10000000-0000-4000-8000-000000000002"
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	c := PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: "https://asservat.example", CollectionEnabled: true, Now: func() time.Time { return now }, NewID: func() string { return "10000000-0000-4000-8000-000000000003" }}
+	p := &publicContextOperationPorts{}
+	mac, e := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{1}, 32), "account-v1", bytes.Repeat([]byte{2}, 32))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(mac.Close)
+	native := &evidence.ContextNativeRuntime{} // handle identity only; never exercised
+	return c, PublicContextOperationServices{
+		Investigation: captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: p, Replay: p, Admission: p, Resolution: p, Targets: p, Eligibility: p, Capabilities: p, Retention: p, Storage: p, Processing: p, Recovery: p, Lifetime: time.Minute},
+		Intents:       auditapp.CaptureOperationPublication{RootID: root, Completed: p, Journal: p, Acknowledgements: p, Writer: p, Reader: p, MAC: mac},
+		Regional:      RegionalAPIContextStart{Runner: executionapp.APIContextRunner{Read: p, Prepare: p, Record: p, Eligibility: p, Retention: p}, Signer: p, Router: &contextstart.Router{}},
+		Progress:      captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: p},
+		Cases:         catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: p, Permissions: p, Catalog: p, Retention: p, Processing: p},
+		Downloads:     evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: p, Sources: p, Authority: p, Sessions: p, Plans: p},
+		Native:        ContextNativeDownloadServices{Runtime: native, Stop: evidence.ContextDownloadStopCoordinator{Ledger: p, Acknowledgements: p, Objects: p, Active: native}},
+	}
+}
+
+func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testing.T) {
+	c, s := publicContextOperationFixture(t)
+	v, e := composePublicContextUseCases(c, s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var _ presentation.ContextContinuation = v.submission
+	regional, ok := v.submission.Start.(RegionalAPIContextStart)
+	publication, auditOK := v.submission.Intents.(auditapp.CaptureOperationPublication)
+	navigator, navOK := v.progress.Navigation.(captureapp.ContextCaseNavigator)
+	cases, caseOK := navigator.Cases.(catalogapp.ContextCaseService)
+	if !ok || !auditOK || !navOK || !caseOK || regional.Router != s.Regional.Router || regional.Runner.Read != s.Regional.Runner.Read || regional.Signer != s.Regional.Signer || regional.Runner.Capabilities != s.Investigation.Capabilities || regional.Runner.Recovery != s.Investigation.Recovery || regional.Runner.Now == nil || publication.MAC != s.Intents.MAC || v.submission.Resolution != s.Investigation.Resolution || v.submission.Admission != s.Investigation.Admission || cases.Catalog != s.Cases.Catalog || v.downloads.Runtime != s.Native.Runtime || v.stop.Active != s.Native.Runtime {
+		t.Fatal("assembly replaced original submission, authority, navigation or native owner")
+	}
+	if v.progress.Recovery != s.Investigation.Recovery || v.cases.Recovery != s.Investigation.Recovery || v.downloads.Recovery != s.Investigation.Recovery {
+		t.Fatal("split recovery sources")
+	}
+	if s.Regional.Runner.Capabilities != nil || s.Regional.Runner.Recovery != nil || s.Progress.Navigation != nil || s.Downloads.Runtime != nil || s.Investigation.Now != nil {
+		t.Fatal("assembly mutated caller's value configuration")
+	}
+	operations, e := NewPublicContextOperations(c, s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_case", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture", "resolve_capture_request"}
+	if operations.PublicOrigin() != c.PublicOrigin || !slices.Equal(operations.ToolNames(), want) {
+		t.Fatal("incomplete shared operation set", operations.ToolNames())
+	}
+	names := operations.ToolNames()
+	names[0] = "forged"
+	if !slices.Equal(operations.ToolNames(), want) {
+		t.Fatal("mutable operation inventory")
+	}
+	c.CollectionEnabled = false
+	disabled, e := NewPublicContextOperations(c, s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	want = slices.DeleteFunc(want, func(v string) bool { return v == "request_capture" })
+	if !slices.Equal(disabled.ToolNames(), want) || !presentation.BrowserOperationSupported(disabled, "request_capture") {
+		t.Fatal("disabled acquisition removed retained evidence or explanation")
+	}
+}
+
+// ADR-194 D1: without a configured worker the set has no native runtime; the
+// coordinator's runtime stays a true nil, so prepare fails closed.
+func TestPublicContextOperationsWithoutNativeRuntime(t *testing.T) {
+	c, s := publicContextOperationFixture(t)
+	s.Native.Runtime, s.Native.Stop.Active = nil, nil
+	v, e := composePublicContextUseCases(c, s)
+	if e != nil || v.downloads.Runtime != nil || v.stop.Active != nil {
+		t.Fatal("runtime-less composition", e)
+	}
+	if _, e = NewPublicContextOperations(c, s); e != nil {
+		t.Fatal(e)
+	}
+}
+
+func TestPublicContextOperationsRejectMissingOrForeignComposition(t *testing.T) {
+	mutations := map[string]func(*PublicContextOperationsConfig, *PublicContextOperationServices){
+		"foreign-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Investigation.RootID = "10000000-0000-4000-8000-000000000099"
+		},
+		"foreign-case-installation": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Cases.InstallationID = "10000000-0000-4000-8000-000000000099"
+		},
+		"foreign-audit-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Intents.RootID = "10000000-0000-4000-8000-000000000099"
+		},
+		"foreign-download-root": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Downloads.RootID = "10000000-0000-4000-8000-000000000099"
+		},
+		"preview": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Investigation.Previews = nil
+		},
+		"resolution": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Investigation.Resolution = nil
+		},
+		"admission": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Investigation.Admission = nil
+		},
+		"intent-publication": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Intents.Completed = nil },
+		"regional-reader": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Regional.Runner.Read = nil
+		},
+		"regional-preparer": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Regional.Runner.Prepare = nil
+		},
+		"regional-local-port": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Regional.Runner.Collector = &contextstart.HubOperations{} // cluster-local ports are per exchange
+		},
+		"regional-signer": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Regional.Signer = nil },
+		"regional-router": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Regional.Router = nil },
+		"regional-capability-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Regional.Runner.Capabilities = s.Investigation.Capabilities
+		},
+		"regional-recovery-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Regional.Runner.Recovery = s.Investigation.Recovery
+		},
+		"navigation-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Progress.Navigation = captureapp.ContextCaseNavigator{Cases: s.Cases}
+		},
+		"native-override": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Downloads.Runtime = s.Native.Runtime
+		},
+		"different-active-runtime": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Native.Stop.Active = &evidence.ContextNativeRuntime{}
+		},
+		"no-active-runtime": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Native.Stop.Active = nil },
+		"no-native-runtime": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Native.Runtime = nil },
+		"no-stop-ledger":    func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) { s.Native.Stop.Ledger = nil },
+		"invalid-review-lifetime": func(_ *PublicContextOperationsConfig, s *PublicContextOperationServices) {
+			s.Investigation.Lifetime = 5*time.Minute + time.Microsecond
+		},
+		"non-tls-origin": func(c *PublicContextOperationsConfig, _ *PublicContextOperationServices) {
+			c.PublicOrigin = "http://asservat.example"
+		},
+		"no-clock": func(c *PublicContextOperationsConfig, _ *PublicContextOperationServices) { c.Now = nil },
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			c, s := publicContextOperationFixture(t)
+			mutate(&c, &s)
+			if got, e := NewPublicContextOperations(c, s); got != nil || !errors.Is(e, presentation.ErrOperationsConfiguration) {
+				t.Fatal("incomplete or foreign assembly accepted", e)
+			}
+		})
+	}
+}
+
+type publicOperationContextKey struct{}
+type publicOperationDeniedIdentity struct {
+	t        *testing.T
+	original context.Context
+	calls    int
+}
+
+func (s *publicOperationDeniedIdentity) ResolveIdentity(ctx context.Context) (identity.Identity, error) {
+	s.calls++
+	want, ok := s.original.Deadline()
+	got, has := ctx.Deadline()
+	if !ok || !has || got.After(want) || ctx.Value(publicOperationContextKey{}) != s.original.Value(publicOperationContextKey{}) || !errors.Is(ctx.Err(), s.original.Err()) {
+		s.t.Fatal("original request context lost or extended")
+	}
+	return identity.Identity{}, identity.ErrDenied
+}
+func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testing.T) {
+	c, s := publicContextOperationFixture(t)
+	operations, e := NewPublicContextOperations(c, s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	const id = "10000000-0000-4000-8000-000000000003"
+	inputs := map[string]string{
+		"list_diagnostics":          `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
+		"preview_capture":           `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
+		"request_capture":           `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,
+		"resolve_capture_request":   `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,
+		"get_capture":               `{"capture_id":"` + id + `"}`,
+		"get_case":                  `{"case_id":"` + id + `"}`,
+		"prepare_artifact_download": `{"artifact_id":"` + id + `","idempotency_key":"download-key"}`,
+		"get_artifact_download":     `{"download_id":"` + id + `"}`,
+		"cancel_artifact_download":  `{"download_id":"` + id + `","idempotency_key":"stop-key"}`,
+	}
+	for _, name := range operations.ToolNames() {
+		t.Run(name, func(t *testing.T) {
+			ctx, stop := context.WithDeadline(context.WithValue(t.Context(), publicOperationContextKey{}, "original-value"), time.Now().Add(time.Second))
+			defer stop()
+			caller := &publicOperationDeniedIdentity{t: t, original: ctx}
+			_, e := operations.Call(ctx, caller, name, json.RawMessage(inputs[name]))
+			if e == nil || caller.calls != 1 {
+				t.Fatal("request bypassed current identity or did not reach its existing service", e, caller.calls)
+			}
+		})
+	}
+	// The same request-owned handle and cancelled context reach the existing
+	// presentation boundary; no factory-owned replacement or detached work.
+	ctx, stop := context.WithDeadline(context.WithValue(t.Context(), publicOperationContextKey{}, "cancelled-value"), time.Now().Add(time.Second))
+	stop()
+	caller := &publicOperationDeniedIdentity{t: t, original: ctx}
+	_, e = operations.Call(ctx, caller, "get_case", json.RawMessage(inputs["get_case"]))
+	if e == nil || caller.calls != 1 {
+		t.Fatal("cancelled original request was replaced", e, caller.calls)
+	}
+}

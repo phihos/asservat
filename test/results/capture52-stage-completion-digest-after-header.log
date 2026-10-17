@@ -1,0 +1,56 @@
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/valid
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/pending
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-root
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-capture
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-key
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/expired-after-read
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/cancelled-after-read
+--- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/valid (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/pending (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-root (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-capture (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-key (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/expired-after-read (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/cancelled-after-read (0.00s)
+=== RUN   TestCaptureOperationClosedPrivatePayload
+--- PASS: TestCaptureOperationClosedPrivatePayload (0.00s)
+=== RUN   TestCaptureOperationUnknownWriteReceiptNeverManufacturesClosure
+--- PASS: TestCaptureOperationUnknownWriteReceiptNeverManufacturesClosure (0.00s)
+=== RUN   TestCaptureOperationReconciliationIsFiniteAndKeepsUnknownSpend
+--- PASS: TestCaptureOperationReconciliationIsFiniteAndKeepsUnknownSpend (0.00s)
+=== RUN   TestCaptureOperationPreservesOriginalDeadlineAfterRead
+--- PASS: TestCaptureOperationPreservesOriginalDeadlineAfterRead (0.00s)
+=== RUN   TestCaptureOperationCancellationDoesNotDetachWrites
+--- PASS: TestCaptureOperationCancellationDoesNotDetachWrites (0.00s)
+=== RUN   TestCaptureOperationMaximumCanonicalIdentityFitsPrivateBounds
+    capture_operation_test.go:270: maximum bounded text: capture=7035 intent=14689 outcome=15061 bytes
+    capture_operation_test.go:270: maximum bounded text: capture=4219 intent=9185 outcome=9557 bytes
+    capture_operation_test.go:270: maximum bounded text: capture=4219 intent=9185 outcome=9557 bytes
+    capture_operation_test.go:270: maximum bounded text: capture=7027 intent=14675 outcome=15047 bytes
+--- PASS: TestCaptureOperationMaximumCanonicalIdentityFitsPrivateBounds (0.02s)
+=== RUN   TestCaptureOperationWriteClaimKeepsShorterRecoveryDeadline
+--- PASS: TestCaptureOperationWriteClaimKeepsShorterRecoveryDeadline (0.00s)
+=== RUN   TestCaptureOperationReadClaimDoesNotRenewDuringAcknowledgement
+--- PASS: TestCaptureOperationReadClaimDoesNotRenewDuringAcknowledgement (0.00s)
+=== RUN   TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline
+--- PASS: TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline (0.00s)
+=== RUN   TestCaptureCompletionDigestCanonicalVersionAndLegacyCompatibility
+--- PASS: TestCaptureCompletionDigestCanonicalVersionAndLegacyCompatibility (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/audit	1.033s
+=== RUN   TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion
+    capture_operation_test.go:107: maximum completed capture pair: legacy expansion=36112 ciphertext total=24125 bytes
+--- PASS: TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion (0.02s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.056s
+=== RUN   TestCaptureAuditAuthenticatesPurposeAndFrozenRecord
+--- PASS: TestCaptureAuditAuthenticatesPurposeAndFrozenRecord (0.01s)
+=== RUN   TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope
+    capture_operation_test.go:90: actual Tink ciphertext under maximum opaque wrapping text: intent=36646 outcome=37143 prepaid=65536 bytes
+--- PASS: TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope (0.03s)
+=== RUN   TestCapturePrivateEnvelopeRejectsControlExpansion
+--- PASS: TestCapturePrivateEnvelopeRejectsControlExpansion (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	1.063s

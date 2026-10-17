@@ -1,0 +1,1 @@
+exit=stopped (started at host load 5.8 from another session; stopped by me during the image build before any cluster existed, to keep timing results valid; its temp dir was removed)

@@ -1,0 +1,4 @@
+Running as user "root" and group "root". This could be dangerous.
+native PCAPNG opened with tshark; rows: 400
+REPOSITORY TAG DIGEST CREATED
+tcpdump v0.57.0 sha256:2176a5bd659841ad7bdbed1633a52b744ccb4232f3fd567e2388361ddd8e047a 2026-10-05T14:37:23Z

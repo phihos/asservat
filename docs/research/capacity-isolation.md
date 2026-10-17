@@ -1,0 +1,18 @@
+# Storm control and quota feasibility
+
+Research date: 2026-10-09. Design conclusions below are proposals; runtime fairness, reservation recovery and performance remain unmeasured.
+
+| Evidence | What it establishes | Design consequence |
+| --- | --- | --- |
+| [Kubernetes ResourceQuota](https://kubernetes.io/docs/concepts/policy/resource-quotas/) | Kubernetes quotas cover supported namespace resources such as compute, PVC storage requests and object counts. | An external object-store evidence quota needs Asservat accounting; creating a ResourceQuota does not reserve bytes in S3. |
+| [Kubernetes resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) | CPU limits use throttling; memory enforcement can involve OOM termination. | Bound collectors/analyzers, but separately qualify helpers, target-runtime work, scratch and application impact. Pod limits alone cannot ensure harmless heap dumps. |
+| [Linux core-pipe limits](https://docs.kernel.org/admin-guide/sysctl/kernel.html) | `core_pipe_limit` controls concurrent piped dump handling and process-wait behavior, and can drop dumps beyond its bound. | Reserve locally before accepting streams; do not queue crashing processes behind an upload backlog. This node-wide mechanism does not allocate fair shares between Deployments. |
+| [Ceph Squid quota administration](https://docs.ceph.com/en/squid/radosgw/admin/) | RGW quota statistics are cached; multiple instances can enforce imperfectly synchronized quotas. | Backend quotas are defense in depth. Use durable admission reservations rather than interpreting an observed bucket-size number as remaining guaranteed capacity. Qualify the actual installed version. |
+
+The prior spec already had edge triggering, cooldowns, generic budgets, grant reservations, bounded artifacts and node concurrency. It did not define durable stored-byte ownership, protected per-workload capacity, fair transfer scheduling or recovery of a complete cross-resource reservation. A maximum alone is insufficient: with overlapping maxima in one shared pool, the first workload can fill capacity needed by the rest.
+
+The [capacity specification](../../specs/capacity.md) therefore separates signal observation from action admission, applies one workload budget across policies/replicas, and combines unborrowable protected storage with a separate shared burst slice. Parent envelopes bound aggregate enrollment; namespace templates preserve automatic onboarding. The pool is accounted ciphertext/copy capacity, not a claim about raw disk geometry. Backend replication overhead and unrelated writers must be qualified before claiming protection from physical exhaustion.
+
+The original design used staged Kubernetes CAS at the hub. Accepted ADR-023 supersedes that mechanism: short SQL transactions now coordinate central quota/grant/work records. Local prepaid slices still need fenced CAS and conservative reconciliation across the hub/cluster boundary. Inventory reconciliation releases space only after verified deletion. No broker is introduced. EXP-19 must test both SQL races/failover and disconnected local slices; see [persistence](../../specs/persistence.md).
+
+The default keeps existing evidence when a workload fills its account and refuses additional expensive collection. Optional same-account rolling deletion is an explicit administrator policy. Other workloads' protected storage is never a source of emergency space. Physical backend failure or an application's own crash loop remains outside a promise of uninterrupted capture; failure and suppression must be visible.

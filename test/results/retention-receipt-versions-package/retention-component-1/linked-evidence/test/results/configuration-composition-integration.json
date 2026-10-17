@@ -1,0 +1,13 @@
+{
+  "manifest_sha256": "0cab5a5c66aaa2d9bcab97de04e1973e78461de3eda47bde8e3351ece7acd46f",
+  "all_payloads_and_bases_matched": true,
+  "integrated": {
+    "cmd/asservat/main.go": "b63b8a04297d9252fc08460e21c06be5fa49957756670d6d11bba914257def97",
+    "docs/architecture/configuration-credential-provisioning.md": "008429e72fd0ea1904147a430821b3833e112f4675aabe9207ca0ac61163a29e",
+    "internal/adapters/kubernetes/configuration_runtime_workload.go": "595ba4608c362eb47686b66d30ba1713411a572fb52d2357871096b259e1a246",
+    "internal/adapters/kubernetes/configuration_runtime_workload_test.go": "cd5de1a55e64f2999041e65857c643ed2d537e16a2bd6644886fe5a630d33905",
+    "internal/bootstrap/configuration_role_inputs.go": "51b06ddd852438f5760769bbf048debf7b1c5b5c7022a65f247c783b24d1e663",
+    "internal/bootstrap/configuration_role_inputs_test.go": "8c818703675c3bbb2ce8f5f81a0459487d2320822ceed3f18a78b314877b3493",
+    "internal/bootstrap/configuration_role_installer_test.go": "460066a4bf927406279d62cb6090fa0231631dc3533bcf82e81c246cbf5c2e7a"
+  }
+}

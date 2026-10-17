@@ -1,0 +1,17 @@
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+=== RUN   TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema
+=== RUN   TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status
+=== RUN   TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only
+=== RUN   TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation
+    permission_admission_test.go:46: synthetic guard probe /apis/authentication.k8s.io/v1/selfsubjectreviews: 201 {"kind":"SelfSubjectReview","apiVersion":"authentication.k8s.io/v1","metadata":{"creationTimestamp":"2026-10-09T23:18:32Z"},"status":{"userInfo":{"username":"fixture-outsider","groups":["asservat-fixture-writers","system:authenticated"]}}}
+    permission_admission_test.go:46: synthetic guard probe /apis/authorization.k8s.io/v1/selfsubjectaccessreviews: 201 {"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","metadata":{"managedFields":[{"manager":"Go-http-client","operation":"Update","apiVersion":"authorization.k8s.io/v1","time":"2026-10-09T23:18:32Z","fieldsType":"FieldsV1","fieldsV1":{"f:spec":{"f:resourceAttributes":{".":{},"f:group":{},"f:namespace":{},"f:resource":{},"f:verb":{},"f:version":{}}}}}]},"spec":{"resourceAttributes":{"namespace":"asservat-system","verb":"create","group":"asservat.io","version":"v1alpha1","resource":"accessbindings"}},"status":{"allowed":true,"reason":"RBAC: allowed by RoleBinding \"admission-fixture/asservat-system\" of Role \"admission-fixture\" to Group \"asservat-fixture-writers\""}}
+    permission_admission_test.go:46: synthetic guard probe /apis/asservat.io/v1alpha1/namespaces/asservat-system/accessbindings: 422 {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"accessbindings.asservat.io \"asservat-guard-probe-plmqg\" is forbidden: ValidatingAdmissionPolicy 'asservat-permissions' with binding 'asservat-permissions' denied request: Asservat permission administrator or matching delegation is required.","reason":"Invalid","details":{"name":"asservat-guard-probe-plmqg","group":"asservat.io","kind":"accessbindings","causes":[{"message":"ValidatingAdmissionPolicy 'asservat-permissions' with binding 'asservat-permissions' denied request: Asservat permission administrator or matching delegation is required."}]},"code":422}
+    permission_admission_test.go:272: live denial qualification: permission configuration unavailable
+--- FAIL: TestPermissionAdmissionWithRealKubernetes (1.07s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema (0.01s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status (0.59s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only (0.21s)
+    --- FAIL: TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation (0.06s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.122s
+FAIL

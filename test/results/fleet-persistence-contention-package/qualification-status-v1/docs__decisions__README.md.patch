@@ -1,0 +1,8 @@
+--- a/docs/decisions/README.md
++++ b/docs/decisions/README.md
+@@ -401,4 +401,4 @@
+ 
+ - **ADR-153 — Operation-owned connector enrollment:** [Original native admission and signing boundaries](153-operation-owned-connector-enrollment.md), distinct complete initial/final enforcement observations and current intermediate source/token/controller reads inside one original operation. Legacy interfaces, SQL checks and unknown spend remain unchanged; component and native qualification are pending.
+ 
+-- **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Source-staged; new behavior and installed startup remain unqualified.
++- **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Component races pass (119 top-level / 605 named) and all ten focused native SQL cases pass; [integration evidence](../../test/results/fleet-persistence-contention-integration.json) preserves the original failures. Broad fleet and installed owner qualification remain pending.

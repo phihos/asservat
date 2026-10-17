@@ -1,0 +1,66 @@
+=== RUN   TestConfigurationWorkerAutomaticRunRetainsOriginalUncertaintyAcrossReadFailure
+--- PASS: TestConfigurationWorkerAutomaticRunRetainsOriginalUncertaintyAcrossReadFailure (0.00s)
+=== RUN   TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly
+=== RUN   TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly/still_pending
+=== RUN   TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly/exact_committed_receipt
+--- PASS: TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly (0.00s)
+    --- PASS: TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly/still_pending (0.00s)
+    --- PASS: TestConfigurationWorkerAutomaticRunKeepsUncertainReceiptInspectOnly/exact_committed_receipt (0.00s)
+=== RUN   TestConfigurationWorkerAutomaticRunHasNoUnboundedRecovery
+--- PASS: TestConfigurationWorkerAutomaticRunHasNoUnboundedRecovery (0.00s)
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/zero
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/root
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/detached_context
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/other_operation
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/order
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/expired
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/already_closed
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_released_call
+--- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/zero (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/root (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/detached_context (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/other_operation (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/order (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/expired (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/already_closed (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_released_call (0.00s)
+=== RUN   TestConfigurationWorkerOpaquePhasePreservesOriginalDeadline
+--- PASS: TestConfigurationWorkerOpaquePhasePreservesOriginalDeadline (0.00s)
+=== RUN   TestConfigurationWorkerOpaqueCloseCancelsAndJoinsBlockedPhase
+--- PASS: TestConfigurationWorkerOpaqueCloseCancelsAndJoinsBlockedPhase (0.00s)
+=== RUN   TestConfigurationWorkerConcurrentPhasePoisonsAndJoinsOriginal
+--- PASS: TestConfigurationWorkerConcurrentPhasePoisonsAndJoinsOriginal (0.00s)
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/still_pending
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/committed_receipt
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_absent_after_unknown_receipt
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_unavailable_after_unknown_receipt
+=== RUN   TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_replaced_after_committed_receipt
+--- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun (0.97s)
+    --- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/still_pending (0.21s)
+    --- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/committed_receipt (0.19s)
+    --- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_absent_after_unknown_receipt (0.19s)
+    --- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_unavailable_after_unknown_receipt (0.19s)
+    --- PASS: TestConfigurationWorkerLostReceiptCASNeverRepeatsWithinAutomaticRun/target_replaced_after_committed_receipt (0.19s)
+=== RUN   TestConfigurationWorkerHistoricalReceiptUsesActualLaterObservationWithoutCreate
+--- PASS: TestConfigurationWorkerHistoricalReceiptUsesActualLaterObservationWithoutCreate (0.06s)
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/missing
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/unknown
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/different_body
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/different_operation
+=== RUN   TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/replacement_after_receipt
+--- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge (0.28s)
+    --- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/missing (0.06s)
+    --- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/unknown (0.05s)
+    --- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/different_body (0.06s)
+    --- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/different_operation (0.06s)
+    --- PASS: TestConfigurationWorkerUnknownOrChangedReadbackCannotAcknowledge/replacement_after_receipt (0.05s)
+=== RUN   TestConfigurationWorkerExistingReceiptRetainsOriginalTimestamp
+--- PASS: TestConfigurationWorkerExistingReceiptRetainsOriginalTimestamp (0.05s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.406s

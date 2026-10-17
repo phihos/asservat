@@ -1,0 +1,190 @@
+{
+  "schemaVersion": "collection-scope/v1",
+  "source": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "resourceUID": "00000000-0000-4000-8000-000000000140"
+  },
+  "executor": {
+    "issuer": "https://identity.example.invalid/realms/company",
+    "subject": "service-owner-123",
+    "clientID": "asservat-browser",
+    "identityType": "human"
+  },
+  "collection": {
+    "kind": "DebugCapture",
+    "spec": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "StatefulSet",
+          "name": "ledger",
+          "uid": "workload-ledger-uid"
+        },
+        "maxPods": 1,
+        "selection": "lowestOrdinal",
+        "adoption": "pinUID",
+        "ordinals": [
+          0
+        ]
+      },
+      "recipeRef": {
+        "name": "composition-4a06dfe8ac66ff7970962d1a",
+        "digest": "4a06dfe8ac66ff7970962d1a4a1af21b2c46cbdb3b89bdd3e09a7d18b56e40a9"
+      },
+      "deadline": "2026-10-09T12:05:00Z"
+    }
+  },
+  "dependencies": [
+    {
+      "role": "captureProfile",
+      "digest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26",
+      "source": {
+        "clusterID": "00000000-0000-4000-8000-000000000010",
+        "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "resourceUID": "fixture-http-headers-v1"
+      }
+    },
+    {
+      "role": "captureProfile",
+      "digest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e",
+      "source": {
+        "clusterID": "00000000-0000-4000-8000-000000000010",
+        "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "resourceUID": "fixture-process-context-v1"
+      }
+    },
+    {
+      "role": "captureProfile",
+      "digest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180",
+      "source": {
+        "clusterID": "00000000-0000-4000-8000-000000000010",
+        "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "resourceUID": "fixture-syscall-activity-v1"
+      }
+    },
+    {
+      "role": "collectionCeiling",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "role": "recipe",
+      "digest": "4a06dfe8ac66ff7970962d1a4a1af21b2c46cbdb3b89bdd3e09a7d18b56e40a9"
+    },
+    {
+      "role": "retention",
+      "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+    }
+  ],
+  "profileComposition": {
+    "authored": {
+      "components": [
+        {
+          "id": "http",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "http-headers",
+            "version": "v1"
+          },
+          "overrides": [
+            {
+              "actionID": "http",
+              "field": "packetFilter",
+              "value": "tcp port 8080"
+            }
+          ]
+        },
+        {
+          "id": "calls",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "syscall-activity",
+            "version": "v1"
+          }
+        },
+        {
+          "id": "context",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "process-context",
+            "version": "v1"
+          }
+        }
+      ],
+      "maxTotalBytes": 100663296,
+      "maxDuration": "120s"
+    },
+    "resolvedProfiles": [
+      {
+        "componentID": "http",
+        "profileRef": {
+          "catalog": "builtin",
+          "name": "http-headers",
+          "version": "v1"
+        },
+        "sourceUID": "fixture-http-headers-v1",
+        "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+        "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+      },
+      {
+        "componentID": "calls",
+        "profileRef": {
+          "catalog": "builtin",
+          "name": "syscall-activity",
+          "version": "v1"
+        },
+        "sourceUID": "fixture-syscall-activity-v1",
+        "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+        "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+      },
+      {
+        "componentID": "context",
+        "profileRef": {
+          "catalog": "builtin",
+          "name": "process-context",
+          "version": "v1"
+        },
+        "sourceUID": "fixture-process-context-v1",
+        "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+        "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+        "definitionDigest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e"
+      }
+    ],
+    "actionMap": [
+      {
+        "componentID": "http",
+        "localActionID": "http",
+        "actionID": "a005bdfce57635c5dabddbdd6",
+        "deduplicated": false
+      },
+      {
+        "componentID": "calls",
+        "localActionID": "syscalls",
+        "actionID": "a5b186fa2f944fc675c96fcc2",
+        "deduplicated": false
+      },
+      {
+        "componentID": "context",
+        "localActionID": "processes",
+        "actionID": "adf187502ec3e8884310b85cf",
+        "deduplicated": false
+      },
+      {
+        "componentID": "context",
+        "localActionID": "sockets",
+        "actionID": "a7e5c90417a8841bef4f7993c",
+        "deduplicated": false
+      }
+    ]
+  },
+  "podBindings": [
+    {
+      "podUID": "pod-uid",
+      "nodeUID": "node-uid",
+      "nodeBootID": "00000000-0000-4000-8000-000000000006"
+    }
+  ]
+}

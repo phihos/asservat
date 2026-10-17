@@ -1,0 +1,38 @@
+[
+  {
+    "path": "test/integration/context_native_admission_race_test.go",
+    "action": "add",
+    "base_sha256": null,
+    "sha256": "915b5ede36eb187189e30de86c3a89520a1f01555f03eae428be1046a1d3690f"
+  },
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "action": "replace",
+    "base_sha256": "c22f1dc23b7b0790dfa55d81c888ab22e5a257fd192105312db241bcf2b92510",
+    "sha256": "226526c76ba89381384c7452b48cde0e4b4869f96cf3365abc9782aa7871c976"
+  },
+  {
+    "path": "test/integration/context_native_interrupted_test.go",
+    "action": "replace",
+    "base_sha256": "dfb9d7d5127f8729e0d700e89d3374573a46201d8674e21b34439ac7813dce5b",
+    "sha256": "4ead0cac80f138c7e2faa0bcd1a263970ea47b5b32e1a909bc6900dc5a7a57e0"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "action": "replace",
+    "base_sha256": "0ea446dd15a86a87395f06c6e5bd8972f36861f0c27409a32977aae2f1fb9707",
+    "sha256": "4353d6ab18089b04c4042f6015fff415e9e5dec5f58974826d079aff6077622d"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "action": "replace",
+    "base_sha256": "c2cce8b96befa6e08cd2e822226525d02a0d115441e74710b82646b654e45b97",
+    "sha256": "3bf6118867a895192e04713278037d1a11a0405fd48eb575a3a172084a9dbd9c"
+  },
+  {
+    "path": "test/integration/native_admission_trace_test.go",
+    "action": "delete",
+    "base_sha256": "aa5a042dd5371001321526f51ea2e27da2ed415b455aa47a9567ad2fd309872e",
+    "sha256": null
+  }
+]

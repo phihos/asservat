@@ -1,0 +1,96 @@
+package kubernetes
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"regexp"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+var ownerBootstrapProviderName = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+
+func ownerBootstrapMount(s string) bool { return ownerBootstrapProviderName.MatchString(s) }
+func ownerBootstrapDigest(purpose string, value any) string {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	h := sha256.New()
+	_, _ = h.Write([]byte("asservat-owner-bootstrap/" + purpose + "/v1\x00"))
+	_, _ = h.Write(b)
+	return hex.EncodeToString(h.Sum(nil))
+}
+func ownerBootstrapPlanValid(p contracts.OwnerBootstrapPlan, now time.Time) bool {
+	if (p.ObservationFormat != "" && p.ObservationFormat != contracts.OwnerObservationOperationFormat) || p.Format != contracts.OwnerBootstrapPlanFormat || !ownerBootstrapMount(p.PKIMount) || !ownerBootstrapLimits(p.Connections, p.Concurrency) || len(p.Peers) < 1 || len(p.Peers) > contracts.OwnerBootstrapInitialPeers {
+		return false
+	}
+	b, err := json.Marshal(p)
+	if err != nil || len(b) > contracts.OwnerDeploymentMaxBytes {
+		return false
+	}
+	for _, peer := range p.Peers {
+		if !authorization.UUID(peer.ClusterID) {
+			return false
+		}
+		if _, _, err = mtls.OwnerTrustRoots(peer.Roots, now); err != nil {
+			return false
+		}
+	}
+	return true
+}
+func ownerBootstrapBody(root *OwnerIdentityRoleRoot, p *contracts.OwnerBootstrapSelectionClaim, plan contracts.OwnerBootstrapPlan) (contracts.OwnerBootstrapSelection, error) {
+	var zero contracts.OwnerBootstrapSelection
+	if root == nil || p == nil || root.resources == nil || !ownerBootstrapPlanValid(plan, root.resources.now()) || p.ObservationFormat != root.resources.observationFormat || p.ObservationFormat != plan.ObservationFormat || p.IssuerEpoch != root.resources.initial.IssuerEpoch || p.PKIMount != plan.PKIMount || p.Connections != plan.Connections || p.Concurrency != plan.Concurrency || len(p.Peers) != len(plan.Peers) {
+		return zero, cfg.ErrChanged
+	}
+	in := root.input
+	reserved := ownerBootstrapReserved(root.input.InstallationID, contracts.InitialRuntimeResourceState{})
+	for _, id := range []string{root.input.InitialClaimID, root.input.ClusterID, root.input.Namespace.UID, root.input.OwnerConfigurationUID, root.input.Resources.UID, root.input.ResourceSetupID, root.input.Deployment.UID, root.input.ServiceAccount.UID, root.resources.initial.IssuerEpoch} {
+		reserved[id] = true
+	}
+	if reserved[p.OperationID] || reserved[p.PermissionRootID] {
+		return zero, cfg.ErrChanged
+	}
+	for _, peer := range p.Peers {
+		if reserved[peer.PeerID] {
+			return zero, cfg.ErrChanged
+		}
+	}
+	body := contracts.OwnerBootstrapSelection{ObservationFormat: p.ObservationFormat, InitialFormat: root.resources.initial.Format, Format: contracts.OwnerBootstrapSelectionFormat, InstallationID: in.InstallationID, ControlClusterID: in.ClusterID, IssuerEpoch: root.resources.initial.IssuerEpoch, Namespace: in.Namespace, Resources: in.Resources, ResourceSetupID: in.ResourceSetupID, ResourceBinding: in.ResourceBinding, OperationID: p.OperationID, PermissionRootID: p.PermissionRootID, PKIMount: p.PKIMount, Connections: p.Connections, Concurrency: p.Concurrency}
+	for i, peer := range p.Peers {
+		desired := plan.Peers[i]
+		if peer.ClusterID != desired.ClusterID || peer.RootsDigest != ownerBootstrapDigest("roots", desired.Roots) {
+			return zero, cfg.ErrChanged
+		}
+		body.Peers = append(body.Peers, contracts.OwnerObservationPeer{InstallationID: in.InstallationID, ClusterID: peer.ClusterID, IssuerEpoch: body.IssuerEpoch, PeerID: peer.PeerID, Roots: desired.Roots})
+	}
+	raw, err := json.Marshal(body)
+	if err != nil || len(raw) > contracts.OwnerDeploymentMaxBytes {
+		return zero, cfg.ErrInvalid
+	}
+	// A fresh destination prevents caller-owned roots or result mutations from
+	// changing any retained selection or later operation.
+	return contracts.DecodeOwnerBootstrapSelection(bytes.NewReader(raw))
+}
+func ownerBootstrapBodyBound(root *OwnerIdentityRoleRoot, p *contracts.OwnerBootstrapSelectionClaim, body contracts.OwnerBootstrapSelection) bool {
+	if p == nil || ownerBootstrapDigest("selection", body) != p.PublicDigest {
+		return false
+	}
+	plan := contracts.OwnerBootstrapPlan{ObservationFormat: body.ObservationFormat, Format: contracts.OwnerBootstrapPlanFormat, PKIMount: body.PKIMount, Connections: body.Connections, Concurrency: body.Concurrency}
+	for _, peer := range body.Peers {
+		plan.Peers = append(plan.Peers, contracts.OwnerBootstrapPeerPlan{ClusterID: peer.ClusterID, Roots: peer.Roots})
+	}
+	exact, err := ownerBootstrapBody(root, p, plan)
+	return err == nil && equalJSON(exact, body)
+}
+
+func ownerBootstrapLimits(connections, concurrency int) bool {
+	return connections >= 1 && connections <= 64 && concurrency >= 1 && concurrency <= 16 && concurrency <= connections
+}

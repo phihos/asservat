@@ -1,0 +1,22 @@
+from pathlib import Path
+import hashlib,json,subprocess,os,time
+root=Path('/home/phil/Projekte/asservat');out=Path(__file__).parent;c=out.parent.parent/'diagnostic-v1'
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(c/'manifest.json')=='7ff3813ad9626a745c0cda90c498f9da49b8145a669a6b593f29958e175e2ef1'
+assert sha(c/'dependencies.json')=='531b2a55440e03747e9d9d9ac2133dadacb562740de4a59022196d517ff37e49'
+assert sha(c/'overlay.json')=='a8dfd47a6b0e183284c952d130023eca0d606d66615c0c5ceee231f928292aff'
+m=json.loads((c/'manifest.json').read_text());deps=json.loads((c/'dependencies.json').read_text())
+def check():
+ return {'payload':[r['path'] for r in m['files'] if sha(c/'files'/r['path'])!=r['payload_sha256']], 'base':[r['path'] for r in m['files'] if sha(root/r['path'])!=r['base_sha256']], 'dependencies':[p for p,h in deps.items() if sha(root/p)!=h]}
+r={'manifest':sha(c/'manifest.json'),'dependencies':sha(c/'dependencies.json'),'runner':sha(Path(__file__)),'before':check(),'started':time.time()}
+assert not any(r['before'].values())
+env=os.environ.copy();env.update({'GOMAXPROCS':'2','GOFLAGS':'-p=2','TMPDIR':str(out/'tmp')})
+for k in list(env):
+ if k.startswith('ASSERVAT_'):del env[k]
+cmd=['go','test','-race','-vet=off','-overlay',str(c/'overlay.json'),'./internal/adapters/kubernetes','-run','^TestPublicRuntimeProjectionTimingDiagnostic$','-count=1','-timeout=45s','-v']
+with (out/'test.log').open('x') as f: p=subprocess.run(cmd,cwd=root,env=env,stdout=f,stderr=subprocess.STDOUT)
+r.update(command=cmd,exit=p.returncode,ended=time.time(),after=check(),log_sha256=sha(out/'test.log'))
+log=(out/'test.log').read_text();r['diagnostic_reached']='projection diagnostic original_remaining_ms=' in log;r['build_failed']='[build failed]' in log
+with (out/'result.json').open('x') as f:json.dump(r,f,indent=2);f.write('\n')
+print(json.dumps(r,indent=2),flush=True)
+raise SystemExit(p.returncode if not any(r['after'].values()) else 2)

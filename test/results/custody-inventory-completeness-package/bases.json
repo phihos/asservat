@@ -1,0 +1,8 @@
+{
+  "internal/adapters/objectstore/custody.go": "b5aef2a98863ea08bc8a605ae38c41684f90ad07e6ef10374560260e9a79969d",
+  "internal/adapters/objectstore/custody_test.go": "2276b0be2d486c58cfd45386d37d851ff6998fd4b43fa02c278ae3a65768c12a",
+  "internal/adapters/objectstore/operation_lifecycle_test.go": "cfe446a95e52d44d6bd4edfc3ae943b196bd0f0b274bc83f73bd3d1270ed8597",
+  "internal/adapters/objectstore/download_stop_lifecycle_test.go": "f8825bd03e1434f70a777af7578c9ff47ffeb1cf9c8b23694f58ff8eaad6a63c",
+  "docs/architecture/custody-transactions.md": "1c847fc08dcaac9fc8247f789e7128ee1601f5c638b627f5cd7bd8ddce1e330f",
+  "internal/adapters/objectstore/custody_inventory_completeness_test.go": null
+}

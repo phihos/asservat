@@ -1,0 +1,446 @@
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew/10s
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew/30s
+--- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew (0.00s)
+    --- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew/10s (0.00s)
+    --- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew/30s (0.00s)
+=== RUN   TestNativePurposeClosingRetainsReservationUntilHandlerJoin
+--- PASS: TestNativePurposeClosingRetainsReservationUntilHandlerJoin (0.00s)
+=== RUN   TestNativePurposeCloseBeforeFirstRequestCannotStrandSlot
+--- PASS: TestNativePurposeCloseBeforeFirstRequestCannotStrandSlot (0.00s)
+=== RUN   TestNativeTwoHopCloseCancelsAndJoinsRegionalRead
+    flow_test.go:61: hub serve terminal native exchange unavailable
+    flow_test.go:61: connector serve terminal native exchange unavailable
+--- PASS: TestNativeTwoHopCloseCancelsAndJoinsRegionalRead (0.03s)
+=== RUN   TestNativeLostFinalAcknowledgementNeverReturnsJoined
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+--- PASS: TestNativeLostFinalAcknowledgementNeverReturnsJoined (0.03s)
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/own-retirement
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-revocation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-cancellation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/upstream-cancellation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-shortening
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-phase
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-reference
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonzero-bytes
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonterminal
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+--- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement (0.57s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/own-retirement (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-revocation (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-cancellation (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/upstream-cancellation (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-shortening (0.08s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-phase (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-reference (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonzero-bytes (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonterminal (0.06s)
+=== RUN   TestNativeCommandAcceptsMaximumExistingSource
+    command_limits_test.go:105: actual Go domain-maximum encoding: source=569446 operation=3898 command=573983 bytes; conservative accepted-domain command bound=574075; fixed command ceiling=655360
+--- PASS: TestNativeCommandAcceptsMaximumExistingSource (0.15s)
+=== RUN   TestNativeMaximumExistingSourceCrossesTwoHops
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+--- PASS: TestNativeMaximumExistingSourceCrossesTwoHops (0.39s)
+=== RUN   TestNativeProductionConnectorAdmissionJoinsRegionalRead
+    flow_test.go:61: hub serve terminal native exchange unavailable
+--- PASS: TestNativeProductionConnectorAdmissionJoinsRegionalRead (0.03s)
+=== RUN   TestNativePositiveContentAcknowledgementDoesNotProveRemoteJoined
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+--- PASS: TestNativePositiveContentAcknowledgementDoesNotProveRemoteJoined (0.06s)
+=== RUN   TestNativeTwoHopPreparationObservationAndFinalHTTPSink
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+--- PASS: TestNativeTwoHopPreparationObservationAndFinalHTTPSink (0.18s)
+=== RUN   TestNativeHandlerActualDuplexAndCurrentRevocation
+=== RUN   TestNativeHandlerActualDuplexAndCurrentRevocation/success
+=== RUN   TestNativeHandlerActualDuplexAndCurrentRevocation/revoked
+--- PASS: TestNativeHandlerActualDuplexAndCurrentRevocation (0.02s)
+    --- PASS: TestNativeHandlerActualDuplexAndCurrentRevocation/success (0.01s)
+    --- PASS: TestNativeHandlerActualDuplexAndCurrentRevocation/revoked (0.01s)
+=== RUN   TestNativeRouterExactOwnerAndSingleAttachment
+--- PASS: TestNativeRouterExactOwnerAndSingleAttachment (0.00s)
+=== RUN   TestNativeRouterCancellationRetainsBlockedFactoryUntilJoined
+--- PASS: TestNativeRouterCancellationRetainsBlockedFactoryUntilJoined (0.00s)
+=== RUN   TestNativeSharedPortActualH2StandbyAndIndependentPurpose
+--- PASS: TestNativeSharedPortActualH2StandbyAndIndependentPurpose (10.55s)
+=== RUN   TestNativeSharedPortUnclassifiedSocketExpires
+--- PASS: TestNativeSharedPortUnclassifiedSocketExpires (2.00s)
+=== RUN   TestNativeServeDeliversPositiveIdleBeforeClosingSocket
+--- PASS: TestNativeServeDeliversPositiveIdleBeforeClosingSocket (0.05s)
+=== RUN   TestNativeServeActualH2AndJoinedCancellation
+--- PASS: TestNativeServeActualH2AndJoinedCancellation (0.02s)
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/http1
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose
+--- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer (0.01s)
+    --- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer/http1 (0.01s)
+    --- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose (0.01s)
+=== RUN   TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay
+    flow_test.go:61: connector serve terminal <nil>
+--- PASS: TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay (1.18s)
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/failed-close
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/unknown-close
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/deadline
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/cancel
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/concurrent-registration
+    flow_test.go:61: connector serve terminal <nil>
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/lost-final
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/known-revocation
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/known-shortening
+--- PASS: TestNativeHandoffRejectsUnacknowledgedClosure (1.37s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/failed-close (0.11s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/unknown-close (0.09s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/deadline (0.70s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/cancel (0.08s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/concurrent-registration (0.08s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/lost-final (0.07s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/known-revocation (0.09s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/known-shortening (0.14s)
+=== RUN   TestNativeFinalMarkerDoesNotStartAuthorityWorkAfterFlush
+==================
+WARNING: DATA RACE
+Read at 0x00c000378053 by goroutine 2720:
+  testing.(*common).destination()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1148 +0x1ca
+  testing.(*common).log()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1120 +0xc4
+  testing.(*common).Log()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1334 +0x78
+  asservat.local/asservat/internal/transport/native_test.flowConversation.Serve()
+      /home/phil/Projekte/asservat/internal/transport/native/flow_test.go:61 +0x176
+  asservat.local/asservat/internal/transport/native_test.(*flowConversation).Serve()
+      <autogenerated>:1 +0x88
+  asservat.local/asservat/internal/transport/native.(*Handler).ServeHTTP()
+      /home/phil/Projekte/asservat/internal/transport/native/handler.go:139 +0x1f1e
+  asservat.local/asservat/internal/transport/native_test.flowServer.func1()
+      /home/phil/Projekte/asservat/internal/transport/native/flow_test.go:120 +0x6b
+  net/http.HandlerFunc.ServeHTTP()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2358 +0x47
+  net/http.serverHandler.ServeHTTP()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3436 +0x2a1
+  net/http.http2Handler.ServeHTTP()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/http2.go:137 +0x71c
+  net/http.(*http2Handler).ServeHTTP()
+      <autogenerated>:1 +0x50
+  net/http/internal/http2.Handler.ServeHTTP-fm()
+      <autogenerated>:1 +0x50
+  net/http/internal/http2.(*serverConn).runHandler()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:2331 +0x1c2
+  net/http/internal/http2.(*serverConn).scheduleHandler.gowrap1()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:2255 +0x54
+
+Previous write at 0x00c000378053 by goroutine 2201:
+  testing.tRunner.func1()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2182 +0x905
+  runtime.deferreturn()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/panic.go:668 +0x53
+  testing.(*T).Run.gowrap1()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0x38
+
+Goroutine 2720 (running) created at:
+  net/http/internal/http2.(*serverConn).scheduleHandler()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:2255 +0x23c
+  net/http/internal/http2.(*serverConn).processHeaders()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:1985 +0xe0c
+  net/http/internal/http2.(*serverConn).processFrame()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:1468 +0x2a4
+  net/http/internal/http2.(*serverConn).processFrameFromReader()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:1406 +0x2e4
+  net/http/internal/http2.(*serverConn).serve()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:844 +0x1724
+  net/http/internal/http2.(*Server).serveConn()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:390 +0x1b0b
+  net/http/internal/http2.(*Server).ServeConn()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/internal/http2/server.go:246 +0x144
+  net/http.(*Server).serveHTTP2Conn()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/http2.go:102 +0xa04
+  net/http.(*conn).serve()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2024 +0x2326
+  net/http.(*Server).Serve.gowrap3()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3604 +0x46
+
+Goroutine 2201 (finished) created at:
+  testing.(*T).Run()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb12
+  testing.runTests.func1()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2744 +0x84
+  testing.tRunner()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21c
+  testing.runTests()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2742 +0x9e9
+  testing.(*M).Run()
+      /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2602 +0xf44
+  main.main()
+      _testmain.go:92 +0x164
+==================
+    testing.go:1867: race detected during execution of test
+--- FAIL: TestNativeFinalMarkerDoesNotStartAuthorityWorkAfterFlush (0.02s)
+=== RUN   TestNativeTerminalOrderingKeepsCurrentAndWriteFailures
+=== RUN   TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/known-denial
+=== RUN   TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/partial-write
+=== RUN   TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/flush-failure
+=== RUN   TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/data-post-check
+--- PASS: TestNativeTerminalOrderingKeepsCurrentAndWriteFailures (0.07s)
+    --- PASS: TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/known-denial (0.02s)
+    --- PASS: TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/partial-write (0.02s)
+    --- PASS: TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/flush-failure (0.01s)
+    --- PASS: TestNativeTerminalOrderingKeepsCurrentAndWriteFailures/data-post-check (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	16.782s
+=== RUN   TestNativeContentStopKeepsSlotsUntilJoinedAndDoesNotCrossPrincipal
+--- PASS: TestNativeContentStopKeepsSlotsUntilJoinedAndDoesNotCrossPrincipal (0.02s)
+=== RUN   TestNativeContentRegistryCloseJoinsAndCannotReuseUnjoinedCapacity
+--- PASS: TestNativeContentRegistryCloseJoinsAndCannotReuseUnjoinedCapacity (0.00s)
+=== RUN   TestNativeContentStopRestrictionBeforeJoinedCancellationBeforeAudit
+--- PASS: TestNativeContentStopRestrictionBeforeJoinedCancellationBeforeAudit (0.00s)
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/ready
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/conditional
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-expired
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-failed
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-failed
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-expired
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-revoked
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-shortened
+--- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/ready (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/conditional (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-expired (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-failed (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-failed (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-expired (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-revoked (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-shortened (0.00s)
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/ready
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/conditional
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-failed
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-shortened
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/body-failed
+--- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/ready (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/conditional (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-failed (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-shortened (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/body-failed (0.00s)
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending/settled
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending/pending
+--- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending (0.10s)
+    --- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending/settled (0.00s)
+    --- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending/pending (0.10s)
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/mismatch
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/expired
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/nonjoined
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/repeat-busy
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/changed-claim
+--- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop (0.10s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/mismatch (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/expired (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/nonjoined (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/repeat-busy (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/changed-claim (0.10s)
+=== RUN   TestNativeResponsePauseRequiresAdmittedResponseAndHonorsDisconnect
+--- PASS: TestNativeResponsePauseRequiresAdmittedResponseAndHonorsDisconnect (0.02s)
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/success
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/revoked
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/shorter-retention
+--- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/success (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/revoked (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/shorter-retention (0.00s)
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/changed-client
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/cancel
+--- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation (0.00s)
+    --- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/changed-client (0.00s)
+    --- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/cancel (0.00s)
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/positive
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/unknown
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/cleanup-first
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/wrong-generation
+--- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/positive (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/unknown (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/cleanup-first (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/wrong-generation (0.00s)
+=== RUN   TestNativeRegionalResultCommitGatesObserveAndNoRepeatedDecrypt
+--- PASS: TestNativeRegionalResultCommitGatesObserveAndNoRepeatedDecrypt (0.00s)
+=== RUN   TestNativeRegionalResultFailedReadCannotRetryAndCloseJoins
+--- PASS: TestNativeRegionalResultFailedReadCannotRetryAndCloseJoins (0.00s)
+=== RUN   TestNativeRegionalObservationRejectsReplacementAndMissingResult
+--- PASS: TestNativeRegionalObservationRejectsReplacementAndMissingResult (0.00s)
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/success
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/partial-sink
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/lost-ack
+--- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/success (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/partial-sink (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/lost-ack (0.00s)
+=== RUN   TestNativeFrameGateConcurrentShorteningCannotRenew
+--- PASS: TestNativeFrameGateConcurrentShorteningCannotRenew (0.00s)
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/cancel
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/revoked
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/changed-owner
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/processing-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/worker-configuration-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/hub-path-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/store-changed
+--- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/cancel (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/revoked (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/changed-owner (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/processing-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/worker-configuration-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/hub-path-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/store-changed (0.00s)
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/missing-processing
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/missing-path
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/wrong-target
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/expired-processing
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/cross-cluster-connector
+--- PASS: TestNativeFrameGateRequiresProcessingAndExactPath (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/missing-processing (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/missing-path (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/wrong-target (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/expired-processing (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/cross-cluster-connector (0.00s)
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/success
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit
+--- PASS: TestNativePreparationPreservesOutcomeAndFinalGate (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/success (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit (0.00s)
+=== RUN   TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader
+--- PASS: TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader (0.00s)
+=== RUN   TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority
+--- PASS: TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority (0.00s)
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened
+--- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.273s
+=== RUN   TestFirstContextPreparationDoesNotGrantASecondAttempt
+--- PASS: TestFirstContextPreparationDoesNotGrantASecondAttempt (0.00s)
+=== RUN   TestFirstContextObservePreservesContentAndRetirementHeadroom
+--- PASS: TestFirstContextObservePreservesContentAndRetirementHeadroom (0.00s)
+=== RUN   TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse
+--- PASS: TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse (0.00s)
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range
+--- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range (0.00s)
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/already-closed
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/retired
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/different-operation
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/replacement-fence
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/old-lease-sequence
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/shortened-row
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/expired-after-lock
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/different-parent
+--- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration (0.02s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/already-closed (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/retired (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/different-operation (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/replacement-fence (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/old-lease-sequence (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/shortened-row (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/expired-after-lock (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/different-parent (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.093s
+FAIL

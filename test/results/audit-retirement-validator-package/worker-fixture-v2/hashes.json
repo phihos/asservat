@@ -1,0 +1,11 @@
+{
+  "HANDOFF.md": "1a699a1f79dc5367fb62acbbd24adf568cd756fbbd29a3e58d2f87239e478c9e",
+  "base/test/fixtures/sql/runtime-roles.sql": "18405c9b5993749d67d4adfaa596b65750babf190deb593709459c5068de61c1",
+  "base/test/integration/download_sessions_test.go": "a9f5915b544e0e70d16b78bf6988003d7b62e5d958f15d3810e0cee37ba131ea",
+  "download_sessions_test.go.patch": "35ceffc6e3b73fcbbc769c1968313d3e71569a189aee21e03f0587e301b3638e",
+  "files/test/fixtures/sql/runtime-roles.sql": "18e9de2e017fc99650ea755005268fc90b158c27e94fd302a158e57e42979b9c",
+  "files/test/integration/download_sessions_test.go": "518282b0f1286c664f52dde7229fffa684553a5b155180ef8bb8a1a94e2503a7",
+  "manifest.json": "a9550e6510c0451c0c35e663ff2944e5c89342c0948f1948b30680e3ce48bb1f",
+  "reviewed-sources.json": "f3ec9d5aa1176b65c62d0f28bad9a95fc7ae9663103b3da49163798c422b9ee8",
+  "runtime-roles.sql.patch": "e9d308af147d00c43c2daee2a067188be5458643d9f34809bd4eafd8f409288b"
+}

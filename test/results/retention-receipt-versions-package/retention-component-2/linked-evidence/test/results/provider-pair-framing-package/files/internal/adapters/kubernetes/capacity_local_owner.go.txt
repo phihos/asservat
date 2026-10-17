@@ -1,0 +1,164 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+)
+
+// ReadCapacityLocalOwner assembles only the original public owner carrier. It
+// uses the completed bridge's current retained guard and exact public resource
+// journal, never an owner provider Secret or the private role creation root.
+func (s *InitialRuntimeBridge) ReadCapacityLocalOwner(ctx context.Context, resources *InitialRuntimeResources, c contracts.CapacityDeployment, m contracts.CapacityCredentialManifest) (contracts.CapacityLocalOwner, time.Time, error) {
+	var out contracts.CapacityLocalOwner
+	var until time.Time
+	if s == nil || resources == nil {
+		return out, until, cfg.ErrInvalid
+	}
+	err := s.operation(ctx, func(call context.Context) error {
+		live, release, err := resources.borrowWorkerProjection(call)
+		if err != nil {
+			return err
+		}
+		defer release()
+		out, until, err = s.readCapacityLocalOwner(live, resources, c, m)
+		return err
+	})
+	if err != nil {
+		return contracts.CapacityLocalOwner{}, time.Time{}, err
+	}
+	return out, until, nil
+}
+
+// The caller retains bridge.operation and the whole resource borrow through
+// its last effect. Publish uses this same fixed read before its claimed CREATE.
+func (s *InitialRuntimeBridge) readCapacityLocalOwner(ctx context.Context, resources *InitialRuntimeResources, c contracts.CapacityDeployment, m contracts.CapacityCredentialManifest) (contracts.CapacityLocalOwner, time.Time, error) {
+	var zero contracts.CapacityLocalOwner
+	before, _, err := s.readInstalledWorkerResources(ctx, resources, m.Input.Worker)
+	if err != nil {
+		return zero, time.Time{}, err
+	}
+	call, end := context.WithDeadline(ctx, before.ValidUntil)
+	defer end()
+	state := before.State
+	if state.OwnerLayout == "" || !initialRuntimeLayoutStateValid(state) || !ownerIdentityResourceStateValid(state, resources.now()) ||
+		state.OwnerIdentity == nil || state.OwnerIdentity.Receipt == nil || state.OwnerLaunch == nil || state.OwnerLaunch.Receipt == nil {
+		return zero, time.Time{}, cfg.ErrUnavailable
+	}
+	inventory, err := resources.inventory(state)
+	if err != nil || inventory.OwnerSource.UID != m.Input.OwnerConfigurationUID {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	// Rebuild the original source body from its already recorded fixed template.
+	// Current accepted same-pool revisions are checked separately below; a new
+	// revision never rewrites this installation provenance or the pinned roots.
+	original, err := resources.object(state, 14)
+	if err != nil {
+		return zero, time.Time{}, err
+	}
+	source, ok := original.object.(*core.ConfigMap)
+	if !ok || preparationDigest(source) != state.Objects[14].TemplateDigest {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	var pool contracts.OwnerConfiguration
+	if err = json.Unmarshal([]byte(source.Data["owner-pool.json"]), &pool); err != nil {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	p := state.OwnerIdentity
+	if p.Receipt.Configuration.Name != resources.names.OwnerInputs || p.Receipt.Credentials.Name != resources.names.OwnerProviders {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	reader := &InstalledOwnerIdentityReader{client: s.source.client}
+	var object core.ConfigMap
+	if err = reader.get(call, "/api/v1/namespaces/"+inventory.Namespace.Name+"/configmaps/"+p.Receipt.Configuration.Name, &object); err != nil {
+		return zero, time.Time{}, err
+	}
+	if object.APIVersion != "v1" || object.Kind != "ConfigMap" || !ownerMetadata(object.ObjectMeta, inventory.Namespace.Name, p.Receipt.Configuration.Name, p.Receipt.Configuration.UID) ||
+		object.ResourceVersion != p.Receipt.ConfigurationResourceVersion || object.Immutable == nil || !*object.Immutable || len(object.Data) != 1 || len(object.BinaryData) != 0 ||
+		len(object.Labels) != 0 || len(object.OwnerReferences) != 0 || len(object.Finalizers) != 0 {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	owner, err := contracts.DecodeOwnerDeployment(bytes.NewBufferString(object.Data["deployment.json"]))
+	if err != nil || owner.Observation == nil || owner.Observation.Activation == nil {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	activation := *owner.Observation.Activation
+	out := contracts.CapacityLocalOwner{Source: inventory.OwnerSource, Pool: pool, Deployment: owner}
+	c.LocalOwner = &out
+	pin, err := CapacityLocalOwnerBinding(c, m)
+	if err != nil || activation.RoleRoot != p.RoleRoot || activation.RoleSetupID != p.RoleSetupID ||
+		!activation.ResourcesCreatedAt.Equal(state.CreatedAt) || !activation.ResourcesUntil.Equal(state.Until) ||
+		!equalJSON(object.Annotations, ownerIdentityReaderAnnotations(activation, p, p.Configuration)) ||
+		!equalJSON(owner.WorkloadGuard, inventory.WorkloadGuard) || !equalJSON(capacityLocalOwnerAdministration(owner, pool), s.source.protection.plan) || pin.ProtectionDigest != s.source.protection.digest {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	// The actual original owner spec and account are verified through the same
+	// fixed installed reader used by owner startup; no token or provider reads.
+	reader.input, reader.activation = owner, activation
+	if err = reader.deployment(call, state); err != nil {
+		return zero, time.Time{}, err
+	}
+	var deployment apps.Deployment
+	if err = reader.get(call, "/apis/apps/v1/namespaces/"+inventory.Namespace.Name+"/deployments/"+inventory.OwnerDeployment.Name, &deployment); err != nil {
+		return zero, time.Time{}, err
+	}
+	digest, err := ownerIdentitySpecDigest(deployment)
+	if err != nil || digest != state.OwnerLaunch.RunningDigest || len(deployment.Spec.Template.Spec.Containers) != 1 ||
+		deployment.Spec.Template.Spec.Containers[0].Image != resources.preparer.plan.Workload.Image {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	template, err := ConnectorAPITemplateDigest(deployment.Spec.Template)
+	if err != nil || template != pin.TemplateDigest || !ownerImagePinned(deployment.Spec.Template.Spec.Containers[0].Image, pin.ImageDigest) {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	// Service and account identity cannot be replaced under a matching name.
+	serviceObject, err := resources.object(state, 12)
+	if err != nil {
+		return zero, time.Time{}, err
+	}
+	var service core.Service
+	if err = reader.get(call, "/api/v1/namespaces/"+inventory.Namespace.Name+"/services/"+inventory.OwnerService.Name, &service); err != nil {
+		return zero, time.Time{}, err
+	}
+	claim := state.Objects[12]
+	if err = workerOriginalObject(&service, serviceObject.object, contracts.PublicRuntimeWorkerObject{Reference: inventory.OwnerService, OperationID: claim.OperationID, TemplateDigest: claim.TemplateDigest}, inventory.Namespace.Name); err != nil {
+		return zero, time.Time{}, err
+	}
+	current, rootsUntil, err := s.source.owner.snapshot(call)
+	if err != nil || current.Suspended || current.Pool != pin.Pool || current.Revision.UID != pin.SourceUID {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	until := identity.Earlier(before.ValidUntil, rootsUntil)
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	after, _, err := s.readInstalledWorkerResources(call, resources, m.Input.Worker)
+	if err != nil || after.UID != before.UID || !equalJSON(after.State, before.State) {
+		return zero, time.Time{}, cfg.ErrUnavailable
+	}
+	last, lastRoots, err := s.source.owner.snapshot(call)
+	if err != nil || !last.Equal(current) {
+		return zero, time.Time{}, cfg.ErrChanged
+	}
+	until = identity.Earlier(until, identity.Earlier(after.ValidUntil, lastRoots))
+	if initialHandoverDeadline(call, resources.now, until) != nil {
+		return zero, time.Time{}, cfg.ErrUnavailable
+	}
+	return out, until, nil
+}
+
+func ownerImagePinned(image string, digest [32]byte) bool {
+	const separator = "@sha256:"
+	if len(image) <= len(separator)+64 {
+		return false
+	}
+	at := len(image) - len(separator) - 64
+	return image[at:at+len(separator)] == separator && image[at+len(separator):] == hex.EncodeToString(digest[:])
+}

@@ -1,0 +1,13 @@
+{
+  "integratedAt": "2026-10-12T10:33:28.942219+00:00",
+  "payloads": 5,
+  "dependencies": 1289,
+  "reviewedH2Dependencies": [
+    "internal/application/evidence/download_content_audit.go",
+    "internal/application/evidence/download_response_transfer.go",
+    "internal/transport/browser/download_content.go"
+  ],
+  "manifestSHA256": "5100f59c002a270f041a718a82e8d6a0534266584d4ebe88c3731ca405521437",
+  "nativeTiming": "pending",
+  "publicRuntimeEnabled": false
+}

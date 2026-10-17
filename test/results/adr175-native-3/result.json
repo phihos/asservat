@@ -1,0 +1,1 @@
+{"exit":1,"status":"failed","finding":"Per-condition Warn-policy diagnostic on the real API server: every condition of the ADR-175 clause holds except !has(object.spec.boundObjectRef), which is false for an unbound TokenRequest. The clause now accepts an absent or empty reference and rejects any named binding.","log":"context-storage.log"}

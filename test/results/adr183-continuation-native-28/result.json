@@ -1,0 +1,13 @@
+{
+  "name": "adr183-continuation-native-28",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [],
+  "result": "Same fixture setup failure as run 27, before any Go test: the synthetic fixture Deployment did not roll out within 90 s. Registry access and the cached pause image were fine, and host memory had 18 GB available. The copied context-storage.log is again a stale copy from run 26. Run 29 adds Pod, event and node diagnostics to the harness on this failure, and its run script removes the stale log first.",
+  "scope": "Infrastructure only.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "environment": "environment.json"
+}

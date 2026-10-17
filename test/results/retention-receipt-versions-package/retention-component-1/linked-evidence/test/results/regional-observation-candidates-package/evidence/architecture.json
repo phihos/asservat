@@ -1,0 +1,33 @@
+{
+  "phase": "architecture",
+  "command": [
+    "make",
+    "go-architecture-check"
+  ],
+  "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/mirror",
+  "exit": 0,
+  "seconds": 1.251,
+  "expectedFailure": false,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

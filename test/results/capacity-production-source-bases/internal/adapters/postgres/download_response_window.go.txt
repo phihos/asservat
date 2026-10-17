@@ -1,0 +1,229 @@
+package postgres
+
+import (
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	"context"
+	"encoding/json"
+	"time"
+)
+
+func decodeWindow(row custodydb.DownloadWindow) (audit.DownloadWindowIntent, artifact.DownloadWindow, error) {
+	var i audit.DownloadWindowIntent
+	if json.Unmarshal(row.IntentJson, &i) != nil || !i.Valid() || i.Window.ID != uid(row.ID) || i.Response.ID != uid(row.ResponseID) || i.Window.SessionID != uid(row.SessionID) || i.Window.Ordinal != row.Ordinal {
+		return i, artifact.DownloadWindow{}, privacy.ErrFence
+	}
+	w := i.Window
+	if len(row.IntentReceipt) > 0 {
+		var receipt audit.Receipt
+		if json.Unmarshal(row.IntentReceipt, &receipt) != nil || !receipt.ValidDownloadWindow(i, "intent") {
+			return i, w, privacy.ErrFence
+		}
+		w.IntentAcknowledged = true
+	}
+	if len(row.OutcomeJson) > 0 {
+		var o artifact.DownloadWindowOutcome
+		if json.Unmarshal(row.OutcomeJson, &o) != nil {
+			return i, w, privacy.ErrFence
+		}
+		w.Outcome = &o
+	}
+	if len(row.OutcomeReceipt) > 0 {
+		var receipt audit.Receipt
+		if json.Unmarshal(row.OutcomeReceipt, &receipt) != nil || !receipt.ValidDownloadWindow(i, "outcome") {
+			return i, w, privacy.ErrFence
+		}
+		w.OutcomeAcknowledged = true
+	}
+	if !w.Valid() {
+		return i, w, privacy.ErrFence
+	}
+	return i, w, nil
+}
+func (s *Downloads) BeginDownloadWindow(ctx context.Context, sessionID, responseID, ownerID, windowID string, a artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
+	var out audit.DownloadWindowIntent
+	if !authorization.UUID(responseID) || !authorization.UUID(ownerID) || !authorization.UUID(windowID) {
+		return out, artifact.ErrInvalid
+	}
+	e := s.responseTransaction(ctx, sessionID, a, func(q *custodydb.Queries, current artifact.DownloadSession, _ time.Time) error {
+		row, e := q.LockDownloadResponse(ctx, custodydb.LockDownloadResponseParams{ID: id(responseID), SessionID: id(sessionID), RootID: id(s.root)})
+		if e != nil {
+			return e
+		}
+		r, e := decodeResponse(row)
+		if e != nil {
+			return e
+		}
+		if r.OwnerID != ownerID {
+			return privacy.ErrFence
+		}
+		allocation, e := q.ReadDownloadControlAllocation(ctx, custodydb.ReadDownloadControlAllocationParams{ID: id(current.AllocationID), RootID: id(s.root)})
+		if e != nil {
+			return e
+		}
+		control := downloadControl(allocation)
+		if !control.Valid() {
+			return privacy.ErrFence
+		}
+		now, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if e = renewResponseCapacity(ctx, q, current, r, now.Time); e != nil {
+			return e
+		}
+		_, r, w, e := r.BeginWindow(current, a, windowID, control.AuditStoreID, control.AuditWriteUntil, now.Time.UTC())
+		if e != nil {
+			return e
+		}
+		out = audit.DownloadWindowIntent{Response: r, Window: w}
+		encoded, e := json.Marshal(out)
+		if e != nil {
+			return e
+		}
+		// Canonical JSON/time representation is shared by immutable SQL and audit.
+		if json.Unmarshal(encoded, &out) != nil || !out.Valid() {
+			return artifact.ErrInvalid
+		}
+		_, e = q.InsertDownloadWindow(ctx, custodydb.InsertDownloadWindowParams{ID: id(windowID), ResponseID: id(responseID), SessionID: id(sessionID), Ordinal: out.Window.Ordinal, IntentJson: encoded})
+		return e
+	})
+	if e != nil {
+		return audit.DownloadWindowIntent{}, e
+	}
+	return out, nil
+}
+func (s *Downloads) LeaseDownloadResponse(ctx context.Context, sessionID, responseID, ownerID, windowID string, a artifact.DownloadAuthority) (artifact.DownloadDeliveryLease, error) {
+	var out artifact.DownloadDeliveryLease
+	if !authorization.UUID(responseID) || !authorization.UUID(ownerID) || !authorization.UUID(windowID) {
+		return out, artifact.ErrInvalid
+	}
+	e := s.responseTransaction(ctx, sessionID, a, func(q *custodydb.Queries, current artifact.DownloadSession, _ time.Time) error {
+		row, e := q.LockDownloadResponse(ctx, custodydb.LockDownloadResponseParams{ID: id(responseID), SessionID: id(sessionID), RootID: id(s.root)})
+		if e != nil {
+			return e
+		}
+		r, e := decodeResponse(row)
+		if e != nil {
+			return e
+		}
+		wr, e := q.LockDownloadWindow(ctx, custodydb.LockDownloadWindowParams{ID: id(windowID), ResponseID: id(responseID), SessionID: id(sessionID)})
+		if e != nil {
+			return e
+		}
+		_, w, e := decodeWindow(wr)
+		if e != nil {
+			return e
+		}
+		now, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if e = renewResponseCapacity(ctx, q, current, r, now.Time); e != nil {
+			return e
+		}
+		r, out, e = r.Lease(current, w, a, ownerID, now.Time.UTC())
+		if e != nil {
+			return e
+		}
+		out.Until = out.Until.UTC().Truncate(time.Microsecond)
+		saved, e := q.LeaseDownloadResponse(ctx, custodydb.LeaseDownloadResponseParams{ID: id(responseID), SessionID: id(sessionID), RootID: id(s.root), LeaseUntil: ts(out.Until)})
+		if e != nil {
+			return e
+		}
+		if saved.LeaseSequence != out.Sequence || !saved.LeaseUntil.Time.Equal(out.Until) {
+			return privacy.ErrConflict
+		}
+		return nil
+	})
+	if e != nil {
+		return artifact.DownloadDeliveryLease{}, e
+	}
+	return out, nil
+}
+func (s *Downloads) FinishDownloadWindow(ctx context.Context, i audit.DownloadWindowIntent, o artifact.DownloadWindowOutcome) (audit.DownloadWindowAuditOutcome, error) {
+	var out audit.DownloadWindowAuditOutcome
+	if !i.Valid() || i.Window.Authority.Scope.RootID != s.root {
+		return out, artifact.ErrInvalid
+	}
+	e := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		sr, e := q.LockDownloadSession(ctx, custodydb.LockDownloadSessionParams{ID: id(i.Window.SessionID), RootID: id(s.root)})
+		if e != nil {
+			return e
+		}
+		current, e := loadDownload(ctx, q, sr)
+		if e != nil {
+			return e
+		}
+		rr, e := q.LockDownloadResponse(ctx, custodydb.LockDownloadResponseParams{ID: id(i.Response.ID), SessionID: sr.ID, RootID: id(s.root)})
+		if e != nil {
+			return e
+		}
+		r, e := decodeResponse(rr)
+		if e != nil {
+			return e
+		}
+		wr, e := q.LockDownloadWindow(ctx, custodydb.LockDownloadWindowParams{ID: id(i.Window.ID), ResponseID: rr.ID, SessionID: sr.ID})
+		if e != nil {
+			return e
+		}
+		stored, w, e := decodeWindow(wr)
+		if e != nil {
+			return e
+		}
+		if !sameJSON(i, stored) {
+			return privacy.ErrConflict
+		}
+		if w.Outcome != nil {
+			if w.Outcome.EmittedBytes != o.EmittedBytes || w.Outcome.Success != o.Success || w.Outcome.VerifiedFinal != o.VerifiedFinal {
+				return privacy.ErrConflict
+			}
+			out = audit.DownloadWindowAuditOutcome{Intent: stored, Outcome: *w.Outcome}
+			return nil
+		}
+		now, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		_, _, w, e = r.RecordWindow(current, w, o, now.Time.UTC())
+		if e != nil {
+			return e
+		}
+		out = audit.DownloadWindowAuditOutcome{Intent: stored, Outcome: *w.Outcome}
+		if !out.Valid() {
+			return artifact.ErrInvalid
+		}
+		encoded, e := json.Marshal(out.Outcome)
+		if e != nil {
+			return e
+		}
+		n, e := q.RecordDownloadWindowOutcome(ctx, custodydb.RecordDownloadWindowOutcomeParams{ID: wr.ID, ResponseID: rr.ID, SessionID: sr.ID, OutcomeJson: encoded})
+		if e == nil && n != 1 {
+			return privacy.ErrConflict
+		}
+		return e
+	})
+	if e != nil {
+		return audit.DownloadWindowAuditOutcome{}, e
+	}
+	return out, nil
+}
+
+// Reentering after a no-output lease gap reacquires the same finite stream lane.
+// A previous response admission is not permanent concurrency capacity.
+func renewResponseCapacity(ctx context.Context, q *custodydb.Queries, s artifact.DownloadSession, r artifact.DownloadResponse, now time.Time) error {
+	if now.Before(r.LeaseUntil) {
+		return nil
+	}
+	streams, e := q.DownloadStreams(ctx, custodydb.DownloadStreamsParams{RootID: id(s.Scope.RootID), PrincipalKey: principalKey(s.Scope.Principal)})
+	if e != nil {
+		return e
+	}
+	if streams.Total >= 16 || streams.Principal >= 2 {
+		return artifact.ErrDownloadCapacity
+	}
+	return nil
+}

@@ -1,0 +1,132 @@
+{
+  "scope": "ADR131 adapter and generated projection checkpoint; all paths new",
+  "files": [
+    {
+      "path": "docs/architecture/initial-bootstrap.md",
+      "base_sha256": null,
+      "sha256": "35e638e758804d336ba79bea337912efb3740ab50c4c70ebe45d8857613dd5b4",
+      "bytes": 6827
+    },
+    {
+      "path": "docs/decisions/131-trusted-bootstrap-input-producer.md",
+      "base_sha256": null,
+      "sha256": "300b03197843f90a13d740ac8bf585b7a01e7c0f4b7e7b255dfa916f01a368f1",
+      "bytes": 4035
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap.go",
+      "base_sha256": null,
+      "sha256": "ade5770575b47d8f9a5073cfbd1d13aa479f909a665c157c3c22739ba285e1d4",
+      "bytes": 11553
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_manager.go",
+      "base_sha256": null,
+      "sha256": "427dec249e3990c14a8f33c7efbf802eab14990bc49d0849a4e224989abb2bff",
+      "bytes": 8726
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_open.go",
+      "base_sha256": null,
+      "sha256": "721b88280da0738e621658e4877934d4c663d4403a9f66c926dccaa224abd0d6",
+      "bytes": 11386
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+      "base_sha256": null,
+      "sha256": "268cddb4c092a6b310d64735a1d7c8b919874f9f961b3e26e6abe0356c930d47",
+      "bytes": 12183
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_projection.go",
+      "base_sha256": null,
+      "sha256": "3da0c4bc36a51cb70e2cb9a81d95d3ef6ac8b8a1d93e5c16d111e0c835351dc2",
+      "bytes": 15364
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_projection_test.go",
+      "base_sha256": null,
+      "sha256": "c5bf151e1410d81c86e7d8cc75b09811845c5f130bffccc443376af8c31f17f6",
+      "bytes": 3702
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_state.go",
+      "base_sha256": null,
+      "sha256": "525c2132e2839f1533c3b6f8572e73b729bcd05716fb35cf9b6c54d9b3c1fa43",
+      "bytes": 9131
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_state_test.go",
+      "base_sha256": null,
+      "sha256": "6371cd3f0f784568d2b7866592576fb05f307156c2d13cbf9d09eef96bc9697c",
+      "bytes": 7611
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager.go",
+      "base_sha256": null,
+      "sha256": "bc18bd1058929749f365678e44404f2e817ff63487f52fb7a478b75a19eb4eca",
+      "bytes": 16615
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager_grants.go",
+      "base_sha256": null,
+      "sha256": "314e5e1343143bdbb491c9410c466d3f7ddadca58a89198ca898042f265fd7aa",
+      "bytes": 2504
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager_history.go",
+      "base_sha256": null,
+      "sha256": "b653b173afd98b487bc175dfc0925c5fbea6035f816a0d1f1a2daf30c2b25c2b",
+      "bytes": 5504
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager_history_test.go",
+      "base_sha256": null,
+      "sha256": "ff5b66e55f741dedf593d8476981d214b358ccfbcf7dad20b9131d32e90dbf98",
+      "bytes": 1690
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager_retirement.go",
+      "base_sha256": null,
+      "sha256": "6d9a6be17f9975dcb9e89b0030c9f84e4022c46c94798beb05caa5fbd4a292ef",
+      "bytes": 11618
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap.go",
+      "base_sha256": null,
+      "sha256": "33fbe6506bacb47e3e86d942183216b1863e061be9112f5d9564f9298d03341e",
+      "bytes": 6656
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-material.schema.json",
+      "base_sha256": null,
+      "sha256": "d54ef91b580c7c7f6a3cca84cc11033f5b272831b4ee72233eb699f6baa6134f",
+      "bytes": 1578
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-state.schema.json",
+      "base_sha256": null,
+      "sha256": "56597b8f8886fba0dc1f622cb2c14ae909ad96ac3832c2ba724b885f6fa80cf0",
+      "bytes": 7782
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap.schema.json",
+      "base_sha256": null,
+      "sha256": "fc4c3ed70ef0e23463caf9882c7245c550897cacd21726f085be015ad0cfe5b9",
+      "bytes": 5126
+    },
+    {
+      "path": "test/integration/initial_bootstrap_manager_test.go",
+      "base_sha256": null,
+      "sha256": "b506657513775653241bed8d5d723e2848240b8fcba7f5a0d62de7da7a0e1684",
+      "bytes": 15651
+    }
+  ],
+  "patch_sha256": "83afdd88b8da6fc093bfb6d1a2a4949da09bdce4fcb333613eca406cf93c64f5",
+  "dependencies": {
+    "internal/contracts/initial_preparer.go": "60192108d90ae7bb2ec737db52406cac1a3719a5593d762908f4823d5b44992b",
+    "internal/adapters/postgres/initial_schema.go": "d2e123ab21a42a298870c5fdb67f922d65e69802f583905d1b5ec243d71c8139",
+    "internal/adapters/postgres/initial_history_roles.go": "8ab6918db7335b5a72f0b44112e228bd367d1cb35f5435cb67dcb10f0970c617",
+    "internal/adapters/postgres/initial_installation_tables.go": "531a85fcb2dba0e21cd63be444483b85018b7a81d10db9de85934cbde371cacf"
+  }
+}

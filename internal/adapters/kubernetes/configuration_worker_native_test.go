@@ -1,0 +1,225 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	auth "k8s.io/api/authentication/v1"
+	"k8s.io/client-go/util/flowcontrol"
+)
+
+// Actual production HTTP clients/20QPS buckets and concrete source code against
+// loopback simulated enforcement. This does not qualify a real Kubernetes
+// guard, complete bridge/SQL operation, or fresh installed startup.
+func TestConfigurationWorkerNativeAndPostLockReadsAreExplicit(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	initial, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.requests.Load() != 33 || f.probes.Load() != 3 {
+		t.Fatalf("initial expected24 observer+9 native, got requests=%d denials=%d", f.requests.Load(), f.probes.Load())
+	}
+	current, err := f.source.readConfigurationWorkerCurrent(ctx, initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.requests.Load() != 45 || f.probes.Load() != 3 || current.proof.observation != initial.proof.observation {
+		t.Fatal("post-lock read hid native I/O, renewed dates, or failed to read12 actual values")
+	}
+	final, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.requests.Load() != 78 || f.probes.Load() != 6 || !configurationRoleSameSources(initial.proof.observation, final.proof.observation) {
+		t.Fatal("final independent native bracket missing or source changed")
+	}
+	until, _ := ctx.Deadline()
+	if final.proof.observation.FreshUntil.After(until) {
+		t.Fatal("final native bracket escaped original caller end")
+	}
+	for n := range f.purposeProbes {
+		if f.purposeProbes[n].Load() != 2 {
+			t.Fatal("one original denied probe omitted from a bracket")
+		}
+	}
+}
+
+func TestConfigurationWorkerPostLockRejectsChangedCompleteValues(t *testing.T) {
+	for name, fault := range map[string]int32{"fleet": 3, "owner": 4, "workload": 5, "account": 7, "administrator": 8, "guard": 10} {
+		t.Run(name, func(t *testing.T) {
+			f := newConfigurationSourcePathFixture(t)
+			ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			initial, err := f.source.readConfigurationWorkerNative(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fault == 10 {
+				f.guardVersion.Add(1)
+			} else {
+				f.fault.Store(fault)
+			}
+			if _, err = f.source.readConfigurationWorkerCurrent(ctx, initial); err == nil {
+				t.Fatal("post-lock read returned retained values despite current change")
+			}
+			if f.probes.Load() != 3 {
+				t.Fatal("post-lock comparison silently acquired replacement enforcement")
+			}
+		})
+	}
+}
+
+func TestConfigurationWorkerFinalBracketNeedsNewNativeEnforcement(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	initial, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.fault.Store(2) // Same objects/guards, but the independent denied PUT now succeeds.
+	if _, err := f.source.readConfigurationWorkerCurrent(ctx, initial); err != nil {
+		t.Fatal("fixture changed ordinary values instead of enforcement", err)
+	}
+	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || f.probes.Load() <= 3 {
+		t.Fatal("old native proof hid actual enforcement loss in final bracket")
+	}
+}
+
+func TestConfigurationWorkerReadsSourceAfterFinalGuard(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	var ownerBindings atomic.Int32
+	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings/cfg-owner") && ownerBindings.Add(1) == 2 {
+			f.fault.Store(4) // During final guard, after the original owner probe GET.
+		}
+		return false
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || ownerBindings.Load() != 2 {
+		t.Fatal("source mutation during final guard was hidden behind probe response")
+	}
+}
+
+func TestConfigurationWorkerBlockedPostLockReadRetainsOriginalEnd(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	ctx, stop := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer stop()
+	initial, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var blocked atomic.Bool
+	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/configmaps/owner") {
+			blocked.Store(true)
+			<-r.Context().Done()
+			return true
+		}
+		return false
+	}
+	// The derived timer may fire a moment before ctx records expiry; the read
+	// must return at the original end, neither early nor late.
+	end, _ := ctx.Deadline()
+	if _, err = f.source.readConfigurationWorkerCurrent(ctx, initial); err == nil || !blocked.Load() || time.Until(end) > 50*time.Millisecond || time.Since(end) > time.Second {
+		t.Fatal("blocked read escaped original bound", err)
+	}
+	<-ctx.Done()
+	requests := f.requests.Load()
+	if _, err = f.source.readConfigurationWorkerCurrent(ctx, initial); !errors.Is(err, cfg.ErrUnavailable) || f.requests.Load() != requests {
+		t.Fatal("expired original proof restarted reads or changed expiry classification", err)
+	}
+}
+
+func TestConfigurationWorkerAliasedDepletedLimiterCannotInventAvailability(t *testing.T) {
+	// A shared bucket is allowed to reduce availability. It is not replaced,
+	// refilled, or given a fresh operation end by the native composition.
+	limiter := flowcontrol.NewTokenBucketRateLimiter(20, 20)
+	f := newConfigurationSourcePathFixtureLimiter(t, limiter)
+	for limiter.TryAccept() {
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 700*time.Millisecond)
+	defer stop()
+	started := time.Now()
+	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil {
+		t.Fatal("depleted shared bucket fabricated a complete native bracket")
+	}
+	if elapsed := time.Since(started); elapsed > 1500*time.Millisecond || f.requests.Load() >= 33 {
+		t.Fatal("aliased bucket escaped the original short bound", elapsed, f.requests.Load())
+	}
+}
+
+func TestConfigurationWorkerNativeConstructorKeepsExactClientsAndPins(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	s := f.source
+	if got, err := NewConfigurationRoleSource(s.client, s.protection, s.fleet, s.owner, s.input); err != nil || got.client != s.client || got.protection != s.protection || got.fleet != s.fleet || got.owner != s.owner {
+		t.Fatal("constructor replaced an original configured client", err)
+	}
+	for _, mode := range []string{"client", "namespace", "fleet-client", "owner-client", "fleet-pin", "owner-pin", "guard-client", "guard-namespace"} {
+		t.Run(mode, func(t *testing.T) {
+			client, protection, fleetSource, owner := s.client, *s.protection, *s.fleet, *s.owner
+			settings := *s.fleet.settings
+			fleetSource.settings = &settings
+			input := s.input
+			switch mode {
+			case "client":
+				copy := *client
+				client = &copy
+			case "namespace":
+				input.Namespace.UID = ownerID(15000)
+			case "fleet-client":
+				copy := *client
+				settings.client = &copy
+			case "owner-client":
+				copy := *client
+				owner.client = &copy
+			case "fleet-pin":
+				input.FleetSource.UID = ownerID(15000)
+			case "owner-pin":
+				input.OwnerSource.UID = ownerID(15000)
+			case "guard-client":
+				copy := *client
+				protection.observer = &copy
+			case "guard-namespace":
+				protection.plan.ControlNamespace.UID = ownerID(15000)
+			}
+			if _, err := NewConfigurationRoleSource(client, &protection, &fleetSource, &owner, input); err == nil {
+				t.Fatal("constructor adopted a substituted client or input pin")
+			}
+		})
+	}
+	if f.requests.Load() != 0 {
+		t.Fatal("pure constructor claimed current readiness through network I/O")
+	}
+}
+
+// A kubelet refresh of the administrator's projected token changes only its
+// credential ID; the principal compares equal, a different Pod does not.
+func TestAdministratorPrincipalIgnoresTokenRefresh(t *testing.T) {
+	user := func(jti, pod string) auth.UserInfo {
+		return auth.UserInfo{Username: "system:serviceaccount:install:runner", UID: ownerID(1), Groups: []string{"system:serviceaccounts"},
+			Extra: map[string]auth.ExtraValue{tokenCredentialExtra: {"JTI=" + jti}, "authentication.kubernetes.io/pod-uid": {pod}}}
+	}
+	before, after := administratorPrincipal(user("a", ownerID(2))), administratorPrincipal(user("b", ownerID(2)))
+	if !equalJSON(before, after) {
+		t.Fatal("token refresh changed the administrator principal")
+	}
+	if equalJSON(before, administratorPrincipal(user("a", ownerID(3)))) {
+		t.Fatal("another Pod's token compared equal")
+	}
+	original := user("a", ownerID(2))
+	_ = administratorPrincipal(original)
+	if len(original.Extra) != 2 {
+		t.Fatal("caller's extra map mutated")
+	}
+}

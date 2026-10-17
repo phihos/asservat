@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/postgres/custody.go",
+    "base": "957eb19e3ca79e776c61fd17e5c4d1c1ce35cb4a5bc40ee3a2434c0968c397e3",
+    "payload": "0e18cb59d8ef232790adf4faed7b88305b17d674ec4a92c867fb24244ce8ea03"
+  },
+  {
+    "path": "migrations/00056_connector_profile_cleanup_alias.sql",
+    "base": null,
+    "payload": "1b5a44ed1d9f7a6c91ea51a230d71b6bf747437ca9a3cd7eb9f8711854d41b11"
+  },
+  {
+    "path": "test/integration/connector_identity_test.go",
+    "base": "d0d5b1fcf45c175dd32a07eba036124a4686ffa07064c9c268dc9269cb310967",
+    "payload": "78317497901f7a43896cb1d44ded67c56d9112af28bdda54640d6f244875e26f"
+  },
+  {
+    "path": "test/integration/connector_profile_cleanup_guard_test.go",
+    "base": null,
+    "payload": "c2b32a0c96305bc9477770bfecffee302269ac84bd87d3d839ec25e2f229f272"
+  }
+]

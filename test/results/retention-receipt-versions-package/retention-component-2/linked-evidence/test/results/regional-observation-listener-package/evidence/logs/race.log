@@ -1,0 +1,50 @@
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/local-without-cert
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/own-without-cert
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/own-with-cert
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-route
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-sni
+=== RUN   TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-host
+--- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication (0.04s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/local-without-cert (0.01s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/own-without-cert (0.01s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/own-with-cert (0.01s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-route (0.01s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-sni (0.00s)
+    --- PASS: TestOwnerObservationDualListenerKeepsPerPathAuthentication/wrong-host (0.01s)
+=== RUN   TestOwnerObservationOnlyListenerActualTLS
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/exact
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/exact-owner-sni
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/wrong-host
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/native-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/worker-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/public-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/extra-body
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/expired-wire
+--- PASS: TestOwnerObservationOnlyListenerActualTLS (0.04s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/exact (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/exact-owner-sni (0.00s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/wrong-host (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/native-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/worker-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/public-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/extra-body (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/expired-wire (0.01s)
+=== RUN   TestOwnerObservationListenerCloseJoinsOriginalCall
+--- PASS: TestOwnerObservationListenerCloseJoinsOriginalCall (0.01s)
+=== RUN   TestOwnerRegionalObservationListenerSeparatePurposeCapacity
+--- PASS: TestOwnerRegionalObservationListenerSeparatePurposeCapacity (5.22s)
+=== RUN   TestOwnerRegionalObservationListenerCleanTerminalEOF
+--- PASS: TestOwnerRegionalObservationListenerCleanTerminalEOF (0.02s)
+=== RUN   TestOwnerRegionalObservationListenerCloseJoinsActualClaim
+--- PASS: TestOwnerRegionalObservationListenerCloseJoinsActualClaim (0.03s)
+=== RUN   TestOwnerRegionalObservationListenerRetainsOriginalParentEnd
+--- PASS: TestOwnerRegionalObservationListenerRetainsOriginalParentEnd (0.45s)
+=== RUN   TestOwnerRegionalObservationListenerRequiresCertificateForStandby
+--- PASS: TestOwnerRegionalObservationListenerRequiresCertificateForStandby (0.01s)
+=== RUN   TestOwnerRegionalObservationListenerProofUsesAcceptTimeNotPathTime
+--- PASS: TestOwnerRegionalObservationListenerProofUsesAcceptTimeNotPathTime (0.61s)
+=== RUN   TestOwnerRegionalObservationListenerUnclassifiedSocketExpires
+--- PASS: TestOwnerRegionalObservationListenerUnclassifiedSocketExpires (2.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	9.455s

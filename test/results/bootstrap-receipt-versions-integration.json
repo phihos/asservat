@@ -1,0 +1,74 @@
+{
+  "at": "2026-10-13T15:17:34.529207+00:00",
+  "manifest": "903654ebcff9fdfba5376528e18561b43996946bf65145d7678a4661dbfc53de",
+  "result": "d28d4300fcbb338594c722f0218f4a7d17e3ccac7d11f4d58c549c24cd1a16a5",
+  "paths": [
+    {
+      "path": "docs/architecture/bootstrap-issuance.md",
+      "base": "32b7fc275641e05a2de7f8b2be75cab2411e46fa155d00cd1e731e60ec73cd08",
+      "payload": "e26e6a1602d8983fb5f9025181296ed8e5a6b5d687c4116aa3fa4d6efa8974b4"
+    },
+    {
+      "path": "internal/adapters/postgres/bootstrap_audit_receipts.go",
+      "base": null,
+      "payload": "e2ccf9718015388e577b41c23fe711c6974a1df5dd71b5f96670f5425119ead8"
+    },
+    {
+      "path": "internal/adapters/postgres/bootstrap_audit_receipts_test.go",
+      "base": null,
+      "payload": "db952c1cbd9ec0cb2f9d6174b0839a7f74b3f409a3486c136d630f3c6777add6"
+    },
+    {
+      "path": "internal/adapters/postgres/bootstrap_issuance.go",
+      "base": "47c6eb7002dc87f3514b1bdebbc403846b78672602fbd8c411f19330d3bd1c94",
+      "payload": "f0410b6bff1591bae08fafaf98f288aa1d3b312f417303b498c23a5c2444aa1b"
+    },
+    {
+      "path": "internal/adapters/postgres/enrollment.go",
+      "base": "cf2afecbb4920f7a304c91248e050630ed0dd55d09579b45bfcadb86bd732e9a",
+      "payload": "1b71e4163dece167f2c746a37e2d69ccccf1a09d0d2230db83886150cde83773"
+    },
+    {
+      "path": "internal/adapters/postgres/enrollment_signing.go",
+      "base": "a5e6baa8a1e710b87026401b941b321e565790bd3187fcfb9a03635341450113",
+      "payload": "22ce9a15be8dd9f5dccfe68dbc47bcde7e2872c1c13868b1cf60bd0e8e629dde"
+    },
+    {
+      "path": "internal/application/fleet/bootstrap_service_test.go",
+      "base": "eba560d7b938e4117dbc9bffe9e152697ad4c304f8e9281fd8b7eeebcc41f0cc",
+      "payload": "a705e5f936fd975ae35b160e2d9daaad3b6528d83c57fc66aaff612cde17f6f8"
+    },
+    {
+      "path": "internal/domain/audit/bootstrap.go",
+      "base": "486ed1c775a76ef9aef0f74a03b466bf4cf8942c88c83f82e73a37361c672225",
+      "payload": "fccccd1ec439531647f56e50401cbfa58d81d90d23b79fe78a0acdf79a0008f4"
+    },
+    {
+      "path": "internal/domain/audit/bootstrap_versions_test.go",
+      "base": null,
+      "payload": "64599057aa660e8ebd22ab4effe67594279c1d68e316fd54c66b3139303e9c9e"
+    },
+    {
+      "path": "test/integration/bootstrap_audit_history_test.go",
+      "base": null,
+      "payload": "6500eadc4889f1f0ca449e9636fc685650a06a808491d28ea52fbd796b7d3907"
+    },
+    {
+      "path": "test/integration/bootstrap_issuance_test.go",
+      "base": "469f84ed4b8df7727a49a9335dc6d3296be0139ec84fdb8ccd046c909e44c150",
+      "payload": "b0f5899db886b989ba927999b6e2881b72f166b49096228b7a00504c518bd14e"
+    },
+    {
+      "path": "test/integration/enrollment_signing_test.go",
+      "base": "882eb1ebe81d3bda03586ba7aff89c45a04d1d8f7c1f9535ab25ca4284f7f206",
+      "payload": "8e1766228b3fd40c32d881b128e962ad7a0b33361040a91caadc005b78741964"
+    },
+    {
+      "path": "test/integration/enrollment_test.go",
+      "base": "72c82da71e2afa6e8b49fd97d7ee58fa945ba14cb67e24322e273e290f025bdc",
+      "payload": "f3b4f128f946a6b25ba838c78c58e33ea545e6ebe634e185473fc1a59fe499b7"
+    }
+  ],
+  "nativeQualified": false,
+  "schemaChange": false
+}

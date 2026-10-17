@@ -1,0 +1,73 @@
+{
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 0,
+      "seconds": 28.664,
+      "sourceChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "name": "interactions",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "-run",
+        "^Test(InitialVersioned|InitialInstallerRequiresVersion|InitialInstallerAuditFormat|OwnerBootstrapOriginalAllocation|OwnerBootstrapStateRetains|OwnerBootstrapGeneratedBinding|OwnerBootstrapSelectionCodecs)",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "seconds": 28.398,
+      "sourceChanged": [],
+      "topLevelPass": 9,
+      "namedPass": 28,
+      "skips": 0
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "seconds": 9.663,
+      "sourceChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "native": false,
+  "sourceCount": 3018,
+  "scratch": "/tmp/asservat-initial-owner-4vsge050",
+  "exit": 0,
+  "scratchRemoved": true,
+  "sourceChanged": [],
+  "files": {
+    "source-hashes.json": "1deb66baa15542041947e97b01f0cb7119df7693d174e54086bc258d3b300f9a",
+    "compile.log": "176f857e00e95640b73e6b46e36fbf8cbfce93b6b741fedb0442b337726e1b9e",
+    "interactions.log": "ded94a7484f77da99b0f88b627b0a151005669e19008bbf1bf5756977c201869",
+    "contracts.log": "a3cc529a54fe7b0a6a6d5275338c29bae840e4f54092a35b7b3c4d10d70cb5fd"
+  }
+}

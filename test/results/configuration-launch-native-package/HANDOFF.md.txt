@@ -1,0 +1,43 @@
+# Configuration launch native matrix
+
+Four test-only paths, frozen from `checks/native-matrix-1/source` after the exact
+compile and vet. No product behavior, shared schema, SQL role grant, migration,
+version, deadline, public route or runtime enablement changes.
+
+- Manifest SHA256: `6f16370352c876cb59071b6bbe3d376e62bdb9fc41f176d2419c8d6530aea073`.
+- Dependency manifest SHA256: `4021928b35062d6532ff81abd90353cbe55cb874056a929d3faea978c8c75abf`.
+- Evidence manifest SHA256: `7b06298b6016979964860e219ff3dd3669cb026093c03cbcc3cbbfb24882f709`.
+
+The result file records handle 2530's actual sequential exits: integration compile
+0 in 6.891s and package vet 0 in 0.864s. Four payloads/bases and 1,505 dependencies were
+unchanged before/after. `go test -run '^$' ./test/integration` compiled these new
+cases; it did not execute them. `go vet ./test/integration` passed. Both used the
+frozen overlay, GOMAXPROCS=2, GOFLAGS=-p=2 and the dedicated build TMPDIR.
+
+The initial snapshot-preparation command failed before any Go execution because
+it listed a nonexistent top-level `queries` directory. Corrected enumeration
+includes the actual query directory under `internal`; no payload changed.
+
+Read PLAN.md for exact cases and synthetic boundaries. Required parent-owned
+native selectors, sequential with unchanged sources and completed cleanup:
+
+1. Fleet fixture with `ASSERVAT_INITIAL_INSTALLATION=1` and
+   `^TestInitialInstallationWithRealServices$/^configuration-runtime-roles-launched-`.
+2. Context fixture with `^TestConfigurationRuntimeLaunchWithRealKubernetes$`.
+
+The six SQL cases use actual SQL/activation/role effects and synthetic protected
+Kubernetes launch proof. The five Kubernetes cases use actual source/guard/Secret
+and Deployment effects with synthetic SQL receipts/provider values. The fixture
+Pod remains scheduling-gated and executes no image. Together these component
+matrices do not replace the unfinished initial guard bridge or installed runtime
+graph. No actual native verdict is claimed by this handoff.
+
+Integration: verify both existing bases and all four payloads, copy only `changes`;
+no generation or schema inventory update. The existing initial-installation loop
+gains six cases and the role helper gains one closed prefix dispatch. The two new
+files are source-owned test helpers. Original launch package/evidence remains
+immutable and separate.
+
+Next full ADR140 work remains the concrete protected object/bridge producer,
+complete generated public/provider/backing projections, exact physical-pool
+inventory and command wiring, followed by the actual installed journey.

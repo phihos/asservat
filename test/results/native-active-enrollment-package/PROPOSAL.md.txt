@@ -1,0 +1,51 @@
+# Current activated enrollment in first context preparation
+
+Source review follows the failed native `native-fresh-content-isolated` run:
+ordinary content and fresh admission race passed, while resume failed before
+ranges. Its connector origin retained 2.071 seconds and hub origin 2.024 seconds;
+connector admission took 706 ms. These are remaining bounds, not operation age.
+The request and source intervals precede construction/publication of the native
+operation. This package does not claim to explain every elapsed millisecond or
+to qualify the failed native workflow.
+
+The already-bound path performs fourteen full current-authority traversals before
+native SQL claim. Six are in construction/registration of an enrollment route
+(new current operation, two local-router checks, three owner-registration checks).
+That route also reads enrollment twice and claims a SQL owner. A further current
+attachment read follows it. The archived pre-consolidation
+`native-preparation-and-cold-trace-phases.json` measured fourteen pre-claim checks
+and 0.80–0.84 seconds to claim on its own older source; it is not a timing claim
+about the latest run. A missed worker poll can add up to the next one-second
+idle interval. Earlier idle sleeps can overlap preparation work and must not be
+added twice.
+
+Native routing does not use the enrollment owner: `NativeAttachment.open` creates
+its exact hub Pod/process operation and locally registers before native SQL claim;
+`NativeOwnerForwarder.OpenNativeOwner` routes that binding and `HubRouter.Attach`
+requires the same live original local operation. `NativeOrigins` independently
+checks real worker TLS, Pod/token proof and current SQL/certificate state.
+
+The approved change returns the already independently reread attachment from
+`observeBoundWorker`. Only an initially active identity with an unchanged exact
+worker, enrollment and activated peer can omit the enrollment route/wait. Values
+are copied before the blocking read. The original Job/Pod observation, final C03,
+all first-preparation accounting/audit, key, native claim, origin, frame and final
+checks remain. Losing/changing selected active identity denies; it cannot create
+another enrollment route or repair a failed preparation. Pending/unactivated
+workers and any peer whose renewal interval intersects the original request keep
+the existing registration and bounded wait.
+
+Renewal eligibility first compares the original request end with actual leaf
+NotAfter minus `WorkerCertificateRenewBefore`, exactly as the credential
+supervisor schedules renewal. Equality retains enrollment. The existing
+`WorkerCertificateEpoch` helper additionally checks original-period compatibility;
+it is not the scheduling decision because fractional CreatedAt and second-truncated
+NotAfter differ at the boundary. The exact final certificate
+ending at original RunUntil (second precision) uses the existing supervisor's
+no-renewal exception, but still must cover the request end. No SQL, wire, polling,
+current authority interval or backing amount changes.
+
+Owned payload: context_native_runtime.go, one new focused test file, and the
+context-native-content architecture paragraph. No live edits. Tests use synthetic
+current SQL/Pod/identity ports and an unknown first batch reply; native qualification
+remains parent-owned after integration.

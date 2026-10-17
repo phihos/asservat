@@ -1,0 +1,111 @@
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.024s [no tests to run]
+=== RUN   TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay
+    configuration_runtime_launch_test.go:193: original launch operation wall=4.697564032s
+--- PASS: TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay (15.88s)
+=== RUN   TestConfigurationLaunchUnknownWriteOnlyObservesOriginal
+--- PASS: TestConfigurationLaunchUnknownWriteOnlyObservesOriginal (10.52s)
+=== RUN   TestConfigurationLaunchUnknownClaimNeverWritesWorkload
+--- PASS: TestConfigurationLaunchUnknownClaimNeverWritesWorkload (10.72s)
+=== RUN   TestConfigurationLaunchRechecksEnforcementAfterClaim
+--- PASS: TestConfigurationLaunchRechecksEnforcementAfterClaim (7.67s)
+=== RUN   TestConfigurationLaunchExactRunningTransition
+=== RUN   TestConfigurationLaunchExactRunningTransition/other_UID
+=== RUN   TestConfigurationLaunchExactRunningTransition/original_version
+=== RUN   TestConfigurationLaunchExactRunningTransition/missing_launch
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_launch
+=== RUN   TestConfigurationLaunchExactRunningTransition/still_inert
+=== RUN   TestConfigurationLaunchExactRunningTransition/excess_replicas
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_account
+=== RUN   TestConfigurationLaunchExactRunningTransition/new_spec_field
+--- PASS: TestConfigurationLaunchExactRunningTransition (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/other_UID (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/original_version (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/missing_launch (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_launch (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/still_inert (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/excess_replicas (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_account (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/new_spec_field (0.00s)
+=== RUN   TestConfigurationLaunchReceiptRechecksEnforcementAfterObjectReads
+--- PASS: TestConfigurationLaunchReceiptRechecksEnforcementAfterObjectReads (8.17s)
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/input-read
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/receipt-cas
+2026/10/12 19:44:52 httptest.Server blocked in Close after 5 seconds, waiting for connections:
+  *tls.Conn 0xc0007a4008 127.0.0.1:56392 in state active
+panic: test timed out after 3m0s
+	running tests:
+		TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO (2m7s)
+		TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/receipt-cas (1m57s)
+
+goroutine 5915 [running]:
+testing.(*M).startAlarm.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2961 +0x605
+created by time.goFunc
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/time/sleep.go:182 +0x45
+
+goroutine 1 [chan receive, 2 minutes]:
+testing.(*T).Run(0xc000290fc8, {0x21fa332, 0x3d}, 0x327b880)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2268 +0xb3e
+testing.runTests.func1(0xc000290fc8)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2744 +0x85
+testing.tRunner(0xc000290fc8, 0xc000507a40)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+testing.runTests({0x21b0f59, 0x17}, {0x21e595c, 0x34}, 0xc0000167c8, {0x331f9b0, 0xd4, 0xd4}, {0xc2ab651e84e917ce, 0x29eb08db1b, ...})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2742 +0x9ea
+testing.(*M).Run(0xc000299c20)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2602 +0xf45
+main.main()
+	_testmain.go:470 +0x165
+
+goroutine 5138 [sync.WaitGroup.Wait]:
+sync.runtime_SemacquireWaitGroup(0x0?, 0x0?)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/sema.go:114 +0x2e
+sync.(*WaitGroup).Wait(0xc000428f70)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/sync/waitgroup.go:206 +0xc5
+net/http/httptest.(*Server).Close(0xc000428f00)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/httptest/server.go:524 +0x452
+testing.(*common).Cleanup.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1462 +0x169
+testing.(*common).runCleanup(0xc0004d7208, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1822 +0x226
+testing.tRunner.func2()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2189 +0x4d
+testing.tRunner(0xc0004d7208, 0xc000590ba0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2201 +0x256
+created by testing.(*T).Run in goroutine 4475
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+
+goroutine 5140 [chan receive]:
+asservat.local/asservat/internal/adapters/kubernetes.newConfigurationLaunchFixture.func1({0x3274960, 0xc0001a85a0}, 0xc000776dc0)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_runtime_launch_test.go:66 +0x15a9
+asservat.local/asservat/internal/adapters/kubernetes.newConfigurationSourcePathFixture.func3({0x3274960, 0xc0001a85a0}, 0xc000776dc0)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_role_source_path_test.go:107 +0x166
+net/http.HandlerFunc.ServeHTTP(0xc00020c360, {0x3274960, 0xc0001a85a0}, 0xc000776dc0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2358 +0x48
+net/http.serverHandler.ServeHTTP({0xc0001c0050?}, {0x3274960, 0xc0001a85a0}, 0xc000776dc0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3436 +0x2a2
+net/http.(*conn).serve(0xc0007a6000, {0x32760c0, 0xc000835920})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2157 +0xedb
+created by net/http.(*Server).Serve in goroutine 5139
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3604 +0x92a
+
+goroutine 4475 [chan receive, 2 minutes]:
+testing.(*T).Run(0xc0004d6488, {0x219d01c, 0xb}, 0xc000590ba0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2268 +0xb3e
+asservat.local/asservat/internal/adapters/kubernetes.TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO(0xc0004d6488)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_runtime_launch_test.go:318 +0x88
+testing.tRunner(0xc0004d6488, 0x327b880)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	180.076s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.025s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.049s [no tests to run]
+FAIL

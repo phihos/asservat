@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "$id": "https://asservat.io/spec/v1/capture-account-key.schema.json",
+  "title": "Protected capacity account HMAC projection",
+  "description": "Account-only compartment. Neither public audit-input key nor hub credentials may be present. No startup generation or automatic rotation. Original accepted root/setup/version remains pinned independently.",
+  "required": [
+    "format",
+    "installationID",
+    "rootUID",
+    "setupID",
+    "version",
+    "key"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-capture-account-key/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "rootUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{43}=$"
+    }
+  }
+}

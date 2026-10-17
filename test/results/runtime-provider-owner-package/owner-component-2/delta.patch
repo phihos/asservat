@@ -1,0 +1,50 @@
+--- test/integration/initial_runtime_owner_continuation_native_test.go
++++ test/integration/initial_runtime_owner_continuation_native_test.go
+@@ -12,6 +12,7 @@
+ 	"asservat.local/asservat/internal/contracts"
+ 	"github.com/jackc/pgx/v5"
+ 	"github.com/jackc/pgx/v5/pgxpool"
++	apps "k8s.io/api/apps/v1"
+ 	core "k8s.io/api/core/v1"
+ 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/client-go/kubernetes"
+@@ -22,6 +23,16 @@
+ type initialRuntimeOwnerContinuation struct {
+ 	resources *kube.InitialRuntimeResources
+ 	bridge    *kube.InitialRuntimeBridge
++	original  *apps.Deployment
++}
++
++// The enclosing worker owns this cleanup, registered before qualify can launch
++// an owner. Keep its Deployment present through the worker's later source-loss
++// assertions so owner deletion cannot become a different guard-loss trigger.
++func (o *initialRuntimeOwnerContinuation) cleanup(t *testing.T, api kubernetes.Interface) {
++	if o != nil && o.original != nil {
++		providerWorkerNativeCleanup(t, api, o.original)
++	}
+ }
+ 
+ func (o *initialRuntimeOwnerContinuation) qualify(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, inventory kube.InitialRuntimeResourceInventory, input contracts.HubWorkerDeployment, roles contracts.ConfigurationRuntimeRoleSnapshot, providers *initialRuntimeNativeProviders, witness *providerWorkerWitness, workerPod *core.Pod, workerImage string) {
+@@ -33,9 +44,9 @@
+ 	if err != nil || string(original.UID) != inventory.OwnerDeployment.UID || original.Spec.Replicas == nil || *original.Spec.Replicas != 0 {
+ 		t.Fatal("original inert owner missing", err)
+ 	}
+-	// Register original-UID foreground GC before the sole launch. It runs before
+-	// the enclosing worker lifetime and before the retained bridge are closed.
+-	defer providerWorkerNativeCleanup(t, api, original)
++	// The enclosing worker registered original-UID foreground cleanup before
++	// entering this continuation; pin its sole target before any owner effect.
++	o.original = original.DeepCopy()
+ 	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
+ 	plan := contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: "owner-pki", Connections: 4, Concurrency: 2, Peers: []contracts.OwnerBootstrapPeerPlan{{ClusterID: input.ClusterID, Roots: providers.issuerRoots}}}
+ 	// The one declared original logical peer and its trust root are fixture
+--- test/integration/initial_runtime_worker_source_native_test.go
++++ test/integration/initial_runtime_worker_source_native_test.go
+@@ -168,6 +168,7 @@
+ 	})
+ 	providerWorkerRequireRunning(t, ctx, api, pod, imageID)
+ 	if owner != nil {
++		defer owner.cleanup(t, api)
+ 		owner.qualify(t, ctx, api, config, inventory, input, launched.Snapshot, providers, witness, pod, imageID)
+ 		providerWorkerRequireRunning(t, ctx, api, pod, imageID)
+ 	}

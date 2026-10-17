@@ -1,0 +1,60 @@
+{
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "phases": [
+    {
+      "name": "targeted",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--run",
+        "^TestContextAdmissionWithRealServices$/^(download-worker-enrollment-audit-versions|download-response-window-accounting)$"
+      ],
+      "exit": 1,
+      "seconds": 63.912,
+      "diskBeforeBytes": 427250970624,
+      "diskAfterBytes": 427053232128,
+      "sourceCount": 2168,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 1,
+      "passedTests": [
+        "TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty",
+        "TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01"
+      ],
+      "testPhases": [
+        {
+          "phase": "suite",
+          "testExit": 1,
+          "incarnation": {
+            "serverStart": "2026-10-13T13:36:10.544361+00:00",
+            "databaseOID": "16384"
+          },
+          "passedTestNames": [
+            "TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty",
+            "TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01"
+          ],
+          "testElapsedSeconds": 40.387662145000036,
+          "qualificationExit": 1
+        }
+      ],
+      "archiveHashes": {
+        "harness.log": "101a69dc57362988434067fdc5eb76ab12807d21922f9f6dc683d2360437661c",
+        "custody-environment.json": "4e6cc28292de78bf5aac7466ce9ee9cb316c56027216c8f111e18e95df6579c5",
+        "custody.log": "74dd9e1422fd211edb61214ed8e11cd03037dfc1ebdd2350899256865e06ef38",
+        "custody-postgres.log": "7c5b18d7b1d59572aef8ca21a35f434a109087e3829a0ccd55ee2056ef9d1b16"
+      }
+    }
+  ],
+  "scope": "Current audit versions: real stored empty/null receipt denials, current owner/native/window checks, historical accounting/cancellation and connector activation/provider/registry; synthetic protected roots, no installed workflow",
+  "exit": 1
+}

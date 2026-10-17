@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/audit_receipt.go": "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/files/internal/adapters/objectstore/audit_receipt.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/audit_receipt_test.go": "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/files/internal/adapters/objectstore/audit_receipt_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/download_stop_lifecycle.go": "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/files/internal/adapters/objectstore/download_stop_lifecycle.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/operation_lifecycle.go": "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/files/internal/adapters/objectstore/operation_lifecycle.go"
+  }
+}

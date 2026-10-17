@@ -1,0 +1,10 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/evidence/worker_owners.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/application/evidence/worker_owners.go",
+    "/home/phil/Projekte/asservat/internal/application/evidence/worker_owners_join_test.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/application/evidence/worker_owners_join_test.go",
+    "/home/phil/Projekte/asservat/internal/application/evidence/worker_routes.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/application/evidence/worker_routes.go",
+    "/home/phil/Projekte/asservat/internal/application/evidence/worker_routes_join_test.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/application/evidence/worker_routes_join_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_deployment.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/bootstrap/owner_deployment.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_deployment_join_test.go": "/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/files/internal/bootstrap/owner_deployment_join_test.go"
+  }
+}

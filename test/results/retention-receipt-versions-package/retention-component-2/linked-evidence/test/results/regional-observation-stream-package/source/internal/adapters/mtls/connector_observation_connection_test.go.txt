@@ -1,0 +1,544 @@
+package mtls
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// This helper uses real h2/mTLS and process-owned keys. Native source, workload
+// and SQL registry values are the explicitly synthetic channel fixture; it is
+// not installed delegation or two-cluster availability qualification.
+func observationStreamClient(t *testing.T, x *observationChannelFixture, handler http.HandlerFunc, maximum int, changeTLS ...func(*tls.Config)) *ConnectorObservationClient {
+	t.Helper()
+	server := httptest.NewUnstartedServer(handler)
+	_, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.ownerPin.Pool.NativePort, err = strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	common, _ := OwnerBootstrapServerName(x.ownerPin.Pool)
+	certificate := x.ownerCA.leaf(t, x.f.clock(), ownerBootstrapBinding(ownerTestID), true, func(c *x509.Certificate) { c.DNSNames = append(c.DNSNames, common) })
+	parsed, err := x509.ParseCertificate(certificate.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := NewOwnerPeerVerifierForPool(x.ownerCA.roots, x.ownerPin.Pool, x.f.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.owner, err = verifier.verifyCertificates([]*x509.Certificate{parsed}, "server")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.EnableHTTP2 = true
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{certificate}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: x.f.clientCA.roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, SessionTicketsDisabled: true}
+	for _, change := range changeTLS {
+		change(server.TLS)
+	}
+	server.StartTLS()
+	candidates := observationCandidatesFunc(func(context.Context) (value.APIContextOwnerCandidates, error) {
+		x.candidateCalls++
+		owners := []value.OwnerBinding{x.owner.Binding}
+		if x.missing {
+			owners = nil
+		}
+		return value.APIContextOwnerCandidates{Pool: x.ownerPin.Pool, Owners: owners, ObservedAt: x.f.clock(), ValidUntil: x.f.clock().Add(5 * time.Second)}, nil
+	})
+	registry := forwardRegistry(func(context.Context, value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
+		x.registryCalls++
+		if x.revoked {
+			return value.OwnerRegistrationObservation{}, value.ErrUnavailable
+		}
+		_, until, _ := value.OwnerCertificateWindow(x.f.now)
+		enrollment := value.OwnerEnrollment{ID: ownerTestID, Binding: x.owner.Binding, Usage: "server", Pool: x.ownerPin.Pool, SourceUID: x.ownerPin.SourceUID, Pod: "owner-1", ReplicaSet: "owner-rs", ReplicaSetUID: ownerTestID, PublicKeyDigest: sha256.Sum256(parsed.RawSubjectPublicKeyInfo), InitialTokenDigest: artifact.Digest{1}, InitialWorkloadDigest: artifact.Digest{2}, InitialProtectionDigest: x.ownerPin.ProtectionDigest, ClaimedAt: x.f.now, InitialHoldUntil: until.Add(value.OwnerRegistrationGrace)}
+		return value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: x.owner, Configuration: ownerBootstrapConfiguration(x.ownerPin.Pool, x.ownerCA, x.f.clock()), ObservedAt: x.f.clock(), FreshUntil: x.f.clock().Add(5 * time.Second)}, nil
+	})
+	client, err := NewConnectorObservationClient(context.Background(), x.ownerPin, server.Listener.Addr().String(), x.ownerCA.roots, x.channel.producer, candidates, registry, x.channel.metadata, maximum, x.f.clock)
+	if err != nil {
+		server.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close(); server.Close() })
+	return client
+}
+
+func streamHello(w http.ResponseWriter, r *http.Request) (contracts.ClusterObservationHello, error) {
+	if r.ProtoMajor != 2 || r.TLS == nil || !r.TLS.HandshakeComplete || r.ContentLength != -1 || r.Method != http.MethodPost || r.URL.Path != contracts.ClusterObservationExchangePath || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" || r.Header.Get("Idempotency-Key") != "" {
+		return contracts.ClusterObservationHello{}, value.ErrDenied
+	}
+	frame, err := contracts.ReadClusterObservationFrame(r.Body)
+	if err != nil || frame.Kind != contracts.ClusterObservationHelloFrame {
+		return contracts.ClusterObservationHello{}, value.ErrDenied
+	}
+	hello, err := contracts.DecodeClusterObservationHello(frame.Payload)
+	clear(frame.Payload)
+	if err != nil {
+		return hello, err
+	}
+	w.Header().Set("Content-Type", contracts.ClusterObservationExchangeMedia)
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	err = http.NewResponseController(w).Flush()
+	return hello, err
+}
+
+type observationEnteredRead struct {
+	io.ReadCloser
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (r *observationEnteredRead) Read(b []byte) (int, error) {
+	r.once.Do(func() { close(r.entered) })
+	return r.ReadCloser.Read(b)
+}
+
+func TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	var calls atomic.Int32
+	serverJoined := make(chan struct{})
+	client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		defer close(serverJoined)
+		if _, err := streamHello(w, r); err != nil {
+			return
+		}
+		<-r.Context().Done()
+	}, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	stream, err := client.Open(ctx, ownerOtherID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x.registryCalls != 0 || x.metadataCalls != 0 {
+		t.Fatal("empty standby performed business proof/read")
+	}
+	if _, err = client.Open(ctx, ownerTestID); err == nil || calls.Load() != 1 {
+		t.Fatal("occupied standby slot reused")
+	}
+	read := make(chan error, 1)
+	entered := make(chan struct{})
+	stream.response = &observationEnteredRead{ReadCloser: stream.response, entered: entered}
+	go func() { _, e := stream.Receive(ctx); read <- e }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("read never reached actual body")
+	}
+	// Close waits for the actual blocked Receive; it cannot be merely a flag.
+	if err = stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case e := <-read:
+		if e == nil {
+			t.Fatal("cancelled read succeeded")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Close did not join admitted read")
+	}
+	select {
+	case <-serverJoined:
+	case <-time.After(time.Second):
+		t.Fatal("actual HTTP handler did not observe stream closure")
+	}
+	client.base.mu.Lock()
+	active := client.base.active
+	client.base.mu.Unlock()
+	if active != 0 || calls.Load() != 1 {
+		t.Fatal("closed stream retained slot or retried", active, calls.Load())
+	}
+}
+
+func TestConnectorObservationHelloCancellationJoinsUnreadPipeWrite(t *testing.T) {
+	// No reader is admitted at all, so Hello's actual io.Pipe write cannot
+	// complete. This is the setup helper; real h2 header cancellation is covered
+	// separately because its small body may fit HTTP/2 flow-control buffers.
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	defer writer.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	body := []byte("routing-only-hello")
+	done := startConnectorObservationHello(writer, body)
+	if err := joinConnectorObservationHello(ctx, reader, writer, done); err == nil {
+		t.Fatal("unread Hello reported completed")
+	}
+	for _, b := range body {
+		if b != 0 {
+			t.Fatal("joined return preceded writer cleanup")
+		}
+	}
+}
+
+func TestConnectorObservationStreamCloseJoinsAdmittedNativeProof(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	entered, cancelled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	x.channel.producer.attester = connectorObservationAttesterFunc(func(ctx context.Context, request value.ConnectorProcessRequest) (value.ConnectorObservationAttestation, error) {
+		close(entered)
+		<-ctx.Done()
+		close(cancelled)
+		<-release
+		return value.ConnectorObservationAttestation{}, value.ErrUnavailable
+	})
+	serverJoined := make(chan struct{})
+	client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+		defer close(serverJoined)
+		if _, err := streamHello(w, r); err != nil {
+			return
+		}
+		x.server = *r.TLS
+		body, err := contracts.EncodeClusterObservationProbe(x.probe(t, x.request(), 1))
+		if err != nil || contracts.WriteClusterObservationFrame(w, contracts.ClusterObservationFrame{Kind: contracts.ClusterObservationProbeFrame, Payload: body}) != nil || http.NewResponseController(w).Flush() != nil {
+			return
+		}
+		<-r.Context().Done()
+	}, 1)
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }) })
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	stream, err := client.Open(ctx, ownerOtherID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := stream.Receive(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe, err := contracts.DecodeClusterObservationProbe(frame.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proofDone := make(chan error, 1)
+	go func() { _, e := stream.AnswerConnectorObservation(ctx, probe); proofDone <- e }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("native proof was not admitted")
+	}
+	closeDone := make(chan struct{})
+	go func() { _ = stream.Close(); close(closeDone) }()
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("native proof did not receive original closure")
+	}
+	select {
+	case <-closeDone:
+		t.Fatal("Close released slot before proof joined")
+	default:
+	}
+	client.base.mu.Lock()
+	active := client.base.active
+	client.base.mu.Unlock()
+	if active != 1 {
+		t.Fatal("admitted closing proof lost its slot", active)
+	}
+	releaseOnce.Do(func() { close(release) })
+	select {
+	case <-closeDone:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not join released proof")
+	}
+	if e := <-proofDone; e == nil {
+		t.Fatal("cancelled native proof returned success")
+	}
+	select {
+	case <-serverJoined:
+	case <-time.After(time.Second):
+		t.Fatal("transport body remained active after joined close")
+	}
+}
+
+func TestConnectorObservationStreamUnknownPOSTIsNotReplayed(t *testing.T) {
+	for _, mode := range []string{"unavailable", "redirect", "fixed-length", "wrong-media"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			var calls atomic.Int32
+			client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				_, _ = contracts.ReadClusterObservationFrame(r.Body)
+				w.Header().Set("Content-Type", contracts.ClusterObservationExchangeMedia)
+				w.Header().Set("Cache-Control", "no-store")
+				switch mode {
+				case "unavailable":
+					w.WriteHeader(http.StatusServiceUnavailable)
+				case "redirect":
+					w.Header().Set("Location", contracts.ClusterObservationExchangePath)
+					w.WriteHeader(http.StatusTemporaryRedirect)
+				case "fixed-length":
+					w.Header().Set("Content-Length", "0")
+					w.WriteHeader(http.StatusOK)
+				case "wrong-media":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_ = http.NewResponseController(w).Flush()
+				}
+			}, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if stream, err := client.Open(ctx, ownerOtherID); err == nil || stream != nil || calls.Load() != 1 || x.metadataCalls != 0 {
+				t.Fatal("unknown POST admitted or retried", err, calls.Load())
+			}
+		})
+	}
+}
+
+func TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate(t *testing.T) {
+	for _, mode := range []string{"wrong-name", "wrong-roots", "excluded-candidate", "no-client-certificate"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			var calls atomic.Int32
+			client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}, 1, func(c *tls.Config) {
+				if mode == "no-client-certificate" {
+					c.ClientAuth = tls.NoClientCert
+				}
+			})
+			switch mode {
+			case "wrong-name":
+				client.base.name = "wrong.invalid"
+			case "wrong-roots":
+				client.base.roots = newOwnerTestCA(t, x.f.clock()).roots
+			case "excluded-candidate":
+				client.base.candidates = observationCandidatesFunc(func(context.Context) (value.APIContextOwnerCandidates, error) {
+					return value.APIContextOwnerCandidates{Pool: x.ownerPin.Pool, Owners: []value.OwnerBinding{ownerBootstrapBinding(ownerOtherID)}, ObservedAt: x.f.clock(), ValidUntil: x.f.clock().Add(5 * time.Second)}, nil
+				})
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if stream, err := client.Open(ctx, ownerOtherID); err == nil || stream != nil || calls.Load() != 0 || x.metadataCalls != 0 {
+				t.Fatal("unqualified TLS/candidate reached Hello", mode, err, calls.Load())
+			}
+		})
+	}
+}
+
+func TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello(t *testing.T) {
+	for _, phase := range []string{"headers", "hello"} {
+		t.Run(phase, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			entered, joined := make(chan struct{}), make(chan struct{})
+			client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+				defer close(joined)
+				close(entered)
+				if phase == "headers" {
+					_, _ = contracts.ReadClusterObservationFrame(r.Body)
+				} else {
+					// Reply without consuming Hello. Its original write must still
+					// finish before Open can return an accepted stream.
+					w.Header().Set("Content-Type", contracts.ClusterObservationExchangeMedia)
+					w.Header().Set("Cache-Control", "no-store")
+					w.WriteHeader(http.StatusOK)
+					_ = http.NewResponseController(w).Flush()
+				}
+				<-r.Context().Done()
+			}, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+			defer cancel()
+			stream, err := client.Open(ctx, ownerOtherID)
+			if phase == "hello" && err == nil {
+				// HTTP/2 flow control may positively consume this small Hello
+				// before the handler reads it. The returned stream still must
+				// die at the same original caller deadline.
+				_, err = stream.Receive(ctx)
+				_ = stream.Close()
+			}
+			if err == nil {
+				t.Fatal("original setup/caller bound renewed")
+			}
+			select {
+			case <-entered:
+			default:
+				t.Fatal("fixture failed before intended HTTP boundary")
+			}
+			select {
+			case <-joined:
+			case <-time.After(time.Second):
+				t.Fatal("deadline did not join server request")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner(t *testing.T) {
+	for attempt := 0; attempt < 4; attempt++ {
+		t.Run(strconv.Itoa(attempt), func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			serverJoined := make(chan struct{})
+			client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+				defer close(serverJoined)
+				if _, err := streamHello(w, r); err != nil {
+					return
+				}
+				cancel() // exactly at the setup-to-retained-stream handoff
+				<-r.Context().Done()
+			}, 1)
+			stream, err := client.Open(ctx, ownerOtherID)
+			if err == nil {
+				if _, e := stream.Receive(ctx); e == nil {
+					t.Fatal("cancelled header boundary admitted a frame")
+				}
+				_ = stream.Close()
+			}
+			client.Close()
+			client.base.mu.Lock()
+			active := client.base.active
+			client.base.mu.Unlock()
+			if active != 0 || x.metadataCalls != 0 {
+				t.Fatal("setup cancellation lost/double-released a slot", active)
+			}
+			select {
+			case <-serverJoined:
+			case <-time.After(time.Second):
+				t.Fatal("setup cancellation did not join actual stream")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationStreamReceiptRequiresExactTerminalEOF(t *testing.T) {
+	for _, mode := range []string{"joined", "extra-byte", "lost-final-eof"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			serverResult := make(chan error, 1)
+			client := observationStreamClient(t, x, func(w http.ResponseWriter, r *http.Request) {
+				hello, err := streamHello(w, r)
+				if err != nil || hello.ExchangeID != ownerOtherID {
+					serverResult <- value.ErrDenied
+					return
+				}
+				x.server = *r.TLS
+				request := x.request()
+				write := func(kind contracts.ClusterObservationFrameKind, payload []byte) error {
+					if e := contracts.WriteClusterObservationFrame(w, contracts.ClusterObservationFrame{Kind: kind, Payload: payload}); e != nil {
+						return e
+					}
+					return http.NewResponseController(w).Flush()
+				}
+				for ordinal := 1; ordinal <= 4; ordinal++ {
+					p, _ := contracts.EncodeClusterObservationProbe(x.probe(t, request, ordinal))
+					if write(contracts.ClusterObservationProbeFrame, p) != nil {
+						serverResult <- value.ErrUnavailable
+						return
+					}
+					frame, e := contracts.ReadClusterObservationFrame(r.Body)
+					if e != nil || frame.Kind != contracts.ClusterObservationSourceFrame {
+						serverResult <- value.ErrUnavailable
+						return
+					}
+					if ordinal == 2 {
+						// This test drives the retained channel directly; the fixed
+						// transport's request codec/order has its own regressions.
+						body, _ := contracts.EncodeClusterObservationRequest(contracts.ClusterObservationRequest{Format: contracts.ClusterObservationFormat, RequestID: request.ID, Challenge: request.Challenge, RootID: request.RootID, ClusterID: request.ClusterID, Purpose: string(request.Purpose), RequestedAt: request.RequestedAt.UTC().Format(time.RFC3339Nano), NotAfter: request.NotAfter.UTC().Format(time.RFC3339Nano)})
+						if write(contracts.ClusterObservationReadFrame, body) != nil {
+							serverResult <- value.ErrUnavailable
+							return
+						}
+						frame, e = contracts.ReadClusterObservationFrame(r.Body)
+						if e != nil || frame.Kind != contracts.ClusterObservationResultFrame {
+							serverResult <- value.ErrUnavailable
+							return
+						}
+					}
+				}
+				digest, _ := app.ClusterObservationRequestDigest(request)
+				receipt, _ := contracts.EncodeClusterObservationReceipt(contracts.ClusterObservationReceipt{Format: contracts.ClusterObservationExchangeFormat, ExchangeID: ownerOtherID, RequestID: request.ID, Challenge: request.Challenge, RequestDigest: ownerObservationHex(digest)})
+				if write(contracts.ClusterObservationReceiptFrame, receipt) != nil {
+					serverResult <- value.ErrUnavailable
+					return
+				}
+				var byteAfterReceipt [1]byte
+				n, e := r.Body.Read(byteAfterReceipt[:])
+				if n != 0 || e != io.EOF {
+					serverResult <- value.ErrUnavailable
+					return
+				}
+				if mode == "extra-byte" {
+					_, _ = w.Write([]byte{1})
+					_ = http.NewResponseController(w).Flush()
+				}
+				if mode == "lost-final-eof" {
+					<-r.Context().Done()
+				}
+				serverResult <- nil
+			}, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			stream, err := client.Open(ctx, ownerOtherID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stream.Close()
+			for step := 0; step < 6; step++ {
+				frame, e := stream.Receive(ctx)
+				if e != nil {
+					t.Fatal("receive", step, e)
+				}
+				var out contracts.ClusterObservationFrame
+				switch frame.Kind {
+				case contracts.ClusterObservationProbeFrame:
+					probe, _ := contracts.DecodeClusterObservationProbe(frame.Payload)
+					proof, e := stream.AnswerConnectorObservation(ctx, probe)
+					if e != nil {
+						t.Fatal("proof", probe.Ordinal, e)
+					}
+					out.Kind = contracts.ClusterObservationSourceFrame
+					out.Payload, _ = contracts.EncodeConnectorObservationReply(proof)
+				case contracts.ClusterObservationReadFrame:
+					result, e := stream.ObserveCluster(ctx, x.request())
+					if e != nil {
+						t.Fatal("metadata", e)
+					}
+					out.Kind = contracts.ClusterObservationResultFrame
+					out.Payload, _ = contracts.EncodeClusterObservationResult(contracts.ClusterObservationResult{Format: contracts.ClusterObservationFormat, RequestID: result.RequestID, Challenge: result.Challenge, RootID: result.RootID, ClusterID: result.ClusterID, Purpose: string(result.Purpose), RequestDigest: ownerObservationHex(result.RequestDigest), Interval: contracts.ClusterObservationInterval{ObservedAt: result.Interval.ObservedAt.UTC().Format(time.RFC3339Nano), FreshUntil: result.Interval.FreshUntil.UTC().Format(time.RFC3339Nano)}, Namespaces: &contracts.ClusterObservationNamespacePage{ResourceVersion: "10", Items: []contracts.ClusterObservationNamespace{}}})
+				case contracts.ClusterObservationReceiptFrame:
+					receipt, _ := contracts.DecodeClusterObservationReceipt(frame.Payload)
+					if e := stream.AcceptObservationReceipt(ctx, receipt); e != nil {
+						t.Fatal("receipt", e)
+					}
+					err = stream.FinishObservation(ctx)
+				default:
+					t.Fatal("unexpected kind", frame.Kind)
+				}
+				if out.Kind != 0 {
+					if e := stream.Send(ctx, out); e != nil {
+						t.Fatal("send", e)
+					}
+				}
+			}
+			_ = stream.Close()
+			if (err == nil) != (mode == "joined") || x.metadataCalls != 1 || x.registryCalls != 4 {
+				t.Fatal("terminal disposition or source bracketing", mode, err, x.metadataCalls, x.registryCalls)
+			}
+			if e := <-serverResult; e != nil {
+				t.Fatal("server fixture", e)
+			}
+		})
+	}
+}

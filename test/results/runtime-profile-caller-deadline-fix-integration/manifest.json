@@ -1,0 +1,18 @@
+{
+  "status": "Frozen minimal caller-deadline correction; no live mutation/build/test. Integrate only after root preserves original failing regression.",
+  "paths": [
+    {
+      "path": "docs/architecture/runtime-profiles.md",
+      "base_sha256": "5b89bdf27881c93c023fa1bf2a2e2d4e349af3a65941734a21fdb62be419f944",
+      "payload_sha256": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79"
+    },
+    {
+      "path": "internal/adapters/diagnostics/go_profile.go",
+      "base_sha256": "3ff90e8361d59908b1eda60687895db60d432cc4f09e430e26be8e1957f3eac8",
+      "payload_sha256": "f3e85ca5012552ee546b98b4c5dac6e420ee2365382694910a60b141abe686c5"
+    }
+  ],
+  "review_patch_sha256": "1e245ad3a32a29b375f56faf38a6bb745899e8248bc380d2ff48799fa8a404be",
+  "regression": "TestGoProfileShortCallerCannotStartUnfinishableRecording",
+  "scope": "Use effective original context deadline before dialing and after channel clamp for HTTP fit/socket/final cleanup bounds. No deadline renewal, guard/permit/start changes or speculative timeout classification."
+}

@@ -1,0 +1,23 @@
+# Six exact owner shutdown deltas on current live bases
+
+This compact handoff excludes the shared owner_provider_lifetime.go supplied by MCP19. It contains only six actual qualified owner shutdown mutations, without the former 74-path dependency overlay or stale schema. Every current live base equals the effective original join-1 input; every output payload is byte-identical to that qualified checkpoint. No textual merge or new behavior was introduced. Current owner observation coordinator source was independently compared with the original effective foundation and is exact.
+
+The three KMS source paths retain the original bounded Close result, join already-admitted native/control/HTTP bodies without new provider I/O, then close local dependencies. OwnerObservationDeployment prevents new Run admission under its shutdown mutex, cancels first, joins admitted Run and children, and only then closes provider/base pools. Run releases its own registration before deferred Close. The two test paths cover blocked readiness/body/control/native operations, legacy provider-nil shutdown, closed-before-Run, retained errors and no-new-provider requests.
+
+Original qualification: join-1 session 75546 terminal 0. Compile 0/4.421s; controlled deployment before 1/23.388s (two intended failures); controlled provider reversal 1/3.509s (three intended failures); corrected scoped races 0/32.000s (28 top-level / 34 named PASS); vet 0/1.455s. All 74 old payload/base and 2,088 dependencies were unchanged. Those full original manifests/results/logs remain immutable and are hashed in qualification-provenance.json. No new test run or native process qualification is claimed for packaging this subset.
+
+The combined tree must include MCP's exact private lifetime joinClosed payload (see dependency-requirements.json) before compilation. Root owns the combined 30+19+6 review/check; this package changes no live source. Native pair, installed owner process and original-budget availability remain separate qualifications.
+
+Files and actual current/payload hashes are in manifest.json; changes.patch contains only these six differences. Exact package hashes:
+
+- `manifest.json` SHA256 `1b7f3d4ca239d0c4e6eb8b0240f0d8e869c058e80b3978cb7396e2a9fc357b8f`
+- `changes.patch` SHA256 `2a655d6b82102b1437e7564b8888f792415591b0adf8e374a05da330545b7809`
+- `qualification-provenance.json` SHA256 `e81de4a35335eed92de2bba331982342394178570e61d1d52a62264b7dd210ea`
+- `dependency-requirements.json` SHA256 `1e92dea02a87e37b74b12078b64b4213d7e3106668636a1cf115930e1a347d7a`
+
+- `internal/adapters/kms/owner_provider_effects.go`
+- `internal/adapters/kms/owner_provider_installed.go`
+- `internal/adapters/kms/owner_provider_installed_join_test.go`
+- `internal/adapters/kms/owner_provider_lifetimes.go`
+- `internal/bootstrap/owner_observation_deployment.go`
+- `internal/bootstrap/owner_observation_deployment_join_test.go`

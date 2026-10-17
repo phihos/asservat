@@ -1,0 +1,4 @@
+=== RUN   TestOwnerBootstrapWorkerCallerCloseAndCopyDeny
+--- PASS: TestOwnerBootstrapWorkerCallerCloseAndCopyDeny (3.64s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	4.694s

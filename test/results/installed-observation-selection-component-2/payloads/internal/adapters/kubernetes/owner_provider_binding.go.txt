@@ -1,0 +1,96 @@
+package kubernetes
+
+import (
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+)
+
+func initialRuntimeLayoutStateValid(v contracts.InitialRuntimeResourceState) bool {
+	if !initialRuntimeObservationSelectionValid(v.WorkerLayout, v.OwnerLayout, v.ObservationFormat) || !contracts.InitialRuntimeLayoutsSupported(v.WorkerLayout, v.OwnerLayout) {
+		return false
+	}
+	if v.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {
+		return v.WorkerProvider != nil && v.OwnerProvider != nil
+	}
+	return v.WorkerProvider == nil && v.OwnerProvider == nil && v.WorkerInputs == nil
+}
+
+// Original rotating provider sources cannot alias an immutable resource or a
+// later compartment's private credential/root object. This check is shared by
+// the installer decoder and runtime readers, including before WorkerInputs is
+// present. It grants no authority to any of these public references.
+func initialRuntimeProviderUIDsDistinct(v contracts.InitialRuntimeResourceState) bool {
+	if v.WorkerProvider == nil && v.OwnerProvider == nil {
+		return true
+	}
+	if v.WorkerProvider == nil || v.OwnerProvider == nil || v.WorkerProvider.AuditCredentials.UID == v.OwnerProvider.AuditCredentials.UID {
+		return false
+	}
+	selected := func(uid string) bool {
+		return uid == v.WorkerProvider.AuditCredentials.UID || uid == v.OwnerProvider.AuditCredentials.UID
+	}
+	for _, object := range v.Objects {
+		if object.Receipt != nil && selected(object.Receipt.UID) {
+			return false
+		}
+	}
+	if p := v.OwnerIdentity; p != nil {
+		if selected(p.RoleRoot.UID) {
+			return false
+		}
+		for _, child := range []*contracts.OwnerIdentityObjectAttempt{p.Credentials, p.Configuration} {
+			if child != nil && child.Receipt != nil && selected(child.Receipt.Object.UID) {
+				return false
+			}
+		}
+	}
+	if p := v.CapacityProjection; p != nil && (selected(p.Setup.RoleRootUID) || p.Receipt != nil && selected(p.Receipt.Secret.UID)) {
+		return false
+	}
+	if p := v.CleanupProjection; p != nil && (selected(p.Setup.RoleRootUID) || p.Receipt != nil && selected(p.Receipt.Secret.UID)) {
+		return false
+	}
+	if p := v.WorkerInputs; p != nil && (selected(p.ConfigurationRoot.UID) || selected(p.SQLProjection.UID) || p.Receipt != nil && selected(p.Receipt.Configuration.UID)) {
+		return false
+	}
+	return true
+}
+
+func ownerProviderSelectionFromProfile(p contracts.OwnerProviderAuthentication) contracts.OwnerProviderSelection {
+	return contracts.OwnerProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials}
+}
+
+// Historical shape checks use the original public root's instant; they cannot
+// extend it or establish current provider/native authority. Runtime validates
+// roots and the exact installed setup again before control/effects.
+func ownerProviderActivationSelectionBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation) bool {
+	p := input.ProviderAuthentication
+	switch a.Input.OwnerLayout {
+	case contracts.OwnerInstalledLayout:
+		return p == nil
+	case contracts.OwnerProviderInstalledLayout:
+		return p != nil && p.ServiceAccount == a.Input.ServiceAccount &&
+			providerconfig.ValidateOwnerProviderSelection(a.Input.InstallationID, ownerProviderSelectionFromProfile(*p)) == nil &&
+			providerconfig.ValidateOwnerProviderAuthentication(input, *p, a.ResourcesCreatedAt) == nil
+	default:
+		return false
+	}
+}
+
+func ownerProviderJournalBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation, v contracts.InitialRuntimeResourceState) bool {
+	if v.OwnerLayout != a.Input.OwnerLayout || v.OwnerLayout == "" || !initialRuntimeProviderSelectionValid(input.InstallationID, v.WorkerLayout, v.OwnerLayout, v.WorkerProvider, v.OwnerProvider) || !ownerProviderActivationSelectionBound(input, a) {
+		return false
+	}
+	if v.OwnerLayout == contracts.OwnerProviderInstalledLayout {
+		return *v.OwnerProvider == ownerProviderSelectionFromProfile(*input.ProviderAuthentication) && ownerBootstrapDeploymentBound(input, v)
+	}
+	return true
+}
+
+func ownerIdentityProjectionKeys(input contracts.OwnerDeployment) []string {
+	keys := []string{contracts.OwnerIdentityRoleManifestFile, "sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json"}
+	if input.ProviderAuthentication == nil {
+		keys = append(keys, "audit-storage.json", "audit-wrap.token", "audit-unwrap.token", "owner-server-sign.token", "owner-client-sign.token")
+	}
+	return keys
+}

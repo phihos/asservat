@@ -1,0 +1,43 @@
+{
+  "manifestSHA256": "72a80b493b31ada39b0f8e497521637ea265f9c7e5d8c04846c0e78c69dfd5f1",
+  "dependencySHA256": "72e266a335e504669b7588bab565226fab8ff18d2e6c1cfdc305a5eb60dfcd39",
+  "dependencies": 1833,
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "base_sha256": "707357a30145266f5bc0c07215501c67cd74d6a2f5cd3ed29e955292ec9df2c5",
+      "payload_sha256": "dde55f95eb0aaca24cd7b9f0a2d8d56f3e698b8a194c293481eff3d3821d80f8"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_channel.go",
+      "base_sha256": "898d3824063a08f46aeab8731b125f15a878aa69172c2c93c2f817c1925f77b0",
+      "payload_sha256": "57233bbe7f77509acc07b09f10b36d7cb6e23e85021baa8d47fe2691018cfde1"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_channel_test.go",
+      "base_sha256": "acd639fbbd147ff1b345b66099f5b58cb0f52728fd8192094ac90ce816037b76",
+      "payload_sha256": "b7ba978b5497af7f7f43e56e63d93d70775465a8fd622380141a31eef550a3f2"
+    },
+    {
+      "path": "internal/application/fleet/cluster_observation_digest.go",
+      "base_sha256": null,
+      "payload_sha256": "f21614d334ecfadea85809593d9075fc027372660bfc8687b6471b4820564d71"
+    },
+    {
+      "path": "internal/domain/fleet/cluster_observation_digest.go",
+      "base_sha256": "51b87b46c104bfebb4b25b4bbcf16da72aa041d434e75935d4b23144aba7c7d5",
+      "payload_sha256": null
+    },
+    {
+      "path": "internal/transport/clusterobservation/digest_parity_test.go",
+      "base_sha256": "f9114ac8b5c054c61a8297a130f4f43a920b4527482b24b04c343cc2433ba432",
+      "payload_sha256": "2f69344cf65cdad9f1d99a2a6a9d5103d1cb7fd40c85addf08d02430b9631c65"
+    },
+    {
+      "path": "internal/transport/clusterobservation/wire.go",
+      "base_sha256": "264a02923791d61b4c1e8331f7f5cf0643278b9fe38f7f84c9dc2c9974a3da4d",
+      "payload_sha256": "ff93ecf4809540a115467667c938524e712ea6de601329f8b86af7e12a61cd0f"
+    }
+  ],
+  "scope": "Application-owned shared deterministic digest preserves exact v1 bytes and the existing domain architecture gate; corrected gate/parity/channel races/vet pass."
+}

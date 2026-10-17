@@ -1,0 +1,164 @@
+# Measured configuration role path and bounded reuse proposal
+
+The immutable `checks/configuration-path-1` run (handle 68810) compiled all six
+affected package groups, then failed the initial-root availability regression.
+The root operation made 149 HTTP requests and 10 negative probes in
+4.951955789 seconds before the original five-second bound stopped it. The
+single complete source observation and unchanged-object RBAC/admission
+negatives passed. The normal production 20 QPS/burst-20 clients and actual
+clock were retained. This is loopback simulated API enforcement, not native
+Kubernetes qualification. All 47 base/payload hashes remained unchanged.
+
+## Cause and smallest proposed change
+
+`Open` currently calls a full protected source observation before the missing
+Secret GET, another full observation before CREATE, and a final `read` that
+itself calls two full observations. `Claim`, the SQL post-lock read and
+`Complete` repeat the same nested proof graph. This repeats complete readers,
+not merely a cheap validation of the original observation.
+
+Use one bounded, purpose-fixed source proof slot in the private operation
+context, tied to the concrete source, together with a private current recheck. No caller can install or
+serialize that slot. It contains only the exact protected public source,
+workload and guard observations already read, with the original earliest
+deadline. It contains no credentials, Secret state or accepted SQL authority.
+The slot holds at most one fixed installation source snapshot for that original
+operation; it is destroyed on return, cancellation, error, source/guard change
+or original expiry. Independently initiated operations cannot reuse it. A cache hit
+never moves its start/end. An operation with insufficient original time denies;
+it does not renew its claim or silently start another proof interval.
+
+The first observation still executes the complete production source proof.
+A current recheck must independently perform these checks, in the existing
+original interval, before a subsequent effect:
+
+1. Exact live namespace and each guard policy/binding UID, generation,
+   resourceVersion, canonical spec and observed status. Compare before and
+   after the negative probes so identity equality cannot hide enforcement
+   changes.
+2. Actual current administrator identity and independent non-administrator
+   probe identity. Fresh RBAC checks and exact denied dry-run UPDATE for the
+   workload, fleet source and owner source. Keep source-policy denial distinct
+   from namespace-policy or RBAC denial.
+3. Exact current fleet and owner source UID, complete canonical values and
+   revision/digests; real public CA expiry; workload/account UID,
+   resourceVersion and bounded Deployment specification. Do not replace these
+   with UID/generation alone.
+4. Parent cancellation, original source/guard/CA dates, any newly known
+   shorter deadline and the persisted original claim end.
+
+This reuses only the original completed nested observation. No RBAC, negative
+admission, source value, workload identity or current SQL recovery check is
+removed. It introduces no broad configuration cache, watch, freshness renewal
+or higher client rate.
+
+## Effect and passive-read boundaries
+
+Root methods should perform one current source check per operation, rather
+than invoking a full source reader on both sides of every passive GET:
+
+| Operation | Current source boundary | Remaining work in that same interval |
+|---|---|---|
+| Open original root | Complete proof, or current private recheck, before the exact named read/create sequence | Named GET; first CREATE only if absence was positive; exact UID/content readback. Unknown CREATE permits only lookup. |
+| Claim one role | Current private recheck before root GET and original UID/RV CAS | Positive CAS is the only first-claim acknowledgement. Exact response validation and the original deadline remain mandatory. No retry of uncertain CAS. |
+| SQL effect | Recovery then installation locks, followed by a fresh current recheck and exact original root/claim read | Original source/claim/activation/incarnation/negative-watermark checks before DDL, after verification and before COMMIT. No lookup can authorize replayed CREATE. |
+| Complete receipt | Current private recheck before exact original root/claim read and receipt CAS | Immutable SQL receipt only; no new role or claim authority. Exact response/readback and original deadline. |
+| Publish projection | Current private recheck plus independently verified original SQL inventory | One immutable Secret CREATE and exact readback/UID recording. No replacement/adoption. |
+
+The passive Secret response does not acquire a second authority interval.
+The full first proof or current recheck must still be live at every I/O result;
+known invalidation always denies. SQL role creation always obtains its own
+post-lock current recheck, so a returned Secret snapshot cannot act as a
+transferable grant. Historical receipt lookup never becomes an effect permit.
+
+This proposal changes only the unqualified new configuration-role path. The
+existing stronger public-role gate and existing historical acknowledgement
+method are unchanged. The three-role and aggregate pool ceilings are unchanged.
+
+## Required evidence before using the result
+
+- Preserve the failing original-root run and rerun the exact case with verbose
+  per-phase request/probe counts, unchanged five-second limits and normal QPS.
+- Exercise actual root Open, Claim, post-lock read and Complete; measuring just
+  a source constructor is insufficient for the credential path.
+- Mutate RBAC or admission response with unchanged object identities between
+  the first proof and later effect. Every effect must deny; add complete source,
+  workload, guard, shorter-deadline and cancellation variants.
+- Preserve one-use unknown claim/create/complete, original root identity and
+  role provenance. The same tests must fail if the current recheck is bypassed.
+- Run the actual SQL role/acknowledgement matrix and later native Kubernetes
+  source/Secret and installed reconciliation qualification separately.
+
+The reuse change and same-operation negative/complete-path tests are now staged,
+source-only and uncompiled. The initial-root measured failure remains open until
+the corrected complete path is qualified. Existing immutable before evidence is
+unchanged; no current installed availability claim follows from this proposal.
+
+## Concrete operation graph
+
+- Root creation is one original operation: complete source observation, exact
+  named GET, first CREATE on positive absence only, exact content/UID readback.
+- Each fixed SQL purpose starts one operation. Claim proves the complete source;
+  the SQL producer locks recovery then installation and independently reads the
+  root with a current recheck; authentication and receipt completion use the
+  original claim/source end. Completion rechecks actual current enforcement.
+- Read-only whole-inventory verification holds the same recovery/installation
+  lock order and rechecks the root after waits. Projection publication uses that
+  verification in the same explicit operation, preserving the original inventory
+  deadline through its bounded create/read/receipt path.
+- The operation callback is joined by root Close, cannot install a caller proof,
+  and its context is cancelled at return. It does not change the three fixed
+  role purposes, SQL grants or connection ceilings. Only the concrete source can
+  initialize the private slot; actual current negative probes remain required
+  for every recheck. No other request can borrow its source observation.
+
+
+## Follow-up measured results and current refinement
+
+`configuration-path-2` (51414) made the exact original Open pass at
+2.102470371s / 71 requests / three distinct negative probes. Compile, vet and
+all changed-enforcement/source/guard/cancellation cases passed, but full role
+Claim failed on JSON readback of monotonic Go time payloads. Normalizing only
+the representation to UTC, with identical instants and original ends, advanced
+`configuration-path-3` (71145) through Claim and the post-lock read. Complete
+then failed at its original end: 4.999557525s / 127 requests / nine negative
+probes. Both failed checkpoints and source hashes remain immutable.
+
+The staged flat first observation brackets all exact guard policies/bindings
+once around the same concrete workload, fleet and owner negative probes and
+before/after canonical value reads. The existing nested generic readers remain
+unchanged. This private configuration bootstrap uses their concrete proof and
+parser mechanics without recursively repeating their full brackets. Rechecks
+still perform fresh negative probes, before/after guard checks and exact current
+complete source/workload values, and never renew the initial observation.
+
+Final read-only SQL inventory takes recovery/installation locks before its
+first full root read. It does not read any retained role state before those
+locks, nor lose the original request bound while waiting. Role CREATE continues
+to require its original positive claim plus an independent post-lock current
+root read. The actual SQL test `configuration-runtime-roles-source-after-lock`
+changes the synthetic protected source only after PostgreSQL reports a real
+blocked advisory-lock waiter, then requires denial with the original one spent
+claim and no created role. It remains unrun and distinct from native Kubernetes
+source proof. The complete loopback test now also measures final projection
+publication under the independently checked inventory's original interval.
+
+
+## Passing loopback checkpoint, distinct from native qualification
+
+`configuration-path-4` (91157) compiled all six groups and passed narrow vet
+and the complete selected source/enforcement/guard/cancellation matrix. Its
+first full role operation completed in 4.552265366s; a test-only outer deadline
+assertion then stopped later phases because it had passed Background instead
+of the asserted parent deadline. That failed run remains immutable.
+
+`configuration-path-5` (40949), changing only the test to supply that exact
+original deadline, passed all three complete role phases in 4.551993804s,
+4.550681374s and 4.551830073s (118 requests / nine probes each), plus final
+inventory/projection in 4.650914493s (120 requests / nine probes). The production
+20 QPS/burst-20 rate and five-second intervals remain unchanged. The callback
+spans one original operation; separate roles retain their separate original
+one-use claims. These measurements include actual bounded API client and
+Secret/CAS mechanics against simulated enforcement only. SQL effects and
+native Kubernetes/current-source latency are not measured by this loopback
+case. No installed availability or public-runtime readiness is claimed.

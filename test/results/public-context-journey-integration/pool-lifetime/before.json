@@ -1,0 +1,18 @@
+[
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "before": "7033302839376c00e66f558ae0a9f3f59e592679ac56651fe497089178d55a7f"
+  },
+  {
+    "path": "test/integration/context_continuation_native_test.go",
+    "before": "3f950a3a6e6166b964ab1f6b28277fe90674918ef87c240cfcd631a45e9488f9"
+  },
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "before": "3c889ecc29908abb60face938b0612ce337b5951cd3c5cdcf74055fb9c00c4a9"
+  },
+  {
+    "path": "test/integration/public_context_journey_native_test.go",
+    "before": "c56b6d80feb967d3c4a06476dab3094c26155cceff5879bbc7545697af519588"
+  }
+]

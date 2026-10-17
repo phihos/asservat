@@ -1,0 +1,118 @@
+openapi: 3.1.1
+info:
+  title: Asservat browser authentication protocol
+  version: 0.1.0
+  description: Same-origin human session endpoints, separate from business-operation and MCP parity. No evidence or target authority is conferred.
+servers:
+- url: https://asservat.example.invalid
+paths:
+  /auth/login:
+    get:
+      operationId: begin_browser_login
+      summary: Start bounded OIDC login
+      parameters:
+      - in: query
+        name: return_to
+        schema: {type: string, maxLength: 2048, default: /}
+      responses:
+        '303':
+          description: Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie.
+          headers:
+            Location: {schema: {type: string, format: uri}}
+        default: {$ref: '#/components/responses/Problem'}
+  /auth/callback:
+    get:
+      operationId: complete_browser_login
+      summary: Consume state and exchange the one-use authorization code
+      parameters:
+      - {in: query, name: state, required: true, schema: {type: string, minLength: 43, maxLength: 43}}
+      - {in: query, name: code, required: true, schema: {type: string, minLength: 1, maxLength: 4096}}
+      - {in: query, name: iss, required: true, schema: {type: string, format: uri, maxLength: 2048}}
+      - {in: query, name: session_state, schema: {type: string, maxLength: 256}}
+      responses:
+        '303':
+          description: Local return path and fresh opaque Secure HttpOnly SameSite=Strict session cookie. No provider credential in the response.
+          headers:
+            Location: {schema: {type: string, maxLength: 2048}}
+        default: {$ref: '#/components/responses/Problem'}
+  /auth/csrf:
+    get:
+      operationId: get_browser_csrf
+      summary: Read CSRF metadata for a retained browser session without token refresh
+      security: [{BrowserSession: []}]
+      responses:
+        '200':
+          description: No identity or evidence is returned. Enables a returning tab to POST refresh before reading current identity. A retained unexpired session may also obtain this token for local logout while settings are suspended or stale; refresh still requires current settings.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [csrf_token]
+                properties:
+                  csrf_token: {type: string, minLength: 43, maxLength: 43}
+        default: {$ref: '#/components/responses/Problem'}
+  /auth/refresh:
+    post:
+      operationId: refresh_browser_session
+      summary: Resolve current identity and refresh credentials when needed
+      security: [{BrowserSession: []}]
+      parameters:
+      - {$ref: '#/components/parameters/Origin'}
+      - {$ref: '#/components/parameters/CSRF'}
+      responses:
+        '200':
+          description: Current session without extending absolute expiry. Administrator lifetime reductions can shorten expiry. Refresh is serialized across replicas and requires current protected settings.
+          content:
+            application/json:
+              schema: {$ref: 'browser-openapi.yaml#/components/schemas/Session'}
+        default: {$ref: '#/components/responses/Problem'}
+  /auth/logout:
+    post:
+      operationId: end_browser_session
+      summary: Sign out of Asservat
+      security: [{BrowserSession: []}]
+      parameters:
+      - {$ref: '#/components/parameters/Origin'}
+      - {$ref: '#/components/parameters/CSRF'}
+      responses:
+        '204': {description: Local session removed and cookie cleared. Does not sign out of other services.}
+        default: {$ref: '#/components/responses/Problem'}
+  /auth/backchannel-logout:
+    post:
+      operationId: receive_oidc_logout
+      summary: Receive a signed OIDC provider logout event
+      description: Authenticated by the logout token, not browser cookies or a CSRF token. Signature, issuer, client, event, expiry, freshness and replay checks are mandatory. Bounded unknown form parameters are ignored as required by OIDC.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: true
+              maxProperties: 128
+              required: [logout_token]
+              properties:
+                logout_token: {type: string, minLength: 1, maxLength: 32768}
+      responses:
+        '200': {description: Current matching sessions revoked or exact event retry acknowledged.}
+        default: {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    BrowserSession: {type: apiKey, in: cookie, name: __Host-asservat-session}
+  parameters:
+    Origin: {in: header, name: Origin, required: true, schema: {type: string, format: uri, maxLength: 2048}, description: Must exactly equal the protected HTTPS console origin.}
+    CSRF: {in: header, name: X-CSRF-Token, required: true, schema: {type: string, minLength: 43, maxLength: 43}}
+  responses:
+    Problem:
+      description: "Sanitized failure. 400 malformed; 401 sign-in required; 403 CSRF/origin denied; 429 capacity; 409 same-session credential rotation in progress (Retry-After: 1), including CSRF lookup; 503 unavailable. Retain the cookie and current page during bounded Busy retry. CSRF and the following POST share the original attempt budget. For logout, 409 guarantees rejection before revocation starts; uncertain revocation returns 503 and must not be automatically retried. No stale CSRF token, identity or evidence is returned. No upstream credential details."
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [type, title, status]
+            additionalProperties: false
+            properties:
+              type: {type: string, const: 'about:blank'}
+              title: {type: string, maxLength: 80}
+              status: {type: integer, minimum: 400, maximum: 599}

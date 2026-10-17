@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_projection_operation.go": "/home/phil/.cache/asservat-build/planning/owner-projection-identity-20261013/checks/copy-1/files/internal/adapters/kubernetes/owner_projection_operation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_projection_operation_native.go": "/home/phil/.cache/asservat-build/planning/owner-projection-identity-20261013/checks/copy-1/before/internal/adapters/kubernetes/owner_projection_operation_native.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_projection_operation_test.go": "/home/phil/.cache/asservat-build/planning/owner-projection-identity-20261013/checks/copy-1/files/internal/adapters/kubernetes/owner_projection_operation_test.go"
+  }
+}

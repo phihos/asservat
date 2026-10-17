@@ -1,0 +1,6 @@
+=== RUN   TestInitialHandoverObservesSQLAfterOriginalPodTermination
+    initial_preparer_handover_observation_test.go:45: successful original Pod paired with stale SQL observation: disposition=audited history=1 pod=1 err=<nil>
+--- FAIL: TestInitialHandoverObservesSQLAfterOriginalPodTermination (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.011s
+FAIL

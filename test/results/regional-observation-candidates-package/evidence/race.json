@@ -1,0 +1,47 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^Test(OwnerObservationCandidate|OwnerObservationReadyGroups|OwnerObservationBootstrapUsesComplete|ConnectorObservationChannel|ConnectorObservationStream|InstalledObservationClient|OwnerEndpointBoundedDiscovery|OwnerPoolNativeCandidateLimit)",
+    "-v",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/mtls",
+    "./internal/bootstrap"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 28.851,
+  "expectedFailure": false,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

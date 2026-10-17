@@ -1,0 +1,172 @@
+{
+  "scope": "ADR141 installed LocalOwner carrier, protected one-use projection, receipt-selected capacity loader, exact role70 current owner read graph, fixed original worker RBAC and actual SQL role fixture; no runtime enablement/migration",
+  "qualification": "immutable unqualified source candidate; native helper not run",
+  "files": [
+    {
+      "path": "docs/architecture/capacity-production.md",
+      "base_sha256": "3a721c305b827cb618beb2aa445600452d4625b4ebcbbc9e9151fb27d6dcf199",
+      "payload_sha256": "d0d14a60420acfd196225eb675e92190299cf98887f42334c5ed9a4cae37e9e7"
+    },
+    {
+      "path": "docs/decisions/141-protected-capacity-production.md",
+      "base_sha256": "c3fab4cbbd705584327863a47fbf98e65d1116d7f1f8d2edf6ec51b46209455b",
+      "payload_sha256": "b3fc279ae3eda79f18510e4a4fa40f252062c5a4750dce9bb744df44faef8d59"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_local_owner.go",
+      "base_sha256": null,
+      "payload_sha256": "7cfbed8ffabc490fa4a7bc8f6d2d4bd86a4f1a2739a7c41dd5a98a5cfa8f817e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_local_owner_binding.go",
+      "base_sha256": null,
+      "payload_sha256": "d19967f8c246b2c915e0d79ce96c97c09e045f8d40ab79dd477b331901dd2ee5"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_local_owner_binding_test.go",
+      "base_sha256": null,
+      "payload_sha256": "2dda267fbb6f42f62073046621b8388e6034ad75df68a28cc41f754b74e1df82"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_local_owner_guard.go",
+      "base_sha256": null,
+      "payload_sha256": "cf070641dfd170fd3dc1553dc1b91a72bba352e83803382c25fcb0993a3fa230"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection.go",
+      "base_sha256": null,
+      "payload_sha256": "8bacf9175c3aa6234862792732a7edfe04aca0ee44671777de2ddc2e80d5f035"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_material.go",
+      "base_sha256": null,
+      "payload_sha256": "aa8774a3c275e70693e187c4e63a5a2aa55adf538254f6c44cc317d5b8b6dd35"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_material_test.go",
+      "base_sha256": null,
+      "payload_sha256": "783339fe7de8f9410f6a4665dfc492bc185e8c33062f999b6e2990b8bfca5228"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_reader_test.go",
+      "base_sha256": null,
+      "payload_sha256": "ee1ac5059691d88395fd19461f199231ba0c7da38e6201d8b6e2ec7d9f7effd2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_secret.go",
+      "base_sha256": null,
+      "payload_sha256": "2849788a7caeb33be5f05b932f94f1de930a673947e967f6f56113c6782124e3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_state_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7c9da3cc380b48cec08f2f93e6b8893daab25f74da149c482c1f7baf64e340bb"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_transition.go",
+      "base_sha256": null,
+      "payload_sha256": "b1d4fabd96b2757c189c9cc6036a495ba96bdc08aa532c7af1f68f5f34aaba9b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_transition_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b7208f6b63113691cc82cb85d6474e4b754da65041374c47d1b38a29ebabf595"
+    },
+    {
+      "path": "internal/adapters/kubernetes/hub_worker_capacity_reads.go",
+      "base_sha256": null,
+      "payload_sha256": "9cc42e177f21964114d90fdea234f3bc3ffa2a61cf873043deccd6fc060e311d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/hub_worker_capacity_reads_test.go",
+      "base_sha256": null,
+      "payload_sha256": "2c903c00652500e5480b9656495134534bef73521443ccbb9482b4bfdee500a0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/hub_worker_installed.go",
+      "base_sha256": "b30f741f7033f6d4f3381af267b9965dcb41d1f221ebe82b0bdfb2bb90fb377e",
+      "payload_sha256": "7bdc4aba6e73172bb795d8e5d44d4d39c7a8f860cbdf1926cc01670faa23e90e"
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_capacity_role_plan.go",
+      "base_sha256": "30f63d049d06987b44e1acf0d1a4e2b6130e25a867df88bb402ac7623af48ba3",
+      "payload_sha256": "291f6bdb1cbf55e384987d87dd98c63f1842ad6776b1544d85af0f9f2f6f454c"
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_capacity_role_plan_test.go",
+      "base_sha256": "0f0d83c48e2ac1850c89f6e5607ff157f853d30931a062face220ad647fd081d",
+      "payload_sha256": "5c1f2689df38355f7f76c3f1cb698a139209bd92fc7a59c772a6e25ffe9325b3"
+    },
+    {
+      "path": "internal/bootstrap/capacity_installed_inputs_test.go",
+      "base_sha256": null,
+      "payload_sha256": "c3935bd2fb9dc5b18193120fffb9d101dd36e31c100e2e8ac361afed57272e43"
+    },
+    {
+      "path": "internal/bootstrap/capacity_installed_observation.go",
+      "base_sha256": null,
+      "payload_sha256": "799e06fff89790f85674909cadc947c763eab43752b9825afdf48c0f52becf49"
+    },
+    {
+      "path": "internal/bootstrap/capacity_installed_worker.go",
+      "base_sha256": null,
+      "payload_sha256": "033a9e7b4c425e93c0c81d9b8bffc17f3eb4c9215e617e162f013f74b69624c5"
+    },
+    {
+      "path": "internal/bootstrap/capacity_projection_wait.go",
+      "base_sha256": "28810cf351bb634db26481b8c61814bad72d3505e5966a6e60846c17350e9798",
+      "payload_sha256": "5dc59bd04d6515feb071f297636c6bbc08d1f745249a654f911d43ca1cad2877"
+    },
+    {
+      "path": "internal/bootstrap/capacity_remote_observation.go",
+      "base_sha256": null,
+      "payload_sha256": "4f49281fffad6a09d5a58eaa6298b32b0d0ccea9518c6ad45c61572073a57af6"
+    },
+    {
+      "path": "internal/bootstrap/capacity_remote_observation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0e9be639401c6539162a9a51a8c353c1f8fd4d7cfeb8714977e8de2a7446b3de"
+    },
+    {
+      "path": "internal/bootstrap/capacity_worker.go",
+      "base_sha256": "35e9b59ad99b7e5c64b1853488d5ae00c2760f7769a134eeae1a52b6974a2800",
+      "payload_sha256": "11df6e5852eb6061b06f524822cce602c824c45459567bff3427a52ed4945139"
+    },
+    {
+      "path": "internal/bootstrap/capacity_worker_inputs.go",
+      "base_sha256": "69b8957dea3a57e716d02f5ae04f44129f187b7148975518dd85f3803406ec7f",
+      "payload_sha256": "da05b441d06f42721440ab3ab45b710d3139e9af80543004e032bcea702e2e87"
+    },
+    {
+      "path": "internal/contracts/capacity_local_owner.go",
+      "base_sha256": null,
+      "payload_sha256": "b3e775f3ec2dff9cb69af9aedaa5567d090ba3ef5edca99057af2090049a6f84"
+    },
+    {
+      "path": "internal/contracts/capacity_local_owner_test.go",
+      "base_sha256": null,
+      "payload_sha256": "ee68ed1e0043a87bf14e7348ed72e3fdd172ff976cb074e308376b210b44085e"
+    },
+    {
+      "path": "internal/contracts/capacity_runtime.go",
+      "base_sha256": "dca62b221c88b790ae2709d9bb4e24c37362a9a82d76cda5cb41147ba863fea8",
+      "payload_sha256": "d3975f1f33da955b9262aa8de679b9460a0f7a2698d0690278d6d94cefed5ecf"
+    },
+    {
+      "path": "specs/contracts/capacity-local-owner.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "1ca7cdc39a4b4f9e0b28b4c889785001ee0c8699d5c89d4879f02449b332b676"
+    },
+    {
+      "path": "test/integration/capacity_owner_registry_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b40e756c7869de4c3a08ba659c54d12c87a2f170324a8e31a10ca7b505dbf7a8"
+    },
+    {
+      "path": "test/integration/capacity_sql_matrix_test.go",
+      "base_sha256": "d4bca6614bd24fdcd328496163717c55fc3336f5b5186cb53962b10e8287cd2e",
+      "payload_sha256": "fcc2aad3154fe8855355fe0e77c32427eee66d87246fc1c1fccfd9e3a071b682"
+    }
+  ],
+  "prior_role_grants_manifest": "f6cadb8c1f3cfa5caf142f8b0a7e211dd85ff97ccc8df948f5a5023269b4d5d6"
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000704",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "watch_id": "00000000-0000-4000-8000-000000000701",
+    "revision": 1,
+    "batch_id": "00000000-0000-4000-8000-000000000703",
+    "state": "Paused",
+    "rows": [],
+    "sources": [
+      {
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "state": "Ready",
+        "filter_generation": 7,
+        "last_observed_at": "2026-10-09T12:05:01Z",
+        "coverage": "partial"
+      }
+    ],
+    "gaps": [
+      {
+        "reason": "subscriberOverflow",
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "count": null,
+        "from": "2026-10-09T12:05:00Z",
+        "until": "2026-10-09T12:05:01Z"
+      }
+    ],
+    "interval_from": "2026-10-09T12:05:00Z",
+    "interval_until": "2026-10-09T12:05:02Z",
+    "received_at": "2026-10-09T12:05:02Z",
+    "output_bytes_spent": 1024,
+    "retry_after_ms": 1000,
+    "handling": {
+      "transient": true,
+      "may_contain_user_data": true,
+      "managed_row_max_age_seconds": 30,
+      "raw_available_live": false,
+      "external_copies_recallable": false,
+      "save_semantics": "freshCurrentWindow"
+    }
+  },
+  "truncated": false,
+  "next_cursor": "opaque-live-cursor-2",
+  "narrowing_hint": null,
+  "warnings": [
+    "Live rows are transient and untrusted; save before raw inspection."
+  ],
+  "provenance": []
+}

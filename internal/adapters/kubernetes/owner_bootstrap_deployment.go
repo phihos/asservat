@@ -1,0 +1,107 @@
+package kubernetes
+
+import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+func ownerBootstrapPKIRoles(in contracts.OwnerDeployment, account contracts.WorkerObjectReference) (string, string) {
+	scope := struct {
+		InstallationID, ClusterID, ConfigurationUID string
+		Namespace, ServiceAccount                   contracts.WorkerObjectReference
+	}{in.InstallationID, in.ClusterID, in.ConfigurationUID, in.Namespace, account}
+	prefix := "asservat-owner-pki-" + ownerBootstrapDigest("pki-name", scope) + "-"
+	return prefix + "server", prefix + "client"
+}
+
+// Public generation uses only the positively acknowledged original selection
+// and the genuine current native responses already read by this operation. It
+// does not create a permission stream, invent process epochs or configure Bao.
+func ownerBootstrapDeployment(root *OwnerIdentityRoleRoot, selection contracts.OwnerBootstrapSelection, current ownerIdentityOperationNative) (contracts.OwnerDeployment, error) {
+	var zero contracts.OwnerDeployment
+	p := current.retained.resources.State.OwnerBootstrap
+	if root == nil || p == nil || p.Child == nil || p.Child.Receipt == nil || !ownerBootstrapBodyBound(root, p, selection) || current.input != root.input {
+		return zero, cfg.ErrChanged
+	}
+	original := root.resources.initial
+	guard := root.bridge.source.protection
+	plan := root.bridge.administration.Owner
+	in := contracts.OwnerDeployment{Format: contracts.OwnerDeploymentFormat, InstallationID: original.InstallationID, ClusterID: original.ClusterID, PermissionRootID: selection.PermissionRootID, Namespace: original.Namespace, ConfigurationUID: root.input.OwnerConfigurationUID, Kubernetes: original.Kubernetes, Postgres: original.Postgres, AuditStore: original.AuditStore, Connections: selection.Connections, Concurrency: selection.Concurrency}
+	in.Postgres.MaxConnections = 1
+	in.KeyService = contracts.OwnerKeyService{Endpoint: original.KeyService.Endpoint, Roots: original.KeyService.Roots, AuditMount: original.KeyService.AuditMount, AuditKey: original.KeyService.AuditKey, PKIMount: selection.PKIMount}
+	in.KeyService.ServerRole, in.KeyService.ClientRole = ownerBootstrapPKIRoles(in, root.input.ServiceAccount)
+	in.WorkloadGuard = contracts.OwnerDeploymentGuard{Name: plan.Name, PolicyUID: guard.pin.PolicyUID, PolicyGeneration: guard.pin.PolicyGeneration, BindingUID: guard.pin.BindingUID, BindingResourceVersion: guard.pin.BindingResourceVersion}
+	for _, a := range plan.Administrators {
+		in.WorkloadGuard.Administrators = append(in.WorkloadGuard.Administrators, contracts.OwnerDeploymentActor{Kind: string(a.Kind), Name: a.Name})
+	}
+	for _, a := range plan.ConfigurationProbes {
+		in.ConfigurationProbes = append(in.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: a.ConfigMap, ServiceAccount: a.ServiceAccount})
+	}
+	for _, a := range plan.SchedulingLeases {
+		in.SchedulingLeases = append(in.SchedulingLeases, contracts.OwnerSchedulingLease{Lease: a.Lease, ServiceAccount: a.ServiceAccount})
+	}
+	if h := plan.InitialHistoryProbe; h != nil {
+		in.InitialHistoryProbe = &contracts.OwnerInitialHistoryProbe{Namespace: contracts.WorkerObjectReference{Name: h.Namespace.Name, UID: h.Namespace.UID}, ServiceAccount: contracts.WorkerObjectReference{Name: h.ServiceAccount, UID: h.ServiceAccountUID}, Configuration: h.Configuration}
+	}
+	if a := plan.APIContextStarts; a != nil {
+		in.APIContextStarts = &contracts.OwnerDeploymentAPIContextStarts{CapacityAccount: contracts.WorkerObjectReference{Name: a.CapacityAccount, UID: a.CapacityAccountUID}, ExecutionAccount: contracts.WorkerObjectReference{Name: a.ExecutionAccount, UID: a.ExecutionAccountUID}}
+	}
+	if a := plan.CapacityProbe; a != nil {
+		in.CapacityProbe = &contracts.OwnerDeploymentCapacityProbe{ServiceAccount: contracts.WorkerObjectReference{Name: a.ServiceAccount, UID: a.ServiceAccountUID}}
+	}
+	deployment := current.source.ownerDeployment
+	digest, err := ConnectorAPITemplateDigest(deployment.Spec.Template)
+	if err != nil || len(deployment.Spec.Template.Spec.Containers) != 1 {
+		return zero, cfg.ErrChanged
+	}
+	parts := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, "@sha256:")
+	if len(parts) != 2 || !ownerIdentityDigestValid(parts[1]) {
+		return zero, cfg.ErrChanged
+	}
+	in.Observation = &contracts.OwnerObservationBootstrap{Format: originalOwnerObservationFormat(selection.ObservationFormat), TemplateDigest: hex.EncodeToString(digest[:]), ImageDigest: parts[1], ProtectionDigest: hex.EncodeToString(guard.digest[:]), Peers: selection.Peers}
+	selected := root.resources.ownerProvider
+	if selected == nil {
+		return zero, cfg.ErrChanged
+	}
+	recipe, err := providerconfig.OwnerProviderRecipeFor(in, selected.AuthMount, selected.AuthMountAccessor, root.input.ServiceAccount, selected.AuditCredentials, root.resources.now())
+	if err != nil {
+		return zero, err
+	}
+	in.ProviderAuthentication = &recipe.Profile
+	if !ownerIdentityProjectionInputBound(root, in, root.resources.now()) || !ownerBootstrapDeploymentBound(in, current.retained.resources.State) {
+		return zero, cfg.ErrChanged
+	}
+	raw, err := json.Marshal(in)
+	if err != nil || len(raw) > contracts.OwnerDeploymentMaxBytes {
+		return zero, cfg.ErrInvalid
+	}
+	return contracts.DecodeOwnerDeployment(bytes.NewReader(raw))
+}
+
+// A runtime may compare its complete mounted input with this historical public
+// selection. Matching does not grant any peer permission or replace SQL/native
+// identity checks. No runtime GET of an unmounted private journal is added.
+func ownerBootstrapDeploymentBound(in contracts.OwnerDeployment, state contracts.InitialRuntimeResourceState) bool {
+	p := state.OwnerBootstrap
+	if p == nil || p.Child == nil || p.Child.Receipt == nil || in.Observation == nil || in.ProviderAuthentication == nil ||
+		p.ObservationFormat != state.ObservationFormat || in.Observation.Format != originalOwnerObservationFormat(state.ObservationFormat) || in.PermissionRootID != p.PermissionRootID || in.KeyService.PKIMount != p.PKIMount || in.Connections != p.Connections || in.Concurrency != p.Concurrency || len(in.Observation.Peers) != len(p.Peers) {
+		return false
+	}
+	server, client := ownerBootstrapPKIRoles(in, in.ProviderAuthentication.ServiceAccount)
+	if in.KeyService.ServerRole != server || in.KeyService.ClientRole != client {
+		return false
+	}
+	for i, peer := range p.Peers {
+		actual := in.Observation.Peers[i]
+		if actual.InstallationID != in.InstallationID || actual.IssuerEpoch != p.IssuerEpoch || actual.ClusterID != peer.ClusterID || actual.PeerID != peer.PeerID || ownerBootstrapDigest("roots", actual.Roots) != peer.RootsDigest {
+			return false
+		}
+	}
+	return true
+}

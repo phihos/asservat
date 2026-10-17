@@ -1,0 +1,11 @@
+# Fresh native race fixture separation
+
+One test-only change: call `qualifyNativeCompletionClosed` only from the original `native-control-races` selector. That original test remains unchanged and retains its requirement that the original preparation lease is still current before/after the already-closed denial. The independently prepared `native-control-admission-race` selector keeps its own fresh authority, exact winner identity and accounting assertions.
+
+The prior combined native run 13568 reached fresh preparation but failed this duplicated old-case assertion before exercising the new concurrent admission. Its logs, source check and cleanup report are preserved under `evidence/prior`. This correction does not turn that failure into an actual race success. Actual fresh-case concurrency remains pending the parent-owned native run.
+
+No product changes, authority renewal, SQL changes, additional budget, interval broadening, source observer changes or trace restoration. Existing callback-trace cleanup is preserved. Observed preparation latency under the recorded host context does not establish a specific CPU/SQL/lock cause; this package makes no latency claim.
+
+The stage runner performs compilation only (`go test ... -run '^$'`) followed by integration vet. These checks execute no real-service assertions and do not qualify race behavior. Results, real exits and before/after hashes are in `evidence/results.json`; GOMAXPROCS=2, GOFLAGS=-p=2 and explicit stage TMPDIR remain fixed. Parent owns integration and external qualification.
+
+Actual runner **67830**, terminal **0**: compile-only exit 0 (7.252s wall), integration vet exit 0 (1.043s wall). All 1,525 dependencies and original/payload hashes unchanged. No build remains active.

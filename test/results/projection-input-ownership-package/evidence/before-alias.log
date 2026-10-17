@@ -1,0 +1,12 @@
+=== RUN   TestProjectionInputOwnershipOwnerConstructor
+    projection_input_ownership_test.go:30: caller changed retained owner projection input
+--- FAIL: TestProjectionInputOwnershipOwnerConstructor (0.05s)
+=== RUN   TestProjectionInputOwnershipOwnerMaterial
+    projection_input_ownership_test.go:62: generated owner projection changed caller input
+--- FAIL: TestProjectionInputOwnershipOwnerMaterial (0.06s)
+=== RUN   TestProjectionInputOwnershipCapacityConstructor
+    projection_input_ownership_test.go:88: caller changed retained capacity projection input
+--- FAIL: TestProjectionInputOwnershipCapacityConstructor (0.09s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.243s
+FAIL

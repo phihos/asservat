@@ -1,0 +1,5 @@
+{
+  "command": "make sql-check spec-check architecture-check design-check go-architecture-check",
+  "exit": 0,
+  "logSHA256": "38b6478ec1222a345f0005421d578f2bab3c514ae27a3d9b87997c6bd2efface"
+}

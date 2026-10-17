@@ -1,0 +1,6 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:234: actual provider access token rejected: invalid identity input
+--- FAIL: TestKeycloakProvider (1.44s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.488s
+FAIL

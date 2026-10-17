@@ -1,0 +1,52 @@
+{
+  "accepted": true,
+  "after": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "beforeMarkers": 3,
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-vet=off",
+    "-v",
+    "-run=^TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority$",
+    "./internal/adapters/mtls"
+  ],
+  "exit": 1,
+  "expectedTests": [],
+  "failedTop": [
+    "TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority"
+  ],
+  "intentionalFailure": true,
+  "namedPass": 0,
+  "passedTop": [],
+  "phase": "before-translated-constructor",
+  "seconds": 36.924,
+  "skips": []
+}

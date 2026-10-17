@@ -1,0 +1,42 @@
+{
+  "accepted": true,
+  "after": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "command": [
+    "python3",
+    "-c",
+    "import importlib.util, json, os, sys; sys.path.insert(0, 'scripts'); spec=importlib.util.spec_from_file_location('fixture', 'scripts/test-context-storage.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); report={}; m.qualify_direct_helper_issuer(dict(os.environ, CGO_ENABLED='0'), report); print(json.dumps(report))"
+  ],
+  "exit": 0,
+  "expectedTests": [],
+  "failedTop": [],
+  "namedPass": 0,
+  "passedTop": [],
+  "phase": "actual-helper-gate",
+  "seconds": 11.892,
+  "skips": []
+}

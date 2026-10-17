@@ -1,0 +1,13 @@
+=== RUN   TestInitialSchemaWithRealPostgres
+=== RUN   TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim
+=== RUN   TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion
+    initial_schema_test.go:172: original prefix phase=inspection version=0 head_read_ok=true head=0 claims=1 root_reads=1 constraints_read_ok=true primary=1 not_null=4 other=0
+    initial_schema_test.go:174: first transactional prefix not retained
+=== NAME  TestInitialSchemaWithRealPostgres
+    initial_schema_test.go:190: original schema prerequisite failed; dependent checks not executed
+--- FAIL: TestInitialSchemaWithRealPostgres (1.61s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim (0.03s)
+    --- FAIL: TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.656s
+FAIL

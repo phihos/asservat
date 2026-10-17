@@ -1,0 +1,31 @@
+{
+  "status": "source-only uncompiled; no component or native qualification",
+  "scope": "symmetric inventory discrepancy plus explicit scoped native inventory fixture",
+  "files": [
+    {
+      "path": "internal/adapters/objectstore/owner_audit_inventory.go",
+      "base": "5a1fec843b52ef3d0f3b3767651ffabbcbc36160a841e61c798621235a3f2228",
+      "payload": "5777d77cf1407e9d49647abc25655ab05f302bb07b45046ff429dd63ce85c686"
+    },
+    {
+      "path": "internal/adapters/objectstore/owner_audit_inventory_match_test.go",
+      "base": null,
+      "payload": "93b58867eb43d8110d75602a1818e877181786bc6970e6e0d2d292d7ed8b1b0e"
+    },
+    {
+      "path": "test/integration/owner_audit_inventory_test.go",
+      "base": null,
+      "payload": "0d67affc4459943193c2cd1d5e6ee261fd503ecd415df2e150da43ef3aa509b6"
+    },
+    {
+      "path": "scripts/test-custody.py",
+      "base": "211c00787a2396412bd343ac60a0613a632dc9a6c11ee8aeecc7e12d16826ad1",
+      "payload": "a4cad1993b7059e3fd75b0517a445e57e4abb0b80b1bfc7e609413710c40c462"
+    },
+    {
+      "path": "scripts/test-owner-inventory-harness.py",
+      "base": null,
+      "payload": "7040a1a145ee4ad9ed74158493c9fcc36decc55904fac44e341a0d46bbe6c246"
+    }
+  ]
+}

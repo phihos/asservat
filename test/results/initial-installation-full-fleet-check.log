@@ -1,0 +1,2 @@
+python3 scripts/test-custody.py --fleet
+Fleet integration exit: 0

@@ -1,0 +1,13 @@
+ok  	asservat.local/asservat/internal/domain/privacy	1.006s
+ok  	asservat.local/asservat/internal/domain/audit	1.005s
+ok  	asservat.local/asservat/internal/application/audit	1.006s
+ok  	asservat.local/asservat/internal/application/privacy	1.015s
+ok  	asservat.local/asservat/internal/application/authorization	1.008s
+ok  	asservat.local/asservat/internal/application/catalog	1.014s
+ok  	asservat.local/asservat/internal/application/evidence	1.243s
+ok  	asservat.local/asservat/internal/application/fleet	1.011s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.046s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.284s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.025s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/native	2.390s
+ok  	asservat.local/asservat/test/integration	1.055s [no tests to run]

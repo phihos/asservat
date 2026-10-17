@@ -1,0 +1,5 @@
+{
+  "path": "internal/adapters/kubernetes/owner_projection_operation_native.go",
+  "sha256": "5c377755116524959e28b45bdbc32f0a1b4be1f162bd7eb454139628503c753a",
+  "scope": "controlled mitigation reversal of five outer receiver checks only; no prior runtime vulnerability claim"
+}

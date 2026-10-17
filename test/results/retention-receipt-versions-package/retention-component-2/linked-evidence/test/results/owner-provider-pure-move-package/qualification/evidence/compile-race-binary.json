@@ -1,0 +1,30 @@
+{
+  "phase": "compile-race-binary",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+    "-race",
+    "-c",
+    "-o",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/tmp/kms.test",
+    "./internal/adapters/kms"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 3.655,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "integratedAt": 1791862322.634205,
+  "jointPreflight": true,
+  "session": 80555,
+  "files": [
+    {
+      "path": "internal/adapters/objectstore/authority.go",
+      "base_sha256": "e923d48389e257bb651701858a00ae6fe38db08e1493c5a6084538b03957dce8",
+      "payload_sha256": "50743c583148f0fbb3557cfc9a616f4177eee0a7b6d480961a4805e5b7bfedef"
+    },
+    {
+      "path": "internal/adapters/objectstore/s3.go",
+      "base_sha256": "91953e28896ef5b5182df7d0b9698b425dc9aba60ddd07d52c8f7c461cdd8ed6",
+      "payload_sha256": "56b67b76881cc6b77a276e18d3e5b2f19255cd5375a4fc424725f7613aa17f00"
+    },
+    {
+      "path": "internal/adapters/objectstore/versioned_audit_test.go",
+      "base_sha256": null,
+      "payload_sha256": "18748fce8b292002ef7f91b37c3a638cee8e8e99e630cf35ef6a0299109b226c"
+    }
+  ],
+  "qualification": {
+    "scope": "Explicit version-required audit store component only; no installed selection or backend IAM qualification",
+    "manifest": "2ae09356432300bb6877cb0654840ddc2eb72290e5fd2652ba3ab673b7880974",
+    "dependencies": "25b46f3117bda0d821b61c7e5c0ce6be70836215bf62c6b1f26a48cfd18ff0a0",
+    "runner": "cadcfef64cee4c0b78afaf02259fe206892eb92428189176264f7f9ad5367cb8",
+    "dependencyCount": 1825,
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/objectstore/..."
+        ],
+        "exit": 0,
+        "seconds": 1.698,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        }
+      },
+      {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=120s",
+          "-v",
+          "./internal/adapters/objectstore/..."
+        ],
+        "exit": 0,
+        "seconds": 9.159,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+          "./internal/adapters/objectstore/..."
+        ],
+        "exit": 0,
+        "seconds": 0.396,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": []
+        }
+      }
+    ],
+    "terminalExit": 0
+  },
+  "scope": "Component prerequisite only; no backend qualification, accepted profile change, or installed runtime enablement"
+}

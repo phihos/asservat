@@ -1,0 +1,208 @@
+package evidence
+
+import (
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"context"
+	"sync"
+)
+
+// ContextNativeResponse is owned by one actual HTTP request. Describe pins only
+// immutable cached facts. The later content phase constructs a native exchange
+// from its own fresh identity batch; the metadata batch is never retained or
+// renewed. No constructor dispatches, prepares, reads payload or unwraps.
+type ContextNativeResponse struct {
+	owner                   context.Context
+	cancel                  context.CancelFunc
+	runtime                 *ContextNativeRuntime
+	mu                      sync.Mutex
+	closed, busy, described bool
+	idle                    chan struct{}
+	closeDone               chan struct{}
+	session                 artifact.DownloadSession
+	key                     contextNativeMetadataKey
+	release                 func()
+	remote                  *RemoteContextSource
+	remoteEnd               context.CancelFunc
+	lease                   artifact.DownloadDeliveryLease
+}
+
+var _ CurrentNativeResponseSource = (*ContextNativeResponse)(nil)
+
+func NewContextNativeResponse(ctx context.Context, r *ContextNativeRuntime) (*ContextNativeResponse, error) {
+	if ctx == nil || ctx.Err() != nil || r == nil || r.bound != nil || r.metadata == nil {
+		return nil, artifact.ErrInvalid
+	}
+	owner, cancel := context.WithCancel(ctx)
+	return &ContextNativeResponse{owner: owner, cancel: cancel, runtime: r, closeDone: make(chan struct{})}, nil
+}
+func (*ContextNativeResponse) Describe(context.Context, artifact.DownloadSession, artifact.DownloadAuthority) (artifact.NativeDownloadMetadata, int64, error) {
+	return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadUnavailable
+}
+func (*ContextNativeResponse) ReadChunk(context.Context, artifact.DownloadDeliveryLease, int64, int64) (NativeResponseChunk, error) {
+	return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+}
+func (s *ContextNativeResponse) enter() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.owner.Err() != nil || s.busy {
+		return false
+	}
+	s.busy = true
+	s.idle = make(chan struct{})
+	return true
+}
+func (s *ContextNativeResponse) leave() { s.mu.Lock(); s.busy = false; close(s.idle); s.mu.Unlock() }
+func (s *ContextNativeResponse) owned(ctx context.Context) (context.Context, context.CancelFunc) {
+	call, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.owner, func() { defer close(joined); cancel() })
+	return call, func() {
+		if !stop() {
+			<-joined
+		}
+		cancel()
+	}
+}
+func (s *ContextNativeResponse) DescribeCurrent(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority) (artifact.NativeDownloadMetadata, int64, error) {
+	if s == nil || ctx == nil || !a.Valid(s.runtime.config.Now()) || session.Scope != a.Scope || !s.enter() {
+		return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadUnavailable
+	}
+	defer s.leave()
+	s.mu.Lock()
+	already := s.described
+	s.mu.Unlock()
+	if already {
+		return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadConflict
+	}
+	call, end := s.owned(ctx)
+	defer end()
+	facts, key, release, e := s.runtime.prepared(call, current, session, true)
+	if e != nil {
+		return artifact.NativeDownloadMetadata{}, 0, e
+	}
+	if !facts.Valid() || release == nil {
+		if release != nil {
+			release()
+		}
+		return artifact.NativeDownloadMetadata{}, 0, ErrDownloadMetadataUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || call.Err() != nil {
+		s.mu.Unlock()
+		release()
+		return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadExpired
+	}
+	s.session, s.key, s.release, s.described = session, key, release, true
+	s.mu.Unlock()
+	return facts.Native, ContextDownloadReadWork, nil
+}
+func (s *ContextNativeResponse) ReadChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
+	var zero NativeResponseChunk
+	if s == nil || ctx == nil || !lease.Valid(s.runtime.config.Now()) || !s.enter() {
+		return zero, artifact.ErrDownloadUnavailable
+	}
+	defer s.leave()
+	s.mu.Lock()
+	session, key, described, active := s.session, s.key, s.described, s.remote
+	s.mu.Unlock()
+	if !described || active != nil || lease.Authority.Scope != session.Scope || offset != lease.Offset || length != lease.Length || length < 1 || length > artifact.MaxContextBytes {
+		return zero, artifact.ErrDownloadUnavailable
+	}
+	call, ownerEnd := s.owned(ctx)
+	bound, work, requestEnd, e := s.runtime.beginRequest(call, current, session)
+	if e != nil {
+		ownerEnd()
+		return zero, e
+	}
+	end := func() { requestEnd(); ownerEnd() }
+	observed, a, e := bound.attachment(work, current, session)
+	if e != nil {
+		end()
+		return zero, e
+	}
+	currentKey, e := contextMetadataKey(session, observed, a)
+	if e != nil || currentKey != key || observed.NativeBusy || observed.NativeUncertain || !observed.ResponseBusy {
+		end()
+		return zero, artifact.ErrDownloadUnavailable
+	}
+	remote, e := bound.remote(work, session, observed, a)
+	if e != nil {
+		end()
+		return zero, e
+	}
+	// The original piece, request and current batch all own the pending chunk.
+	// Keep them until the final sink acknowledgement and joined native cleanup.
+	effect, stop := context.WithDeadline(work, bound.bound.Deadline())
+	finalEnd := func() { stop(); end() }
+	chunk, e := remote.ReadChunkCurrent(effect, current, lease, offset, length)
+	if e != nil {
+		remote.Close()
+		finalEnd()
+		clear(chunk.Bytes)
+		return zero, e
+	}
+	s.mu.Lock()
+	if s.closed || effect.Err() != nil {
+		s.mu.Unlock()
+		clear(chunk.Bytes)
+		remote.Close()
+		finalEnd()
+		return zero, artifact.ErrDownloadExpired
+	}
+	s.remote, s.remoteEnd, s.lease = remote, finalEnd, lease
+	s.mu.Unlock()
+	return chunk, nil
+}
+func (s *ContextNativeResponse) AcknowledgeNativeChunk(ctx context.Context, lease artifact.DownloadDeliveryLease, offset, length int64) error {
+	if s == nil || ctx == nil || !s.enter() {
+		return artifact.ErrDownloadUnavailable
+	}
+	defer s.leave()
+	s.mu.Lock()
+	remote, end, actual := s.remote, s.remoteEnd, s.lease
+	s.mu.Unlock()
+	if remote == nil || lease != actual {
+		return artifact.ErrDownloadUnavailable
+	}
+	e := remote.AcknowledgeNativeChunk(ctx, lease, offset, length)
+	remote.Close()
+	end()
+	s.mu.Lock()
+	s.remote, s.remoteEnd = nil, nil
+	s.mu.Unlock()
+	return e
+}
+func (s *ContextNativeResponse) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	if s.closed {
+		done := s.closeDone
+		s.mu.Unlock()
+		<-done
+		return
+	}
+	s.closed = true
+	s.cancel()
+	busy, idle := s.busy, s.idle
+	s.mu.Unlock()
+	if busy {
+		<-idle
+	}
+	s.mu.Lock()
+	remote, end, release := s.remote, s.remoteEnd, s.release
+	s.remote, s.remoteEnd, s.release = nil, nil, nil
+	s.mu.Unlock()
+	if remote != nil {
+		remote.Close()
+	}
+	if end != nil {
+		end()
+	}
+	if release != nil {
+		release()
+	}
+	close(s.closeDone)
+}

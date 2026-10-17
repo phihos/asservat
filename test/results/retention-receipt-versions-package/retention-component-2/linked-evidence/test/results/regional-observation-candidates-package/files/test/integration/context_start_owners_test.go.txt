@@ -1,0 +1,388 @@
+package integration
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/json"
+	"errors"
+	"math/big"
+	"net/url"
+	"os"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// This private fixture CA signs only exact already-spent SQL permits. It is not
+// a production bootstrap/provider. Actual X509 verification, SQL roles/spend,
+// encrypted object audit and activation remain the production components.
+type contextStartOwnerIssuer struct {
+	ca  *x509.Certificate
+	key *ecdsa.PrivateKey
+}
+
+func (s contextStartOwnerIssuer) SignOwnerCertificate(ctx context.Context, p value.OwnerCertificatePermit, csr []byte) (value.IssuedOwnerCertificate, error) {
+	var zero value.IssuedOwnerCertificate
+	if ctx.Err() != nil || !p.Valid(time.Now()) {
+		return zero, value.ErrDenied
+	}
+	request, e := x509.ParseCertificateRequest(csr)
+	if e != nil || request.CheckSignature() != nil {
+		return zero, value.ErrDenied
+	}
+	key, e := mtls.EnrollmentKey(csr)
+	if e != nil || key != p.PublicKeyDigest {
+		return zero, value.ErrDenied
+	}
+	uri, e := mtls.OwnerURI(p.Binding)
+	if e != nil {
+		return zero, e
+	}
+	eku := x509.ExtKeyUsageClientAuth
+	template := &x509.Certificate{SerialNumber: big.NewInt(time.Now().UnixNano()), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, URIs: []*url.URL{uri}, NotBefore: p.CheckedAt.UTC().Truncate(time.Second).Add(-time.Second), NotAfter: p.CertificateNotAfter}
+	if p.Usage == "server" {
+		eku = x509.ExtKeyUsageServerAuth
+		name, e := mtls.OwnerServerName(p.Binding)
+		if e != nil {
+			return zero, e
+		}
+		template.DNSNames = []string{name}
+		if p.Configuration.Configuration.Pool.NativeBootstrap != "" {
+			common, e := mtls.OwnerBootstrapServerName(p.Configuration.Configuration.Pool)
+			if e != nil {
+				return zero, e
+			}
+			template.DNSNames = append(template.DNSNames, common)
+		}
+	}
+	template.ExtKeyUsage = []x509.ExtKeyUsage{eku}
+	der, e := x509.CreateCertificate(rand.Reader, template, s.ca, request.PublicKey, s.key)
+	if e != nil || ctx.Err() != nil || !p.Valid(time.Now()) {
+		return zero, value.ErrUnavailable
+	}
+	return value.IssuedOwnerCertificate{Certificate: value.OwnerCertificate{Binding: p.Binding, Usage: p.Usage, Digest: sha256.Sum256(der), NotBefore: template.NotBefore, NotAfter: template.NotAfter}, DER: der, ChainDER: [][]byte{s.ca.Raw}}, nil
+}
+
+type contextStartOwnerSQL struct {
+	lab                                    *ownerConfigLab
+	config                                 value.OwnerConfiguration
+	writer, ack, activate, reader, cleanup *postgres.OwnerEnrollments
+	readPool                               *pgxpool.Pool
+	effectPools                            []*pgxpool.Pool
+	audit                                  *objectstore.OwnerEnrollmentAuditObjects
+	issuer                                 contextStartOwnerIssuer
+	verifier                               *mtls.OwnerPeerVerifier
+}
+
+func newContextStartOwnerSQL(t *testing.T, ctx context.Context, lab *ownerConfigLab, c value.OwnerConfiguration, issuer contextStartOwnerIssuer) *contextStartOwnerSQL {
+	t.Helper()
+	s := &contextStartOwnerSQL{lab: lab, config: c, issuer: issuer}
+	ledger := func(role, password string) *postgres.OwnerEnrollments {
+		pc := lab.writerPool.Config()
+		pc.ConnConfig.User = role
+		pc.ConnConfig.Password = password
+		pc.MaxConns = 2
+		pool, e := pgxpool.NewWithConfig(ctx, pc)
+		if e != nil {
+			t.Fatal(e)
+		}
+		t.Cleanup(pool.Close)
+		if role == "owner_enrollment_read_runtime" {
+			s.readPool = pool
+		} else {
+			s.effectPools = append(s.effectPools, pool)
+		}
+		v, e := postgres.NewOwnerEnrollments(ctx, pool, c.Pool.InstallationID, c.Pool.ClusterID, c.Pool.NamespaceUID, c.Revision.UID, custodyID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return v
+	}
+	s.writer = ledger("owner_enrollment_runtime", "synthetic-owner-enrollment")
+	s.ack = ledger("owner_enrollment_audit_runtime", "synthetic-owner-enrollment-audit")
+	s.activate = ledger("owner_enrollment_activate_runtime", "synthetic-owner-enrollment-activate")
+	s.reader = ledger("owner_enrollment_read_runtime", "synthetic-owner-enrollment-read")
+	s.cleanup = ledger("owner_enrollment_cleanup_runtime", "synthetic-owner-enrollment-cleanup")
+	s.audit = &objectstore.OwnerEnrollmentAuditObjects{Store: lab.audit.Store, Seal: lab.audit.Seal, Open: lab.audit.Open}
+	roots := x509.NewCertPool()
+	roots.AddCert(issuer.ca)
+	var e error
+	s.verifier, e = mtls.NewOwnerPeerVerifierForPool(roots, c.Pool, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return s
+}
+
+// Short combined fixtures retain only current read authority after initial enrollment.
+func (s *contextStartOwnerSQL) closeEffects() {
+	for _, p := range s.effectPools {
+		p.Close()
+	}
+	s.effectPools = nil
+}
+func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
+	if _, e := s.lab.admin.Exec(ctx, "UPDATE fleet_trust SET observed_at=statement_timestamp(),fresh_until=statement_timestamp()+interval '30 seconds' WHERE installation_id=$1", s.config.Pool.InstallationID); e != nil {
+		return value.OwnerConfigurationObservation{}, e
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
+	r, ack, e := s.lab.writer.ObserveOwnerConfiguration(ctx, o)
+	if e != nil {
+		return o, e
+	}
+	if !ack {
+		r, e = s.lab.audit.WriteOwnerConfiguration(ctx, s.config)
+		if e != nil {
+			return o, e
+		}
+		if e = s.lab.ack.AcknowledgeOwnerConfiguration(ctx, s.config, r); e != nil {
+			return o, e
+		}
+	}
+	return s.lab.reader.ReadOwnerConfiguration(ctx)
+}
+func (s *contextStartOwnerSQL) proof(ctx context.Context, r value.OwnerEnrollmentRequest) (value.OwnerEnrollmentProof, error) {
+	n := time.Now().UTC()
+	o, e := s.refresh(ctx, 5*time.Second)
+	if e != nil {
+		return value.OwnerEnrollmentProof{}, e
+	}
+	key, e := mtls.EnrollmentKey(r.CSRDER)
+	if e != nil {
+		return value.OwnerEnrollmentProof{}, e
+	}
+	return value.OwnerEnrollmentProof{Binding: r.Binding, Usage: r.Usage, Configuration: o, Pod: "synthetic-owner", ReplicaSet: "synthetic-owner-rs", ReplicaSetUID: s.config.Pool.DeploymentUID, PublicKeyDigest: key, TokenDigest: artifact.Digest{1}, WorkloadDigest: artifact.Digest{2}, ProtectionDigest: artifact.Digest{3}, ObservedAt: n, FreshUntil: identity.Earlier(n.Add(5*time.Second), o.FreshUntil)}, nil
+}
+func (s *contextStartOwnerSQL) coordinator() *app.OwnerEnrollmentCoordinator {
+	return &app.OwnerEnrollmentCoordinator{Verifier: s.verifier, Proofs: ownerProofFunction(s.proof), Ledger: s.writer, Activation: s.activate, Audit: s.audit, Acknowledgements: s.ack, Issuer: s.issuer, Now: time.Now}
+}
+
+func TestContextStartOwnersWithRealServices(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if path == "" {
+		path = os.Getenv("ASSERVAT_FLEET_FIXTURES")
+	}
+	if path == "" {
+		t.Skip("owned SQL/S3 fixture required")
+	}
+	raw, e := os.ReadFile(path)
+	var f fixture
+	if e != nil || json.Unmarshal(raw, &f) != nil {
+		t.Fatal("fixture unavailable")
+	}
+	clear(raw)
+	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
+	defer end()
+	ca, key := connectorSQLCA(t)
+	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444}
+	c := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
+	l := ownerConfigurationLab(t, ctx, f, c)
+	s := newContextStartOwnerSQL(t, ctx, l, c, contextStartOwnerIssuer{ca, key})
+	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+		t.Fatal("missing current configuration yielded candidates")
+	}
+	read := func(want int) value.APIContextOwnerCandidates {
+		t.Helper()
+		if _, e = s.refresh(ctx, 5*time.Second); e != nil {
+			t.Fatal(e)
+		}
+		v, e := s.reader.ReadContextStartOwners(ctx)
+		if e != nil || !v.Valid(time.Now()) || len(v.Owners) != want {
+			t.Fatal("exact complete candidate count", want, len(v.Owners), e)
+		}
+		return v
+	}
+	read(0)
+	binding := value.OwnerBinding{InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, PodUID: custodyID(), ProcessEpoch: custodyID()}
+	req := value.OwnerEnrollmentRequest{Binding: binding, Usage: "server", CSRDER: connectorSQLCSR(t)}
+	proof, e := s.proof(ctx, req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	enrollment, _, _, e := s.writer.ClaimOwnerEnrollment(ctx, proof)
+	if e != nil {
+		t.Fatal(e)
+	}
+	read(0) // unaudited enrollment
+	receipt, e := s.audit.WriteOwnerEnrollment(ctx, enrollment)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.ack.AcknowledgeOwnerEnrollment(ctx, enrollment, receipt); e != nil {
+		t.Fatal(e)
+	}
+	read(0) // no issued certificate
+	proof, e = s.proof(ctx, req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	progress, e := s.writer.PrepareOwnerCertificate(ctx, proof)
+	if e != nil || !progress.MaySign {
+		t.Fatal("positive original signing claim", e)
+	}
+	issued, e := s.issuer.SignOwnerCertificate(ctx, progress.Attempt.Permit, req.CSRDER)
+	if e != nil {
+		t.Fatal(e)
+	}
+	issued, e = s.verifier.CheckOwnerCertificateCurrent(progress.Attempt.Permit, req.CSRDER, issued.DER, issued.ChainDER, proof.Configuration)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.writer.StoreOwnerCertificate(ctx, progress.Attempt, issued); e != nil {
+		t.Fatal(e)
+	}
+	read(0) // result without independent audit
+	record := audit.OwnerCertificate{Attempt: progress.Attempt, Certificate: issued.Certificate}
+	receipt, e = s.audit.WriteOwnerCertificate(ctx, record)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.ack.AcknowledgeOwnerCertificate(ctx, record, receipt); e != nil {
+		t.Fatal(e)
+	}
+	read(0) // acknowledged certificate is still not activated
+	proof, e = s.proof(ctx, req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.activate.ActivateOwnerCertificate(ctx, proof, progress.Attempt); e != nil {
+		t.Fatal(e)
+	}
+	if got := read(1); got.Owners[0] != binding {
+		t.Fatal("candidate changed process")
+	}
+	clientReq := req
+	clientReq.Usage = "client"
+	clientReq.CSRDER = connectorSQLCSR(t)
+	if _, e = s.coordinator().Enroll(ctx, clientReq); e != nil {
+		t.Fatal("separate real client purpose", e)
+	}
+	read(1)
+	t.Run("reader-has-no-effect-role", func(t *testing.T) {
+		_, e := s.readPool.Exec(ctx, "UPDATE hub_owner_enrollment SET retired_at=clock_timestamp() WHERE id=$1", enrollment.ID)
+		var pg *pgconn.PgError
+		if !errors.As(e, &pg) || pg.Code != "42501" {
+			t.Fatal("reader write was not an actual privilege denial")
+		}
+	})
+	t.Run("complete-overflow-is-unavailable", func(t *testing.T) {
+		var extra []value.OwnerEnrollment
+		for range 16 {
+			r := req
+			r.Binding.PodUID = custodyID()
+			r.Binding.ProcessEpoch = custodyID()
+			r.CSRDER = connectorSQLCSR(t)
+			cert, e := s.coordinator().Enroll(ctx, r)
+			if e != nil {
+				t.Fatal("bounded actual extra enrollment", e)
+			}
+			registration, e := s.reader.ReadOwnerRegistration(ctx, cert.Certificate)
+			if e != nil {
+				t.Fatal(e)
+			}
+			extra = append(extra, registration.Enrollment)
+		}
+		if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+			t.Fatal("seventeen owners returned an incomplete successful list")
+		}
+		for _, v := range extra {
+			if e = s.cleanup.RetireOwnerEnrollment(ctx, v); e != nil {
+				t.Fatal(e)
+			}
+		}
+		read(1)
+	})
+	t.Run("original-observation-expires-behind-real-lock", func(t *testing.T) {
+		o, e := s.refresh(ctx, 350*time.Millisecond)
+		if e != nil {
+			t.Fatal(e)
+		}
+		tx, e := l.admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer tx.Rollback(context.Background())
+		var pid int32
+		if e = tx.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&pid); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = tx.Exec(ctx, "SELECT 1 FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE", pool.InstallationID, pool.ClusterID); e != nil {
+			t.Fatal(e)
+		}
+		call, cancel := context.WithCancel(ctx)
+		result := make(chan error, 1)
+		joined := false
+		go func() { _, e := s.reader.ReadContextStartOwners(call); result <- e }()
+		defer func() {
+			cancel()
+			_ = tx.Rollback(context.Background())
+			if !joined {
+				<-result
+			}
+		}()
+		for {
+			var waiting bool
+			e = l.admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE usename='owner_enrollment_read_runtime' AND $1=ANY(pg_blocking_pids(pid)))", pid).Scan(&waiting)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if waiting {
+				break
+			}
+			if !time.Now().Before(o.FreshUntil) {
+				t.Fatal("reader did not reach actual held row")
+			}
+			time.Sleep(time.Millisecond)
+		}
+		timer := time.NewTimer(time.Until(o.FreshUntil) + 20*time.Millisecond)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			t.Fatal(ctx.Err())
+		}
+		if e = tx.Rollback(ctx); e != nil {
+			t.Fatal(e)
+		}
+		e = <-result
+		joined = true
+		if e == nil {
+			t.Fatal("blocked read renewed original current observation")
+		}
+		read(1)
+	})
+	t.Run("retired-server-client-alone-not-candidate", func(t *testing.T) {
+		if e = s.cleanup.RetireOwnerEnrollment(ctx, enrollment); e != nil {
+			t.Fatal(e)
+		}
+		read(0)
+	})
+	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+		t.Fatal("configuration fence yielded successful discovery")
+	}
+	read(0)
+	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", pool.InstallationID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
+		t.Fatal("recovery fence yielded successful discovery")
+	}
+	t.Log("actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/overflow/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic")
+}

@@ -1,0 +1,91 @@
+from pathlib import Path
+import hashlib, json, os, shutil, signal, subprocess, time
+
+stage = Path(__file__).resolve().parent
+repo = Path('/home/phil/Projekte/asservat')
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+maps = {n: json.loads((stage/(n+'.json')).read_text()) for n in ['payload','bases','dependencies','mirror']}
+tool = json.loads((stage/'tool.json').read_text())
+generated = {}
+derived = {}
+
+def check():
+    files = set(subprocess.run(['rg','--files','-g','*.go','-g','go.mod','-g','go.sum'],cwd=repo,capture_output=True,text=True,check=True).stdout.splitlines())
+    expected = {p for p in maps['dependencies'] if p.endswith('.go') or Path(p).name in {'go.mod','go.sum'}}
+    mirror = {str(p.relative_to(stage/'mirror')) for p in (stage/'mirror').rglob('*') if p.is_file()}
+    return {
+        'live': [p for p,h in maps['dependencies'].items() if sha(repo/p)!=h],
+        'bases': [p for p,h in maps['bases'].items() if sha(repo/p)!=h],
+        'payload': [p for p,h in maps['payload'].items() if sha(stage/'files'/p)!=h],
+        'fileSet': sorted(files^expected),
+        'mirror': [p for p,h in (maps['mirror']|generated).items() if sha(stage/'mirror'/p)!=h],
+        'mirrorSet': sorted(mirror^(set(maps['mirror'])|set(generated))),
+        'freeze': [p for p,h in json.loads((stage/'freeze.json').read_text()).items() if sha(stage/p)!=h],
+        'derived': [p for p,h in derived.items() if sha(stage/p)!=h],
+        'tool': [] if sha(Path(tool['path']))==tool['sha256'] else ['sqlc'],
+    }
+
+evidence = stage/'evidence'
+evidence.mkdir(exist_ok=False)
+env=os.environ.copy()
+env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(stage/'tmp'))
+
+def phase(name,command,cwd=repo,failure=None):
+    before=check()
+    if any(before.values()):
+        (evidence/(name+'-preflight.json')).write_text(json.dumps(before,indent=2)+'\n')
+        raise SystemExit('immutable preflight failed')
+    start=time.monotonic()
+    with (evidence/(name+'.log')).open('x') as log:
+        p=subprocess.Popen(command,cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        print(json.dumps({'phase':name,'pid':p.pid,'command':command}),flush=True)
+        try: code=p.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid,signal.SIGTERM)
+            try: p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(p.pid,signal.SIGKILL);p.wait()
+            code=124
+    after=check()
+    body=(evidence/(name+'.log')).read_text()
+    expected_failure=failure is not None and code>0 and code!=124 and failure in body and '[build failed]' not in body
+    report={'phase':name,'command':command,'cwd':str(cwd),'exit':code,'seconds':round(time.monotonic()-start,3),'expectedFailure':expected_failure,'before':before,'after':after}
+    (evidence/(name+'.json')).write_text(json.dumps(report,indent=2)+'\n')
+    print(json.dumps(report),flush=True)
+    if any(after.values()) or (failure is None and code!=0) or (failure is not None and not expected_failure):
+        raise SystemExit(1)
+    return body
+
+version=phase('sqlc-version',[tool['path'],'version'])
+if version.strip()!=tool['version']: raise SystemExit('wrong pinned SQLc version')
+phase('generate',[tool['path'],'generate','-f',str(stage/'generation/sqlc.json')])
+new='internal/adapters/postgres/custodydb/owner_observation_candidates.sql.go'
+produced={p.name:sha(p) for p in (stage/'generation/generated').glob('*.go')}
+existing={p.name:sha(p) for p in (repo/'internal/adapters/postgres/custodydb').glob('*.go')}
+if set(produced)!=set(existing)|{Path(new).name} or any(produced[p]!=h for p,h in existing.items()):
+    (evidence/'generation-drift.json').write_text(json.dumps({'produced':produced,'existing':existing},indent=2)+'\n')
+    raise SystemExit('unexpected generated binding changes')
+shutil.copy2(stage/'generation/generated'/Path(new).name,stage/'mirror'/new)
+generated[new]=produced[Path(new).name]
+overlay=json.loads((stage/'overlay.json').read_text())
+overlay['Replace'][str(repo/new)]=str(stage/'generation/generated'/Path(new).name)
+(stage/'build-overlay.json').write_text(json.dumps(overlay,indent=2)+'\n')
+build=list(json.loads((stage/'manifest.json').read_text()))
+build.append({'path':new,'action':'add','base':None,'sha256':generated[new],'group':'generated','source':'generation/generated/'+Path(new).name})
+(stage/'build-manifest.json').write_text(json.dumps(build,indent=2)+'\n')
+for p in (stage/'generation/generated').glob('*.go'):
+    derived[str(p.relative_to(stage))]=sha(p)
+for name in ['build-overlay.json','build-manifest.json']:
+    derived[name]=sha(stage/name)
+(evidence/'generated.json').write_text(json.dumps({'new':generated,'allGenerated':produced,'existingUnchanged':True,'derived':derived},indent=2)+'\n')
+
+phase('before-value',['go','test','-overlay',str(stage/'before-value.json'),'-vet=off','-count=1','-timeout=60s','-run','^TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess$/^opted17$','-v','./internal/domain/fleet'],failure='candidate bound 17 17')
+phase('before-consumer',['go','test','-overlay',str(stage/'before-consumer.json'),'-vet=off','-count=1','-timeout=60s','-run','^TestInstalledObservationClientSelectsOriginalCandidateReader$/^opted-valid$','-v','./internal/bootstrap'],failure='original selected candidate reader')
+overlay=['-overlay',str(stage/'build-overlay.json')]
+packages=['./internal/domain/fleet','./internal/application/fleet','./internal/adapters/kubernetes','./internal/adapters/mtls','./internal/adapters/postgres','./internal/bootstrap','./test/integration']
+phase('compile',['go','test',*overlay,'-vet=off','-run','^$',*packages])
+selected='^Test(OwnerObservationCandidate|OwnerObservationReadyGroups|OwnerObservationBootstrapUsesComplete|ConnectorObservationChannel|ConnectorObservationStream|InstalledObservationClient|OwnerEndpointBoundedDiscovery|OwnerPoolNativeCandidateLimit)'
+phase('race',['go','test',*overlay,'-race','-vet=off','-count=1','-timeout=180s','-run',selected,'-v',*packages[:4],'./internal/bootstrap'])
+phase('vet',['go','vet',*overlay,*packages])
+phase('architecture',['make','go-architecture-check'],stage/'mirror')
+print(json.dumps({'terminal':0,'generated':generated,'finalHashes':check()}),flush=True)

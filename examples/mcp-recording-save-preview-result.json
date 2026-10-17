@@ -1,0 +1,278 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000196",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "kind": "recordingSavePreview",
+    "operation": "recordingSave",
+    "preview_id": "00000000-0000-4000-8000-000000000194",
+    "capture_id": "00000000-0000-4000-8000-000000000190",
+    "expires_at": "2026-10-09T12:01:00Z",
+    "save_scope_digest": "33dc70161e239f66d41de88282ce27c1a2426797fb743c9f688e0261e39822d8",
+    "selected_recordings": [
+      {
+        "recording_handle": "recording-synthetic-traffic",
+        "policy_uid": "policy-trigger-lifecycles-uid",
+        "policy_name": "trigger-lifecycles",
+        "pod_uid": "pod-uid",
+        "pod_name": "api-synthetic",
+        "action_id": "traffic",
+        "kind": "packetCapture",
+        "state": "Ready",
+        "available_before_seconds": 30,
+        "maximum_before": "30s",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "handle_expires_at": "2026-10-09T12:01:00Z",
+        "save_eligible": true,
+        "blockers": [],
+        "execution_authority": {
+          "mode": "team",
+          "executor": {
+            "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+            "subject": "policy:policy-trigger-lifecycles-uid",
+            "clientID": "policy-executor",
+            "identityType": "workload"
+          },
+          "continuesAfterCreatorLeaves": true,
+          "notAfter": "2026-11-08T12:00:00Z",
+          "limits": {
+            "maxExecutions": 100,
+            "maxBytes": 1099511627776,
+            "maxObservedBytes": 1099511627776
+          },
+          "state": "Ready",
+          "reasonCodes": [],
+          "ownerTeams": [
+            {
+              "kind": "Group",
+              "issuer": "https://identity.example.invalid/realms/company",
+              "id": "team-payments"
+            }
+          ]
+        }
+      },
+      {
+        "recording_handle": "recording-synthetic-syscalls",
+        "policy_uid": "policy-trigger-lifecycles-uid",
+        "policy_name": "trigger-lifecycles",
+        "pod_uid": "pod-uid",
+        "pod_name": "api-synthetic",
+        "action_id": "syscalls",
+        "kind": "syscallTrace",
+        "state": "Ready",
+        "available_before_seconds": 30,
+        "maximum_before": "30s",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "handle_expires_at": "2026-10-09T12:01:00Z",
+        "save_eligible": true,
+        "blockers": [],
+        "execution_authority": {
+          "mode": "team",
+          "executor": {
+            "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+            "subject": "policy:policy-trigger-lifecycles-uid",
+            "clientID": "policy-executor",
+            "identityType": "workload"
+          },
+          "continuesAfterCreatorLeaves": true,
+          "notAfter": "2026-11-08T12:00:00Z",
+          "limits": {
+            "maxExecutions": 100,
+            "maxBytes": 1099511627776,
+            "maxObservedBytes": 1099511627776
+          },
+          "state": "Ready",
+          "reasonCodes": [],
+          "ownerTeams": [
+            {
+              "kind": "Group",
+              "issuer": "https://identity.example.invalid/realms/company",
+              "id": "team-payments"
+            }
+          ]
+        }
+      }
+    ],
+    "windows": [
+      {
+        "recording_handle": "recording-synthetic-traffic",
+        "before": "20s",
+        "after": "0s"
+      },
+      {
+        "recording_handle": "recording-synthetic-syscalls",
+        "before": "20s",
+        "after": "0s"
+      }
+    ],
+    "capture_assessment": {
+      "schemaVersion": "capture-assessment/v1",
+      "assessmentID": "00000000-0000-4000-8000-000000000193",
+      "planDigest": "33dc70161e239f66d41de88282ce27c1a2426797fb743c9f688e0261e39822d8",
+      "generatedAt": "2026-10-09T12:00:00Z",
+      "validUntil": "2026-10-09T12:01:00Z",
+      "basis": {
+        "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "metrics": {
+          "state": "unavailable"
+        }
+      },
+      "scope": {
+        "observationPods": 1,
+        "incidentPods": 1
+      },
+      "combinedImpact": {
+        "level": "unknown",
+        "hasUnknowns": true,
+        "effects": [
+          "nodeCPU",
+          "collectorMemory",
+          "storageIO",
+          "uploadContention"
+        ],
+        "explanation": "Incremental snapshot encryption and upload compete for node resources. Existing recorders continue under their own limits; no new recorder or dump starts. No matching measurements are available."
+      },
+      "actions": [
+        {
+          "actionID": "traffic",
+          "executionMode": "ongoing",
+          "impact": {
+            "level": "unknown",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU",
+              "collectorMemory",
+              "storageIO",
+              "uploadContention"
+            ],
+            "explanation": "Cost describes saving existing bytes; recording was already authorized. Limits do not predict overhead."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "networkAddresses"
+            ],
+            "transientOnly": [],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 4194304,
+              "sourceRef": "action:traffic:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 4194304,
+              "sourceRef": "declared-frozen-capacity",
+              "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+            }
+          ]
+        },
+        {
+          "actionID": "syscalls",
+          "executionMode": "ongoing",
+          "impact": {
+            "level": "unknown",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU",
+              "collectorMemory",
+              "storageIO",
+              "uploadContention"
+            ],
+            "explanation": "Cost describes saving existing bytes; recording was already authorized. Limits do not predict overhead."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "personalIdentifiers"
+            ],
+            "transientOnly": [],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 16777216,
+              "sourceRef": "action:syscalls:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 16777216,
+              "sourceRef": "declared-frozen-capacity",
+              "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+            }
+          ]
+        }
+      ],
+      "combinedQuantities": [],
+      "interactions": [],
+      "alternatives": [],
+      "handlingCodes": [
+        "minimizeCapture",
+        "restrictAccess",
+        "preferApprovedExtracts",
+        "reviewBeforeSharing",
+        "approvedClientsOnly",
+        "externalCopiesNotRecalled"
+      ],
+      "handlingPolicyRef": "company-debug-evidence/v1"
+    },
+    "blockers": [],
+    "navigation_uri": "https://asservat.example.invalid/captures/previews/00000000-0000-4000-8000-000000000194"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

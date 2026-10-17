@@ -1,0 +1,61 @@
+# ADR-140 — Protected producers for installed public runtime
+
+Status: accepted direction; configuration-role component checkpoint. Complete
+installed public composition and its acceptance journey remain in progress.
+
+The existing public endpoint constructor composes browser, session, MCP and
+native-content handlers, but it does not produce their installed inputs or
+credentials. Startup must assemble actual configured components and validate
+the complete graph before binding a listener. A fixture, retained configuration
+receipt or successful TLS setup cannot fill an authority producer gap.
+
+Use purpose-fixed post-activation producers and fixed private projections.
+These are separate from the retired initial SQL manager. Generate role names,
+projection filenames and supported finite limits from product contracts rather
+than asking an operator to author individual grants. Validate the total
+PostgreSQL connection budget across runtime, rollout, reconciler, verifier and
+installer compartments before installed provisioning.
+
+Configuration reconciliation needs its own three-role bootstrap. Requiring
+fresh accepted owner configuration before creating its source/audit credentials
+would create a dependency cycle. For these three credential effects only, use
+an independently current, guarded fleet/owner/workload proof alongside original
+positive installation activation and current database incarnation, issuer epoch,
+suspension and recovery checks. This replaces only stale SQL source-observation
+freshness; it does not create accepted configuration or bypass negative fences.
+Public role provisioning retains its stronger current accepted-source gate.
+
+Each original five-second operation retains a private proof slot tied to the
+same concrete source reader. Repeat actual enforcement probes and canonical
+source/workload/guard checks before effects and after blocking SQL locks.
+Never reuse the slot across independent requests, reset observation starts,
+increase client rates or extend the earliest original deadline. A private
+30-minute Secret holds one-use role claims and exact original receipts. Unknown
+claims or SQL results allow exact lookup only. The immutable runtime projection
+contains fixed credentials and historical provenance, not current authority.
+
+Stable audit-input and account HMAC seeds belong to a separate protected public
+role root. Capacity receives only the account seed and original version; these
+are not artifact wrapping keys. The configuration bootstrap contains neither.
+The current public role list is a partial identity/read inventory, not the
+complete installed role plan. Its inclusion as a shared implementation
+dependency does not authorize public startup.
+
+The resulting configuration credentials can construct the real reconciler
+with a recovery-first current acknowledgement adapter. Acknowledgement remains
+distinct from activation. Keep the historical acknowledgement adapter available
+for its original component contract. Change the installed command only with
+the corresponding generated projection and runtime qualification.
+
+Central multi-cluster public serving remains required: select exact profiles
+from the current C03-authorized download path, reusing the existing owner
+catalog and per-profile authority. Do not select a default, union trust roots
+or treat a catalog entry as authority. One accepted normal-lane audit lifecycle
+per permission root must be shared by processing initialization/restriction and
+public preparation/status/content. All retained compatibility fields and
+original account-key versions remain binding.
+
+The component source, measured checks and remaining production prerequisites
+are described in [configuration credential provisioning](../architecture/configuration-credential-provisioning.md).
+This decision enables no public listener, Helm runtime, new approval or SQL
+schema migration.

@@ -1,0 +1,35 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "files": [
+    {
+      "path": "internal/application/evidence/download_content_audit.go",
+      "base_sha256": "b2a2d93a6f32ea2b5de27bc66bed3c696ad453bf6171908cd9313e892ff6cb45",
+      "payload_sha256": "a93326486ffb4abede6a1e7404a9b3aa10fa8e3d9fcd7c2456ac4c9fb483cfb5",
+      "bytes": 3155
+    },
+    {
+      "path": "internal/application/evidence/download_content_body_phase_test.go",
+      "base_sha256": null,
+      "payload_sha256": "59a443b2af550667a685b8be6d9a46403a13a1d1ec2486eb579dce15eb04e6e7",
+      "bytes": 2320
+    },
+    {
+      "path": "internal/application/evidence/download_response_transfer.go",
+      "base_sha256": "d257b10d668fa70860f848613e345161495a91bc1c6cfbe153025d8a9c65b3f7",
+      "payload_sha256": "2a2d2c8484e3a3c9e208bcbe72fdb38ba5ffcf8cfe6bed3c15dc940cabcf02f5",
+      "bytes": 16432
+    },
+    {
+      "path": "internal/transport/browser/download_content.go",
+      "base_sha256": "2e05b361a381718ed3cb0bb37f9c99d2b2addc8e9673d1f0ad53194a6b8930f4",
+      "payload_sha256": "0e2e568ffae11bbdc71bb254cdacdfb0a085b7e2f68080530b39dfb3af2f7015",
+      "bytes": 16258
+    },
+    {
+      "path": "internal/transport/browser/download_content_deadline_test.go",
+      "base_sha256": null,
+      "payload_sha256": "270db1176ed015a7e97bc5c49e11f9e5c56f024383fdfb8c3f1abbc5a07e2d44",
+      "bytes": 7106
+    }
+  ]
+}

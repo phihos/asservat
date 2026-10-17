@@ -1,0 +1,50 @@
+{
+  "scope": "Original connector permit observation intersection; no SQL/wire/deadline change",
+  "files": [
+    {
+      "path": "docs/architecture/connector-renewal.md",
+      "base_sha256": "1b3da335383b9f48b65fa7287886e6607ba16eb3ad5aa3fb4f66904e7cbb36ba",
+      "new_sha256": "e13eb8d1ac225f2d4721c4acf59d3d3a98311497696fb7eed457968eef640a58"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_issuance.go",
+      "base_sha256": "34a7a96d07dc4ed4259b179dc8bd5f292cd7436bc35f9c18b259e5ead9717b3c",
+      "new_sha256": "98b28857ce8e6dc133e67e27f7707462a3f080e9beec8e31062f7e2d32a01b81"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_issuance_test.go",
+      "base_sha256": "116ce4fa37fd6220d94bdafde99cf201cfbb646b93462f609689ce190638db30",
+      "new_sha256": "18612b6cb4e2a15ea371783d020a80fe565ec5600e030d4526ad2d19da2b7e7c"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_credentials.go",
+      "base_sha256": "14ea785f594426172702d00cdb1bbf523536f971634cc77ff2aff64c3962fc46",
+      "new_sha256": "223955ee9c24ada827370b8da1557bfa6f3b7e5759d81d4b65c987d102e7c426"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_permit_overlap_test.go",
+      "base_sha256": null,
+      "new_sha256": "567c46335a1c7f7630b8c7575d2a57dbf15f6d1aa2794289b22a5621239902c2"
+    },
+    {
+      "path": "internal/application/fleet/connector_permit_overlap_test.go",
+      "base_sha256": null,
+      "new_sha256": "a741df079ec1330720d3b39abbc8465b845d6dc384453638e210300db37fa06f"
+    },
+    {
+      "path": "internal/application/fleet/connector_renewal.go",
+      "base_sha256": "33a66530e8ef67990581ac51686a287be4b699fe0208b1db5821a9e19a5db700",
+      "new_sha256": "244c893cfaa027a06107ead85177e0d01e4f313c94bd9117246a38a291696dde"
+    },
+    {
+      "path": "internal/domain/fleet/connector_issuance.go",
+      "base_sha256": "8af31fedb81c15b798b16f51cac9adf3277d9d46b28a5a00a258b1584aafcc09",
+      "new_sha256": "2bcdfa359928455fa894c808d149203bede61c33782d4ba7d339cfc4d9132c71"
+    },
+    {
+      "path": "internal/domain/fleet/connector_permit_overlap_test.go",
+      "base_sha256": null,
+      "new_sha256": "56b1e3e7b2c953b149986b071588f5c5bb9d5a808c74efd13dc78fe221380ef0"
+    }
+  ]
+}

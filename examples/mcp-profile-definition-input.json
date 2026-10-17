@@ -1,0 +1,8 @@
+{
+  "target_handle": "target-ledger-001",
+  "profile_ref": {
+    "catalog": "builtin",
+    "name": "syscall-activity",
+    "version": "v1"
+  }
+}

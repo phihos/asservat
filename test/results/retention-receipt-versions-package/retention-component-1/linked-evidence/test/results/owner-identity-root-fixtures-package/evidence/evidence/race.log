@@ -1,0 +1,10 @@
+=== RUN   TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs
+--- PASS: TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs (15.47s)
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit
+--- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement (10.61s)
+    --- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit (5.31s)
+    --- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit (5.30s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	27.132s

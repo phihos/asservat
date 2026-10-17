@@ -1,0 +1,14 @@
+=== RUN   TestContextStartOwnersWithRealServices
+=== RUN   TestContextStartOwnersWithRealServices/reader-has-no-effect-role
+=== RUN   TestContextStartOwnersWithRealServices/complete-overflow-is-unavailable
+=== RUN   TestContextStartOwnersWithRealServices/original-observation-expires-behind-real-lock
+=== RUN   TestContextStartOwnersWithRealServices/retired-server-client-alone-not-candidate
+=== NAME  TestContextStartOwnersWithRealServices
+    context_start_owners_test.go:380: actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/overflow/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic
+--- PASS: TestContextStartOwnersWithRealServices (2.79s)
+    --- PASS: TestContextStartOwnersWithRealServices/reader-has-no-effect-role (0.00s)
+    --- PASS: TestContextStartOwnersWithRealServices/complete-overflow-is-unavailable (1.64s)
+    --- PASS: TestContextStartOwnersWithRealServices/original-observation-expires-behind-real-lock (0.39s)
+    --- PASS: TestContextStartOwnersWithRealServices/retired-server-client-alone-not-candidate (0.02s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.840s

@@ -1,0 +1,138 @@
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/missing
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/null
+--- PASS: TestInitialInstallationReceiptRequiresImmutableVersion (0.00s)
+    --- PASS: TestInitialInstallationReceiptRequiresImmutableVersion/missing (0.00s)
+    --- PASS: TestInitialInstallationReceiptRequiresImmutableVersion/null (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/audit	1.006s
+=== RUN   TestInitialInstallationHistoricalObservation
+=== RUN   TestInitialInstallationHistoricalObservation/prepared
+=== RUN   TestInitialInstallationHistoricalObservation/audited
+=== RUN   TestInitialInstallationHistoricalObservation/expired-claim-historical-success
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-audited-history
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-activated-history
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-audited-history
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-activated-history
+=== RUN   TestInitialInstallationHistoricalObservation/activation-without-audit
+=== RUN   TestInitialInstallationHistoricalObservation/activation-at-expiry
+=== RUN   TestInitialInstallationHistoricalObservation/activation-before-claim
+=== RUN   TestInitialInstallationHistoricalObservation/unknown-record-field
+=== RUN   TestInitialInstallationHistoricalObservation/trailing-record
+=== RUN   TestInitialInstallationHistoricalObservation/foreign-audit
+--- PASS: TestInitialInstallationHistoricalObservation (0.01s)
+    --- PASS: TestInitialInstallationHistoricalObservation/prepared (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/audited (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/expired-claim-historical-success (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unversioned-audited-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unversioned-activated-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/null-version-audited-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/null-version-activated-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-without-audit (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-at-expiry (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-before-claim (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unknown-record-field (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/trailing-record (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/foreign-audit (0.00s)
+=== RUN   TestInitialInstallationInventoryMatchesCatalogOrdering
+--- PASS: TestInitialInstallationInventoryMatchesCatalogOrdering (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.053s
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/caller_input_ownership
+--- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes (2.44s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/caller_input_ownership (0.00s)
+=== RUN   TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions
+--- PASS: TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions (0.00s)
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target
+--- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target (0.00s)
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor
+--- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts (0.01s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor (0.00s)
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read
+--- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState (0.45s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read (0.07s)
+=== RUN   TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority
+--- PASS: TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority (0.00s)
+=== RUN   TestInitialRuntimeRootPinOriginalCreationInputAndReplacement
+--- PASS: TestInitialRuntimeRootPinOriginalCreationInputAndReplacement (2.97s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	6.934s

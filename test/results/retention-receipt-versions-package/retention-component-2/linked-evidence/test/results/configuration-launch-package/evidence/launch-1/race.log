@@ -1,0 +1,41 @@
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.052s [no tests to run]
+=== RUN   TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay
+    configuration_runtime_launch_test.go:174: original launch operation wall=4.695957041s
+    configuration_runtime_launch_test.go:186: record independent original result permission configuration unavailable
+--- FAIL: TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay (12.27s)
+=== RUN   TestConfigurationLaunchUnknownWriteOnlyObservesOriginal
+--- PASS: TestConfigurationLaunchUnknownWriteOnlyObservesOriginal (11.85s)
+=== RUN   TestConfigurationLaunchUnknownClaimNeverWritesWorkload
+    configuration_runtime_launch_test.go:220: original spent launch claim missing permission source identity changed
+--- FAIL: TestConfigurationLaunchUnknownClaimNeverWritesWorkload (5.87s)
+=== RUN   TestConfigurationLaunchRechecksEnforcementAfterClaim
+--- PASS: TestConfigurationLaunchRechecksEnforcementAfterClaim (5.87s)
+=== RUN   TestConfigurationLaunchExactRunningTransition
+=== RUN   TestConfigurationLaunchExactRunningTransition/missing_launch
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_launch
+=== RUN   TestConfigurationLaunchExactRunningTransition/still_inert
+=== RUN   TestConfigurationLaunchExactRunningTransition/excess_replicas
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_account
+=== RUN   TestConfigurationLaunchExactRunningTransition/new_spec_field
+=== RUN   TestConfigurationLaunchExactRunningTransition/other_UID
+=== RUN   TestConfigurationLaunchExactRunningTransition/original_version
+--- PASS: TestConfigurationLaunchExactRunningTransition (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/missing_launch (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_launch (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/still_inert (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/excess_replicas (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_account (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/new_spec_field (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/other_UID (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/original_version (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	35.975s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.059s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.055s [no tests to run]
+FAIL

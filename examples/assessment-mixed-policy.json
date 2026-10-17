@@ -1,0 +1,291 @@
+{
+  "schemaVersion": "capture-assessment/v1",
+  "assessmentID": "00000000-0000-4000-8000-000000000161",
+  "planDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "generatedAt": "2026-10-09T12:00:00Z",
+  "validUntil": "2026-10-09T12:05:00Z",
+  "basis": {
+    "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "metrics": {
+      "state": "unavailable"
+    }
+  },
+  "scope": {
+    "observationPods": 20,
+    "incidentPods": 1
+  },
+  "combinedImpact": {
+    "level": "high",
+    "hasUnknowns": true,
+    "effects": [
+      "applicationPause",
+      "collectorMemory",
+      "nodeCPU",
+      "storageIO",
+      "uploadContention"
+    ],
+    "explanation": "Known mechanism effects are a minimum; workload headroom, combined overhead and placement are unmeasured. Limits are not predictions."
+  },
+  "actions": [
+    {
+      "actionID": "traffic",
+      "executionMode": "ongoing",
+      "impact": {
+        "level": "unknown",
+        "hasUnknowns": true,
+        "effects": [
+          "nodeCPU",
+          "collectorMemory",
+          "storageIO"
+        ],
+        "explanation": "Recording/parser overhead depends on traffic and placement; no matching overhead measurements are available."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "networkAddresses"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 86100,
+        "maximumAgeSeconds": 86400,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 86400
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 4194304,
+          "sourceRef": "action:traffic:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        },
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "whileArmed",
+          "scope": "perObservationPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 4194304,
+          "sourceRef": "declared-ring-and-parser-allocations",
+          "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+        },
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 4194304,
+          "sourceRef": "declared-frozen-capacity",
+          "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+        }
+      ]
+    },
+    {
+      "actionID": "syscalls",
+      "executionMode": "ongoing",
+      "impact": {
+        "level": "unknown",
+        "hasUnknowns": true,
+        "effects": [
+          "nodeCPU",
+          "collectorMemory"
+        ],
+        "explanation": "Kernel event rate and collector cost are unmeasured; limits bound retained data, not application latency."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "personalIdentifiers"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 86100,
+        "maximumAgeSeconds": 86400,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 86400
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 16777216,
+          "sourceRef": "action:syscalls:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        },
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "whileArmed",
+          "scope": "perObservationPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 8388608,
+          "sourceRef": "declared-ring-and-parser-allocations",
+          "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+        },
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 16777216,
+          "sourceRef": "declared-frozen-capacity",
+          "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+        }
+      ]
+    },
+    {
+      "actionID": "core",
+      "executionMode": "onTrigger",
+      "impact": {
+        "level": "high",
+        "hasUnknowns": true,
+        "effects": [
+          "applicationPause",
+          "storageIO",
+          "uploadContention"
+        ],
+        "explanation": "Live dump can stop selected processes; pause duration and workload latency are unmeasured."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "userContent",
+          "credentials",
+          "personalIdentifiers"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 21300,
+        "maximumAgeSeconds": 21600,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 21600
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 536870912,
+          "sourceRef": "action:core:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        },
+        {
+          "dimension": "applicationPauseMs",
+          "phase": "perIncident",
+          "scope": "perProcess",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 10000,
+          "sourceRef": "action:core:maxStopPerProcess",
+          "coverage": "Configured stop watchdog budget for each process; not predicted pause or guaranteed termination of blocked kernel work."
+        }
+      ]
+    }
+  ],
+  "combinedQuantities": [
+    {
+      "dimension": "collectorMemoryBytes",
+      "phase": "whileArmed",
+      "scope": "wholePlan",
+      "basis": "configuredLimit",
+      "lower": 0,
+      "upper": 251658240,
+      "sourceRef": "sum-of-compatible-declared-limits",
+      "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+    },
+    {
+      "dimension": "collectorMemoryBytes",
+      "phase": "perIncident",
+      "scope": "wholePlan",
+      "basis": "configuredLimit",
+      "lower": 0,
+      "upper": 20971520,
+      "sourceRef": "sum-of-compatible-declared-limits",
+      "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+    },
+    {
+      "dimension": "outputBytes",
+      "phase": "perIncident",
+      "scope": "wholePlan",
+      "basis": "configuredLimit",
+      "lower": 0,
+      "upper": 557842432,
+      "sourceRef": "sum-of-compatible-declared-limits",
+      "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+    }
+  ],
+  "interactions": [
+    {
+      "actionIDs": [
+        "traffic",
+        "syscalls",
+        "core"
+      ],
+      "kind": "combinedCostUnknown",
+      "message": "Concurrent application/kernel work may interact; no matching combined benchmark or fresh pressure data is available.",
+      "blocking": false
+    }
+  ],
+  "alternatives": [
+    {
+      "actionIDs": [
+        "traffic",
+        "syscalls"
+      ],
+      "change": "futureOnly",
+      "benefit": "Avoid continuously armed recording by explicitly selecting onTrigger with zero lookback.",
+      "coverageLoss": "Traffic and syscalls before the next trigger will be unavailable."
+    }
+  ],
+  "handlingCodes": [
+    "minimizeCapture",
+    "restrictAccess",
+    "preferApprovedExtracts",
+    "reviewBeforeSharing",
+    "approvedClientsOnly",
+    "externalCopiesNotRecalled"
+  ],
+  "handlingPolicyRef": "company-debug-evidence/v1"
+}

@@ -1,0 +1,27 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:128: federation: federation enroll failed: unavailable
+    federation_regional_native_test.go:129: regional: connector enrollment pending: hub-channel
+    federation_regional_native_test.go:130: regional process not enrolled with both leaves
+    direct_observation_native_fixture_test.go:191: native original helper Pod mode=regional original=true phase=Running status-count=1
+--- FAIL: TestFederationRegionalProductWithRealKubernetes (97.85s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	97.910s
+FAIL

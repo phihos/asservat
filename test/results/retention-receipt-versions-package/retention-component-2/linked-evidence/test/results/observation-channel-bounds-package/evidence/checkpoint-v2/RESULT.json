@@ -1,0 +1,41 @@
+{
+  "session": 77428,
+  "terminal": 0,
+  "topLevelPasses": 44,
+  "namedPasses": 184,
+  "skips": 0,
+  "phases": {
+    "compile": {
+      "exit": 0,
+      "seconds": 11.372
+    },
+    "race": {
+      "exit": 0,
+      "seconds": 20.527
+    },
+    "vet": {
+      "exit": 0,
+      "seconds": 4.05
+    },
+    "go-architecture": {
+      "exit": 0,
+      "seconds": 4.699
+    }
+  },
+  "beforeSession": 96138,
+  "beforeExit": 1,
+  "beforeBoundaries": {
+    "post-metadata candidate lost original shorter owner cutoff": 1,
+    "metadata result lost newly observed owner cutoff": 1,
+    "expired retained cutoff admitted another candidate read": 1,
+    "metadata result survived original cutoff during key lock wait": 1
+  },
+  "v1CompileExit": 1,
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 7795568640
+  },
+  "dependencies": 2081,
+  "payloads": 2,
+  "mirrorPaths": 2082
+}

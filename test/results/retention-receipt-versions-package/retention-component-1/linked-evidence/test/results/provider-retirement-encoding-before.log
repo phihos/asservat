@@ -1,0 +1,5 @@
+--- FAIL: TestInitialProviderPinnedRetirementEncoding (0.01s)
+    initial_provider_retirement_encoding_test.go:24: pinned single-error retirement rejected key service refused or unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.013s
+FAIL

@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/application/privacy	(cached)
+ok  	asservat.local/asservat/internal/adapters/jose	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.505s
+ok  	asservat.local/asservat/test/integration	(cached)

@@ -1,0 +1,11 @@
+# Projection input ownership correction
+
+The owner projection constructor, owner material encoder and capacity projection constructor unmarshaled a serialized input back into a shallow copy of that input. Go's decoder reused existing pointers and slice storage. The material encoder consequently inserted the generated activation into the caller's input, and constructor callers could later change retained nested inputs. Each path now decodes into a fresh zero value. There is no layout, wire, digest, grant or authority change.
+
+The new source test invokes each existing production path with synthetic original fixtures. It verifies the material operation leaves caller input unchanged, changes to returned nested material cannot change the caller, and later caller mutations cannot change either constructor's retained input. It supplies no native, SQL, provider or effect authority.
+
+Session 18757 ended exit 0. Compile passed in 6.712 seconds; the exact original three production paths failed all three named ownership tests in 11.375 seconds; corrected affected races passed in 72.432 seconds; package vet passed in 2.005 seconds. The runner preserves each actual exit and checks all four payload/base hashes, the three before variants and all 2,074 dependency hashes before and after every phase. No native test ran.
+
+The original 180-second race package bound, GOMAXPROCS=2, GOFLAGS=-p=2 and explicit checkpoint TMPDIR remain. Exact commands and results are in run.py and result.json. Payload manifest SHA256: `bd91b71bb1a84f97bb25dbd09e39694316bb3e8f52e1bdb213e34dbc3a55ac8c`; dependency SHA256: `06d3321d89fe785dedf11bc7533bb608c80daac34b3ccd7bedb27648cb2d105b`; runner SHA256: `f9c9f258f463577fad6a479c47ef288f2b13b937898dfbfd08ed7d77509973eb`.
+
+All four paths apply directly to the current live tree, independent of the staged joint v2 profile. The broader v2 diagnostic and its later source edits remain separate. The only refreshed existing dependencies relative to that diagnostic are the parent's independently integrated reconciliation.go and hub_worker.go joined-shutdown corrections, recorded in dependency-delta.json.

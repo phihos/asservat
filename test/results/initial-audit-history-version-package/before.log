@@ -1,0 +1,45 @@
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/missing
+    initial_installation_test.go:23: INITIAL_HISTORY_ACCEPTED_WITHOUT_IMMUTABLE_VERSION missing
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/null
+    initial_installation_test.go:23: INITIAL_HISTORY_ACCEPTED_WITHOUT_IMMUTABLE_VERSION null
+--- FAIL: TestInitialInstallationReceiptRequiresImmutableVersion (0.00s)
+    --- FAIL: TestInitialInstallationReceiptRequiresImmutableVersion/missing (0.00s)
+    --- FAIL: TestInitialInstallationReceiptRequiresImmutableVersion/null (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.002s
+=== RUN   TestInitialInstallationHistoricalObservation
+=== RUN   TestInitialInstallationHistoricalObservation/prepared
+=== RUN   TestInitialInstallationHistoricalObservation/audited
+=== RUN   TestInitialInstallationHistoricalObservation/expired-claim-historical-success
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-audited-history
+    initial_installation_read_test.go:53: invalid historical state accepted
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-activated-history
+    initial_installation_read_test.go:53: invalid historical state accepted
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-audited-history
+    initial_installation_read_test.go:53: invalid historical state accepted
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-activated-history
+    initial_installation_read_test.go:53: invalid historical state accepted
+=== RUN   TestInitialInstallationHistoricalObservation/activation-without-audit
+=== RUN   TestInitialInstallationHistoricalObservation/activation-at-expiry
+=== RUN   TestInitialInstallationHistoricalObservation/activation-before-claim
+=== RUN   TestInitialInstallationHistoricalObservation/unknown-record-field
+=== RUN   TestInitialInstallationHistoricalObservation/trailing-record
+=== RUN   TestInitialInstallationHistoricalObservation/foreign-audit
+--- FAIL: TestInitialInstallationHistoricalObservation (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/prepared (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/audited (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/expired-claim-historical-success (0.00s)
+    --- FAIL: TestInitialInstallationHistoricalObservation/unversioned-audited-history (0.00s)
+    --- FAIL: TestInitialInstallationHistoricalObservation/unversioned-activated-history (0.00s)
+    --- FAIL: TestInitialInstallationHistoricalObservation/null-version-audited-history (0.00s)
+    --- FAIL: TestInitialInstallationHistoricalObservation/null-version-activated-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-without-audit (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-at-expiry (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-before-claim (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unknown-record-field (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/trailing-record (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/foreign-audit (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.010s
+FAIL

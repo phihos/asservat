@@ -1,0 +1,278 @@
+//go:build ignore
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+)
+
+// All control is local to the original helper Pod, reached with explicit owned
+// test kubectl exec. This socket is neither a product route nor an authority
+// broker. Only fixed setup/read/close operations exist; there are no endpoint overrides.
+func main() {
+	if len(os.Args) != 2 {
+		os.Exit(2)
+	}
+	if os.Args[1] == "joined" {
+		b, err := os.ReadFile(joinedFile)
+		if err != nil || !bytes.Equal(b, []byte("joined\n")) {
+			os.Exit(1)
+		}
+		_, _ = os.Stdout.Write(b)
+		return
+	}
+	if os.Args[1] == "control" {
+		if runControl() != nil {
+			fmt.Fprintln(os.Stderr, "observation fixture control unavailable")
+			os.Exit(1)
+		}
+		return
+	}
+	mode := os.Args[1]
+	if mode != "hwork" && mode != "owner" && mode != "regional" {
+		os.Exit(2)
+	}
+	// Match the product's process-local key boundary before constructing any
+	// credential owner. This changes only this helper, never host core_pattern.
+	if syscall.Setrlimit(syscall.RLIMIT_CORE, &syscall.Rlimit{Cur: 0, Max: 0}) != nil {
+		emitFailure("inputs", errFixture)
+		os.Exit(1)
+	}
+	root, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	setup, cancel := context.WithTimeout(root, 2*time.Minute)
+	inputPhase := beginPhase("inputs")
+	in, err := loadInput(setup, mode)
+	cancel()
+	inputPhase(err)
+	if err != nil {
+		emitFailure("inputs", err)
+		os.Exit(1)
+	}
+	composition := beginPhase("composition")
+	runtime, err := newRuntime(root, in)
+	composition(err)
+	if err != nil {
+		emitFailure("composition", err)
+		os.Exit(1)
+	}
+	err = serveControl(runtime)
+	if err != nil && root.Err() == nil && !runtime.shutdownRequested.Load() {
+		emitFailure("control", err)
+	}
+	runtime.Close()
+	if err != nil && root.Err() == nil && !runtime.shutdownRequested.Load() {
+		emitFailure("control", err)
+		os.Exit(1)
+	}
+	// This fixed local marker follows actual joined native handlers/streams and
+	// closed SQL pools. Signal delivery or an unknown control reply is not proof.
+	if err = os.WriteFile(joinedFile, []byte("joined\n"), 0400); err != nil {
+		os.Exit(1)
+	}
+	if runtime.shutdownRequested.Load() && root.Err() == nil {
+		// Keep this fixture process inert until owned Pod removal, preventing an
+		// Always-restart Deployment from starting a new identity after shutdown.
+		timer := time.NewTimer(time.Until(in.Until))
+		defer timer.Stop()
+		select {
+		case <-root.Done():
+		case <-timer.C:
+		}
+	}
+}
+
+type phaseError struct {
+	phase string
+	cause error
+}
+
+func (e phaseError) Error() string { return e.phase }
+func (e phaseError) Unwrap() error { return e.cause }
+
+func emitFailure(phase string, err error) {
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		if e, ok := current.(phaseError); ok {
+			phase = e.phase
+		}
+	}
+	_ = json.NewEncoder(os.Stderr).Encode(controlResult{Phase: phase, Category: errorCategory(err)})
+}
+
+// Setup-only, closed labels and durations. There are no request/credential
+// bodies, object identities, SQL text, addresses or error strings here.
+// Each fixed composition step executes once; input wait emits at most three
+// additional progress events under its original two-minute setup context.
+func beginPhase(phase string) func(error) {
+	start := time.Now()
+	emitPhase(phase, "begin", 0, nil)
+	return func(err error) { emitPhase(phase, "end", time.Since(start), err) }
+}
+func emitPhase(phase, event string, elapsed time.Duration, err error) {
+	_ = json.NewEncoder(os.Stderr).Encode(struct {
+		Format, Phase, Event, Category string
+		ElapsedNanos                   int64
+	}{"observation-native-phase/v1", phase, event, errorCategory(err), elapsed.Nanoseconds()})
+}
+
+func writeFrame(w io.Writer, b []byte) error {
+	if len(b) == 0 || len(b) > maxControlBytes {
+		return errFixture
+	}
+	var size [4]byte
+	binary.BigEndian.PutUint32(size[:], uint32(len(b)))
+	if n, e := w.Write(size[:]); e != nil {
+		return e
+	} else if n != len(size) {
+		return io.ErrShortWrite
+	}
+	for len(b) > 0 {
+		n, e := w.Write(b)
+		if e != nil {
+			return e
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		b = b[n:]
+	}
+	return nil
+}
+func readFrame(r io.Reader) ([]byte, error) {
+	var size [4]byte
+	if _, e := io.ReadFull(r, size[:]); e != nil {
+		return nil, e
+	}
+	n := binary.BigEndian.Uint32(size[:])
+	if n == 0 || n > maxControlBytes {
+		return nil, errFixture
+	}
+	b := make([]byte, n)
+	_, e := io.ReadFull(r, b)
+	return b, e
+}
+func runControl() error {
+	raw, e := io.ReadAll(io.LimitReader(os.Stdin, maxControlBytes+1))
+	if e != nil {
+		return errFixture
+	}
+	var q controlRequest
+	if strictDecode(raw, maxControlBytes, &q) != nil || !time.Now().Before(q.Until) || q.Until.After(time.Now().Add(30*time.Second)) {
+		return errFixture
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), q.Until)
+	defer cancel()
+	conn, e := (&net.Dialer{}).DialContext(ctx, "unix", controlSocket)
+	if e != nil {
+		return errFixture
+	}
+	defer conn.Close()
+	if conn.SetDeadline(q.Until) != nil || writeFrame(conn, raw) != nil {
+		return errFixture
+	}
+	b, e := readFrame(conn)
+	if e != nil {
+		return errFixture
+	}
+	var reply controlResult
+	if strictDecode(b, maxControlBytes, &reply) != nil {
+		return errFixture
+	}
+	_, e = os.Stdout.Write(append(b, '\n'))
+	return e
+}
+
+func serveControl(runtime *fixtureRuntime) error {
+	// The owned emptyDir starts empty. Refuse to unlink/adopt any old socket.
+	if _, e := os.Lstat(controlSocket); !os.IsNotExist(e) {
+		return errFixture
+	}
+	listener, e := net.Listen("unix", controlSocket)
+	if e != nil {
+		return e
+	}
+	defer listener.Close()
+	defer os.Remove(controlSocket)
+	if e = os.Chmod(controlSocket, 0600); e != nil {
+		return e
+	}
+	var active sync.WaitGroup
+	closing := make(chan struct{})
+	stop := context.AfterFunc(runtime.root, func() { _ = listener.Close(); close(closing) })
+	defer func() {
+		if !stop() {
+			<-closing
+		}
+		active.Wait()
+	}()
+	slots := make(chan struct{}, 2)
+	for {
+		conn, e := listener.Accept()
+		if e != nil {
+			return e
+		}
+		select {
+		case slots <- struct{}{}:
+		default:
+			_ = conn.Close()
+			continue
+		}
+		active.Add(1)
+		go func() { defer active.Done(); defer func() { <-slots }(); handleControl(runtime, conn) }()
+	}
+}
+func handleControl(runtime *fixtureRuntime, conn net.Conn) {
+	defer conn.Close()
+	ctx, cancel := context.WithCancel(runtime.root)
+	defer cancel()
+	closed := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close(); close(closed) })
+	defer func() {
+		cancel()
+		if !stop() {
+			<-closed
+		}
+	}()
+	if conn.SetDeadline(time.Now().Add(3*time.Second)) != nil {
+		return
+	}
+	raw, e := readFrame(conn)
+	if e != nil {
+		return
+	}
+	var q controlRequest
+	if strictDecode(raw, maxControlBytes, &q) != nil || !time.Now().Before(q.Until) || q.Until.After(time.Now().Add(30*time.Second)) {
+		return
+	}
+	call, end := context.WithDeadline(ctx, q.Until)
+	defer end()
+	if conn.SetDeadline(q.Until) != nil {
+		return
+	}
+	// A closed/extra-byte control stream cancels the original admitted work.
+	// This goroutine is always joined before releasing the local slot.
+	readDone := make(chan struct{})
+	go func() { var b [1]byte; _, _ = conn.Read(b[:]); cancel(); close(readDone) }()
+	defer func() { _ = conn.Close(); <-readDone }()
+	reply := runtime.command(call, q)
+	if call.Err() != nil {
+		return
+	}
+	b, e := json.Marshal(reply)
+	if e != nil {
+		return
+	}
+	_ = writeFrame(conn, b)
+}

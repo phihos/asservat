@@ -1,0 +1,239 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+)
+
+// OwnerIdentityRoleRoot derives its immutable scope from these concrete
+// installation producers. An input snapshot cannot replace either the current
+// native retained bridge or independently accepted SQL owner configuration.
+func NewOwnerIdentityRoleRoot(ctx context.Context, bridge *InitialRuntimeBridge, resources *InitialRuntimeResources, accepted fleetapp.OwnerConfigurationReader, layout string) (*OwnerIdentityRoleRoot, error) {
+	if ctx == nil || ctx.Err() != nil || bridge == nil || resources == nil || accepted == nil || !ownerIdentityDigestValid(layout) || resources.preparer != bridge.preparer || resources.rootUID != bridge.rootUID || !equalJSON(resources.initial, bridge.initial) || resources.ownerLayout == "" || !initialRuntimeProviderSelectionValid(resources.initial.InstallationID, resources.workerLayout, resources.ownerLayout, resources.workerProvider, resources.ownerProvider) {
+		return nil, cfg.ErrInvalid
+	}
+	life, cancel := context.WithCancel(ctx)
+	s := &OwnerIdentityRoleRoot{bridge: bridge, resources: resources, accepted: accepted, ctx: life, cancel: cancel}
+	err := s.operation(ctx, func(call context.Context) error {
+		original, _, err := s.readResources(call)
+		if err != nil {
+			return err
+		}
+		in, err := s.inputFromResources(original, layout)
+		if err != nil {
+			return err
+		}
+		s.resourceCreatedAt, s.resourceUntil = original.State.CreatedAt, original.State.Until
+		s.input = in
+		_, _, err = s.current(call)
+		return err
+	})
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+// Input contains only the original public scope selected by the concrete
+// producer. SQL independently requires the compiled layout before any effect.
+func (s *OwnerIdentityRoleRoot) Input() contracts.OwnerIdentityRoles {
+	if s == nil {
+		return contracts.OwnerIdentityRoles{}
+	}
+	return s.input
+}
+
+func (s *OwnerIdentityRoleRoot) inputFromResources(v contracts.InitialRuntimeResourceSnapshot, layout string) (contracts.OwnerIdentityRoles, error) {
+	var zero contracts.OwnerIdentityRoles
+	if !authorization.UUID(v.UID) || len(v.State.Objects) != contracts.InitialRuntimeResourceCount || v.State.OwnerLayout != s.resources.ownerLayout || !contracts.InitialRuntimeLayoutsSupported(v.State.WorkerLayout, v.State.OwnerLayout) || v.State.Objects[0].Receipt == nil || v.State.Objects[10].Receipt == nil || v.State.Objects[14].Receipt == nil {
+		return zero, cfg.ErrChanged
+	}
+	n := s.resources.names
+	return contracts.OwnerIdentityRoles{Format: contracts.OwnerIdentityRolesFormat, InstallationID: s.bridge.initial.InstallationID, InitialClaimID: s.bridge.record.Claim.ID, ClusterID: s.bridge.initial.ClusterID, Namespace: s.bridge.initial.Namespace, OwnerConfigurationUID: v.State.Objects[14].Receipt.UID, Resources: contracts.WorkerObjectReference{Name: s.resources.name(), UID: v.UID}, ResourceSetupID: v.State.SetupID, ResourceBinding: v.State.BindingDigest, OwnerLayout: v.State.OwnerLayout, Deployment: contracts.WorkerObjectReference{Name: n.Owner, UID: v.State.Objects[10].Receipt.UID}, ServiceAccount: contracts.WorkerObjectReference{Name: n.Owner, UID: v.State.Objects[0].Receipt.UID}, LayoutDigest: layout}, nil
+}
+
+// Must be called under s.operation, which holds the original bridge SQL
+// recovery/activation locks and joins all callbacks before returning.
+func (s *OwnerIdentityRoleRoot) readResources(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, error) {
+	var zero contracts.InitialRuntimeResourceSnapshot
+	before, _, _, phase, err := s.bridge.readCurrent(ctx)
+	if err != nil || phase != 2 || before.State.Probe == nil || before.State.Probe.Receipt == nil || before.State.Retained == nil || before.State.Retained.Receipt == nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	call, end := context.WithDeadline(ctx, before.ValidUntil)
+	defer end()
+	v, obj, err := s.resources.read(call)
+	if err != nil || v.State.OwnerLayout != s.resources.ownerLayout || !contracts.InitialRuntimeLayoutsSupported(v.State.WorkerLayout, v.State.OwnerLayout) || len(v.State.Objects) != contracts.InitialRuntimeResourceCount {
+		return zero, nil, cfg.ErrChanged
+	}
+	for _, c := range v.State.Objects {
+		if c.Receipt == nil {
+			return zero, nil, cfg.ErrChanged
+		}
+	}
+	if s.input.Format != "" {
+		in, e := s.inputFromResources(v, s.input.LayoutDigest)
+		if e != nil || in != s.input || !v.State.CreatedAt.Equal(s.resourceCreatedAt) || !v.State.Until.Equal(s.resourceUntil) {
+			return zero, nil, cfg.ErrChanged
+		}
+	}
+	after, _, _, phase, err := s.bridge.readCurrent(call)
+	v.ValidUntil = identity.Earlier(v.ValidUntil, identity.Earlier(before.ValidUntil, after.ValidUntil))
+	if err != nil || phase != 2 || after.UID != before.UID || !equalJSON(after.State, before.State) || initialHandoverDeadline(call, s.resources.now, v.ValidUntil) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	return v, obj, nil
+}
+
+// Once launch has any claim, this function is inspection-only: current roles
+// may be verified, but no missing role or projection may be created. The exact
+// pending running shape permits reconciliation without inventing a receipt.
+func (s *OwnerIdentityRoleRoot) current(ctx context.Context) (time.Time, bool, error) {
+	return s.currentConfiguration(ctx, nil)
+}
+
+// A provider setup observation belongs to one accepted revision. Reuse the
+// existing complete current reads; do not turn identity equality into proof
+// or add an independent authority cache.
+func (s *OwnerIdentityRoleRoot) currentConfiguration(ctx context.Context, expected *fleet.OwnerConfiguration) (time.Time, bool, error) {
+	first, err := s.accepted.ReadOwnerConfiguration(ctx)
+	if err != nil || !first.Valid(s.resources.now()) || first.Configuration.Suspended {
+		return time.Time{}, false, cfg.ErrUnavailable
+	}
+	if expected != nil && !first.Configuration.Equal(*expected) {
+		return time.Time{}, false, cfg.ErrChanged
+	}
+	pool := first.Configuration.Pool
+	if first.Configuration.Revision.UID != s.input.OwnerConfigurationUID || pool.InstallationID != s.input.InstallationID || pool.ClusterID != s.input.ClusterID || pool.Namespace != s.input.Namespace.Name || pool.NamespaceUID != s.input.Namespace.UID || pool.Deployment != s.input.Deployment.Name || pool.DeploymentUID != s.input.Deployment.UID || pool.ServiceAccount != s.input.ServiceAccount.Name || pool.AccountUID != s.input.ServiceAccount.UID || pool.NativePort != contracts.OwnerInstalledNativePort || pool.NativeBootstrap != fleet.OwnerBootstrapProfile {
+		return time.Time{}, false, cfg.ErrChanged
+	}
+	call, end := context.WithDeadline(ctx, first.FreshUntil)
+	defer end()
+	snapshot, _, err := s.readResources(call)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	if !ownerIdentityOriginalConfiguration(s.resources, snapshot.State, first.Configuration) {
+		return time.Time{}, false, cfg.ErrChanged
+	}
+	until := identity.Earlier(first.FreshUntil, snapshot.ValidUntil)
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	if err = s.originalOwner(call, snapshot.State); err != nil {
+		return time.Time{}, false, err
+	}
+	last, err := s.accepted.ReadOwnerConfiguration(call)
+	until = identity.Earlier(until, last.FreshUntil)
+	if err != nil || !last.Valid(s.resources.now()) || !first.Configuration.Equal(last.Configuration) || initialHandoverDeadline(call, s.resources.now, until) != nil {
+		return time.Time{}, false, cfg.ErrUnavailable
+	}
+	return until, snapshot.State.OwnerLaunch != nil, nil
+}
+
+func (s *OwnerIdentityRoleRoot) originalOwner(ctx context.Context, state contracts.InitialRuntimeResourceState) error {
+	// Original account remains independently checked even when the exact original
+	// Deployment is running after a spent launch.
+	for _, index := range []int{0, 10, 12} {
+		want, err := s.resources.object(state, index)
+		if err != nil {
+			return err
+		}
+		accessor, _ := meta.Accessor(want.object)
+		raw, err := s.bridge.source.client.api.Get().AbsPath(want.collection + "/" + accessor.GetName()).MaxRetries(0).DoRaw(ctx)
+		if err != nil {
+			return cfg.ErrUnavailable
+		}
+		if _, err = s.resources.verified(ctx, raw, state, index); err == nil && !(index == 10 && state.OwnerLaunch != nil && state.OwnerLaunch.Receipt != nil) {
+			continue
+		}
+		if index != 10 || state.OwnerLaunch == nil {
+			return cfg.ErrChanged
+		}
+		var deployment apps.Deployment
+		if permissionJSON(raw, 256<<10, 131072) != nil || strictGuardJSON(raw, &deployment) != nil || !ownerIdentityClaimedLaunchObject(deployment, state, s.input) {
+			return cfg.ErrChanged
+		}
+		inert := deployment.DeepCopy()
+		*inert.Spec.Replicas = 0
+		delete(inert.Annotations, ownerIdentityLaunchMarker)
+		inert.Generation = 1
+		b, e := json.Marshal(inert)
+		if e != nil {
+			return cfg.ErrChanged
+		}
+		if _, e = s.resources.verified(ctx, b, state, index); e != nil {
+			return e
+		}
+	}
+	until, ok := ctx.Deadline()
+	if !ok {
+		return cfg.ErrInvalid
+	}
+	return initialHandoverDeadline(ctx, s.resources.now, until)
+}
+
+func ownerIdentityClaimedLaunchObject(d apps.Deployment, state contracts.InitialRuntimeResourceState, in contracts.OwnerIdentityRoles) bool {
+	l := state.OwnerLaunch
+	if l == nil || d.APIVersion != "apps/v1" || d.Kind != "Deployment" || !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Generation != 2 || d.ResourceVersion == l.InertResourceVersion || d.Spec.Replicas == nil || *d.Spec.Replicas != 1 || len(d.OwnerReferences) != 0 || len(d.Finalizers) != 0 || d.Annotations[initialRuntimeResourceMarker] != state.Objects[10].OperationID || d.Annotations[ownerIdentityLaunchMarker] != l.OperationID {
+		return false
+	}
+	count := 2
+	if r, ok := d.Annotations["deployment.kubernetes.io/revision"]; ok {
+		if r != "1" {
+			return false
+		}
+		count++
+	}
+	if len(d.Annotations) != count {
+		return false
+	}
+	running, e := ownerIdentitySpecDigest(d)
+	if e != nil || running != l.RunningDigest {
+		return false
+	}
+	copy := d.DeepCopy()
+	*copy.Spec.Replicas = 0
+	inert, e := ownerIdentitySpecDigest(*copy)
+	return e == nil && inert == l.InertDigest && (l.Receipt == nil || l.Receipt.Generation == d.Generation)
+}
+
+// A higher accepted source revision cannot replace the original installation's
+// service, issuer epoch or trust roots. Root/profile migration is a separate
+// protected operation, not a side effect of first private owner provisioning.
+func ownerIdentityOriginalConfiguration(resources *InitialRuntimeResources, state contracts.InitialRuntimeResourceState, current fleet.OwnerConfiguration) bool {
+	object, e := resources.object(state, 14)
+	if e != nil {
+		return false
+	}
+	cm, ok := object.object.(*core.ConfigMap)
+	if !ok {
+		return false
+	}
+	var original contracts.OwnerConfiguration
+	if strictGuardJSON([]byte(cm.Data["owner-pool.json"]), &original) != nil {
+		return false
+	}
+	pool := fleet.OwnerPool{InstallationID: original.InstallationID, ClusterID: original.ClusterID, IssuerEpoch: original.IssuerEpoch, Namespace: original.Namespace.Name, NamespaceUID: original.Namespace.UID, Service: original.Service.Name, ServiceUID: original.Service.UID, Deployment: original.Deployment.Name, DeploymentUID: original.Deployment.UID, ServiceAccount: original.ServiceAccount.Name, AccountUID: original.ServiceAccount.UID, Port: original.Port, NativePort: original.NativePort, NativeBootstrap: original.NativeBootstrap, NativeCandidateLimit: original.NativeCandidateLimit}
+	if current.Pool != pool || len(current.IssuerRoots) != len(original.IssuerRoots) {
+		return false
+	}
+	for i, root := range original.IssuerRoots {
+		if !bytes.Equal(root, current.IssuerRoots[i]) {
+			return false
+		}
+	}
+	return true
+}

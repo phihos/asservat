@@ -1,0 +1,112 @@
+# Owner readiness and process lifetime
+
+[ADR-088](../decisions/088-owner-startup-readiness.md) connects existing credentials, receiving and live forwarding under a shared owner lifetime. C-04 owns the readiness check and public-key snapshot port; C-21 implements it on process-owned credentials; `internal/bootstrap` performs concrete wiring. The existing domain, wire and SQL contracts are unchanged.
+
+## Readiness before Kubernetes Ready
+
+The startup check takes a private exact `OwnerBinding` and `OwnerPool`, both owned key instances, the active certificate registry, native pre-Ready proof reader and clock. It never accepts a user principal or network address. For each server/client purpose:
+
+1. Obtain the installed public certificate and copied identity-free CSR for that exact binding/purpose.
+2. Read current activated registration for the certificate, verify pool identity, and reverify actual owned DER under pinned and current accepted roots.
+3. Read current Pod-bound token/CSR/workload/admission proof. Match it to the immutable registration and exact accepted configuration; Pod Ready is deliberately absent from this proof.
+4. Repeat registry and owned cryptographic checks. Preserve original registration, proof and certificate expiry; require identical accepted configuration across both purposes.
+5. Recheck both owned keys after all blocking work. A close or renewal of the first key while checking the second invalidates the result.
+
+The returned time is an expiring scheduling hint, capped by the original five-second call, actual parent deadline and every original dependency interval. It cannot activate identity, grant evidence rights, acknowledge audit, refresh recovery or authenticate a connection. Normal `OwnerAuthenticator` checks still require Ready routing and current real TLS. This avoids a startup cycle without allowing pre-Ready forwarding.
+
+## Concrete runtime composition
+
+`bootstrap.NewOwnerRuntime` accepts independently protected dependencies through `OwnerRuntimeConfig`: exact installation pool, current Pod UID and configuration-source UID; accepted configuration; separate server/client audited enrollment facets; active registry; native proof/protection/routes; a factory for exact local request ownership; and the installation-bound worker trust catalog/shared read facets from [multi-cluster routing](worker-routing.md) for forwarding. These are programmatic installation inputs, not a public JSON/CLI API. The loader must supply the real independently scoped services. Constructor success is not installation acceptance.
+
+Read current unsuspended accepted owner configuration within five seconds, verify pool/source, and copy the public roots. Disable core dumping for this process before creating private keys. Generate a fresh random UUID process epoch, create separate process-owned purpose keys and construct the actual receiver and forwarder with one cancellation root. The request factory receives that exact binding; it only constructs the existing local router/SQL ownership receiver. Failed construction closes any keys and transports already created. Roots and original current configuration must still be valid at completion.
+
+`Run` accepts one owned TCP listener with the exact configured port, only once. It starts the existing pair supervisor and waits for activated identity before starting the private mTLS listener. A separate serial loop checks readiness, then waits one second. It keeps no earlier success after a failed check. `Ready()` also rejects expiry, clock rollback and closed roots without waiting for the loop; it neither performs remote I/O nor caches authority. A new worker-ingress call uses this hint before invoking the unchanged live forwarder. The receiver still performs its complete independent current admission/output checks.
+
+The owner readiness hint describes only this subsystem. Full hub Pod readiness additionally needs the API/control/query dependencies and safe recovery. There is no health HTTP endpoint in this composition. The private listener remains the exact existing HTTP/1.1, TLS 1.3, mutual-authentication profile with connection/request/time limits.
+
+Parent cancellation, explicit Close, renewal failure or listener failure clears readiness, disables both owned keys, cancels outbound deliveries and closes serving sockets. [ADR-139](../decisions/139-shared-native-context-start-listener.md) requires Run to join every started supervisor/listener/readiness child after cancellation and closure. The earlier six-second return could leave an owned child running and has been removed. An uncooperative dependency keeps shutdown incomplete; outer process termination remains the final containment boundary and does not count as joined cleanup. Expiry never refills signing, routing or capacity budgets. Close without Run also disables the keys/forwarder; callers own a rejected listener until Run accepts it.
+
+## Qualification and installation gaps
+
+Synthetic lifecycle tests use real generated CSR/certificates and mutual TLS, but synthetic configuration, registration and proof readers. The test can become locally ready while its route/peer checks still deny actual HTTP admission. It verifies readiness loss/recovery, no signing during readiness, public snapshot isolation, closed/changed keys, proof/configuration mismatches, parent expiry, fresh epochs, stale hints and joined listener/enrollment shutdown. It does not establish operator or Kubernetes authority.
+
+Native integration exercises the readiness checker with actual Kubernetes admission/Pod/token proof, accepted SQL configuration, activated OpenBao-issued identities and current roots. It remains outside the pause Pod, with fixture-owned initial trust/recovery and tokens. Actual results and source hashes are in [implementation progress](../implementation-progress.md).
+
+The [deployment loader](owner-deployment.md) now supplies protected file/provider loading, projected credentials and the private executable entry point. Remaining: installation-generated projections, continuously reconciled recovery/source bootstrap, whole-hub health composition, native in-Pod routing and renewal/load qualification. Then connect connector-local proof mediation, actual native evidence bytes and public UI/MCP/download flows. The chart must not advertise a runnable hub or enable collection based on this subsystem alone.
+
+## Observation-only installed startup
+
+ADR-144 selects a separate `NewOwnerObservationRuntime`, with no worker routing,
+request-owner, native transfer or context-start dependencies. It uses the same
+process-owned paired keys, current registration/proof and pre-Ready identity
+checker. Its listener serves only the fixed bounded own-owner proof; full owner
+authentication, current local protection, exact installed template and actual
+Ready route still precede that proof. A static logical connector allowlist is
+only pre-authentication for this narrow purpose. It is not process activation
+or metadata authority. Original caller/source/child bounds and joined shutdown
+remain mandatory. The original NativePort has exactly one runtime owner.
+
+The phase is explicit in original protected deployment input. Optional mounted
+backend/public files cannot select a phase or become authority. The identity
+loader verifies the original four-purpose SQL provenance manifest before
+creating authority adapters. Receipt-driven later backend transition and actual
+installed observation qualification remain required; the full runtime retains
+its existing mandatory dependencies.
+
+## Operator startup diagnostics
+
+The private `hub-api` command reports one closed startup record before a nonzero
+failure exit. Its fixed `phase` identifies the loader, current native identity
+check, one of the four SQL credential roles, accepted configuration, provider
+setup, initial paired identity, or subsequent serving phase. `native` and
+`detail` distinguish token review, original journal, mounted configuration and
+credentials, Deployment/account/live-Pod identity, and final guard/deadline
+checks. An existing accepted-configuration SQL diagnostic contributes its fixed
+check and reason. Unknown causes remain `other` or `unavailable`; a category is
+not a claim about an unobserved root cause.
+
+Operator logs contain no underlying error text, endpoints, identifiers, paths,
+credentials, mounted values, hashes, tokens or query strings. Internally the
+original error chain remains available to `errors.Is`/`errors.As`. Classification
+adds no reads, retries, clock samples, authority or observation freshness. The
+same original deadlines, constructor branches, cleanup and nonzero exits apply.
+Use the named phase to check the original installation projection, its current
+Pod/admission protection, the generated SQL role, or current source/recovery
+state. Do not replace a failed original object or grant broader privileges to
+make startup proceed.
+
+On an original owner process failure, the native fixture reads at most 8 KiB
+from each current and previous `hub` log under one original-caller-bounded
+five-second interval. It checks the original Pod UID before and after, keeps
+only the closed diagnostic record, discards unrelated output and preserves the
+failure. These reads are diagnostics, never identity or availability proof.
+Component and installed qualification for this diagnostic change are pending.
+
+## Original launch receipt convergence
+
+[ADR-164](../decisions/164-owner-launch-receipt-convergence.md) distinguishes a
+started original Pod from the installer's later acknowledgement of its launch.
+The observation-mode loader may passively await only a fully valid original
+launch whose receipt is absent. It retains the entire first pending public
+journal state. The sole permitted transition is that launch's receipt appearing;
+changed claims, siblings, root identities, mounted projections or dates deny.
+
+The loader retains its original thirty-second startup deadline. Passive reads
+of the exact original journal are spaced by 250 ms and individually bounded by
+five seconds, the original caller and resource-root end. No SQL credential,
+key/provider action, identity activation or request serving occurs while pending.
+A read failure is terminal; this is not a retry policy for arbitrary failures.
+After convergence, the full guard, token, immutable projection, Deployment,
+original live Pod and journal bracket must succeed with a new at-most-five-second
+proof before credentials are used. The first positive receipt and complete
+state are pinned across that proof; another receipt cannot be adopted. That
+proof does not renew any original
+installation claim or effect attempt. Ordinary runtime Verify remains a single
+bounded proof, without waiting. Expiry/cancellation retains a nonzero startup exit.
+
+The focused before regression runs the actual projection producer under the
+existing synthetic provider/API/SQL fixture: its legitimate pending launch is
+rejected as changed, while its completed original receipt is accepted. This
+establishes the interleaving defect, not unique attribution of the native13
+journal-state diagnostic. Corrected component and installed qualification remain
+pending; earlier failing runs are retained.

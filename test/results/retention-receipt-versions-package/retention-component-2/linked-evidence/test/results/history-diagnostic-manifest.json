@@ -1,0 +1,32 @@
+[
+  {
+    "path": "internal/adapters/postgres/initial_history_diagnostic.go",
+    "base_sha256": null,
+    "sha256": "fd38226269c2e3a447c2485d419458ac2dc88a0e63a1279697e0d6c38a53e703"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_diagnostic_test.go",
+    "base_sha256": null,
+    "sha256": "b74b3c0788795bd84659a3c13d19113fa713a76cdaa976355b3e72d1c533a763"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_roles.go",
+    "base_sha256": "8fca743a3823f21fc91462ceeef86ee8836575a6f9fc762fa8344a5b37b02ad8",
+    "sha256": "3a8c8dacd56078c267e4fae203a31b770f5a0be1dbb7b5077c28e51de4acf280"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "3ed08eb694378a02dcbaf947a587e50d4595b141865fc5666d9f6172943dbf11",
+    "sha256": "9d33c91cecf6457e8be0cde7526f70d52606eb2df552e1354f41b2aa0cb82dbe"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_sql.go",
+    "base_sha256": "eac2bffc81f05ffde7f7f87d30a3d795b622518305c5b73105a1f3a79c62b9ac",
+    "sha256": "622c898850b8b6fbc56153a6dd7579bbaec7e8b8af092b6b4fc33fadc23264c8"
+  },
+  {
+    "path": "test/integration/initial_history_role_test.go",
+    "base_sha256": null,
+    "sha256": "bf3f33a3c23716bb24b8c96b81b8e832f47790f7c7406e250c7ab1cdd6f35061"
+  }
+]

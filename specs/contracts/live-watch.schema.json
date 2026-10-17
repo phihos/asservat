@@ -1,0 +1,1076 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/live-watch.schema.json",
+  "title": "Asservat approved live watch v1",
+  "$defs": {
+    "displayFilter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "protocol"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "peer_uid"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "method"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "syscall"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "port"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gte",
+                      "lte"
+                    ]
+                  },
+                  "value": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "status"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gte",
+                      "lte"
+                    ]
+                  },
+                  "value": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 599
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "pid"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gte",
+                      "lte"
+                    ]
+                  },
+                  "value": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4194304
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "error"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq"
+                    ]
+                  },
+                  "value": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "const": "remote_ip"
+                  },
+                  "op": {
+                    "enum": [
+                      "eq",
+                      "neq"
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "ipv4"
+                      },
+                      {
+                        "type": "string",
+                        "format": "ipv6"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "field",
+                  "op",
+                  "value"
+                ]
+              }
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "all"
+      ]
+    },
+    "projection": {
+      "enum": [
+        "packetMetadata",
+        "httpHeaders",
+        "syscallMetadata"
+      ]
+    },
+    "source": {},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "bytes_per_second": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 262144
+        },
+        "max_rows_per_batch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "max_buffer_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "row_max_age_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "replay_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "duration_seconds",
+        "max_output_bytes",
+        "bytes_per_second",
+        "max_rows_per_batch",
+        "max_buffer_bytes",
+        "row_max_age_seconds",
+        "replay_seconds"
+      ]
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "enum": [
+            "sensorLoss",
+            "projectionSampled",
+            "subscriberOverflow",
+            "reconnect",
+            "filterChanged",
+            "paused",
+            "sourceEnded",
+            "clockUncertain",
+            "sourceUnavailable",
+            "bufferExpired",
+            "accessLost"
+          ]
+        },
+        "source_session_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "reason",
+        "source_session_id",
+        "count",
+        "from",
+        "until"
+      ]
+    },
+    "sourceStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "enum": [
+            "Warming",
+            "Ready",
+            "Degraded",
+            "Stopped",
+            "Unavailable"
+          ]
+        },
+        "filter_generation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "last_observed_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage": {
+          "enum": [
+            "observed",
+            "partial",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "source_session_id",
+        "state",
+        "filter_generation",
+        "last_observed_at",
+        "coverage"
+      ]
+    },
+    "handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "transient": {
+          "const": true
+        },
+        "may_contain_user_data": {
+          "const": true
+        },
+        "managed_row_max_age_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "raw_available_live": {
+          "const": false
+        },
+        "external_copies_recallable": {
+          "const": false
+        },
+        "save_semantics": {
+          "const": "freshCurrentWindow"
+        }
+      },
+      "required": [
+        "transient",
+        "may_contain_user_data",
+        "managed_row_max_age_seconds",
+        "raw_available_live",
+        "external_copies_recallable",
+        "save_semantics"
+      ]
+    },
+    "row": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "row_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 180
+            },
+            "source_session_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source_sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "observed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "received_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "clock_uncertainty_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "filter_generation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "projection": {
+              "const": "packetMetadata"
+            },
+            "pod_uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "protocol": {
+                  "enum": [
+                    "TCP",
+                    "UDP",
+                    "ICMP",
+                    "Other",
+                    "Unknown"
+                  ]
+                },
+                "peer_uid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "remote_ip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "remote_port": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "direction": {
+                  "enum": [
+                    "ingress",
+                    "egress",
+                    "unknown"
+                  ]
+                },
+                "wire_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1048576
+                },
+                "pid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4194304
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "protocol",
+                "peer_uid",
+                "remote_ip",
+                "remote_port",
+                "direction",
+                "wire_bytes",
+                "pid"
+              ]
+            }
+          },
+          "required": [
+            "row_id",
+            "source_session_id",
+            "source_sequence",
+            "observed_at",
+            "received_at",
+            "expires_at",
+            "clock_uncertainty_ms",
+            "filter_generation",
+            "projection",
+            "pod_uid",
+            "fields"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "row_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 180
+            },
+            "source_session_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source_sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "observed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "received_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "clock_uncertainty_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "filter_generation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "projection": {
+              "const": "httpHeaders"
+            },
+            "pod_uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 100,
+                      "maximum": 599
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "peer_uid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "headers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ]
+                  },
+                  "minItems": 0,
+                  "maxItems": 8
+                },
+                "pairing": {
+                  "enum": [
+                    "request",
+                    "response",
+                    "paired"
+                  ]
+                },
+                "duration_ms": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 60000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "method",
+                "status",
+                "peer_uid",
+                "headers",
+                "pairing",
+                "duration_ms"
+              ]
+            }
+          },
+          "required": [
+            "row_id",
+            "source_session_id",
+            "source_sequence",
+            "observed_at",
+            "received_at",
+            "expires_at",
+            "clock_uncertainty_ms",
+            "filter_generation",
+            "projection",
+            "pod_uid",
+            "fields"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "row_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 180
+            },
+            "source_session_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source_sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "observed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "received_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "clock_uncertainty_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "filter_generation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "projection": {
+              "const": "syscallMetadata"
+            },
+            "pod_uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4194304
+                },
+                "syscall": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "error": {
+                  "type": "boolean"
+                },
+                "errno": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4095
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "duration_ns": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "paired": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "pid",
+                "syscall",
+                "error",
+                "errno",
+                "duration_ns",
+                "paired"
+              ]
+            }
+          },
+          "required": [
+            "row_id",
+            "source_session_id",
+            "source_sequence",
+            "observed_at",
+            "received_at",
+            "expires_at",
+            "clock_uncertainty_ms",
+            "filter_generation",
+            "projection",
+            "pod_uid",
+            "fields"
+          ]
+        }
+      ]
+    },
+    "watch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "state": {
+          "enum": [
+            "Active",
+            "Paused",
+            "Closed",
+            "Expired",
+            "Exhausted",
+            "SourceEnded",
+            "AccessLost",
+            "Disconnected"
+          ]
+        },
+        "source_session_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "projection": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/projection"
+        },
+        "accepted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "idle_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "limits": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/limits"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "handling": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/handling"
+        }
+      },
+      "required": [
+        "watch_id",
+        "revision",
+        "state",
+        "source_session_ids",
+        "projection",
+        "accepted_at",
+        "expires_at",
+        "idle_expires_at",
+        "limits",
+        "cursor",
+        "handling"
+      ]
+    },
+    "batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "batch_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "enum": [
+            "Active",
+            "Paused",
+            "Closed",
+            "Expired",
+            "Exhausted",
+            "SourceEnded",
+            "AccessLost",
+            "Disconnected"
+          ]
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/row"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/sourceStatus"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/gap"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "interval_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "interval_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "received_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "output_bytes_spent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000
+        },
+        "handling": {
+          "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/handling"
+        }
+      },
+      "required": [
+        "watch_id",
+        "revision",
+        "batch_id",
+        "state",
+        "rows",
+        "sources",
+        "gaps",
+        "interval_from",
+        "interval_until",
+        "received_at",
+        "output_bytes_spent",
+        "retry_after_ms",
+        "handling"
+      ]
+    },
+    "sourcePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/source"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "sources"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "live-watch-fixture/v1"
+    },
+    "watch": {
+      "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/watch"
+    },
+    "batch": {
+      "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/batch"
+    }
+  },
+  "required": [
+    "schema_version",
+    "watch",
+    "batch"
+  ]
+}

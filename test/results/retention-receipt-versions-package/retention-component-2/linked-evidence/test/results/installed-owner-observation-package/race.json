@@ -1,0 +1,33 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/owner-installed-startup-20261012/checks/joined-v1/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-run",
+    "^Test(InstalledOwner|OwnerIdentity|InitialRuntime|InstalledWorker|InstalledHubWorker|OwnerEndpoints|OwnerObservation|InstalledClusterObservation)",
+    "-v",
+    "./internal/contracts",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/postgres",
+    "./internal/adapters/mtls",
+    "./internal/transport/native",
+    "./internal/bootstrap",
+    "./internal/application/fleet"
+  ],
+  "exit": 0,
+  "seconds": 24.086,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  }
+}

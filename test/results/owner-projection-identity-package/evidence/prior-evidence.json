@@ -1,0 +1,7 @@
+{
+  "files": {
+    "/home/phil/.cache/asservat-build/planning/owner-projection-identity-20261013/manifest.json": "c5c2e1cf5105cdee9a1f3d4200e53247e32781c8bf21e8f8cd4ec76293645a3b",
+    "/home/phil/.cache/asservat-build/planning/owner-projection-identity-20261013/checks/copy-1/before/internal/adapters/kubernetes/owner_projection_operation_native.go": "5c377755116524959e28b45bdbc32f0a1b4be1f162bd7eb454139628503c753a"
+  },
+  "scope": "source freeze and exact controlled reversal"
+}

@@ -1,0 +1,42 @@
+# Direct H/A/R native fixture — source checkpoint
+
+Status: source reviewed, **uncompiled and unrun**. No native or installed availability verdict is claimed. The five-path product v2 listener/metadata component is already integrated; this package changes only the test helper, its integration test and the owned context harness. Live sources remain untouched.
+
+The next immutable build snapshot must use the parent’s stable post-integration sources, including migrations 55 and 56. Source review resumed after the reported power outage on boot `e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c`; no pre-outage PID or session was reused.
+
+## Exact scope
+
+Twelve new Go files:
+
+- `test/fixtures/observation-native/{main,inputs,metrics,runtime,enrollment,data}.go`
+- `test/integration/direct_observation_native_{test,fixture_test,access_test,sql_test,source_test,data_test}.go` (the first is `direct_observation_native_test.go`)
+
+One existing harness path: `scripts/test-context-storage.py`. The exact selector is `^TestDirectHolderObservationWithRealKubernetes$`; no additional public or runtime selector is enabled. The existing five-path component is a dependency, not a duplicate payload.
+
+The standalone helper uses `//go:build ignore`, matching existing fixture programs, and the harness builds its six explicit source files. It creates no importable product package under `test/`. `TestDirectNativeFixtureWireParity` compares the integration DTO copy against the helper source exactly after only package/build-tag normalization. The existing Go architecture gate is unchanged.
+
+## Concrete topology and authority
+
+H and A are distinct original Restricted Deployment Pods in one owned Kind cluster. R is an original Restricted Deployment Pod in the other. The test-only fixed helper is built once, hashed and loaded at the same exact image digest into both nodes. No test dial override is passed to H: it uses the actual complete SQL candidate read, native Service/EndpointSlice observation and A’s actual Pod IP.
+
+A exposes the product `ServeOwnerObservationOperation` listener on 9444. Its protected Service has exactly the three accepted owner/observation/public ports. A separate fixture NodePort Service gives R cross-cluster reachability; that dial hint supplies no SNI, issuer, Service identity, registry or native authority. R verifies the original owner common name, actual TLS leaf and current accepted registration. H uses common SNI for the locator and the matched exact process SNI for the sole claim.
+
+H uses only the existing minimized role70 owner-read graph. A and R get their separate existing purpose credentials. A/R generate and retain their process keys inside their own helper processes. Actual original Pod-token reviews, native workload/source guards, SQL49 source staging and certificate activation, encrypted versioned-S3 audit, TLS1.3/h2, four numbered regional source values, both SQL pairs and final native/result checks remain concrete. Initial accepted owner source, recovery activation, issuer CAs, wrapping keys and retained-history/backend qualification are explicitly synthetic fixture roots.
+
+The host fixture runs a joined real fleet observer and owner-configuration observer from its explicit synthetic accepted input. Each iteration supplies its own original five-second value; request reads never refresh it. SQL49 does not have a fabricated periodic connector-source lease writer: R reads the real protected source on its existing enrollment and ordinal paths. The source-owner loop fails and cancels the fixture on error.
+
+## Measured path and limits
+
+The first native matrix is deliberately bounded: four consecutive independent requests on the same H/A/R processes and retained clients/pools, covering namespace candidates, workload candidates, exact workload metadata and namespace guard. Each request is created once before host-to-H dispatch with its original five-second cutoff. Host dispatch, SQL/TLS/native work and return transit all consume it. The already-open R standby retains its original 30-second socket cap and leaf; late attachment never grants five additional seconds.
+
+All existing native clients keep their 20-QPS/20-burst bound. No per-request pool, rate limiter, new grant, warm-up retry or failure retry is introduced. An unavailable first purpose terminates the matrix. The fixture then mutates an annotation on the exact original R Pod and requires no result from the next independently admitted request, followed by joined closure and no available old standby.
+
+Setup/standby and complete-request counters are separate for H, A and R. They record native request counts, HTTP 403 counts separately, other errors and response-header duration. A 403 counter alone does not prove the selected independent denial; the unchanged guard verifies that. SQL reports only pool acquisition counts/durations/empty/cancelled acquisitions, **not SQL statement count or lock duration**. Source ages, whole monotonic latency, original remaining time and fixed terminal categories are included. No URL, query text, arguments, token, credential, evidence payload or identity is emitted in those counters. The actual transfer verdict is logged before subsequent diagnostic status reads.
+
+The metadata-only additions are one namespace LIST; namespace GET/LIST/GET for workload candidates; four exact workload/namespace reads; or the complete existing namespace guard proof. These are structural calls, not a total duration estimate. The full path still needs its actual native timing verdict. Host source-observer pools are retained and measured separately from the helpers; this fixture does not claim full installed HWORK background/shared-client contention, multiple healthy owners, concurrent H requests, aged-bound success or sustained production availability. Existing component regressions cover those authority/lifetime edge cases individually; this first native matrix does not replace later installed qualification.
+
+## Cleanup and proposed checks
+
+Cleanup is registered before immutable input creation, so a later setup failure still closes helpers that may have started. Restrictive shutdown does not infer success from a reply or socket EOF. It requires the exact original Pod’s local `joined` marker, emitted only after actual native handlers/streams and SQL pools close. The helper then stays inert until owned Pod removal, preventing an Always-restart controller from creating a new identity. Host source owners and pools join before the owned lab is removed. Original component limits are unchanged; eight minutes is only the outer setup/matrix lifetime.
+
+After parent allocation: an exact frozen source mirror, explicit helper-file compilation and `./test/integration` compilation, the one wire-parity test, integration/helper vet, Go architecture and a bounded Python harness syntax/selection check. Compilation that selects no service tests is reported only as compilation. The parent then owns the exact native selector, with before/after source hashes, actual selected pass names, timing reports and complete cleanup. Every failed attempt remains archived; no passing component or test-shaped counterexample will be called usable native routing.

@@ -1,0 +1,52 @@
+=== RUN   TestLocalStartWithRealKubernetes
+=== RUN   TestLocalStartWithRealKubernetes/requires-prepaid-ready
+=== RUN   TestLocalStartWithRealKubernetes/one-real-cas-and-restart
+=== RUN   TestLocalStartWithRealKubernetes/no-reset-mutation-or-delete
+=== RUN   TestLocalStartWithRealKubernetes/schema-bounds-and-owner-gc
+=== RUN   TestLocalStartWithRealKubernetes/pinned-work-trust-read-only-role
+=== RUN   TestLocalStartWithRealKubernetes/pinned-fleet-administration-read-only-role
+=== RUN   TestLocalStartWithRealKubernetes/journal-pins-control-namespace-uid
+--- PASS: TestLocalStartWithRealKubernetes (1.07s)
+    --- PASS: TestLocalStartWithRealKubernetes/requires-prepaid-ready (0.02s)
+    --- PASS: TestLocalStartWithRealKubernetes/one-real-cas-and-restart (0.29s)
+    --- PASS: TestLocalStartWithRealKubernetes/no-reset-mutation-or-delete (0.09s)
+    --- PASS: TestLocalStartWithRealKubernetes/schema-bounds-and-owner-gc (0.01s)
+    --- PASS: TestLocalStartWithRealKubernetes/pinned-work-trust-read-only-role (0.07s)
+    --- PASS: TestLocalStartWithRealKubernetes/pinned-fleet-administration-read-only-role (0.07s)
+    --- PASS: TestLocalStartWithRealKubernetes/journal-pins-control-namespace-uid (0.01s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+=== RUN   TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema
+=== RUN   TestPermissionAdmissionWithRealKubernetes/automation-is-administrator-only
+=== RUN   TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status
+=== RUN   TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only
+=== RUN   TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation
+=== RUN   TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation/guarded-reconciliation-with-SQL-and-encrypted-audit
+--- PASS: TestPermissionAdmissionWithRealKubernetes (8.19s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/delegation-and-structural-schema (0.01s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/automation-is-administrator-only (0.03s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/updates-patches-apply-delete-and-status (1.16s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/source-conditional-validation-and-admin-only (0.21s)
+    --- PASS: TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation (6.36s)
+        --- PASS: TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation/guarded-reconciliation-with-SQL-and-encrypted-audit (6.21s)
+=== RUN   TestRetentionWithRealKubernetes
+=== RUN   TestRetentionWithRealKubernetes/baseline-and-delegated-write
+=== RUN   TestRetentionWithRealKubernetes/scope-cannot-be-erased-or-moved
+=== RUN   TestRetentionWithRealKubernetes/invalid-limits-duplicate-rules-and-unknown-fields
+=== RUN   TestRetentionWithRealKubernetes/status-writer-separated-from-spec-author
+=== RUN   TestRetentionWithRealKubernetes/current-guard-proof-is-dry-run-and-pinned
+=== RUN   TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion
+=== RUN   TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/watch-retains-lower-then-raise
+=== RUN   TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/durable-guarded-reconciliation
+    retention_test.go:395: stable source availability gap: permission configuration unavailable; now=2026-10-10 08:07:42.975386113 +0000 UTC sequence=1 watch=773 list=773 observed=2026-10-10 10:07:37.842881 +0200 CEST until=2026-10-10 10:07:42.842881 +0200 CEST lease=2026-10-10 10:08:04.798296 +0200 CEST suspended=false
+--- FAIL: TestRetentionWithRealKubernetes (9.21s)
+    --- PASS: TestRetentionWithRealKubernetes/baseline-and-delegated-write (0.02s)
+    --- PASS: TestRetentionWithRealKubernetes/scope-cannot-be-erased-or-moved (0.01s)
+    --- PASS: TestRetentionWithRealKubernetes/invalid-limits-duplicate-rules-and-unknown-fields (0.00s)
+    --- PASS: TestRetentionWithRealKubernetes/status-writer-separated-from-spec-author (0.01s)
+    --- PASS: TestRetentionWithRealKubernetes/current-guard-proof-is-dry-run-and-pinned (0.29s)
+    --- FAIL: TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion (8.62s)
+        --- PASS: TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/watch-retains-lower-then-raise (0.04s)
+        --- FAIL: TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/durable-guarded-reconciliation (8.49s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	18.532s
+FAIL

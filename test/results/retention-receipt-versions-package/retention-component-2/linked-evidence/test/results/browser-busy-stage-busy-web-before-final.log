@@ -1,0 +1,205 @@
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/browser-refresh-owner-20261011/busy-before/web
+
+ ❯ src/auth/session.test.ts (22 tests | 6 failed) 236ms
+   ❯ browser session lifecycle (18)
+     × retains the current workspace while a competing owned refresh joins, then rechecks 55ms
+     × bounds busy retries without clearing the current page or extending its deadline 2ms
+     × shares one bounded retry budget between CSRF and POST collisions 2ms
+     × stops busy retry at original session expiry and cannot resurrect it 1ms
+     × one click logs out after a concurrent CSRF rotation without replaying the logout POST 2ms
+   ❯ bounded authentication transport (4)
+     × recognizes only the bounded exact busy problem, never a bare status or redirect 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > retains the current workspace while a competing owned refresh joins, then rechecks
+AssertionError: expected { phase: 'unavailable' } to be { phase: 'active', …(2) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+-   "phase": "active",
+-   "scope": AbortSignal {
+-     Symbol(kEvents): undefined,
+-     Symbol(events.maxEventTargetListeners): 0,
+-     Symbol(events.maxEventTargetListenersWarned): false,
+-     Symbol(kHandlers): undefined,
+-     Symbol(kAborted): true,
+-     Symbol(kReason): AbortError {
+-       "message": "This operation was aborted",
+-     },
+-     Symbol(kComposite): false,
+-   },
+-   "session": {
+-     "csrf_token": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+-     "expires_at": "2026-10-11T21:25:56.659Z",
+-     "principal": {
+-       "issuer": "https://identity.invalid",
+-       "kind": "user",
+-       "subject_id": "developer",
+-     },
+-     "roles": [],
+-     "step_up": "unavailable",
+-   },
++   "phase": "unavailable",
+  }
+
+ ❯ src/auth/session.test.ts:62:35
+     60|     const pending = controller.resume();
+     61|     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+     62|     expect(controller.snapshot()).toBe(current);
+       |                                   ^
+     63|     expect(current.scope.aborted).toBe(false);
+     64|     await vi.advanceTimersByTimeAsync(1_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > bounds busy retries without clearing the current page or extending its deadline
+AssertionError: expected { phase: 'unavailable' } to be { phase: 'active', …(2) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+-   "phase": "active",
+-   "scope": AbortSignal {
+-     Symbol(kEvents): undefined,
+-     Symbol(events.maxEventTargetListeners): 0,
+-     Symbol(events.maxEventTargetListenersWarned): false,
+-     Symbol(kHandlers): undefined,
+-     Symbol(kAborted): true,
+-     Symbol(kReason): AbortError {
+-       "message": "This operation was aborted",
+-     },
+-     Symbol(kComposite): false,
+-   },
+-   "session": {
+-     "csrf_token": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+-     "expires_at": "2026-10-11T21:25:56.714Z",
+-     "principal": {
+-       "issuer": "https://identity.invalid",
+-       "kind": "user",
+-       "subject_id": "developer",
+-     },
+-     "roles": [],
+-     "step_up": "unavailable",
+-   },
++   "phase": "unavailable",
+  }
+
+ ❯ src/auth/session.test.ts:79:35
+     77|     const pending = controller.resume();
+     78|     await vi.advanceTimersByTimeAsync(10_001); await pending;
+     79|     expect(controller.snapshot()).toBe(current);
+       |                                   ^
+     80|     expect(current.scope.aborted).toBe(false);
+     81|     const calls = fetcher.mock.calls.length;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > shares one bounded retry budget between CSRF and POST collisions
+AssertionError: expected { phase: 'unavailable' } to be { phase: 'active', …(2) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+-   "phase": "active",
+-   "scope": AbortSignal {
+-     Symbol(kEvents): undefined,
+-     Symbol(events.maxEventTargetListeners): 0,
+-     Symbol(events.maxEventTargetListenersWarned): false,
+-     Symbol(kHandlers): undefined,
+-     Symbol(kAborted): true,
+-     Symbol(kReason): AbortError {
+-       "message": "This operation was aborted",
+-     },
+-     Symbol(kComposite): false,
+-   },
+-   "session": {
+-     "csrf_token": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+-     "expires_at": "2026-10-11T21:25:56.716Z",
+-     "principal": {
+-       "issuer": "https://identity.invalid",
+-       "kind": "user",
+-       "subject_id": "developer",
+-     },
+-     "roles": [],
+-     "step_up": "unavailable",
+-   },
++   "phase": "unavailable",
+  }
+
+ ❯ src/auth/session.test.ts:102:35
+    100|     const pending = controller.resume();
+    101|     await vi.advanceTimersByTimeAsync(10_001); await pending;
+    102|     expect(controller.snapshot()).toBe(original);
+       |                                   ^
+    103|     const calls = fetcher.mock.calls.length;
+    104|     expect(calls).toBeLessThanOrEqual(13);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > stops busy retry at original session expiry and cannot resurrect it
+AssertionError: expected { phase: 'unavailable' } to deeply equal { phase: 'signedOut', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "phase": "signedOut",
+-   "reason": "expired",
++   "phase": "unavailable",
+  }
+
+ ❯ src/auth/session.test.ts:116:35
+    114|     const pending = controller.resume();
+    115|     await vi.advanceTimersByTimeAsync(1_500); await pending;
+    116|     expect(controller.snapshot()).toEqual({ phase: 'signedOut', reason…
+       |                                   ^
+    117|     const calls = fetcher.mock.calls.length;
+    118|     await vi.advanceTimersByTimeAsync(10_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > one click logs out after a concurrent CSRF rotation without replaying the logout POST
+AssertionError: expected 'unavailable' to be 'signedOut' // Object.is equality
+
+Expected: "signedOut"
+Received: "unavailable"
+
+ ❯ src/auth/session.test.ts:152:41
+    150|     const pending = controller.logout();
+    151|     await vi.advanceTimersByTimeAsync(1_000); await pending;
+    152|     expect(controller.snapshot().phase).toBe('signedOut');
+       |                                         ^
+    153|     expect(fetcher.mock.calls.filter(([path]) => path === '/auth/logou…
+    154|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/auth/session.test.ts > bounded authentication transport > recognizes only the bounded exact busy problem, never a bare status or redirect
+AssertionError: expected Error: Session request failed { …(1) } to match object { status: 409, busy: true }
+
+- Expected
++ Received
+
+- {
+-   "busy": true,
++ SessionFailure {
+    "status": 409,
+  }
+
+ ❯ src/auth/session.test.ts:218:83
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 16 passed (22)
+   Start at  23:23:56
+   Duration  731ms (environment 55%, tests 37%, transform 6%, import 2%)
+

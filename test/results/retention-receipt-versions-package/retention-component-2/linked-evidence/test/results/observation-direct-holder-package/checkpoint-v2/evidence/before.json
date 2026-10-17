@@ -1,0 +1,44 @@
+{
+  "phase": "before",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/before-overlay.json",
+    "-vet=off",
+    "-count=1",
+    "-timeout=30s",
+    "-run",
+    "^TestDirectHolderUnavailableFirstCandidateKeepsIndependentPositive$",
+    "-v",
+    "./internal/bootstrap"
+  ],
+  "exit": 1,
+  "expectedExit": 1,
+  "seconds": 3.074,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0,
+  "failureMarker": "unavailable first candidate cancelled independent pending positive",
+  "markerOccurrences": 1
+}

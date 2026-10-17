@@ -1,0 +1,13 @@
+=== RUN   TestLocalStartWithRealKubernetes
+    local_start_test.go:93: ValidatingAdmissionPolicy.admissionregistration.k8s.io "asservat-start-test" is invalid: spec.validations[1].expression: Invalid value: "namespaceObject != null && namespaceObject.metadata.uid == \"9687cdbb-70fd-49d6-980d-f163396e5ee7\"": compilation failed: ERROR: <input>:1:52: undefined field 'uid'
+         | namespaceObject != null && namespaceObject.metadata.uid == "9687cdbb-70fd-49d6-980d-f163396e5ee7"
+         | ...................................................^
+--- FAIL: TestLocalStartWithRealKubernetes (0.04s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+    permission_admission_test.go:84: ValidatingAdmissionPolicy.admissionregistration.k8s.io "asservat-permissions" is invalid: spec.validations[2].expression: Invalid value: "namespaceObject != null && namespaceObject.metadata.uid == \"9687cdbb-70fd-49d6-980d-f163396e5ee7\"": compilation failed: ERROR: <input>:1:52: undefined field 'uid'
+         | namespaceObject != null && namespaceObject.metadata.uid == "9687cdbb-70fd-49d6-980d-f163396e5ee7"
+         | ...................................................^
+--- FAIL: TestPermissionAdmissionWithRealKubernetes (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.115s
+FAIL

@@ -1,0 +1,23 @@
+python3 scripts/test-custody.py
+Fixture command failed: Error response from daemon: all predefined address pools have been fully subnetted
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 105, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 38, in main
+    run(["docker", "network", "create", "--internal", "--label", label, network])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 18, in run
+    return subprocess.check_output(args, text=True, stderr=subprocess.PIPE, timeout=120, **kw).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['docker', 'network', 'create', '--internal', '--label', 'asservat.test=custody-eiojlb8n', 'asservat-custody-eiojlb8n']' returned non-zero exit status 1.
+make: *** [Makefile:64: custody-integration] Error 1

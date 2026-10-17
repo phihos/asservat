@@ -1,0 +1,305 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+type HubWorkerDeployment struct {
+	input            contracts.HubWorkerDeployment
+	root             context.Context
+	cancel           context.CancelFunc
+	closers          []func()
+	once             sync.Once
+	leader           *kube.ReconciliationLeader
+	reconciler       *app.ConfigurationReconciler
+	providers        *kms.InstalledConfigurationProviderEffects
+	runtimeAdmission *app.WorkerRuntimeAdmission
+	mu               sync.Mutex
+	closed           bool
+	running          bool
+	owners           sync.WaitGroup
+}
+
+func readHubWorkerInputs(ctx context.Context, files *os.Root) (*providerInputs, contracts.HubWorkerDeployment, error) {
+	var zero contracts.HubWorkerDeployment
+	b, err := mounts.Read(ctx, files, "deployment.json", contracts.OwnerDeploymentMaxBytes)
+	if err != nil {
+		return nil, zero, mounts.ErrUnavailable
+	}
+	defer clear(b)
+	c, err := contracts.DecodeHubWorkerDeployment(bytes.NewReader(b))
+	if err != nil || validateHubWorkerInputs(c) != nil {
+		return nil, zero, mounts.ErrUnavailable
+	}
+	return &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, c, nil
+}
+
+func validateHubWorkerInputs(c contracts.HubWorkerDeployment) error {
+	if c.Activation != nil && !kube.HubWorkerActivationBound(c) {
+		return mounts.ErrUnavailable
+	}
+	if c.Format != contracts.HubWorkerDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.Namespace.UID) || len(validation.IsDNS1123Label(c.Namespace.Name)) != 0 {
+		return mounts.ErrUnavailable
+	}
+	for _, r := range []contracts.WorkerObjectReference{c.FleetSource, c.OwnerSource, c.LeaderLease} {
+		if !authorization.UUID(r.UID) || len(validation.IsDNS1123Subdomain(r.Name)) != 0 {
+			return mounts.ErrUnavailable
+		}
+	}
+	if c.FleetSource == c.OwnerSource || c.FleetSource.Name == c.OwnerSource.Name || c.FleetGuard.Name == c.OwnerGuard.Name {
+		return mounts.ErrUnavailable
+	}
+	for _, g := range []contracts.OwnerDeploymentGuard{c.FleetGuard, c.OwnerGuard} {
+		if !identity.Text(g.Name, 253) || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || !identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || g.PolicyGeneration >= 1<<53 || len(g.Administrators) < 1 || len(g.Administrators) > 32 {
+			return mounts.ErrUnavailable
+		}
+		seen := map[contracts.OwnerDeploymentActor]bool{}
+		for _, a := range g.Administrators {
+			if (a.Kind != "User" && a.Kind != "Group") || !identity.Text(a.Name, 256) || seen[a] {
+				return mounts.ErrUnavailable
+			}
+			seen[a] = true
+		}
+	}
+	if providerconfig.Validate(c.Kubernetes, c.Postgres, c.AuditStore, c.KeyService, time.Now()) != nil {
+		return mounts.ErrUnavailable
+	}
+	return nil
+}
+
+func NewHubWorkerDeployment(ctx context.Context, files *os.Root) (*HubWorkerDeployment, error) {
+	return newHubWorkerDeployment(ctx, files, nil)
+}
+
+// NewProvisionedHubWorkerDeployment is the installed path. Every fixed SQL
+// login must match the actual original role receipt and exact current ACL.
+// The legacy constructor above remains only for independently composed
+// component fixtures; it is not selected by the installed command.
+func NewProvisionedHubWorkerDeployment(ctx context.Context, files *os.Root) (*HubWorkerDeployment, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	b, e := mounts.Read(ctx, files, contracts.ConfigurationRuntimeRoleManifestFile, contracts.ConfigurationRuntimeRoleMaxBytes)
+	if e != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	m, e := contracts.DecodeConfigurationRuntimeCredentialManifest(bytes.NewReader(b))
+	clear(b)
+	if e != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	return newHubWorkerDeployment(ctx, files, &m)
+}
+func newHubWorkerDeployment(ctx context.Context, files *os.Root, manifest *contracts.ConfigurationRuntimeCredentialManifest) (*HubWorkerDeployment, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || disableWorkerCoreDumps() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	in, c, err := readHubWorkerInputs(ctx, files)
+	if err != nil {
+		return nil, err
+	}
+	// Provider-installed inputs require the separate concrete native/provider
+	// constructor. Never ignore their presence and fall back to static tokens.
+	if c.ProviderAuthentication != nil || c.ProviderInputs != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	if manifest != nil && (manifest.Input.InstallationID != c.InstallationID || manifest.Input.ClusterID != c.ClusterID || manifest.Input.Namespace != c.Namespace || manifest.Input.FleetSource != c.FleetSource || manifest.Input.OwnerSource != c.OwnerSource || manifest.Input.LayoutDigest != postgres.ConfigurationRuntimeRoleLayoutDigest()) {
+		return nil, mounts.ErrUnavailable
+	}
+	root, cancel := context.WithCancel(ctx)
+	d := &HubWorkerDeployment{input: c, root: root, cancel: cancel, closers: []func(){in.closeHTTP}}
+	complete := false
+	defer func() {
+		if !complete {
+			d.Close()
+		}
+	}()
+	startup, end := context.WithTimeout(root, 30*time.Second)
+	defer end()
+	pools := map[string]*pgxpool.Pool{}
+	users := map[string]bool{}
+	for _, role := range []string{"fleet", "configuration", "audit"} {
+		p, err := in.sqlConfig(startup, "sql-"+role+".json")
+		if err != nil || p == nil || users[p.ConnConfig.User] {
+			return nil, mounts.ErrUnavailable
+		}
+		users[p.ConnConfig.User] = true
+		purpose := map[string]string{"fleet": "configuration-fleet", "configuration": "configuration-source", "audit": "configuration-audit"}[role]
+		if manifest != nil {
+			expected, known := postgres.ConfigurationRuntimeRoleName(c.InstallationID, purpose)
+			if !known || p.ConnConfig.User != expected {
+				return nil, mounts.ErrUnavailable
+			}
+			p.MaxConns, p.MinConns = 1, 0
+			p.ConnConfig.RequireAuth = "scram-sha-256"
+		}
+		pool, err := pgxpool.NewWithConfig(startup, p)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		pools[role] = pool
+		d.closers = append(d.closers, pool.Close)
+		if manifest != nil && postgres.VerifyConfigurationRuntimeCredential(startup, pool, *manifest, purpose) != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	leader, err := kube.NewPermissionClient(in.kubernetes("kube-leader.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	plan := func(g contracts.OwnerDeploymentGuard, source string) (cfg.ConfigMapAdministration, kube.GuardPin) {
+		p := cfg.ConfigMapAdministration{Name: g.Name, SourceName: source, ControlNamespace: control}
+		for _, a := range g.Administrators {
+			p.Administrators = append(p.Administrators, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
+		}
+		return p, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
+	}
+	fp, fg := plan(c.FleetGuard, c.FleetSource.Name)
+	protection, err := kube.NewFleetConfigurationProtection(observer, probe, fp, fg)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	fleetSource, err := kube.NewProtectedFleetSettings(observer, protection, c.FleetSource.Name, c.FleetSource.UID, c.InstallationID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	op, og := plan(c.OwnerGuard, c.OwnerSource.Name)
+	ownerProtection, err := kube.NewOwnerConfigurationProtection(observer, probe, op, og)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	ownerSource, err := kube.NewOwnerConfigurationSource(observer, ownerProtection, c.OwnerSource.Name, c.OwnerSource.UID, c.InstallationID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	fleetStore, err := postgres.NewFleetObservation(startup, pools["fleet"], c.InstallationID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	ownerStore, err := postgres.NewOwnerConfigurations(startup, pools["configuration"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.OwnerSource.UID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	var ack auditapp.OwnerConfigurationAcknowledgements
+	if manifest != nil {
+		ack, err = postgres.NewCurrentOwnerConfigurationAcknowledgements(startup, pools["audit"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.OwnerSource.UID)
+	} else {
+		ack, err = postgres.NewOwnerConfigurations(startup, pools["audit"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.OwnerSource.UID)
+	}
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+
+	h, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, h.CloseIdleConnections)
+	seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, seal.Close)
+	open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, open.Close)
+	sh, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, sh.CloseIdleConnections)
+	store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, mountedStorage{in}, sh)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, store.Close)
+	d.reconciler = &app.ConfigurationReconciler{Fleet: &app.TrustObserver{Settings: fleetSource, Projection: fleetStore, Now: time.Now}, Owner: &app.OwnerConfigurationObserver{Reader: ownerSource, Ledger: ownerStore, Audit: &objectstore.OwnerConfigurationAuditObjects{Store: store, Seal: seal, Open: open}, Acknowledgements: ack, Now: time.Now}}
+	d.leader, err = kube.NewReconciliationLeader(leader, c.LeaderLease.Name, c.LeaderLease.UID, ownerRandomID())
+	if err != nil || startup.Err() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	complete = true
+	return d, nil
+}
+
+func (d *HubWorkerDeployment) Run() error {
+	if d == nil || d.leader == nil || d.reconciler == nil {
+		return mounts.ErrUnavailable
+	}
+	d.mu.Lock()
+	if d.closed || d.running || d.root == nil || d.root.Err() != nil {
+		d.mu.Unlock()
+		return mounts.ErrUnavailable
+	}
+	d.running = true
+	d.owners.Add(1)
+	d.mu.Unlock()
+	// Release this owner before Close can wait for it. An external Close may
+	// already be waiting and must not close providers beneath the leader loop.
+	defer func() { d.owners.Done(); d.Close() }()
+	return d.leader.Run(d.root, d.runConfiguration)
+}
+func (d *HubWorkerDeployment) Close() {
+	if d == nil {
+		return
+	}
+	d.once.Do(func() {
+		d.mu.Lock()
+		d.closed = true
+		if d.cancel != nil {
+			d.cancel()
+		}
+		d.mu.Unlock()
+		d.owners.Wait()
+		if d.providers != nil {
+			// The provider close interval is used once. A bounded failure still
+			// joins cancelled work locally before dependencies can be released;
+			// no later shutdown iteration gets another revocation window.
+			_ = d.providers.CloseAndJoin(context.Background())
+		}
+		for i := len(d.closers) - 1; i >= 0; i-- {
+			d.closers[i]()
+		}
+	})
+}
+func RunHubWorker(ctx context.Context, podUID string) error {
+	if ctx == nil || ctx.Err() != nil {
+		return mounts.ErrUnavailable
+	}
+	files, err := os.OpenRoot(contracts.HubWorkerDeploymentRoot)
+	if err != nil {
+		return mounts.ErrUnavailable
+	}
+	defer files.Close()
+	return runHubWorkerFiles(ctx, files, podUID)
+}

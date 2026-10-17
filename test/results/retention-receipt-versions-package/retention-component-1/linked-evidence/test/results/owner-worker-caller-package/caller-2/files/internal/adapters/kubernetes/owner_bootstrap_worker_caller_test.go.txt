@@ -1,0 +1,259 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+func TestOwnerBootstrapWorkerCallerOriginalReceipts(t *testing.T) {
+	f := newOwnerWorkerCallerFixture(t)
+	writes, creates := f.api.writes.Load(), f.api.creates.Load()
+	var roleReads, selectionReads atomic.Int32
+	f.f.api.mu.Lock()
+	previous := f.f.api.extra
+	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && r.URL.Path == f.rolePath {
+			roleReads.Add(1)
+		}
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/"+f.selection.Snapshot.State.OwnerBootstrap.Child.Receipt.Object.Name) {
+			selectionReads.Add(1)
+		}
+		return previous != nil && previous(w, r)
+	}
+	f.f.api.mu.Unlock()
+	end := time.Now().Add(4 * time.Second)
+	call, cancel := context.WithDeadline(context.Background(), end)
+	defer cancel()
+	got, err := f.producer.ReadWorkerCaller(call)
+	if err != nil {
+		t.Fatal("original caller", err)
+	}
+	if !got.Pin.Valid() || got.Pin.RootID != f.selection.Selection.PermissionRootID || got.Pin.AccountUID != f.resources.State.Objects[1].Receipt.UID ||
+		got.Pin.DeploymentUID != f.resources.State.Objects[11].Receipt.UID || got.ConfigurationRoot.UID != f.roles.UID ||
+		got.LaunchOperationID != f.roles.State.Launch.OperationID || got.FreshUntil.After(end) || !got.ObservedAt.Before(got.FreshUntil) {
+		t.Fatal("caller lost original provenance or deadline")
+	}
+	template, err := ConnectorAPITemplateDigest(f.deployment.Spec.Template)
+	if err != nil || got.Pin.TemplateDigest != template || got.Pin.ProtectionDigest != f.f.source.protection.digest {
+		t.Fatal("caller template/guard does not bind the original full value")
+	}
+	if roleReads.Load() != 2 || selectionReads.Load() != 2 || f.api.writes.Load() != writes || f.api.creates.Load() != creates {
+		t.Fatal("read-only brackets changed", roleReads.Load(), selectionReads.Load(), f.api.writes.Load(), f.api.creates.Load())
+	}
+	raw, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range f.roles.State.Roles {
+		if bytes.Contains(raw, []byte(role.Password)) {
+			t.Fatal("public provenance leaked private predecessor credential")
+		}
+	}
+	if bytes.Contains(raw, []byte("PodUID")) || bytes.Contains(raw, []byte("ReplicaSetUID")) {
+		t.Fatal("caller provenance invented transient descendant identity")
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement(t *testing.T) {
+	for _, name := range []string{"missing launch receipt", "role root UID", "launch marker", "worker UID", "worker account UID", "template annotation", "image", "guard receipt"} {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerWorkerCallerFixture(t)
+			f.f.api.mu.Lock()
+			deploymentPath := "/apis/apps/v1/namespaces/" + f.roles.State.Input.Namespace.Name + "/deployments/" + f.roles.State.Input.Deployment.Name
+			switch name {
+			case "missing launch receipt":
+				f.roles.State.Launch.Receipt = nil
+				f.store(t, f.rolePath, f.roleObject(t))
+			case "role root UID":
+				f.roles.UID = ownerID(21900)
+				f.store(t, f.rolePath, f.roleObject(t))
+			case "launch marker":
+				f.deployment.Annotations[configurationLaunchAnnotation] = ownerID(21901)
+				f.store(t, deploymentPath, f.deployment)
+			case "worker UID":
+				f.f.api.objects[deploymentPath]["metadata"].(map[string]any)["uid"] = ownerID(21902)
+			case "worker account UID":
+				path := "/api/v1/namespaces/" + f.roles.State.Input.Namespace.Name + "/serviceaccounts/" + f.roles.State.Input.ServiceAccount.Name
+				f.f.api.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(21903)
+			case "template annotation":
+				f.deployment.Spec.Template.Annotations = map[string]string{"extra": "changed"}
+				f.store(t, deploymentPath, f.deployment)
+			case "image":
+				f.deployment.Spec.Template.Spec.Containers[0].Image = "replacement.example/test@sha256:" + strings.Repeat("7", 64)
+				f.store(t, deploymentPath, f.deployment)
+			case "guard receipt":
+				f.resources.State.Objects[17].Receipt.UID = ownerID(21904)
+				object := f.f.api.objects[f.f.resources.path()]
+				var secret map[string]any
+				encoded, _ := json.Marshal(object)
+				_ = json.Unmarshal(encoded, &secret)
+				// Replace through the fixture's typed object map below.
+				raw, _ := json.Marshal(f.resources.State)
+				secret["data"] = map[string][]byte{"state.json": raw}
+				f.store(t, f.f.resources.path(), secret)
+			}
+			f.f.api.mu.Unlock()
+			out, err := f.producer.ReadWorkerCaller(context.Background())
+			if err == nil || out.Pin != (fleet.ClusterObservationCallerPin{}) {
+				t.Fatal("unacknowledged/replaced original caller returned a pin")
+			}
+		})
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent(t *testing.T) {
+	for _, name := range []string{"journal changed", "guard lost", "child replaced"} {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerWorkerCallerFixture(t)
+			var reads atomic.Int32
+			f.f.api.mu.Lock()
+			previous := f.f.api.extra
+			f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+				if r.Method == http.MethodGet && r.URL.Path == f.rolePath && reads.Add(1) == 1 {
+					// Deliver the exact first value, then change what the final
+					// actual read/proof sees. Never alter the first returned bytes.
+					permissionReply(w, f.f.api.objects[f.rolePath])
+					switch name {
+					case "journal changed":
+						f.roles.ResourceVersion = "changed"
+						f.store(t, f.rolePath, f.roleObject(t))
+					case "guard lost":
+						f.f.fault.Store(2)
+					case "child replaced":
+						path := "/api/v1/namespaces/" + f.roles.State.Input.Namespace.Name + "/configmaps/" + f.selection.Snapshot.State.OwnerBootstrap.Child.Receipt.Object.Name
+						f.f.api.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(21905)
+					}
+					return true
+				}
+				return previous != nil && previous(w, r)
+			}
+			f.f.api.mu.Unlock()
+			out, err := f.producer.ReadWorkerCaller(context.Background())
+			if err == nil || out.Pin != (fleet.ClusterObservationCallerPin{}) {
+				t.Fatal("final original mutation returned caller provenance")
+			}
+			if name == "journal changed" && !errors.Is(err, cfg.ErrChanged) {
+				t.Fatal("confirmed final journal mismatch lost changed classification", err)
+			}
+		})
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerCloseAndCopyDeny(t *testing.T) {
+	f := newOwnerWorkerCallerFixture(t)
+	copied := *f.producer
+	if _, err := copied.ReadWorkerCaller(context.Background()); err == nil {
+		t.Fatal("copied producer admitted caller read")
+	}
+	if _, err := f.producer.ReadWorkerCaller(context.Background()); err != nil {
+		t.Fatal("copy rejection poisoned original", err)
+	}
+	f.producer.Close()
+	if _, err := f.producer.ReadWorkerCaller(context.Background()); err == nil {
+		t.Fatal("closed producer admitted caller read")
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead(t *testing.T) {
+	f := newOwnerWorkerCallerFixture(t)
+	entered, release := make(chan struct{}), make(chan struct{})
+	// Own fixture-handler release separately from request cancellation so server
+	// teardown cannot wait forever on HTTP/1 cancellation detection.
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	var reads atomic.Int32
+	f.f.api.mu.Lock()
+	previous := f.f.api.extra
+	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && r.URL.Path == f.rolePath && reads.Add(1) == 2 {
+			close(entered)
+			<-release
+			permissionReply(w, f.f.api.objects[f.rolePath])
+			return true
+		}
+		return previous != nil && previous(w, r)
+	}
+	f.f.api.mu.Unlock()
+	call, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	type result struct {
+		value OwnerBootstrapWorkerCaller
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() { value, err := f.producer.ReadWorkerCaller(call); done <- result{value, err} }()
+	select {
+	case <-entered:
+	case r := <-done:
+		t.Fatal("did not reach actual final journal read", r.err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("final read not reached under original bound")
+	}
+	cancel()
+	close(release)
+	select {
+	case r := <-done:
+		if !errors.Is(r.err, cfg.ErrUnavailable) || errors.Is(r.err, cfg.ErrChanged) || r.value.Pin != (fleet.ClusterObservationCallerPin{}) {
+			t.Fatal("cancelled final read did not remain unavailable", r.err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancelled caller read did not join")
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable(t *testing.T) {
+	f := newOwnerWorkerCallerFixture(t)
+	var reads atomic.Int32
+	f.f.api.mu.Lock()
+	previous := f.f.api.extra
+	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && r.URL.Path == f.rolePath && reads.Add(1) == 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return true
+		}
+		return previous != nil && previous(w, r)
+	}
+	f.f.api.mu.Unlock()
+	out, err := f.producer.ReadWorkerCaller(context.Background())
+	if reads.Load() != 2 || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || out.Pin != (fleet.ClusterObservationCallerPin{}) {
+		t.Fatal("unavailable final journal became changed identity", reads.Load(), err)
+	}
+}
+
+func TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable(t *testing.T) {
+	f := newOwnerWorkerCallerFixture(t)
+	var reads atomic.Int32
+	f.f.api.mu.Lock()
+	previous := f.f.api.extra
+	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && r.URL.Path == f.rolePath && reads.Add(1) == 2 {
+			// Return exactly the original journal but advance only the fixture's
+			// clock beyond the already admitted interval before it is consumed.
+			// No sleep or product deadline adjustment is involved.
+			permissionReply(w, f.f.api.objects[f.rolePath])
+			f.f.api.shift += 6 * time.Second
+			return true
+		}
+		return previous != nil && previous(w, r)
+	}
+	f.f.api.mu.Unlock()
+	out, err := f.producer.ReadWorkerCaller(context.Background())
+	if reads.Load() != 2 || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || out.Pin != (fleet.ClusterObservationCallerPin{}) {
+		t.Fatal("expired final return became changed identity", reads.Load(), err)
+	}
+}

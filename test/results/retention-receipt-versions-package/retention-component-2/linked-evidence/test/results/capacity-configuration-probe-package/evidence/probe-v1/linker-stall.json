@@ -1,0 +1,18 @@
+{
+  "recorded_unix": 1791852089.0137072,
+  "session": 7216,
+  "runner_pid": 658238,
+  "go_test_pid": 658261,
+  "linker_pid": 669274,
+  "before_log_bytes": 0,
+  "test_verdict": null,
+  "linker_main_wait": "futex_wait",
+  "linker_worker_669276_wait": "reserve_bytes.cold",
+  "linker_children": [],
+  "binary_bytes": 61243392,
+  "rss_kib": 83440,
+  "swap_kib": 73240,
+  "filesystem_df": "/dev/nvme0n1p2 1.9T 1.8T 108G 95% /home",
+  "proc_stack": "permission denied",
+  "interpretation": "Linker has not launched tests; kernel filesystem reservation wait observed. No regression verdict or termination."
+}

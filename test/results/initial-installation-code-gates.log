@@ -1,0 +1,63 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.897s
+ok  	asservat.local/asservat/internal/adapters/kms	1.954s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	25.943s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.022s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.549s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.741s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.045s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.385s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.094s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.029s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.048s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.221s
+ok  	asservat.local/asservat/internal/application/evidence	1.090s
+ok  	asservat.local/asservat/internal/application/execution	1.036s
+ok  	asservat.local/asservat/internal/application/fleet	2.070s
+ok  	asservat.local/asservat/internal/application/identity	1.034s
+ok  	asservat.local/asservat/internal/application/planning	1.058s
+ok  	asservat.local/asservat/internal/application/privacy	1.043s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	4.343s
+ok  	asservat.local/asservat/internal/contracts	1.008s
+ok  	asservat.local/asservat/internal/domain/artifact	1.009s
+ok  	asservat.local/asservat/internal/domain/audit	1.007s
+ok  	asservat.local/asservat/internal/domain/authorization	1.407s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.007s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+ok  	asservat.local/asservat/internal/domain/identity	1.007s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.021s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.438s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	2.011s
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 43 packages, 189 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 22 files match sqlc v1.31.1

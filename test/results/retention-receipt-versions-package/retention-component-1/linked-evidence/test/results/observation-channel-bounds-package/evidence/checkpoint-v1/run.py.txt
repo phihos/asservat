@@ -1,0 +1,63 @@
+from pathlib import Path
+import hashlib,json,os,signal,subprocess,time,tempfile,shutil
+stage=Path(__file__).resolve().parent
+repo=Path('/home/phil/Projekte/asservat')
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+maps={name:json.loads((stage/(name+'.json')).read_text()) for name in ['payload','bases','dependencies']}
+def check():
+    actual=set(subprocess.run(['rg','--files','-g','*.go','-g','go.mod','-g','go.sum'],cwd=repo,capture_output=True,text=True,check=True).stdout.splitlines())
+    expected={k for k in maps['dependencies'] if k.endswith('.go') or Path(k).name in {'go.mod','go.sum'}}
+    payloads={str(p.relative_to(stage/'files')) for p in (stage/'files').rglob('*') if p.is_file()}
+    return {'live':[k for k,v in maps['dependencies'].items() if sha(repo/k)!=v], 'bases':[k for k,v in maps['bases'].items() if sha(repo/k)!=v], 'payload':[k for k,v in maps['payload'].items() if sha(stage/'files'/k)!=v], 'fileSet':sorted(actual^expected), 'payloadSet':sorted(payloads^set(maps['payload'])), 'mirror':[k for k,v in json.loads((stage/'mirror-manifest.json').read_text()).items() if sha(stage/'architecture-mirror'/k)!=v], 'mirrorSet':sorted({str(p.relative_to(stage/'architecture-mirror')) for p in (stage/'architecture-mirror').rglob('*') if p.is_file()} ^ set(json.loads((stage/'mirror-manifest.json').read_text()))), 'freeze':[k for k,v in json.loads((stage/'freeze.json').read_text()).items() if sha(stage/k)!=v]}
+evidence=stage/'evidence'
+evidence.mkdir(exist_ok=False)
+free=shutil.disk_usage('/tmp').free
+if free < 4*1024**3: raise SystemExit('owned build tmpfs requires at least 4 GiB free')
+if subprocess.check_output(['stat','-f','-c','%T','/tmp'],text=True).strip()!='tmpfs': raise SystemExit('expected tmpfs /tmp')
+scratch=Path(tempfile.mkdtemp(prefix='asservat-observation-channel-bounds-',dir='/tmp'))
+if scratch.stat().st_uid!=os.getuid() or scratch.stat().st_mode & 0o777 != 0o700: raise SystemExit('invalid owned scratch')
+(evidence/'scratch.json').write_text(json.dumps({'path':str(scratch),'freeBefore':free,'uid':os.getuid(),'mode':'0700'},indent=2)+'\n')
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(scratch))
+# Only the parent-owned external harness may enable real service tests.
+for name in list(env):
+    if name.startswith('ASSERVAT_') and ('FIXTURE' in name or 'NATIVE' in name):
+        del env[name]
+reports=[]
+def phase(name,command,expected=0,marker=None):
+    before=check()
+    if any(before.values()):
+        (evidence/(name+'-preflight.json')).write_text(json.dumps(before,indent=2)+'\n')
+        raise SystemExit('immutable preflight failed')
+    start=time.monotonic()
+    with (evidence/(name+'.log')).open('x') as log:
+        p=subprocess.Popen(command,cwd=repo,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        print(json.dumps({'phase':name,'pid':p.pid,'command':command}),flush=True)
+        try: code=p.wait(timeout=600)
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid,signal.SIGTERM)
+            try:p.wait(timeout=5)
+            except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+            code=124
+    after=check()
+    occurrences=(evidence/(name+'.log')).read_text().count(marker) if marker else None
+    result={'phase':name,'command':command,'cwd':str(repo),'exit':code,'expectedExit':expected,'expectedFailureOccurrences':occurrences,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+    (evidence/(name+'.json')).write_text(json.dumps(result,indent=2)+'\n');reports.append(result)
+    print(json.dumps(result),flush=True)
+    if code!=expected or any(after.values()) or marker and occurrences!=2:raise SystemExit(1)
+try:
+    overlay=['-overlay',str(stage/'overlay.json')]
+    packages=['./internal/adapters/mtls','./internal/bootstrap']
+    phase('before',['go','test','-overlay',str(stage/'before-overlay.json'),'-race','-vet=off','-count=1','-timeout=120s','-run','^TestOperationChannel(CarriesSelectedOwnerCutoffs|ExpiredRetainedCutoffDeniesBeforeAnotherRead|OriginalSelectedCutoffSurvivesKeyLockWait)$','-v','./internal/adapters/mtls'],expected=1)
+    beforeLog=(evidence/'before.log').read_text()
+    markers=['post-metadata candidate lost original shorter owner cutoff','metadata result lost newly observed owner cutoff','expired retained cutoff admitted another candidate read','metadata result survived original cutoff during key lock wait']
+    counts={m:beforeLog.count(m) for m in markers}
+    (evidence/'before-boundaries.json').write_text(json.dumps(counts,indent=2)+'\n')
+    if any(v<1 for v in counts.values()): raise SystemExit('before failed at unintended boundary')
+    phase('compile',['go','test',*overlay,'-vet=off','-run','^$',*packages])
+    phase('race',['go','test',*overlay,'-race','-vet=off','-count=1','-timeout=120s','-run','^Test(OperationChannel|OperationCoordinator|OperationOwner|ConnectorOperation|ConnectorObservationChannel|HubConnectorObservation|OwnerBootstrap|RegionalOperationActual)','-v',*packages])
+    phase('vet',['go','vet',*overlay,*packages])
+    phase('go-architecture',['python3',str(stage/'architecture-mirror/scripts/check-go-architecture.py')])
+    print(json.dumps({'terminal':0,'finalHashes':check()}),flush=True)
+finally:
+    shutil.rmtree(scratch)
+    (evidence/'scratch-cleanup.json').write_text(json.dumps({'removed':not scratch.exists(),'freeAfter':shutil.disk_usage('/tmp').free})+'\n')

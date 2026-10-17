@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capacity-runtime-projection-claim.schema.json",
+  "title": "Original capacity runtime projection claim",
+  "description": "Optional public provenance on the original installed resource journal. Unique original operation, exact paired-root setup and at most five-second CREATE interval inside original thirty-minute journal lifetime. Only acknowledged first claim may CREATE. Unknown outcomes are exact lookup-only; positive Secret UID/RV never replaces current workload, source, role or SQL recovery checks. Public digest excludes passwords, tokens and secret-payload hashes. Runtime verifies the exact completed receipt and dedicated immutable projection before loading capacity credentials. Application checks original times, matching setup, installed layout and sibling/original ID uniqueness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationID",
+    "publicDigest",
+    "setup",
+    "claimedAt",
+    "until"
+  ],
+  "properties": {
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "publicDigest": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[a-f0-9]{64}$"
+    },
+    "setup": {
+      "$ref": "https://asservat.io/spec/v1/capacity-root-setup-claim.schema.json#/$defs/receipt"
+    },
+    "claimedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt": {
+      "$ref": "https://asservat.io/spec/v1/capacity-runtime-projection-claim.schema.json#/$defs/receipt"
+    }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secret",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "secret": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "files": {
+    "HANDOFF.md": "7ac9976c532f906572ddcb3c0016f611db230f6455d80d559c13ab043e40c4f9",
+    "bases.json": "15d813b217a9162f98060d0b7abd5d4b4c5555158715947035ffe799cb77e1c5",
+    "changes.patch": "b22c5040d6f04bcba8e79969a7d5442a01f2c3ab6562fa0b3c9b438ce07c4b86",
+    "dependencies.json": "21a6459857e46236ccd66c625ab735e43ce5df567de9e9641c71c80bc9d11c25",
+    "evidence/after.json": "e05bb22837bb0421746d044c032320079b1a299e2b01b1156ac8b6b875522aa7",
+    "evidence/after.log": "0f9942b34aa998d5624d2fdabb3f4054675e6b155e12afc975e6ccca27eb496d",
+    "evidence/before.json": "ec3ab17293988d44718c8f81ea9063d97b790dd3e25af3477fd856208a4332a7",
+    "evidence/before.log": "be83385aeba43204a208f2b8ed0402e3e6fcd30df3ff586a8d68932ab038e7c1",
+    "evidence/prior/native-admission-callback-diagnostic-check.log": "7cd4c2d01dc5f568fcba6fd36ed2eac33365cc0b889fcbf4fe244284cb4085da",
+    "evidence/prior/native-admission-callback-diagnostic-environment.json": "ecd61ac3d4f60eabf8c997d7a26d73fccf89c6c498ebc19619b9a130f8da395e",
+    "evidence/prior/native-admission-callback-diagnostic-postgres.log": "408034000ffd1b0754818f9b8a90d5d8bbb064dbee5e8f84afa91722107e6125",
+    "evidence/prior/native-admission-callback-diagnostic.log": "9710e2b2d2ef2e7f4453ad3af898a0e89c2b13b6ac0713870194734459391faa",
+    "evidence/run_checks.py": "bd691b73970b251eaf399e7f58596de09e9c801c225a35ff93dca50ef9cf25e7",
+    "evidence/vet.json": "89064d2a3cc88078d23df78d60aa706ea3068f519bd0d8fcabde3b024ada2896",
+    "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "files/internal/application/evidence/native_exchange.go": "40e221f66b8aca2b6496d1890c87f24bfd36d59bbab4c89bd4be4e8cadf978c1",
+    "files/internal/transport/native/admission_budget_test.go": "2adaf1f495ca721c696d978cdea488401286ca40baa3c722747d5f0029d06cdb",
+    "files/internal/transport/native/admission_check.go": "75d36d7b0c22f6da903e0202d25786d2312e7579ca348ab8f8facb5b00c31336",
+    "files/internal/transport/native/admission_check_test.go": "71119c6fcaf72773510384ba472687d7b7b8b96f055c580e188f264fec629ccd",
+    "files/internal/transport/native/operation.go": "5039122f2b18bd01a2491e471f98d5b25f423d9852a33d4b09289442794481fd",
+    "files/internal/transport/native/registration.go": "ec180da35b5c52db51a707e7faff687262ddbfae932ea12e03fc1ff7679b2d13",
+    "files/internal/transport/native/router.go": "8cc7888b57d852df6b4b2a728042fc4f86fda17c8dd942b473b4f8872f994070",
+    "manifest.json": "0056723c25186699ec1f6d232c5429bf0754bf71010c94a3b184a0c8262435a5",
+    "overlay-after.json": "5d5b029325071f8e352cf38892d410f7ae5b41990f2f8ba03b154ca8c0eac18c",
+    "overlay-before.json": "56a01993b6c4160bc9c01fd851fd974c418428f4d9b0699700fc6522d3b7b242",
+    "payload-hashes.json": "ee1f3ce852ebc0075273cd8aa1e03b330690c31373a266188a0095294006581d"
+  }
+}

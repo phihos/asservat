@@ -1,0 +1,10 @@
+=== RUN   TestCapacityNativeProcessingLineageDates
+=== RUN   TestCapacityNativeProcessingLineageDates/original-recipe-exceeds-prepaid-horizon
+=== RUN   TestCapacityNativeProcessingLineageDates/explicit-policy-covers-original-session
+=== RUN   TestCapacityNativeProcessingLineageDates/same-policy-does-not-promise-future-renewal
+--- PASS: TestCapacityNativeProcessingLineageDates (0.00s)
+    --- PASS: TestCapacityNativeProcessingLineageDates/original-recipe-exceeds-prepaid-horizon (0.00s)
+    --- PASS: TestCapacityNativeProcessingLineageDates/explicit-policy-covers-original-session (0.00s)
+    --- PASS: TestCapacityNativeProcessingLineageDates/same-policy-does-not-promise-future-renewal (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.052s

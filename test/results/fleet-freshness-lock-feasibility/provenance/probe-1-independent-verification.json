@@ -1,0 +1,38 @@
+{
+  "resultSHA256": "3d73fbc1ea62a5110821c1691c919b8d784e66a5d1c24b9d2c698413900cb455",
+  "exit": 2,
+  "artifactCount": 79,
+  "sourceCount": 13,
+  "allArchivedHashesAndExactSetMatch": true,
+  "currentSourcesMatch": true,
+  "all43OwnedProcessGroupsAbsent": true,
+  "dockerAbsence": [
+    {
+      "kind": "container",
+      "exit": 1,
+      "stdout": "[]\n",
+      "stderr": "Error response from daemon: No such container: 391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b\n"
+    },
+    {
+      "kind": "volume",
+      "exit": 1,
+      "stdout": "[]\n",
+      "stderr": "Error response from daemon: get 13c5f01e83dbd533a9fa505bf44c3fca23353ee304f95afe2ab8eeacc43d1aab: no such volume\n"
+    }
+  ],
+  "labelledContainersAbsent": true,
+  "observedRenewalWithHeldShare": true,
+  "observedSemanticBlock": [
+    {
+      "pid": 279,
+      "role": "probe_semantic",
+      "state": "active",
+      "waitType": "Lock",
+      "waitEvent": "transactionid",
+      "blockers": [
+        237
+      ]
+    }
+  ],
+  "scope": "View/ACL and first renewal/block reached; controlled release and remaining matrix unrun due application-name NOTICE parser failure."
+}

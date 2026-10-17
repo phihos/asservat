@@ -1,0 +1,92 @@
+[
+  {
+    "step": "compile",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/native-sql-timing-20261012/overlay.json",
+      "./test/integration",
+      "-run",
+      "^$",
+      "-count=1",
+      "-timeout=60s"
+    ],
+    "exit": 0,
+    "timed_out": false,
+    "elapsed_seconds": 14.208,
+    "before": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    },
+    "after": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    }
+  },
+  {
+    "step": "race",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/native-sql-timing-20261012/overlay.json",
+      "./test/integration",
+      "-run",
+      "^TestNativeSQLTiming",
+      "-count=1",
+      "-timeout=60s"
+    ],
+    "exit": 0,
+    "timed_out": false,
+    "elapsed_seconds": 43.336,
+    "before": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    },
+    "after": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    }
+  },
+  {
+    "step": "vet",
+    "command": [
+      "go",
+      "vet",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/native-sql-timing-20261012/overlay.json",
+      "./test/integration"
+    ],
+    "exit": 0,
+    "timed_out": false,
+    "elapsed_seconds": 11.337,
+    "before": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    },
+    "after": {
+      "dependencies": 1374,
+      "changes": [],
+      "manifest_sha256": "11614241c055efc7b4c67e52ea82ac6103c22d670cea20bfca0d34cce320cef9",
+      "dependencies_sha256": "1e48f2acb2c71e08f72e89b9365c3dfad2ffab2faf9baa793a7e709863271312",
+      "overlay_sha256": "d97058e1c76a321a8315738d6917450b84315a0f2ab0b519f4ab3a4800eec812"
+    }
+  }
+]

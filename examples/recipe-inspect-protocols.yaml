@@ -1,0 +1,66 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: inspect-protocols
+  namespace: payments
+spec:
+  description: Synthetic bounded discovery diagnostic; identity and protocol adapters
+    require qualification.
+  actions:
+  - id: processes
+    kind: processSnapshot
+    parameters:
+      include:
+      - identity
+      - status
+      - cgroups
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: sockets
+    kind: networkSnapshot
+    parameters:
+      include:
+      - sockets
+      - counters
+      - socketOwners
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: sample
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: rawPackets
+        snaplen: 2048
+      before: 0s
+      after: 10s
+      ring:
+        maxAge: 10s
+        maxBytes: 8388608
+        segmentBytes: 2097152
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - cidrs:
+          - 0.0.0.0/0
+          - ::/0
+        protocol: any
+        resolution: frozen
+        maxEndpoints: 1
+        maxStaleness: 5s
+      maxFrozenBytes: 8388608
+      maxConcurrentSnapshots: 1
+    required: true
+    impact: sensitiveRead
+    limits:
+      maxBytes: 8388608
+      timeout: 15s
+    executionMode: onTrigger
+  maxTotalBytes: 10485760
+  maxDuration: 20s

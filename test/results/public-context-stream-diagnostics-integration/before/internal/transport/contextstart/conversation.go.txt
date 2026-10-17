@@ -1,0 +1,225 @@
+package contextstart
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	executionapp "asservat.local/asservat/internal/application/execution"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/contracts"
+	execution "asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// Stream is one actual, retained HTTP/2 conversation. Implementations bound
+// bytes, frames, current peers and socket operations; Close cancels and joins.
+// There is no reconnect, multiplexing or alternate destination within a stream.
+type Stream interface {
+	Context() context.Context
+	AwaitWork(context.Context) (contracts.APIContextFrame, fleet.APIContextReceiver, error)
+	Send(context.Context, contracts.APIContextFrame) error
+	Receive(context.Context) (contracts.APIContextFrame, error)
+	Close() error
+}
+type RegionalExecutor interface {
+	ExecuteAPIContext(context.Context, fleet.AuthenticatedAPIContextWork, identities.CurrentIdentity) (executionapp.ContextResult, error)
+}
+
+func knownResult(state string) bool {
+	switch state {
+	case "StoredPendingVerification", "AlreadyStarted", "PreparationUncertain", "Unavailable":
+		return true
+	}
+	return false
+}
+
+// ServeHub dispatches once and answers only new identity questions from this
+// exact exchange. Its result is not catalog visibility or new admission proof.
+func ServeHub(ctx context.Context, stream Stream, w fleet.APIContextWork, signed []byte, current identities.CurrentIdentity, now func() time.Time) (string, error) {
+	if ctx == nil || ctx.Err() != nil || stream == nil || now == nil || !w.Valid(now()) || len(signed) == 0 || len(signed) > contracts.APIContextSignedWorkBytes {
+		return "", fleet.ErrInvalid
+	}
+	call, cancel := context.WithDeadline(ctx, w.NotAfter)
+	ended := make(chan struct{})
+	stopStream := context.AfterFunc(stream.Context(), func() { cancel(); close(ended) })
+	defer func() {
+		if !stopStream() {
+			<-ended
+		}
+		cancel()
+	}()
+	source, e := NewHubIdentity(call, w, current, now)
+	if e != nil {
+		return "", e
+	}
+	defer source.Close()
+	if e = stream.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: signed}); e != nil {
+		return "", e
+	}
+	for count := 0; count <= contracts.APIContextIdentityChecks; count++ {
+		frame, e := stream.Receive(call)
+		if e != nil {
+			return "", e
+		}
+		switch frame.Kind {
+		case contracts.APIContextIdentityRequestFrame:
+			q, e := contracts.DecodeAPIContextIdentityRequest(frame.Payload)
+			clear(frame.Payload)
+			if e != nil {
+				return "", e
+			}
+			response, e := source.Answer(call, q)
+			if e != nil {
+				return "", e
+			}
+			encoded, e := contracts.EncodeAPIContextIdentity(response)
+			if e != nil {
+				return "", e
+			}
+			// A shorter identity observation also bounds the actual response write.
+			until, e := time.Parse(time.RFC3339Nano, response.ValidUntil)
+			if e != nil {
+				clear(encoded)
+				return "", fleet.ErrDenied
+			}
+			send, stop := context.WithDeadline(call, until)
+			e = stream.Send(send, contracts.APIContextFrame{Kind: contracts.APIContextIdentityResponseFrame, Payload: encoded})
+			clear(encoded)
+			stop()
+			if e != nil {
+				return "", e
+			}
+		case contracts.APIContextResultFrame:
+			result, e := contracts.DecodeAPIContextResult(frame.Payload)
+			clear(frame.Payload)
+			if e != nil || result.Format != contracts.APIContextExchangeFormat || result.ExchangeID != w.Channel.ExchangeID || result.CaptureID != w.CaptureID || !knownResult(result.State) {
+				return "", contracts.ErrAPIContextProtocol
+			}
+			// The final current check belongs to the public request. It grants no
+			// regional effect and consumes none of the eight regional read slots.
+			source.state.mu.Lock()
+			until := source.state.until
+			source.state.mu.Unlock()
+			final, stop := context.WithDeadline(call, until)
+			observed, e := current.ResolveIdentity(final)
+			if e == nil {
+				observed, e = source.state.accept(final, observed)
+			}
+			if e != nil {
+				stop()
+				return "", e
+			}
+			receipt, e := contracts.EncodeAPIContextReceipt(contracts.APIContextReceipt{Format: contracts.APIContextExchangeFormat, ExchangeID: w.Channel.ExchangeID, CaptureID: w.CaptureID, State: "received"})
+			if e != nil {
+				stop()
+				return "", e
+			}
+			write, done := context.WithDeadline(final, observed.ValidUntil)
+			e = stream.Send(write, contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: receipt})
+			clear(receipt)
+			done()
+			stop()
+			if e != nil || call.Err() != nil || !now().Before(observed.ValidUntil) {
+				return "", fleet.ErrUnavailable
+			}
+			return result.State, nil
+		default:
+			clear(frame.Payload)
+			return "", contracts.ErrAPIContextProtocol
+		}
+	}
+	return "", contracts.ErrAPIContextProtocol
+}
+
+type regionalIdentityExchange struct{ stream Stream }
+
+func (r regionalIdentityExchange) ResolveAPIIdentity(ctx context.Context, q contracts.APIContextIdentityRequest) (contracts.APIContextIdentityResponse, error) {
+	b, e := contracts.EncodeAPIContextIdentityRequest(q)
+	if e != nil {
+		return contracts.APIContextIdentityResponse{}, e
+	}
+	e = r.stream.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: b})
+	clear(b)
+	if e != nil {
+		return contracts.APIContextIdentityResponse{}, e
+	}
+	f, e := r.stream.Receive(ctx)
+	defer clear(f.Payload)
+	if e != nil || f.Kind != contracts.APIContextIdentityResponseFrame {
+		return contracts.APIContextIdentityResponse{}, contracts.ErrAPIContextProtocol
+	}
+	return contracts.DecodeAPIContextIdentity(f.Payload)
+}
+
+// ServeRegional accepts exactly one signed API capture. The receiver was built
+// from this actual TLS exchange plus current local process/registry checks.
+// The executor's positive first-preparation and local CAS are unchanged.
+func ServeRegional(ctx context.Context, stream Stream, receiver fleet.APIContextReceiver, check ReceiverCheck, verifier fleetapp.APIContextWorkVerifier, runner RegionalExecutor, now func() time.Time) error {
+	if ctx == nil || ctx.Err() != nil || stream == nil || check == nil || verifier == nil || runner == nil || now == nil || !receiver.Valid(now()) {
+		return fleet.ErrInvalid
+	}
+	f, currentReceiver, e := stream.AwaitWork(ctx)
+	if e != nil || f.Kind != contracts.APIContextWorkFrame {
+		clear(f.Payload)
+		return contracts.ErrAPIContextProtocol
+	}
+	if currentReceiver.Channel != receiver.Channel || !currentReceiver.Valid(now()) {
+		clear(f.Payload)
+		return fleet.ErrDenied
+	}
+	authenticated, e := verifier.VerifyAPIContextWork(ctx, f.Payload, currentReceiver)
+	clear(f.Payload)
+	if e != nil || !authenticated.Valid(now()) {
+		return fleet.ErrDenied
+	}
+	call, cancel := context.WithDeadline(ctx, authenticated.ValidUntil)
+	ended := make(chan struct{})
+	stopStream := context.AfterFunc(stream.Context(), func() { cancel(); close(ended) })
+	defer func() {
+		if !stopStream() {
+			<-ended
+		}
+		cancel()
+	}()
+	current, e := NewRemoteIdentity(call, authenticated, regionalIdentityExchange{stream}, now)
+	if e != nil {
+		return e
+	}
+	defer current.Close()
+	result, runErr := runner.ExecuteAPIContext(call, authenticated, current)
+	state := "Unavailable"
+	if runErr == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted") {
+		state = result.State
+	} else if errors.Is(runErr, execution.ErrPreparationUncertain) {
+		state = "PreparationUncertain"
+	}
+	// Ciphertext receipts/native bytes and raw downstream errors never cross this
+	// start protocol. Their durable interpretation belongs to existing readers.
+	current.state.mu.Lock()
+	until := current.state.until
+	current.state.mu.Unlock()
+	resultCtx, stop := context.WithDeadline(call, identity.Earlier(until, authenticated.ValidUntil))
+	defer stop()
+	encoded, e := contracts.EncodeAPIContextResult(contracts.APIContextResult{Format: contracts.APIContextExchangeFormat, ExchangeID: authenticated.Work.Channel.ExchangeID, CaptureID: authenticated.Work.CaptureID, State: state})
+	if e != nil {
+		return e
+	}
+	e = stream.Send(resultCtx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: encoded})
+	clear(encoded)
+	if e != nil {
+		return e
+	}
+	f, e = stream.Receive(resultCtx)
+	defer clear(f.Payload)
+	if e != nil || f.Kind != contracts.APIContextReceiptFrame {
+		return contracts.ErrAPIContextProtocol
+	}
+	receipt, e := contracts.DecodeAPIContextReceipt(f.Payload)
+	if e != nil || receipt.Format != contracts.APIContextExchangeFormat || receipt.ExchangeID != authenticated.Work.Channel.ExchangeID || receipt.CaptureID != authenticated.Work.CaptureID || receipt.State != "received" || resultCtx.Err() != nil || !now().Before(until) {
+		return contracts.ErrAPIContextProtocol
+	}
+	return nil
+}

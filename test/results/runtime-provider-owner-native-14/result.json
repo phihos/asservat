@@ -1,0 +1,72 @@
+{
+  "mode": "owner",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair",
+    "--runtime-provider-worker",
+    "--runtime-provider-owner"
+  ],
+  "runnerSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 2550,
+  "sourceSnapshotSHA256": "658b282238af1faa82f1098ee71b7d81859dd6461265e9fe3ac5c71f674a34d2",
+  "expectedHarnessSourceCount": 2353,
+  "requiredPassedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "expectedSkippedTests": [],
+  "scratch": "/home/phil/.cache/asservat-build/runtime-provider-owner-native-14-tmp",
+  "validationErrors": [],
+  "processJoined": true,
+  "diskBeforeBytes": 416973783040,
+  "tmpFreeBeforeBytes": 16779939840,
+  "commandExit": 0,
+  "seconds": 615.974,
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "missingRequiredTests": [],
+  "cleanupFailures": [],
+  "testExit": 0,
+  "exactHarnessSources": true,
+  "ownedDockerCleanup": {
+    "container": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "network": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "volume": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "image": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "kindNodes": {
+      "exit": 0,
+      "remainingNames": []
+    }
+  },
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "658b282238af1faa82f1098ee71b7d81859dd6461265e9fe3ac5c71f674a34d2",
+    "expected-harness-sources.json": "17e1643de1c3f245d64daf49a1a6dc6c6bf86f45773dae51d27e66ee92d0b55c",
+    "gate.log": "83bd22387e3545dd8bf6b7a6cd59a26c00b373fc772ed2c1cdb884296189f989",
+    "context-storage.log": "5eba85242c145d294b03559d75444d07964aeedb253e23a80b0d0137e3ceafc6",
+    "context-storage-environment.json": "1cedc86a31017ac320cc8d472b27c35bf680498600720a8323ebf53e404641cf"
+  },
+  "exit": 0
+}

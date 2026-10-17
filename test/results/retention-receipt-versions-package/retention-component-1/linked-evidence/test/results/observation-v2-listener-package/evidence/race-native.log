@@ -1,0 +1,82 @@
+=== RUN   TestOwnerObservationOperationFirstRequestCloseRace
+--- PASS: TestOwnerObservationOperationFirstRequestCloseRace (0.00s)
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew/10s
+=== RUN   TestNativePurposeOriginalAcceptedDeadlineCannotRenew/30s
+--- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew (0.00s)
+    --- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew/10s (0.00s)
+    --- PASS: TestNativePurposeOriginalAcceptedDeadlineCannotRenew/30s (0.00s)
+=== RUN   TestNativePurposeClosingRetainsReservationUntilHandlerJoin
+--- PASS: TestNativePurposeClosingRetainsReservationUntilHandlerJoin (0.00s)
+=== RUN   TestNativePurposeCloseBeforeFirstRequestCannotStrandSlot
+--- PASS: TestNativePurposeCloseBeforeFirstRequestCannotStrandSlot (0.00s)
+=== RUN   TestOwnerObservationOperationListenerExactPurposes
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/local-locator
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/local-claim
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/common-cannot-claim
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/exact-cannot-locate
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/host-cannot-change-sni
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/client-certificate-cannot-be-hwork
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/claim-query
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/wrong-method
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/legacy-local-disabled
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/legacy-regional-disabled
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/owner-proof-disabled
+=== RUN   TestOwnerObservationOperationListenerExactPurposes/public-disabled
+--- PASS: TestOwnerObservationOperationListenerExactPurposes (0.07s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/local-locator (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/local-claim (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/common-cannot-claim (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/exact-cannot-locate (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/host-cannot-change-sni (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/client-certificate-cannot-be-hwork (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/claim-query (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/wrong-method (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/legacy-local-disabled (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/legacy-regional-disabled (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/owner-proof-disabled (0.01s)
+    --- PASS: TestOwnerObservationOperationListenerExactPurposes/public-disabled (0.00s)
+=== RUN   TestOwnerObservationOperationListenerStandbyPreservesProofCapacity
+--- PASS: TestOwnerObservationOperationListenerStandbyPreservesProofCapacity (5.22s)
+=== RUN   TestOwnerObservationOperationListenerCloseJoinsHandler
+--- PASS: TestOwnerObservationOperationListenerCloseJoinsHandler (0.06s)
+=== RUN   TestOwnerObservationOperationListenerAcceptPreludeAndProofDeadline
+--- PASS: TestOwnerObservationOperationListenerAcceptPreludeAndProofDeadline (2.21s)
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/same-name
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/different-port
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/wrong-regional
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/ip
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/noncanonical-port
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/no-proof-reservation
+=== RUN   TestOwnerObservationOperationListenerRejectsInvalidTuple/over-total
+--- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/same-name (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/different-port (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/wrong-regional (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/ip (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/noncanonical-port (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/no-proof-reservation (0.00s)
+    --- PASS: TestOwnerObservationOperationListenerRejectsInvalidTuple/over-total (0.00s)
+=== RUN   TestOwnerObservationOnlyListenerActualTLS
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/exact
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/exact-owner-sni
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/wrong-host
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/native-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/worker-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/public-path
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/extra-body
+=== RUN   TestOwnerObservationOnlyListenerActualTLS/expired-wire
+--- PASS: TestOwnerObservationOnlyListenerActualTLS (0.05s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/exact (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/exact-owner-sni (0.00s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/wrong-host (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/native-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/worker-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/public-path (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/extra-body (0.01s)
+    --- PASS: TestOwnerObservationOnlyListenerActualTLS/expired-wire (0.01s)
+=== RUN   TestOwnerObservationListenerCloseJoinsOriginalCall
+--- PASS: TestOwnerObservationListenerCloseJoinsOriginalCall (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	8.649s

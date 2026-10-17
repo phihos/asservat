@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/capture_admission_test.go": "/home/phil/.cache/asservat-build/planning/native-sql-timing-20261012/files/test/integration/capture_admission_test.go",
+    "/home/phil/Projekte/asservat/test/integration/native_sql_timing_test.go": "/home/phil/.cache/asservat-build/planning/native-sql-timing-20261012/files/test/integration/native_sql_timing_test.go"
+  }
+}

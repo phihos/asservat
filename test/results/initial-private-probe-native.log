@@ -1,0 +1,45 @@
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/healthy-native-request-drain
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-target_namespace
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-root
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-account
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-cluster_role
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-collection
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-role-cannot-refill
+--- PASS: TestInitialPreparationPublicInputsWithRealKubernetes (58.71s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/healthy-native-request-drain (0.90s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-role-cannot-refill (0.00s)
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain
+=== NAME  TestInitialPreparationPrivateProbeWithRealKubernetes
+    initial_preparer_private_test.go:86: native private probe permission configuration unavailable
+--- FAIL: TestInitialPreparationPrivateProbeWithRealKubernetes (34.06s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain (0.90s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	92.830s
+FAIL

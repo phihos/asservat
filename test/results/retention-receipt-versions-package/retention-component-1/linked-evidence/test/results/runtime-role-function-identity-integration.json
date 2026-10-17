@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "scope": "exact compiled function overload ACL verification; no changed grants/layout/intervals",
+    "files": [
+      {
+        "path": "internal/adapters/postgres/public_runtime_function_identity_test.go",
+        "base_sha256": null,
+        "payload_sha256": "055255e48a8e771f803cb00823ff35a01585951c73783bc1f9bafbc8cb3e8b43"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_roles.go",
+        "base_sha256": "097ec59e77398298cb097ae47f09dcb2b4038e7222c3df64d4749615f63ec3a3",
+        "payload_sha256": "cf9a3c91ea5417bf0cabc3f40fd7d8b0b1a260eec664a908c5060f8018f7fc0f"
+      },
+      {
+        "path": "test/integration/capacity_sql_fixture_test.go",
+        "base_sha256": "468db31625e30e67d5576f19b38cf541fcc85c0c165be776c2ff10a892fc270e",
+        "payload_sha256": "42b3a6b8bf8ac6e4170cab3de208ddec37998a56fcb471a30ed9520e8dce2eb8"
+      }
+    ]
+  },
+  "dependencyCount": 2700
+}

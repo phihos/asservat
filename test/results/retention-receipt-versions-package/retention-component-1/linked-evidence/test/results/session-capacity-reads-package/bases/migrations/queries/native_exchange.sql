@@ -1,0 +1,62 @@
+-- name: ReadNativeBacking :one
+SELECT * FROM download_native_backing WHERE allocation_id=$1 AND root_id=$2;
+
+-- name: InsertNativeBacking :exec
+INSERT INTO download_native_backing(allocation_id,root_id,policy_json,rows_limit,keys_limit,transitions_per_row,backup_horizon_seconds,cleanup_seconds,valid_until,retire_by,residual_until)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10);
+
+-- name: LockNativeOwner :one
+SELECT * FROM download_native_owner WHERE worker_id=$1 AND root_id=$2 FOR UPDATE;
+
+-- name: ReadNativeOwner :one
+SELECT * FROM download_native_owner WHERE worker_id=$1 AND root_id=$2;
+
+-- name: InsertNativeOwner :one
+INSERT INTO download_native_owner(worker_id,root_id,allocation_id,operation_id,fence,operation_json,authority_json,lease_sequence,lease_started,lease_until,updated_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$9) RETURNING *;
+
+-- name: ReplaceNativeOwner :one
+UPDATE download_native_owner SET operation_id=$4,fence=fence+1,operation_json=$5,authority_json=$6,lease_sequence=$7,lease_started=$8,lease_until=$9,updated_at=$8,updates=updates+1,closed=false
+WHERE worker_id=$1 AND root_id=$2 AND fence=$3 AND closed AND retired_at IS NULL RETURNING *;
+
+-- name: RenewNativeOwner :one
+UPDATE download_native_owner SET authority_json=$5,lease_sequence=$6,lease_started=$7,lease_until=$8,updated_at=$7,updates=updates+1
+WHERE worker_id=$1 AND root_id=$2 AND operation_id=$3 AND fence=$4 AND NOT closed AND retired_at IS NULL RETURNING *;
+
+-- name: CloseNativeOwner :execrows
+UPDATE download_native_owner SET closed=true,updated_at=clock_timestamp(),updates=updates+1
+WHERE worker_id=$1 AND root_id=$2 AND operation_id=$3 AND fence=$4 AND NOT closed AND retired_at IS NULL;
+
+-- name: RetireNativeOwner :execrows
+WITH instant AS MATERIALIZED (SELECT clock_timestamp() AS now)
+UPDATE download_native_owner SET closed=true,retired_at=instant.now,updated_at=instant.now,updates=updates+1 FROM instant
+WHERE worker_id=$1 AND root_id=$2 AND retired_at IS NULL;
+
+-- name: ReadNativeKey :one
+SELECT * FROM download_native_key WHERE window_id=$1 AND root_id=$2;
+
+-- name: LockNativeKey :one
+SELECT * FROM download_native_key WHERE window_id=$1 AND root_id=$2 FOR UPDATE;
+
+-- name: InsertNativeKey :exec
+INSERT INTO download_native_key(window_id,worker_id,root_id,allocation_id,operation_id,operation_fence,authority_json,proof_json,installation_id,key_id,peer_id,certificate_sha256,valid_until,created_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);
+
+-- name: SpendNativeKeyRole :execrows
+UPDATE download_native_key SET used_roles=used_roles|sqlc.arg(role_mask)::smallint
+WHERE window_id=$1 AND root_id=$2 AND used_roles&sqlc.arg(role_mask)::smallint=0;
+
+-- name: DeleteNativeKeys :execrows
+DELETE FROM download_native_key WHERE worker_id=$1 AND root_id=$2;
+
+-- name: DeleteNativeOwner :execrows
+DELETE FROM download_native_owner WHERE worker_id=$1 AND root_id=$2;
+
+-- name: DeleteNativeBacking :execrows
+DELETE FROM download_native_backing WHERE allocation_id=$1 AND root_id=$2;
+
+-- name: ReadSessionNativeBacking :one
+SELECT effective.* FROM artifact_download s
+JOIN download_native_backing b ON b.allocation_id=s.allocation_id AND b.root_id=s.root_id
+CROSS JOIN LATERAL capacity_session_native(s,b) effective
+WHERE s.id=$1 AND s.root_id=$2;

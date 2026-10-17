@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestConnectorAPIProcessWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "status": "failed",
+  "finding": "PrepareStart now finishes in 1.38 s with 3.62 s of its original interval left (process-constructor 2.80 s, process-read 0.70 s, ~1 ms per API round trip, so elapsed time is limiter wait), but returns ErrUnavailable right after the single CapacityReservation POST: exactly one pre-check ran (2 SSR, 2 SA, 3 VAP and 3 binding reads), so either the POST failed with a non-forbidden/non-conflict status or its response was refused by the closed decoder. Subtests named-whole-secret-and-foreign-denial and changed-input-metadata passed.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log"
+}

@@ -1,0 +1,15 @@
+=== RUN   TestOwnerAuditInventoryWithRealServices
+=== RUN   TestOwnerAuditInventoryWithRealServices/list-only-retains-versions-before-multipart-denial
+=== RUN   TestOwnerAuditInventoryWithRealServices/multipart-policy-rejects-other-prefixes
+=== RUN   TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies
+=== RUN   TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory
+=== RUN   TestOwnerAuditInventoryWithRealServices/inventory-preserves-all-physical-obligations
+    owner_audit_inventory_test.go:246: independent exact version bodies and all seven version/marker entries unchanged; one unfinished upload and part retained; no ledger, release or retirement effect
+--- PASS: TestOwnerAuditInventoryWithRealServices (0.31s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/list-only-retains-versions-before-multipart-denial (0.01s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/multipart-policy-rejects-other-prefixes (0.00s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies (0.01s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory (0.01s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/inventory-preserves-all-physical-obligations (0.01s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.365s

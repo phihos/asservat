@@ -1,0 +1,251 @@
+package postgres
+
+import (
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"io"
+	"strings"
+	"time"
+)
+
+// NativeKeys consumes three purpose-specific window slots. The original
+// preparation still uses DownloadKeys; a window is never cast to a batch.
+// Insert-capable hub and spend-only A-KEY instances use distinct SQL roles.
+type NativeKeys struct {
+	owners *NativeOwners
+	scope  value.KeyScope
+}
+
+func NewNativeKeys(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, scope value.KeyScope, g DownloadTransactionGuards) (*NativeKeys, error) {
+	if !scope.Valid() || scope.Purpose != "artifact" || scope.InstallationID != p.InstallationID {
+		return nil, artifact.ErrInvalid
+	}
+	owners, e := NewNativeOwners(ctx, pool, root, p, g)
+	if e != nil {
+		return nil, e
+	}
+	return &NativeKeys{owners, scope}, nil
+}
+func (s *NativeKeys) withWindow(ctx context.Context, ref value.NativeReference, a artifact.DownloadAuthority, window string, generation int64, fn func(*custodydb.Queries, artifact.DownloadSession, value.WorkerEnrollment, custodydb.DownloadNativeOwner, time.Time) error) error {
+	if s == nil || !ref.Valid() || !value.UUID(window) || generation < 1 || !a.Valid(time.Now()) {
+		return authapp.ErrKeyDenied
+	}
+	return s.owners.workers.withSession(ctx, ref.SessionID, a, func(q *custodydb.Queries, p artifact.DownloadSession, now time.Time) error {
+		initial, e := q.ReadNativeOwner(ctx, custodydb.ReadNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(a.Scope.RootID)})
+		if e != nil {
+			return e
+		}
+		o, _, e := decodeNativeOwner(initial)
+		if e != nil || o.Reference != ref || o.Kind != value.NativeResponse || o.Generation != generation || o.SourceVersion != a.Scope.Version {
+			return authapp.ErrKeyDenied
+		}
+		seq, until, e := nativeParent(ctx, q, p, o, now, false)
+		if e != nil {
+			return e
+		}
+		en, e := nativeWorker(ctx, q, a.Scope.RootID, o)
+		if e != nil {
+			return e
+		}
+		row, e := q.LockNativeOwner(ctx, custodydb.LockNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(a.Scope.RootID)})
+		if e != nil {
+			return e
+		}
+		if row.Closed || row.RetiredAt.Valid || !bytes.Equal(row.OperationJson, initial.OperationJson) || row.LeaseSequence != seq || row.LeaseUntil.Time.After(until) {
+			return authapp.ErrKeyDenied
+		}
+		response, e := q.ReadDownloadResponse(ctx, custodydb.ReadDownloadResponseParams{ID: id(o.ParentID), SessionID: id(p.ID), RootID: id(a.Scope.RootID)})
+		if e != nil || uid(response.ActiveWindow) != window {
+			return authapp.ErrKeyDenied
+		}
+		clock, e := q.CurrentTime(ctx)
+		if e != nil || !clock.Time.Before(row.LeaseUntil.Time) {
+			return authapp.ErrKeyDenied
+		}
+		if e = fn(q, p, en, row, clock.Time.UTC()); e != nil {
+			return e
+		}
+		after, e := q.CurrentTime(ctx)
+		if e != nil || !after.Time.Before(row.LeaseUntil.Time) {
+			return authapp.ErrKeyDenied
+		}
+		return nil
+	})
+}
+func (s *NativeKeys) BindNativeDownloadKeys(ctx context.Context, ref value.NativeReference, l artifact.DownloadDeliveryLease, scope value.KeyScope, peer value.KeyPeer, proof value.KeyWorkerProof) error {
+	if s == nil || ctx == nil || scope != s.scope || !l.Valid(time.Now()) || peer.Role != "acquisition" || !peer.CanRequest(scope, "unwrap") || proof.Peer != peer || !proof.Valid(time.Now()) || proof.Binding.DownloadID != ref.SessionID {
+		return authapp.ErrKeyDenied
+	}
+	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(l.Until, proof.FreshUntil))
+	defer cancel()
+	encoded, e := json.Marshal(l.Authority)
+	if e != nil || len(encoded) > 16384 {
+		return authapp.ErrKeyDenied
+	}
+	pb, e := json.Marshal(proof)
+	if e != nil || len(pb) > 16384 {
+		return authapp.ErrKeyDenied
+	}
+	e = s.withWindow(ctx, ref, l.Authority, l.WindowID, l.Generation, func(q *custodydb.Queries, p artifact.DownloadSession, en value.WorkerEnrollment, o custodydb.DownloadNativeOwner, now time.Time) error {
+		if proof.Binding != en.Worker.Binding || peer.PeerID != en.Worker.Binding.PodUID || !peer.Valid(now) || !proof.Valid(now) || l.Sequence != o.LeaseSequence {
+			return authapp.ErrKeyDenied
+		}
+		if e := activeWorkerCertificate(ctx, q, en.Worker, peer); e != nil {
+			return e
+		}
+		operation, _, err := decodeNativeOwner(o)
+		if err != nil || operation.ParentID != l.ResponseID {
+			return authapp.ErrKeyDenied
+		}
+		response, err := q.ReadDownloadResponse(ctx, custodydb.ReadDownloadResponseParams{ID: id(l.ResponseID), SessionID: id(p.ID), RootID: id(p.Scope.RootID)})
+		if err != nil || uid(response.OwnerID) != l.OwnerID {
+			return authapp.ErrKeyDenied
+		}
+		window, err := q.LockDownloadWindow(ctx, custodydb.LockDownloadWindowParams{ID: id(l.WindowID), ResponseID: id(l.ResponseID), SessionID: id(p.ID)})
+		if err != nil {
+			return err
+		}
+		_, win, err := decodeWindow(window)
+		if err != nil || win.Offset != l.Offset || win.Length != l.Length {
+			return authapp.ErrKeyDenied
+		}
+		until := identity.Earlier(l.Until, identity.Earlier(o.LeaseUntil.Time, identity.Earlier(peer.NotAfter, proof.FreshUntil))).UTC().Truncate(time.Microsecond)
+		old, e := q.ReadNativeKey(ctx, custodydb.ReadNativeKeyParams{WindowID: id(l.WindowID), RootID: id(p.Scope.RootID)})
+		if e == nil {
+			original, e := downloadWorkerProof(old.ProofJson, peer, p.ID, now)
+			if e != nil || original.Binding != proof.Binding || old.WorkerID != id(ref.WorkerID) || old.OperationID != id(ref.OperationID) || old.OperationFence != ref.Fence || old.InstallationID != id(scope.InstallationID) || old.KeyID != scope.KeyID || old.PeerID != id(peer.PeerID) || !bytes.Equal(old.CertificateSha256, peer.Certificate[:]) || !sameNativeJSON(old.AuthorityJson, encoded) || old.ValidUntil.Time.After(until) || !now.Before(old.ValidUntil.Time) {
+				return authapp.ErrKeyDenied
+			}
+			return nil
+		}
+		if !errors.Is(e, pgx.ErrNoRows) {
+			return e
+		}
+		if !now.Before(until) {
+			return authapp.ErrKeyDenied
+		}
+		if e = q.InsertNativeKey(ctx, custodydb.InsertNativeKeyParams{WindowID: id(l.WindowID), WorkerID: id(ref.WorkerID), RootID: id(p.Scope.RootID), AllocationID: id(p.AllocationID), OperationID: id(ref.OperationID), OperationFence: ref.Fence, AuthorityJson: encoded, ProofJson: pb, InstallationID: id(scope.InstallationID), KeyID: scope.KeyID, PeerID: id(peer.PeerID), CertificateSha256: peer.Certificate[:], ValidUntil: ts(until), CreatedAt: ts(now)}); e != nil {
+			return e
+		}
+		after, e := q.CurrentTime(ctx)
+		if e != nil || !proof.Valid(after.Time) || !after.Time.Before(until) {
+			return authapp.ErrKeyDenied
+		}
+		return nil
+	})
+	if e != nil || ctx.Err() != nil {
+		return authapp.ErrKeyDenied
+	}
+	return nil
+}
+func (s *NativeKeys) Resolve(ctx context.Context, peer value.KeyPeer, r value.KeyRequestInfo) (value.KeyOperationPermit, error) {
+	var out value.KeyOperationPermit
+	if s == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !value.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+		return out, authapp.ErrKeyDenied
+	}
+	q := custodydb.New(s.owners.workers.downloads.ledger.pool)
+	row, e := q.ReadNativeKey(ctx, custodydb.ReadNativeKeyParams{WindowID: id(r.AuthorityID), RootID: id(s.owners.workers.downloads.root)})
+	if e != nil {
+		return out, authapp.ErrKeyDenied
+	}
+	var a artifact.DownloadAuthority
+	if json.Unmarshal(row.AuthorityJson, &a) != nil || a.Scope.RootID != s.owners.workers.downloads.root || !a.Valid(time.Now()) {
+		return out, authapp.ErrKeyDenied
+	}
+	own, e := q.ReadNativeOwner(ctx, custodydb.ReadNativeOwnerParams{WorkerID: row.WorkerID, RootID: row.RootID})
+	if e != nil {
+		return out, authapp.ErrKeyDenied
+	}
+	o, _, e := decodeNativeOwner(own)
+	if e != nil || o.Reference.OperationID != uid(row.OperationID) || o.Reference.Fence != row.OperationFence {
+		return out, authapp.ErrKeyDenied
+	}
+	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(row.ValidUntil.Time, a.ValidUntil))
+	defer cancel()
+	e = s.withWindow(ctx, o.Reference, a, r.AuthorityID, o.Generation, func(q *custodydb.Queries, p artifact.DownloadSession, en value.WorkerEnrollment, owner custodydb.DownloadNativeOwner, now time.Time) error {
+		active, e := q.LockNativeKey(ctx, custodydb.LockNativeKeyParams{WindowID: row.WindowID, RootID: row.RootID})
+		if e != nil {
+			return e
+		}
+		if !peer.Valid(now) || active.WorkerID != row.WorkerID || active.OperationID != row.OperationID || active.OperationFence != row.OperationFence || active.InstallationID != id(s.scope.InstallationID) || active.KeyID != s.scope.KeyID || active.PeerID != id(peer.PeerID) || !bytes.Equal(active.CertificateSha256, peer.Certificate[:]) || !bytes.Equal(active.AuthorityJson, row.AuthorityJson) || !now.Before(active.ValidUntil.Time) {
+			return authapp.ErrKeyDenied
+		}
+		proof, e := downloadWorkerProof(active.ProofJson, peer, p.ID, now)
+		if e != nil || proof.Binding != en.Worker.Binding || active.ValidUntil.Time.After(proof.FreshUntil) {
+			return authapp.ErrKeyDenied
+		}
+		if e = activeWorkerCertificate(ctx, q, en.Worker, peer); e != nil {
+			return e
+		}
+		published, e := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: row.RootID})
+		if e != nil {
+			return e
+		}
+		expected, e := currentPublishedContext(published)
+		if e != nil {
+			return authapp.ErrKeyDenied
+		}
+		mask := int16(0)
+		for i, role := range []string{"data-key", "index-key", "manifest-key"} {
+			b, e := evidence.ArtifactKeyBinding(expected.Binding(), role)
+			if e != nil {
+				return e
+			}
+			if bytes.Equal(b, r.Binding) {
+				mask = int16(1 << i)
+				break
+			}
+		}
+		if mask == 0 || active.UsedRoles&mask != 0 {
+			return authapp.ErrKeyDenied
+		}
+		count, e := q.SpendNativeKeyRole(ctx, custodydb.SpendNativeKeyRoleParams{WindowID: row.WindowID, RootID: row.RootID, RoleMask: mask})
+		if e != nil || count != 1 {
+			return authapp.ErrKeyDenied
+		}
+		until := identity.Earlier(active.ValidUntil.Time, identity.Earlier(peer.NotAfter, owner.LeaseUntil.Time))
+		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.RecoveryEpoch, Revision: uint64(o.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now, ValidUntil: until}
+		after, e := q.CurrentTime(ctx)
+		if e != nil || !proof.Valid(after.Time) || !out.Valid(peer, r, after.Time) {
+			return authapp.ErrKeyDenied
+		}
+		return nil
+	})
+	if e != nil || ctx.Err() != nil {
+		return value.KeyOperationPermit{}, authapp.ErrKeyDenied
+	}
+	return out, nil
+}
+
+func sameNativeJSON(a, b []byte) bool {
+	decode := func(raw []byte) (any, bool) {
+		var v any
+		d := json.NewDecoder(bytes.NewReader(raw))
+		d.UseNumber()
+		if d.Decode(&v) != nil || d.Decode(new(any)) != io.EOF {
+			return nil, false
+		}
+		return v, true
+	}
+	av, ok := decode(a)
+	if !ok {
+		return false
+	}
+	bv, ok := decode(b)
+	if !ok {
+		return false
+	}
+	ac, ae := json.Marshal(av)
+	bc, be := json.Marshal(bv)
+	return ae == nil && be == nil && bytes.Equal(ac, bc)
+}

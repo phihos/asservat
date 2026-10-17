@@ -1,0 +1,1 @@
+{"exit":1,"status":"failed","finding":"Unbound 600-second capacity TokenRequest by the connector Pod-bound credential was still denied by the owner workload guard; the generated clause looked correct, so run 3 adds per-condition Warn-policy diagnostics.","log":"context-storage.log"}

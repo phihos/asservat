@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>Asservat · UI design prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="layout">
+  <aside id="sidebar">
+    <a class="brand" href="#/overview"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5h18v22H7zM11 10h10M11 15h10M11 20h5"/></svg>asservat</a>
+    <div class="workspace-label">Debugging workspace</div>
+    <nav id="navigation" aria-label="Main navigation"></nav>
+    <div class="sidebar-bottom"><a href="#/help">Help & shortcuts <span aria-hidden="true">↗</span></a><a href="#/access">Your access</a><span class="local-note">Private installation</span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="top-context"><button id="menu-toggle" class="quiet" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">☰</button><div id="breadcrumb"></div></div>
+      <div class="top-actions"><span class="demo-label">Synthetic preview</span><button id="prototype-toggle" class="quiet" aria-haspopup="dialog">Prototype controls</button><button id="identity-button" aria-label="Your identity and access">AM</button></div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+</div>
+<dialog id="prototype-dialog" aria-labelledby="prototype-title">
+  <div class="dialog-top"><h2 id="prototype-title">Prototype controls</h2><button id="prototype-close" class="icon-button quiet" aria-label="Close prototype controls">×</button></div>
+  <p class="muted">Synthetic data only. No action connects to a cluster.</p>
+  <label class="field">Persona<select id="persona"><option value="maintainer">Maintainer + owner</option><option value="recipient">Share recipient</option><option value="approver">Independent approver</option><option value="admin">Operator + maintainer</option></select></label>
+  <label class="field">Screen<select id="screen-picker"></select></label>
+  <label class="field">State<select id="state-picker"><option value="normal">Normal</option><option value="loading">Loading</option><option value="empty">Empty</option><option value="denied">Access changed</option><option value="expired">Expired</option><option value="offline">Cluster offline</option><option value="quota">Quota reached</option></select></label>
+  <details><summary>Live-view simulation</summary><p>With an active live view, introduce a delivery gap without changing the recording.</p><button data-action="live-gap">Simulate a delivery gap</button></details>
+  <div class="dialog-actions"><button id="reset-demo">Reset demo</button><button id="prototype-done" class="primary">View screen</button></div>
+</dialog>
+<dialog id="action-dialog" aria-labelledby="dialog-title">
+  <form method="dialog" id="dialog-form"><div class="dialog-top"><span class="eyebrow">Review action</span><button value="cancel" class="icon-button quiet" aria-label="Close dialog">×</button></div><h2 id="dialog-title"></h2><div id="dialog-body"></div><div class="dialog-actions"><button value="cancel">Go back</button><button id="dialog-confirm" value="confirm" class="primary">Confirm</button></div></form>
+</dialog>
+<div id="notice" role="status" aria-live="polite"></div>
+<script src="screens.js"></script><script src="live.js"></script><script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+--- FAIL: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity (0.09s)
+    initial_runtime_object_defaults_test.go:26: owner-deployment builder omitted explicit Always restart policy
+    --- FAIL: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/api_defaults (0.00s)
+        initial_runtime_object_defaults_test.go:55: owner-deployment receipt acceptance=false, want true: permission source identity changed
+    --- FAIL: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/original_controller_revision (0.00s)
+        initial_runtime_object_defaults_test.go:57: owner-deployment receipt acceptance=false, want true: permission source identity changed
+    initial_runtime_object_defaults_test.go:26: worker-deployment builder omitted explicit Always restart policy
+    --- FAIL: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/api_defaults (0.00s)
+        initial_runtime_object_defaults_test.go:55: worker-deployment receipt acceptance=false, want true: permission source identity changed
+    --- FAIL: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/original_controller_revision (0.00s)
+        initial_runtime_object_defaults_test.go:57: worker-deployment receipt acceptance=false, want true: permission source identity changed
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.138s
+FAIL

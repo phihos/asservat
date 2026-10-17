@@ -1,0 +1,11 @@
+{
+  "scope": "Real SQL49 operation pairs using synthetic native/source/TLS values; no installed routing",
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^connector-observation-operation$"
+  ],
+  "exit": 1,
+  "seconds": 42.637
+}

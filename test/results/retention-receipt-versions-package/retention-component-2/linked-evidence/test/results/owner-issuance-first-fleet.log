@@ -1,0 +1,6 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:101: actual owner CSR signing server key service refused or unavailable
+--- FAIL: TestEnrollmentOwnerPKIWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.085s
+FAIL

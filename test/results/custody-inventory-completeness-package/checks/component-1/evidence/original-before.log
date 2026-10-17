@@ -1,0 +1,23 @@
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/versions
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=initial api=versions err=<nil> deletes=1 aborts=1
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/uploads
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=initial api=uploads err=<nil> deletes=1 aborts=1
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/current
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=initial api=current err=<nil> deletes=1 aborts=1
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/versions
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=final api=versions err=<nil> deletes=1 aborts=1
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/uploads
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=final api=uploads err=<nil> deletes=1 aborts=1
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/current
+    custody_inventory_completeness_test.go:92: omitted IsTruncated certified absence or wrong failure: phase=final api=current err=<nil> deletes=1 aborts=1
+--- FAIL: TestPurgeRejectsOmittedInventoryCompleteness (0.07s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/initial/versions (0.01s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/initial/uploads (0.01s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/initial/current (0.01s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/final/versions (0.01s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/final/uploads (0.01s)
+    --- FAIL: TestPurgeRejectsOmittedInventoryCompleteness/final/current (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/objectstore	0.118s
+FAIL

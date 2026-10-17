@@ -1,0 +1,197 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"io"
+	"net/netip"
+	"os"
+	"slices"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+func capacityRuntimeReference(v contracts.WorkerObjectReference) bool {
+	return authorization.UUID(v.UID) && len(validation.IsDNS1123Subdomain(v.Name)) == 0
+}
+func capacityRuntimeGuard(g contracts.OwnerDeploymentGuard) bool {
+	if len(validation.IsDNS1123Label(g.Name)) != 0 || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) ||
+		!identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || g.PolicyGeneration > 2147483647 || len(g.Administrators) < 1 || len(g.Administrators) > 32 {
+		return false
+	}
+	seen := map[contracts.OwnerDeploymentActor]bool{}
+	for _, a := range g.Administrators {
+		if (a.Kind != "User" && a.Kind != "Group") || !identity.Text(a.Name, 256) || seen[a] {
+			return false
+		}
+		seen[a] = true
+	}
+	return true
+}
+func capacityRuntimeEndpoint(p contracts.OwnerProviderEndpoint) bool {
+	if !ownerEndpoint(p.Endpoint) {
+		return false
+	}
+	_, _, err := mtls.OwnerTrustRoots(p.Roots, time.Now())
+	return err == nil
+}
+
+func capacityRuntimeQualification(raw []byte) (app.CapacityQualification, error) {
+	var out app.CapacityQualification
+	if len(raw) < 2 || len(raw) > 128<<10 {
+		return out, mounts.ErrUnavailable
+	}
+	a := jsontext.Value(bytes.Clone(raw))
+	if a.Canonicalize() != nil {
+		return out, mounts.ErrUnavailable
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if d.Decode(&out) != nil {
+		return app.CapacityQualification{}, mounts.ErrUnavailable
+	}
+	var extra any
+	if d.Decode(&extra) != io.EOF || !out.Valid() || !app.ValidateRootBackingInput(out.RootBacking) {
+		return app.CapacityQualification{}, mounts.ErrUnavailable
+	}
+	b, err := json.Marshal(out)
+	z := jsontext.Value(b)
+	if err != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) {
+		return app.CapacityQualification{}, mounts.ErrUnavailable
+	}
+	return out, nil
+}
+
+func capacityRuntimeProcessingPaths(in []contracts.DownloadEnvironmentPath) ([]privacy.DownloadPath, error) {
+	if len(in) < 1 || len(in) > 32 {
+		return nil, mounts.ErrUnavailable
+	}
+	revision := func(v contracts.DownloadEnvironmentRevision) (identity.Revision, error) {
+		out := identity.Revision{UID: v.UID, Generation: v.Generation}
+		b, err := hex.DecodeString(v.SHA256)
+		if err != nil || len(b) != len(out.Digest) || hex.EncodeToString(b) != v.SHA256 {
+			return out, mounts.ErrUnavailable
+		}
+		copy(out.Digest[:], b)
+		if !out.Valid() {
+			return out, mounts.ErrUnavailable
+		}
+		return out, nil
+	}
+	seen := map[string]bool{}
+	out := make([]privacy.DownloadPath, 0, len(in))
+	for _, v := range in {
+		worker, err := revision(v.WorkerConfiguration)
+		if err != nil {
+			return nil, err
+		}
+		hub, err := revision(v.HubConfiguration)
+		if err != nil {
+			return nil, err
+		}
+		p := privacy.DownloadPath{ID: v.ID, TargetClusterID: v.TargetClusterID, StoreID: v.StoreID, StorageRegion: v.StorageRegion,
+			AcquisitionClusterID: v.AcquisitionClusterID, AcquisitionRegion: v.AcquisitionRegion, ConnectorClusterID: v.ConnectorClusterID, ConnectorRegion: v.ConnectorRegion,
+			HubClusterID: v.HubClusterID, HubRegion: v.HubRegion, WorkerConfiguration: worker, HubConfiguration: hub}
+		if !p.Valid() || seen[p.ID] {
+			return nil, mounts.ErrUnavailable
+		}
+		seen[p.ID] = true
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func readCapacityWorkerInputs(ctx context.Context, files *os.Root) (contracts.CapacityDeployment, contracts.CapacityCredentialManifest, app.CapacityQualification, error) {
+	var c contracts.CapacityDeployment
+	var m contracts.CapacityCredentialManifest
+	var q app.CapacityQualification
+	fail := func() (contracts.CapacityDeployment, contracts.CapacityCredentialManifest, app.CapacityQualification, error) {
+		return contracts.CapacityDeployment{}, contracts.CapacityCredentialManifest{}, app.CapacityQualification{}, mounts.ErrUnavailable
+	}
+	b, err := mounts.Read(ctx, files, contracts.CapacityDeploymentFile, contracts.CapacityDeploymentMaxBytes)
+	if err != nil {
+		return fail()
+	}
+	c, err = contracts.DecodeCapacityDeployment(bytes.NewReader(b))
+	clear(b)
+	if err != nil || c.Format != contracts.CapacityDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.PermissionRootID) ||
+		!authorization.UUID(c.RoleRootUID) || !authorization.UUID(c.RoleSetupID) || c.AccountVersion != c.RoleSetupID+"-account/v1" {
+		return fail()
+	}
+	q, err = capacityRuntimeQualification(c.Qualification)
+	if err != nil || q.RootBacking.RootID != c.PermissionRootID || q.RootBacking.InstallationID != c.InstallationID || q.RootBacking.AccountVersion != c.AccountVersion {
+		return fail()
+	}
+	control := c.Control
+	if !authorization.UUID(control.ClusterID) || !capacityRuntimeReference(control.Namespace) || len(validation.IsDNS1123Label(control.Namespace.Name)) != 0 ||
+		!capacityRuntimeEndpoint(control.Kubernetes) || !capacityRuntimeGuard(control.Guard) || !capacityRuntimeReference(control.ProbeAccount) ||
+		control.StatusUsers == nil || !identity.Strings(control.StatusUsers, 16, 256) || len(c.Clusters) != len(q.NamespaceGuards) {
+		return fail()
+	}
+	seen := map[string]bool{}
+	for _, v := range c.Clusters {
+		if !authorization.UUID(v.ClusterID) || seen[v.ClusterID] || !capacityRuntimeReference(v.ProbeNamespace) || len(validation.IsDNS1123Label(v.ProbeNamespace.Name)) != 0 ||
+			!capacityRuntimeReference(v.ProbeAccount) || !capacityClusterEndpoint(c.LocalOwner != nil, v.Kubernetes) || !capacityRuntimeGuard(v.Guard) || !slices.IsSorted(v.Keys) {
+			return fail()
+		}
+		seen[v.ClusterID] = true
+		found := false
+		for _, pin := range q.NamespaceGuards {
+			if pin.ClusterID == v.ClusterID && slices.Equal(pin.Keys, v.Keys) {
+				found = true
+			}
+		}
+		if !found {
+			return fail()
+		}
+	}
+	if !capacityRuntimeReference(c.Processing.Source) || c.Processing.Source.UID != q.RootBacking.ProcessingSourceUID || !capacityRuntimeGuard(c.Processing.Guard) ||
+		c.Processing.Guard.Name == control.Guard.Name {
+		return fail()
+	}
+	if _, err = capacityRuntimeProcessingPaths(c.Processing.Paths); err != nil {
+		return fail()
+	}
+	p := c.Postgres
+	if p.MaxConnections != 1 || p.Port < 1 || p.Port > 65535 || !identity.Text(p.Database, 63) {
+		return fail()
+	}
+	if _, err = netip.ParseAddr(p.Host); err != nil && !ownerDNSName.MatchString(p.Host) {
+		return fail()
+	}
+	if _, _, err = mtls.OwnerTrustRoots(p.Roots, time.Now()); err != nil {
+		return fail()
+	}
+	b, err = mounts.Read(ctx, files, contracts.CapacityCredentialManifestFile, contracts.CapacityCredentialManifestMaxBytes)
+	if err != nil {
+		return fail()
+	}
+	m, err = contracts.DecodeCapacityCredentialManifest(bytes.NewReader(b))
+	clear(b)
+	if err != nil || postgres.ValidateCapacityCredentialManifest(m, time.Now()) != nil || m.Input.InstallationID != c.InstallationID ||
+		m.RootUID != c.RoleRootUID || m.SetupID != c.RoleSetupID || m.Capacity.PermissionRootID != c.PermissionRootID || ctx.Err() != nil {
+		return fail()
+	}
+	return c, m, q, nil
+}
+
+// Installed observation uses the authenticated local hop only. An endpoint in
+// that profile is rejected rather than ignored or used as a remote fallback.
+func capacityClusterEndpoint(installed bool, endpoint contracts.OwnerProviderEndpoint) bool {
+	if installed {
+		return endpoint.Endpoint == "" && len(endpoint.Roots) == 0
+	}
+	return capacityRuntimeEndpoint(endpoint)
+}

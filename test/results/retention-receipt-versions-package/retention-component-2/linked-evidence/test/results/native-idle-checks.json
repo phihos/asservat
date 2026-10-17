@@ -1,0 +1,33 @@
+{
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-idle-response-20261012/tmp"
+  },
+  "checks": [
+    {
+      "session": 7342,
+      "command": "go test -overlay before-overlay.json -race ./internal/transport/native -run '^TestNativeServeDeliversPositiveIdleBeforeClosingSocket$' -count=1",
+      "exit": 1,
+      "result": "Expected failing-before reproduction: native exchange unavailable after exactly one valid idle admission; package 0.119s. Test was gofmt formatted before the corrected run."
+    },
+    {
+      "session": 82532,
+      "command": "go test -overlay overlay.json -race ./internal/transport/native -run '^TestNativeServeDeliversPositiveIdleBeforeClosingSocket$' -count=1",
+      "exit": 0,
+      "result": "1.149s; all three exact positive responses and sequential one-slot sockets succeed."
+    },
+    {
+      "session": 68227,
+      "command": "go test -overlay overlay.json -race ./internal/transport/native ./internal/adapters/mtls -run '^TestNative(Serve|SharedPort|Purpose|NoCommand)' -count=1",
+      "exit": 0,
+      "result": "native 13.669s, mtls 1.125s."
+    },
+    {
+      "session": 60634,
+      "command": "go vet -overlay overlay.json ./internal/transport/native ./internal/adapters/mtls",
+      "exit": 0,
+      "result": "Existing-package overlay vet passed with empty log."
+    }
+  ]
+}

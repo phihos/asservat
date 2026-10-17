@@ -1,0 +1,5 @@
+{
+  "path": "test/integration/context_native_content_test.go",
+  "sha256": "2c429443b706eb54cb32d0e47c0330ab4319360b6a581939e56cdfa20128a729",
+  "scope": "Fixture-only preservation of original acknowledged normal-lane storage, backup and history profile; no production changes."
+}

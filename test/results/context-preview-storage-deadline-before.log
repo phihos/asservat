@@ -1,0 +1,5 @@
+--- FAIL: TestContextPreviewRetainsShorterStorageObservation (0.00s)
+    context_investigation_test.go:608: preview extended storage observation: 2026-10-11 12:00:05 +0000 UTC != 2026-10-11 12:00:01 +0000 UTC
+FAIL
+FAIL	asservat.local/asservat/internal/application/capture	0.002s
+FAIL

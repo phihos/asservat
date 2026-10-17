@@ -1,0 +1,83 @@
+from pathlib import Path
+import hashlib, json, os, subprocess, time
+
+root = Path('/home/phil/Projekte/asservat')
+stage = Path('/home/phil/.cache/asservat-build/planning/capacity-configuration-probe-20261013')
+candidate = stage / 'candidate-v1'
+out = Path(__file__).parent
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(candidate / 'manifest.json') == 'd2213693e8f0a45d2106b001bd9c3ff10f3c8dafdee88971e8e864f427daee09'
+assert sha(candidate / 'dependencies.json') == '9570f303ffea48686424d2f874f288ec1e6c8f0ea1b3eef481922c82de020c56'
+assert sha(candidate / 'overlay.json') == 'f917c850da9b880ee8a6394da0aa03fb9de13162313f00ce372d2ec2f2848a37'
+assert sha(candidate / 'before-overlay.json') == '4a006e89ece74c8293d3363b1f744604bfd70d4a2401374c8048326119fc0547'
+manifest = json.loads((candidate / 'manifest.json').read_text())
+dependencies = json.loads((candidate / 'dependencies.json').read_text())
+
+def verify():
+    errors = {k: [] for k in ('payloads', 'bases', 'retained_bases', 'dependencies')}
+    for row in manifest['files']:
+        p = row['path']
+        if sha(candidate / 'changes' / p) != row['payload_sha256']:
+            errors['payloads'].append(p)
+        if sha(root / p) != row['base_sha256']:
+            errors['bases'].append(p)
+        if sha(candidate / 'bases' / p) != row['base_sha256']:
+            errors['retained_bases'].append(p)
+    for p, h in dependencies.items():
+        if sha(root / p) != h:
+            errors['dependencies'].append(p)
+    return errors
+
+result = {'manifest': sha(candidate / 'manifest.json'), 'dependencies': sha(candidate / 'dependencies.json'),
+          'runner': sha(Path(__file__)), 'before': verify(), 'phases': [], 'started_at': time.time()}
+env = os.environ.copy()
+env.update({'GOMAXPROCS': '2', 'GOFLAGS': '-p=2', 'TMPDIR': str(out / 'tmp')})
+for key in list(env):
+    if key.startswith('ASSERVAT_'):
+        env.pop(key)
+
+def phase(name, command, expected=0, required=()):
+    started = time.time()
+    log = out / (name + '.log')
+    with log.open('x') as file:
+        process = subprocess.run(command, cwd=root, env=env, stdout=file, stderr=subprocess.STDOUT)
+    with (out / (name + '.exit')).open('x') as file:
+        file.write(str(process.returncode) + '\n')
+    value = {'name': name, 'command': command, 'exit': process.returncode, 'expected': expected,
+             'seconds': time.time() - started, 'log_sha256': sha(log)}
+    result['phases'].append(value)
+    print(json.dumps(value), flush=True)
+    if process.returncode != expected:
+        raise RuntimeError(name + ' unexpected exit')
+    text = log.read_text()
+    if '[build failed]' in text or any(x not in text for x in required):
+        raise RuntimeError(name + ' did not reach the intended assertion')
+
+try:
+    if any(result['before'].values()):
+        raise RuntimeError('unexplained source drift before launch')
+    phase('before', ['go', 'test', '-race', '-vet=off', '-overlay', str(candidate / 'before-overlay.json'),
+                     './internal/bootstrap', '-run', '^TestInitialConfigurationDocuments', '-count=1', '-timeout=3m', '-v'],
+          expected=1, required=('generated configuration installer changed the complete original owner guard',
+                                'unsupported original start branch silently changed the generated guard',
+                                '--- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/legacy-omission'))
+    phase('after-race', ['go', 'test', '-race', '-vet=off', '-overlay', str(candidate / 'overlay.json'),
+                         './internal/bootstrap', '-run', '^Test(InitialConfigurationDocuments|ConfigurationRoleInstaller|OwnerCapacityProbe)',
+                         '-count=1', '-timeout=3m', '-v'],
+          required=('--- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard',
+                    '--- PASS: TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard'))
+    phase('vet', ['go', 'vet', '-overlay', str(candidate / 'overlay.json'), './internal/bootstrap'])
+    result['terminal_exit'] = 0
+except Exception as error:
+    result['terminal_exit'] = 1
+    result['error'] = str(error)
+finally:
+    result['after'] = verify()
+    result['ended_at'] = time.time()
+    if any(result['after'].values()):
+        result['terminal_exit'] = 2
+    with (out / 'result.json').open('x') as file:
+        json.dump(result, file, indent=2)
+        file.write('\n')
+    print(json.dumps(result, indent=2), flush=True)
+raise SystemExit(result['terminal_exit'])

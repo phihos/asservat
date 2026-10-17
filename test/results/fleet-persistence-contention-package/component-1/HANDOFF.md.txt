@@ -1,0 +1,36 @@
+# ADR155 component handoff
+
+Seventeen exact source paths are component-qualified and remain outside the live repository. Session 44166 ended 0; no job remains. Native SQL contention/lost-reply behavior and full owner startup remain unqualified.
+
+- Payload manifest: `b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60` (nine existing bases, eight new files).
+- Dependencies: `8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157` (4,336 current inputs, including sqlc.yaml, embedded schemas, authored web assets and Markdown link closure).
+- Executed runner: `95f4da320337af77d9f93494598d20741147a36d9f2b0ad198efa558f83974fc`.
+- Result: c98fd4a738b4c8c6019a81919b042dc34016e46f4628a59e8953d4f13918931a.
+- All payload/base/dependency/metadata hashes, mirror file contents and complete mirror file sets remained unchanged. Owned scratch removed. GOMAXPROCS2/-p2 retained; no generation/native/live edits.
+
+Behavior: only an exact last-callback LockFleetTrust 55P03, after independent positive same-row checks, may classify the failed persistence as unavailable without adding suspension. Actual postmaster/database/primary and complete row/date comparison repeat after rollback. All reads fit the original SQL/caller/source interval and final confirmation also retains the old stored expiry. The normal effect lock, recovery checks, generic transaction retry/cleanup and all other failure fences remain. Bootstrap invalidates scheduling notices on this error; it never reports committed freshness. No new authority or success hint is introduced.
+
+Actual component phases:
+
+- `compile`: exit 0 (expected 0), 21.081s, 0 top-level / 0 named PASS entries.
+- `application-before`: exit 1 (expected 1), 5.073s, 0 top-level / 6 named PASS entries.
+- `application-domain-races`: exit 0 (expected 0), 17.577s, 112 top-level / 557 named PASS entries.
+- `postgres-races`: exit 0 (expected 0), 16.576s, 6 top-level / 45 named PASS entries.
+- `bootstrap-races`: exit 0 (expected 0), 11.576s, 1 top-level / 3 named PASS entries.
+- `vet`: exit 0 (expected 0), 2.575s, 0 top-level / 0 named PASS entries.
+- `go-architecture`: exit 0 (expected 0), 1.080s, 0 top-level / 0 named PASS entries.
+- `canonical`: exit 0 (expected 0), 8.574s, 0 top-level / 0 named PASS entries.
+
+The original-app regression used unchanged live TrustObserver with the new domain error and new test. It failed only unchanged-persistence and wrapped-persistence at the intended assertion; all six negative branches passed. Corrected races total 119 top-level / 605 named PASS entries. PostgreSQL pure cases cover complete identity/date equality, unknown error codes, and an actual-incarnation change despite independently reaccepted effective recovery=false. Bootstrap checks both pending and active notice cancellation. Full app/domain suites passed, not only the new test. Actual scoped SQL roles/effects were not executed in this component run.
+
+Canonical gates: 121 schemas, 10,665 assertions, 716 malformed examples rejected; architecture 1,219 positives / 120 negatives; design 63 screens / 9 journeys. These are contract/design checks, not installed-runtime evidence.
+
+Next separately allocated native run must use the existing owned fleet provider fixture, preserving its fixed deadlines and credentials:
+
+```
+ASSERVAT_INITIAL_INSTALLATION=1 python3 scripts/test-custody.py --fleet --run '^TestInitialInstallationWithRealServices$/^owner-identity-roles-(constructor-(expired-source|bridge-contention)|observation-(contention(-changed|-expired|-final-(change|renewed|recovery|expired))?|unknown-commit))$'
+```
+
+Require all eight new and two preserved child PASS names, fleet-environment.json testExit0, exact source hashes unchanged and cleanupFailures empty. The original wrapper-only omitted --fleet failure remains in owner-sql-prerequisite/prerequisite-1; prerequisite-2 passed the original two diagnostic cases. New fixture source/witness/role-root facts remain explicitly synthetic; SQL activation/locks, provider and encrypted audit are actual. Unknown COMMIT uses one dropped successful server CommandComplete; final mutation cases delay only delivery of an actual lock-abort error and then mutate the actual row after the real bridge releases. They do not fabricate product proof or change effect deadlines.
+
+The new tests are compiled, not native-qualified. Do not infer that this resolves original native93479's unknown predicate or the independent owner S83 operation budget. Only after native classification checks pass should the original fresh worker/owner installation be retried.

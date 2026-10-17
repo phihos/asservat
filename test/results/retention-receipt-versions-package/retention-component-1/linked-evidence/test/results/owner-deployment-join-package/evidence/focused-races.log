@@ -1,0 +1,224 @@
+=== RUN   TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer
+--- PASS: TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer (0.01s)
+=== RUN   TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery
+--- PASS: TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery (0.01s)
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/expiry
+--- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls (0.02s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/expiry (0.00s)
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/proof
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/prepare-certificate
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/sign
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/activate
+--- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery (0.01s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/proof (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/prepare-certificate (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/sign (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/activate (0.01s)
+=== RUN   TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate
+--- PASS: TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate (0.00s)
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/expiry
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/groups
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/shorter
+--- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner (0.01s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/expiry (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/groups (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/shorter (0.00s)
+=== RUN   TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound
+--- PASS: TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound (0.00s)
+=== RUN   TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck
+--- PASS: TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck (0.00s)
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/groups
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/scopes
+--- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation (0.00s)
+    --- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/groups (0.00s)
+    --- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/scopes (0.00s)
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/dispatch
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/enrollment
+--- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts (0.01s)
+    --- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/dispatch (0.00s)
+    --- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/enrollment (0.01s)
+=== RUN   TestWorkerCurrentCheckCannotStartOverAfterBlockingProof
+--- PASS: TestWorkerCurrentCheckCannotStartOverAfterBlockingProof (0.00s)
+=== RUN   TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery
+--- PASS: TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery (0.01s)
+=== RUN   TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound
+--- PASS: TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound (0.00s)
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release
+--- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose (0.15s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim (0.05s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup (0.05s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release (0.05s)
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return
+--- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return (0.00s)
+=== RUN   TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement
+--- PASS: TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement (0.00s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsRegistrationIO
+--- PASS: TestWorkerRoutesCloseAndJoinRetainsRegistrationIO (0.05s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment
+--- PASS: TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment (0.05s)
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/valid
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/credential
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/actor
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/worker
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/pod
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/start
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/end
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/installation
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/authority-installation
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/expired
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/cancelled
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/binding-expired
+--- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/valid (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/credential (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/actor (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/worker (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/pod (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/start (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/end (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/installation (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/authority-installation (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/expired (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/binding-expired (0.00s)
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/authority-expired
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/owner-expired
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/caller-cancelled
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/parent-cancelled
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/router-closed
+--- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/authority-expired (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/owner-expired (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/caller-cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/parent-cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/router-closed (0.00s)
+=== RUN   TestWorkerRoutesKeepConcurrentWorkerTokensSeparate
+--- PASS: TestWorkerRoutesKeepConcurrentWorkerTokensSeparate (0.00s)
+=== RUN   TestWorkerRoutesBoundConcurrentRegistrationAndPreserveReplacement
+--- PASS: TestWorkerRoutesBoundConcurrentRegistrationAndPreserveReplacement (0.00s)
+=== RUN   TestWorkerRoutesKeepClosingWorkChargedUntilItReturns
+--- PASS: TestWorkerRoutesKeepClosingWorkChargedUntilItReturns (0.00s)
+=== RUN   TestWorkerRoutesCancelIdleOwnersAndCloseRouter
+--- PASS: TestWorkerRoutesCancelIdleOwnersAndCloseRouter (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.348s
+=== RUN   TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies
+--- PASS: TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies (0.14s)
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/parent-cancel
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/catalog-unavailable
+--- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait (1.21s)
+    --- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/parent-cancel (0.11s)
+    --- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/catalog-unavailable (1.10s)
+=== RUN   TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission
+--- PASS: TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission (0.00s)
+=== RUN   TestOwnerMountedInputsAndSQLRotation
+--- PASS: TestOwnerMountedInputsAndSQLRotation (0.00s)
+=== RUN   TestOwnerInputRejections
+=== RUN   TestOwnerInputRejections/unknown
+=== RUN   TestOwnerInputRejections/alias
+=== RUN   TestOwnerInputRejections/provider-http
+=== RUN   TestOwnerInputRejections/provider-query
+=== RUN   TestOwnerInputRejections/postgres-socket
+=== RUN   TestOwnerInputRejections/shared-sign-role
+=== RUN   TestOwnerInputRejections/unknown-format
+=== RUN   TestOwnerInputRejections/duplicate-administrator
+=== RUN   TestOwnerInputRejections/nil-roots
+=== RUN   TestOwnerInputRejections/bad-root
+=== RUN   TestOwnerInputRejections/excess-concurrency
+=== RUN   TestOwnerInputRejections/foreign-file
+=== RUN   TestOwnerInputRejections/null-probes
+=== RUN   TestOwnerInputRejections/duplicate-probe
+=== RUN   TestOwnerInputRejections/wildcard-probe
+=== RUN   TestOwnerInputRejections/foreign-probe
+=== RUN   TestOwnerInputRejections/too-many-probes
+=== RUN   TestOwnerInputRejections/null-leases
+=== RUN   TestOwnerInputRejections/duplicate-lease
+=== RUN   TestOwnerInputRejections/wildcard-lease
+=== RUN   TestOwnerInputRejections/foreign-lease-account
+=== RUN   TestOwnerInputRejections/too-many-leases
+--- PASS: TestOwnerInputRejections (0.09s)
+    --- PASS: TestOwnerInputRejections/unknown (0.00s)
+    --- PASS: TestOwnerInputRejections/alias (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-http (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-query (0.00s)
+    --- PASS: TestOwnerInputRejections/postgres-socket (0.00s)
+    --- PASS: TestOwnerInputRejections/shared-sign-role (0.00s)
+    --- PASS: TestOwnerInputRejections/unknown-format (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-administrator (0.00s)
+    --- PASS: TestOwnerInputRejections/nil-roots (0.00s)
+    --- PASS: TestOwnerInputRejections/bad-root (0.00s)
+    --- PASS: TestOwnerInputRejections/excess-concurrency (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-file (0.00s)
+    --- PASS: TestOwnerInputRejections/null-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/null-leases (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-lease-account (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-leases (0.00s)
+=== RUN   TestOwnerRuntimeJoinsBlockedChildAfterCancellation
+--- PASS: TestOwnerRuntimeJoinsBlockedChildAfterCancellation (6.26s)
+=== RUN   TestOwnerRuntimeReadinessAndShutdown
+--- PASS: TestOwnerRuntimeReadinessAndShutdown (2.01s)
+=== RUN   TestOwnerRuntimeFreshEpochAndExpiredReadiness
+--- PASS: TestOwnerRuntimeFreshEpochAndExpiredReadiness (0.00s)
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/cancel-enrollment
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/closed-listener
+--- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure (0.01s)
+    --- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/cancel-enrollment (0.00s)
+    --- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/closed-listener (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	10.788s

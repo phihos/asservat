@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestVersionedAuditStorageWithRealServices$"
+  ],
+  "exit": 0,
+  "seconds": 69.307
+}

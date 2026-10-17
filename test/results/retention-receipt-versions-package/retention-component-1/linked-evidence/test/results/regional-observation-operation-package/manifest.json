@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/connector_observation_operation.go",
+    "base": null,
+    "payload": "602d7427c7f457ca8b3cafcb2c423d5d3aa37867db39ca8ede1dccd9df09c9ba"
+  },
+  {
+    "path": "internal/adapters/kubernetes/connector_observation_operation_native.go",
+    "base": null,
+    "payload": "75932fd8a16c200f0ef89c95841abe1f966a0fb36d982bddc079949d228069d1"
+  },
+  {
+    "path": "internal/adapters/kubernetes/connector_observation_operation_test.go",
+    "base": null,
+    "payload": "2b583765628848993bd2a478480824d3025999d5c50fe925f866bca1d82c6eac"
+  }
+]

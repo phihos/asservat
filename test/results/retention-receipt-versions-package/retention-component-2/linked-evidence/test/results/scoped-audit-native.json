@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--scoped-audit"
+  ],
+  "exit": 0,
+  "seconds": 33.686
+}

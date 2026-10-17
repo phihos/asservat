@@ -1,0 +1,8 @@
+--- FAIL: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork (0.00s)
+    --- FAIL: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-original-purge (0.00s)
+        operation_verification_budget_test.go:204: unsupported unacknowledged history purged originals [original]
+    --- FAIL: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-certificate (0.00s)
+        operation_verification_budget_test.go:197: historical unsupported record started certificate work 1 0 0
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.002s
+FAIL

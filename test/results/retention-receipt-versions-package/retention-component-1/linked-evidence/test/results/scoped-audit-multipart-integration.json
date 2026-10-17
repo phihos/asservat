@@ -1,0 +1,42 @@
+{
+  "manifestSHA256": "94a0d91feb7bbfe91cabcd43bd0092d175062cd64892101effb28b2ad74011d0",
+  "dependenciesSHA256": "88a23e63c82d101bbe8a28b0e27653d68815a2e4650928b1dd0bba7384f95ebb",
+  "files": [
+    {
+      "path": "test/integration/scoped_audit_storage_test.go",
+      "baseSHA256": "e6a66a2772fd75b1b67a8c5515a8d5dc827be6ba69aab0308c4e238dbae81c80",
+      "payloadSHA256": "8b93664ea48f8782e93a0f0922e61dc33285c201a4f06083ca8666e1190c86eb"
+    }
+  ],
+  "verification": {
+    "scope": "multipart IAM test addition compile/vet only; native run pending",
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-2/overlay.json",
+          "-run",
+          "^$",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 52.307
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-2/overlay.json",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 1.945
+      }
+    ],
+    "dependencies": 1931
+  },
+  "scope": "test-only multipart inventory and independent abort; native pending"
+}

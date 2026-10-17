@@ -1,0 +1,5 @@
+{
+  "integrated": true,
+  "manifestSHA256": "dcc9715117fc6a8d869dceaebf3ce8692345cccfdcff7e7bc41816ec217f4ea9",
+  "qualification": "pending; shorter-caller regression expected to fail"
+}

@@ -1,0 +1,7 @@
+{
+  "scope": "source-only failing regression; existing actual producer fixture, synthetic authority explicit",
+  "file": "internal/adapters/kubernetes/owner_identity_provider_journal_test.go",
+  "sha256": "2aa73309be6ae028eae0c4e9b5968bc6c9230604183a9e045f9d90d192447232",
+  "expected_before": "pending-original-launch fails exact cfg.ErrChanged, acknowledged-original-launch must pass; not executed",
+  "command": "go test -race -count=1 -timeout=15m -run ^TestOwnerIdentityProviderJournalAcrossOriginalLaunchReceipt$ ./internal/adapters/kubernetes"
+}

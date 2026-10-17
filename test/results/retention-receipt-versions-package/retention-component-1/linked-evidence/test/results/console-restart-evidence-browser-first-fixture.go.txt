@@ -1,0 +1,353 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	app "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/console"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
+)
+
+// This separate built-browser journey deliberately supplies synthetic C14 data
+// and native file bytes. Actual TLS/CSRF/current-request/canonical projection,
+// browser attachment failure and React behavior are exercised. This is not SQL,
+// encrypted audit, regional-worker, IdP, installation or evidence qualification.
+func TestConsoleNativeRestartWithBuiltPackage(t *testing.T) {
+	if os.Getenv("ASSERVAT_CONSOLE_BROWSER_TEST") != "1" {
+		t.Skip("set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist")
+	}
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test-only asset root permits isolated built-bundle qualification without
+	// modifying live web/dist. Normal repository invocation needs no override.
+	if isolated := os.Getenv("ASSERVAT_CONSOLE_RESTART_ROOT"); isolated != "" {
+		if !filepath.IsAbs(isolated) {
+			t.Fatal("isolated console fixture root must be absolute")
+		}
+		root = isolated
+	}
+	server := httptest.NewUnstartedServer(nil)
+	defer server.Close()
+	host, _, err := net.SplitHostPort(server.Listener.Addr().String())
+	if err != nil || !net.ParseIP(host).IsLoopback() {
+		t.Fatal("restart fixture requires owned loopback")
+	}
+	origin := "https://" + server.Listener.Addr().String()
+	static, err := console.New(origin, os.DirFS(filepath.Join(root, "web", "dist")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions := &consoleRestartSessions{&consoleSyntheticSessions{origin: origin, state: "revoked", expiresAt: time.Now().Add(2 * time.Minute)}}
+	sessionHandler := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
+	cases := &consoleSyntheticCases{state: "ready", expiresAt: time.Now().Add(time.Hour)}
+	var sequence atomic.Int64
+	newID := func() string { return consoleCaptureID(600 + int(sequence.Add(1))) }
+	caseOps, err := presentation.NewContextCaseOperations(presentation.ContextCaseOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: newID}, cases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &consoleRestartDownloads{created: time.Now().UTC()}
+	downloadOps, err := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: newID}, service, service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	composed, err := presentation.NewInvestigationOperations(nil, caseOps, downloadOps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/test/restart-stats" {
+			if r.Method != http.MethodGet || r.TLS == nil || "https://"+r.Host != origin || r.URL.RawQuery != "" {
+				w.WriteHeader(400)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store, private")
+			service.mu.Lock()
+			defer service.mu.Unlock()
+			_ = json.NewEncoder(w).Encode(service.stats)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/test/") {
+			sessions.control(w, r)
+			return
+		}
+		if r.URL.Path == "/api/v1/session" || strings.HasPrefix(r.URL.Path, "/auth/") {
+			sessionHandler.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/operations/") {
+			// Use the actual socket for deadline control but hold the finite canonical
+			// reply until the selected test-only lost-response boundary is applied.
+			held := &consoleRestartReply{ResponseRecorder: httptest.NewRecorder(), wire: w}
+			operations.ServeHTTP(held, r)
+			name := strings.TrimPrefix(r.URL.Path, "/api/v1/operations/")
+			if service.loseReply(name) {
+				if held.Code != 200 || !strings.Contains(held.Body.String(), `"status":"ok"`) {
+					t.Error("lost-reply fixture did not reach positive canonical reply")
+				}
+				panic(http.ErrAbortHandler)
+			}
+			for key, values := range held.Header() {
+				w.Header()[key] = values
+			}
+			w.WriteHeader(held.Code)
+			_, _ = w.Write(held.Body.Bytes())
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, browser.DownloadContentPrefix) {
+			cookie, e := r.Cookie(browser.SessionCookie)
+			if e != nil {
+				w.WriteHeader(401)
+				return
+			}
+			if _, e = sessions.Resolve(r.Context(), cookie.Value, false); e != nil {
+				w.WriteHeader(401)
+				return
+			}
+			if r.Method != http.MethodGet || r.URL.RawQuery != "" || r.TLS == nil || "https://"+r.Host != origin {
+				w.WriteHeader(400)
+				return
+			}
+			service.content(w, r)
+			return
+		}
+		static.ServeHTTP(w, r)
+	})
+	server.StartTLS()
+	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "web", "tests", "native-restart-journey.mjs"), origin)
+	cmd.Dir = root
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		e := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if errors.Is(e, syscall.ESRCH) {
+			return os.ErrProcessDone
+		}
+		return e
+	}
+	cmd.WaitDelay = 5 * time.Second
+	var output consoleBoundedOutput
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+	if err = cmd.Run(); err != nil {
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		t.Fatalf("built native-restart browser: %v\n%s", err, output.String())
+	}
+	t.Logf("Synthetic C14/session/file source; actual built React, HTTPS, CSRF, canonical operations and browser download failure:\n%s", output.String())
+}
+
+type consoleRestartSessions struct{ *consoleSyntheticSessions }
+
+func (s *consoleRestartSessions) Resolve(ctx context.Context, cookie string, refresh bool) (app.SessionView, error) {
+	v, e := s.consoleSyntheticSessions.Resolve(ctx, cookie, refresh)
+	if e == nil {
+		v.Identity.Scopes = append(v.Identity.Scopes, "evidence:download")
+	}
+	return v, e
+}
+
+type consoleRestartReply struct {
+	*httptest.ResponseRecorder
+	wire http.ResponseWriter
+}
+
+func (w *consoleRestartReply) Unwrap() http.ResponseWriter { return w.wire }
+
+type consoleRestartStats struct {
+	PrepareKeys  []string `json:"prepare_keys"`
+	StopKeys     []string `json:"stop_keys"`
+	Events       []string `json:"events"`
+	NativeIDs    []string `json:"native_ids"`
+	Statuses     []string `json:"statuses"`
+	Accepted     int      `json:"accepted"`
+	StopPositive bool     `json:"stop_positive"`
+	LostStop     bool     `json:"lost_stop"`
+	LostPrepare  bool     `json:"lost_prepare"`
+}
+type consoleRestartDownloads struct {
+	mu                                        sync.Mutex
+	created                                   time.Time
+	principal                                 identity.Principal
+	originalKey, newKey, stopKey, stopRequest string
+	dropStop, dropPrepare                     bool
+	stats                                     consoleRestartStats
+}
+
+const consoleRestartBody = "synthetic browser restart fixture bytes only\n"
+
+func (s *consoleRestartDownloads) current(ctx context.Context, c app.CurrentIdentity) (identity.Identity, error) {
+	i, e := c.ResolveIdentity(ctx)
+	if e != nil {
+		return i, e
+	}
+	if !i.Valid(time.Now()) || ctx.Err() != nil {
+		return i, identity.ErrDenied
+	}
+	return i, nil
+}
+func (s *consoleRestartDownloads) view(i identity.Identity, id string) evidence.ContextDownloadView {
+	now := time.Now().UTC()
+	deadline := s.created.Add(time.Minute)
+	state := artifact.DownloadReady
+	if id == consoleCaptureID(90) && s.stopKey != "" {
+		state = artifact.DownloadCancelled
+	}
+	m := &artifact.NativeDownloadMetadata{Filename: "synthetic-pod-status.json", Format: "application/json", ETag: `"synthetic-native-version"`, Coverage: "Synthetic browser fixture only.", Size: int64(len(consoleRestartBody)), SHA256: sha256.Sum256([]byte(consoleRestartBody)), ReadUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
+	if state.Terminal() {
+		m = nil
+	}
+	return evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: id, AllocationID: consoleCaptureID(82), Scope: artifact.DownloadScope{RootID: consoleCaptureID(1), ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid", Version: artifact.Digest{9}, Principal: i.Principal}, RequestDigest: artifact.Digest{10}, State: state, CreatedAt: s.created, Deadline: deadline, OutputLimit: 8192, ReadLimit: 12 << 20, RequestLimit: 4}, Metadata: m, ValidUntil: identity.Earlier(now.Add(5*time.Second), identity.Earlier(i.ValidUntil, deadline)), AccessUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
+}
+func (s *consoleRestartDownloads) PrepareContextDownload(ctx context.Context, c app.CurrentIdentity, artifactID, key string) (evidence.ContextDownloadView, error) {
+	i, e := s.current(ctx, c)
+	if e != nil {
+		return evidence.ContextDownloadView{}, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if artifactID != consoleCaptureID(81) || !authorization.UUID(key) || len(s.stats.PrepareKeys) >= 4 || !time.Now().Before(s.created.Add(time.Minute)) {
+		return evidence.ContextDownloadView{}, artifact.ErrDownloadUnavailable
+	}
+	if s.originalKey != "" && s.principal != i.Principal {
+		return evidence.ContextDownloadView{}, identity.ErrDenied
+	}
+	s.stats.PrepareKeys = append(s.stats.PrepareKeys, key)
+	s.stats.Events = append(s.stats.Events, "prepare")
+	if s.originalKey == "" {
+		s.originalKey = key
+		s.principal = i.Principal
+		s.stats.Accepted++
+		return s.view(i, consoleCaptureID(90)), nil
+	}
+	if key == s.originalKey {
+		return s.view(i, consoleCaptureID(90)), nil
+	}
+	if !s.stats.StopPositive {
+		return evidence.ContextDownloadView{}, artifact.ErrDownloadUnavailable
+	}
+	if s.newKey == "" {
+		s.newKey = key
+		s.stats.Accepted++
+		s.dropPrepare = true
+	} else if key != s.newKey {
+		return evidence.ContextDownloadView{}, artifact.ErrDownloadCapacity
+	}
+	return s.view(i, consoleCaptureID(91)), nil
+}
+func (s *consoleRestartDownloads) GetContextDownload(ctx context.Context, c app.CurrentIdentity, id string) (evidence.ContextDownloadView, error) {
+	i, e := s.current(ctx, c)
+	if e != nil {
+		return evidence.ContextDownloadView{}, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if i.Principal != s.principal || id != consoleCaptureID(90) && id != consoleCaptureID(91) || len(s.stats.Statuses) >= 16 {
+		return evidence.ContextDownloadView{}, artifact.ErrDownloadUnavailable
+	}
+	if id == consoleCaptureID(91) && s.newKey == "" {
+		return evidence.ContextDownloadView{}, artifact.ErrDownloadUnavailable
+	}
+	v := s.view(i, id)
+	s.stats.Statuses = append(s.stats.Statuses, string(v.Session.State))
+	return v, nil
+}
+func (s *consoleRestartDownloads) CancelContextDownload(ctx context.Context, c app.CurrentIdentity, id, key, request string) (artifact.DownloadStopReceipt, error) {
+	i, e := s.current(ctx, c)
+	if e != nil {
+		return artifact.DownloadStopReceipt{}, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id != consoleCaptureID(90) || i.Principal != s.principal || !authorization.UUID(key) || len(s.stats.StopKeys) >= 3 {
+		return artifact.DownloadStopReceipt{}, artifact.ErrDownloadUnavailable
+	}
+	s.stats.StopKeys = append(s.stats.StopKeys, key)
+	s.stats.Events = append(s.stats.Events, "stop")
+	if s.stopKey == "" {
+		s.stopKey = key
+		s.stopRequest = request
+		s.dropStop = true
+	} else if s.stopKey != key {
+		return artifact.DownloadStopReceipt{}, artifact.ErrDownloadConflict
+	}
+	now := time.Now()
+	return artifact.DownloadStopReceipt{DownloadID: id, RequestID: s.stopRequest, State: "Cancelled", AuditState: "pending", ObservedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), i.ValidUntil)}, nil
+}
+func (s *consoleRestartDownloads) loseReply(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if name == "cancel_artifact_download" {
+		if s.dropStop {
+			s.dropStop = false
+			s.stats.LostStop = true
+			return true
+		}
+		if s.stopKey != "" {
+			s.stats.StopPositive = true
+		}
+	}
+	if name == "prepare_artifact_download" && s.dropPrepare {
+		s.dropPrepare = false
+		s.stats.LostPrepare = true
+		return true
+	}
+	return false
+}
+func (s *consoleRestartDownloads) content(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, browser.DownloadContentPrefix), "/content")
+	original := id == consoleCaptureID(90) && s.originalKey != "" && s.stopKey == ""
+	fresh := id == consoleCaptureID(91) && s.newKey != ""
+	if r.URL.Path != browser.DownloadContentPrefix+id+"/content" || (!original && !fresh) || len(s.stats.NativeIDs) >= 2 {
+		s.mu.Unlock()
+		w.WriteHeader(404)
+		return
+	}
+	s.stats.NativeIDs = append(s.stats.NativeIDs, id)
+	s.mu.Unlock()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="synthetic-pod-status.json"`)
+	w.Header().Set("Cache-Control", "no-store, private")
+	w.Header().Set("Content-Length", fmt.Sprint(len(consoleRestartBody)))
+	if original {
+		_, _ = io.WriteString(w, consoleRestartBody[:8])
+		_ = http.NewResponseController(w).Flush()
+		panic(http.ErrAbortHandler)
+	}
+	_, _ = io.WriteString(w, consoleRestartBody)
+}

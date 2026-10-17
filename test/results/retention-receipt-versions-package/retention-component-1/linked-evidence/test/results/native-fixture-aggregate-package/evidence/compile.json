@@ -1,0 +1,34 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-fixture-aggregate-20261012/overlay.json",
+    "./test/integration",
+    "-run",
+    "^$",
+    "-count=1",
+    "-timeout=60s"
+  ],
+  "exit": 0,
+  "harnessTimeout": false,
+  "seconds": 7.503,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "payloadSHA256": "6a6db20c2d9b3e1e8df71926da3efdd225313a4d89eeb6b173704459b0aad0a2",
+  "dependencySHA256": "2779b830c2c6b757657f80109d2f9d95e31b46e7f2445b19a99b59cf10f8d396",
+  "dependenciesCount": 1504,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-fixture-aggregate-20261012/tmp"
+  }
+}

@@ -1,0 +1,6 @@
+=== RUN   TestRegionalInstallerWithRealKubernetes
+    regional_installer_native_test.go:83: installer-cluster: regional installation stopped at protection-proof: unavailable
+--- FAIL: TestRegionalInstallerWithRealKubernetes (0.20s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.255s
+FAIL

@@ -1,0 +1,122 @@
+[
+  {
+    "path": "docs/architecture/native-owner-listener.md",
+    "base": null,
+    "sha256": "3c60ae5c73ce6d680fb8b8a81b3631e0c8c124341b2a02aac1f548a475c693dd"
+  },
+  {
+    "path": "docs/decisions/122-private-native-owner-listener.md",
+    "base": null,
+    "sha256": "a1b9b8be49b2d9a9fd26998da8a2f638dcd20a1611fb2e72031f6329ee396b6f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_configuration.go",
+    "base": "1701af049019cb3d528cab237cc905eaecf526da56953f616677aa8745a7e88a",
+    "sha256": "1ff2383627b2fc18a5362ab787d079c95258e5a1a8f2c897a2942aa8bafc2a56"
+  },
+  {
+    "path": "internal/adapters/mtls/native_forwarder.go",
+    "base": "b4b528035839b24cf9f1ed8ac95c652b51fc156a1b0ef48bd8efad708c1ccdd9",
+    "sha256": "85c7bfcf25744ccde2b69c0d02a2023807e75081cc46f5d45a9a3b5dfee08986"
+  },
+  {
+    "path": "internal/adapters/postgres/native_readers.go",
+    "base": null,
+    "sha256": "bb307b88db2f9e3eec82af77c7f56333bf29290e509ede6c6c59c28be1ca0e92"
+  },
+  {
+    "path": "internal/application/evidence/native_exchange.go",
+    "base": "32f8948ea527264fd0dc07dc2e7906f4dcaeb1bcdc5c794024e6d4f8ec4b216d",
+    "sha256": "083d03b4d0aedf82adeb23e7086e289a88b1255f53e8953b27b9c046fc861db7"
+  },
+  {
+    "path": "internal/application/evidence/native_origin.go",
+    "base": "8e1dd177db27b26828c47ea74196c7a667fc2f192524ad65381ebf5403eade4b",
+    "sha256": "559439d9d7e78534c0a7690b0250b202cc29c94efcf0e6d4f6e99bbebc3f2633"
+  },
+  {
+    "path": "internal/bootstrap/hub_api.go",
+    "base": "2d7923a688474416c77ca0ebca22eb0a764d929f35765fec9af52fde9ec7b706",
+    "sha256": "1a440efd78c6a5d1259a86b208fff0d1c7c1b3a407447da13d8809147b466127"
+  },
+  {
+    "path": "internal/bootstrap/owner_deployment.go",
+    "base": "6991157da5d028a01ea277f978dda75a62cb359b29cc679ecf5da2cb9e7cc861",
+    "sha256": "15c1fd0e37748be2b192b2281b2f053886bdcd5b3cc69f04a9bcf1409a61c5bf"
+  },
+  {
+    "path": "internal/bootstrap/owner_inputs.go",
+    "base": "1f9a7723c8b7bec75442582cb12a4aafe88a3a4826c493887d1944035147cd6f",
+    "sha256": "90e8de2b278e2695e66a5c049d0b4bd3f7267933dbded7038259aa6755fccd56"
+  },
+  {
+    "path": "internal/bootstrap/owner_native.go",
+    "base": null,
+    "sha256": "f835176ad7ed3c66d560bdc80c73cedeb5ec62fb2506d059619f772d33b3bc2c"
+  },
+  {
+    "path": "internal/bootstrap/owner_native_inputs.go",
+    "base": null,
+    "sha256": "694a5078c817f158fe59ead0691cdf886baffa9c7da8c1dd302dba17eea610a5"
+  },
+  {
+    "path": "internal/bootstrap/owner_native_inputs_test.go",
+    "base": null,
+    "sha256": "1013b84ca702bb02e7d3d5fb81e704feef1a9b5688b172c79caa6ccff956ca78"
+  },
+  {
+    "path": "internal/bootstrap/owner_runtime.go",
+    "base": "06eafec7eb9602ec2e8246784290827a0c2755d042a1a5999f34c7fa63c7cdfc",
+    "sha256": "0ac43579130a0e1f250e333388b111ebd14449dcda58e960d82ff1170b1d8da1"
+  },
+  {
+    "path": "internal/contracts/owner_configuration.go",
+    "base": "f7bc1a6862c2166c8df5c077de3554a74fe405656b69949ab4cf183e10b775c3",
+    "sha256": "c49eec4f773877f1f7d6924f9f17ce7e39dad51c1a21de8f895e016f57fcbe38"
+  },
+  {
+    "path": "internal/contracts/owner_deployment.go",
+    "base": "f443ac6ffc09afdec035e0f549ed085f294f08a246ab4b047f88f3a43964c6c4",
+    "sha256": "126e9a65b146fb20f1f916253c1d3215c7a5c7d3bee3149e5349d006a40c8821"
+  },
+  {
+    "path": "internal/contracts/owner_native_test.go",
+    "base": null,
+    "sha256": "299733de32559a0164b3b62ffadf218f67f985c8157be2ba7d878383837f12c2"
+  },
+  {
+    "path": "internal/domain/fleet/owner.go",
+    "base": "e0bbe6211c4f2903c5d07a9991f021c6c541d581f3391d847a2a91bc764d4a6c",
+    "sha256": "fef596e5c98408021f75c8e8637bbb7a948e13755d48445bf218c7702fa3bfac"
+  },
+  {
+    "path": "internal/domain/fleet/owner_native_test.go",
+    "base": null,
+    "sha256": "aa6595abcf1ad0f491d069268b2642a0cea50fc1e87e0e406020ecf374bb9eee"
+  },
+  {
+    "path": "internal/transport/native/server.go",
+    "base": null,
+    "sha256": "24533aba0acc2fb5df8b095ebdb2a651d4a2228663efd351bbf32103c3d5f66b"
+  },
+  {
+    "path": "internal/transport/native/server_test.go",
+    "base": null,
+    "sha256": "caedf97487eacd700f33a57ab77759258841822d9f8688c2803f79a2d6813a08"
+  },
+  {
+    "path": "specs/contracts/owner-configuration.schema.json",
+    "base": "c15d81baa002c2e6e9c54fec311f1ea123b9ada4331249a5eeda1477c1695d54",
+    "sha256": "946b52befa9cf9bba46950e17c61622bb4666216013091a474a50a515df500e0"
+  },
+  {
+    "path": "specs/contracts/owner-deployment.schema.json",
+    "base": "4d7635ac65ea2504895c60761f3a0eedfcd6ef1e78ec89af92e536f1c4738a29",
+    "sha256": "623d238882f2bb929d4f59e81a6b92b5d9def985339768b3f43754d7dec29a53"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base": "bd6621f50d3fa36871cfcc80976da0cb5bd3156dbc40eb3b63ef65ae6a481e6b",
+    "sha256": "7f96b068ac54a2160106df055c86f223c83992805f51a207e8ad4ac64c8e8073"
+  }
+]

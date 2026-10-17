@@ -1,0 +1,9 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_bridge.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge_history.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_bridge_history.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge_transition.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_bridge_transition.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_resources.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_resources.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_root_pin_test.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_root_pin_test.go"
+  }
+}

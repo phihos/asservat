@@ -1,0 +1,9 @@
+{
+  "command": [
+    "make",
+    "audit-storage-integration"
+  ],
+  "exit": 0,
+  "seconds": 39.678,
+  "scope": "exact scoped audit fixture including narrower cleanup permissions and multipart abortion"
+}

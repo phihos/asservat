@@ -1,0 +1,95 @@
+{
+  "started": 1791911651.5267167,
+  "runner": "d0c6fb5cf05844c6319ae9955e87c353771d0afc4a2d3e14ca8880eb0d99e839",
+  "manifest": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+  "dependencies": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+  "before": {
+    "metadata": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "directories": []
+  },
+  "metadata": {
+    "run.py": "d0c6fb5cf05844c6319ae9955e87c353771d0afc4a2d3e14ca8880eb0d99e839",
+    "manifest.json": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+    "dependencies.json": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+    "dependency-args.json": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+    "inventory.json": "6424f0dbf4ac9968095c9aecffbf5f5d9a7631e14ab86339f463077c3ee0e585",
+    "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+    "freeze.json": "14bd95ae9a75ce305771b6d0849eb859b2051559d2a8aa78cd3afba742e9a79f",
+    "required-tests.json": "c062b5fb00e83886651b901e667545699b8f683569c51acbc89382aa5bb8fde9",
+    "expected-native-sources.json": "dd8ebe254a08a74fd529c46e77f3cd88f758241107af7b4b764706a048a0be19"
+  },
+  "phases": [
+    {
+      "native": {
+        "source_map_matches_expected": true,
+        "source_map_matches_final_mirror": true,
+        "testExit": 0,
+        "cleanupFailures": [],
+        "sourceUnchangedDuringTest": true,
+        "source_count": 2253,
+        "passedTestNames": [
+          "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-changed",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-expired",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-unknown-commit",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-change",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-renewed",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-recovery",
+          "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-expired"
+        ],
+        "required_present": true
+      },
+      "mirror_file_set": [],
+      "name": "actual-sql",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--fleet",
+        "--run",
+        "^TestInitialInstallationWithRealServices$/^owner-identity-roles-(constructor-(expired-source|bridge-contention)|observation-(contention(-changed|-expired|-final-(change|renewed|recovery|expired))?|unknown-commit))$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 54.209041595458984,
+      "stop_reason": null,
+      "log_sha256": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "native": true,
+  "runtime_enablement": false,
+  "boot_id": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-fleet-contention-native-abafsgpv",
+  "tmp_free_before": 16731344896,
+  "home_free_before": 420029743104,
+  "mirror_changed": [],
+  "mirror_file_set": [],
+  "cleanup_confirmed": true,
+  "exit": 0,
+  "ended": 1791911706.7581394,
+  "after": {
+    "metadata": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "directories": []
+  },
+  "scratch_removed": true
+}

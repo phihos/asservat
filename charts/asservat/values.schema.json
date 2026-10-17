@@ -1,0 +1,714 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Asservat configuration and bounded initial installer values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "runtime"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "hub",
+        "cluster",
+        "combined"
+      ],
+      "description": "Intended release topology; this development chart installs configuration foundations only."
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "const": false,
+          "description": "Must remain false until the runtime roles and their installation qualification are implemented."
+        }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "name",
+        "targetNamespace",
+        "image",
+        "registrySecret",
+        "probeAudience",
+        "secrets",
+        "kubernetes",
+        "postgres",
+        "auditStore",
+        "keyService",
+        "fleet",
+        "providers"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "targetNamespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 456,
+          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+        },
+        "registrySecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "probeAudience": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "producer",
+            "schema",
+            "retirement"
+          ],
+          "properties": {
+            "producer": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "schema": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "retirement": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            }
+          }
+        },
+        "kubernetes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "rootsPEM"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "rootsPEM": {
+              "type": "string",
+              "maxLength": 32768
+            }
+          }
+        },
+        "postgres": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host",
+            "port",
+            "database",
+            "maxConnections",
+            "rootsPEM"
+          ],
+          "properties": {
+            "host": {
+              "type": "string",
+              "maxLength": 253
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "database": {
+              "type": "string",
+              "maxLength": 63
+            },
+            "maxConnections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "rootsPEM": {
+              "type": "string",
+              "maxLength": 32768
+            }
+          }
+        },
+        "auditStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "region",
+            "bucket",
+            "rootsPEM"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "region": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "bucket": {
+              "type": "string",
+              "maxLength": 63
+            },
+            "rootsPEM": {
+              "type": "string",
+              "maxLength": 32768
+            }
+          }
+        },
+        "keyService": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "auditMount",
+            "auditKey",
+            "rootsPEM"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "auditMount": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "auditKey": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "rootsPEM": {
+              "type": "string",
+              "maxLength": 32768
+            }
+          }
+        },
+        "fleet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "clients",
+            "subjects",
+            "groups",
+            "deliveryProfiles",
+            "maxActiveBootstraps",
+            "maxBootstrapHistory",
+            "maxClusters"
+          ],
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "clients": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "subjects": {
+              "type": "array",
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "kind": {
+                    "enum": [
+                      "human",
+                      "workload"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ]
+              }
+            },
+            "groups": {
+              "type": "array",
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "deliveryProfiles": {
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "maxActiveBootstraps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128
+            },
+            "maxBootstrapHistory": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            },
+            "maxClusters": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            }
+          }
+        },
+        "providers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuerPolicy",
+            "wrapRole",
+            "wrapPolicy",
+            "unwrapRole",
+            "unwrapPolicy"
+          ],
+          "properties": {
+            "issuerPolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "not": {
+                "enum": [
+                  "root",
+                  "default"
+                ]
+              }
+            },
+            "wrapRole": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "not": {
+                "enum": [
+                  "root",
+                  "default"
+                ]
+              }
+            },
+            "wrapPolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "not": {
+                "enum": [
+                  "root",
+                  "default"
+                ]
+              }
+            },
+            "unwrapRole": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "not": {
+                "enum": [
+                  "root",
+                  "default"
+                ]
+              }
+            },
+            "unwrapPolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+              "not": {
+                "enum": [
+                  "root",
+                  "default"
+                ]
+              }
+            }
+          },
+          "description": "All five names must be distinct; runtime validation checks cross-field uniqueness before bootstrap effects."
+        },
+        "continuation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "workerProvider",
+            "ownerProvider",
+            "ownerIssuerRootsPEM",
+            "ownerPKIMount",
+            "ownerConnections",
+            "ownerConcurrency",
+            "public"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "workerProvider": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authMount",
+                "authMountAccessor"
+              ],
+              "properties": {
+                "authMount": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
+                },
+                "authMountAccessor": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
+                }
+              }
+            },
+            "ownerProvider": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authMount",
+                "authMountAccessor"
+              ],
+              "properties": {
+                "authMount": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
+                },
+                "authMountAccessor": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
+                }
+              }
+            },
+            "ownerIssuerRootsPEM": {
+              "type": "string",
+              "maxLength": 32768
+            },
+            "ownerPKIMount": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,128}$"
+            },
+            "ownerConnections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "ownerConcurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "public": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "origin",
+                "issuer",
+                "clientID",
+                "maxLifetimeSeconds",
+                "maxLogins",
+                "maxSessions",
+                "maxLogoutEvents",
+                "clients",
+                "eligibleSubjects",
+                "eligibleGroups",
+                "groupMaxAgeSeconds"
+              ],
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "issuer": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "clientID": {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                "maxLifetimeSeconds": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 86400
+                },
+                "maxLogins": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4096
+                },
+                "maxSessions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65536
+                },
+                "maxLogoutEvents": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65536
+                },
+                "clients": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "kind": {
+                        "enum": [
+                          "human",
+                          "workload"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "eligibleSubjects": {
+                  "type": "array",
+                  "maxItems": 256,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "kind": {
+                        "enum": [
+                          "human",
+                          "workload"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "eligibleGroups": {
+                  "type": "array",
+                  "maxItems": 256,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "groupMaxAgeSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 300
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "image": {
+                "minLength": 73
+              },
+              "secrets": {
+                "properties": {
+                  "producer": {
+                    "minLength": 1
+                  },
+                  "schema": {
+                    "minLength": 1
+                  },
+                  "retirement": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "postgres": {
+                "properties": {
+                  "host": {
+                    "minLength": 1
+                  },
+                  "database": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "auditStore": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "region": {
+                    "minLength": 1
+                  },
+                  "bucket": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "keyService": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "auditMount": {
+                    "minLength": 1
+                  },
+                  "auditKey": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "fleet": {
+                "properties": {
+                  "issuer": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "clients": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "namespace",
+        "image",
+        "registrySecret",
+        "offer",
+        "bootstrapSecret"
+      ],
+      "description": "ADR-193: mode=cluster installs one regional connector through installer-cluster as a post-install/post-upgrade hook.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "description": "Connector namespace the installer creates; never kube-*."
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 456,
+          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$",
+          "description": "The exact product repository@sha256 digest of the installer Job; the connector image comes from the offer."
+        },
+        "registrySecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "offer": {
+          "type": "string",
+          "maxLength": 1048576,
+          "description": "The hub's public regional-offer.json."
+        },
+        "bootstrapSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "description": "Existing operator Secret with bootstrap.json, the record read from the bootstrap channel. Never a chart value."
+        },
+        "evidenceSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "description": "ADR-196: existing operator Secret with evidence-storage.json, the write-only regional evidence credential; required exactly when the offer names the regional executor. Never a chart value."
+        }
+      }
+    }
+  }
+}

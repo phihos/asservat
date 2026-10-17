@@ -1,0 +1,557 @@
+package postgres
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Implemented by the native protected installer Secret, never runtime ingress.
+// Only the positive boolean from its first CAS can start SQL creation.
+type PublicRuntimeRoleRoot interface {
+	OpenPublicRuntimeRoles(context.Context) (contracts.PublicRuntimeRoleSnapshot, error)
+	ReadPublicRuntimeRoles(context.Context) (contracts.PublicRuntimeRoleSnapshot, error)
+	ClaimPublicRuntimeRole(context.Context, string, uint32, time.Time) (contracts.PublicRuntimeRoleSnapshot, bool, error)
+	CompletePublicRuntimeRole(context.Context, contracts.PublicRuntimeRoleSnapshot, string, contracts.PublicRuntimeRoleReceipt) error
+}
+
+type PublicRuntimeSQLRoles struct {
+	pool          *pgxpool.Pool
+	root          PublicRuntimeRoleRoot
+	input         contracts.PublicRuntimeRoles
+	administrator uint32
+	ctx           context.Context
+	cancel        context.CancelFunc
+	mu            sync.Mutex
+	closed, busy  bool
+	work          sync.WaitGroup
+}
+
+func NewPublicRuntimeSQLRoles(ctx context.Context, c *pgx.ConnConfig, root PublicRuntimeRoleRoot, input contracts.PublicRuntimeRoles) (*PublicRuntimeSQLRoles, error) {
+	if ctx == nil || ctx.Err() != nil || c == nil || root == nil || input.Format != contracts.PublicRuntimeRolesFormat || input.LayoutDigest != PublicRuntimeRoleLayoutDigest() || !authorization.UUID(input.OwnerConfigurationUID) || !authorization.UUID(input.InitialClaimID) || !authorization.UUID(input.ClusterID) || !authorization.UUID(input.Namespace.UID) || input.Namespace.Name == "" || len(input.Namespace.Name) > 63 {
+		return nil, cfg.ErrInvalid
+	}
+	if _, ok := PublicRuntimeRoleName(input.InstallationID, "identity-read"); !ok {
+		return nil, cfg.ErrInvalid
+	}
+	if c.User == "" || c.Database == "" || c.TLSConfig == nil || c.TLSConfig.InsecureSkipVerify || c.TLSConfig.ServerName == "" || c.TLSConfig.MinVersion < tls.VersionTLS13 || len(c.Fallbacks) != 0 || c.Tracer != nil || c.ValidateConnect != nil || c.AfterConnect != nil {
+		return nil, cfg.ErrInvalid
+	}
+	c = c.Copy()
+	c.RuntimeParams = map[string]string{"application_name": "asservat-public-role-provisioner", "search_path": "pg_catalog,public", "timezone": "UTC", "lock_timeout": "1000ms", "statement_timeout": "5000ms", "idle_in_transaction_session_timeout": "5000ms", "synchronous_commit": "on", "row_security": "off"}
+	c.ConnectTimeout = 5 * time.Second
+	config, err := pgxpool.ParseConfig("")
+	if err != nil {
+		return nil, cfg.ErrInvalid
+	}
+	config.ConnConfig = c
+	config.MaxConns = 1
+	config.MinConns = 0
+	life, cancel := context.WithCancel(ctx)
+	pool, err := pgxpool.NewWithConfig(life, config)
+	if err != nil {
+		cancel()
+		return nil, cfg.ErrUnavailable
+	}
+	out := &PublicRuntimeSQLRoles{pool: pool, root: root, input: input, ctx: life, cancel: cancel}
+	current, end := context.WithTimeout(life, 5*time.Second)
+	defer end()
+	var valid bool
+	err = pool.QueryRow(current, `SELECT oid,rolsuper AND rolcanlogin AND current_user=session_user AND NOT pg_is_in_recovery() FROM pg_roles WHERE rolname=session_user`).Scan(&out.administrator, &valid)
+	if err != nil || !valid {
+		out.Close()
+		return nil, cfg.ErrDenied
+	}
+	if _, _, err = out.current(current, pool); err != nil {
+		out.Close()
+		return nil, err
+	}
+	return out, nil
+}
+func (s *PublicRuntimeSQLRoles) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.work.Wait()
+	s.pool.Close()
+}
+func (s *PublicRuntimeSQLRoles) enter(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.work.Add(1)
+	s.mu.Unlock()
+	life, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	return life, func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.work.Done()
+	}, nil
+}
+
+type publicRoleQuery interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+// Every effect uses actual current accepted recovery, independently from the
+// Kubernetes source. Recheck after locks and immediately before COMMIT.
+func (s *PublicRuntimeSQLRoles) current(ctx context.Context, q publicRoleQuery) (uint32, time.Time, error) {
+	var database, administrator uint32
+	var postmaster time.Time
+	var valid bool
+	err := q.QueryRow(ctx, `SELECT (SELECT oid FROM pg_database WHERE datname=current_database()),pg_postmaster_start_time(),p.oid,
+ p.rolsuper AND p.rolcanlogin AND current_user=session_user AND NOT pg_is_in_recovery()
+ AND EXISTS(SELECT 1 FROM public.fleet_initial_activation a JOIN public.fleet_current_trust t ON t.installation_id=a.installation_id
+ WHERE a.installation_id=$1 AND a.claim_id=$2 AND a.audit_receipt_json IS NOT NULL AND a.activated_at IS NOT NULL
+ AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until AND t.fresh_until-t.observed_at<=interval '30 seconds')
+ FROM pg_roles p WHERE p.rolname=session_user`, s.input.InstallationID, s.input.InitialClaimID).Scan(&database, &postmaster, &administrator, &valid)
+	if err != nil || !valid || administrator != s.administrator || ctx.Err() != nil {
+		return 0, time.Time{}, cfg.ErrUnavailable
+	}
+	return database, postmaster.UTC(), nil
+}
+
+type publicRuntimeRoleProvenance struct {
+	Format, InstallationID, InitialClaimID, OwnerConfigurationUID, RootUID, SetupID, Purpose, LayoutDigest, OperationID string
+	DatabaseOID                                                                                                         uint32
+	PostmasterAt, ClaimedAt, Until                                                                                      time.Time
+}
+
+func (s *PublicRuntimeSQLRoles) provenance(snapshot contracts.PublicRuntimeRoleSnapshot, purpose string, claim contracts.PublicRuntimeRoleClaim) publicRuntimeRoleProvenance {
+	return publicRuntimeRoleProvenance{
+		Format: "asservat-public-runtime-role/v1", InstallationID: s.input.InstallationID,
+		InitialClaimID: s.input.InitialClaimID, OwnerConfigurationUID: s.input.OwnerConfigurationUID,
+		RootUID: snapshot.UID, SetupID: snapshot.State.OperationID, Purpose: purpose,
+		LayoutDigest: s.input.LayoutDigest, OperationID: claim.OperationID,
+		DatabaseOID: claim.DatabaseOID, PostmasterAt: claim.PostmasterAt, ClaimedAt: claim.ClaimedAt, Until: claim.Until,
+	}
+}
+
+// Provision processes the closed inventory sequentially. Every distinct first
+// role claim has its own original five-second interval. Replay never grants,
+// repairs, resets a password, or creates a role absent after an unknown result.
+func (s *PublicRuntimeSQLRoles) Provision(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	check, cancel := context.WithTimeout(ctx, 5*time.Second)
+	_, _, err = s.current(check, s.pool)
+	cancel()
+	if err != nil {
+		return zero, err
+	}
+	snapshot, err := s.root.OpenPublicRuntimeRoles(ctx)
+	if err != nil || snapshot.State.Input != s.input {
+		return zero, cfg.ErrUnavailable
+	}
+	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
+		if ctx.Err() != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		// ADR-186: a root that scopes one proof to one role operation runs the
+		// claim, role step and completion inside it.
+		run := func(op context.Context) error { return s.provisionPublicRole(op, purpose) }
+		if scoped, ok := s.root.(publicRoleOperator); ok {
+			err = scoped.WithPublicRoleOperation(ctx, run)
+		} else {
+			err = run(ctx)
+		}
+		if err != nil {
+			return zero, err
+		}
+	}
+	verified, err := s.verifiedSnapshot(ctx)
+	if err != nil {
+		return zero, provisionStop("verify", err)
+	}
+	return verified, nil
+}
+
+// Verify checks the complete inventory once more and returns the projection
+// candidate. Run inside the root's role operation with the publication, so
+// the candidate's original interval covers the projection (ADR-186).
+func (s *PublicRuntimeSQLRoles) Verify(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, error) {
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return contracts.PublicRuntimeRoleSnapshot{}, err
+	}
+	defer end()
+	return s.verifiedSnapshot(ctx)
+}
+
+// publicRoleOperator is the optional ADR-186 root capability.
+type publicRoleOperator interface {
+	WithPublicRoleOperation(context.Context, func(context.Context) error) error
+}
+
+func (s *PublicRuntimeSQLRoles) provisionPublicRole(ctx context.Context, purpose string) error {
+	at := strconv.Itoa(slices.Index(contracts.PublicRuntimeRolePurposes(), purpose)+1) + "/" + strconv.Itoa(len(contracts.PublicRuntimeRolePurposes()))
+	observation, finish := context.WithTimeout(ctx, 5*time.Second)
+	defer finish()
+	database, postmaster, err := s.current(observation, s.pool)
+	if err != nil {
+		return provisionStop("current:"+purpose+" "+at, err)
+	}
+	claimed, fresh, err := s.root.ClaimPublicRuntimeRole(observation, purpose, database, postmaster)
+	if err != nil || claimed.State.Input != s.input {
+		return provisionStop("claim:"+purpose+" "+at, errors.Join(cfg.ErrUnavailable, err))
+	}
+	n := slices.Index(contracts.PublicRuntimeRolePurposes(), purpose)
+	if len(claimed.State.Roles) != len(contracts.PublicRuntimeRolePurposes()) || claimed.State.Roles[n].Claim == nil {
+		return cfg.ErrUnavailable
+	}
+	material := claimed.State.Roles[n]
+	until := claimed.ValidUntil
+	if fresh && material.Claim.Until.Before(until) {
+		until = material.Claim.Until
+	}
+	call, short := context.WithDeadline(observation, until)
+	defer short()
+	step := "role:"
+	receipt, err := s.role(call, claimed, material, fresh)
+	if err == nil {
+		step = "authenticate:"
+		err = s.authenticate(call, material, receipt)
+	}
+	// Authentication and closure retain the same interval; a lost receipt can
+	// be independently rediscovered, without repeating the create transaction.
+	if err == nil && call.Err() == nil {
+		step = "complete:"
+		err = s.root.CompletePublicRuntimeRole(call, claimed, purpose, receipt)
+	}
+	if err != nil {
+		return provisionStop(step+purpose+" "+at, err)
+	}
+	return nil
+}
+
+// Verify the whole inventory together before returning a projection candidate.
+// Earlier per-role successes do not let a later role's observation silently
+// renew their checks. This final interval is retained by credential delivery.
+func (s *PublicRuntimeSQLRoles) verifiedSnapshot(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	life, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	until, _ := life.Deadline()
+	snapshot, err := s.root.ReadPublicRuntimeRoles(life)
+	if err != nil || snapshot.State.Input != s.input || len(snapshot.State.Roles) != len(contracts.PublicRuntimeRolePurposes()) {
+		return zero, cfg.ErrUnavailable
+	}
+	if snapshot.ValidUntil.Before(until) {
+		until = snapshot.ValidUntil
+	}
+	bounded, stop := context.WithDeadline(life, until)
+	defer stop()
+	tx, err := s.pool.BeginTx(bounded, pgx.TxOptions{})
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	defer func() {
+		c, e := context.WithTimeout(context.WithoutCancel(bounded), time.Second)
+		defer e()
+		_ = tx.Rollback(c)
+	}()
+	var locked string
+	if err = tx.QueryRow(bounded, `SELECT installation_id::text FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, s.input.InstallationID).Scan(&locked); err != nil || locked != s.input.InstallationID {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, err = tx.Exec(bounded, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, _, err = s.current(bounded, tx); err != nil {
+		return zero, err
+	}
+	for _, material := range snapshot.State.Roles {
+		if material.Claim == nil || material.Receipt == nil {
+			return zero, cfg.ErrUnavailable
+		}
+		b, err := json.Marshal(s.provenance(snapshot, material.Purpose, *material.Claim))
+		if err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = s.verify(bounded, tx, material, b); err != nil {
+			return zero, err
+		}
+	}
+	if _, _, err = s.current(bounded, tx); err != nil || bounded.Err() != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	if err = tx.Commit(bounded); err != nil || bounded.Err() != nil || !time.Now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	snapshot.ValidUntil = until
+	return snapshot, nil
+}
+
+func (s *PublicRuntimeSQLRoles) role(ctx context.Context, snapshot contracts.PublicRuntimeRoleSnapshot, material contracts.PublicRuntimeRoleMaterial, fresh bool) (contracts.PublicRuntimeRoleReceipt, error) {
+	var zero contracts.PublicRuntimeRoleReceipt
+	name, ok := PublicRuntimeRoleName(s.input.InstallationID, material.Purpose)
+	if !ok || material.Claim == nil {
+		return zero, cfg.ErrInvalid
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	defer func() {
+		rollback, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer end()
+		_ = tx.Rollback(rollback)
+	}()
+	// Recovery is locked before the installation role lock; it stays held
+	// through all role effects and the final original-deadline check.
+	var locked string
+	if err = tx.QueryRow(ctx, `SELECT installation_id::text FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, s.input.InstallationID).Scan(&locked); err != nil || locked != s.input.InstallationID {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.input.InstallationID); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	database, postmaster, err := s.current(ctx, tx)
+	if err != nil {
+		return zero, err
+	}
+	// Blocking SQL locks cannot detach creation from the actual current guarded
+	// workload. The independent root read uses its own read connection, preserves
+	// this original deadline and cannot renew or replace the persisted claim.
+	currentRoot, err := s.root.ReadPublicRuntimeRoles(ctx)
+	n := slices.Index(contracts.PublicRuntimeRolePurposes(), material.Purpose)
+	if err != nil || currentRoot.UID != snapshot.UID || currentRoot.State.Input != snapshot.State.Input || currentRoot.State.OperationID != snapshot.State.OperationID || n < 0 || n >= len(currentRoot.State.Roles) || currentRoot.State.Roles[n].Claim == nil || *currentRoot.State.Roles[n].Claim != *material.Claim || currentRoot.State.Roles[n].Password != material.Password {
+		return zero, cfg.ErrUnavailable
+	}
+	ctx, narrower := context.WithDeadline(ctx, currentRoot.ValidUntil)
+	defer narrower()
+	if ctx.Err() != nil || !time.Now().Before(currentRoot.ValidUntil) {
+		return zero, cfg.ErrUnavailable
+	}
+	if fresh && (database != material.Claim.DatabaseOID || !postmaster.Equal(material.Claim.PostmasterAt) || !time.Now().Before(material.Claim.Until) || !time.Now().Before(snapshot.State.Until)) {
+		return zero, cfg.ErrUnavailable
+	}
+	connections, bounded := contracts.PublicRuntimeRoleConnectionLimit(material.Purpose)
+	if !bounded {
+		return zero, cfg.ErrInvalid
+	}
+	expected := s.provenance(snapshot, material.Purpose, *material.Claim)
+	encoded, err := json.Marshal(expected)
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	var oid uint32
+	err = tx.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname=$1`, name).Scan(&oid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if !fresh {
+			return zero, cfg.ErrUnavailable
+		}
+		verifier, err := initialPasswordVerifier(InitialSQLLogin{Username: name, Password: material.Password})
+		if err != nil {
+			return zero, err
+		}
+		if _, _, err = s.current(ctx, tx); err != nil || ctx.Err() != nil || !time.Now().Before(material.Claim.Until) {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = tx.Exec(ctx, "CREATE ROLE "+pgx.Identifier{name}.Sanitize()+" LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT "+strconv.Itoa(connections)+" PASSWORD '"+verifier+"'"); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		grants, _ := publicRuntimeRoleGrants(material.Purpose)
+		for _, g := range grants {
+			if _, err = tx.Exec(ctx, g.sql(name)); err != nil {
+				return zero, cfg.ErrUnavailable
+			}
+		}
+		// Superuser creation does not need membership. Explicitly remove any
+		// creator grant so a future non-superuser creator cannot retain a SET path.
+		if _, err = tx.Exec(ctx, "REVOKE "+pgx.Identifier{name}.Sanitize()+" FROM "+pgx.Identifier{s.pool.Config().ConnConfig.User}.Sanitize()); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		if _, err = tx.Exec(ctx, "COMMENT ON ROLE "+pgx.Identifier{name}.Sanitize()+" IS "+quoteSQLLiteral(string(encoded))); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+	} else if err != nil {
+		return zero, cfg.ErrUnavailable
+	} else if fresh {
+		// A first claim cannot adopt a preexisting role even if a caller copied its
+		// comment. Only a previously spent exact claim enters independent lookup.
+		return zero, cfg.ErrChanged
+	}
+	receipt, err := s.verify(ctx, tx, material, encoded)
+	if err != nil {
+		return zero, err
+	}
+	if _, _, err = s.current(ctx, tx); err != nil || ctx.Err() != nil || fresh && !time.Now().Before(material.Claim.Until) {
+		return zero, cfg.ErrUnavailable
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return receipt, nil
+}
+func quoteSQLLiteral(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+func (s *PublicRuntimeSQLRoles) authenticate(ctx context.Context, material contracts.PublicRuntimeRoleMaterial, receipt contracts.PublicRuntimeRoleReceipt) error {
+	c := s.pool.Config().ConnConfig.Copy()
+	c.User = receipt.RoleName
+	c.Password = material.Password
+	c.RequireAuth = "scram-sha-256"
+	c.ValidateConnect = nil
+	c.AfterConnect = nil
+	connection, err := pgx.ConnectConfig(ctx, c)
+	if err != nil {
+		return cfg.ErrUnavailable
+	}
+	defer func() {
+		closeCtx, end := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer end()
+		_ = connection.Close(closeCtx)
+	}()
+	var valid bool
+	err = connection.QueryRow(ctx, `SELECT oid=$1 AND current_user=session_user FROM pg_roles WHERE rolname=session_user`, receipt.RoleOID).Scan(&valid)
+	if err != nil || !valid || ctx.Err() != nil {
+		return cfg.ErrUnavailable
+	}
+	return nil
+}
+
+func (s *PublicRuntimeSQLRoles) verify(ctx context.Context, q publicRoleQuery, material contracts.PublicRuntimeRoleMaterial, provenance []byte) (contracts.PublicRuntimeRoleReceipt, error) {
+	name, known := PublicRuntimeRoleName(s.input.InstallationID, material.Purpose)
+	grants, fixed := publicRuntimeRoleGrants(material.Purpose)
+	connections, bounded := contracts.PublicRuntimeRoleConnectionLimit(material.Purpose)
+	if !known || !fixed || !bounded {
+		return contracts.PublicRuntimeRoleReceipt{}, cfg.ErrInvalid
+	}
+	return verifyFixedRuntimeRole(ctx, q, name, connections, s.input.LayoutDigest, material.Receipt, provenance, grants)
+}
+
+// Private catalog mechanics shared by the two fixed producers. Inputs come
+// only from their compiled inventories; this helper performs no authority
+// check or effect and is not an application-selectable role manager.
+func verifyFixedRuntimeRole(ctx context.Context, q publicRoleQuery, name string, connections int, layout string, receipt *contracts.PublicRuntimeRoleReceipt, provenance []byte, grants []publicRuntimeGrant) (contracts.PublicRuntimeRoleReceipt, error) {
+
+	var zero contracts.PublicRuntimeRoleReceipt
+	var oid uint32
+	var valid bool
+	var comment string
+	err := q.QueryRow(ctx, `SELECT oid,rolcanlogin AND NOT rolsuper AND NOT rolinherit AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls AND rolconnlimit=$2 AND rolvaliduntil IS NULL,coalesce(shobj_description(oid,'pg_authid'),'') FROM pg_roles WHERE rolname=$1`, name, connections).Scan(&oid, &valid, &comment)
+	if err != nil || !valid || !bytes.Equal([]byte(comment), provenance) || receipt != nil && (receipt.RoleOID != oid || receipt.RoleName != name || receipt.LayoutDigest != layout) {
+		return zero, cfg.ErrChanged
+	}
+	var unsafe bool
+	err = q.QueryRow(ctx, `SELECT
+ EXISTS(SELECT 1 FROM pg_auth_members WHERE member=$1 OR roleid=$1)
+ OR EXISTS(SELECT 1 FROM pg_shdepend WHERE refclassid='pg_authid'::regclass AND refobjid=$1 AND deptype='o')
+ OR EXISTS(SELECT 1 FROM pg_shdepend WHERE refclassid='pg_authid'::regclass AND refobjid=$1 AND deptype='a' AND classid NOT IN ('pg_class'::regclass,'pg_namespace'::regclass,'pg_database'::regclass,'pg_proc'::regclass))
+ OR EXISTS(SELECT 1 FROM pg_db_role_setting WHERE setrole=$1)
+ OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE a.grantee=0 AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%')
+ OR EXISTS(SELECT 1 FROM pg_attribute x JOIN pg_class c ON c.oid=x.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(x.attacl) a WHERE a.grantee=0 AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%')
+ OR EXISTS(SELECT 1 FROM pg_namespace n CROSS JOIN LATERAL aclexplode(n.nspacl) a WHERE a.grantee=0 AND a.privilege_type='CREATE')
+ OR EXISTS(SELECT 1 FROM pg_database d CROSS JOIN LATERAL aclexplode(d.datacl) a WHERE a.grantee=0 AND a.privilege_type='CREATE')
+ OR EXISTS(SELECT 1 FROM pg_largeobject_metadata l CROSS JOIN LATERAL aclexplode(l.lomacl) a WHERE a.grantee=0)
+ OR EXISTS(SELECT 1 FROM pg_foreign_server f CROSS JOIN LATERAL aclexplode(f.srvacl) a WHERE a.grantee=0)
+ OR EXISTS(SELECT 1 FROM pg_foreign_data_wrapper f CROSS JOIN LATERAL aclexplode(f.fdwacl) a WHERE a.grantee=0)
+ OR EXISTS(SELECT 1 FROM pg_tablespace t CROSS JOIN LATERAL aclexplode(t.spcacl) a WHERE a.grantee=0)
+ OR EXISTS(SELECT 1 FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a WHERE a.grantee=$1 OR (a.grantee=0 AND d.defaclobjtype IN ('r','S','n','L')))`, oid).Scan(&unsafe)
+	if err != nil || unsafe {
+		return zero, cfg.ErrChanged
+	}
+	want := make([]string, 0, len(grants))
+	allowedFunctions := []string{}
+	for _, g := range grants {
+		if g.kind == "function" {
+			if g.column != "" || g.privilege != "EXECUTE" {
+				return zero, cfg.ErrChanged
+			}
+			allowedFunctions = append(allowedFunctions, "public."+g.object)
+		} else {
+			want = append(want, g.key())
+		}
+	}
+	// Compare exact resolved overloads, not PostgreSQL's display spelling of
+	// argument aliases (for example timestamptz -> timestamp with time zone).
+	// Resolution uses only the compiled public-qualified allowlist. It changes
+	// neither the grant SQL nor its immutable layout/provenance digest.
+	var functionOIDs []string
+	err = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege($1::oid,p.oid,'EXECUTE') AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) x WHERE to_regprocedure(x)::oid=p.oid)), ARRAY(SELECT coalesce(to_regprocedure(x)::oid::text,'') FROM unnest($2::text[]) x)`, oid, allowedFunctions).Scan(&unsafe, &functionOIDs)
+	if err != nil || unsafe || len(functionOIDs) != len(allowedFunctions) {
+		return zero, cfg.ErrChanged
+	}
+	for _, object := range functionOIDs {
+		resolved, err := strconv.ParseUint(object, 10, 32)
+		if err != nil || resolved == 0 || strconv.FormatUint(resolved, 10) != object {
+			return zero, cfg.ErrChanged
+		}
+		want = append(want, (publicRuntimeGrant{"function", object, "", "EXECUTE"}).key())
+	}
+	rows, err := q.Query(ctx, `SELECT 'table',n.nspname||'.'||c.relname,'',a.privilege_type,a.is_grantable FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE a.grantee=$1
+ UNION ALL SELECT 'table',n.nspname||'.'||c.relname,x.attname,a.privilege_type,a.is_grantable FROM pg_attribute x JOIN pg_class c ON c.oid=x.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(x.attacl) a WHERE a.grantee=$1
+ UNION ALL SELECT 'schema',nspname,'',a.privilege_type,a.is_grantable FROM pg_namespace CROSS JOIN LATERAL aclexplode(nspacl) a WHERE a.grantee=$1
+ UNION ALL SELECT 'database',datname,'',a.privilege_type,a.is_grantable FROM pg_database CROSS JOIN LATERAL aclexplode(datacl) a WHERE a.grantee=$1
+ UNION ALL SELECT 'function',n.nspname||'.'||p.oid::text,'',a.privilege_type,a.is_grantable FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE a.grantee=$1`, oid)
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	actual := []string{}
+	for rows.Next() {
+		var g publicRuntimeGrant
+		var grantable bool
+		if err = rows.Scan(&g.kind, &g.object, &g.column, &g.privilege, &grantable); err != nil || grantable {
+			rows.Close()
+			return zero, cfg.ErrChanged
+		}
+		if g.kind == "table" || g.kind == "function" {
+			if !strings.HasPrefix(g.object, "public.") {
+				rows.Close()
+				return zero, cfg.ErrChanged
+			}
+			g.object = strings.TrimPrefix(g.object, "public.")
+		}
+		actual = append(actual, g.key())
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	slices.Sort(actual)
+	slices.Sort(want)
+	if !slices.Equal(actual, want) || ctx.Err() != nil {
+		return zero, cfg.ErrChanged
+	}
+	return contracts.PublicRuntimeRoleReceipt{RoleName: name, RoleOID: oid, LayoutDigest: layout}, nil
+}
+func (s *PublicRuntimeSQLRoles) String() string { return "protected public runtime SQL role producer" }
+
+var _ fmt.Stringer = (*PublicRuntimeSQLRoles)(nil)

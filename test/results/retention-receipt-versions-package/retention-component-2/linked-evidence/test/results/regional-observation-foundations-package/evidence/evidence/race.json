@@ -1,0 +1,38 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-conversation-20261013/checkpoint-v1/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^Test(ConnectorObservation|RemoteConnectorSource|ClusterObservation|ConnectorProcessProofBeforeReadinessAndCurrentProtection|ConnectorRetirementProofPreservesLiveActorAndPurpose|ConnectorOwnedObservationRequiresActivatedCurrentOriginalProcess|ConnectorPaired)",
+    "-v",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/contracts",
+    "./internal/adapters/mtls",
+    "./internal/adapters/kubernetes",
+    "./internal/transport/clusterobservation"
+  ],
+  "exit": 0,
+  "seconds": 36.63,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

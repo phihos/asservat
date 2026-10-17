@@ -1,0 +1,238 @@
+# Installed owner identity
+
+The original installer must start the owner service without handing it setup
+administration credentials or depending on its own running endpoint. The
+ADR-140/ADR-144 continuation fixes an owner-only credential projection and a
+one-use launch in the original resource journal. It supports REQ-DEP-003 and
+REQ-FED-001. Actual qualification is recorded in
+[implementation progress](../implementation-progress.md); a component check is
+not an installed service or public investigation workflow.
+
+## Original layout and credentials
+
+A fresh installation selects `asservat-owner-installed/v1` alongside the
+installed worker layout before any of the nineteen resource claims. The binding
+includes both layouts. Existing legacy and worker-only journals cannot be
+adopted. The generated Deployment remains Restricted and starts at zero replicas.
+It has the fixed identity ConfigMap, ten-key provider Secret, and separate
+optional observation/public projections. Optional volume presence does not
+select a runtime mode or authorize a listener.
+
+The owner identity SQL inventory has four fixed roles: enrollment, audit,
+activation and registry. Each retained process uses one connection per role;
+the global limit is four retained owner processes plus one serialized installer
+verifier. Names, direct privileges, role attributes, OIDs, provenance and actual
+SCRAM login are independently verified. These roles do not accept source
+configuration, modify fleet recovery or receive public investigation credentials.
+Current SQL checks now return fixed internal prerequisite diagnostics from the
+same statement that decides acceptance. The original administrator, schema,
+activation, recovery, source-interval and strict freshness predicates remain
+unchanged, including both original database-clock comparisons. Diagnostics
+preserve the unavailable error classification and expose no credential, source
+identity or raw provider error; a later sample cannot explain an earlier refusal.
+The private role journal retains only the original bounded creation attempts;
+uncertain results permit exact lookup, never password reset, privilege repair
+or adoption. Runtime has no permission to read that private role journal.
+
+The accepted configuration reader also supplies fixed internal diagnostics for
+its original SQL statements and predicates, using its existing database clock
+and returned rows. Detail from retryable transaction attempts is discarded before
+another attempt can fail elsewhere. The native qualification fixture records
+only the exact typed check/reason enums; production native consumers retain
+their existing unavailable normalization. These diagnostics neither refresh a
+source nor authorize startup. Component and native results are recorded in
+[implementation progress](../implementation-progress.md).
+
+The original installed-owner qualification now identifies an expired fleet
+observation during the second selection phase, while the ordinary fleet writer
+contends with startup's recovery lock. This remains an availability defect;
+diagnostic coverage does not qualify startup or permit a longer deadline.
+
+[ADR-158](../decisions/158-owner-startup-critical-sections.md) moves the first full
+native preflight before the retained SQL bridge for the seven original fresh
+installer paths; the projection-only refinement below changes that first bracket. It preserves root/resource/source ownership and the original caller end.
+The bridge then locks recovery and activation, compares the exact preflight fleet
+source and original intervals, and performs current native and separately
+transactional accepted-owner checks before claims or effects. The full final
+native bracket remains locked. Owner-head locks are not retained by the outer
+bridge, allowing the independent owner observer to update its own observation.
+The private role journal still requires a positive short accepted/recovery check
+before its first GET; no credential use is allowed before post-lock admission.
+Component races, affected gates and real SQL contention tests pass. The original
+installed test now completes owner construction, selection and worker-caller
+verification, then stops at projection verification. Its exact remaining failure
+and sustained installed availability still require qualification.
+
+[ADR-159](../decisions/159-owner-projection-split-preflight.md) now combines the
+projection's first native bracket and post-bridge current reads. A private
+one-use prefix retains original resource receipts, source observations and public
+object checks; it is neither a completed proof nor an effect permit. The exact
+source still binds the unchanged recovery/activation lock. Current guards,
+sources, journals, administrator and workload objects are compared after that
+wait, with the final namespace read last. Completion retains the prefix's
+original observation start and earliest end. Provider inspection remains serial
+before this work; the other six fresh paths are unchanged.
+
+The first private role-journal read now follows both completed native admission
+and a positive separate short accepted-owner transaction under the bridge. It
+requires the already-pinned original UID. A valid newer version of that same UID
+may be selected before its first read; unread earlier contents are not compared.
+The full first-read UID/version/state then binds all subsequent checks. Missing
+or replacement roots and later mutations deny. The public resource-journal CAS still precedes
+the full current check under role/advisory locks, so changes during the claim
+cannot authorize an external CREATE or launch. The independent final native
+bracket, original deadlines, conservative uncertain spend and joined closure
+remain. No owner-head lock spans the remaining native work. Component races and
+affected gates pass; installed qualification remains pending.
+
+Projection diagnostics now retain the exact first failed operation's closed
+codes when its one permitted independent inspection also fails. The inspection
+error alone determines unwrapping and the stopped disposition. A private
+invocation-owned slot carries fixed native-stage codes through SQL normalization,
+never a credential, protected value or raw provider error; copied handles cannot
+change it. The SQL adapter similarly reports only a closed deciding-stage enum
+from its original statements and predicates. No diagnostic adds an API/SQL read,
+clock sample, claim, retry or deadline. Component and original installed-run
+qualification remain separately recorded in implementation progress. The native
+reruns locate the original failure within the final source-check branch and
+separately locate the failed inspection at the outer bridge. The eighth run
+narrows the original failure to the final fleet-policy read and records one
+live-context source-client limiter refusal in that same SQL call; see ADR-159.
+Earlier successful transport returns do not establish final completion.
+
+The source branch now retains closed codes for its existing API, guard/probe,
+object-equality and final-clock predicates. Nested codes retain no provider error
+text; normal error matching still follows the original cause. Predicate order,
+joined probe precedence and original clock samples remain unchanged. The owned
+native fixture also observes each original client's rate-limiter Wait calls and
+refusals, including refusals while the calling context remains live. It supplies
+one standard 20-QPS/burst-20 bucket per original client and retains that same
+pointer through REST construction and every phase. These counters add no native
+time samples, token reservations, refills or HTTP requests. A live-context refusal
+alone does not establish its cause. Qualification remains in implementation
+progress; the diagnostics do not repair startup.
+
+The immutable identity projection contains public `owner-roles.json`, four SQL
+credential files, scoped audit storage and separate audit wrapping, opening,
+server-signing and client-signing credentials. The public journal digest covers
+only typed deployment input and public role provenance. Passwords, tokens and
+hashes of private credential payloads never enter that digest or public status.
+Provider issuance and role verification remain distinct operations.
+
+## Selected read-only projection finalization
+
+[ADR-162](../decisions/162-owner-projection-read-only-finalization.md) selects a
+separate execution and mandatory read-only finalization for the six fresh
+provider projection transitions and two launch transitions. Execution keeps
+current postclaim/postlock authority, exact roles and the single original effect;
+its return is spent/unverified. A private same-live-root pending record blocks
+further effects until current independent verification succeeds. Fresh-provider
+mutating entry points cannot bypass the split protocol. The actual legacy
+`OwnerInstalledLayout` and role operations remain unchanged. The split protocol
+is implemented; component and installed qualification are pending.
+
+The first execution requires original live role-root creation and completed
+verification; opening an existing private journal is not creation lineage. An
+inert controller can exist before role creation. New controllers cannot adopt
+existing projection/launch progress, and later steps require the same process
+to retain the previously finalized result. Checks run inside original operation
+serialization, including for earlier queued calls. This provides no restart
+producer or durable global owner record.
+
+Finalization owns a fresh observation interval of at most five seconds within
+the original caller/root/setup lifetime. It never renews a claim or effect end.
+Recovery/activation and role/advisory locks precede completion of the native
+prefix and the private journal read. The complete native bracket, accepted SQL,
+provider/material and exact-role checks are followed by current comparisons and
+repeat reads of known immutable child UIDs/resource versions. It performs no
+persistent API/SQL mutation, receipt CAS or effect replay.
+Execution pins SQL59 `semantic_version` in its locked authority read; finalization
+compares the retained value under those locks. Unchanged observation renewal may
+proceed, but suspend/resume and semantic ABA invalidate the pending result. This
+adds a scalar pin without changing the nine-column view or implying continuous
+native guard protection.
+
+A positive CREATE response supplies only a candidate identity; missing original
+UIDs cannot be adopted by finalization or inspection. Unknown journal CAS permits
+exact readback on the already-known root only after the original locked semantic
+pin exists; an unknown earlier claim remains unverified. Known child pins must
+also match before a later execution writes a receipt or performs a dependent
+effect. Original spend remains retained.
+Copied/lost/reconstructed pending records cannot continue the sequence. The
+driver adds eight explicit verification calls without increasing effect limits
+or its original parent deadline. Stored receipts remain historical; the runtime
+checks below independently establish current authority. A launched Pod may exist
+before finalization returns, so finalizer failure never implies rollback.
+The driver's completion flag is a historical outcome with no freshness lease.
+Outer cleanup must join before return, and original cancellation or closure during
+that cleanup suppresses success; later runtime operations still require their
+own current authority.
+
+## Resuming interrupted installation
+
+The journal rules below retain historical attempts and receipts. They do not
+recreate an ADR-162 pending record after loss of its live controller, or permit
+adopting an unknown CREATE UID. The selected split protocol requires the original
+known pins and one-use finalization described above before progression.
+
+The original public resource journal owns an immutable projection intent, then
+two ordered child attempts: credentials first, configuration second. Each child
+has a separate operation ID and at most five-second first-write interval. A
+positively acknowledged claim permits exactly its fixed CREATE. Any existing
+claim, including an expired claim or an ambiguous CREATE response, permits only
+independent exact lookup. A 404 cannot grant another CREATE.
+
+A positive first-object receipt allows the never-attempted second child to be
+claimed using fresh current authority, within the original resource setup end.
+This does not renew the first attempt or parent intent. Each object has both
+parent and child operation annotations. A joint receipt is written only after
+both positive receipts and must match their exact UIDs and resource versions.
+Sibling capacity/cleanup claims and objects cannot be reused as owner identity.
+Every journal CAS preserves unrelated sibling fields.
+
+Only that complete receipt can precede the separate zero-to-one Deployment
+launch. The launch binds its original UID, inert resource version, both exact
+spec digests and a new operation ID. Unknown launch results permit reconciliation
+of the exact inert or claimed running object, without another scale operation.
+Any launch claim permanently closes role/projection creation. Readiness and
+ongoing authorization are separate from successful launch acknowledgement.
+
+## Runtime startup and current observations
+
+Before SQL credential use, the concrete reader checks the original public
+journal UID, completed projection/launch receipts, actual immutable mounted
+objects, original account/Deployment templates, current native workload guard
+and online Pod-bound TokenReview. Pod, ReplicaSet and Deployment identities are
+checked around the token verification. The entire check retains its original
+at-most-five-second deadline. All four SQL credential checks consume the
+remaining interval; startup cannot reset it after blocking work.
+
+The observation startup branch consumes the complete original guard input and
+activation pin before composing identity services. Its identity-only listener
+exposes no public investigation, native evidence transfer or unconfigured
+observation backend. Backend/public promotion requires its own positive
+projection receipt and reviewed composition; there is no optional-file fallback.
+
+The original owner source body is installation provenance. Later compatible
+accepted source revisions may be used, with current revision and roots checked
+on every operation and unchanged through its response. Original source, pool,
+Service, account, Deployment, template and pinned issuer trust constraints still
+apply. Neither a source observation nor a historical receipt supplies current
+activation, recovery or request authority.
+
+C-20 owns the closed contracts; C-21 owns concrete Kubernetes/SQL adapters and
+fixed credential production; C-04 consumes current identity and observation
+facts. The bootstrap package composes them without manufacturing authority.
+The schema is structural validation; Go enforces cross-object identity, order,
+non-aliasing, original deadlines and current enforcement.
+
+## Independent installed capacity probes
+
+[ADR-145](../decisions/145-independent-capacity-probe.md) retains the original
+worker account/UID in the complete workload guard. Only the two explicit dry-run
+capacity-source CREATE operations pass that namespace policy; the distinct
+capacity administrator policy must deny. Fresh installed layouts also retain the
+fixed processing-source ConfigMap in their named dry-run UPDATE probes. Both are
+chosen before original guard receipts 17/18; no already-claimed journal is
+adopted. Activation and every private loader reconstruct the same complete plan.
+The native policy composition and the installed worker remain separate gates.

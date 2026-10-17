@@ -1,0 +1,14 @@
+=== RUN   TestInitialProviderIssuerWithRealOpenBao
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup
+    initial_provider_issuer_test.go:95: role_only_explicit_max_ttl_zero=true; nonrenewable=true; finite_actual_expiry=true
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/wrap
+    initial_provider_issuer_test.go:146: positive credential retirement key service refused or unavailable
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/unwrap
+    initial_provider_issuer_test.go:146: positive credential retirement key service refused or unavailable
+--- FAIL: TestInitialProviderIssuerWithRealOpenBao (0.10s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup (0.00s)
+    --- FAIL: TestInitialProviderIssuerWithRealOpenBao/wrap (0.03s)
+    --- FAIL: TestInitialProviderIssuerWithRealOpenBao/unwrap (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.146s
+FAIL

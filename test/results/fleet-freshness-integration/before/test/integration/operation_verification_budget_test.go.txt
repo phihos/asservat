@@ -1,0 +1,156 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/audit"
+	value "asservat.local/asservat/internal/domain/audit"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Called by the existing selected SQL/S3 lifecycle fixture after an actual
+// positive certificate completion. This is not bootstrap/profile qualification.
+func qualifyOperationCertificateVerification(t *testing.T, ctx context.Context, admin, ackPool *pgxpool.Pool, ack *postgres.OperationLifecycles, verifier app.OperationCleanupVerifier, r value.OperationRetirement, receipt value.Receipt, mode string) {
+	t.Helper()
+	count := func(want int64) {
+		t.Helper()
+		var got int64
+		if e := admin.QueryRow(ctx, "SELECT certificate_verify_attempts FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$2", r.RootID, r.OperationID).Scan(&got); e != nil || got != want {
+			t.Fatal("unexpected durable verifier spend", got, want, e)
+		}
+	}
+	count(0)
+	if e := ack.AcknowledgeOperationCertificate(ctx, r, receipt); e != app.ErrUnavailable {
+		t.Fatal("acknowledgement without prepaid verification", e)
+	}
+	// The UPDATE credential is intentionally independent, but cannot reset,
+	// jump, combine acknowledgement with spend, or spend before writer completion.
+	if _, e := ackPool.Exec(ctx, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=2 WHERE operation_id=$1", r.OperationID); e == nil {
+		t.Fatal("verifier jumped two claims")
+	}
+	count(0)
+	if mode == "blocked-expiry" {
+		// Refresh only the fixture observation; never change recovery acceptance.
+		refreshAuditFixtureRecovery(t, ctx, admin, r.InstallationID, 250*time.Millisecond)
+		lock, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer lock.Rollback(ctx)
+		if _, e = lock.Exec(ctx, "SELECT 1 FROM operation_audit_pool WHERE root_id=$1 AND lane='normal' FOR UPDATE", r.RootID); e != nil {
+			t.Fatal(e)
+		}
+		end := time.Now().Add(time.Second)
+		done := make(chan error, 1)
+		go func() {
+			bounded, cancel := context.WithDeadline(ctx, end)
+			defer cancel()
+			_, err := ack.ClaimOperationCertificateVerification(bounded, r, receipt)
+			done <- err
+		}()
+		observed := false
+		for time.Now().Before(end) {
+			var waiting int
+			if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE usename='operation_audit_ack_runtime' AND cardinality(pg_blocking_pids(pid))>0").Scan(&waiting); e != nil {
+				t.Fatal(e)
+			}
+			if waiting > 0 {
+				observed = true
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if !observed {
+			t.Fatal("claim never reached blocked pool lock")
+		}
+		time.Sleep(275 * time.Millisecond)
+		if e = lock.Rollback(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if e = <-done; e != app.ErrUnavailable {
+			t.Fatal("expired original recovery observation authorized claim", e)
+		}
+		count(0)
+		refreshAuditFixtureRecovery(t, ctx, admin, r.InstallationID, 30*time.Second)
+	}
+	claim := func() (time.Time, error) { return ack.ClaimOperationCertificateVerification(ctx, r, receipt) }
+	var until time.Time
+	var e error
+	if mode == "concurrent" {
+		type result struct {
+			until time.Time
+			err   error
+		}
+		done := make(chan result, 2)
+		for i := 0; i < 2; i++ {
+			go func() { u, e := claim(); done <- result{u, e} }()
+		}
+		for i := 0; i < 2; i++ {
+			x := <-done
+			if x.err != nil {
+				t.Fatal("concurrent prepaid verifier", x.err)
+			}
+			if until.IsZero() || x.until.Before(until) {
+				until = x.until
+			}
+		}
+		count(2)
+		if _, e = claim(); e != app.ErrUnavailable {
+			t.Fatal("third verifier claim succeeded", e)
+		}
+		// Actual S3 read/decryption failure still consumes its preceding claim.
+		bad := r
+		bad.WritersDigest[0] ^= 1
+		bounded, cancel := context.WithDeadline(ctx, until)
+		if e = verifier.VerifyOperationCertificate(bounded, bad, receipt); e == nil {
+			cancel()
+			t.Fatal("mismatched independent certificate verification succeeded")
+		}
+		cancel()
+	} else if mode == "unknown-claim" {
+		// Hide an actually committed claim response. The coordinator receives no
+		// permit and does no I/O; only the original second allowance remains.
+		if _, e = claim(); e != nil {
+			t.Fatal("lost-claim fixture commit", e)
+		}
+		count(1)
+		until, e = claim()
+		if e != nil {
+			t.Fatal("remaining verifier allowance", e)
+		}
+		count(2)
+		if _, e = claim(); e != app.ErrUnavailable {
+			t.Fatal("unknown claim reset attempts", e)
+		}
+	} else {
+		until, e = claim()
+		if e != nil {
+			t.Fatal("prepaid verifier claim", e)
+		}
+		count(1)
+	}
+	if !time.Now().Before(until) || until.After(r.CertificateWriteUntil) || until.After(time.Now().Add(5*time.Second)) {
+		t.Fatal("verification deadline extended")
+	}
+	bounded, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	if e = verifier.VerifyOperationCertificate(bounded, r, receipt); e != nil {
+		t.Fatal("independent certificate verification", e)
+	}
+	if e = ack.AcknowledgeOperationCertificate(bounded, r, receipt); e != nil {
+		t.Fatal("certificate acknowledgement", e)
+	}
+	if _, e = claim(); e != app.ErrUnavailable {
+		t.Fatal("acknowledged certificate granted more verification", e)
+	}
+	_, e = ackPool.Exec(ctx, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=0 WHERE operation_id=$1", r.OperationID)
+	var pe *pgconn.PgError
+	if !errors.As(e, &pe) || pe.Code != "23514" {
+		t.Fatal("spent attempt reset not trigger-fenced", e)
+	}
+}

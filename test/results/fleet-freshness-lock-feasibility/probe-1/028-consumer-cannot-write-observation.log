@@ -1,0 +1,3 @@
+NOTICE:  identifier "asservat-fleet-lock-f3896909557748f9:consumer-cannot-write-observation" will be truncated to "asservat-fleet-lock-f3896909557748f9:consumer-cannot-write-obse"
+ERROR:  42501: permission denied for table fleet_observation
+LOCATION:  aclcheck_error, aclchk.c:2793

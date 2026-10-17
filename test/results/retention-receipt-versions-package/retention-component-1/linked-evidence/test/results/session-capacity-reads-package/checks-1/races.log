@@ -1,0 +1,96 @@
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/valid
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/sql-timezone
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/legacy
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-managed
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/unmanaged-snapshot
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-digest
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/unknown-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/case-alias
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/null-counter
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/duplicate-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-root
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-allocation
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/later-session
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-format
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/fractional-time
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/oversize
+--- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack (0.02s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/valid (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/sql-timezone (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/legacy (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-managed (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/unmanaged-snapshot (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-digest (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/unknown-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/case-alias (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/null-counter (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/duplicate-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-root (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-allocation (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/later-session (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-format (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/fractional-time (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/oversize (0.00s)
+=== RUN   TestSessionCapacityReadsRetainOriginalLimitsAndCurrentSpend
+--- PASS: TestSessionCapacityReadsRetainOriginalLimitsAndCurrentSpend (0.00s)
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/account
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/allocation
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/root
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing-deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/digest
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-body
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-digest
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/case-alias
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/session-deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/invalid-session
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/changed-audit-store
+--- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots (0.01s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/account (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/allocation (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/root (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing-deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/digest (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-body (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-digest (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/case-alias (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/session-deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/invalid-session (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/changed-audit-store (0.00s)
+=== RUN   TestSessionCapacityReadsKeepUnmanagedRowsUnchanged
+--- PASS: TestSessionCapacityReadsKeepUnmanagedRowsUnchanged (0.00s)
+=== RUN   TestFirstContextPreparationDoesNotGrantASecondAttempt
+--- PASS: TestFirstContextPreparationDoesNotGrantASecondAttempt (0.00s)
+=== RUN   TestFirstContextObservePreservesContentAndRetirementHeadroom
+--- PASS: TestFirstContextObservePreservesContentAndRetirementHeadroom (0.00s)
+=== RUN   TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse
+--- PASS: TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse (0.00s)
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range
+--- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.080s

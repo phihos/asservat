@@ -1,0 +1,52 @@
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/valid
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-grants
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-credential-path
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/public-layout
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-activation
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-native-pin
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-source
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-guard
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unbounded-connections
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-probes
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-root
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/plaintext-provider
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/symlink-escape
+--- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders (0.05s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/valid (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-grants (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-credential-path (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/public-layout (0.01s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-activation (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-native-pin (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-source (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-guard (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unbounded-connections (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-probes (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-root (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/plaintext-provider (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/symlink-escape (0.00s)
+=== RUN   TestConfigurationRoleInstallerRemedyDiscardsPrivateFailure
+--- PASS: TestConfigurationRoleInstallerRemedyDiscardsPrivateFailure (0.00s)
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/legacy-omission
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/installed-capacity-probe
+--- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard (0.01s)
+    --- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/legacy-omission (0.01s)
+    --- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/installed-capacity-probe (0.00s)
+=== RUN   TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard
+--- PASS: TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard (0.00s)
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount/valid
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount/omitted
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount/bad-name
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount/missing-uid
+=== RUN   TestOwnerCapacityProbePreservesExactOptionalAccount/bad-uid
+--- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount (0.01s)
+    --- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount/valid (0.00s)
+    --- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount/omitted (0.00s)
+    --- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount/bad-name (0.00s)
+    --- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount/missing-uid (0.00s)
+    --- PASS: TestOwnerCapacityProbePreservesExactOptionalAccount/bad-uid (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.123s

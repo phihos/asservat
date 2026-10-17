@@ -1,0 +1,42 @@
+{
+  "internal/adapters/kubernetes/owner_identity_producer_fixture_test.go": {
+    "producer7": null,
+    "current": "0b1c412ffecf8bd1cc09430f36e7d92b41751732c9d87e5a4efc3a757d0c5730"
+  },
+  "internal/adapters/kubernetes/owner_identity_producer_test.go": {
+    "producer7": null,
+    "current": "9669e4cc27f0c7e8470ad39dd69225025852fdc72536e20ec94de661109dbd37"
+  },
+  "internal/adapters/mtls/connector_observation_channel.go": {
+    "producer7": "898d3824063a08f46aeab8731b125f15a878aa69172c2c93c2f817c1925f77b0",
+    "current": "57233bbe7f77509acc07b09f10b36d7cb6e23e85021baa8d47fe2691018cfde1"
+  },
+  "internal/adapters/mtls/connector_observation_channel_test.go": {
+    "producer7": "acd639fbbd147ff1b345b66099f5b58cb0f52728fd8192094ac90ce816037b76",
+    "current": "b7ba978b5497af7f7f43e56e63d93d70775465a8fd622380141a31eef550a3f2"
+  },
+  "internal/application/fleet/cluster_observation_digest.go": {
+    "producer7": null,
+    "current": "f21614d334ecfadea85809593d9075fc027372660bfc8687b6471b4820564d71"
+  },
+  "internal/transport/clusterobservation/digest_parity_test.go": {
+    "producer7": "f9114ac8b5c054c61a8297a130f4f43a920b4527482b24b04c343cc2433ba432",
+    "current": "2f69344cf65cdad9f1d99a2a6a9d5103d1cb7fd40c85addf08d02430b9631c65"
+  },
+  "internal/transport/clusterobservation/wire.go": {
+    "producer7": "264a02923791d61b4c1e8331f7f5cf0643278b9fe38f7f84c9dc2c9974a3da4d",
+    "current": "ff93ecf4809540a115467667c938524e712ea6de601329f8b86af7e12a61cd0f"
+  },
+  "migrations/README.md": {
+    "producer7": null,
+    "current": "647033a670c06f765dc053f060753451e35bd69ef4f0eb12c72209ec94de0da9"
+  },
+  "test/integration/initial_installation_test.go": {
+    "producer7": null,
+    "current": "a6b3160bf6dac3bd7665a471610ef76bb1eb2873a1d49dace747152297c7a18b"
+  },
+  "test/integration/owner_identity_roles_test.go": {
+    "producer7": null,
+    "current": "7dee1b45f3ee1dd891f394ec70518b6bd8e236a541ce99e9b90ab4a50a0abda3"
+  }
+}

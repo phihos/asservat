@@ -1,0 +1,313 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-13 10:53:51.320 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 10:53:51.320 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 10:53:51.349 UTC [43] LOG:  database system was shut down at 2026-10-13 10:53:51 UTC
+2026-10-13 10:53:51.359 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down....2026-10-13 10:53:51.506 UTC [37] LOG:  received fast shutdown request
+2026-10-13 10:53:51.509 UTC [37] LOG:  aborting any active transactions
+2026-10-13 10:53:51.511 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-13 10:53:51.511 UTC [41] LOG:  shutting down
+2026-10-13 10:53:51.514 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-13 10:53:52.501 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.021 s, sync=0.951 s, total=0.991 s; sync files=303, longest=0.009 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+.2026-10-13 10:53:52.515 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-13 10:53:52.628 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 10:53:52.628 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-13 10:53:52.628 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-13 10:53:52.631 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 10:53:52.638 UTC [95] LOG:  database system was shut down at 2026-10-13 10:53:52 UTC
+2026-10-13 10:53:52.643 UTC [1] LOG:  database system is ready to accept connections
+2026-10-13 10:53:52.676 UTC [100] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-13 10:53:52.676 UTC [100] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-13 10:54:05.527 UTC [120] ERROR:  permission denied for table fleet_initial_activation
+2026-10-13 10:54:05.527 UTC [120] STATEMENT:  UPDATE fleet_initial_activation SET singleton=true
+2026-10-13 10:54:05.527 UTC [120] ERROR:  permission denied for table fleet_initial_activation
+2026-10-13 10:54:05.527 UTC [120] STATEMENT:  DELETE FROM fleet_initial_activation WHERE false
+2026-10-13 10:54:05.527 UTC [120] ERROR:  permission denied for table fleet_initial_activation
+2026-10-13 10:54:05.527 UTC [120] STATEMENT:  INSERT INTO fleet_initial_activation(singleton) VALUES(true)
+2026-10-13 10:54:05.527 UTC [120] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:05.527 UTC [120] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:06.417 UTC [124] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:06.417 UTC [124] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:06.417 UTC [124] ERROR:  permission denied for table fleet_initial_activation
+2026-10-13 10:54:06.417 UTC [124] STATEMENT:  UPDATE fleet_initial_activation SET audit_receipt_json='x'
+2026-10-13 10:54:06.418 UTC [118] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:06.418 UTC [118] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:06.418 UTC [119] ERROR:  permission denied for table fleet_initial_activation
+2026-10-13 10:54:06.418 UTC [119] STATEMENT:  UPDATE fleet_initial_activation SET audit_receipt_json='x'
+2026-10-13 10:54:06.418 UTC [124] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:06.418 UTC [124] STATEMENT:  DELETE FROM custody_pool
+2026-10-13 10:54:06.419 UTC [119] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:06.419 UTC [119] STATEMENT:  TRUNCATE custody_pool
+2026-10-13 10:54:06.419 UTC [124] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:06.419 UTC [124] STATEMENT:  CREATE TABLE forbidden_initial(id int)
+2026-10-13 10:54:06.493 UTC [127] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:06.493 UTC [127] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:06.494 UTC [127] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 10:54:06.494 UTC [127] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-13 10:54:06.532 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_00" by role "postgres"
+2026-10-13 10:54:06.581 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_01" by role "postgres"
+2026-10-13 10:54:06.624 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_02" by role "postgres"
+2026-10-13 10:54:06.668 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_03" by role "postgres"
+2026-10-13 10:54:06.719 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_04" by role "postgres"
+2026-10-13 10:54:06.770 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_05" by role "postgres"
+2026-10-13 10:54:06.815 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_06" by role "postgres"
+2026-10-13 10:54:06.860 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_10" by role "postgres"
+2026-10-13 10:54:06.905 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_11" by role "postgres"
+2026-10-13 10:54:06.951 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_12" by role "postgres"
+2026-10-13 10:54:06.997 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_13" by role "postgres"
+2026-10-13 10:54:07.044 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_14" by role "postgres"
+2026-10-13 10:54:07.090 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_15" by role "postgres"
+2026-10-13 10:54:07.134 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_16" by role "postgres"
+2026-10-13 10:54:07.182 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_17" by role "postgres"
+2026-10-13 10:54:07.229 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_18" by role "postgres"
+2026-10-13 10:54:07.275 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_19" by role "postgres"
+2026-10-13 10:54:07.322 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_20" by role "postgres"
+2026-10-13 10:54:07.370 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_30" by role "postgres"
+2026-10-13 10:54:07.417 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_31" by role "postgres"
+2026-10-13 10:54:07.464 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_32" by role "postgres"
+2026-10-13 10:54:07.512 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_33" by role "postgres"
+2026-10-13 10:54:07.559 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_34" by role "postgres"
+2026-10-13 10:54:07.612 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_40" by role "postgres"
+2026-10-13 10:54:07.659 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_41" by role "postgres"
+2026-10-13 10:54:07.705 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_42" by role "postgres"
+2026-10-13 10:54:07.755 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_43" by role "postgres"
+2026-10-13 10:54:07.804 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_44" by role "postgres"
+2026-10-13 10:54:07.855 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_45" by role "postgres"
+2026-10-13 10:54:07.906 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_70" by role "postgres"
+2026-10-13 10:54:07.953 UTC [128] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000039_pub_71" by role "postgres"
+2026-10-13 10:54:09.626 UTC [191] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:09.626 UTC [191] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:09.627 UTC [191] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:09.627 UTC [191] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:09.627 UTC [191] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:09.627 UTC [191] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-13 10:54:09.858 UTC [192] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:09.858 UTC [192] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:09.858 UTC [192] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 10:54:09.858 UTC [192] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-13 10:54:09.982 UTC [194] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:09.982 UTC [194] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:09.983 UTC [194] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 10:54:09.983 UTC [194] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-13 10:54:10.016 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_00" by role "postgres"
+2026-10-13 10:54:10.103 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_01" by role "postgres"
+2026-10-13 10:54:10.148 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_02" by role "postgres"
+2026-10-13 10:54:10.193 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_03" by role "postgres"
+2026-10-13 10:54:10.244 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_04" by role "postgres"
+2026-10-13 10:54:10.294 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_05" by role "postgres"
+2026-10-13 10:54:10.340 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_06" by role "postgres"
+2026-10-13 10:54:10.384 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_10" by role "postgres"
+2026-10-13 10:54:10.429 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_11" by role "postgres"
+2026-10-13 10:54:10.475 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_12" by role "postgres"
+2026-10-13 10:54:10.520 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_13" by role "postgres"
+2026-10-13 10:54:10.567 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_14" by role "postgres"
+2026-10-13 10:54:10.612 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_15" by role "postgres"
+2026-10-13 10:54:10.658 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_16" by role "postgres"
+2026-10-13 10:54:10.705 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_17" by role "postgres"
+2026-10-13 10:54:10.751 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_18" by role "postgres"
+2026-10-13 10:54:10.798 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_19" by role "postgres"
+2026-10-13 10:54:10.844 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_20" by role "postgres"
+2026-10-13 10:54:10.891 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_30" by role "postgres"
+2026-10-13 10:54:10.939 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_31" by role "postgres"
+2026-10-13 10:54:10.987 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_32" by role "postgres"
+2026-10-13 10:54:11.034 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_33" by role "postgres"
+2026-10-13 10:54:11.080 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_34" by role "postgres"
+2026-10-13 10:54:11.132 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_40" by role "postgres"
+2026-10-13 10:54:11.179 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_41" by role "postgres"
+2026-10-13 10:54:11.227 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_42" by role "postgres"
+2026-10-13 10:54:11.276 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_43" by role "postgres"
+2026-10-13 10:54:11.325 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_44" by role "postgres"
+2026-10-13 10:54:11.374 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_45" by role "postgres"
+2026-10-13 10:54:11.423 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_70" by role "postgres"
+2026-10-13 10:54:11.471 UTC [195] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000006d_pub_71" by role "postgres"
+2026-10-13 10:54:13.149 UTC [259] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.149 UTC [259] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:13.150 UTC [259] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:13.150 UTC [259] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:13.150 UTC [259] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:13.150 UTC [259] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-13 10:54:13.370 UTC [260] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.370 UTC [260] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:13.371 UTC [260] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 10:54:13.371 UTC [260] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-13 10:54:13.595 UTC [264] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.595 UTC [264] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:13.596 UTC [264] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 10:54:13.596 UTC [264] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-13 10:54:13.720 UTC [266] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000ac_cfg_00" by role "postgres"
+2026-10-13 10:54:13.771 UTC [266] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000ac_cfg_01" by role "postgres"
+2026-10-13 10:54:13.817 UTC [266] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000ac_cfg_02" by role "postgres"
+2026-10-13 10:54:13.915 UTC [270] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.915 UTC [270] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:13.915 UTC [270] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 10:54:13.915 UTC [270] STATEMENT:  UPDATE hub_owner_configuration_revision SET audit_receipt_json=NULL WHERE false
+2026-10-13 10:54:13.945 UTC [271] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.945 UTC [271] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:13.945 UTC [271] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 10:54:13.945 UTC [271] STATEMENT:  UPDATE hub_owner_configuration_revision SET audit_receipt_json=NULL WHERE false
+2026-10-13 10:54:13.976 UTC [272] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:13.976 UTC [272] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:13.976 UTC [272] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 10:54:13.976 UTC [272] STATEMENT:  UPDATE hub_owner_configuration SET observed_at=observed_at WHERE false
+2026-10-13 10:54:19.092 UTC [274] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000be_cfg_00" by role "postgres"
+2026-10-13 10:54:19.143 UTC [274] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000be_cfg_01" by role "postgres"
+2026-10-13 10:54:19.190 UTC [274] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000000be_cfg_02" by role "postgres"
+2026-10-13 10:54:19.287 UTC [278] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:19.287 UTC [278] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:19.288 UTC [278] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 10:54:19.288 UTC [278] STATEMENT:  UPDATE hub_owner_configuration_revision SET audit_receipt_json=NULL WHERE false
+2026-10-13 10:54:19.318 UTC [279] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:19.318 UTC [279] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:19.318 UTC [279] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 10:54:19.318 UTC [279] STATEMENT:  UPDATE hub_owner_configuration_revision SET audit_receipt_json=NULL WHERE false
+2026-10-13 10:54:19.349 UTC [280] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:19.349 UTC [280] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 10:54:19.349 UTC [280] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 10:54:19.349 UTC [280] STATEMENT:  UPDATE hub_owner_configuration SET observed_at=observed_at WHERE false
+2026-10-13 10:54:20.091 UTC [290] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000142_cfg_00" by role "postgres"
+2026-10-13 10:54:20.142 UTC [290] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000142_cfg_01" by role "postgres"
+2026-10-13 10:54:20.188 UTC [290] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000142_cfg_02" by role "postgres"
+2026-10-13 10:54:20.520 UTC [297] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000154_cfg_00" by role "postgres"
+2026-10-13 10:54:20.572 UTC [297] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000154_cfg_01" by role "postgres"
+2026-10-13 10:54:20.618 UTC [297] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000154_cfg_02" by role "postgres"
+2026-10-13 10:54:21.801 UTC [303] ERROR:  canceling statement due to lock timeout
+2026-10-13 10:54:21.801 UTC [303] CONTEXT:  while locking tuple (0,4) in relation "hub_owner_configuration"
+2026-10-13 10:54:21.801 UTC [303] STATEMENT:  -- name: LockOwnerConfiguration :one
+	SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE
+	
+2026-10-13 10:54:22.897 UTC [305] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000166_cfg_00" by role "postgres"
+2026-10-13 10:54:22.948 UTC [305] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000166_cfg_01" by role "postgres"
+2026-10-13 10:54:22.997 UTC [305] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000166_cfg_02" by role "postgres"
+2026-10-13 10:54:23.500 UTC [313] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000178_cfg_00" by role "postgres"
+2026-10-13 10:54:23.551 UTC [313] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000178_cfg_01" by role "postgres"
+2026-10-13 10:54:23.597 UTC [313] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000178_cfg_02" by role "postgres"
+2026-10-13 10:54:23.901 UTC [320] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000018a_cfg_00" by role "postgres"
+2026-10-13 10:54:23.949 UTC [320] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000018a_cfg_01" by role "postgres"
+2026-10-13 10:54:23.993 UTC [320] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000018a_cfg_02" by role "postgres"
+2026-10-13 10:54:24.277 UTC [327] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000019c_cfg_00" by role "postgres"
+2026-10-13 10:54:24.325 UTC [327] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000019c_cfg_01" by role "postgres"
+2026-10-13 10:54:24.369 UTC [327] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000019c_cfg_02" by role "postgres"
+2026-10-13 10:54:24.619 UTC [332] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001b3_cfg_00" by role "postgres"
+2026-10-13 10:54:24.667 UTC [332] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001b3_cfg_01" by role "postgres"
+2026-10-13 10:54:24.711 UTC [332] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001b3_cfg_02" by role "postgres"
+2026-10-13 10:54:24.902 UTC [337] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001ca_cfg_00" by role "postgres"
+2026-10-13 10:54:24.950 UTC [337] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001ca_cfg_01" by role "postgres"
+2026-10-13 10:54:24.994 UTC [337] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001ca_cfg_02" by role "postgres"
+2026-10-13 10:54:25.192 UTC [342] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001e1_cfg_00" by role "postgres"
+2026-10-13 10:54:25.241 UTC [342] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001e1_cfg_01" by role "postgres"
+2026-10-13 10:54:25.285 UTC [342] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001e1_cfg_02" by role "postgres"
+2026-10-13 10:54:25.473 UTC [347] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001f8_cfg_00" by role "postgres"
+2026-10-13 10:54:25.521 UTC [347] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001f8_cfg_01" by role "postgres"
+2026-10-13 10:54:25.564 UTC [347] WARNING:  role "postgres" has not been granted membership in role "as_100000000000400080000000000001f8_cfg_02" by role "postgres"
+2026-10-13 10:54:25.910 UTC [354] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000020f_cfg_00" by role "postgres"
+2026-10-13 10:54:25.958 UTC [354] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000020f_cfg_01" by role "postgres"
+2026-10-13 10:54:26.002 UTC [354] WARNING:  role "postgres" has not been granted membership in role "as_1000000000004000800000000000020f_cfg_02" by role "postgres"
+2026-10-13 10:54:26.226 UTC [360] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000226_own_00" by role "postgres"
+2026-10-13 10:54:26.271 UTC [360] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000226_own_01" by role "postgres"
+2026-10-13 10:54:26.313 UTC [360] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000226_own_02" by role "postgres"
+2026-10-13 10:54:26.356 UTC [360] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000226_own_03" by role "postgres"
+2026-10-13 10:54:26.611 UTC [369] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:26.611 UTC [369] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:26.612 UTC [369] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:26.612 UTC [369] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:26.612 UTC [369] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:26.612 UTC [369] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:26.655 UTC [371] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:26.655 UTC [371] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:26.656 UTC [371] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:26.656 UTC [371] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:26.656 UTC [371] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:26.656 UTC [371] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:26.698 UTC [373] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:26.698 UTC [373] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:26.698 UTC [373] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:26.698 UTC [373] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:26.698 UTC [373] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:26.698 UTC [373] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:26.740 UTC [375] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:26.740 UTC [375] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:26.740 UTC [375] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:26.740 UTC [375] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:26.741 UTC [375] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:26.741 UTC [375] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:26.858 UTC [382] FATAL:  too many connections for role "as_10000000000040008000000000000226_own_00"
+2026-10-13 10:54:27.046 UTC [384] FATAL:  password authentication failed for user "as_10000000000040008000000000000226_own_00"
+2026-10-13 10:54:27.046 UTC [384] DETAIL:  Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 10:54:27.592 UTC [394] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000255_own_00" by role "postgres"
+2026-10-13 10:54:27.673 UTC [394] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000255_own_01" by role "postgres"
+2026-10-13 10:54:27.716 UTC [394] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000255_own_02" by role "postgres"
+2026-10-13 10:54:27.759 UTC [394] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000255_own_03" by role "postgres"
+2026-10-13 10:54:28.030 UTC [404] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:28.030 UTC [404] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:28.031 UTC [404] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:28.031 UTC [404] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:28.031 UTC [404] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:28.031 UTC [404] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:28.075 UTC [406] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:28.075 UTC [406] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:28.075 UTC [406] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:28.075 UTC [406] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:28.075 UTC [406] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:28.075 UTC [406] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:28.118 UTC [408] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:28.118 UTC [408] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:28.118 UTC [408] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:28.118 UTC [408] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:28.118 UTC [408] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:28.118 UTC [408] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:28.160 UTC [410] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:28.160 UTC [410] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-13 10:54:28.160 UTC [410] ERROR:  permission denied for table custody_pool
+2026-10-13 10:54:28.160 UTC [410] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-13 10:54:28.160 UTC [410] ERROR:  permission denied for schema public at character 14
+2026-10-13 10:54:28.160 UTC [410] STATEMENT:  CREATE TABLE public.forbidden_owner_identity(id int)
+2026-10-13 10:54:28.791 UTC [421] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000295_own_00" by role "postgres"
+2026-10-13 10:54:28.838 UTC [421] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000295_own_01" by role "postgres"
+2026-10-13 10:54:28.884 UTC [421] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000295_own_02" by role "postgres"
+2026-10-13 10:54:28.928 UTC [421] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000295_own_03" by role "postgres"
+2026-10-13 10:54:30.396 UTC [447] FATAL:  password authentication failed for user "asservat_init_100000000000400080000000000002f5_prepare"
+2026-10-13 10:54:30.396 UTC [447] DETAIL:  Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 10:54:30.677 UTC [451] ERROR:  permission denied for table fleet_trust
+2026-10-13 10:54:30.677 UTC [451] STATEMENT:  SELECT * FROM fleet_trust
+2026-10-13 10:54:30.691 UTC [452] FATAL:  password authentication failed for user "asservat_init_100000000000400080000000000002f5_activate"
+2026-10-13 10:54:30.691 UTC [452] DETAIL:  User "asservat_init_100000000000400080000000000002f5_activate" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"

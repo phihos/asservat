@@ -1,0 +1,3 @@
+ok  	asservat.local/asservat/internal/adapters/kubernetes	14.290s
+ok  	asservat.local/asservat/internal/bootstrap	1.058s
+ok  	asservat.local/asservat/test/integration	1.057s

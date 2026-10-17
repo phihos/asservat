@@ -1,0 +1,86 @@
+{
+  "at": "2026-10-13T16:07:35.030195+00:00",
+  "payloadManifest": "1d9cf1bbf9fc5ff72ba67191db9bf837b237149957ae58194acf78a907553234",
+  "result": "8a230c40d35228d418bdcd046e51a813a84cd0bc94841138257d57d55a8c6c5f",
+  "dependencies": "501e2e45882bbffe414a9d2c93221aba591562f7c33bd35df054e076acce64d3",
+  "paths": [
+    {
+      "path": "docs/architecture/connector-renewal.md",
+      "base": "d11d9c747b63cce99dee8ac14e0a2951b827ea522843176d5b937fb52b5d7921",
+      "payload": "bd3b7a2ace8e1ca539ebe84186a9ea206c9367314549432a3b7252ac0bd74ac1"
+    },
+    {
+      "path": "docs/decisions/153-operation-owned-connector-enrollment.md",
+      "base": null,
+      "payload": "1e00cccb6acf52386dad438a781086890b6538e5c4299aeb656c462d15fdae4f"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base": "7b6976888aa0be4869d02ce131d1bbb0cf1d42bda4aa02bac8bbd16044ec4c4c",
+      "payload": "082279ba3d0325388b50fdac3e26abd87e4f8b62840778d80471760f12181846"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_identity.go",
+      "base": "6373c4b1f2c97aee82770bf78ffef0d07be10b90d675ebc316aa5f40b5913e98",
+      "payload": "534ef67d6321c55f61dfc4b3e80f344462e29ac6c4a062a269861fd3cd220a50"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_lifecycle_native.go",
+      "base": null,
+      "payload": "be97e2993783a86ed9e57d52f9906d86f5675d70f01dcc5122ffe6e6455fbfb3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_lifecycle_nested_regression_test.go",
+      "base": null,
+      "payload": "ff65d5282fde7cabeddcc620a6f982f35e84902200e818997d1f5c8ec77d96d7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_lifecycle_operation.go",
+      "base": null,
+      "payload": "e0c89a355b6537e549a71dafe2da51b9509e274bbe0a91aafb63992724e5a2f6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_lifecycle_operation_test.go",
+      "base": null,
+      "payload": "b180a6402b5f00f753c802c56f0f803568ced54735244f49b0ba2add7fcbf256"
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_process.go",
+      "base": "07864302052bdbd703e94f6f3eeb0a8499ab0ffcb461fbdab378a9dea34498a7",
+      "payload": "afe56e75aae3fc1dab5faafbbe00a1484e5d7184ccd5a9074dca57ba8acf6e2a"
+    },
+    {
+      "path": "internal/application/fleet/connector_lifecycle_effects.go",
+      "base": null,
+      "payload": "e1030cd44c282af536d9bf87fadb5ed8c704c7998bf4689f6ec92a9e86096b87"
+    },
+    {
+      "path": "internal/application/fleet/connector_lifecycle_effects_test.go",
+      "base": null,
+      "payload": "33c2d96ccb7b80a7a01a864e4a99454960eccd0ae305a204776e972fda31d52e"
+    },
+    {
+      "path": "internal/application/fleet/connector_lifecycle_operation.go",
+      "base": null,
+      "payload": "06d4e93f4b79f2a1143720d5e4043f7aab211038f56b3cb661cbf54f12373c68"
+    },
+    {
+      "path": "internal/application/fleet/connector_process.go",
+      "base": "a151db7c0c5c23d9f5d299c895d0f84c64a566fabc08cff2f951e595a053d7d8",
+      "payload": "c4847855034c7fb2325e6b680c596b06f660ce94624f9b325ea141b21f6f460e"
+    },
+    {
+      "path": "internal/application/fleet/connector_renewal.go",
+      "base": "244c893cfaa027a06107ead85177e0d01e4f313c94bd9117246a38a291696dde",
+      "payload": "58e4efd14c3e7d321f930bffabaeb2ee64625a37c11a1ccf96707a6123a13a6b"
+    },
+    {
+      "path": "internal/domain/fleet/connector_lifecycle_operation.go",
+      "base": null,
+      "payload": "a467403999f5627d3b941bbd87564b37f259a91bf4346e37f84d4e5bf355c4ef"
+    }
+  ],
+  "nativeQualified": false,
+  "runtimeSelection": false,
+  "schemaChange": false
+}

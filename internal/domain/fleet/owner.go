@@ -1,0 +1,88 @@
+package fleet
+
+import (
+	"net/netip"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// OwnerBinding names one hub process. A locator, endpoint or matching strings
+// alone do not attest this identity or confer the developer's authority.
+type OwnerBinding struct {
+	InstallationID, ClusterID, IssuerEpoch, PodUID, ProcessEpoch string
+}
+
+func (b OwnerBinding) Valid() bool {
+	return authorization.UUID(b.InstallationID) && authorization.UUID(b.ClusterID) && authorization.UUID(b.IssuerEpoch) && authorization.UUID(b.PodUID) && authorization.UUID(b.ProcessEpoch)
+}
+
+const OwnerBootstrapProfile = "owner-bootstrap/v1"
+
+// OwnerPool is independently pinned installation configuration, never a worker
+// supplied selector, callback, namespace or port. Its qualified source/issuer
+// is a bootstrap responsibility; a constructor value cannot establish it.
+type OwnerPool struct {
+	InstallationID, ClusterID, IssuerEpoch                string
+	Namespace, NamespaceUID, Service, ServiceUID          string
+	Deployment, DeploymentUID, ServiceAccount, AccountUID string
+	Port                                                  int
+	NativePort                                            int    `json:",omitzero"`
+	NativeBootstrap                                       string `json:",omitempty"`
+	NativeCandidateLimit                                  int    `json:",omitzero"`
+	// OperationPort is the ADR-150 v2 operation listener's own port when the
+	// native port is shared (ADR-197); zero keeps v2 on NativePort.
+	OperationPort int `json:",omitzero"`
+}
+
+// OperationListenPort is where the v2 operation server listens and its
+// clients dial: OperationPort, else NativePort.
+func (p OwnerPool) OperationListenPort() int {
+	if p.OperationPort != 0 {
+		return p.OperationPort
+	}
+	return p.NativePort
+}
+
+func (p OwnerPool) Valid() bool {
+	return authorization.UUID(p.InstallationID) && authorization.UUID(p.ClusterID) && authorization.UUID(p.IssuerEpoch) && authorization.UUID(p.NamespaceUID) && authorization.UUID(p.ServiceUID) && authorization.UUID(p.DeploymentUID) && authorization.UUID(p.AccountUID) && identity.Text(p.Namespace, 63) && identity.Text(p.Service, 63) && identity.Text(p.Deployment, 253) && identity.Text(p.ServiceAccount, 253) && p.Port >= 1024 && p.Port <= 65535 && (p.NativePort == 0 || p.NativePort >= 1024 && p.NativePort <= 65535 && p.NativePort != p.Port) && (p.NativeBootstrap == "" || p.NativeBootstrap == OwnerBootstrapProfile && p.NativePort != 0) && (p.NativeCandidateLimit == 0 || p.NativeCandidateLimit >= 1 && p.NativeCandidateLimit <= OwnerRegistrationsPerPool && p.NativeBootstrap == OwnerBootstrapProfile) &&
+		(p.OperationPort == 0 || p.OperationPort >= 1024 && p.OperationPort <= 65535 && p.OperationPort != p.Port && p.OperationPort != p.NativePort && p.NativeCandidateLimit != 0)
+}
+
+type OwnerEndpoint struct {
+	Binding                OwnerBinding
+	Pool                   OwnerPool
+	Pod, ReplicaSetUID     string
+	Addresses              []string
+	ObservedAt, FreshUntil time.Time
+}
+
+func OwnerAddress(s string) bool {
+	a, err := netip.ParseAddr(s)
+	return err == nil && a.String() == s && !a.Is4In6() && a.Zone() == "" && a.IsGlobalUnicast() && !a.IsLinkLocalUnicast()
+}
+
+func (e OwnerEndpoint) Valid(now time.Time) bool {
+	if !e.Binding.Valid() || !e.Pool.Valid() || e.Binding.InstallationID != e.Pool.InstallationID || e.Binding.ClusterID != e.Pool.ClusterID || e.Binding.IssuerEpoch != e.Pool.IssuerEpoch || !identity.Text(e.Pod, 253) || !authorization.UUID(e.ReplicaSetUID) || len(e.Addresses) < 1 || len(e.Addresses) > 2 || !identity.Fresh(e.ObservedAt, e.FreshUntil, now, 5*time.Second) {
+		return false
+	}
+	for i, a := range e.Addresses {
+		if !OwnerAddress(a) || i > 0 && e.Addresses[i-1] >= a {
+			return false
+		}
+	}
+	return true
+}
+
+type OwnerCertificate struct {
+	Binding             OwnerBinding
+	Usage               string // Exactly server or client, with separate leaves.
+	Digest              artifact.Digest
+	NotBefore, NotAfter time.Time
+}
+
+func (c OwnerCertificate) Valid(now time.Time) bool {
+	return c.Binding.Valid() && (c.Usage == "server" || c.Usage == "client") && c.Digest != (artifact.Digest{}) && !c.NotBefore.IsZero() && !now.Before(c.NotBefore) && now.Before(c.NotAfter) && c.NotAfter.After(c.NotBefore) && !c.NotAfter.After(c.NotBefore.Add(time.Hour))
+}

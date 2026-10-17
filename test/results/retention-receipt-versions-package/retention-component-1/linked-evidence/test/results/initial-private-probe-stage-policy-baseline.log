@@ -1,0 +1,5 @@
+--- FAIL: TestInitialPrivateContinuationPreservesExistingPolicyBytes (0.00s)
+    initial_preparer_private_test.go:302: policy profile "" changed: 040a058ff689335d97580222faa96afc9c3b4ecb2d726e2b9e6664bcf02151e0
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.009s
+FAIL

@@ -1,0 +1,15 @@
+--- FAIL: TestRelayRequestBoundaries (0.09s)
+    --- FAIL: TestRelayRequestBoundaries/valid (0.01s)
+        server_test.go:234: status 403
+    --- FAIL: TestRelayRequestBoundaries/operation-outlives-first-proof (0.01s)
+        server_test.go:234: status 403
+--- FAIL: TestRelayCancellationClosesActiveRequests (1.00s)
+    server_test.go:281: operation did not start
+--- FAIL: TestRelayTLSProfileAndConnectionLimit (0.12s)
+    server_test.go:359: resumed session or failed request
+FAIL
+FAIL	asservat.local/asservat/internal/transport/ownerrelay	1.260s
+ok  	asservat.local/asservat/internal/application/evidence	1.057s
+ok  	asservat.local/asservat/internal/application/fleet	1.013s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.860s
+FAIL

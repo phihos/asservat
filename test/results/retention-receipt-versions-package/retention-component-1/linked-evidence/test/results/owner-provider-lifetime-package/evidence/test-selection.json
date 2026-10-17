@@ -1,0 +1,34 @@
+{
+  "top_level_passes": 25,
+  "passed": [
+    "TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor",
+    "TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation",
+    "TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority",
+    "TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd",
+    "TestOwnerProviderUnverifiedJWTOnlyShortensReauthenticationScheduling",
+    "TestOwnerProviderControlCannotInheritTLSBypassHooks",
+    "TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential",
+    "TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure",
+    "TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure",
+    "TestOwnerProviderLeaseExpiresDuringActualTLSBody",
+    "TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins",
+    "TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd",
+    "TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential",
+    "TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline",
+    "TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup",
+    "TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken",
+    "TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication",
+    "TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow",
+    "TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath",
+    "TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned",
+    "TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining",
+    "TestOwnerProviderRecipeHasOnlyFourSeparatedEffects",
+    "TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope",
+    "TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration",
+    "TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes"
+  ],
+  "skipped": [
+    "TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao"
+  ],
+  "result_sha256": "380dedf5516e745bfc0f4aa8ecf4fb5ef47b1e1b9cd4e0c6ad4a482ffe9eb745"
+}

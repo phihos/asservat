@@ -1,0 +1,122 @@
+{
+  "runnerSHA256": "78099d38c685540cb00692b7ea0d7eadc9e99c0c3b248267cd7cecfcbe0b1dff",
+  "steps": [
+    {
+      "name": "regression",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(TestContextStreamWorkLeaseFitsOriginalRateBudget)$",
+        "./internal/transport/contextstart"
+      ],
+      "pid": 1816046,
+      "processGroup": 1816046,
+      "exit": 1,
+      "seconds": 5.705,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/transport/contextstart",
+          "TestContextStreamWorkLeaseFitsOriginalRateBudget"
+        ]
+      ],
+      "requiredTopLevelTests": 1,
+      "missingPackagePasses": [
+        "asservat.local/asservat/internal/transport/contextstart"
+      ],
+      "missingRequiredTests": [
+        [
+          "asservat.local/asservat/internal/transport/contextstart",
+          "TestContextStreamWorkLeaseFitsOriginalRateBudget"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": false,
+      "observedTopLevelRuns": [
+        [
+          "asservat.local/asservat/internal/transport/contextstart",
+          "TestContextStreamWorkLeaseFitsOriginalRateBudget",
+          1
+        ]
+      ],
+      "observedTopLevelPasses": [],
+      "passedNamedTests": [],
+      "failuresOrSkips": [
+        {
+          "Time": "2026-10-14T06:54:37.653852624+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/contextstart",
+          "Test": "TestContextStreamWorkLeaseFitsOriginalRateBudget/exact-observation-count",
+          "Elapsed": 0
+        },
+        {
+          "Time": "2026-10-14T06:54:42.604423921+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/contextstart",
+          "Test": "TestContextStreamWorkLeaseFitsOriginalRateBudget/original-five-seconds-standard-20-20",
+          "Elapsed": 4.95
+        },
+        {
+          "Time": "2026-10-14T06:54:42.604495581+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/contextstart",
+          "Test": "TestContextStreamWorkLeaseFitsOriginalRateBudget",
+          "Elapsed": 4.95
+        },
+        {
+          "Time": "2026-10-14T06:54:42.605743056+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/contextstart",
+          "Elapsed": 4.976
+        }
+      ]
+    }
+  ],
+  "sourceCount": 3098,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "failed",
+  "reviewedPayloads": {
+    "internal/transport/contextstart/stream.go": "18c811ce3d377d4a9a9f17e29433e58e21ee9c971de182e5c0224eb1f819d00f",
+    "internal/transport/contextstart/conversation.go": "1bfa024e8e0318f773b878de45086d8714ce1899c2d84172f2f0bb896095e5cc",
+    "internal/transport/contextstart/diagnostic.go": "b3905e70a5f0955aee8a3710e8808dd8b22f160670fb6fa7619c7c4e148b9227",
+    "internal/adapters/mtls/context_start_client.go": "e44f0ae8937a8729272cea2c3a4ab5beb84ba05a0287f4875cbb721020125716",
+    "internal/adapters/kubernetes/api_execution_identity.go": "28aee38c23b7c2f23085bd5406ba642936d39d16e8b211102022e63692323bb9",
+    "internal/adapters/kubernetes/permissions.go": "dd56b869a7a2d9a1b710455e9c86c9ea47559b7bb1bdc460111d18f4e20118e4",
+    "internal/application/execution/api_context.go": "4d1fd30f550451198ead6e17fdb40f62b86f35d963cb6996b74ac190b7a0b256",
+    "internal/transport/contextstart/frame_lease_budget_test.go": "2f7f25b0595224b1459fdf75c590b4ba43b7164c2ba2ffce1eaacf485d0f90c1"
+  },
+  "selections": {
+    "regression": [
+      "./internal/transport/contextstart",
+      "^(TestContextStreamWorkLeaseFitsOriginalRateBudget)$"
+    ]
+  },
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "9e62e9ad221bbb277da8c536a0d3a4a681595e2994cc691789d85dc6cdc68949",
+    "runner.py": "78099d38c685540cb00692b7ea0d7eadc9e99c0c3b248267cd7cecfcbe0b1dff",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "regression.log": "87b065c2b2a3f26f21aee0a4cbd81d0c6cb8c434cc0721ba7216d1beb361a506",
+    "payloads/internal/application/execution/api_context.go.txt": "4d1fd30f550451198ead6e17fdb40f62b86f35d963cb6996b74ac190b7a0b256",
+    "payloads/internal/adapters/mtls/context_start_client.go.txt": "e44f0ae8937a8729272cea2c3a4ab5beb84ba05a0287f4875cbb721020125716",
+    "payloads/internal/adapters/kubernetes/api_execution_identity.go.txt": "28aee38c23b7c2f23085bd5406ba642936d39d16e8b211102022e63692323bb9",
+    "payloads/internal/adapters/kubernetes/permissions.go.txt": "dd56b869a7a2d9a1b710455e9c86c9ea47559b7bb1bdc460111d18f4e20118e4",
+    "payloads/internal/transport/contextstart/stream.go.txt": "18c811ce3d377d4a9a9f17e29433e58e21ee9c971de182e5c0224eb1f819d00f",
+    "payloads/internal/transport/contextstart/conversation.go.txt": "1bfa024e8e0318f773b878de45086d8714ce1899c2d84172f2f0bb896095e5cc",
+    "payloads/internal/transport/contextstart/diagnostic.go.txt": "b3905e70a5f0955aee8a3710e8808dd8b22f160670fb6fa7619c7c4e148b9227",
+    "payloads/internal/transport/contextstart/frame_lease_budget_test.go.txt": "2f7f25b0595224b1459fdf75c590b4ba43b7164c2ba2ffce1eaacf485d0f90c1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "scope": "fixture-only: match existing FleetObservation view row-lock privilege; no production changes",
+  "files": [
+    {
+      "path": "test/integration/capacity_sql_fixture_test.go",
+      "base_sha256": "8e99a4654b75c537be2219f40673f5c21166cf599f3799490b09f621f8044374",
+      "payload_sha256": "468db31625e30e67d5576f19b38cf541fcc85c0c165be776c2ff10a892fc270e"
+    }
+  ]
+}

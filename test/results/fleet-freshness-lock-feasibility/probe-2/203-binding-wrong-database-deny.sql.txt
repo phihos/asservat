@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+SELECT json_build_object('suspended',suspended,'blocked',recovery_blocked,'nonnull',observed_at IS NOT NULL AND fresh_until IS NOT NULL,'invalidDates',observed_at=fresh_until,'admitted',NOT suspended AND NOT recovery_blocked AND observed_at<=clock_timestamp() AND clock_timestamp()<fresh_until) FROM public.fleet_current_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR SHARE;

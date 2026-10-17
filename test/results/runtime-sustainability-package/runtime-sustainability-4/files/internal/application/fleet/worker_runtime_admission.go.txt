@@ -1,0 +1,231 @@
+package fleet
+
+import (
+	"context"
+	"sync"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// WorkerRuntimeAdmission only schedules the five fixed expensive worker2
+// operations. A ticket supplies no native/SQL/provider proof or new deadline.
+// Independent fleet and owner source observers never enter this queue.
+type WorkerRuntimeAdmission struct {
+	mu          sync.Mutex
+	self        *WorkerRuntimeAdmission
+	root        context.Context
+	closeOnce   sync.Once
+	closed      bool
+	active      *workerRuntimeTicket
+	queue       []*workerRuntimeTicket
+	slots       [5]*workerRuntimeTicket
+	changed     chan struct{}
+	stop        func() bool
+	done        chan struct{}
+	fleetKnown  *value.Administration
+	fleetNotice *value.Administration
+}
+
+type workerRuntimePurpose uint8
+
+const (
+	workerWrapRefresh workerRuntimePurpose = iota
+	workerUnwrapRefresh
+	workerOwnerAuditPurpose
+	workerCapacity
+	workerCleanup
+)
+
+type workerRuntimeTicket struct {
+	purpose         workerRuntimePurpose
+	ctx             context.Context
+	cancel          context.CancelFunc
+	ready           chan struct{}
+	granted         bool
+	schedulingUntil time.Time
+	grantedAt       time.Time
+	scheduled       bool
+	ownerAuditTaken bool
+}
+
+// A lease is only admitted process work. Native and SQL effects must establish
+// their own original authority after admission, or retain an already-selected
+// caller/source deadline while waiting. Copies cannot release the original.
+type WorkerRuntimeAdmissionLease struct {
+	self   *WorkerRuntimeAdmissionLease
+	owner  *WorkerRuntimeAdmission
+	ticket *workerRuntimeTicket
+	once   sync.Once
+}
+
+func NewWorkerRuntimeAdmission(ctx context.Context) (*WorkerRuntimeAdmission, error) {
+	if ctx == nil || ctx.Err() != nil {
+		return nil, value.ErrUnavailable
+	}
+	s := &WorkerRuntimeAdmission{root: ctx, changed: make(chan struct{}), done: make(chan struct{})}
+	s.self = s
+	s.stop = context.AfterFunc(ctx, func() { s.closeAdmission(); close(s.done) })
+	return s, nil
+}
+
+func (s *WorkerRuntimeAdmission) WaitWrapRefresh(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
+	return s.wait(ctx, workerWrapRefresh)
+}
+func (s *WorkerRuntimeAdmission) WaitUnwrapRefresh(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
+	return s.wait(ctx, workerUnwrapRefresh)
+}
+func (s *WorkerRuntimeAdmission) WaitOwnerAudit(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
+	return s.wait(ctx, workerOwnerAuditPurpose)
+}
+func (s *WorkerRuntimeAdmission) WaitCapacity(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
+	return s.wait(ctx, workerCapacity)
+}
+func (s *WorkerRuntimeAdmission) WaitCleanup(ctx context.Context) (*WorkerRuntimeAdmissionLease, error) {
+	return s.wait(ctx, workerCleanup)
+}
+
+func (s *WorkerRuntimeAdmission) signalLocked() {
+	close(s.changed)
+	s.changed = make(chan struct{})
+}
+
+// Only the single finite slot for this purpose may wait or execute. Later
+// callers cannot bypass another live ticket, including one that is closing.
+func (s *WorkerRuntimeAdmission) wait(ctx context.Context, purpose workerRuntimePurpose) (*WorkerRuntimeAdmissionLease, error) {
+	if s == nil || s.self != s || s.root == nil || ctx == nil || ctx.Err() != nil || int(purpose) >= len(s.slots) {
+		return nil, value.ErrUnavailable
+	}
+	schedulingUntil := time.Now().Add(5 * time.Second)
+	s.mu.Lock()
+	if s.closed || s.root.Err() != nil || ctx.Err() != nil || !time.Now().Before(schedulingUntil) || s.slots[purpose] != nil {
+		s.mu.Unlock()
+		return nil, value.ErrUnavailable
+	}
+	call, cancel := context.WithCancel(ctx)
+	t := &workerRuntimeTicket{purpose: purpose, ctx: call, cancel: cancel, ready: make(chan struct{}), schedulingUntil: schedulingUntil}
+	s.slots[purpose] = t
+	s.queue = append(s.queue, t)
+	s.dispatchLocked()
+	s.signalLocked()
+	s.mu.Unlock()
+	timer := time.NewTimer(time.Until(t.schedulingUntil))
+	defer timer.Stop()
+	select {
+	case <-call.Done():
+	case <-t.ready:
+	case <-timer.C:
+	}
+	s.mu.Lock()
+	if s.closed || s.root.Err() != nil || call.Err() != nil || !time.Now().Before(t.schedulingUntil) || !t.granted || s.active != t {
+		// No admitted operation escaped this wait. Cancellation racing dispatch
+		// may remove its reserved slot immediately; active returned leases cannot.
+		s.removeLocked(t)
+		s.dispatchLocked()
+		s.signalLocked()
+		s.mu.Unlock()
+		return nil, value.ErrUnavailable
+	}
+	p := &WorkerRuntimeAdmissionLease{owner: s, ticket: t}
+	p.self = p
+	s.mu.Unlock()
+	return p, nil
+}
+
+func (s *WorkerRuntimeAdmission) removeLocked(t *workerRuntimeTicket) {
+	t.cancel()
+	if s.active == t {
+		s.active = nil
+	}
+	if s.slots[t.purpose] == t {
+		s.slots[t.purpose] = nil
+	}
+	for i, queued := range s.queue {
+		if queued == t {
+			copy(s.queue[i:], s.queue[i+1:])
+			s.queue[len(s.queue)-1] = nil
+			s.queue = s.queue[:len(s.queue)-1]
+			break
+		}
+	}
+}
+
+func (s *WorkerRuntimeAdmission) dispatchLocked() {
+	if s.closed || s.root.Err() != nil || s.active != nil {
+		return
+	}
+	for len(s.queue) != 0 {
+		next := s.queue[0]
+		copy(s.queue, s.queue[1:])
+		s.queue[len(s.queue)-1] = nil
+		s.queue = s.queue[:len(s.queue)-1]
+		if next.ctx.Err() != nil {
+			s.removeLocked(next)
+			continue
+		}
+		s.active, next.granted, next.grantedAt = next, true, time.Now()
+		close(next.ready)
+		return
+	}
+}
+
+func (p *WorkerRuntimeAdmissionLease) Context() context.Context {
+	if p == nil || p.self != p {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		return ctx
+	}
+	p.owner.mu.Lock()
+	defer p.owner.mu.Unlock()
+	return context.WithValue(p.ticket.ctx, workerRuntimeLeaseKey{}, p)
+}
+
+// Release belongs after all actual child work joins, never on a timer. The
+// enclosing native/provider operation still owns its independent close rules.
+func (p *WorkerRuntimeAdmissionLease) Release() {
+	if p == nil || p.self != p {
+		return
+	}
+	p.once.Do(func() {
+		s := p.owner
+		s.mu.Lock()
+		s.removeLocked(p.ticket)
+		s.dispatchLocked()
+		s.signalLocked()
+		s.mu.Unlock()
+	})
+}
+
+func (s *WorkerRuntimeAdmission) closeAdmission() {
+	s.mu.Lock()
+	s.closed = true
+	for _, t := range s.slots {
+		if t != nil {
+			t.cancel()
+		}
+	}
+	s.signalLocked()
+	s.mu.Unlock()
+}
+
+// Close cancels waiters and active work, then joins every returned lease. A
+// cancelled active operation retains its slot until its real owner releases it.
+func (s *WorkerRuntimeAdmission) Close() {
+	if s == nil || s.self != s || s.root == nil {
+		return
+	}
+	s.closeOnce.Do(func() {
+		s.closeAdmission()
+		if !s.stop() {
+			<-s.done
+		}
+		s.mu.Lock()
+		for s.active != nil || len(s.queue) != 0 {
+			changed := s.changed
+			s.mu.Unlock()
+			<-changed
+			s.mu.Lock()
+		}
+		s.mu.Unlock()
+	})
+}

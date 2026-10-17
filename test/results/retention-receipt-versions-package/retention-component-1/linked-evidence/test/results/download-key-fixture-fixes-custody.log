@@ -1,0 +1,10 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-key-retention-shortened
+--- PASS: TestContextAdmissionWithRealServices (1.43s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-retention-shortened (1.12s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expired-source
+--- PASS: TestPermissionAuthorityPoliciesWithRealServices (0.41s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expired-source (0.40s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.897s

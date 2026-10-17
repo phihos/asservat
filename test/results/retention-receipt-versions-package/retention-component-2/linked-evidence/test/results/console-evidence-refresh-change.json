@@ -1,0 +1,7 @@
+{
+  "file": "web/tests/evidence-journey.mjs",
+  "base": "a1a62d79465e395527af15252632acade713ba82e5f4d259a36cc95c9e9752e0",
+  "new": "7e0cef670135a649ef67b426516599c9ce703d2f017b71136025749b38ebc713",
+  "failure": "console-restart-integrated-browser.log",
+  "scope": "First navigation response and actual rendered evidence remain asserted; complete wire is inspected on explicit same-page refresh rather than a discarded navigation CDP body."
+}

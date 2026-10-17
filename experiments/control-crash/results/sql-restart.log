@@ -1,0 +1,5 @@
+=== RUN   TestAfterRestartDurability
+    admission_test.go:527: single-primary abrupt restart preserved acknowledged denial and uncertain charge; not HA/failover/PITR proof
+--- PASS: TestAfterRestartDurability (0.00s)
+PASS
+ok  	asservat.local/experiments/control-crash	0.007s

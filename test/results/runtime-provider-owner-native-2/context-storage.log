@@ -1,0 +1,32 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:260: original activation a97f3535-5a61-487b-a5cb-e36a242f6027 image docker.io/library/asservat-context-worker@sha256:bb0460ed322874cee5a28a28be75dc15fffdf42755a3d521b72dcdf78442931c exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity
+    initial_bootstrap_chain_test.go:343: actual source-bound IAM, version-pinned read/write and delete/cross-prefix/versioning denial for original source 9b746899-1148-4087-83b7-5defa7fbdf96; complete runtime copy accounting remains unqualified
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-three-role-provision elapsed=16.884440653s calls[C B H S W T]=[0 0 0 345 33 66] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:343: actual configuration role provisioning elapsed=16.884490984s
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-provider-pair-complete-inputs elapsed=7.646586433s calls[C B H S W T]=[54 52 28 153 12 24] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:343: actual provider/bridge/SQL worker input driver elapsed=7.646639053s progress=2
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-provider-worker-complete-launch elapsed=7.682109621s calls[C B H S W T]=[54 52 28 155 12 24] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:343: original worker deployment=d73b9ac1-1efb-4a11-9905-519ee5e48ed1 replicaSet=9ba4318d-aa55-40a2-a247-ee68fbda70f5 pod=de61a918-0572-46e7-a2a8-98d2a5cac3a5 imageID=docker.io/library/asservat-context-worker@sha256:bb0460ed322874cee5a28a28be75dc15fffdf42755a3d521b72dcdf78442931c template=3fa02fb362e0258ff0331748ae49b812f9c7044c1438080cfdad1c453f5ab749
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T22:02:47.412778+02:00 until=2026-10-13T22:02:52.412767+02:00 remaining=4.041001642s
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T22:02:48.864716+02:00 until=2026-10-13T22:02:52.686708+02:00 remaining=3.515242639s
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T22:02:49.879788+02:00 until=2026-10-13T22:02:54.136494+02:00 remaining=3.965250847s
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-owner-root-constructor elapsed=1.616991796s calls[C B H S W T]=[24 26 14 52 8 18] original 20QPS/burst20 clients retained
+    initial_runtime_owner_continuation_native_test.go:227: native original-deadline phase=actual-owner-root-constructor calls=[24 26 14 52 8 18] missing=[0 0 0 0 0 0] expired-at-return=[0 0 0 0 0 0] minimum-before[C B H S W T]=[3.900932521s 3.940343752s 3.945190325s 2.705681025s 2.702601721s 2.699797228s] minimum-after=[3.900155687s 3.939559129s 3.943789968s 2.704775201s 2.701936817s 2.699305085s]; no deadline created or renewed
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-owner-sql-constructor elapsed=18.393455ms calls[C B H S W T]=[0 0 0 0 0 0] original 20QPS/burst20 clients retained
+    initial_runtime_owner_continuation_native_test.go:227: native original-deadline phase=actual-owner-sql-constructor calls=[0 0 0 0 0 0] missing=[0 0 0 0 0 0] expired-at-return=[0 0 0 0 0 0] minimum-before[C B H S W T]=[0s 0s 0s 0s 0s 0s] minimum-after=[0s 0s 0s 0s 0s 0s]; no deadline created or renewed
+    initial_runtime_provider_pair_native_test.go:514: native phase=actual-owner-original-selection elapsed=6.539699481s calls[C B H S W T]=[60 65 35 131 20 45] original 20QPS/burst20 clients retained
+    initial_runtime_owner_continuation_native_test.go:227: native original-deadline phase=actual-owner-original-selection calls=[60 65 35 131 20 45] missing=[0 0 0 0 0 0] expired-at-return=[0 0 0 0 0 0] minimum-before[C B H S W T]=[1.518459186s 1.557317905s 1.561948956s 327.839189ms 324.839075ms 321.817451ms] minimum-after=[1.517590793s 1.556483331s 1.56046543s 326.915405ms 324.079722ms 321.255369ms]; no deadline created or renewed
+    initial_bootstrap_chain_test.go:343: original owner selection not acknowledged permission configuration unavailable stopped original-result-unverified
+    initial_runtime_provider_pair_native_test.go:514: native phase=complete-native-provider-pair elapsed=2m14.231229984s calls[C B H S W T]=[1444 1692 909 1166 118 249] original 20QPS/burst20 clients retained
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:365: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (433.16s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (20.80s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity (135.91s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	433.214s
+FAIL

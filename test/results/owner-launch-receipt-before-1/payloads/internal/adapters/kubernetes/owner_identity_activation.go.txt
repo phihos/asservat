@@ -1,0 +1,158 @@
+package kubernetes
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+const ownerIdentityProjectionMarker = "asservat.io/owner-identity-projection"
+const ownerIdentityLaunchMarker = "asservat.io/owner-identity-launch"
+
+func ownerIdentityDigestValid(v string) bool {
+	return preparationDigestValid(v) && v != strings.Repeat("0", 64)
+}
+
+func ownerIdentityMicrotime(t time.Time) bool {
+	return t.Year() >= 2020 && t.Equal(t.Truncate(time.Microsecond))
+}
+
+func ownerIdentityInterval(start, until, first, last, now time.Time) bool {
+	return ownerIdentityMicrotime(start) && ownerIdentityMicrotime(until) && !start.Before(first) && !start.After(now) && until.After(start) && until.Sub(start) <= 5*time.Second && !until.After(last)
+}
+
+// This validates historical shape only. Current native enforcement, original
+// journal UID, actual mounted objects and SQL credential checks remain separate.
+func OwnerIdentityActivationBound(input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation) bool {
+	v := a.Input
+	if input.Format != contracts.OwnerDeploymentFormat || !installationRefValid(v.Namespace.Name, v.Namespace.UID) || v.Format != contracts.OwnerIdentityRolesFormat || !ownerProviderActivationSelectionBound(input, a) || v.InstallationID != input.InstallationID || v.ClusterID != input.ClusterID || v.Namespace != input.Namespace || v.OwnerConfigurationUID != input.ConfigurationUID || !ownerIdentityDigestValid(v.ResourceBinding) || !ownerIdentityDigestValid(v.LayoutDigest) || !ownerIdentityMicrotime(a.ResourcesCreatedAt) || a.ResourcesCreatedAt.After(time.Now()) || a.ResourcesUntil.Sub(a.ResourcesCreatedAt) != 30*time.Minute {
+		return false
+	}
+	for _, id := range []string{v.InstallationID, v.InitialClaimID, v.ClusterID, v.Namespace.UID, v.OwnerConfigurationUID, v.ResourceSetupID, a.RoleSetupID} {
+		if !authorization.UUID(id) {
+			return false
+		}
+	}
+	n := runtimeResourceNames(v.InstallationID)
+	seen := map[string]bool{}
+	for _, x := range []struct {
+		got  contracts.WorkerObjectReference
+		name string
+	}{
+		{v.Resources, "asservat-runtime-resources-" + strings.ReplaceAll(v.InstallationID, "-", "")},
+		{a.RoleRoot, "asservat-owner-identity-roles-" + strings.ReplaceAll(v.InstallationID, "-", "")},
+		{v.Deployment, n.Owner}, {v.ServiceAccount, n.Owner},
+	} {
+		if x.got.Name != x.name || !authorization.UUID(x.got.UID) || seen[x.got.UID] {
+			return false
+		}
+		seen[x.got.UID] = true
+	}
+	return true
+}
+
+func ownerIdentityResourceStateValid(v contracts.InitialRuntimeResourceState, now time.Time) bool {
+	p, l := v.OwnerIdentity, v.OwnerLaunch
+	if p == nil {
+		return l == nil
+	}
+	if v.OwnerLayout == "" || !initialRuntimeLayoutStateValid(v) || len(v.Objects) != contracts.InitialRuntimeResourceCount || !authorization.UUID(p.OperationID) || !ownerIdentityDigestValid(p.PublicDigest) || !installationRefValid(p.RoleRoot.Name, p.RoleRoot.UID) || !authorization.UUID(p.RoleRoot.UID) || !authorization.UUID(p.RoleSetupID) || !ownerIdentityInterval(p.ClaimedAt, p.Until, v.CreatedAt, v.Until, now) {
+		return false
+	}
+	ids := map[string]bool{v.SetupID: true}
+	uids := map[string]bool{}
+	for _, o := range v.Objects {
+		if o.Receipt == nil || !authorization.UUID(o.OperationID) || ids[o.OperationID] || !authorization.UUID(o.Receipt.UID) || uids[o.Receipt.UID] {
+			return false
+		}
+		ids[o.OperationID], uids[o.Receipt.UID] = true, true
+	}
+	// Worker projection siblings may share their paired-root setup, but none of
+	// their claims, setup identities or positive objects belongs to the owner.
+	if c := v.CapacityProjection; c != nil {
+		ids[c.OperationID], ids[c.Setup.OperationID], ids[c.Setup.RoleSetupID] = true, true, true
+		uids[c.Setup.RoleRootUID] = true
+		if c.Receipt != nil {
+			uids[c.Receipt.Secret.UID] = true
+		}
+	}
+	if c := v.CleanupProjection; c != nil {
+		ids[c.OperationID], ids[c.Setup.OperationID], ids[c.Setup.RoleSetupID] = true, true, true
+		uids[c.Setup.RoleRootUID] = true
+		if c.Receipt != nil {
+			uids[c.Receipt.Secret.UID] = true
+		}
+	}
+	if ids[p.OperationID] || ids[p.RoleSetupID] || p.RoleSetupID == p.OperationID || uids[p.RoleRoot.UID] {
+		return false
+	}
+	ids[p.OperationID], ids[p.RoleSetupID], uids[p.RoleRoot.UID] = true, true, true
+	// Fixed order, independent one-use CREATE claims. An expired child remains
+	// representable for exact result lookup; it cannot be reused to CREATE.
+	previous := p.ClaimedAt
+	for i, child := range []*contracts.OwnerIdentityObjectAttempt{p.Credentials, p.Configuration} {
+		if child == nil {
+			if i == 0 && p.Configuration != nil || p.Receipt != nil || l != nil {
+				return false
+			}
+			break
+		}
+		if i == 1 && p.Credentials.Receipt == nil {
+			return false
+		}
+		if !authorization.UUID(child.OperationID) || ids[child.OperationID] || !ownerIdentityInterval(child.ClaimedAt, child.Until, previous, v.Until, now) {
+			return false
+		}
+		ids[child.OperationID] = true
+		if r := child.Receipt; r != nil {
+			if !installationRefValid(r.Object.Name, r.Object.UID) || !authorization.UUID(r.Object.UID) || uids[r.Object.UID] || !identity.Text(r.ResourceVersion, 128) || !ownerIdentityMicrotime(r.ObservedAt) || r.ObservedAt.Before(child.ClaimedAt) || r.ObservedAt.After(now) || !r.ObservedAt.Before(v.Until) {
+				return false
+			}
+			uids[r.Object.UID] = true
+			previous = r.ObservedAt
+		} else if p.Receipt != nil || l != nil {
+			return false
+		}
+	}
+	if r := p.Receipt; r != nil {
+		if p.Credentials == nil || p.Credentials.Receipt == nil || p.Configuration == nil || p.Configuration.Receipt == nil || !ownerIdentityMicrotime(r.ObservedAt) || r.ObservedAt.Before(previous) || r.ObservedAt.After(now) || !r.ObservedAt.Before(v.Until) || r.Credentials != p.Credentials.Receipt.Object || r.CredentialsResourceVersion != p.Credentials.Receipt.ResourceVersion || r.Configuration != p.Configuration.Receipt.Object || r.ConfigurationResourceVersion != p.Configuration.Receipt.ResourceVersion {
+			return false
+		}
+	}
+
+	if l == nil {
+		return true
+	}
+	if p.Receipt == nil || !authorization.UUID(l.OperationID) || ids[l.OperationID] || l.ProjectionOperationID != p.OperationID || !identity.Text(l.InertResourceVersion, 128) || !ownerIdentityDigestValid(l.InertDigest) || !ownerIdentityDigestValid(l.RunningDigest) || l.InertDigest == l.RunningDigest || !ownerIdentityInterval(l.ClaimedAt, l.Until, p.Receipt.ObservedAt, v.Until, now) {
+		return false
+	}
+	if r := l.Receipt; r != nil {
+		if !identity.Text(r.ResourceVersion, 128) || r.ResourceVersion == l.InertResourceVersion || r.Generation != 2 || !ownerIdentityMicrotime(r.ObservedAt) || r.ObservedAt.Before(l.ClaimedAt) || r.ObservedAt.After(now) || r.ObservedAt.After(v.Until) {
+			return false
+		}
+	}
+	return true
+}
+
+// Only public, immutable inputs enter this digest. It is neither a password
+// verifier nor an authority certificate.
+func ownerIdentityPublicDigest(in contracts.OwnerDeployment, m contracts.OwnerIdentityCredentialManifest) (string, error) {
+	b, e := json.Marshal(struct {
+		Input    contracts.OwnerDeployment
+		Manifest contracts.OwnerIdentityCredentialManifest
+	}{in, m})
+	if e != nil || len(b) > contracts.OwnerDeploymentMaxBytes+contracts.OwnerIdentityRoleMaxBytes {
+		return "", cfg.ErrInvalid
+	}
+	h := sha256.New()
+	h.Write([]byte("asservat-owner-identity-projection/v1\x00"))
+	h.Write(b)
+	return hex.EncodeToString(h.Sum(nil)), nil
+}

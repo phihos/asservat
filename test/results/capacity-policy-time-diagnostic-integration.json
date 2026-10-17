@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "scope": "fixture-only actual managed capture policy typed-wire equality diagnostic before new request",
+    "files": [
+      {
+        "path": "test/integration/capacity_context_test.go",
+        "base_sha256": "aab8c427de9b35877663cef73a13ed159cbbb14bd664a8c35f5e6217a6935e9b",
+        "payload_sha256": "7d5d847c6e5da7336c915d54e9a339820f29bbcd103dcefe19fcf5f8cad596ea"
+      }
+    ]
+  },
+  "dependencies": 3225,
+  "scope": "Actual policy round-trip diagnostic before new request; no production change"
+}

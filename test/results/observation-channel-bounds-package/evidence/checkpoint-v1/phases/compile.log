@@ -1,0 +1,6 @@
+# asservat.local/asservat/internal/adapters/mtls
+../../.cache/asservat-build/planning/regional-observation-channel-bounds-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_operation_channel.go:252:26: cannot use 1st function result (value of interface type context.Context) as "asservat.local/asservat/internal/domain/fleet".APIContextOwnerCandidates value in multiple assignment
+../../.cache/asservat-build/planning/regional-observation-channel-bounds-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_operation_channel.go:254:125: cannot use current (variable of struct type "asservat.local/asservat/internal/domain/fleet".APIContextOwnerCandidates) as context.Context value in argument to c.producer.credentials.observationKeysCurrent: "asservat.local/asservat/internal/domain/fleet".APIContextOwnerCandidates does not implement context.Context (missing method Deadline)
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL	asservat.local/asservat/internal/bootstrap [build failed]
+FAIL

@@ -1,0 +1,19 @@
+=== RUN   TestScopedVersionedAuditStorageWithRealServices
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/scoped-concurrent-encrypted-audit
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-latest-replacement-preserves-committed-version
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/configuration
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/owner
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/separate-prefix-and-anonymous-denial
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/independent-complete-version-retirement
+    scoped_audit_storage_test.go:287: retired 5 versions including 1 null copy and 1 marker from 4 bounded inventory pages
+--- PASS: TestScopedVersionedAuditStorageWithRealServices (2.15s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/scoped-concurrent-encrypted-audit (2.04s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-latest-replacement-preserves-committed-version (0.01s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure (0.01s)
+        --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/configuration (0.01s)
+        --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/owner (0.01s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/separate-prefix-and-anonymous-denial (0.02s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/independent-complete-version-retirement (0.03s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.206s

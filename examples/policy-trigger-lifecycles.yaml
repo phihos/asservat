@@ -1,0 +1,64 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: trigger-lifecycles
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: api
+      uid: workload-api-uid
+    maxPods: 1
+    selection: triggeringPod
+    adoption: pinUID
+  detectors:
+  - id: panic-log
+    kind: log
+    options:
+      stream: stderr
+      pattern: panic|fatal error|connection reset
+      match: regexp
+      maxRecordBytes: 65536
+  - id: memory-high
+    kind: resource
+    options:
+      metric: memoryLimitRatio
+      operator: gte
+      threshold: 0.85
+      sampleInterval: 5s
+  - id: probe-failed
+    kind: probe
+    options:
+      probeType: Liveness
+      minimumFailures: 1
+      window: 30s
+      source: auto
+  when:
+    any:
+    - detector: panic-log
+    - for:
+        expression:
+          detector: memory-high
+        duration: 20s
+    - detector: probe-failed
+  recipeRef:
+    name: trigger-lifecycles
+    digest: 8c1632a5cbda6ea3e7d67b8630d4a7538fcf0e0fea67e12ff5b861742488ea73
+  budgets:
+    cooldown: 5m
+    burst: 2
+    maxOccurrencesPerHour: 12
+    maxConcurrentActions: 3
+  retention: 72h
+  suspended: false
+  observation:
+    mode: allAuthorized
+  evaluation:
+    scope: pod
+    fireOnActivation: true
+    rearmFor: 10s
+  recordingSaves:
+    enabled: true

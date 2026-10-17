@@ -1,0 +1,199 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/reject-missing-version-before-initial-audit-ack
+=== RUN   TestInitialInstallationWithRealServices/reject-null-version-before-initial-audit-ack
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-reader-role-is-select-only
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-denial-before-sql
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-final-check-keeps-original-bound
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-blocked-sql-keeps-original-bound
+=== RUN   TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt
+=== RUN   TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt
+=== RUN   TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark
+=== RUN   TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies
+=== RUN   TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql
+=== RUN   TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny
+=== RUN   TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies
+=== RUN   TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait
+=== RUN   TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-preview-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-resolution-generated-role-effects
+=== NAME  TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+    initial_installation_test.go:558: actual SQL role creation/SCRAM/privilege matrix passed; Secret root CAS and protected configuration facts were explicit synthetic test inputs
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-matrix
+    initial_installation_test.go:577: actual fixed configuration SQL credentials preserve current recovery and leave owner acceptance absent; protected source/Secret facts synthetic
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-expired-observation
+    initial_installation_test.go:577: actual fixed configuration SQL credentials preserve current recovery and leave owner acceptance absent; protected source/Secret facts synthetic
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-changed-source
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-source-after-lock
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-source-rollback
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-source-mutation
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-reconcile
+    initial_installation_test.go:577: actual three-role source/audit/read graph completed within original five seconds: 36.892351ms; protected source/Secret facts synthetic
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-source-expired
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-lock-expired
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-recovery
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-current-generation
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-matrix
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-missing-role
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-ambient
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-changed-source
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-held-lock
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-recovery-after-lock
+    initial_installation_test.go:577: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-matrix
+    initial_installation_test.go:588: actual four-purpose owner SQL role creation/SCRAM/privilege matrix passed; inert resource journal, Secret root CAS, accepted owner source and native guard remain explicitly synthetic inputs
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-runtime-administrator-denied
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-lost-completion
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-root-after-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-verification-root-after-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source
+    initial_installation_test.go:588: actual constructor refused original unavailable fleet source without role effects; no authority retry or deadline change
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention
+    initial_installation_test.go:588: actual constructor refused original unavailable fleet source without role effects; no authority retry or deadline change
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-changed
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-expired
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-unknown-commit
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-change
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-renewed
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-recovery
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-expired
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-generation
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-digest
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-issuer
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-after-lock
+    initial_installation_test.go:627: actual owner bridge wait edge: waiter=902 blocker=121
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-recovery-after-lock
+    initial_installation_test.go:627: actual owner bridge wait edge: waiter=904 blocker=121
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-expired-after-lock
+    initial_installation_test.go:627: actual owner bridge wait edge: waiter=905 blocker=121
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-caller-expired-after-lock
+    initial_installation_test.go:627: actual owner bridge wait edge: waiter=908 blocker=121
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current-end
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-late-callback
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-concurrent-observers
+    initial_runtime_bridge_sql_test.go:663: actual restrictive source wait edge: waiter=917 blocker=913
+    initial_runtime_bridge_sql_test.go:663: actual restrictive fence wait edge: waiter=917 blocker=913
+=== RUN   TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement
+    initial_installation_test.go:630: non-superuser maintenance provisioned exact purpose roles with client-derived SCRAM; exact replay preserves password/expiry, wrong secrets and excess grants deny, retirement revokes existing/new sessions' authority
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:631: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (62.74s)
+    --- PASS: TestInitialInstallationWithRealServices/reject-missing-version-before-initial-audit-ack (0.35s)
+    --- PASS: TestInitialInstallationWithRealServices/reject-null-version-before-initial-audit-ack (0.04s)
+    --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block (0.48s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-reader-role-is-select-only (0.00s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-denial-before-sql (0.00s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-final-check-keeps-original-bound (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-blocked-sql-keeps-original-bound (0.25s)
+    --- PASS: TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt (0.17s)
+    --- PASS: TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark (0.06s)
+    --- PASS: TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql (0.03s)
+    --- PASS: TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny (0.02s)
+    --- PASS: TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies (0.05s)
+    --- PASS: TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write (0.00s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix (14.47s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-preview-generated-role-effects (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-resolution-generated-role-effects (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim (0.15s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion (10.07s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-held-lock (0.25s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock (0.14s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-matrix (0.37s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-expired-observation (5.39s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-unknown-claim (0.09s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-changed-source (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-held-lock (0.19s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-recovery-after-lock (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-source-after-lock (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-source-rollback (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-source-mutation (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-reconcile (0.41s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-source-expired (2.39s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-lock-expired (0.62s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-recovery (0.42s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-ack-current-generation (0.42s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-matrix (0.39s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-missing-role (0.31s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-ambient (0.32s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-changed-source (0.32s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-held-lock (0.48s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-recovery-after-lock (0.31s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-matrix (1.25s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-runtime-administrator-denied (0.12s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-unknown-claim (0.13s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-lost-completion (0.80s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-held-lock (0.24s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-recovery-after-lock (0.13s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-root-after-lock (0.13s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-verification-root-after-lock (0.39s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source (0.41s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention (1.20s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention (5.13s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-changed (2.12s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-expired (1.89s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-unknown-commit (0.15s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-change (1.12s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-renewed (1.12s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-recovery (1.14s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-expired (2.11s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock (0.21s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock (0.09s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback (0.18s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction (0.09s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-generation (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-digest (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-issuer (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-after-lock (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-recovery-after-lock (0.09s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-expired-after-lock (0.31s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-caller-expired-after-lock (0.31s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current-end (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-late-callback (0.28s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-concurrent-observers (0.44s)
+    --- PASS: TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement (0.66s)
+PASS
+ok  	asservat.local/asservat/test/integration	63.797s

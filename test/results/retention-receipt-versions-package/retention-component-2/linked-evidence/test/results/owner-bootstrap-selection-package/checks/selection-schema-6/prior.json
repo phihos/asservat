@@ -1,0 +1,14 @@
+{
+  "manifest_path": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/manifest.json",
+  "manifest_sha256": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+  "result_path": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/result.json",
+  "result_sha256": "2f2438495288b13cb4a769b8699bfe8f2c549d602fc74dfcb00ffe192fb0daf6",
+  "payload_deltas": [
+    {
+      "path": "specs/contracts/owner-bootstrap-selection.schema.json",
+      "before": "a92768b8f3b17495b3d71ebcb5061afa40c465ea9de5e0d11250ce988d758961",
+      "after": "21952c43241db5c894e24b54fc3033a7dbbb8e46137ac76ad144c712c74e128d"
+    }
+  ],
+  "schema_test_report_correction": "reported15 assertions corrected to14; assertions unchanged; no Go payload changes"
+}

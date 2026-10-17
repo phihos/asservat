@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/contracts	1.009s
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.450s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/internal/adapters/mtls	7.800s

@@ -1,0 +1,24 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-context-storage.py
+Creating owned synthetic cluster 1
+Fixture command failed: ERROR: failed to create cluster: 'asservat-context-0kqp9_d5-0' is not a valid cluster name, cluster names must match `^[a-z0-9.-]+$`
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 163, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 85, in main
+    run(["kind", "create", "cluster", "--name", name, "--image", NODE, "--kubeconfig", str(config), "--wait", "90s"])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 27, in run
+    return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['kind', 'create', 'cluster', '--name', 'asservat-context-0kqp9_d5-0', '--image', 'kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5', '--kubeconfig', '/home/phil/.cache/asservat-build/context-0kqp9_d5/kube-0', '--wait', '90s']' returned non-zero exit status 1.
+make: *** [Makefile:45: context-integration] Error 1

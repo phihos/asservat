@@ -1,0 +1,5 @@
+=== RUN   TestWorkerChannelRechecksExpiredServerAtRenewal
+2026/10/10 17:29:23 http: TLS handshake error from 127.0.0.1:35678: remote error: tls: bad certificate
+--- PASS: TestWorkerChannelRechecksExpiredServerAtRenewal (0.02s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.067s

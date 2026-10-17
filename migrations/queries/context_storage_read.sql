@@ -1,0 +1,20 @@
+-- name: ObserveContextStorage :one
+SELECT b.root_id,b.cluster_id,b.namespace_uid,b.workload_uid,b.allocation_id,
+ b.source_uid,b.source_generation,b.source_digest,b.observed_at,b.fresh_until,
+ LEAST(b.fresh_until,COALESCE(capacity_managed_admission_until(b.root_id,b.allocation_id,'context',clock_timestamp()),'-infinity'::timestamptz))::timestamptz AS capacity_until,
+ a.revision AS allocation_revision,a.valid_until AS allocation_valid_until,
+ a.paused AS allocation_paused,a.service_class,
+ p.store_id,p.revision AS pool_revision,p.valid_until AS pool_valid_until,
+ p.paused AS pool_paused,
+ cp.configured AS control_pool_configured,cp.paused AS control_pool_paused,cp.revision AS control_pool_revision,
+ cp.valid_until AS control_pool_until,cp.full_limit AS control_pool_full,cp.replay_limit AS control_pool_replay,
+ cp.backed_full,cp.backed_replay,
+ ca.configured AS control_account_configured,ca.paused AS control_account_paused,ca.revision AS control_account_revision,
+ ca.valid_until AS control_account_until,ca.full_limit AS control_account_full,ca.replay_limit AS control_account_replay,
+ ca.charged_full,ca.charged_replay
+FROM context_storage_binding b
+JOIN custody_allocation a ON a.id=b.allocation_id
+JOIN custody_pool p ON p.id=a.pool_id
+JOIN context_control_account ca ON ca.root_id=b.root_id AND ca.allocation_id=b.allocation_id
+JOIN context_control_pool cp ON cp.root_id=ca.root_id
+WHERE b.root_id=$1 AND b.cluster_id=$2 AND b.namespace_uid=$3 AND b.workload_uid=$4;

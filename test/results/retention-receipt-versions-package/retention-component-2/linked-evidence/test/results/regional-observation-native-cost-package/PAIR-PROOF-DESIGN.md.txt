@@ -1,0 +1,37 @@
+# Proposed next boundary after the native counterexample
+
+Source analysis only. No production change or new authority is implemented by this document. The first native receiver measurement remains pending.
+
+## What is duplicated
+
+One concrete receiver `CheckObservationRouting` composes two full owner authentications and two full installed-workload observations. Each authentication independently brackets a Ready route with two native guard proofs, while each installed-workload observation independently brackets two complete live chains with another two native guard proofs. Both owners belong to the same independently pinned pool, namespace, deployment and native guard. The resulting first pair has eight native guard proofs, four live workload chains and two overlapping endpoint chains: 94 observer requests and 24 probe requests before any holder lookup. The handler repeats that complete pair afterward.
+
+Current `OwnerAuthenticator.authenticate`, its public methods and current consumers must remain unchanged. The new route must not replace one of their required callbacks with a memoized port that pretends to perform a fresh read. Neither a cached TLS leaf nor a value returned by a native reader authorizes a request by itself.
+
+## Smallest useful structural refactor for review
+
+A purpose-specific *complete owner pair observation* can acquire and return the concrete facts once under a single explicit bracket:
+
+1. Bind original query, call cancellation, installed pin, actual sender TLS leaf and local private serving identity before I/O. Read both exact current SQL registrations and current accepted root/configuration; verify actual leaf/key and explicit same-pool delegation before native metadata.
+2. Perform one complete current native guard proof for that exact common namespace/deployment.
+3. Read one exact Service/Ready EndpointSlice set and two native workload snapshots for each distinct contacted Pod. A snapshot already reads namespace/account/Deployment/Pod/ReplicaSet and verifies the full original template. Reuse the actual objects from that snapshot for endpoint/account/controller checks. Share namespace/account/Deployment objects only within the same concrete snapshot pass; read them again on the second pass. A repeated Pod identity may share the same Pod/ReplicaSet observation only after exact equality, never by selecting a latest process.
+4. Re-read the exact Service/Ready set and native guard, compare unchanged original object identity/template/selected readiness, then re-read both SQL registrations/configuration and roots. Verify private key closure/renewal, actual leaves, caller cancellation and every original deadline after blocking work.
+5. Return a privately constructed pair proof with the actual complete observations and their original dates. This one observation can support both peer authentication and installed-template assertions; it is not two independent observations. It must not expose arbitrary callback injection, mint another source interval or be reusable for another query, TLS connection, leaf, root, pool or process.
+
+For two distinct Pods, sharing only namespace/account/Deployment reads inside each snapshot pass gives a structural target of two guards (14 observer), two complete paired workload passes (14 observer) and two Service/EndpointSlice passes (4 observer): approximately 32 observer and 6 probe requests. This is a design count, not measured qualification. Cardinality, exact RV comparisons, guard CAS conflicts and native latency may add work. The strict original five-second request and existing client limit stay unchanged.
+
+The scoped native adapter can expose this closed aggregate port without changing the general owner authenticator. Adapter-specific deterministic comparisons should be extracted from existing checks, not copied into a weaker parallel validator. The application composes SQL and native proofs; mTLS supplies the actual private/TLS identities. Constructors remain bootstrap-owned and purpose-fixed. No wire, grant, migration, role, source acceptance or listener selection change is required for this structural step.
+
+## Why that first refactor is not sufficient by itself
+
+Four independent 32-read pairs on the forwarding process (before/after locator and before/after claim) still require 128 native observer requests, before complete candidate discovery, extra connection routing reads and SQL. At 20 QPS/burst20 that lower bound is 5.4 seconds. Therefore pair aggregation alone cannot justify enabling the installed path.
+
+A subsequent explicit request-owned proof lifetime must separately establish where already complete observations may be retained through read-only locator work and exact connection setup, and where newly current checks are mandatory immediately before the one claim/read and before reply. Retention would preserve each original timestamp and earliest deadline; it must not call a cached result a new check. It must bind the new actual exact-SNI connection and recheck current SQL registration/configuration/roots and private key state before an effect. Known native changes and cancellation must veto; revocation discovered on final native re-observation must suppress the reply. The contracts currently specify full pre/post native checks on each HTTP leg, so this is an explicit contract amendment requiring review, not an implementation detail to hide inside an adapter.
+
+An alternative that does not amend that per-leg contract is unavailable at the existing API limit even after the proposed aggregation. Do not solve it with parallel client limiters, a larger burst, longer proof expiry, deferred authentication, a second selected POST, retries after uncertainty, extra pool capacity or a simplified boolean guard.
+
+## Regression requirements
+
+Before implementation, keep the real native original-bound counterexample. The aggregate source tests must reject a changed original pool/template/protection, either exact Pod/RS/Service replacement, selected endpoint loss or incomplete pages, mixed SQL accepted revisions/roots, activation revocation between reads, a closed/renewed private key, wrong TLS connection/leaf and an original deadline/cancellation that expires at each blocking boundary. Record exact native request classes and prove two actual independent snapshot passes rather than two uses of one captured value. Existing authenticator/readers and their negative tests stay intact.
+
+A future request-proof lifetime regression must additionally cover mutation between locator and claim, new exact TLS connection with a wrong or renewed leaf, stopped standby, stale sequence, changed selected holder and final reply cancellation; one admitted POST remains spent/unknown with no replacement. Its native success gate must include complete forwarder/receiver plus all four regional proof ordinals in the same original interval, actual API/SQL counts and elapsed time, and joined shutdown. Loopback or isolated pair success cannot satisfy that gate.

@@ -1,0 +1,11 @@
+# Configuration provider component checkpoint
+
+The nine new component sources define a closed two-purpose configuration-worker recipe, public administrator automation artifact, dedicated one-purpose S3 projection and kubelet-issued 600-second provider audience. They do not publish inputs, verify a real provider setup, launch a worker, or select a runtime command. The parent owns integration.
+
+Candidate: candidate-component-v2/manifest.json (`c2b4b14a83ad9aa79374be5fac56094af3551a980771bc408bd85c45b0d330f3`). Dependency manifest: `5b42fd41f822a7da7acd3603a7ade83c456ccd35fb6dbfe6b8c08645f4d0805c`. The tenth payload is console-owned dependency-only providerconfig/owner_provider_recipe.go, now already integrated byte-identically. All nine own paths are new. V1 remains immutable and unrun; V2 records only the exact nine-path reviewed console integration delta, with unchanged payload bytes.
+
+Actual job 45674 exited 0. Compile 7.825s; full contracts/provider race suite 4.220s; selected worker Kube race suite 11.981s; three-package vet 1.976s. Original GOMAXPROCS=2, GOFLAGS=-p=2 and owned build TMPDIR. Logs/result/runner are in checks/component-v2. All 10 payloads/bases and 1,883 current source dependencies remained unchanged before and after. No native service was run.
+
+The worker regression undoes exactly the three new projection/RBAC changes and compares the complete generated object graph with the original installed v1 builder. It separately compares rebuilt original JSON bytes. Recipe tests check exact two purpose ACLs/role bodies, original public source and provider scope, digest mutation, finite token bounds, invalid/foreign identities and the generated actual-source-UID S3 prefix. Existing contracts tests were included. No failing-before behavior is claimed for the new APIs.
+
+Remaining: parent concrete setup GET verifier and real provider-shape qualification; prelaunch WorkerInputs one-create journal/retained bridge producer; current dedicated S3 Secret and provider material verification; worker v2 launch/runtime proof/lazy provider effects and joined shutdown; actual selected backend enforcement; joint owner2/worker2 original resource profile. The automation artifact states backend requirements, not capability or readiness. The installed command remains unchanged.

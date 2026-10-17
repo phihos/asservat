@@ -1,0 +1,41 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^Test(ObservationOperation|OwnerObservationOperation|ConnectorObservationOperation|ConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO|ConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority|ConnectorProcessProofBeforeReadinessAndCurrentProtection)",
+    "-v",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/postgres"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "expectedExit": 0,
+  "expectedFailureOccurrences": null,
+  "seconds": 60.059,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  }
+}

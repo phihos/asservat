@@ -1,0 +1,37 @@
+# Required input before container startup
+
+Source-only proposal; no product/runtime/fixture payload changed here and no test run. Native2 remains failed, with no qualified H/A/R request.
+
+## Established failure
+
+`test/results/direct-observation-native-2/direct/context-storage.log` first records original owner Running/Ready/restarts0, input missing at 30.059s and 60.019s, then the original 60-second control wait fails. HWORK later records successful strict input decoding at 72.345s; regional at 78.360s. SQL connections/constructors then take milliseconds. Later enrollment failures/restarts occur after the test's deferred cancel stopped the host source owner; they are not independent evidence of an enrollment defect.
+
+Source: `direct_observation_native_fixture_test.go:119` creates an optional Secret projection into `/fixture` with no Items filter or subPath. `installInput` creates an immutable Secret named mode+`-inputs` with key `input.json`. `inputs.go:65` checks that payload's PodUID against downward `metadata.uid`. There is no path/key omission. The host begins runtime-ready waiting before the file is projected.
+
+Official Kubernetes documents eventually consistent mounted Secret propagation, including kubelet sync plus cache propagation delay: https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod . That explains why an API create acknowledgment cannot prove file materialization. Actual individual kubelet cache/sync timings were not instrumented; do not invent their exact values.
+
+## Minimal ordering
+
+1. Make only this fixture's input Secret projection required. No container can start while the Secret is absent; the original helper's two-minute input loader remains unchanged.
+2. Split discovery of the original Pod identity from observing it Running. Before creating inputs, retain the exact Pending Pod UID and its actual controller chain/defaulted Deployment template. Reject multiple Pods, deletion, replacement or any container that has already started unexpectedly. Do not guess UID or reuse a later Pod.
+3. Construct existing immutable inputs from that retained Pod UID, defaulted original Deployment/template, existing namespace guard and protected regional source. Create exactly the same Secret once, using the current unknown-create accounting.
+4. Under one finite two-minute setup observation interval fixed at the original input-create attempt (and capped by the whole fixture), wait for that same Pod to start with its actual Pod IP. Reject restarts/replacement/termination. No authority/proof/enrollment request starts or is retried by this wait.
+5. Start the unchanged 60-second control-readiness observation only after this setup barrier. Existing helper enrollment and product calls keep their own original five-/thirty-second contexts. The whole fixture remains eight minutes.
+
+The required Secret still requires actual Pod creation first: its Input.PodUID is exact. It does not require a running container or Pod IP. `baseInput` consumes only Pod UID. The current native namespace guard proves the Deployment/namespace and denied dry-run, without Ready or Pod checks; the regional source reads its protected ConfigMap. Thus retaining a Pending Pod breaks the fixture dependency without inventing identity.
+
+Kubelet obtains the dedicated projected tokens for the actual existing Pod and account during volume setup. Those token paths/audiences and token RBAC remain unchanged. No helper consumes a token until it actually runs; actual online TokenReview/native Pod/RS/Deployment checks remain required later. An absent required Secret may prevent token volume completion, which is harmless because setup uses its separate existing fixture observer/probe credentials, not a helper's token.
+
+## Cleanup and uncertainty
+
+The existing cleanup registration remains before the first input create attempt. If creation was never attempted, no helper process can start with the required Secret absent and the original Pending Pod is removed by owned fixture teardown; do not describe this as a remote Joined result. If create was attempted or its reply was lost, retain the attempt and continue to require the original helper's positive joined marker. Pending or empty status alone never certifies that a process cannot start later. A helper that cannot be contacted/joined still fails qualification and is forcibly removed only by the owned external lab teardown, reported separately. No substitution of Pod deletion/absence for successful helper Close.
+
+For a started original process, current exact control shutdown and marker remain mandatory. No early generic control state protocol is needed to make the healthy input-before-container path run. A future cancellation regression that demonstrates a distinct inability to close an actually started setup must be addressed separately; this ordering does not claim to repair every failed-start shutdown path.
+
+## Proposed narrow source scope
+
+- `test/integration/direct_observation_native_fixture_test.go`: required projection; separate exact Pending identity discovery and same-Pod Running wait; immutable create-time setup end retained; no private payload output.
+- `test/integration/direct_observation_native_test.go`: insert explicit setup barrier before unchanged runtime-ready wait; focused pure predicate regression(s) for Pending identity, replacement/restart/termination rejection and original setup expiry.
+- Add a narrowly named integration test helper file only if the existing two files become unwieldy. No standalone helper, DTO, product, schema, grant, provider, listener or harness change is currently needed.
+
+Tests should demonstrate that a 72-second projection arrival falls within the distinct original setup interval while a 60-second runtime-ready check retains its original duration; never sleep that long in a unit test. Current request/proof clocks are not test-controlled or extended. Component compile/vet/pure tests precede any owned real two-cluster rerun. Real pending-Pod/TokenRequest/mount ordering and complete H/A/R remain native gates.

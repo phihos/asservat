@@ -1,0 +1,634 @@
+--- /dev/null
++++ b/docs/architecture/connector-credentials.md
+@@ -0,0 +1,15 @@
++# Process-owned initial connector credentials
++
++C-04/C-21 under REQ-FED-001. This component supplies the connector process key owner for the existing audited bootstrap enrollment; it does not yet implement renewal, a worker-facing server identity, protected startup provisioning or a connector executable.
++
++`ConnectorCredentials` generates one P-256 key and identity-free CSR. Protected runtime startup must suppress core dumps before constructing it. The private bootstrap reference pins the original installation/cluster/issuer/peer, bootstrap ID, secret digest and original five-minute interval. A constructor creates no issuance authority. Existing SQL/audit/provider enrollment independently checks the claim and remains the only activation producer.
++
++Unknown enrollment replies retain the same key, CSR, bootstrap and expiry; the client allows one active attempt and at least one second between attempts. It joins original owning-context cancellation even if an internal caller supplies Background. Close joins the active attempt and disables previously returned signers. Public certificate/chain/key snapshots are copied; physical Go heap erasure is not claimed.
++
++Before installing the leaf, the client independently reads the original historical claim/key/expiry, requires the exact claim-derived thirty-minute certificate end, validates the actual chain/peer/key/clientAuth-only profile, and checks current peer registration. Historical claim metadata does not grant authority. After installation, Enroll performs a current registration check without asking the issuer to sign again, and discards the retained bootstrap digest. Ordinary TLS uses still require current NativeConnectorIdentity/PeerAuthenticator checks; a local certificate snapshot is not a permit.
++
++`NativeConnectorIdentity` now supplies supported TLS1.3 signature schemes when asking a process-owned callback for its preflight certificate snapshot. The prior version supplied an empty scheme list, which real TLS certificate callbacks correctly rejected despite static fixture callbacks succeeding. This selection is not a manufactured TLS handshake; the actual connection still negotiates its own signature scheme and validates TLS plus current registry before forwarding.
++
++The typed initial enrollment/claim ports are internal composition. A future network enrollment adapter must use the actual protected bootstrap credential and server-side digest verification; it must not serialize the stored digest as a bearer substitute. Root/provider keys never enter this key owner.
++
++Qualification: focused tests reproduce the prior native-callback failure, then pass with the supported-scheme fix. Full mTLS/fleet race suites and affected vet pass. A real loopback TLS connection uses the process-owned callback and rejects the same client after current registry revocation. Tests use synthetic bootstrap/issuer/registration services; no real SQL/OpenBao/bootstrap delivery, deployed connector Pod, certificate renewal or server producer is qualified by this component. Those remain the next production composition tasks under the reserved ADR126/migration49 work. The new audit lane must preserve old bytes, finite history/backing, independent current activation and first-installation complete-history reads.
+--- /dev/null
++++ b/internal/adapters/mtls/connector_credentials.go
+@@ -0,0 +1,274 @@
++package mtls
++
++import (
++	"bytes"
++	"context"
++	"crypto"
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/sha256"
++	"crypto/tls"
++	"crypto/x509"
++	"io"
++	"sync"
++	"time"
++
++	app "asservat.local/asservat/internal/application/fleet"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/fleet"
++)
++
++// ConnectorCredentials owns one initial connector process key. The runtime
++// must disable core dumps before construction. This type never exports the key,
++// invents a bootstrap or renews the initial certificate. Its TLS snapshot is
++// identity only: NativeConnectorIdentity still checks current registry authority.
++type ConnectorCredentials struct {
++	mu          sync.Mutex
++	root        context.Context
++	stop        context.CancelFunc
++	bootstrap   app.ConnectorBootstrapReference
++	enrollment  app.ConnectorCredentialEnrollment
++	claims      app.ConnectorCredentialClaims
++	registry    *app.PeerAuthenticator
++	verifier    *PeerVerifier
++	now         func() time.Time
++	key         *ecdsa.PrivateKey
++	csr         []byte
++	cert        *tls.Certificate
++	identity    value.PeerCertificate
++	active      chan struct{}
++	cancel      context.CancelFunc
++	lastAttempt time.Time
++	closed      bool
++}
++
++func NewConnectorCredentials(ctx context.Context, bootstrap app.ConnectorBootstrapReference, roots *x509.CertPool, enrollment app.ConnectorCredentialEnrollment, claims app.ConnectorCredentialClaims, registry app.PeerRegistry, now func() time.Time) (*ConnectorCredentials, error) {
++	if ctx == nil || ctx.Err() != nil || now == nil || !bootstrap.Valid(now()) || enrollment == nil || claims == nil || registry == nil {
++		return nil, value.ErrInvalid
++	}
++	verifier, err := NewPeerVerifier(roots, bootstrap.Binding.InstallationID, value.ConnectorPeer, now)
++	if err != nil {
++		return nil, err
++	}
++	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	if err != nil {
++		return nil, value.ErrUnavailable
++	}
++	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
++	if err != nil {
++		return nil, value.ErrUnavailable
++	}
++	if _, err = EnrollmentKey(csr); err != nil {
++		return nil, err
++	}
++	if ctx.Err() != nil || !bootstrap.Valid(now()) {
++		return nil, value.ErrUnavailable
++	}
++	root, stop := context.WithCancel(ctx)
++	return &ConnectorCredentials{root: root, stop: stop, bootstrap: bootstrap, enrollment: enrollment, claims: claims, registry: &app.PeerAuthenticator{Registry: registry, Now: now}, verifier: verifier, now: now, key: key, csr: csr}, nil
++}
++
++// Enroll executes one attempt with the original CSR/bootstrap. Unknown replies
++// permit only that same request; no new key/claim/expiry or hidden retry is used.
++// Once installed, this performs a current registration check without reissuing.
++func (c *ConnectorCredentials) Enroll(ctx context.Context) error {
++	if c == nil || ctx == nil || ctx.Err() != nil {
++		return value.ErrInvalid
++	}
++	c.mu.Lock()
++	start := c.now()
++	if c.closed || c.root.Err() != nil || c.active != nil {
++		c.mu.Unlock()
++		return value.ErrUnavailable
++	}
++	cached := c.cert != nil
++	if !cached && (!c.bootstrap.Valid(start) || !c.lastAttempt.IsZero() && start.Before(c.lastAttempt.Add(time.Second))) {
++		c.mu.Unlock()
++		return value.ErrUnavailable
++	}
++	deadline := start.Add(30 * time.Second)
++	if cached {
++		deadline = start.Add(5 * time.Second)
++	} else if c.bootstrap.NotAfter.Before(deadline) {
++		deadline = c.bootstrap.NotAfter
++	}
++	call, cancel := context.WithDeadline(ctx, deadline)
++	stopped := make(chan struct{})
++	stopRoot := context.AfterFunc(c.root, func() { cancel(); close(stopped) })
++	done := make(chan struct{})
++	c.active, c.cancel = done, cancel
++	if !cached {
++		c.lastAttempt = start
++	}
++	csr := bytes.Clone(c.csr)
++	identity := c.identity
++	bootstrap := c.bootstrap
++	c.mu.Unlock()
++	defer func() {
++		cancel()
++		if !stopRoot() {
++			<-stopped
++		}
++		c.mu.Lock()
++		c.active, c.cancel = nil, nil
++		close(done)
++		c.mu.Unlock()
++	}()
++	if cached {
++		observed, err := c.registry.AuthenticatePeer(call, identity)
++		c.mu.Lock()
++		defer c.mu.Unlock()
++		if err != nil || c.closed || c.root.Err() != nil || call.Err() != nil || c.now().Before(start) || !c.now().Before(deadline) || !c.now().Before(observed.ValidUntil) {
++			return value.ErrUnavailable
++		}
++		return nil
++	}
++	key, err := EnrollmentKey(csr)
++	if err != nil {
++		return err
++	}
++	claim := value.EnrollmentClaim{InstallationID: bootstrap.Binding.InstallationID, BootstrapID: bootstrap.ID, SecretDigest: bootstrap.SecretDigest, PublicKeyDigest: key}
++	issued, err := c.enrollment.Enroll(call, claim, bytes.Clone(csr))
++	if err != nil {
++		return err
++	}
++	if call.Err() != nil || c.root.Err() != nil || c.now().Before(start) || !bootstrap.Valid(c.now()) {
++		return value.ErrUnavailable
++	}
++	original, err := c.claims.ReadEnrollmentClaim(call, claim.InstallationID, claim.BootstrapID)
++	if err != nil || !original.Valid() || original.BootstrapID != bootstrap.ID || original.Binding != bootstrap.Binding || original.PublicKeyDigest != key || !original.IssuedAt.Equal(bootstrap.NotBefore) || !original.NotAfter.Equal(bootstrap.NotAfter) || original.ClaimedAt.After(c.now()) {
++		return value.ErrDenied
++	}
++	cert, identity, err := c.checkCertificate(issued, key, original.ClaimedAt)
++	if err != nil {
++		return err
++	}
++	observed, err := c.registry.AuthenticatePeer(call, identity)
++	if err != nil {
++		return err
++	}
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	finish := c.now()
++	if c.closed || c.root.Err() != nil || call.Err() != nil || finish.Before(start) || !finish.Before(deadline) || !bootstrap.Valid(finish) || !identity.Valid(finish) || !finish.Before(observed.ValidUntil) {
++		return value.ErrUnavailable
++	}
++	cert.PrivateKey = &connectorCredentialSigner{owner: c, identity: identity, publicDER: bytes.Clone(cert.Leaf.RawSubjectPublicKeyInfo)}
++	c.cert, c.identity = cert, identity
++	// Positive installation no longer needs the bootstrap credential. Unknown
++	// attempts retain it for the exact original retry, never another process.
++	c.bootstrap.SecretDigest = artifact.Digest{}
++	return nil
++}
++func (c *ConnectorCredentials) checkCertificate(issued value.IssuedCertificate, key artifact.Digest, claimed time.Time) (*tls.Certificate, value.PeerCertificate, error) {
++	var zero value.PeerCertificate
++	if len(issued.DER) < 1 || len(issued.DER) > 16<<10 || len(issued.ChainDER) > 3 {
++		return nil, zero, value.ErrDenied
++	}
++	raw := make([][]byte, 1, len(issued.ChainDER)+1)
++	raw[0] = bytes.Clone(issued.DER)
++	total := len(issued.DER)
++	for _, der := range issued.ChainDER {
++		total += len(der)
++		if len(der) < 1 || len(der) > 16<<10 || total > 32<<10 {
++			return nil, zero, value.ErrDenied
++		}
++		raw = append(raw, bytes.Clone(der))
++	}
++	chain := make([]*x509.Certificate, len(raw))
++	for i, der := range raw {
++		parsed, err := x509.ParseCertificate(der)
++		if err != nil {
++			return nil, zero, value.ErrDenied
++		}
++		chain[i] = parsed
++	}
++	checked, err := c.verifier.verifyCertificates(chain)
++	if err != nil || checked.Binding != c.bootstrap.Binding || !sameConnectorCertificate(checked, issued.Certificate) || artifact.Digest(sha256.Sum256(chain[0].RawSubjectPublicKeyInfo)) != key || !checked.NotAfter.Equal(claimed.Add(30*time.Minute).UTC().Truncate(time.Second)) || checked.NotBefore.Before(claimed.Add(-time.Minute)) {
++		return nil, zero, value.ErrDenied
++	}
++	return &tls.Certificate{Certificate: raw, Leaf: chain[0]}, checked, nil
++}
++func sameConnectorCertificate(a, b value.PeerCertificate) bool {
++	return a.Binding == b.Binding && a.Digest == b.Digest && a.NotBefore.Equal(b.NotBefore) && a.NotAfter.Equal(b.NotAfter)
++}
++
++func (c *ConnectorCredentials) GetClientCertificate(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
++	if c == nil || info == nil || info.Version != tls.VersionTLS13 {
++		return nil, value.ErrDenied
++	}
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	if c.closed || c.root.Err() != nil || c.cert == nil || !c.identity.Valid(c.now()) {
++		return nil, value.ErrUnavailable
++	}
++	out := *c.cert
++	out.Certificate = make([][]byte, len(c.cert.Certificate))
++	for i, der := range c.cert.Certificate {
++		out.Certificate[i] = bytes.Clone(der)
++	}
++	out.Leaf, _ = x509.ParseCertificate(out.Certificate[0])
++	if info.SupportsCertificate(&out) != nil {
++		return nil, value.ErrDenied
++	}
++	return &out, nil
++}
++func (c *ConnectorCredentials) Certificate() (value.PeerCertificate, error) {
++	if c == nil {
++		return value.PeerCertificate{}, value.ErrInvalid
++	}
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	if c.closed || c.root.Err() != nil || !c.identity.Valid(c.now()) {
++		return value.PeerCertificate{}, value.ErrUnavailable
++	}
++	return c.identity, nil
++}
++
++// Close joins the owned attempt, disables retained signers and discards owned
++// references. Go does not promise physical heap erasure; sockets belong to the
++// runtime and must be closed and joined there as well.
++func (c *ConnectorCredentials) Close() {
++	if c == nil {
++		return
++	}
++	c.mu.Lock()
++	c.closed = true
++	c.stop()
++	if c.cancel != nil {
++		c.cancel()
++	}
++	done := c.active
++	c.key, c.cert = nil, nil
++	c.identity = value.PeerCertificate{}
++	c.bootstrap.SecretDigest = artifact.Digest{}
++	c.mu.Unlock()
++	if done != nil {
++		<-done
++	}
++}
++
++type connectorCredentialSigner struct {
++	owner     *ConnectorCredentials
++	identity  value.PeerCertificate
++	publicDER []byte
++}
++
++func (s *connectorCredentialSigner) Public() crypto.PublicKey {
++	key, _ := x509.ParsePKIXPublicKey(bytes.Clone(s.publicDER))
++	return key
++}
++func (s *connectorCredentialSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
++	c := s.owner
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	if c.closed || c.root.Err() != nil || c.key == nil || !s.identity.Valid(c.now()) || opts == nil || opts.HashFunc() != crypto.SHA256 || len(digest) != sha256.Size {
++		return nil, value.ErrDenied
++	}
++	signed, err := c.key.Sign(rand.Reader, digest, opts)
++	if err != nil || c.closed || c.root.Err() != nil || !s.identity.Valid(c.now()) {
++		return nil, value.ErrDenied
++	}
++	return signed, nil
++}
+--- /dev/null
++++ b/internal/adapters/mtls/connector_credentials_test.go
+@@ -0,0 +1,278 @@
++package mtls
++
++import (
++	"bytes"
++	"context"
++	"crypto"
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/sha256"
++	"crypto/tls"
++	"crypto/x509"
++	"errors"
++	"math/big"
++	"net/http"
++	"net/http/httptest"
++	"net/url"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	app "asservat.local/asservat/internal/application/fleet"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/audit"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++type connectorCredentialFixture struct {
++	t              *testing.T
++	ca             ownerTestCA
++	now            time.Time
++	advance        atomic.Int64
++	bootstrap      app.ConnectorBootstrapReference
++	original       audit.EnrollmentClaim
++	issued         value.IssuedCertificate
++	firstCSR       []byte
++	calls          int
++	mode           string
++	block, release chan struct{}
++	revoked        atomic.Bool
++}
++
++func newConnectorCredentialFixture(t *testing.T) *connectorCredentialFixture {
++	now := time.Now().UTC().Truncate(time.Second)
++	b := value.PeerBinding{InstallationID: ownerTestID, ClusterID: ownerTestID, IssuerEpoch: ownerTestID, PeerID: ownerTestID, Role: value.ConnectorPeer}
++	f := &connectorCredentialFixture{t: t, ca: newOwnerTestCA(t, now), now: now, bootstrap: app.ConnectorBootstrapReference{ID: ownerTestID, Binding: b, SecretDigest: artifact.Digest{1}, NotBefore: now, NotAfter: now.Add(5 * time.Minute)}}
++	return f
++}
++func (f *connectorCredentialFixture) clock() time.Time {
++	return f.now.Add(time.Duration(f.advance.Load()))
++}
++func (f *connectorCredentialFixture) Enroll(ctx context.Context, c value.EnrollmentClaim, csr []byte) (value.IssuedCertificate, error) {
++	f.calls++
++	if f.firstCSR == nil {
++		f.firstCSR = bytes.Clone(csr)
++	} else if !bytes.Equal(f.firstCSR, csr) {
++		f.t.Error("retry replaced original CSR")
++	}
++	key, e := EnrollmentKey(csr)
++	if e != nil || key != c.PublicKeyDigest || c.SecretDigest != f.bootstrap.SecretDigest || c.BootstrapID != f.bootstrap.ID {
++		return value.IssuedCertificate{}, value.ErrDenied
++	}
++	if f.mode == "blocked" {
++		close(f.block)
++		<-ctx.Done()
++		<-f.release
++		return value.IssuedCertificate{}, ctx.Err()
++	}
++	if f.mode == "unknown" && f.calls == 1 {
++		return value.IssuedCertificate{}, value.ErrUnavailable
++	}
++	request, e := x509.ParseCertificateRequest(csr)
++	if e != nil {
++		return value.IssuedCertificate{}, e
++	}
++	f.original = audit.EnrollmentClaim{BootstrapID: c.BootstrapID, Binding: f.bootstrap.Binding, PublicKeyDigest: key, IssueAuthorityDigest: artifact.Digest{2}, IssueAuditDigest: artifact.Digest{3}, IssueAuditID: ownerTestID, IssuedAt: f.bootstrap.NotBefore, ClaimedAt: f.now, NotAfter: f.bootstrap.NotAfter}
++	u, _ := PeerURI(f.bootstrap.Binding)
++	template := &x509.Certificate{SerialNumber: big.NewInt(2), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, URIs: []*url.URL{u}, NotBefore: f.now.Add(-time.Second), NotAfter: f.now.Add(30 * time.Minute)}
++	switch f.mode {
++	case "server":
++		template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
++	case "extended":
++		template.NotAfter = template.NotAfter.Add(time.Second)
++	case "wrong-key":
++		k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++		request.PublicKey = k.Public()
++	case "dns":
++		template.DNSNames = []string{"unexpected.invalid"}
++	}
++	der, e := x509.CreateCertificate(rand.Reader, template, f.ca.cert, request.PublicKey, f.ca.key)
++	if e != nil {
++		return value.IssuedCertificate{}, e
++	}
++	f.issued = value.IssuedCertificate{Certificate: value.PeerCertificate{Binding: f.bootstrap.Binding, Digest: artifact.Digest(sha256.Sum256(der)), NotBefore: template.NotBefore, NotAfter: template.NotAfter}, DER: der, ChainDER: [][]byte{f.ca.cert.Raw}}
++	return f.issued, nil
++}
++func (f *connectorCredentialFixture) ReadEnrollmentClaim(context.Context, string, string) (audit.EnrollmentClaim, error) {
++	out := f.original
++	if f.mode == "changed-claim" {
++		out.NotAfter = out.NotAfter.Add(-time.Second)
++	}
++	return out, nil
++}
++func (f *connectorCredentialFixture) PeerRegistration(_ context.Context, b value.PeerBinding) (value.PeerRegistration, error) {
++	if f.revoked.Load() {
++		return value.PeerRegistration{}, value.ErrDenied
++	}
++	now := f.clock()
++	out := value.PeerRegistration{Binding: b, Revision: identity.Revision{UID: ownerTestID, Generation: 1, Digest: artifact.Digest{4}}, Enabled: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Certificates: []value.PeerCertificate{f.issued.Certificate}}
++	if f.mode == "late-registry" {
++		f.advance.Add(int64(31 * time.Second))
++	}
++	return out, nil
++}
++func (f *connectorCredentialFixture) owner(ctx context.Context) *ConnectorCredentials {
++	c, e := NewConnectorCredentials(ctx, f.bootstrap, f.ca.roots, f, f, f, f.clock)
++	if e != nil {
++		f.t.Fatal(e)
++	}
++	f.t.Cleanup(c.Close)
++	return c
++}
++func connectorRequestInfo() *tls.CertificateRequestInfo {
++	return &tls.CertificateRequestInfo{Version: tls.VersionTLS13, SignatureSchemes: []tls.SignatureScheme{tls.ECDSAWithP256AndSHA256}}
++}
++func TestConnectorCredentialsOriginalClaimAndRetainedSigner(t *testing.T) {
++	f := newConnectorCredentialFixture(t)
++	f.mode = "unknown"
++	c := f.owner(context.Background())
++	if c.Enroll(context.Background()) == nil {
++		t.Fatal("unknown outcome installed certificate")
++	}
++	f.advance.Store(int64(2 * time.Second))
++	if e := c.Enroll(context.Background()); e != nil {
++		t.Fatal(e)
++	}
++	cert, e := c.GetClientCertificate(connectorRequestInfo())
++	if e != nil {
++		t.Fatal(e)
++	}
++	if !cert.Leaf.NotAfter.Equal(f.now.Add(30 * time.Minute)) {
++		t.Fatal("retry extended certificate expiry")
++	}
++	if e = c.Enroll(context.Background()); e != nil || f.calls != 2 {
++		t.Fatal("installed leaf reissued", e, f.calls)
++	}
++	// A retained certificate is immutable public state and a bounded signer.
++	cert.Certificate[0][0] ^= 1
++	again, e := c.GetClientCertificate(connectorRequestInfo())
++	if e != nil || bytes.Equal(cert.Certificate[0], again.Certificate[0]) {
++		t.Fatal("snapshot alias", e)
++	}
++	signer := again.PrivateKey.(crypto.Signer)
++	digest := sha256.Sum256([]byte("synthetic handshake"))
++	if _, e = signer.Sign(rand.Reader, digest[:], crypto.SHA256); e != nil {
++		t.Fatal(e)
++	}
++	f.revoked.Store(true)
++	if c.Enroll(context.Background()) == nil {
++		t.Fatal("cached identity bypassed current registration")
++	}
++	c.Close()
++	if _, e = signer.Sign(rand.Reader, digest[:], crypto.SHA256); e == nil {
++		t.Fatal("retained signer survived close")
++	}
++}
++func TestConnectorCredentialsRejectMalformedAndLateResults(t *testing.T) {
++	for _, mode := range []string{"server", "extended", "wrong-key", "dns", "changed-claim", "late-registry"} {
++		t.Run(mode, func(t *testing.T) {
++			f := newConnectorCredentialFixture(t)
++			f.mode = mode
++			c := f.owner(context.Background())
++			if c.Enroll(context.Background()) == nil {
++				t.Fatal("unqualified result installed")
++			}
++			if _, e := c.GetClientCertificate(connectorRequestInfo()); e == nil {
++				t.Fatal("rejected result exposed")
++			}
++		})
++	}
++}
++func TestConnectorCredentialsCloseJoinsOriginalOwner(t *testing.T) {
++	f := newConnectorCredentialFixture(t)
++	f.mode = "blocked"
++	f.block = make(chan struct{})
++	f.release = make(chan struct{})
++	owner, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	c := f.owner(owner)
++	enrolled := make(chan error, 1)
++	go func() { enrolled <- c.Enroll(context.Background()) }()
++	<-f.block
++	closed := make(chan struct{})
++	go func() { c.Close(); close(closed) }()
++	select {
++	case <-closed:
++		t.Fatal("Close returned before blocked owned operation joined")
++	case <-time.After(10 * time.Millisecond):
++	}
++	close(f.release)
++	select {
++	case e := <-enrolled:
++		if !errors.Is(e, context.Canceled) {
++			t.Fatal(e)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("enrollment did not cancel")
++	}
++	select {
++	case <-closed:
++	case <-time.After(time.Second):
++		t.Fatal("Close did not join")
++	}
++}
++func TestConnectorIdentityUsesProcessOwnedCertificate(t *testing.T) {
++	f := newConnectorCredentialFixture(t)
++	c := f.owner(context.Background())
++	if e := c.Enroll(context.Background()); e != nil {
++		t.Fatal(e)
++	}
++	n, e := NewNativeConnectorIdentity(f.bootstrap.Binding, f.ca.roots, &app.PeerAuthenticator{Registry: f, Now: f.clock}, c.GetClientCertificate, f.clock)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if _, e = n.CheckNativeConnector(context.Background()); e != nil {
++		t.Fatal("production process-owned callback rejected", e)
++	}
++}
++
++func TestConnectorCredentialsActualTLSAndCurrentRevocation(t *testing.T) {
++	f := newConnectorCredentialFixture(t)
++	c := f.owner(context.Background())
++	if e := c.Enroll(context.Background()); e != nil {
++		t.Fatal(e)
++	}
++	verifier, e := NewPeerVerifier(f.ca.roots, f.bootstrap.Binding.InstallationID, value.ConnectorPeer, f.clock)
++	if e != nil {
++		t.Fatal(e)
++	}
++	authenticator := app.PeerAuthenticator{Registry: f, Now: f.clock}
++	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		peer, e := verifier.Verify(r.TLS)
++		if e == nil {
++			_, e = authenticator.AuthenticatePeer(r.Context(), peer)
++		}
++		if e != nil {
++			w.WriteHeader(http.StatusForbidden)
++			return
++		}
++		w.WriteHeader(http.StatusNoContent)
++	}))
++	server.TLS = &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: f.ca.roots, Time: f.clock}
++	server.StartTLS()
++	defer server.Close()
++	client := server.Client()
++	transport := client.Transport.(*http.Transport).Clone()
++	defer transport.CloseIdleConnections()
++	transport.TLSClientConfig = transport.TLSClientConfig.Clone()
++	transport.TLSClientConfig.GetClientCertificate = c.GetClientCertificate
++	client.Transport = transport
++	client.Timeout = 2 * time.Second
++	for _, revoked := range []bool{false, true} {
++		f.revoked.Store(revoked)
++		response, e := client.Get(server.URL)
++		if e != nil {
++			t.Fatal("actual process-owned TLS client", e)
++		}
++		response.Body.Close()
++		expected := http.StatusNoContent
++		if revoked {
++			expected = http.StatusForbidden
++		}
++		if response.StatusCode != expected {
++			t.Fatal("current registration did not fence same client identity", response.StatusCode)
++		}
++	}
++}
+--- a/internal/adapters/mtls/native_connector.go
++++ b/internal/adapters/mtls/native_connector.go
+@@ -40,7 +40,14 @@
+ 	started := c.now()
+ 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
+ 	defer stop()
+-	cert, e := c.certificate(&tls.CertificateRequestInfo{Version: tls.VersionTLS13})
++	// This is a preflight snapshot selection, not a fabricated TLS handshake.
++	// A real process-owned callback checks SupportsCertificate, so supply the
++	// TLS1.3 signing schemes accepted by this profile. Actual TLS still chooses
++	// and verifies its own negotiated signing scheme before any forwarded data.
++	cert, e := c.certificate(&tls.CertificateRequestInfo{Version: tls.VersionTLS13, SignatureSchemes: []tls.SignatureScheme{
++		tls.ECDSAWithP256AndSHA256, tls.ECDSAWithP384AndSHA384, tls.ECDSAWithP521AndSHA512,
++		tls.Ed25519, tls.PSSWithSHA256, tls.PSSWithSHA384, tls.PSSWithSHA512,
++	}})
+ 	if e != nil || cert == nil || cert.PrivateKey == nil || len(cert.Certificate) < 1 || len(cert.Certificate) > 4 {
+ 		return nil, zero, time.Time{}, value.ErrDenied
+ 	}
+--- /dev/null
++++ b/internal/application/fleet/connector_credentials.go
+@@ -0,0 +1,37 @@
++package fleet
++
++import (
++	"context"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/audit"
++	"asservat.local/asservat/internal/domain/authorization"
++	value "asservat.local/asservat/internal/domain/fleet"
++)
++
++// ConnectorBootstrapReference is protected installation delivery, not a new
++// issuance permit. SQL independently checks the original reviewed bootstrap,
++// secret digest, original expiry and exact key. No constructor renews them.
++type ConnectorBootstrapReference struct {
++	ID                  string
++	Binding             value.PeerBinding
++	SecretDigest        artifact.Digest
++	NotBefore, NotAfter time.Time
++}
++
++func (r ConnectorBootstrapReference) Valid(now time.Time) bool {
++	return authorization.UUID(r.ID) && r.Binding.Valid() && r.Binding.Role == value.ConnectorPeer && r.SecretDigest != (artifact.Digest{}) && !r.NotBefore.IsZero() && !now.Before(r.NotBefore) && now.Before(r.NotAfter) && r.NotAfter.After(r.NotBefore) && !r.NotAfter.After(r.NotBefore.Add(5*time.Minute))
++}
++
++// The existing audited coordinator implements this port. A raw PKI signer does
++// not: returning an issued-but-inactive certificate cannot satisfy enrollment.
++type ConnectorCredentialEnrollment interface {
++	Enroll(context.Context, value.EnrollmentClaim, []byte) (value.IssuedCertificate, error)
++}
++
++// This historical read independently pins the original claim/key/expiry. It is
++// never current peer authority; the consumer separately checks PeerRegistry.
++type ConnectorCredentialClaims interface {
++	ReadEnrollmentClaim(context.Context, string, string) (audit.EnrollmentClaim, error)
++}

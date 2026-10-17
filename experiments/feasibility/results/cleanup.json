@@ -1,0 +1,31 @@
+{
+  "finishedUTC": "2026-10-09T19:01:58.231979+00:00",
+  "vmPID": 1662269,
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "experiments/feasibility/vm/lab.py",
+        "down"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "python3",
+        "experiments/feasibility/services.py",
+        "down"
+      ],
+      "exit": 0
+    }
+  ],
+  "verificationRetry": "Initial cleanup verification rejected Docker lower-case no such volume message; case-insensitive read-only verification confirmed absence. No repeated deletion was necessary.",
+  "checks": {
+    "vmStopped": true,
+    "container:c3e60d92e17de4753c0428be3f40639d740c268d6a2a6ca0228368d26b6496f7": "absent",
+    "network:asservat-feasibility-20261009": "absent",
+    "volume:efce560be0f2b301cd00cf1e4e79757b8984dce53e71682728884427165c1db1": "absent",
+    "privateLabStateRemoved": true
+  },
+  "scope": "Only this experiment VM, private cache/SSH keys, labelled S3 container, anonymous volume and network removed. Shared build/image caches and other infrastructure untouched. Filesystem removal is not a physical-media erasure claim."
+}

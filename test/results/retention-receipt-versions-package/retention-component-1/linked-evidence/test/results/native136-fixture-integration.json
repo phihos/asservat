@@ -1,0 +1,7 @@
+{
+  "integratedAt": "2026-10-12T10:47:39.222873+00:00",
+  "payloads": 2,
+  "dependencies": 4,
+  "scope": "test-only exact synthetic HTTP cookie and handler join",
+  "manifestSHA256": "6fc1a28fc53131c4a43cccb7b33510ec5166736ab0467bfad30ae7ec2532efa2"
+}

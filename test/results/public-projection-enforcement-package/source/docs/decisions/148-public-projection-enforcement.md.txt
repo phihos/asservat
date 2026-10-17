@@ -1,0 +1,41 @@
+# ADR-148 — One public projection enforcement interval
+
+Status: accepted; implementation and component qualification in progress.
+
+The public role projection repeatedly traversed the same native proof through
+nested current/read/update calls. With the unchanged 20 QPS/Burst 20 clients,
+a controlled TLS component case made 86 API requests with 46.003 ms transport
+I/O, exhausted the original 3,551 ms remaining SQL-verified interval, and returned
+a changed-source error after the claim and Secret existed but before the receipt.
+The original interval and API rate limits remain mandatory.
+
+Within one serialized PublishPublicRuntimeProjection, obtain the first real
+independently denied enforcement proof and retain its original observation and
+expiry. Intersect the caller, SQL-verification and five-second deadlines before
+any reads; later source/root bounds can only shorten that interval. Reuse only
+that denial while checking complete current policy/binding pins and versions,
+namespace, real administrator identity, accepted SQL configuration and original
+worker journal/Deployment/account/Lease at each of five explicit boundaries:
+before root read; after root read before claim; after acknowledged claim before
+CREATE; after exact Secret/root readback before receipt; after receipt before
+returning success. Independent source reads continue to bracket each traversal.
+
+A changed or unavailable observation permanently fails the call. Never renew,
+reacquire or share its proof across calls. Current pins include full compiled
+policy/binding validation, not only names or status. This gives bounded
+freshness within the original interval, not instantaneous enforcement revocation
+between API requests. Generic role creation/completion and configuration-role
+proof behavior are unchanged.
+
+Only an acknowledged first claim permits the sole CREATE. An unknown claim
+permits no CREATE, an unknown CREATE permits exact lookup only, and a later
+invocation cannot recreate a missing Secret. Receipt CAS remains once-set; a
+failed post-write check may leave an original receipt but cannot report success.
+Keep unavailable/cancelled reads distinct from positively observed identity
+changes. Preserve root cancellation and joined closure of all in-flight work.
+
+No new wire, SQL migration, credential, cache, runtime enablement or user action
+is introduced. Component tests must retain the actual default limiter, current
+revocation/changed-pin checks, blocking-read expiry/cancellation, unknown writes
+and per-call proof acquisition. Actual protected native projection composition
+remains separately required; a loopback enforcement fixture is not that proof.

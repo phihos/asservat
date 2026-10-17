@@ -1,0 +1,18 @@
+{
+  "scope": "Negative branch SQL51 reproduction only; fixture-only definer, original live process/deadlines, no production migration or role expansion",
+  "before": [],
+  "boot": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^connector-identity-fast$/^live-profile-cleanup-trigger-denies-with-original-row$"
+  ],
+  "exit": 1,
+  "seconds": 20.667,
+  "intendedFailure": false,
+  "sourceUnchanged": true,
+  "sourceCount": 2158,
+  "cleanupFailures": [],
+  "after": []
+}

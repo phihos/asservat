@@ -1,0 +1,95 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "profiles": [
+      {
+        "profile_ref": {
+          "catalog": "builtin",
+          "name": "process-context",
+          "version": "v1"
+        },
+        "display_name": "Process and socket context",
+        "description": "Process and socket context without arguments, environment or attachment.",
+        "available": true,
+        "deprecated": false,
+        "approval_required": false,
+        "blockers": [],
+        "execution_modes": [
+          "onTrigger"
+        ]
+      },
+      {
+        "profile_ref": {
+          "catalog": "builtin",
+          "name": "network-connections",
+          "version": "v1"
+        },
+        "display_name": "Incoming and outgoing transport traffic",
+        "description": "Network headers in both directions on qualified pod paths; no application payload.",
+        "available": true,
+        "deprecated": false,
+        "approval_required": false,
+        "blockers": [],
+        "execution_modes": [
+          "ongoing"
+        ]
+      },
+      {
+        "profile_ref": {
+          "catalog": "builtin",
+          "name": "http-headers",
+          "version": "v1"
+        },
+        "display_name": "HTTP/1 headers, both directions",
+        "description": "Plain HTTP/1 request and response header projection; no TLS plaintext or HTTP/2 support.",
+        "available": true,
+        "deprecated": false,
+        "approval_required": true,
+        "blockers": [],
+        "execution_modes": [
+          "ongoing"
+        ]
+      },
+      {
+        "profile_ref": {
+          "catalog": "builtin",
+          "name": "go-cpu",
+          "version": "v1"
+        },
+        "display_name": "Short Go CPU profile",
+        "description": "Ten-second CPU profile using the qualified go-pprof-loopback endpoint template.",
+        "available": true,
+        "deprecated": false,
+        "approval_required": true,
+        "blockers": [],
+        "execution_modes": [
+          "onTrigger"
+        ]
+      },
+      {
+        "profile_ref": {
+          "catalog": "builtin",
+          "name": "syscall-activity",
+          "version": "v1"
+        },
+        "display_name": "System calls of all pod processes",
+        "description": "Bounded syscall metadata from all current and new pod processes; no user-memory reads.",
+        "available": true,
+        "deprecated": false,
+        "approval_required": false,
+        "blockers": [],
+        "execution_modes": [
+          "ongoing"
+        ]
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

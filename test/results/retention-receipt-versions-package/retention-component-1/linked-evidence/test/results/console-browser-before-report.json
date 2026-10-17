@@ -1,0 +1,21 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "settings outage hides workspace and still permits local logout",
+    "returning tab uses CSRF and permitted POST refresh for expired access",
+    "revoked session cannot display workspace"
+  ],
+  "errors": [
+    "Applying inline style violates the following Content Security Policy directive 'style-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Applying inline style violates the following Content Security Policy directive 'style-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Applying inline style violates the following Content Security Policy directive 'style-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Applying inline style violates the following Content Security Policy directive 'style-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Applying inline style violates the following Content Security Policy directive 'style-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked."
+  ],
+  "external": [],
+  "violations": [],
+  "failure": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByText('Your session has expired. Sign in again to continue.')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" getByText('Your session has expired. Sign in again to continue.') with timeout 5000ms\n  - waiting for getByText('Your session has expired. Sign in again to continue.')\n"
+}

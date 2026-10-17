@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-3",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Handover-pinned installer input read; the continuation then stopped at worker/documents (changed), inside the handover read or BuildInstalledInitialConfigurationDocuments/BuildHubWorkerActivation. Run 4 derives the recipe from BuildInitialConfigurationDocuments as the qualified native chain did, passes the journal's worker layout explicitly to the artifact, and splits the step names.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

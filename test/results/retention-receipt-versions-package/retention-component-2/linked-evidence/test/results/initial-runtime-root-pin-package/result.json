@@ -1,0 +1,70 @@
+{
+  "manifest_sha256": "c0b66d656f5fb97ec82e316d170bf570640d9a5dcca74fb7607f8f391a23108c",
+  "dependencies_sha256": "2f3127b0dced709001ec74e929878fc934f7e3efccf0aae1b764cf85291e10c2",
+  "commands": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/before-overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestInitialRuntimeRootPinOriginalCreationInputAndReplacement$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "seconds": 10.153244617002201
+    },
+    {
+      "name": "after",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestInitialRuntime(RootPin|Bridge|Resource)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 11.250987199993688
+    },
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 11.78587799500383
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.550107258008211
+    }
+  ],
+  "source_changes": [],
+  "paths": 5,
+  "dependencies": 1702,
+  "terminal_exit": 0
+}

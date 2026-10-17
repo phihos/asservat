@@ -1,0 +1,8 @@
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 47 files match sqlc v1.31.1
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 59, in <module>
+    raise ValueError(f"Domain import is not a pure value utility: {imported}")
+ValueError: Domain import is not a pure value utility: crypto/sha256
+make: *** [Makefile:58: go-architecture-check] Error 1

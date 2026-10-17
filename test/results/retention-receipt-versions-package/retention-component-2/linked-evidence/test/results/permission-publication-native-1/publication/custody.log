@@ -1,0 +1,28 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-reset-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-reset-null
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-initial-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-permission-initial-null
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-capture-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-capture-null
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-verification-empty
+=== RUN   TestContextAdmissionWithRealServices/publication-audit-history-verification-null
+=== RUN   TestContextAdmissionWithRealServices/download-permission-reset-empty
+=== RUN   TestContextAdmissionWithRealServices/download-permission-reset-null
+=== RUN   TestContextAdmissionWithRealServices/download-permission-initial-empty
+=== RUN   TestContextAdmissionWithRealServices/download-permission-initial-null
+--- PASS: TestContextAdmissionWithRealServices (9.08s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-reset-empty (1.01s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-reset-null (0.59s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-initial-empty (0.60s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-permission-initial-null (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-capture-empty (0.72s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-capture-null (0.71s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-verification-empty (0.74s)
+    --- PASS: TestContextAdmissionWithRealServices/publication-audit-history-verification-null (0.73s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-reset-empty (0.90s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-reset-null (0.72s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-initial-empty (0.72s)
+    --- PASS: TestContextAdmissionWithRealServices/download-permission-initial-null (0.70s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.138s

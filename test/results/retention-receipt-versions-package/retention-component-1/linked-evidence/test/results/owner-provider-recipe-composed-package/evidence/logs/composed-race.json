@@ -1,0 +1,27 @@
+{
+  "phase": "composed-race",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^TestOwnerIdentityComposedUnknownObjectsAndLaunchAreLookupOnly$",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "seconds": 86.838,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

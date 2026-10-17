@@ -1,0 +1,59 @@
+{
+  "scope": "storage custody components; no capture or disclosure authority",
+  "images": {
+    "asservat-custody-fk9oopl9-postgres": {
+      "requested": "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+      "imageID": "sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+      "containerID": "9e4fc521875fd166343ce5da988ac653dcd75b6290bde2ea69e94b985c51e3dd"
+    },
+    "asservat-custody-fk9oopl9-s3": {
+      "requested": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+      "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+      "containerID": "ce242828fcdf86bdda1092b873e4dd054c3712270415fa01f72740ad91147279"
+    }
+  },
+  "sourceHashes": {
+    "go.mod": "bbad07abcecf044e81b02470300e5d4d93a167f1a94f564e89601bd718137294",
+    "go.sum": "e2563de0f73cfa32fe67ae453fe1df608b334733220f8bead881edb656271a2a",
+    "internal/adapters/kms/transit.go": "c08b72aabfd70393c3a532a3c1fe629e1aa56d8562c8301a7178a375d61e278b",
+    "internal/adapters/kms/transit_test.go": "366ab04572aa640fbe763b2366b53ffd810c1caf206dfab7e5058f8a9c50d7cc",
+    "internal/adapters/kubernetes/context.go": "995c2cd2afc253719cf1989868cbcefe69fcd5a57bc927b26bcaaed804e8adb9",
+    "internal/adapters/kubernetes/context_test.go": "95fb1ba6e6e6c0825d1af95e662aba0e67772b1608ae24b38655d637df2fe6bc",
+    "internal/adapters/objectstore/custody.go": "b5aef2a98863ea08bc8a605ae38c41684f90ad07e6ef10374560260e9a79969d",
+    "internal/adapters/objectstore/custody_test.go": "2276b0be2d486c58cfd45386d37d851ff6998fd4b43fa02c278ae3a65768c12a",
+    "internal/adapters/objectstore/framed/crypto.go": "a7ca1e4f27279c96ce40d3b85158d44766fdb9408cc36aba1abadff68571140d",
+    "internal/adapters/objectstore/framed/decode.go": "195dcfbfd84fe26ba39c33e8c592001c1ec7ae30f446f18fdabef6162d98dd2f",
+    "internal/adapters/objectstore/framed/encode.go": "d56e46c8c8733777eddbea412c8cd3885f07b5e40f74eda8a1c8624449f270cd",
+    "internal/adapters/objectstore/framed/framed_test.go": "ed677daa0ef07a3a6cd2b895642191b5b67899bdc06ac58e6a41793713f9d888",
+    "internal/adapters/objectstore/framed/json.go": "214c2ecbdcc4933955d6644b7bd839516b1db307559865cff8f3c8dc4400ce35",
+    "internal/adapters/objectstore/framed/layout.go": "236986d52f3db7705f7f8f136d1219bb729213eda3fbd64010c3965d1e8d02aa",
+    "internal/adapters/objectstore/framed/manifest.go": "1525aade8de349c91224f77910441fd5d7bd4fb35bb8c9340dadb41eb14d65e0",
+    "internal/adapters/objectstore/s3.go": "963baaa9d2763ecfb2d8221b8e8fd4b9a40a8fb3a7a439149fe5ce2b2a730d70",
+    "internal/adapters/objectstore/s3_test.go": "66238119228529697661c66ef0d973e0bcac815a0252b6a7cb36eb3bd8697626",
+    "internal/adapters/postgres/capacity.go": "52be8f40dc7795dea3067abcec982a0a1905fb6b979975d9b176df2ad7c95e15",
+    "internal/adapters/postgres/custody.go": "6cbbf3ef09402e10dacc259049da68534562f927c7d999afb47a40d405f03a15",
+    "internal/adapters/postgres/custodydb/custody.sql.go": "26a448124ae7b97f016c2898ca62fafe70427885bb92d59ebdcde9dd6dbaee14",
+    "internal/adapters/postgres/custodydb/db.go": "f414ba282416480b2c5b941db3887837eeed21fbafbf5c6820c9eaa577c038c4",
+    "internal/adapters/postgres/custodydb/models.go": "84b97179853427cd37f6d0b9078fb0fc62eb4a51be4982e3daa2cd2958afd3bb",
+    "internal/application/capacity/storage.go": "3c9d0e9c90b4ec32956a746e6ff0df77cdae26f9f3d82b5a2e2301bf5cd0d4d8",
+    "internal/application/evidence/custody.go": "136e9b6f2f345ba6d02eae9dbd08386572fbb9080da38b05f5e89ccab6993dfe",
+    "internal/application/evidence/storage.go": "0099878cfbe43650a2d3d5901670731a2abe84766cfbc11a15727b1dba5441ef",
+    "internal/application/privacy/custody.go": "8f1cec231bc64876a771bab622fa28a47235f2a4bd2561760dae0c98182909a4",
+    "internal/application/privacy/custody_test.go": "eae0a593dd140b803b7b9786950130705c07bf1502d9aa431129453cdce2f4b5",
+    "internal/domain/artifact/context.go": "07910dbb85a3a9ac356ca5bf44b6749797422da1f975f5e93afd67c6967a7438",
+    "internal/domain/artifact/custody.go": "4625686508b24096f3a737817466309b7ce98c8833d363e6c0c80cb07e96adec",
+    "internal/domain/artifact/storage.go": "29d5dc9b574b77373bc0256be42f717a176303ee75f8407ca8285c792afc0f39",
+    "migrations/00001_custody.sql": "dfd6317dfa389d8d681fcf3ced27cf2f054d268bc1fde7076ce29308b8156ab3",
+    "migrations/queries/custody.sql": "cebb21e92ac0ac6f5a3eeb63ae7a80b0a420bf7cb72a20d6fbbe416224eebcd8",
+    "scripts/test-custody.py": "e047722458e5df0ec3f30bcaed2f547e3b4680e73407375a56f6f71fd3aff77d",
+    "sqlc.yaml": "f7d59f9d87c0a156e0ee51a9dc5573039f236ed3cc9ff4d3f2abe30df2d069e1",
+    "test/integration/context_storage_test.go": "7e88b943470d9b5b56658ff10c76d7623ad94c4d683b0131d95b9eebd4af3698",
+    "test/integration/custody_test.go": "1a1bcc2c934395faba030239e46f34d45793aa723c40ee33be609e28f683e48b"
+  },
+  "gooseVersion": "goose version: v3.28.0",
+  "migration": "",
+  "goVersion": "go version go1.27.2 linux/amd64",
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "cleanupFailures": []
+}

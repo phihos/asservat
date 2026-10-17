@@ -1,0 +1,8 @@
+{
+  "foundation_manifest": "c80660d1c11cd050d0c7376578e70dfbae7020611507e291fc684a2c6130a89b",
+  "foundation_paths": 69,
+  "schema_payload_paths": 14,
+  "worker_schema_dependency": "0cdfca1edd2a49ded2cd8bd8a90652afa52267f4adeb0f0b8cc9c75065e5ddd1",
+  "graph_status": "Explicit unintegrated owner-versioned-1 + immutable worker reader/builder dependencies. Complete worker publisher/launch/runtime and ADR150 selection are not qualified by these Python checks.",
+  "external_links": "test/results and existing web/dist symlinked for documentation target-existence checks only; no native or compiled output executed"
+}

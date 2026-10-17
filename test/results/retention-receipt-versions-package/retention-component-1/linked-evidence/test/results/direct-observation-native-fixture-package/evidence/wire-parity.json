@@ -1,0 +1,33 @@
+{
+  "phase": "wire-parity",
+  "command": [
+    "/tmp/asservat-direct-har-k3xddyq8/integration.test",
+    "-test.run=^TestDirectNativeFixtureWireParity$",
+    "-test.v",
+    "-test.timeout=60s"
+  ],
+  "exit": 0,
+  "seconds": 0.181,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "namedPass": 1,
+  "skips": 0
+}

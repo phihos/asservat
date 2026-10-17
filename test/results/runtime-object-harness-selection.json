@@ -1,0 +1,29 @@
+{
+  "checks": [
+    {
+      "command": "test-runtime-object-selection.py",
+      "exit": 0,
+      "seconds": 0.08639205200597644,
+      "output": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n"
+    },
+    {
+      "command": "test-regional-context-selection.py",
+      "exit": 0,
+      "seconds": 0.068252904995461,
+      "output": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.000s\n\nOK\n"
+    },
+    {
+      "command": "test-initial-bootstrap-selection.py",
+      "exit": 0,
+      "seconds": 0.0936389220005367,
+      "output": "...\n----------------------------------------------------------------------\nRan 3 tests in 0.000s\n\nOK\n"
+    },
+    {
+      "command": "test-helm-bootstrap-selection.py",
+      "exit": 0,
+      "seconds": 0.08738141600042582,
+      "output": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.002s\n\nOK\n"
+    }
+  ],
+  "harnessSHA256": "6469ad104ad15d19a76384497c24ca7d909f141ce64807b15160d2f2f0552ce4"
+}

@@ -1,0 +1,150 @@
+package kms
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// This exercises the fixed supervisor with the existing real-TLS synthetic
+// provider fixture. Its private proof callback is deliberately synthetic; this
+// cannot qualify the concrete installed native/SQL constructor.
+func installedProviderSupervisorFixture(t *testing.T) (*InstalledOwnerProviderEffects, *ownerEffectFixture) {
+	t.Helper()
+	f := newOwnerEffectFixture(t)
+	root, cancel := context.WithCancel(context.Background())
+	s := &InstalledOwnerProviderEffects{effects: f.effects, root: root, cancel: cancel, closeDone: make(chan struct{})}
+	t.Cleanup(func() {
+		if err := s.Close(context.Background()); err != nil {
+			t.Error("fixed provider supervisor did not join", err)
+		}
+	})
+	return s, f
+}
+
+func TestInstalledOwnerProviderSupervisorPrimesExactlyFourAndDoesNotReloginOnTicks(t *testing.T) {
+	s, f := installedProviderSupervisorFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.Prime(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	logins, lookups := f.logins, f.lookups
+	f.mu.Unlock()
+	if logins != 4 || lookups != 4 {
+		t.Fatal("startup did not fund exactly four distinct purposes", logins, lookups)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- s.Run(ctx) }()
+	// Cross an actual scheduling tick while every acknowledged original lease
+	// remains current. Ordinary ticks must not create another provider token.
+	timer := time.NewTimer(1200 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case err := <-finished:
+		t.Fatal("supervisor exited before cancellation", err)
+	}
+	if err := s.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+	case <-ctx.Done():
+		t.Fatal("provider loop did not join cancellation")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.logins != logins || f.lookups != lookups || f.revokes != 4 || len(f.calls) != 0 {
+		t.Fatal("passive ticks issued credentials/effects or closure missed a purpose")
+	}
+	if s.Run(ctx) == nil || s.Prime(ctx) == nil {
+		t.Fatal("closed supervisor restarted")
+	}
+}
+
+func TestInstalledOwnerProviderCloseRetainsBorrowUntilActualRelease(t *testing.T) {
+	s, _ := installedProviderSupervisorFixture(t)
+	caller, stop := context.WithTimeout(context.Background(), time.Second)
+	defer stop()
+	borrowed, release, err := s.borrow(caller, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var released sync.Once
+	joinedRelease := func() { released.Do(release) }
+	defer joinedRelease()
+	if end, ok := borrowed.Deadline(); !ok {
+		t.Fatal("borrow lost original caller deadline")
+	} else if original, _ := caller.Deadline(); end.After(original) {
+		t.Fatal("borrow extended original caller interval")
+	}
+	short, end := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer end()
+	if s.Close(short) == nil {
+		t.Fatal("close reported joined while source read still owned")
+	}
+	if borrowed.Err() == nil {
+		t.Fatal("closing owner did not cancel the borrowed read")
+	}
+	select {
+	case <-s.closeDone:
+		t.Fatal("timeout discarded outstanding source ownership")
+	default:
+	}
+	if _, cleanup, e := s.borrow(context.Background(), time.Second); e == nil {
+		cleanup()
+		t.Fatal("closing owner admitted another read")
+	}
+	joinedRelease()
+	if s.Close(context.Background()) != nil {
+		t.Fatal("positive source completion could not finish close")
+	}
+}
+
+func TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope(t *testing.T) {
+	f := newOwnerEffectFixture(t)
+	now := time.Now().UTC()
+	id := f.pool.InstallationID
+	value := fleet.OwnerConfiguration{Pool: f.pool, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: f.roots}
+	s := &InstalledOwnerProviderEffects{original: value.Clone()}
+	observation := func(v fleet.OwnerConfiguration) fleet.OwnerConfigurationObservation {
+		return fleet.OwnerConfigurationObservation{Configuration: v, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	}
+	if !s.currentConfiguration(observation(value)) {
+		t.Fatal("original accepted scope rejected")
+	}
+	advanced := value.Clone()
+	advanced.Revision.Generation++
+	advanced.Revision.Digest = artifact.Digest{3}
+	if !s.currentConfiguration(observation(advanced)) {
+		t.Fatal("new independent operation cannot observe original unchanged pool")
+	}
+	for name, change := range map[string]func(*fleet.OwnerConfiguration){
+		"source":    func(v *fleet.OwnerConfiguration) { v.Revision.UID = "10000000-0000-4000-8000-000000001499" },
+		"service":   func(v *fleet.OwnerConfiguration) { v.Pool.ServiceUID = "10000000-0000-4000-8000-000000001499" },
+		"epoch":     func(v *fleet.OwnerConfiguration) { v.Pool.IssuerEpoch = "10000000-0000-4000-8000-000000001499" },
+		"guard":     func(v *fleet.OwnerConfiguration) { v.ProtectionDigest = artifact.Digest{9} },
+		"roots":     func(v *fleet.OwnerConfiguration) { v.IssuerRoots[0][0] ^= 1 },
+		"suspended": func(v *fleet.OwnerConfiguration) { v.Suspended = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := value.Clone()
+			change(&changed)
+			if s.currentConfiguration(observation(changed)) {
+				t.Fatal("changed authority adopted through a fresh revision")
+			}
+		})
+	}
+	expired := observation(value)
+	expired.ObservedAt, expired.FreshUntil = now.Add(-6*time.Second), now.Add(-time.Second)
+	if s.currentConfiguration(expired) {
+		t.Fatal("stored matching source renewed expired observation")
+	}
+}

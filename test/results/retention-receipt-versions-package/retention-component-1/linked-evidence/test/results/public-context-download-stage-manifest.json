@@ -1,0 +1,278 @@
+[
+  {
+    "path": "docs/architecture/public-context-download.md",
+    "base_sha256": null,
+    "sha256": "9dfe317dc6d0b64db10654fa5b7cce2d4bf7cdd7c6d9c045aaa55314e388bd94",
+    "bytes": 6414
+  },
+  {
+    "path": "docs/decisions/119-public-context-download-and-prepaid-stop.md",
+    "base_sha256": null,
+    "sha256": "3ca69f6619dc126eb2aff95708952e6a53601aa8bef203d17388dacaae47e96c",
+    "bytes": 4114
+  },
+  {
+    "path": "docs/interfaces/browser-openapi.yaml",
+    "base_sha256": "8fb3779d2a574349fdd383b1ee2ab8731d0213e0f413cc0812f1ba2ade94a472",
+    "sha256": "4867c19eb058152efe4ba9a4525451959ab5c5773cd78761e07e9be2d111acad",
+    "bytes": 307145
+  },
+  {
+    "path": "docs/interfaces/download-validation.json",
+    "base_sha256": "3fbf06d1afccf660f64996baaf335913644ccd76bb108b711b26b9e9d799af1a",
+    "sha256": "e3c9dba5a5d781627c730cc15ec03edb67ec41d696e58329ac6efe64d146f599",
+    "bytes": 141
+  },
+  {
+    "path": "internal/adapters/objectstore/download_stop.go",
+    "base_sha256": null,
+    "sha256": "55589dc9cba080de30e3e5ffe32f1139a40cbaded2d4bef7450c6bb71cc8593e",
+    "bytes": 2299
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/download_stop.go",
+    "base_sha256": null,
+    "sha256": "235ca93be505995148157425198a2131568d34eef3befe4ce630e64fb5b4dd51",
+    "bytes": 795
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/download_stop_test.go",
+    "base_sha256": null,
+    "sha256": "603115cf408e9e2874fc7cbfdec6912d8b20a19d06c6292f9994d5d49ccf60f5",
+    "bytes": 1706
+  },
+  {
+    "path": "internal/adapters/postgres/custody.go",
+    "base_sha256": "ddd3cc8cc23a8653d801e939ad493248b4ff844d28ca628a2980ebfe0386fa18",
+    "sha256": "5c881662ffa2f9e540843061c244100f17bc5ff159634f1f2aae66ce9d9fbebf",
+    "bytes": 16876
+  },
+  {
+    "path": "internal/adapters/postgres/download.go",
+    "base_sha256": "2ddc64ad4250f8cf5e3e9c38a9391d038bfef161583791e3c4591a943748c50e",
+    "sha256": "1df7f01a89794131194572507f4165e95d8630b1a7df7e0eb85f7b0ab283cb0c",
+    "bytes": 25935
+  },
+  {
+    "path": "internal/adapters/postgres/download_stop.go",
+    "base_sha256": null,
+    "sha256": "59f0a9cef7f6c882d8eb6551f0dd7ec63bc5dfddd52c40afb1f4bb4b41a87ef5",
+    "bytes": 14179
+  },
+  {
+    "path": "internal/adapters/postgres/initial_installation_tables.go",
+    "base_sha256": "d4bd021d07fb3a3f5b1fe7f8699fe75eddc8cab6899b476f5d30124033dff04a",
+    "sha256": "dc6daef0f56d5a11c9d4235b1a7087563687fe6c04963709291be4045b264ca1",
+    "bytes": 2110
+  },
+  {
+    "path": "internal/application/evidence/context_download_control.go",
+    "base_sha256": "8329d76476eef0eaf6737589ee33121c3fde42537e1bdac325fe310594b9c468",
+    "sha256": "0eb23f767650109f9e588aa1e8350435daa64d59fdcfc1118e66eb74c82728ca",
+    "bytes": 17120
+  },
+  {
+    "path": "internal/application/evidence/download_stop.go",
+    "base_sha256": null,
+    "sha256": "83eeb6c07d8c32b21645de3c5d15414119df8bd6d4cf8c2337f55de9feb1aacd",
+    "bytes": 6355
+  },
+  {
+    "path": "internal/application/evidence/download_stop_test.go",
+    "base_sha256": null,
+    "sha256": "2e5790d1d45a75fa83c089d1c57e8b6eb7c1c0323bd35fd73b62ec5ab8fef7d9",
+    "bytes": 6040
+  },
+  {
+    "path": "internal/contracts/investigation-schemas/cancel_artifact_download.json",
+    "base_sha256": null,
+    "sha256": "cc2d1e8f39b8cdd751b5e1064e0ff78767e36327ca1dc16d80a0ae9b33e56893",
+    "bytes": 5018
+  },
+  {
+    "path": "internal/contracts/investigation-schemas/get_artifact_download.json",
+    "base_sha256": null,
+    "sha256": "70a0fcea50f0b5488f5a082ed717b78d538b39a01be4e8548d03ff682774f749",
+    "bytes": 10572
+  },
+  {
+    "path": "internal/contracts/investigation-schemas/prepare_artifact_download.json",
+    "base_sha256": null,
+    "sha256": "52efbea7f7229917716cb82f4be479c92e832554a6f6ce1a9b0bc9c48841d4cf",
+    "bytes": 10448
+  },
+  {
+    "path": "internal/contracts/investigation_schema.go",
+    "base_sha256": "7ea57d4468dd3018a71fb2fc95aafe88500c413b45d0f90c2660616cadd17365",
+    "sha256": "1b7345bd13ea6b0bbc92bf68b613d11be9bc492474e2c639e5512d8deeed6bc9",
+    "bytes": 4073
+  },
+  {
+    "path": "internal/domain/artifact/download.go",
+    "base_sha256": "2ba4abfa4b8d3851ef87fd16371142d3c4fb99c99b0129b28e98b56ee21b323a",
+    "sha256": "1c68c05be3a7ef1114f082752db1d3218f8236cb88e8899a09a4534e75efa73f",
+    "bytes": 11169
+  },
+  {
+    "path": "internal/domain/artifact/download_stop.go",
+    "base_sha256": null,
+    "sha256": "30a4bf122501174b4beceeffa6f76044bbcd8a760841f97ea653aebc95154cc5",
+    "bytes": 3513
+  },
+  {
+    "path": "internal/domain/audit/operation.go",
+    "base_sha256": "63569b63ccdcb7d9f2472aed429073fa13449a2238184486cc04ae7d2b46edfe",
+    "sha256": "7dd96c3a952649f882c95357ee1284eaf8fea46e4c15f4b06f57fd9470f5c1d5",
+    "bytes": 4874
+  },
+  {
+    "path": "internal/transport/browser/download_test.go",
+    "base_sha256": null,
+    "sha256": "9d7bea586579c1326b2bc9116abd764749250a83b94ec27c43c26210484c450a",
+    "bytes": 3613
+  },
+  {
+    "path": "internal/transport/browser/investigation.go",
+    "base_sha256": "4abf6b3cd015203a2917a79ae93b057b024d51e7942b5e22c6f8edc8e595f3e0",
+    "sha256": "05ffdb53ed17c26235ca73fa4b44f6bb497ac9be6f085c6b0e9d8a095580ef57",
+    "bytes": 10583
+  },
+  {
+    "path": "internal/transport/mcp/download_test.go",
+    "base_sha256": null,
+    "sha256": "2e95d1a3991ceb519eb60a4a5fbe4e3711ed6663608a23878d1fee2112ed113f",
+    "bytes": 4664
+  },
+  {
+    "path": "internal/transport/mcp/handler.go",
+    "base_sha256": "81a8cabdeb3277400484a7b806d6a2b7d9bc421af4cce8857d0c9cf0ec0d8f68",
+    "sha256": "64471d4eb97edce3f340d96d7f6644fc1c73d1dd2d8f39101abbff117919c091",
+    "bytes": 25244
+  },
+  {
+    "path": "internal/transport/presentation/context_download.go",
+    "base_sha256": null,
+    "sha256": "7ae20b96797ec6bec1a27f314ca1ba3a7a3480254a1e54b3f3d6c34f9116086b",
+    "bytes": 11978
+  },
+  {
+    "path": "internal/transport/presentation/context_download_test.go",
+    "base_sha256": null,
+    "sha256": "d6f09402d2bb0b9efca052c24f279404c4a33ed7d571d1722a5777d3a7ccaaa8",
+    "bytes": 9843
+  },
+  {
+    "path": "internal/transport/presentation/investigation_operations.go",
+    "base_sha256": "2f8e3134a33b39b7a8f9694d3b4f6cbf252515f0b344d474b23e884bd3abf5ac",
+    "sha256": "0629a874a0836f1a51cc86e4bed8a975c6ba003d40aafbe595bbf0be5131cdf6",
+    "bytes": 4910
+  },
+  {
+    "path": "internal/transport/presentation/operation_audit.go",
+    "base_sha256": "d45ced7da1ba4e16aa144c7e243ab74561a32ebd8f74f182c637a5517cb329f8",
+    "sha256": "e5a0a5a770b6a39a5006891201d4698fea059780516b7159c89eacfb3139e66e",
+    "bytes": 18842
+  },
+  {
+    "path": "migrations/00046_download_stop.sql",
+    "base_sha256": null,
+    "sha256": "154ade87b3cc5d11460cc0a0222f9aa927bc01f99fb8b96bb54f12742da9b39c",
+    "bytes": 17367
+  },
+  {
+    "path": "migrations/queries/download.sql",
+    "base_sha256": "f95e3f2dfbda2c8cc589ed2d6c8e1cd15ccb22a0e8d360ead7b76235245009b0",
+    "sha256": "44d4d66474beea72b507a7e3ab85fbca1c9c98c4634ed17bf18bfeb102927de1",
+    "bytes": 2852
+  },
+  {
+    "path": "migrations/queries/download_stop.sql",
+    "base_sha256": null,
+    "sha256": "591c9303d454be455d89740519625583a4e72f1a0b991519c716fe06a9115bc4",
+    "bytes": 2241
+  },
+  {
+    "path": "scripts/check-downloads.py",
+    "base_sha256": "1f85bbed03e15dddcaced548bab75b0cbc6de1a6e5575c0f832b848901588e95",
+    "sha256": "bb4e248b51e48efad6a60448fa76aeecae93a747ceb478dae789080e232e610f",
+    "bytes": 8670
+  },
+  {
+    "path": "scripts/investigation-schemas.py",
+    "base_sha256": "4b102628cb80581a4e8a4b29441d69825b48e8aaa0330db20127c5cabdebe8c0",
+    "sha256": "43b391f8f105bcba4a7d0daa3ab8cd68340851bcae26ada8590e3df2e85e1d06",
+    "bytes": 10387
+  },
+  {
+    "path": "specs/artifact-downloads.md",
+    "base_sha256": "eabe2f8459c75287d1cb632f81d8ae57452a84512b684b6b533ec1953263b55a",
+    "sha256": "7cbca5d7cd393e738fae700a62453eea87f405e37abc4a247918ab7ace3c5419",
+    "bytes": 20236
+  },
+  {
+    "path": "specs/contracts/artifact-download.schema.json",
+    "base_sha256": "079ce51983499675f3f0ca1eea315fc45b6aadda9b5175ee27aadeff0e1bfce1",
+    "sha256": "004383f25fb7f7dab2cf5fe1c29cb4501b0f47377fa82e70e9516f7ac9629438",
+    "bytes": 8446
+  },
+  {
+    "path": "specs/contracts/mcp-tools.json",
+    "base_sha256": "69ad6c4caad6823953325bbaf1059350b5b74559c194decd1ba3539b8cae9e98",
+    "sha256": "f4eb55f091d2f1181d201f675aa076f42c259f453f0f696a2bee05ecc6ed6b83",
+    "bytes": 323569
+  },
+  {
+    "path": "test/fixtures/sql/runtime-roles.sql",
+    "base_sha256": "8039de05cfbce9c7e0e1a9750f14dd07bde02497b1bc37c101d0ac1c6b78f5a0",
+    "sha256": "a17b756ac45146edfb40b215bbd89d1e8862cc2b8dddc3cfe9409e19a409fde2",
+    "bytes": 59765
+  },
+  {
+    "path": "test/integration/context_publication_test.go",
+    "base_sha256": "3ca8b9ba057b28aa07b3b977470f6670aee6c002653c7792030a23258a5860f7",
+    "sha256": "f0205de22f360fc205fe193c07d0d5e8d0047151438e4e2aad22b13df655fac4",
+    "bytes": 20624
+  },
+  {
+    "path": "test/integration/download_stop_test.go",
+    "base_sha256": null,
+    "sha256": "658d2656ee8c392fd0d11e6515a824e25bb7b629bafe392a94688fd5c7775485",
+    "bytes": 14584
+  },
+  {
+    "path": "web/src/evidence/EvidenceWorkspace.tsx",
+    "base_sha256": "a2242660ec10554a78c642c2509ce29b80ea426431cc2623e7eefacbeb20bfc5",
+    "sha256": "e54838b089337ddc10c9ab15a2c5bee656b3987e721beebf82c92e6a3e50b152",
+    "bytes": 9156
+  },
+  {
+    "path": "web/src/evidence/evidence.test.ts",
+    "base_sha256": "a48a2feb0f7634851116de6e4b468257c091123fb02bf32441fe720828afa219",
+    "sha256": "869541816bc91fcbb805da10f172bf6ff6e1fed2d4f15cbb2c6eccc9e5ff15a7",
+    "bytes": 12382
+  },
+  {
+    "path": "web/src/evidence/evidence.ts",
+    "base_sha256": "2c7493bcf24cecee6f2555d6bb50d0e56fa439482a194c55cd4dea7e675ba8b4",
+    "sha256": "07102894aed7a88fa04184086541150b3ce0c8a50b5fdb1d4ebccea727fda500",
+    "bytes": 11933
+  },
+  {
+    "path": "web/src/evidence/http.ts",
+    "base_sha256": "8a7a6c67600dccd602f9462737a16605c223746d6367ef83c2dcba553cc63351",
+    "sha256": "9674e11d8ba6c131d1926f43206da7bee98391b30776e0b0943c2f86c39116d2",
+    "bytes": 4504
+  },
+  {
+    "path": "web/src/generated/evidence.d.ts",
+    "base_sha256": "c0c44b88c9d27f1ace34638693b731b89bef33a14bbcaab1f50a91285ab5f8f4",
+    "sha256": "f6a4c39596001d777a39a97dcfda97edc502392a09132820ae3d286e9f432b8a",
+    "bytes": 10981
+  },
+  {
+    "path": "web/src/generated/validate-evidence.js",
+    "base_sha256": "c0b07749dfc27635e2ba96ef780a7939a72064108797430ba303013036b9b9c4",
+    "sha256": "30e5f2248a8c96c162bc6e43a0a2c1cf06f030c5372ec39f0a84b20cf4ec340e",
+    "bytes": 247373
+  }
+]

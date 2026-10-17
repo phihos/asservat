@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/adapters/objectstore/owner_audit_inventory.go",
+    "base": null,
+    "payload": "5a1fec843b52ef3d0f3b3767651ffabbcbc36160a841e61c798621235a3f2228"
+  },
+  {
+    "path": "internal/adapters/objectstore/owner_audit_inventory_scope_test.go",
+    "base": null,
+    "payload": "234531d9cbac4a308522c103563f3ebca816b0a472059a338b20d6db96c6ccca"
+  },
+  {
+    "path": "internal/adapters/objectstore/owner_audit_inventory_test.go",
+    "base": null,
+    "payload": "447b31ef29fa24a8378a24a24b7d39989363af0044290cae2bd917b65b5ed242"
+  }
+]

@@ -1,0 +1,42 @@
+=== RUN   TestInitialPreparationProvidersWithRealServices
+=== RUN   TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain
+=== RUN   TestInitialPreparationProvidersWithRealServices/original-loader-replay
+=== RUN   TestInitialPreparationProvidersWithRealServices/original-provider-rights-retirement
+=== NAME  TestInitialPreparationProvidersWithRealServices
+    initial_preparer_provider_test.go:321: actual fixed-file preparation loader and Run; original SQL/native probe, two scoped OpenBao issue claims and seven immutable target files. Bootstrap identity/roles/material/S3 credentials remain explicit fixture inputs. Provider revocation follows joined preparation while original Pod stays gated; activation/handover and composed retirement remain pending
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-target_namespace
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-root
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-account
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-cluster_role
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-delete-collection
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationProvidersWithRealServices/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationProvidersWithRealServices/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationProvidersWithRealServices/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationProvidersWithRealServices/retired-role-cannot-refill
+--- PASS: TestInitialPreparationProvidersWithRealServices (99.33s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain (0.90s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/original-loader-replay (18.46s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/original-provider-rights-retirement (0.07s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/retired-rules-cannot-refill (0.01s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/retired-role-cannot-refill (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	100.390s

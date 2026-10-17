@@ -1,0 +1,5 @@
+--- FAIL: TestForwardCredentialFixtureFollowsRenewalBoundary (0.01s)
+    owner_forwarder_test.go:139: fixture issued for its stale setup clock signed control work rejected
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.012s
+FAIL

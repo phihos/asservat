@@ -1,0 +1,239 @@
+--- a/internal/adapters/objectstore/custody.go
++++ b/internal/adapters/objectstore/custody.go
+@@ -67,6 +67,9 @@
+ 	if err != nil {
+ 		return result, ErrStorage
+ 	}
++	if v == nil || v.IsTruncated == nil {
++		return result, artifact.ErrIntegrity
++	}
+ 	if len(v.Versions)+len(v.DeleteMarkers) > inventoryBatch {
+ 		return result, artifact.ErrLimit
+ 	}
+@@ -87,10 +90,13 @@
+ 			return result, err
+ 		}
+ 	}
+-	result.truncated = aws.ToBool(v.IsTruncated)
++	result.truncated = *v.IsTruncated
+ 	u, err := s.client.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: &s.bucket, Prefix: &prefix, MaxUploads: aws.Int32(inventoryBatch)})
+ 	if err != nil {
+ 		return result, ErrStorage
++	}
++	if u == nil || u.IsTruncated == nil {
++		return result, artifact.ErrIntegrity
+ 	}
+ 	if len(u.Uploads) > inventoryBatch {
+ 		return result, artifact.ErrLimit
+@@ -102,10 +108,13 @@
+ 		}
+ 		result.uploads = append(result.uploads, upload{key, ref})
+ 	}
+-	result.truncated = result.truncated || aws.ToBool(u.IsTruncated)
++	result.truncated = result.truncated || *u.IsTruncated
+ 	o, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &s.bucket, Prefix: &prefix, MaxKeys: aws.Int32(inventoryBatch)})
+ 	if err != nil {
+ 		return result, ErrStorage
++	}
++	if o == nil || o.IsTruncated == nil {
++		return result, artifact.ErrIntegrity
+ 	}
+ 	if len(o.Contents) > inventoryBatch {
+ 		return result, artifact.ErrLimit
+@@ -117,7 +126,7 @@
+ 		}
+ 		result.keys = append(result.keys, key)
+ 	}
+-	result.truncated = result.truncated || aws.ToBool(o.IsTruncated)
++	result.truncated = result.truncated || *o.IsTruncated
+ 	return result, nil
+ }
+ 
+--- a/internal/adapters/objectstore/custody_test.go
++++ b/internal/adapters/objectstore/custody_test.go
+@@ -54,6 +54,8 @@
+ 					fmt.Fprint(w, "<ListVersionsResult>")
+ 					if mode == "truncated" {
+ 						fmt.Fprint(w, "<IsTruncated>true</IsTruncated>")
++					} else {
++						fmt.Fprint(w, "<IsTruncated>false</IsTruncated>")
+ 					}
+ 					if mode == "retained-marker" || mode == "delete-failed" || mode == "foreign-key" {
+ 						key := loc.Prefix() + "data"
+@@ -66,11 +68,11 @@
+ 					return
+ 				}
+ 				if q.Has("uploads") {
+-					fmt.Fprint(w, "<ListMultipartUploadsResult/>")
++					fmt.Fprint(w, "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>")
+ 					return
+ 				}
+ 				if q.Has("list-type") {
+-					fmt.Fprint(w, "<ListBucketResult>")
++					fmt.Fprint(w, "<ListBucketResult><IsTruncated>false</IsTruncated>")
+ 					if mode == "null-version" && deletes == 0 {
+ 						fmt.Fprintf(w, "<Contents><Key>%sdata</Key><Size>1</Size></Contents>", loc.Prefix())
+ 					}
+--- a/internal/adapters/objectstore/operation_lifecycle_test.go
++++ b/internal/adapters/objectstore/operation_lifecycle_test.go
+@@ -173,15 +173,17 @@
+ 					fmt.Fprint(w, "<ListVersionsResult>")
+ 					if mode == "truncated" {
+ 						fmt.Fprint(w, "<IsTruncated>true</IsTruncated>")
++					} else {
++						fmt.Fprint(w, "<IsTruncated>false</IsTruncated>")
+ 					}
+ 					if deletes.Load() == 0 || mode == "retained-marker" {
+ 						fmt.Fprintf(w, "<Version><Key>%s</Key><VersionId>v1</VersionId></Version>", key)
+ 					}
+ 					fmt.Fprint(w, "</ListVersionsResult>")
+ 				case q.Has("uploads"):
+-					fmt.Fprint(w, "<ListMultipartUploadsResult/>")
++					fmt.Fprint(w, "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>")
+ 				case q.Has("list-type"):
+-					fmt.Fprint(w, "<ListBucketResult/>")
++					fmt.Fprint(w, "<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>")
+ 				default:
+ 					t.Error("unexpected request")
+ 				}
+--- a/internal/adapters/objectstore/download_stop_lifecycle_test.go
++++ b/internal/adapters/objectstore/download_stop_lifecycle_test.go
+@@ -165,15 +165,17 @@
+ 					fmt.Fprint(w, "<ListVersionsResult>")
+ 					if mode == "truncated" {
+ 						fmt.Fprint(w, "<IsTruncated>true</IsTruncated>")
++					} else {
++						fmt.Fprint(w, "<IsTruncated>false</IsTruncated>")
+ 					}
+ 					if deletes.Load() == 0 || mode == "retained-marker" {
+ 						fmt.Fprintf(w, "<Version><Key>%s</Key><VersionId>v1</VersionId></Version>", key)
+ 					}
+ 					fmt.Fprint(w, "</ListVersionsResult>")
+ 				case q.Has("uploads"):
+-					fmt.Fprint(w, "<ListMultipartUploadsResult/>")
++					fmt.Fprint(w, "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>")
+ 				case q.Has("list-type"):
+-					fmt.Fprint(w, "<ListBucketResult/>")
++					fmt.Fprint(w, "<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>")
+ 				default:
+ 					t.Error("unexpected request")
+ 				}
+--- a/docs/architecture/custody-transactions.md
++++ b/docs/architecture/custody-transactions.md
+@@ -36,7 +36,7 @@
+ 
+ Before deleting, `privacy.Cleaner` requires `WriterBarrier.CloseAndWait`: revoke/fence the attempt's ability to write and confirm all in-flight uploads/completions have stopped. Lease expiry alone, sending a cancellation, or observing an empty listing does not establish this. There is deliberately **no production barrier implementation yet**. Bootstrap must not enable a cleanup worker with a no-op barrier; the test-only barrier is valid only because the fixture explicitly finishes every synthetic writer.
+ 
+-The S3 cleanup adapter inventories versions, delete markers, multipart uploads and current objects under the exact UUID-derived attempt prefix. It aborts uploads, deletes explicit versions (including null versions), and rechecks all inventories. Missing permissions, malformed/incomplete responses, unsupported inventory, backend errors or remaining entries leave the charge intact. One call processes at most 128 entries per inventory API; additional entries require a fresh bounded retry. This relies on a qualified backend's complete inventory semantics and a completed writer barrier. It makes no claim about unmanaged replicas or physical disk sanitization.
++The S3 cleanup adapter inventories versions, delete markers, multipart uploads and current objects under the exact UUID-derived attempt prefix. It aborts uploads, deletes explicit versions (including null versions), and rechecks all inventories. Missing permissions, malformed/incomplete responses, unsupported inventory, backend errors or remaining entries leave the charge intact. Each of the three LIST responses must include an explicit `IsTruncated` value before its rows can be used. An omitted field is unknown completeness, never an empty complete page. Malformed initial inventory permits no delete or abort; malformed final inventory cannot certify absence after already completed mutations. The same shared inventory checks apply to operation and download-stop audit cleanup. One call processes at most 128 entries per inventory API; additional entries require a fresh bounded retry. This relies on a qualified backend's complete inventory semantics and a completed writer barrier. It makes no claim about unmanaged replicas or physical disk sanitization.
+ 
+ Only the current, unexpired deletion lease may finish. SQL releases the original reservation exactly once, clears receipts and retains the minimized deleted record/event for future restore suppression. Duplicate completion of that fence is idempotent; old fences cannot refund. Cleanup failure requires a subsequent lease/retry and remains pending or overdue according to its original deadline. Automatic polling/backoff, operator notices, early erasure/holds, all-store lineage, finite tombstone retention, restore and durable deletion audit are still pending.
+ 
+--- a/internal/adapters/objectstore/custody_inventory_completeness_test.go
++++ b/internal/adapters/objectstore/custody_inventory_completeness_test.go
+@@ -0,0 +1,105 @@
++package objectstore
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"sync"
++	"testing"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"github.com/aws/aws-sdk-go-v2/credentials"
++)
++
++// Exercise the real TLS transport and AWS XML decoder: an omitted Boolean must
++// not become false and thereby certify deletion. The initial scan contains both
++// a version and an upload; the independent final scan follows their exact removal.
++func TestPurgeRejectsOmittedInventoryCompleteness(t *testing.T) {
++	location := artifact.Location{ClusterID: "10000000-0000-4000-8000-000000000001", ArtifactID: "10000000-0000-4000-8000-000000000002", AttemptID: "10000000-0000-4000-8000-000000000003"}
++	for _, phase := range []string{"initial", "final"} {
++		for index, api := range []string{"versions", "uploads", "current"} {
++			t.Run(phase+"/"+api, func(t *testing.T) {
++				var mu sync.Mutex
++				scans, lists, deletes, aborts := 0, 0, 0, 0
++				key, uploadKey := location.Prefix()+"data", location.Prefix()+"manifest"
++				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++					mu.Lock()
++					defer mu.Unlock()
++					w.Header().Set("Content-Type", "application/xml")
++					q := r.URL.Query()
++					if r.Method == http.MethodDelete {
++						switch {
++						case q.Get("uploadId") == "pending" && !q.Has("versionId") && strings.HasSuffix(r.URL.Path, "/"+uploadKey):
++							aborts++
++						case q.Get("versionId") == "v1" && !q.Has("uploadId") && strings.HasSuffix(r.URL.Path, "/"+key):
++							deletes++
++						default:
++							t.Error("unexpected or unqualified mutation")
++							w.WriteHeader(http.StatusBadRequest)
++							return
++						}
++						w.WriteHeader(http.StatusNoContent)
++						return
++					}
++					if r.Method != http.MethodGet || q.Get("prefix") != location.Prefix() {
++						t.Error("inventory escaped original request/prefix")
++						w.WriteHeader(http.StatusBadRequest)
++						return
++					}
++					var name, root string
++					switch {
++					case q.Has("versions"):
++						scans++
++						name, root = "versions", "ListVersionsResult"
++					case q.Has("uploads"):
++						name, root = "uploads", "ListMultipartUploadsResult"
++					case q.Get("list-type") == "2":
++						name, root = "current", "ListBucketResult"
++					default:
++						t.Error("unexpected LIST API")
++						w.WriteHeader(http.StatusBadRequest)
++						return
++					}
++					lists++
++					fmt.Fprintf(w, "<%s>", root)
++					malformed := name == api && ((phase == "initial" && scans == 1) || (phase == "final" && scans == 2))
++					if !malformed {
++						fmt.Fprint(w, "<IsTruncated>false</IsTruncated>")
++					}
++					switch {
++					case name == "versions" && deletes == 0:
++						fmt.Fprintf(w, "<Version><Key>%s</Key><VersionId>v1</VersionId></Version>", key)
++					case name == "uploads" && aborts == 0:
++						fmt.Fprintf(w, "<Upload><Key>%s</Key><UploadId>pending</UploadId></Upload>", uploadKey)
++					case name == "current" && deletes == 0:
++						fmt.Fprintf(w, "<Contents><Key>%s</Key><Size>1</Size></Contents>", key)
++					}
++					fmt.Fprintf(w, "</%s>", root)
++				}))
++				defer server.Close()
++				store, err := New(server.URL, "us-east-1", "fixture", credentials.NewStaticCredentialsProvider("synthetic", "synthetic", ""), server.Client())
++				if err != nil {
++					t.Fatal(err)
++				}
++				err = store.PurgeAttempt(context.Background(), location)
++				mu.Lock()
++				gotLists, gotDeletes, gotAborts := lists, deletes, aborts
++				mu.Unlock()
++				if !errors.Is(err, artifact.ErrIntegrity) {
++					t.Fatalf("omitted IsTruncated certified absence or wrong failure: phase=%s api=%s err=%v deletes=%d aborts=%d", phase, api, err, gotDeletes, gotAborts)
++				}
++				wantLists, wantEffects := index+1, 0
++				if phase == "final" {
++					wantLists += 3
++					wantEffects = 1
++				}
++				if gotLists != wantLists || gotDeletes != wantEffects || gotAborts != wantEffects {
++					t.Fatalf("continued after malformed inventory: lists=%d want=%d deletes=%d aborts=%d want-each=%d", gotLists, wantLists, gotDeletes, gotAborts, wantEffects)
++				}
++			})
++		}
++	}
++}

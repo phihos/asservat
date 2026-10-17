@@ -1,0 +1,46 @@
+{
+  "component": {
+    "root": "/home/phil/.cache/asservat-build/planning/fleet-persistence-contention-20261013/checks/component-1",
+    "files": {
+      "HANDOFF.md": "24172fab56f64a429c98a38b4ccfed829bd865d5ae29fed345ad975bb432a6c2",
+      "dependencies.json": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+      "dependency-args.json": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+      "evidence/application-before.log": "6eb47e24ac8f932635e4b493c0ca7f47573a5e0f07d109130e71570608a5841e",
+      "evidence/application-domain-races.log": "04334ebed123bbe4024f9d6ab12351853e0328cac182d67f111f03e86e3e72b2",
+      "evidence/bootstrap-races.log": "659d28d195f1dcea49479f295dca3d726ddf46f2da70197a12356daabc84b5c3",
+      "evidence/canonical.log": "606de5e3e6b74042a95c55cd8adf078e9c25fe27a68fe8b8c1daca670dc44ba8",
+      "evidence/compile.log": "bbe8a1462f7e21d54b8910febdb3abb40571049060a1c67b980cccb2795993dd",
+      "evidence/go-architecture.log": "f15bc21afd9ed213b82b0123d1065df4072d9469804640ebd04fb3b5ee367c72",
+      "evidence/postgres-races.log": "6b7c07b7f209b59b0fa5953bd504d849638eb6b0513164a0b6a7748750245515",
+      "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "freeze.json": "0cbe378a2f016eb25e0cfa39a3aa2b3e76b5e6becbb2d51f0a24ab540de4bc8f",
+      "inventory.json": "6424f0dbf4ac9968095c9aecffbf5f5d9a7631e14ab86339f463077c3ee0e585",
+      "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+      "manifest.json": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+      "mirror-manifest.json": "c353968bda15a21f662ebed7c2c809335cff2d047a25236db07e05ca3ca0cddf",
+      "result.json": "c98fd4a738b4c8c6019a81919b042dc34016e46f4628a59e8953d4f13918931a",
+      "run.py": "95f4da320337af77d9f93494598d20741147a36d9f2b0ad198efa558f83974fc",
+      "runner.log": "7dc2fed822f5fded9073c72b16d6223eefba7c82ebbb2482464b7a7ca616838d"
+    }
+  },
+  "native": {
+    "root": "/home/phil/.cache/asservat-build/planning/fleet-persistence-contention-20261013/checks/native-1",
+    "files": {
+      "dependencies.json": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+      "dependency-args.json": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+      "evidence/actual-sql.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+      "evidence/native/fleet-environment.json": "ee3c4db404ec8b43d5a7fad5999d14fca40bf7fa3cf3e40dc3fbcad72b562157",
+      "evidence/native/fleet.log": "31ddee9e88aefd4f8b46de0cfece09843f72f1a54fec427652b6cf07b4d9bf8b",
+      "expected-native-sources.json": "dd8ebe254a08a74fd529c46e77f3cd88f758241107af7b4b764706a048a0be19",
+      "freeze.json": "14bd95ae9a75ce305771b6d0849eb859b2051559d2a8aa78cd3afba742e9a79f",
+      "inventory.json": "6424f0dbf4ac9968095c9aecffbf5f5d9a7631e14ab86339f463077c3ee0e585",
+      "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+      "manifest.json": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+      "mirror-manifest.json": "c353968bda15a21f662ebed7c2c809335cff2d047a25236db07e05ca3ca0cddf",
+      "required-tests.json": "c062b5fb00e83886651b901e667545699b8f683569c51acbc89382aa5bb8fde9",
+      "result.json": "4a50a5a80af480cc3863956c922dc028643b403ca8b4140a565a17cc51c8d749",
+      "run.py": "d0c6fb5cf05844c6319ae9955e87c353771d0afc4a2d3e14ca8880eb0d99e839",
+      "runner.log": "66eae624fa06d75363314e4b288c76bc5b9490d5684270a8c0ef95f387975c84"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_effects_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "bc72b789ad6aa265785340bd8a67aa195af49fe8e25f24b5d6254c376209d4ed"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_native_test.go",
+    "base_sha256": "03a4d96775f7c0dce74e60acc23f1c22914117c6781705e25f8f89ee1e32db23",
+    "payload_sha256": "b9221ed673677b8a3ddcd72d99dd5585a86704f5c0cb379c331af6734e0d0614"
+  }
+]

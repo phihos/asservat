@@ -1,0 +1,162 @@
+[
+  {
+    "path": "docs/decisions/140-installed-public-runtime-producers.md",
+    "base_sha256": "b08bcef1bec7893421abafc2f1f880e25fc17666505a7d5040eb102be8ceeffb",
+    "payload_sha256": "032a1181f0a5eb3cf0f371d44f26918a47a1524326576de02b6bbddaf387df30"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_current.go",
+    "base_sha256": "1133d4db29ba22358b6d4b058a2d75d7e10779956fb02320c141b26f352cfccd",
+    "payload_sha256": "17350c7c2b0e3b608eb6f258ad643e5b4d28957e5dd80ef77ca54d17cb2efc84"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge.go",
+    "base_sha256": null,
+    "payload_sha256": "77563d2ca89f3b97c02991bea44ff516cc55519437923de69d58d99f7eb8a05c"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_history.go",
+    "base_sha256": null,
+    "payload_sha256": "8beb01c03838b49bc1445f126ad08a884ccc85c70aad842331d1b787f6d1d47b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_policy.go",
+    "base_sha256": null,
+    "payload_sha256": "5a9a6c93cc275976512b6469d63926d4fd417bfbc36765985faebaf8eb262a81"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_policy_test.go",
+    "base_sha256": null,
+    "payload_sha256": "20dea0451bf44147ba694e1010c6b1c6373e4ec75c09fd7765c95ccaace0e23e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_test.go",
+    "base_sha256": null,
+    "payload_sha256": "31c32e305778ca152cf44f755a74370d92abe1b03c3da19e2f274b8ea4406c7f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_transition.go",
+    "base_sha256": null,
+    "payload_sha256": "6467a48e1a64f8097df2b97083d714378060361870f6d74c6a000cf1dbe9ad6d"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resource_inventory.go",
+    "base_sha256": null,
+    "payload_sha256": "5e4cc248c0f83541f7f1be4004617760b93230df7dbc411751b7a99f77131bee"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resource_objects.go",
+    "base_sha256": null,
+    "payload_sha256": "724006f6b1e49379c54fae5c65b91e3501eab9ca5d6d5c8ab9f90b6ca7a7b64b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resource_objects_test.go",
+    "base_sha256": null,
+    "payload_sha256": "88feb710fb2dfe1bd0bbca23ff3c2b97721be1df7f54d0733f63c044fe71ce34"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+    "base_sha256": null,
+    "payload_sha256": "3fd0a9093d79101a02f8485a80bba8c2e59f87664ac73ad0a57594fa8dfde4e6"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_workload.go",
+    "base_sha256": null,
+    "payload_sha256": "018af3c13c3b31a0f68d63978f76a678fc18ac5ca64b228b4d2d0ff57770924c"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+    "base_sha256": "430c8d2ceaf1703b6b2c7c5aa74820e869bc94d2cb79ecc093f29112464d39cc",
+    "payload_sha256": "6842f3f341e7ffc48643709ea395485ae23df719d3280eb0dd53259971e3825e"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_history_test.go",
+    "base_sha256": null,
+    "payload_sha256": "7a7f631efa9a591c49eb3f746af0582d4f30c0fdc1911101c645e96bec1b0e90"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_inputs.go",
+    "base_sha256": "813ddc0669f4e37bc81d4a8ddd219495ca5926a757474ab12195a2c570589463",
+    "payload_sha256": "9726db3fdc6343bc68a0d09ef3fee385973f7bf0e681504b93b59bebe6518f3f"
+  },
+  {
+    "path": "internal/bootstrap/configuration_role_installer.go",
+    "base_sha256": "8c019e8580e0497dddb3abad0235afcf65c7a7dd72785861a6d00ebbb7d566fd",
+    "payload_sha256": "88aa215b2892453253494499b23dc4dd0dafa39ed230ace0e8d4b46668974f21"
+  },
+  {
+    "path": "internal/bootstrap/owner_deployment.go",
+    "base_sha256": "15c1fd0e37748be2b192b2281b2f053886bdcd5b3cc69f04a9bcf1409a61c5bf",
+    "payload_sha256": "c7fc65e58ea1700b434891e6be7def3da56f33e31eba4f0635d7ff33615538b2"
+  },
+  {
+    "path": "internal/bootstrap/owner_inputs.go",
+    "base_sha256": "93a35c6beda7710eec2c10bfeef584f9ed9402668bb6f63dffa104eca9ece31a",
+    "payload_sha256": "7a2f269e1475950fcbbd7387874519a45a87bbac21ebdc355a13e00ca765c68d"
+  },
+  {
+    "path": "internal/contracts/configuration_role_installer.go",
+    "base_sha256": "64b9f8fd2c1d4a06bdef0665c490c4c12eb83f3a43051a7edae72126b1a3b02a",
+    "payload_sha256": "0029b518d8f7310fad21e4bde3b4ff67d42c4d267b110e192e68c348aa0aa96f"
+  },
+  {
+    "path": "internal/contracts/initial_runtime_bridge.go",
+    "base_sha256": null,
+    "payload_sha256": "5594148dda5165cf1a733e493c705066145f0bdb997f75fa2fad2968bea075ad"
+  },
+  {
+    "path": "internal/contracts/initial_runtime_resources.go",
+    "base_sha256": null,
+    "payload_sha256": "5315812a8c3d40c87aace4b1d78e68716e8be4438dcc24bc0ff74a60269f2750"
+  },
+  {
+    "path": "internal/contracts/owner_deployment.go",
+    "base_sha256": "126e9a65b146fb20f1f916253c1d3215c7a5c7d3bee3149e5349d006a40c8821",
+    "payload_sha256": "ff67c13a61d358e95dd17ea72df428dadd5048bfb34f14b6f9bebb8feac016fa"
+  },
+  {
+    "path": "internal/domain/configuration/initial_runtime_bridge.go",
+    "base_sha256": null,
+    "payload_sha256": "b7bda1bc96cf918b706c9c90f557020597180b3ecd34566e72c6fabfae6f819b"
+  },
+  {
+    "path": "internal/domain/configuration/owner_administration.go",
+    "base_sha256": "a620af2e673a5ec582793c555dcce5c0d8ea8537ac79ae67e575eca0c396205a",
+    "payload_sha256": "0c9c0480026b6486a7ba39f422544eaf9028009caa6e193d199289d36277b93f"
+  },
+  {
+    "path": "specs/contracts/configuration-role-installer.schema.json",
+    "base_sha256": "087ae7811705bcdacdf544cfc7309a06788627e61fa4b0d1294b1cf763acd468",
+    "payload_sha256": "b84232ab4df9a7c1ed1e87f7c311ae98d7ea840ef52e6055d0139d90788f7856"
+  },
+  {
+    "path": "specs/contracts/initial-runtime-bridge.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "42985d6a32fa8e04515edfe7a9e97a598722ce6a0fca40bfaebd746ece3e8130"
+  },
+  {
+    "path": "specs/contracts/initial-runtime-resources.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "c30538e08f9fd6fefed821f0e6811d294a299697e761b4c9e5c5326c8896f1d5"
+  },
+  {
+    "path": "specs/contracts/owner-deployment.schema.json",
+    "base_sha256": "623d238882f2bb929d4f59e81a6b92b5d9def985339768b3f43754d7dec29a53",
+    "payload_sha256": "4b76e4d4c16f0b6f76a650366c02a0763efc6d6f2de4cab435fdf607ca61dfda"
+  },
+  {
+    "path": "specs/persistence.md",
+    "base_sha256": "289cb32225b5ba2998c58da8f6782ff3d51f6196270a03f85e4204a2caa8385a",
+    "payload_sha256": "f98f4858f2ca6e580f2d41a4e4058335658cf7c1e25181876efcc47906d5c40c"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "base_sha256": "297903109d3610619b41ce0ef6f08ce7f4ff269b58d9e34541b52ebaab06b424",
+    "payload_sha256": "2a4a0270743ce8614f3b13d0245f3f6a786a1aae2e0100297fabb4e3d7d62090"
+  },
+  {
+    "path": "test/integration/initial_runtime_bridge_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "5157cc3ed75ba466067ff7d223967e608d2b50a2ce095ee6b39f66ba98635bcf"
+  }
+]

@@ -1,0 +1,130 @@
+# Bounded Go runtime-profile acquisition
+
+This component implements the C-11/C-23 mechanism boundary for the existing
+`profile` action (REQ-PRF-001/002 and REQ-LIF-001). It is not an installed profile
+feature. Profile-specific acceptance, start/quota admission, endpoint resolution,
+protected node networking, semantic verification and publication remain required.
+The existing 4096-byte pod-status authorities and public routes are unchanged.
+
+## Lifetime and authority contract
+
+`GoProfileRequest` is an immutable, resolved mechanism input. It contains the
+original artifact/attempt binding, exact whole-pod/node/boot identity, named
+source and resolved endpoint digest, profile parameters, native byte limit and
+original `NotBefore`/`Deadline`. Its producer must derive the deadline from the
+earliest accepted capture, action, grant, processing/write and retention cutoff.
+The mechanism cannot extend any of those deadlines or create/renew a permit.
+`PinnedPod.ControllerUID` keeps the existing immediate-controller meaning; it is
+empty for a bare Pod, never fabricated as the Pod UID. Full workload ownership
+and credential audience come from the original accepted scope/current resolver.
+This is an on-trigger action, including a cumulative or delta profile. A timed
+profile is not a recorder and has no pre-trigger history.
+
+Before calling acquisition the execution service must have committed the
+original intrusive start, impact/output reservations and conflicting-runtime
+slot, and prepared wrap-only encryption keys. This new mechanism input cannot
+be used as an existing `ContextStart` or public collection scope. In particular,
+the existing local start binding's one-minute ceiling cannot represent a
+60-second CPU profile plus setup/shutdown margin. Profile-specific admission
+must resolve that contract explicitly before maximum-duration profiles can be
+enabled; this component does not silently widen the existing binding.
+
+The separate `GoProfileGuard` reports a current observation of that same admitted
+request, including original grants, current permission/deny/recovery state,
+exact endpoint source, target incarnation and retained runtime-domain slot.
+There is no production guard implementation in this component. Each observation
+lasts at most five seconds. A one-second current-state recheck is bounded by the
+previous observation's **original** expiry. A blocked, stale, denied or failed
+recheck stops the socket; success may replace only observation freshness inside
+the unchanged action deadline. It cannot alter the request or replenish spend.
+Original caller cancellation remains connected throughout acquisition and
+encryption. The observer is joined before returning.
+
+The mechanism requires at least two seconds of explicitly admitted setup/finish
+margin, permits at most ten, and does not synthesize defaults. Planning retains
+the product's ten-second CPU, five-second trace and five-second snapshot defaults.
+If remaining time no longer fits the requested recording plus margin, do not
+contact the application. Recording duration, not HTTP/client timeout, sets the
+server-side upper request parameter. Cancellation or even complete HTTP EOF
+does not independently prove the remote profiler stopped. Unknown starts remain
+spent; the mechanism has no retry, stop-profiler request or capacity-refund path.
+
+## Named endpoint and network boundary
+
+`GoProfileDialer` is a required trusted capability, not an implemented node
+resolver. It resolves only the admitted source/digest, rechecks exact pod/node
+identity and credential audience and opens the connection from the target node.
+For target-loopback it must enter the exact qualified target network namespace;
+ordinary collector loopback is forbidden. Pod IP and declared port are routing
+facts, not serving-process attribution. No container permission or public
+container selector is introduced. Node-local and network-namespace qualification
+remain outstanding.
+
+The dialer returns one already authenticated HTTP/1 connection with its original
+channel/credential expiry (no later than the action deadline) and a fixed
+administrator-selected Host value and optional bounded Authorization value.
+For a credentialed endpoint it must first verify the configured TLS peer and
+the credential's workload audience; unauthenticated clear transport cannot carry
+that credential. The adapter cannot supply an address override, TLS roots,
+credential reference, URL, port or arbitrary request header. Its socket deadline and request context retain the earlier channel expiry;
+neither a fresh current observation nor the longer action interval can extend it.
+Its HTTP transport
+has no environment proxy, DNS path, redirects, persistent connections or retry.
+It receives that one connection once. HTTP/2 is not negotiated by this profile.
+
+Paths are fixed Go pprof paths; CPU maps to `/debug/pprof/profile` and runtime
+trace to `/debug/pprof/trace`. Only `debug=0`, approved integral `seconds` and
+explicit heap-snapshot `gc=1` are generated. Never call index, cmdline, symbol,
+sampling controls or an application's stop endpoint. Go handles a `seconds`
+request through its delta path before heap GC, so `forceGC` combined with delta
+is rejected rather than claiming GC occurred. The standard handler's busy
+response is recognized only by its exact bounded signature; arbitrary server
+errors do not become `ProfilerBusy`. [Go pprof API](https://pkg.go.dev/net/http/pprof),
+[Go HTTP pprof implementation](https://go.dev/src/net/http/pprof/pprof.go).
+
+## Evidence and local tools
+
+Successful response entity bytes flow directly into the prepared
+`evidence.StorageEncoder`. HTTP transfer framing is removed, while content
+encoding and native gzip bytes are preserved exactly: automatic decompression
+is disabled. No native file, plaintext object or whole-profile buffer is created.
+Calling acquisition transfers ownership of the single-use prepared sink even
+when validation, current authority or endpoint opening fails. Acquisition closes
+the sink after joining source/observer work, drops prepared key references and
+checks the original cutoffs again; it cannot reuse that attempt. Releasing Go
+primitive references is not a promise of physical memory erasure.
+The existing versioned framed format retains native length/checksum for later
+authenticated byte-exact download. This component returns an encrypted layout
+and acquisition facts, not a catalog artifact or readable profile.
+
+Response headers are bounded, non-success bodies are inspected only through a
+small fixed classifier and never emitted/logged, and accepted body reads have a
+hard native cap with at most one overflow byte. Empty/truncated/over-limit and
+partially consumed responses cannot report complete acquisition. Consumer errors
+stop the socket, preserve possible-start provenance and do not return a usable
+layout. Endpoint Host, authorization and upstream error strings are absent from
+returned errors and acquisition provenance.
+
+An HTTP success and an octet-stream content type do not verify profile semantics.
+The separate offline C-18 parser must establish sample types/units, duration,
+sampling configuration, labels, mappings and format before publication. Unknown
+process attribution, disabled block/mutex sampling and remote stop must remain
+unknown until qualified. No parser or flamegraph renderer runs in this
+network-enabled mechanism process. Native downloads and local pprof/trace tools
+remain required; their publication/transfer integration is not supplied here.
+
+All originals are raw evidence that may contain user data. Original acquisition
+retention, workload quotas, encrypted custody, audit and independent verification
+must cover the output and partial copies. No sample/label redaction is claimed
+for the preserved original. Managed deletion cannot erase downloaded copies.
+
+## Qualification and remaining composition
+
+The staged tests exercise synthetic HTTP and the existing framed encoder; test
+guards and node connections are explicitly synthetic. Passing them does not
+qualify real node routing, runtime-domain mutual exclusion, production authority,
+object-store custody/publication, native-download permissions or the UI/MCP flow.
+No public/Helm profile capability is enabled by these new files. The integration
+sequence is accepted endpoint/template resolution and profile-specific admission,
+qualified node dialer/current guard, bounded custody/manifest verification, then
+the same shared capture/catalog/native-download workflow and isolated analysis.

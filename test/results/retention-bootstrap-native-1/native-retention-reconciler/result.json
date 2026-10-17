@@ -1,0 +1,43 @@
+{
+  "name": "native-retention-reconciler",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestRetentionWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "seconds": 95.717,
+  "diskBeforeBytes": 424006766592,
+  "sourceSnapshotUnchanged": true,
+  "requiredPassedTests": [
+    "TestRetentionWithRealKubernetes",
+    "TestRetentionWithRealKubernetes/baseline-and-delegated-write",
+    "TestRetentionWithRealKubernetes/current-guard-proof-is-dry-run-and-pinned",
+    "TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion",
+    "TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/durable-guarded-reconciliation"
+  ],
+  "passedTests": [],
+  "missingRequiredTests": [
+    "TestRetentionWithRealKubernetes",
+    "TestRetentionWithRealKubernetes/baseline-and-delegated-write",
+    "TestRetentionWithRealKubernetes/current-guard-proof-is-dry-run-and-pinned",
+    "TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion",
+    "TestRetentionWithRealKubernetes/reader-role-current-snapshot-and-deletion/durable-guarded-reconciliation"
+  ],
+  "validationErrors": [
+    "native test exit missing or nonzero",
+    "missing required selected PASS names"
+  ],
+  "harnessSourceMismatches": [],
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "testExit": 1,
+  "archiveHashes": {
+    "harness.log": "dbf60749d00b58fbbbd48a6ded853fc7bc9c9fd3213126d763a4f457ebd9eefe",
+    "context-storage.log": "c04902db76f521b09de4cc9e8cfd2f13cdacd249071876460782230cf9961f91",
+    "context-storage-environment.json": "2097bcab265073c13aadb229dd7f97f574988b26de74dc5c663a3cb57e35ceaa",
+    "context-storage-kubelet.log": "972f23046b7f5d7430c2fa3652f3f7f7e491536a036f1988e84e783f5c69e569",
+    "context-storage-postgres.log": "110f8fefc32930df1a5ba22bce5195d770fefc92f72fa9b68ad68760490c0bd6"
+  }
+}

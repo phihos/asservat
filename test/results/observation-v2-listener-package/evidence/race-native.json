@@ -1,0 +1,45 @@
+{
+  "phase": "race-native",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^Test(OwnerObservationOperationListener|OwnerObservationOperationFirstRequestCloseRace|OwnerObservationOnlyListenerActualTLS|OwnerObservationListenerCloseJoinsOriginalCall|NativePurpose)",
+    "-v",
+    "./internal/transport/native"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 10.185,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "topLevelPass": 11,
+  "namedPass": 40,
+  "skips": 0,
+  "failureMarker": null,
+  "markerOccurrences": null
+}

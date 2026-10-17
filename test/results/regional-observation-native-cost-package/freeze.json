@@ -1,0 +1,14 @@
+{
+  "IMPLEMENTATION.md": "02f6796e868567863c6596785ad960987b0012bb26e55f349876461460c4c590",
+  "PAIR-PROOF-DESIGN.md": "04b028df325a96c00009663a12489e00006ec6903201fe40ec30fd89416f2459",
+  "PROPOSAL.md": "65c4446d2e8e3255dd213afada0c593fbd073a2634957337c8b941f5c08f5d04",
+  "bases.json": "8d61e6e7833d6a3b9c19c7f8492c61727023430a163285dd0ecedcc1cbffa43c",
+  "dependencies.json": "a113b4e10a7cf1cb74ed7fd21e189b197d7568c35c474572c799f52bf89f3e77",
+  "files/test/integration/owner_observation_native_cost_counter_test.go": "be6c378da298af9caf619c9f192768a705caa6e17b4b3dcb2bf374b5db74c9bc",
+  "files/test/integration/owner_observation_native_cost_fixture_test.go": "6fb2987c9f5a11b3789b90a46946c87e4e075b67b6fa422cc44fafbb680e2d4d",
+  "files/test/integration/owner_observation_native_cost_test.go": "5fa7949502251b74a6926ac7a2db1a8a810a461117c994c5f995e2e8aa1234a1",
+  "manifest.json": "978603c24ddd77e7307fb2fda6c2c29dd90a98a25e7c15644133942a127c7a12",
+  "overlay.json": "53352f42656067f90ecd61459b6d8354e6f6a4626332d0748b3c377a40930a64",
+  "payload.json": "db8260a94c6b479ed5d2b0fdd888746a27bc15647b0571b7679d1dc02aae8d15",
+  "run.py": "6d06c5828526efa69d33d9bb7cdc3af18b7c551d1e2fca1c15c5af63ee567b65"
+}

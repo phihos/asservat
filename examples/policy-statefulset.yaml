@@ -1,0 +1,48 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: ledger-memory
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      name: ledger
+      uid: workload-ledger-uid
+    maxPods: 1
+    selection: triggeringPod
+    adoption: pinUID
+    ordinals:
+    - 0
+  detectors:
+  - id: memory-high
+    kind: resource
+    options:
+      metric: memoryLimitRatio
+      operator: gte
+      threshold: 0.85
+      sampleInterval: 5s
+  when:
+    for:
+      expression:
+        detector: memory-high
+      duration: 20s
+  recipeRef:
+    name: bounded-live-diagnostics
+    digest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
+  grantRef: 00000000-0000-4000-8000-000000000040
+  budgets:
+    cooldown: 30m
+    burst: 1
+    maxOccurrencesPerHour: 2
+    maxConcurrentActions: 1
+  retention: 72h
+  suspended: false
+  observation:
+    mode: allAuthorized
+  evaluation:
+    scope: pod
+    fireOnActivation: true
+    rearmFor: 10s

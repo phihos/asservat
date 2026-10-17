@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: asservat-lab
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sink
+  namespace: asservat-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: sink}
+  template:
+    metadata:
+      labels: {app: sink}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: app
+          image: python:3.13-alpine
+          command: [python3, -u, -c]
+          args:
+            - |
+              import socket
+              s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+              s.bind(('0.0.0.0',58888))
+              while True: s.recvfrom(65535)
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sink
+  namespace: asservat-lab
+spec:
+  selector: {app: sink}
+  ports: [{port: 58888, targetPort: 58888, protocol: UDP}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sender
+  namespace: asservat-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: sender}
+  template:
+    metadata:
+      labels: {app: sender}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: app
+          image: python:3.13-alpine
+          command: [python3, -u, -c]
+          args:
+            - |
+              import socket,time,struct
+              i=0
+              while True:
+                try:
+                  with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as s:
+                    s.sendto(b'ASSERVAT-SYNTHETIC-'+struct.pack('!I',i),('sink',58888))
+                  i+=1
+                except OSError: pass
+                time.sleep(.01)
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 100m, memory: 64Mi}

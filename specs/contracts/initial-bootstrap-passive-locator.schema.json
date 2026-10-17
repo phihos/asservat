@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-passive-locator.schema.json",
+  "title": "Immutable metadata-only original history locator",
+  "description": "At most 2048 bytes. No credentials, private content hash, endpoint or authority. Read only with actual PartialObjectMetadata; no full Secret fallback.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "seedUID",
+    "installationID",
+    "requestID",
+    "clusterID",
+    "projection",
+    "history",
+    "operationID"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bootstrap-passive-history/v1"
+    },
+    "seedUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "projection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "history": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    }
+  }
+}

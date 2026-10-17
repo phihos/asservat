@@ -1,0 +1,20 @@
+{
+  "baseRoot": "/home/phil/Projekte/asservat",
+  "files": [
+    {
+      "path": "docs/architecture/initial-private-probe.md",
+      "baseSha256": "74b72cfd8f71fdb78934a51af99c4e6b021303f70c5f1d766323b904a88375e8",
+      "newSha256": "c2f059bfbb3955ffc065feea496e504d9db7cec0ec067b88c0b6b5b5514ca44d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+      "baseSha256": "6ebb10ef278dea7bad8b3f26fa3f67cb0c15df5f67b473240a9c8a71769148d3",
+      "newSha256": "757ee630fd2705fb901d62143541027a7a0501d1caee43c6e66984e0680e1e50"
+    },
+    {
+      "path": "test/integration/initial_preparer_private_test.go",
+      "baseSha256": "6a97ed625e59d598e3096325f92f747cd81c513e838cf0ceb68ef85d7795abd4",
+      "newSha256": "da69b6b17070d5236631ce60fcaacd3e29618f34cf133bb168afbc3f46105a97"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+--- FAIL: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound (0.00s)
+    configuration_role_inert_test.go:24: inert Restricted-workload provisioning phase denied
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.009s
+FAIL

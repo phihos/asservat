@@ -1,0 +1,9 @@
+{
+  "SCOPE.md": "48b4118f87a985f65fa19a7781998831551da7b6027e9f23e9012e7e86e9a7e4",
+  "bases.json": "6f9dce3e9d0fdc83409f79ffe53d208fecff815fa14e5c8de9fd02874c38f600",
+  "dependencies.json": "87ed8193ad1d25310e1fa3641dbe7285f48536a302c634a1b1ac427d00cbf368",
+  "manifest.json": "7c1c660878d3b0f745e35c7d2d78ceadb479fd3ba7f353b50e53ad9038dece96",
+  "overlay.json": "bc753b440495eabe0925b6b67e272fdfd6bb3a892001c2ede6ee42aadc3e3909",
+  "payload.json": "29a815a1e5e495514f80d42a61331f425d73a929319aed6a220bff34a0c00e4a",
+  "run.py": "dbaff9bd1380fbd3522486dbd3123d2ded7a6ede534515ba5eba4a8b08c257a6"
+}

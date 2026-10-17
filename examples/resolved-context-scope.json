@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "collection-scope/v1",
+  "source": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "resourceUID": "00000000-0000-4000-8000-000000000045"
+  },
+  "executor": {
+    "issuer": "https://identity.example.invalid/realms/company",
+    "subject": "developer-123",
+    "clientID": "asservat-browser",
+    "identityType": "human"
+  },
+  "collection": {
+    "kind": "DebugCapture",
+    "spec": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "name": "api",
+          "uid": "deployment-api-uid"
+        },
+        "maxPods": 1,
+        "selection": "allWithinLimit",
+        "adoption": "pinUID"
+      },
+      "recipeRef": {
+        "name": "builtin-pod-status-v1",
+        "digest": "174a28447df11de92c374c60a44a3a5c03c8481e3f5c57943521ab5da3dce1c3"
+      },
+      "deadline": "2026-10-10T12:01:00Z",
+      "retention": "3600s"
+    }
+  },
+  "dependencies": [
+    {
+      "role": "collectionCeiling",
+      "digest": "0200000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "role": "collector",
+      "digest": "0300000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "role": "projection",
+      "digest": "ddb974bae2428c1469a5cab504cf410a8b2d5331fd5bfe3bdf2b8856579a4141"
+    },
+    {
+      "role": "recipe",
+      "digest": "174a28447df11de92c374c60a44a3a5c03c8481e3f5c57943521ab5da3dce1c3"
+    },
+    {
+      "role": "retention",
+      "digest": "0400000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "podBindings": [
+    {
+      "podUID": "pod-uid",
+      "nodeUID": "node-uid",
+      "nodeBootID": "00000000-0000-4000-8000-000000000006"
+    }
+  ],
+  "effectiveRetention": [
+    {
+      "actionID": "pod-status",
+      "purposeRef": "diagnostics",
+      "privacyClass": "potentialPersonalData",
+      "evidenceType": "context",
+      "requestedAgeSeconds": 3600,
+      "maximumAgeSeconds": 86400,
+      "deletionBudgetSeconds": 300,
+      "policyRefs": [
+        {
+          "uid": "baseline",
+          "generation": 1,
+          "digest": "0400000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "path": "weed/s3api/s3api_bucket_policy_engine.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/s3api_bucket_policy_engine.go",
+    "sha256": "d8a2a66e238b9c1c602fc4df69f59d0471792659db066f2ee99201eaeb9eac47"
+  },
+  {
+    "path": "weed/s3api/s3api_bucket_policy_handlers.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/s3api_bucket_policy_handlers.go",
+    "sha256": "df06ca7d1985ec3505b6b7826127dd9c8de4bb8b27cc365f39d60ad8076d9f05"
+  },
+  {
+    "path": "weed/s3api/s3api_bucket_policy_authz_test.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/s3api_bucket_policy_authz_test.go",
+    "sha256": "be63fbcd401128fce56ad1081ba2b747ab238d0c6640cca7ef1e5a736c4eb763"
+  },
+  {
+    "path": "weed/s3api/auth_credentials.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/auth_credentials.go",
+    "sha256": "074f564ad1315adacd56b9e4dbe16d85e8efff2b9fa47ace936d22eee60d135c"
+  },
+  {
+    "path": "weed/command/mini.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/command/mini.go",
+    "sha256": "8c88fce5f9ffac10c1b3908a5552dd98ca52934b7f9dc9fc02d1e7152f98f3b5"
+  },
+  {
+    "path": "weed/pb/iam.proto",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/pb/iam.proto",
+    "sha256": "1a98b16a9991d80c6629b2205e746d8ac5b65d65474246410db4358f4a726817"
+  },
+  {
+    "path": "weed/s3api/policy_engine/types.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/policy_engine/types.go",
+    "sha256": "9d84df22c8e3a8d23e2574070411d348e85f40b5052d768b1d963c29df4783f9"
+  },
+  {
+    "path": "weed/s3api/policy_engine/conditions.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/policy_engine/conditions.go",
+    "sha256": "7feafa197e77975311287b94712472753a66538d876baa9edf9a0e5dc2c66415"
+  },
+  {
+    "path": "weed/s3api/policy_engine/engine.go",
+    "url": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/policy_engine/engine.go",
+    "sha256": "4516a4c679b6988fd90de54f2a86e5df4d290b055f8e4f54964055aadaff842d"
+  }
+]

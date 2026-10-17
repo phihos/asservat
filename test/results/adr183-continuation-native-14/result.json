@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-14",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "ADR-186 operation-scoped proof: all 66 public runtime roles provisioned natively in 2 min 49 s. Stopped at public/roles-projection (unavailable): the projection is bounded by the verified candidate's five-second interval, which the separate verification (35-request read plus SQL) had partly spent before publication (63 requests). Run 15 verifies and publishes inside one role operation; the projection starts from the opening proof (unit: 76 instead of 98 requests).",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-42",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure of the test's assertion, not the processes. The continuation completed, and the hub-worker and owner both ran without restarts after the capacity projection (the run-40 guard plan fix holds). The test waited for capacity_workload.ready_at, but the fixture has no labelled application workloads, so that table stays empty; the capacity root's ReadyAt lives in capacity_source.root_configuration. The assertion now reads that and logs the source and root phases on timeout.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,4 @@
+=== RUN   TestSequentialBaseline
+--- PASS: TestSequentialBaseline (0.73s)
+PASS
+ok  	asservat.local/experiments/feasibility	0.729s

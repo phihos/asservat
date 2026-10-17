@@ -1,0 +1,5 @@
+=== RUN   TestInitialNamespaceProtectionWithRealKubernetes
+    initial_namespace_test.go:230: pre-namespace staging policy denies RBAC-permitted writes, Pod creation and token minting; public dry-run input checks remain independent; removed guard denies; no provider credentials or activation
+--- PASS: TestInitialNamespaceProtectionWithRealKubernetes (6.88s)
+PASS
+ok  	asservat.local/asservat/test/integration	7.933s

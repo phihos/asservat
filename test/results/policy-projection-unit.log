@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/domain/authorization	0.003s
+ok  	asservat.local/asservat/internal/domain/configuration	0.003s
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.128s
+ok  	asservat.local/asservat/internal/adapters/postgres	0.002s

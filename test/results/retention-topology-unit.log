@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/adapters/kubernetes	8.418s
+ok  	asservat.local/asservat/internal/application/privacy	(cached)
+ok  	asservat.local/asservat/internal/application/configuration	(cached)
+?   	asservat.local/asservat/internal/contracts	[no test files]

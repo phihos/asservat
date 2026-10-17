@@ -1,0 +1,13 @@
+# Capture/publication current audit versions
+
+Source-only correction after the current worker/native batch. No qualification or live change yet.
+
+Keep historical accepted-record/progress decoding separate from current start/publication authority. New legacy capture-intent and verification acknowledgements require immutable versions. Current acceptedPublication verifies the complete retained receipt of the explicitly selected legacy or capture-operation protocol. Historical progress may report an original durable result without authorizing acquisition, disclosure or capacity release.
+
+PublishContext must validate all retained verification receipt fields, not only its audit flag/digest. Current catalog/read/key gates must do the same after existing locks. ReadPublishedContext already joins the capture and verification rows: project these two bounded records together and check them in one shared Go helper at every consumer, adding neither a query nor a table grant. Preserve current identity, source/recovery/privacy, original request intervals and all subsequent effect fences. Native evidence receipts remain generic.
+
+The helper validates each receipt's purpose/key, nullable presence, exact hash size, bounds, immutable version, original record/target relationships and publication ordering. API acquisition result verification remains in the existing independently accepted execution/result path; no receipt supplies that provenance. The query adds no raw artifact data.
+
+Qualified comparisons must include old-code failures for empty/null persisted capture and verification receipts, legacy/new-protocol separation, new acknowledgements, published catalog/byte/key authority and historical accounting/reporting. Use versioned synthetic stores and exact fixture restoration; do not introduce versions into retained production history or authorize a replacement write. Full operation/deletion/lifecycle audit retirement remains a separate continuation.
+
+Shared files with permission work: context_publication.go publicationFence and download.go permission-fence loop. Compose those disjoint hunks explicitly before any compile/freeze; neither staged batch supersedes the other.

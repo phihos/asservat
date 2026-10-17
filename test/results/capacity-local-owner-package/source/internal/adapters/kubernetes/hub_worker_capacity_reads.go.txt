@@ -1,0 +1,25 @@
+package kubernetes
+
+import (
+	"strings"
+
+	rbac "k8s.io/api/rbac/v1"
+)
+
+// This fixed read/probe graph belongs only to the fresh installed worker's
+// original Role/ClusterRole templates. RBAC cannot distinguish a dry-run CREATE
+// or UPDATE: the exact original namespace branch and independently pinned
+// capacity/processing source guards must enforce those denials. Their absence
+// never becomes a usable current observation. There is no remote API access,
+// Secret privilege or namespace-wide ConfigMap read. Capacity UPDATE, DELETE and
+// status subresources are absent from this role.
+func augmentInstalledWorkerCapacityReads(w *HubWorkerWorkload, installationID string) {
+	prefix := "asservat-" + strings.ReplaceAll(installationID, "-", "")
+	w.Role.Rules = append(w.Role.Rules,
+		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
+		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{prefix + "-processing-source"}, Verbs: []string{"get", "update"}},
+	)
+	w.ClusterRole.Rules = append(w.ClusterRole.Rules,
+		rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{prefix + "-capacity-guard", prefix + "-processing-guard"}, Verbs: []string{"get"}},
+	)
+}

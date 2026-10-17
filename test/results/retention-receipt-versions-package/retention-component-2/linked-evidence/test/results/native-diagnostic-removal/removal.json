@@ -1,0 +1,17 @@
+{
+  "scope": "remove fixture-only trace and connection diagnostics; preserve source supervision and sequential phase ownership",
+  "before": {
+    "test/integration/context_native_content_test.go": "a0d394a4f21c0add04efd29e26334f317bafc3777402998e6bb389ca54a78243",
+    "test/integration/context_native_interrupted_test.go": "322cec1df70483c649023acc06c6ce2178e4ad4afdc95969b2f6f3bb5a052841",
+    "test/integration/native_exchange_test.go": "7c55844f7c5f58a00a2a37fccc5ccfa824f0084ddd075b94ee6d5d73f5762c9f",
+    "test/integration/native_preparation_trace_test.go": "6cd001b3c3dfadd551becb5e83b0f6814be2e2bdcb7b73f9511eeecc26ac9630",
+    "test/integration/native_connection_diagnostic_test.go": "c25b1617652ec0959c594e229ba0d8a41fa32873da133a93306a4710f598e6a9"
+  },
+  "after": {
+    "test/integration/context_native_content_test.go": "a2dc5ee6f6049151dd5d64a69d0a58e34082d6286eae77bfb0717d1022b19d23",
+    "test/integration/context_native_interrupted_test.go": "4ead0cac80f138c7e2faa0bcd1a263970ea47b5b32e1a909bc6900dc5a7a57e0",
+    "test/integration/native_exchange_test.go": "95fee4c62a74cc3110f2991e07ede64cfa68b638008d0c641cf83d140403b18e",
+    "test/integration/native_preparation_trace_test.go": null,
+    "test/integration/native_connection_diagnostic_test.go": null
+  }
+}

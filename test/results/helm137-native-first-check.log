@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 364, in <module>
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 120, in main
+    registry.upload(worker_tag, worker_info["Id"])
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/helm_registry.py", line 109, in upload
+    raise RuntimeError("registry image changed original compiled configuration")
+RuntimeError: registry image changed original compiled configuration
+{"terminalExit": 1, "testExit": 1, "passedEntries": 0, "sourceHashes": 1457, "unchanged": null, "changedAfterExit": [], "cleanupFailures": []}

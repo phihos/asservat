@@ -1,0 +1,23 @@
+--- a/docs/decisions/155-unchanged-fleet-persistence-contention.md
++++ b/docs/decisions/155-unchanged-fleet-persistence-contention.md
+@@ -1,6 +1,6 @@
+ # ADR-155 — Unchanged fleet observation persistence contention
+ 
+-Status: selected for staged implementation. Requirements: REQ-FED-001 and REQ-DB-005. The exact SQL lock/failure chain is reproduced; the new classification is not yet qualified or integrated.
++Status: implemented; component and focused native qualification pass. Requirements: REQ-FED-001 and REQ-DB-005. Broad fleet regression and the original installed owner transition remain pending.
+ 
+ ## Problem
+ 
+@@ -22,6 +22,10 @@
+ 
+ ## Qualification
+ 
+-Source-only tests cover exact row/source/incarnation comparisons, unavailable error classification, source-versus-persistence ordering and pending/active notice cancellation. The staged actual SQL cases exercise unchanged bridge contention with byte-identical retained row/deadline, expiry without a refreshed observation, and unchanged fencing attempts for changed or expired sources. A test-only TLS bridge drops one successful COMMIT acknowledgement; the actual committed row must be observed before ordinary fencing. Separate cases delay delivery of the actual server lock-abort error until the original bridge releases and the actual row changes, enters recovery, or receives an independently newer observation. Final confirmation must reject all three, and the original failure CAS must preserve the newer observation. No passing result for this new behavior is claimed. The earlier diagnostic's two actual SQL cases and source hashes remain separate evidence.
++[Component results](../../test/results/fleet-persistence-contention-package/component-1/result.json) preserve the meaningful failure of the unchanged original application observer, then the corrected full fleet application/domain and scoped PostgreSQL/bootstrap race tests: 119 top-level and 605 named passing entries. Compilation, vet, Go architecture and specification/design gates pass; the specification gate reports 121 schemas and 10,665 assertions.
+ 
+-Installed owner execution and the original owner phase timing budget still require native qualification. This decision does not enable public services or the v2 observation backend.
++[Focused native results](../../test/results/fleet-persistence-contention-package/native-1/result.json) pass all ten required cases: eight new contention/uncertain-outcome cases and both preserved constructor prerequisites. Actual PostgreSQL bridge locks retain the unchanged row and original expiry; changed/expired inputs retain fencing. A committed UPDATE whose successful COMMIT reply is lost still fences. Source/recovery changes and original stored expiry after server lock abort reject classification, while the existing failure CAS preserves an independently newer observation. The actual SQL/provider fixture uses explicitly synthetic source/witness/role-root inputs. PostgreSQL incarnation replacement with an independently reaccepted positive row is a pure comparison negative; this fixture does not restart the database between the two observations.
++
++The native package took 17.808 seconds; all 2,253 native source hashes and the complete source file set matched the independent frozen closure, all 4,336 dependencies stayed unchanged, and owned cleanup completed. [Integration metadata](../../test/results/fleet-persistence-contention-integration.json) records the exact source and evidence packages. The motivating historical failures remain preserved; these results do not identify the original full-bootstrap refusal's exact predicate.
++
++Broad fleet regression, installed owner execution and the original owner phase timing budget still require native qualification. This decision does not enable public services or the v2 observation backend.

@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/bootstrap	2.112s
+ok  	asservat.local/asservat/internal/application/evidence	1.028s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.252s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	15.347s

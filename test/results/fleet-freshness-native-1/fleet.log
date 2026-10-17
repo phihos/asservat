@@ -1,0 +1,77 @@
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-fences-existing-root-without-observation-backfill
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-table
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-table SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-column
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-column SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-public
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-public SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-inherited
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-inherited SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-references
+    fleet_freshness_native_test.go:838: actual migration59 refusal legacy-references SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal retained-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-foreign-key
+    fleet_freshness_native_test.go:838: actual migration59 refusal retained-foreign-key SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-global-writer-member
+    fleet_freshness_native_test.go:838: actual migration59 refusal global-writer-member SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-table
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-table SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-trigger
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-trigger SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-references
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-references SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-function
+    fleet_freshness_native_test.go:838: actual migration59 refusal default-function SQLSTATE 55000
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/migration-preserves-unrelated-reader-and-lock-grants
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/missing-root-never-seeds-current-observation
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/actual-activation-seeds-once-and-replay-never-renews
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/pristine-inventory-rejects-unactivated-observation-row
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/unchanged-renewal-coexists-with-current-share
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/restrictive-source-waits-for-current-share
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/failure-fence-waits-for-current-share
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/initial-activation-table-order-does-not-invert-semantic-row
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-table
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-authority
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-observation
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/adapter-confirms-only-unchanged-authority-contention
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/original-basis-expiry-survives-lock-wait
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/expired-positive-basis-still-fences-original-semantic-root
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/aba-and-repeated-fence-never-revive-old-basis
+=== RUN   TestEnrollmentFleetFreshnessWithRealPostgres/runtime-cannot-write-base-or-positive-row
+--- PASS: TestEnrollmentFleetFreshnessWithRealPostgres (7.53s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-fences-existing-root-without-observation-backfill (0.02s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-table (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-column (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-public (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-inherited (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-trigger (0.00s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-legacy-references (0.00s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-trigger (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-retained-foreign-key (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-global-writer-member (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-table (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-trigger (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-references (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-refuses-default-function (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/migration-preserves-unrelated-reader-and-lock-grants (0.01s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/missing-root-never-seeds-current-observation (0.09s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/actual-activation-seeds-once-and-replay-never-renews (0.34s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/pristine-inventory-rejects-unactivated-observation-row (0.03s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/unchanged-renewal-coexists-with-current-share (0.08s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/restrictive-source-waits-for-current-share (0.08s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/failure-fence-waits-for-current-share (0.08s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/initial-activation-table-order-does-not-invert-semantic-row (0.08s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-table (1.06s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-authority (1.06s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/exact-lock-disposition-observation (1.06s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/adapter-confirms-only-unchanged-authority-contention (1.06s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/original-basis-expiry-survives-lock-wait (0.46s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/expired-positive-basis-still-fences-original-semantic-root (0.31s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/aba-and-repeated-fence-never-revive-old-basis (0.07s)
+    --- PASS: TestEnrollmentFleetFreshnessWithRealPostgres/runtime-cannot-write-base-or-positive-row (0.05s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.578s

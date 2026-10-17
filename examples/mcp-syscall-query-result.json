@@ -1,0 +1,44 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "raw",
+  "status": "ok",
+  "data": {
+    "kind": "syscallQuery",
+    "events": [
+      {
+        "identity": {
+          "process_ref": "process-worker-001",
+          "thread_ref": "thread-worker-001",
+          "pod_uid": "pod-ledger-uid"
+        },
+        "syscall": "connect",
+        "abi": "linux-x86_64",
+        "timestamp": "2026-10-09T12:00:01Z",
+        "duration_ns": 500000,
+        "outcome": "error",
+        "errno": "ECONNREFUSED",
+        "arguments": [
+          {
+            "name": "address",
+            "value": "synthetic peer address",
+            "truncated": false
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "dropped_events": 0,
+      "unmatched_events": 0,
+      "truncated": false,
+      "gaps": []
+    }
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": []
+}

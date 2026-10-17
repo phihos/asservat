@@ -1,0 +1,26 @@
+CREATE OR REPLACE FUNCTION guard_download_native_key() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE b public.download_native_backing;o public.download_native_owner;w public.download_worker;s public.artifact_download;n timestamptz;
+BEGIN
+ IF TG_OP='DELETE' THEN
+  SELECT * INTO STRICT b FROM public.download_native_backing WHERE allocation_id=OLD.allocation_id;
+  SELECT * INTO STRICT o FROM public.download_native_owner WHERE worker_id=OLD.worker_id;
+  SELECT * INTO STRICT w FROM public.download_worker WHERE id=OLD.worker_id;
+  SELECT * INTO STRICT s FROM public.artifact_download WHERE id=w.session_id;
+  b:=public.capacity_session_native(s,b);
+  n:=clock_timestamp();
+  IF o.retired_at IS NULL OR w.retired_proof_json IS NULL OR n<o.retired_at+make_interval(secs=>b.backup_horizon_seconds::double precision) THEN RAISE EXCEPTION 'native key history not quiescent' USING ERRCODE='23514';END IF;
+  UPDATE public.download_native_backing SET residual_until=GREATEST(residual_until,n+make_interval(secs=>b.backup_horizon_seconds::double precision)),overdue=overdue OR n+make_interval(secs=>b.backup_horizon_seconds::double precision)>b.retire_by WHERE allocation_id=b.allocation_id;RETURN OLD;
+ END IF;
+ SELECT * INTO STRICT o FROM public.download_native_owner WHERE worker_id=NEW.worker_id;
+ SELECT * INTO STRICT b FROM public.download_native_backing WHERE allocation_id=NEW.allocation_id FOR UPDATE;
+ SELECT * INTO STRICT w FROM public.download_worker WHERE id=NEW.worker_id;
+ SELECT * INTO STRICT s FROM public.artifact_download WHERE id=w.session_id;
+ b:=public.capacity_session_native(s,b);
+ n:=clock_timestamp();
+ IF o.closed OR o.retired_at IS NOT NULL OR o.root_id<>NEW.root_id OR o.allocation_id<>NEW.allocation_id OR o.operation_id<>NEW.operation_id OR o.fence<>NEW.operation_fence OR NEW.valid_until>o.lease_until OR n>=NEW.valid_until OR NOT EXISTS(SELECT 1 FROM public.download_window win JOIN public.download_response r ON r.id=win.response_id JOIN public.artifact_download s ON s.id=r.session_id WHERE win.id=NEW.window_id AND r.id=(o.operation_json->>'ParentID')::uuid AND r.generation=(o.operation_json->>'Generation')::bigint AND r.generation=s.generation AND r.active_window=win.id AND NOT r.closed AND r.lease_until>=NEW.valid_until AND win.intent_receipt IS NOT NULL AND win.intent_completion IS NOT NULL AND win.outcome_json IS NULL AND NEW.authority_json->'Scope'=s.scope_json) THEN RAISE EXCEPTION 'native key current window unavailable' USING ERRCODE='23514';END IF;
+ IF TG_OP='INSERT' THEN
+  IF jsonb_typeof(NEW.authority_json->'ValidUntil') IS DISTINCT FROM 'string' OR jsonb_typeof(NEW.proof_json->'FreshUntil') IS DISTINCT FROM 'string' OR NEW.used_roles<>0 OR NEW.created_at>n OR NEW.valid_until>(NEW.authority_json->>'ValidUntil')::timestamptz OR NEW.valid_until>(NEW.proof_json->>'FreshUntil')::timestamptz OR NEW.installation_id IS DISTINCT FROM (o.operation_json#>>'{Reference,InstallationID}')::uuid OR NEW.peer_id IS DISTINCT FROM (o.operation_json->>'WorkerPodUID')::uuid THEN RAISE EXCEPTION 'native key identity mismatch' USING ERRCODE='23514';END IF;
+  UPDATE public.download_native_backing SET charged_keys=charged_keys+1 WHERE allocation_id=b.allocation_id;
+ ELSIF (to_jsonb(NEW)-'used_roles') IS DISTINCT FROM (to_jsonb(OLD)-'used_roles') OR NEW.used_roles=OLD.used_roles OR NEW.used_roles|OLD.used_roles<>NEW.used_roles OR (NEW.used_roles#OLD.used_roles) NOT IN (1,2,4) THEN RAISE EXCEPTION 'native key slots immutable' USING ERRCODE='23514';END IF;
+ RETURN NEW;
+END $$;

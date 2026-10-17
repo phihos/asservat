@@ -1,0 +1,28 @@
+=== RUN   TestProviderOwnerProjectionOperationCompleteAndLaunch
+--- PASS: TestProviderOwnerProjectionOperationCompleteAndLaunch (8.67s)
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/admitted
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/after-lock
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/apply
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/final
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/result
+--- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle (0.29s)
+    --- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle/admitted (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle/after-lock (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle/apply (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle/final (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsCopiedOuterHandle/result (0.08s)
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/apply
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/final
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/result
+--- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect (0.15s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/apply (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/final (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/result (0.05s)
+=== RUN   TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce
+--- PASS: TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce (0.08s)
+=== RUN   TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext
+--- PASS: TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext (0.06s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	10.294s

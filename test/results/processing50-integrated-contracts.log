@@ -1,0 +1,7 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 51 packages, 265 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 41 files match sqlc v1.31.1
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+FAIL: Unregistered schema reference: #/$defs/path
+make: *** [Makefile:5: spec-check] Error 1

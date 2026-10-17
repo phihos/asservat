@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/adapters/postgres/initial_schema_checks.go",
+    "base_sha256": "d8791a38ab6c9ef3e0ac086fb4fb8f03d2abfa35c4416d8ee2fc23bfab05c8a5",
+    "sha256": "ba3c0d73928fd641a72a7ed071dbbd50ce183f9adb82ee12be94c4dc318a4a8e"
+  },
+  {
+    "path": "test/integration/initial_schema_test.go",
+    "base_sha256": "c84b205aff5956e1281ee873975c926a0f8270abf65f02d0996eff85d92757c1",
+    "sha256": "5d9264dcc1d1f9a2ede12ee42d3795722636e9fff5e795a719658b1b652731d6"
+  },
+  {
+    "path": "docs/architecture/initial-schema.md",
+    "base_sha256": "88b75e00c85b2ad7c63c6a6c4d9392ce951aca50330f527add19f589f9621c84",
+    "sha256": "e84f8bf5f45ccdabfe3eaf0e07ad38ab4bcb1bcbdd89027a260c23968d8ca93e"
+  }
+]

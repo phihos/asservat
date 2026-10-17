@@ -1,0 +1,26 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-earliest-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-earliest-null
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-latest-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-history-latest-null
+=== RUN   TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-current-admitted-effect-null
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root
+=== RUN   TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt
+--- PASS: TestContextAdmissionWithRealServices (2.16s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-earliest-empty (0.37s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-earliest-null (0.11s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-latest-empty (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-history-latest-null (0.10s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty (0.29s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-current-admitted-effect-null (0.15s)
+    --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising (0.69s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root (0.03s)
+        --- PASS: TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt (0.03s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.212s

@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-retention-observation
+    download_sessions_test.go:205: current native retention read <nil>
+--- FAIL: TestContextAdmissionWithRealServices (1.47s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-retention-observation (1.14s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.529s
+FAIL

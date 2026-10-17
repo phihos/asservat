@@ -1,0 +1,142 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"net/netip"
+	"slices"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+var _ app.OwnerObservationCandidateGroupsReader = (*OwnerEndpoints)(nil)
+
+// ReadyOwnerObservationCandidates performs one complete bounded LIST sequence,
+// not one LIST per retained SQL process. It never infers a latest process or
+// returns an address: the eventual contacted Pod still needs the unchanged
+// exact live route/Pod/RS/Deployment/guard and actual TLS/registry checks.
+func (s *OwnerEndpoints) ReadyOwnerObservationCandidates(ctx context.Context, candidates value.APIContextOwnerCandidates) (value.OwnerObservationCandidateGroups, error) {
+	var zero value.OwnerObservationCandidateGroups
+	if s == nil || ctx == nil || ctx.Err() != nil || !candidates.Valid(s.client.now()) || candidates.Pool != s.pool || s.pool.NativeCandidateLimit == 0 {
+		return zero, value.ErrInvalid
+	}
+	candidates.Owners = append([]value.OwnerBinding(nil), candidates.Owners...)
+	start := s.client.now()
+	until := identity.Earlier(start.Add(5*time.Second), candidates.ValidUntil)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	if _, err := s.client.namespace(call, s.client.control); err != nil {
+		return zero, err
+	}
+	service, err := s.service(call)
+	if err != nil {
+		return zero, err
+	}
+	wanted := make(map[string][]value.OwnerBinding)
+	for _, b := range candidates.Owners {
+		wanted[b.PodUID] = append(wanted[b.PodUID], b)
+	}
+	type podState struct {
+		name, node string
+		ready      bool
+		addresses  map[string]bool
+	}
+	states := make(map[string]*podState)
+	continuation, version := "", ""
+	seen := map[string]bool{}
+	total, count, endpointCount := 0, 0, 0
+	complete := false
+	for page := 0; page < 64; page++ {
+		b, err := s.client.raw(call, "/apis/discovery.k8s.io/v1/namespaces/"+s.pool.Namespace+"/endpointslices", map[string]string{"labelSelector": labels.Set{"kubernetes.io/service-name": s.pool.Service}.AsSelector().String(), "limit": "64", "continue": continuation})
+		total += len(b)
+		var list discovery.EndpointSliceList
+		if err != nil || total > 8<<20 || json.Unmarshal(b, &list) != nil || list.APIVersion != "discovery.k8s.io/v1" || list.Kind != "EndpointSliceList" || !identity.Text(list.ResourceVersion, 128) || len(list.Items) > 64 || count+len(list.Items) > 64 || len(list.Continue) > 4096 || version != "" && version != list.ResourceVersion {
+			return zero, value.ErrUnavailable
+		}
+		version, count = list.ResourceVersion, count+len(list.Items)
+		for _, item := range list.Items {
+			endpointCount += len(item.Endpoints)
+			owner, ok := ownerController(item.OwnerReferences, "Service", "v1")
+			if !ok || owner.Name != s.pool.Service || string(owner.UID) != s.pool.ServiceUID || item.Namespace != s.pool.Namespace || item.DeletionTimestamp != nil || item.Labels["kubernetes.io/service-name"] != s.pool.Service || item.Labels["endpointslice.kubernetes.io/managed-by"] != "endpointslice-controller.k8s.io" || endpointCount > 1024 || !ownerSlicePorts(s.pool, item.Ports) || (item.AddressType != discovery.AddressTypeIPv4 && item.AddressType != discovery.AddressTypeIPv6) {
+				return zero, value.ErrUnavailable
+			}
+			for _, ep := range item.Endpoints {
+				ref := ep.TargetRef
+				// An unidentified managed endpoint cannot prove absence of a candidate.
+				if ref == nil || !authorization.UUID(string(ref.UID)) || (ref.APIVersion != "" && ref.APIVersion != "v1") || ref.Kind != "Pod" || ref.Namespace != s.pool.Namespace || ref.Name == "" || len(validation.IsDNS1123Subdomain(ref.Name)) != 0 {
+					return zero, value.ErrUnavailable
+				}
+				uid := string(ref.UID)
+				if len(wanted[uid]) == 0 {
+					continue
+				}
+				if ep.NodeName == nil || !identity.Text(*ep.NodeName, 253) || ep.Conditions.Ready == nil || len(ep.Addresses) < 1 || len(ep.Addresses) > 2 {
+					return zero, value.ErrUnavailable
+				}
+				ready := *ep.Conditions.Ready && (ep.Conditions.Serving == nil || *ep.Conditions.Serving) && (ep.Conditions.Terminating == nil || !*ep.Conditions.Terminating)
+				old := states[uid]
+				if old == nil {
+					old = &podState{name: ref.Name, node: *ep.NodeName, ready: ready, addresses: map[string]bool{}}
+					states[uid] = old
+				}
+				if old.name != ref.Name || old.node != *ep.NodeName || old.ready != ready {
+					return zero, value.ErrUnavailable
+				}
+				for _, address := range ep.Addresses {
+					a, err := netip.ParseAddr(address)
+					if err != nil || !value.OwnerAddress(address) || a.Is4() != (item.AddressType == discovery.AddressTypeIPv4) {
+						return zero, value.ErrUnavailable
+					}
+					old.addresses[address] = true
+					if len(old.addresses) > 2 {
+						return zero, value.ErrUnavailable
+					}
+				}
+			}
+		}
+		if list.Continue == "" {
+			complete = true
+			break
+		}
+		if seen[list.Continue] {
+			return zero, value.ErrUnavailable
+		}
+		seen[list.Continue] = true
+		continuation = list.Continue
+	}
+	if !complete {
+		return zero, value.ErrUnavailable
+	}
+	latest, err := s.service(call)
+	if err != nil || latest.ResourceVersion != service.ResourceVersion {
+		return zero, value.ErrUnavailable
+	}
+	if _, err = s.client.namespace(call, s.client.control); err != nil {
+		return zero, err
+	}
+	out := value.OwnerObservationCandidateGroups{Candidates: candidates, EndpointResourceVersion: version, ObservedAt: start, ValidUntil: until}
+	uids := make([]string, 0, len(states))
+	for uid, st := range states {
+		if st.ready {
+			uids = append(uids, uid)
+		}
+	}
+	slices.Sort(uids)
+	for _, uid := range uids {
+		out.Groups = append(out.Groups, value.OwnerObservationCandidateGroup{PodUID: uid, Owners: append([]value.OwnerBinding(nil), wanted[uid]...)})
+	}
+	if call.Err() != nil || s.client.current(call, start, 5*time.Second) != nil || !out.Valid(s.client.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return out, nil
+}

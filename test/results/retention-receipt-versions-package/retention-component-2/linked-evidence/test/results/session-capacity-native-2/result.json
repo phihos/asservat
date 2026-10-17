@@ -1,0 +1,96 @@
+{
+  "bootID": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "phases": [
+    {
+      "name": "owners-expanded",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--run",
+        "^TestContextAdmissionWithRealServices$/^(verified-publication-concurrent-idempotent-and-readable|download-worker-native-preparation-race|download-worker-request-owners)$"
+      ],
+      "exit": 0,
+      "seconds": 47.771,
+      "diskBeforeBytes": 430601191424,
+      "diskAfterBytes": 430370893824,
+      "sourceCount": 2157,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 0,
+      "passedTests": [
+        "TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable",
+        "TestContextAdmissionWithRealServices/download-worker-native-preparation-race",
+        "TestContextAdmissionWithRealServices/download-worker-request-owners"
+      ],
+      "testPhases": [
+        {
+          "phase": "suite",
+          "testExit": 0,
+          "incarnation": {
+            "serverStart": "2026-10-13T12:21:24.996511+00:00",
+            "databaseOID": "16384"
+          },
+          "passedTestNames": [
+            "TestContextAdmissionWithRealServices/verified-publication-concurrent-idempotent-and-readable",
+            "TestContextAdmissionWithRealServices/download-worker-native-preparation-race",
+            "TestContextAdmissionWithRealServices/download-worker-request-owners"
+          ],
+          "testElapsedSeconds": 35.28343693199986,
+          "qualificationExit": 0
+        }
+      ],
+      "archiveHashes": {
+        "harness.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+        "custody-environment.json": "4c342a4c92719b4c71218dc0110c9496bcb5b7c213bc2e520bc42ff3fee4d8d9",
+        "custody.log": "9c4d0a5147dd7bfe9006c152e59148bf8efb98357c31900b10cdad7f50ac5545"
+      }
+    },
+    {
+      "name": "native-reads",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--run",
+        "^TestContextAdmissionWithRealServices$/^(download-worker-native-(content|content-resume|content-interrupted|control-races|control-admission-race|exchange)|download-response-window-accounting)$"
+      ],
+      "exit": 1,
+      "seconds": 89.27,
+      "diskBeforeBytes": 430370893824,
+      "diskAfterBytes": 430305132544,
+      "sourceCount": 2157,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 1,
+      "passedTests": [
+        "TestContextAdmissionWithRealServices/download-worker-native-control-races",
+        "TestContextAdmissionWithRealServices/download-worker-native-control-admission-race",
+        "TestContextAdmissionWithRealServices/download-response-window-accounting"
+      ],
+      "testPhases": [
+        {
+          "phase": "suite",
+          "testExit": 1,
+          "incarnation": {
+            "serverStart": "2026-10-13T12:22:12.438048+00:00",
+            "databaseOID": "16384"
+          },
+          "passedTestNames": [
+            "TestContextAdmissionWithRealServices/download-worker-native-control-races",
+            "TestContextAdmissionWithRealServices/download-worker-native-control-admission-race",
+            "TestContextAdmissionWithRealServices/download-response-window-accounting"
+          ],
+          "testElapsedSeconds": 81.83288995400017,
+          "qualificationExit": 1
+        }
+      ],
+      "archiveHashes": {
+        "harness.log": "101a69dc57362988434067fdc5eb76ab12807d21922f9f6dc683d2360437661c",
+        "custody-environment.json": "f5bba74367b01021c0ef383155b0df4190981b48dfe77fabc31df6acdc3fbebf",
+        "custody.log": "fad2a736e53c478438b3dc7cf1df84f75651468e7911730a5aa0ffe546bd197e",
+        "custody-postgres.log": "8f65ade08eab4578a488da33bd2463edb4a5d0087b57c3e1a3685d804ed6cfaf"
+      }
+    }
+  ],
+  "scope": "Expanded owner-race occupancy, native context/control/session projections, capture-intent fixture grant and required owner audit versions; synthetic source roots, no installed workflow",
+  "exit": 1
+}

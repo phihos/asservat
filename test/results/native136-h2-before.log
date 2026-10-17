@@ -1,0 +1,5 @@
+--- FAIL: TestNativeContentHTTP2BodySetupSurvivesOriginalPreflightDeadline (0.15s)
+    download_content_deadline_test.go:60: valid fresh content phase failed after old preflight deadline: Get "https://127.0.0.1:38845": stream error: stream ID 1; INTERNAL_ERROR; received from peer
+FAIL
+FAIL	asservat.local/asservat/internal/transport/browser	0.158s
+FAIL

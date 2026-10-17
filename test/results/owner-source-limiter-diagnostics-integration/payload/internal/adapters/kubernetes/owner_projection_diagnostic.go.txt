@@ -1,0 +1,194 @@
+package kubernetes
+
+import (
+	"errors"
+	"sync/atomic"
+)
+
+type ownerProjectionCheck uint8
+
+const (
+	projectionCheckUnknown ownerProjectionCheck = iota
+	projectionCheckEnter
+	projectionCheckProviderBorrow
+	projectionCheckProviderObserve
+	projectionCheckInitialNative
+	projectionCheckOriginalInput
+	projectionCheckProviderMaterial
+	projectionCheckProjectionMaterial
+	projectionCheckOwnerClaim
+	projectionCheckPlan
+	projectionCheckSqlOperation
+	projectionCheckOuterResult
+	projectionCheckOuterBridge
+	projectionCheckCurrentBegin
+	projectionCheckCurrentNative
+	projectionCheckCurrentInput
+	projectionCheckCurrentMaterial
+	projectionCheckCurrentFinish
+	projectionCheckApplyBegin
+	projectionCheckApplyProviderBound
+	projectionCheckApplyEffect
+	projectionCheckApplyFinish
+	projectionCheckFinalBegin
+	projectionCheckFinalChildren
+	projectionCheckFinalNative
+	projectionCheckFinalOriginals
+	projectionCheckFinalRoles
+	projectionCheckFinalLaunch
+	projectionCheckFinalInput
+	projectionCheckFinalMaterial
+	projectionCheckFinalFinish
+	projectionCheckResultBegin
+	projectionCheckResultEncode
+	projectionCheckResultFinish
+)
+
+func (c ownerProjectionCheck) String() string {
+	switch c {
+	case projectionCheckEnter:
+		return "projection.enter"
+	case projectionCheckProviderBorrow:
+		return "projection.provider-borrow"
+	case projectionCheckProviderObserve:
+		return "projection.provider-observe"
+	case projectionCheckInitialNative:
+		return "projection.initial-native"
+	case projectionCheckOriginalInput:
+		return "projection.original-input"
+	case projectionCheckProviderMaterial:
+		return "projection.provider-material"
+	case projectionCheckProjectionMaterial:
+		return "projection.projection-material"
+	case projectionCheckOwnerClaim:
+		return "projection.owner-claim"
+	case projectionCheckPlan:
+		return "projection.plan"
+	case projectionCheckSqlOperation:
+		return "projection.sql-operation"
+	case projectionCheckOuterResult:
+		return "projection.outer-result"
+	case projectionCheckOuterBridge:
+		return "projection.outer-bridge"
+	case projectionCheckCurrentBegin:
+		return "projection.current-begin"
+	case projectionCheckCurrentNative:
+		return "projection.current-native"
+	case projectionCheckCurrentInput:
+		return "projection.current-input"
+	case projectionCheckCurrentMaterial:
+		return "projection.current-material"
+	case projectionCheckCurrentFinish:
+		return "projection.current-finish"
+	case projectionCheckApplyBegin:
+		return "projection.apply-begin"
+	case projectionCheckApplyProviderBound:
+		return "projection.apply-provider-bound"
+	case projectionCheckApplyEffect:
+		return "projection.apply-effect"
+	case projectionCheckApplyFinish:
+		return "projection.apply-finish"
+	case projectionCheckFinalBegin:
+		return "projection.final-begin"
+	case projectionCheckFinalChildren:
+		return "projection.final-children"
+	case projectionCheckFinalNative:
+		return "projection.final-native"
+	case projectionCheckFinalOriginals:
+		return "projection.final-originals"
+	case projectionCheckFinalRoles:
+		return "projection.final-roles"
+	case projectionCheckFinalLaunch:
+		return "projection.final-launch"
+	case projectionCheckFinalInput:
+		return "projection.final-input"
+	case projectionCheckFinalMaterial:
+		return "projection.final-material"
+	case projectionCheckFinalFinish:
+		return "projection.final-finish"
+	case projectionCheckResultBegin:
+		return "projection.result-begin"
+	case projectionCheckResultEncode:
+		return "projection.result-encode"
+	case projectionCheckResultFinish:
+		return "projection.result-finish"
+	default:
+		return "projection.unknown"
+	}
+}
+
+// Only closed codes are retained across the SQL normalizer. Neither original
+// errors nor protected values enter this invocation-owned diagnostic slot.
+type ownerProjectionDiagnosticSlot struct {
+	first atomic.Pointer[ownerProjectionDiagnostic]
+}
+
+type ownerProjectionDiagnostic struct {
+	check  ownerProjectionCheck
+	cause  error
+	inner  *ownerProjectionDiagnostic
+	native *ownerOperationDiagnostic
+}
+
+func (e *ownerProjectionDiagnostic) Error() string {
+	text := e.check.String()
+	if e.inner != nil {
+		text += ": " + e.inner.Error()
+	}
+	if e.native != nil {
+		text += ": " + e.native.Error()
+	}
+	return text
+}
+func (e *ownerProjectionDiagnostic) Unwrap() error { return e.cause }
+func projectionDiagnostic(check ownerProjectionCheck, cause error) *ownerProjectionDiagnostic {
+	var inner *ownerProjectionDiagnostic
+	var native *ownerOperationDiagnostic
+	_ = errors.As(cause, &inner)
+	_ = errors.As(cause, &native)
+	return &ownerProjectionDiagnostic{check: check, cause: cause, inner: inner, native: native}
+}
+func projectionNativeCodes(e *ownerOperationDiagnostic) *ownerOperationDiagnostic {
+	if e == nil {
+		return nil
+	}
+	return &ownerOperationDiagnostic{check: e.check, detail: projectionNativeCodes(e.detail), source: configurationSourceCodes(e.source)}
+}
+func projectionFixedCodes(err error) *ownerProjectionDiagnostic {
+	var e *ownerProjectionDiagnostic
+	if !errors.As(err, &e) || e == nil {
+		return nil
+	}
+	return &ownerProjectionDiagnostic{check: e.check, inner: projectionFixedCodes(e.inner), native: projectionNativeCodes(e.native)}
+}
+func (s *OwnerProjectionOperation) diagnosticReturn(check ownerProjectionCheck, err *error) {
+	if *err == nil {
+		return
+	}
+	if _, ok := (*err).(*ownerProjectionDiagnostic); !ok {
+		*err = projectionDiagnostic(check, *err)
+	}
+	if s != nil && s.self == s && s.failure != nil {
+		s.failure.first.CompareAndSwap(nil, projectionFixedCodes(*err))
+	}
+}
+
+// The original inspection error remains the sole unwrap/disposition source.
+// First-attempt codes explain the stopped invocation; they cannot widen its
+// error classification, refill an attempt or request another inspection.
+type ownerProjectionInspectionDiagnostic struct {
+	cause             error
+	first, inspection *ownerProjectionDiagnostic
+}
+
+func (e *ownerProjectionInspectionDiagnostic) Error() string {
+	first, inspection := "projection.unknown", "projection.unknown"
+	if e.first != nil {
+		first = e.first.Error()
+	}
+	if e.inspection != nil {
+		inspection = e.inspection.Error()
+	}
+	return "owner projection advance: " + first + "; inspection: " + inspection
+}
+func (e *ownerProjectionInspectionDiagnostic) Unwrap() error { return e.cause }

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py"
+  ],
+  "exit": 1,
+  "seconds": 723.302,
+  "passedTopLevel": [
+    "TestContextAdmissionWithRealServices",
+    "TestCustodyWithRealServices",
+    "TestEnrollmentBootstrapIssuanceWithRealServices",
+    "TestEnrollmentBootstrapReservationsWithRealServices",
+    "TestEnrollmentFleetFreshnessWithRealPostgres",
+    "TestEnrollmentFleetObservationWithRealPostgres",
+    "TestEnrollmentOwnerConfigurationWithRealServices",
+    "TestEnrollmentSigningWithRealServices",
+    "TestEnrollmentSyntheticFleetObservationBinding",
+    "TestEnrollmentWithRealServices",
+    "TestPeerRegistryWithRealServices",
+    "TestPermissionAuthorityPoliciesWithRealServices",
+    "TestPermissionAuthorityWithRealServices"
+  ],
+  "passedCount": 437,
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 1,
+  "status": "failed"
+}

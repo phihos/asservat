@@ -1,0 +1,209 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-12 21:22:11.074 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 21:22:11.074 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 21:22:11.090 UTC [43] LOG:  database system was shut down at 2026-10-12 21:22:10 UTC
+2026-10-12 21:22:11.108 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-12 21:22:11.310 UTC [37] LOG:  received fast shutdown request
+.2026-10-12 21:22:11.314 UTC [37] LOG:  aborting any active transactions
+2026-10-12 21:22:11.315 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-12 21:22:11.315 UTC [41] LOG:  shutting down
+2026-10-12 21:22:11.487 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-12 21:22:12.106 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.107 s, sync=0.484 s, total=0.791 s; sync files=303, longest=0.138 s, average=0.002 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-12 21:22:12.134 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-12 21:22:12.250 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 21:22:12.251 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-12 21:22:12.251 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-12 21:22:12.255 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 21:22:12.268 UTC [65] LOG:  database system was shut down at 2026-10-12 21:22:12 UTC
+2026-10-12 21:22:12.279 UTC [1] LOG:  database system is ready to accept connections
+2026-10-12 21:22:12.449 UTC [77] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-12 21:22:12.449 UTC [77] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-12 21:22:13.868 UTC [77] ERROR:  syntax error at end of input at character 10605
+2026-10-12 21:22:13.868 UTC [77] STATEMENT:  CREATE FUNCTION capacity_qualification_valid(v jsonb) RETURNS boolean
+	LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+	DECLARE g jsonb;b jsonb;k text;key_value jsonb;previous_key text;clusters text[]:='{}';pools text[]:='{}';capacities text[]:='{}';ids text[]:='{}';stores text[]:='{}';system_found boolean:=false;
+	BEGIN
+	 IF NOT public.capacity_json_fields(v,ARRAY['ID','Digest','RootBacking','NamespaceGuards','Backends']) OR NOT public.capacity_json_uuid(v->'ID') OR
+	  NOT public.capacity_json_digest(v->'Digest') OR v->'RootBacking'->'QualificationID' IS DISTINCT FROM v->'ID' OR v->'RootBacking'->'QualificationDigest' IS DISTINCT FROM v->'Digest' OR
+	  jsonb_typeof(v->'NamespaceGuards') IS DISTINCT FROM 'array' OR jsonb_array_length(v->'NamespaceGuards') NOT BETWEEN 1 AND 16 OR
+	  jsonb_typeof(v->'Backends') IS DISTINCT FROM 'array' OR jsonb_array_length(v->'Backends') NOT BETWEEN 1 AND 16 THEN RETURN false;END IF;
+	 FOR g IN SELECT value FROM jsonb_array_elements(v->'NamespaceGuards') LOOP
+	  IF NOT public.capacity_json_fields(g,ARRAY['ClusterID','Digest','Keys']) OR NOT public.capacity_json_uuid(g->'ClusterID') OR NOT public.capacity_json_digest(g->'Digest') OR
+	   g->>'ClusterID'=ANY(clusters) OR jsonb_typeof(g->'Keys') IS DISTINCT FROM 'array' OR jsonb_array_length(g->'Keys') NOT BETWEEN 1 AND 256 THEN RETURN false;END IF;
+	  clusters:=array_append(clusters,g->>'ClusterID');previous_key:=NULL;
+	  FOR key_value IN SELECT value FROM jsonb_array_elements(g->'Keys') LOOP
+	   IF NOT public.capacity_json_text(key_value,1,253) OR previous_key IS NOT NULL AND (key_value#>>'{}') COLLATE "C"<=previous_key COLLATE "C" THEN RETURN false;END IF;
+	   previous_key:=key_value#>>'{}';
+	  END LOOP;
+	 END LOOP;
+	 FOR b IN SELECT value FROM jsonb_array_elements(v->'Backends') LOOP
+	  IF NOT public.capacity_json_fields(b,ARRAY['Layout','ID','Digest','PoolUID','StorageProfile','CapacityID','PoolID','EvidenceStoreID','AuditStoreID','Usable']) OR
+	   b->>'Layout' IS DISTINCT FROM 'dedicated-capacity-envelope/v1' OR NOT public.capacity_json_digest(b->'Digest') OR
+	   NOT public.capacity_json_text(b->'PoolUID',1,64) OR NOT public.capacity_json_text(b->'StorageProfile',1,63) OR NOT public.capacity_amount_valid(b->'Usable') OR
+	   b->>'PoolUID'=ANY(pools) OR b->>'CapacityID'=ANY(capacities) OR b->>'PoolID'=ANY(ids) OR b->>'EvidenceStoreID'=ANY(stores) THEN RETURN false;END IF;
+	  FOREACH k IN ARRAY ARRAY['ID','CapacityID','PoolID','EvidenceStoreID','AuditStoreID'] LOOP IF NOT public.capacity_json_uuid(b->k) THEN RETURN false;END IF;END LOOP;
+	  pools:=array_append(pools,b->>'PoolUID');capacities:=array_append(capacities,b->>'CapacityID');ids:=array_append(ids,b->>'PoolID');stores:=array_append(stores,b->>'EvidenceStoreID');
+	  IF b->>'PoolUID'=v->'RootBacking'->>'SystemPoolUID' THEN
+	   IF b->>'AuditStoreID' IS DISTINCT FROM v->'RootBacking'->'Capture'->'Policy'->>'StoreID' THEN RETURN false;END IF;system_found:=true;
+	  END IF;
+	 END LOOP;
+	 RETURN system_found;
+	EXCEPTION WHEN data_exception THEN RETURN false;
+	END $$;
+	
+	CREATE FUNCTION capacity_backend_for(s public.capacity_source,p jsonb) RETURNS jsonb
+	LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+	DECLARE b jsonb;
+	BEGIN
+	 IF NOT public.capacity_qualification_valid(s.qualification) OR p->>'Format' IS DISTINCT FROM 'capacity-pool/v1' THEN RETURN NULL;END IF;
+	 SELECT value INTO STRICT b FROM jsonb_array_elements(s.qualification->'Backends') WHERE value->>'PoolUID'=p->>'UID';
+	 IF b->'StorageProfile' IS DISTINCT FROM p->'StorageProfile' OR NOT public.capacity_amount_valid(p->'Capacity') OR
+	  (b->'Usable'->>'Bytes')::bigint<(p->'Capacity'->>'Bytes')::bigint OR (b->'Usable'->>'Objects')::bigint<(p->'Capacity'->>'Objects')::bigint THEN RETURN NULL;END IF;
+	 RETURN b;
+	EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN NULL;
+	END $$;
+	
+	CREATE FUNCTION capacity_root_configuration_valid(v jsonb) RETURNS boolean
+	LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+	DECLARE k text;d timestamptz;last_at timestamptz;first_at timestamptz;first_until timestamptz;revision_at timestamptz;revision_until timestamptz;planned timestamptz;revision bigint;zero bytea:=decode(repeat('00',32),'hex');
+	BEGIN
+	 IF NOT public.capacity_json_fields(v,ARRAY['Format','RootID','AttemptID','PlanDigest','Revision','InitialObservedAt','InitialUntil','RevisionObservedAt','RevisionUntil','PlannedUntil','ReservedAt','CaptureBackedAt','ReadyAt','ReconciledAt','PreviousDigest','ReconciledDigest']) OR
+	  v->>'Format' IS DISTINCT FROM 'protected-capacity-configuration/v1' OR NOT public.capacity_json_uuid(v->'RootID') OR NOT public.capacity_json_uuid(v->'AttemptID') OR
+	  v->'RootID'=v->'AttemptID' OR NOT public.capacity_json_digest(v->'PlanDigest') OR NOT public.capacity_json_integer(v->'Revision',1,1152921504606846975) OR
+	  public.connector_digest(v->'PreviousDigest') IS NULL OR public.connector_digest(v->'ReconciledDigest') IS NULL THEN RETURN false;END IF;
+	 FOREACH k IN ARRAY ARRAY['InitialObservedAt','InitialUntil','RevisionObservedAt','RevisionUntil','PlannedUntil','ReservedAt'] LOOP
+	  IF NOT public.capacity_json_text(v->k,20,40) THEN RETURN false;END IF;
+	  d:=(v->>k)::timestamptz;IF NOT isfinite(d) OR d='0001-01-01 00:00:00+00'::timestamptz THEN RETURN false;END IF;
+	 END LOOP;
+	 first_at:=(v->>'InitialObservedAt')::timestamptz;first_until:=(v->>'InitialUntil')::timestamptz;revision_at:=(v->>'RevisionObservedAt')::timestamptz;revision_until:=(v->>'RevisionUntil')::timestamptz;
+	 planned:=(v->>'PlannedUntil')::timestamptz;last_at:=(v->>'ReservedAt')::timestamptz;revision:=(v->>'Revision')::bigint;
+	 IF first_until<=first_at OR first_until>first_at+interval '5 seconds' OR revision_at<first_at OR revision_until<=revision_at OR revision_until>revision_at+interval '5 seconds' OR last_at<revision_at OR last_at>=revision_until OR planned<=last_at OR
+	  revision=1 AND (first_at<>revision_at OR first_until<>revision_until OR public.connector_digest(v->'PreviousDigest')<>zero) OR
+	  revision>1 AND public.connector_digest(v->'PreviousDigest')=zero THEN RETURN false;END IF;
+	 FOREACH k IN ARRAY ARRAY['CaptureBackedAt','ReadyAt','ReconciledAt'] LOOP
+	  IF v->k='null'::jsonb THEN CONTINUE;END IF;
+	  IF NOT public.capacity_json_text(v->k,20,40) THEN RETURN false;END IF;
+	  d:=(v->>k)::timestamptz;
+	  IF NOT isfinite(d) OR d<last_at OR k<>'ReconciledAt' AND d>=planned OR k='ReadyAt' AND v->'CaptureBackedAt'='null'::jsonb THEN RETURN false;END IF;
+	  last_at:=d;
+	 END LOOP;
+	 RETURN (v->'ReconciledAt'='null'::jsonb)=(public.connector_digest(v->'ReconciledDigest')=zero);
+	EXCEPTION WHEN data_exception THEN RETURN false;
+	END $$;
+	
+	-- Compare only qualified timestamp fields by instant. All other closed fields
+	-- remain exact; Go's UTC Z and PostgreSQL's +00:00 are not different receipts.
+	CREATE FUNCTION capacity_root_configuration_matches(a jsonb,b jsonb) RETURNS boolean
+	LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+	DECLARE dates text[]:=ARRAY['InitialObservedAt','InitialUntil','RevisionObservedAt','RevisionUntil','PlannedUntil','ReservedAt','CaptureBackedAt','ReadyAt','ReconciledAt'];k text;
+	BEGIN
+	 IF NOT public.capacity_root_configuration_valid(a) OR NOT public.capacity_root_configuration_valid(b) OR (a-dates) IS DISTINCT FROM (b-dates) THEN RETURN false;END IF;
+	 FOREACH k IN ARRAY dates LOOP
+	  IF (a->>k)::timestamptz IS DISTINCT FROM (b->>k)::timestamptz THEN RETURN false;END IF;
+	 END LOOP;
+	 RETURN true;
+	EXCEPTION WHEN data_exception THEN RETURN false;
+	END $$;
+	
+	CREATE FUNCTION capacity_root_transition_valid(old_row public.capacity_source,new_row public.capacity_source) RETURNS boolean
+	LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+	DECLARE old_value jsonb:=old_row.root_configuration;v jsonb:=new_row.root_configuration;k text;pool_name text;compiled jsonb;pool_plan jsonb;n timestamptz:=clock_timestamp();general boolean;capture boolean;opening boolean;
+	BEGIN
+	 general:=public.capacity_role_ok(old_row.root_id,'capacity');capture:=public.capacity_role_ok(old_row.root_id,'capacity-capture');
+	 IF NOT(general OR capture) OR new_row.suspended OR new_row.observed_at IS NULL OR new_row.observed_at>n OR n>=new_row.fresh_until OR
+	  NOT public.capacity_root_configuration_valid(v) OR v->>'RootID' IS DISTINCT FROM new_row.root_id::text OR
+	  new_row.root_plan IS DISTINCT FROM convert_from(new_row.root_plan_bytes,'UTF8')::jsonb OR
+	  new_row.root_plan_digest IS DISTINCT FROM sha256(convert_to('asservat-capacity-root/json-v1','UTF8')||decode('00','hex')||new_row.root_plan_bytes) OR
+	  public.connector_digest(v->'PlanDigest') IS DISTINCT FROM new_row.root_plan_digest OR
+	  new_row.root_plan->'Input' IS DISTINCT FROM new_row.qualification->'RootBacking' OR
+	  new_row.root_plan->'Input'->>'AccountVersion' IS DISTINCT FROM new_row.account_version OR
+	  new_row.root_plan->'Input'->>'RootID' IS DISTINCT FROM new_row.root_id::text OR
+	  new_row.root_plan->'Input'->>'InstallationID' IS DISTINCT FROM new_row.installation_id::text OR
+	  new_row.configuration_spent>(new_row.root_plan->'Totals'->>'ConfigurationTransitions')::bigint THEN RETURN false;END IF;
+	 -- A root-only refresh cannot pick a different system pool or treat malformed
+	 -- unrelated pools as this root's backing. The matching pool compiles fully.
+	 SELECT p->'Resource'->>'Name' INTO STRICT pool_name FROM jsonb_array_elements(new_row.accepted_snapshot->'Snapshot'->'Pools') p WHERE p->'Resource'->>'UID'=new_row.root_plan->'Input'->>'SystemPoolUID';
+	 pool_plan:=public.capacity_compile_pool(new_row.accepted_snapshot,pool_name);
+	 compiled:=public.capacity_compile_root(new_row.qualification->'RootBacking',pool_plan);
+	 IF compiled IS NULL OR compiled IS DISTINCT FROM new_row.root_plan OR public.capacity_backend_for(new_row,pool_plan) IS NULL THEN RETURN false;END IF;
+	 IF old_row.root_plan IS NOT NULL AND ROW(new_row.root_plan,new_row.root_plan_bytes,new_row.root_plan_digest) IS DISTINCT FROM ROW(old_row.root_plan,old_row.root_plan_bytes,old_row.root_plan_digest) THEN RETURN false;END IF;
+	 IF new_row.root_mutation_xid IS NULL THEN
+	  -- Closing the private transaction marker changes no receipt or debit.
+	  RETURN old_row.root_mutation_xid=pg_current_xact_id() AND v IS NOT DISTINCT FROM old_value AND new_row.configuration_spent=old_row.configuration_spent;
+	 END IF;
+	 IF new_row.root_mutation_xid<>pg_current_xact_id() OR old_row.root_mutation_xid IS NOT NULL AND old_row.root_mutation_xid<>pg_current_xact_id() THEN RETURN false;END IF;
+	 opening:=old_row.root_mutation_xid IS NULL;
+	 IF new_row.configuration_spent<>old_row.configuration_spent+CASE WHEN opening THEN 1 ELSE 0 END THEN RETURN false;END IF;
+	 IF old_value IS NULL THEN
+	  RETURN general AND (v->>'Revision')::bigint=1 AND v->'CaptureBackedAt'='null'::jsonb AND v->'ReadyAt'='null'::jsonb AND v->'ReconciledAt'='null'::jsonb AND
+	   (v->>'RevisionObservedAt')::timestamptz<=n AND n<(v->>'RevisionUntil')::timestamptz AND (v->>'ReservedAt')::timestamptz<=n AND
+	   (v->>'PlannedUntil')::timestamptz=(v->>'RevisionObservedAt')::timestamptz+make_interval(secs=>(new_row.root_plan->'Input'->>'AdmissionSeconds')::double precision);
+	 END IF;
+	 IF (v-ARRAY['CaptureBackedAt','ReadyAt','ReconciledAt','ReconciledDigest']) IS DISTINCT FROM (old_value-ARRAY['CaptureBackedAt','ReadyAt','ReconciledAt','ReconciledDigest']) THEN
+	  -- Revision selection additionally requires an exact all-child disposition
+	  -- from the previous revision. No external effect or missing receipt can be
+	  -- promoted by expiry or an unchanged GET. The private effect owns the proof.
+	  RETURN general AND old_value->'ReconciledAt'<>'null'::jsonb AND (v->>'Revision')::bigint=(old_value->>'Revision')::bigint+1 AND
+	   (v-ARRAY['Revision','RevisionObservedAt','RevisionUntil','PlannedUntil','ReservedAt','CaptureBackedAt','ReadyAt','ReconciledAt','PreviousDigest','ReconciledDigest']) IS NOT DISTINCT FROM
+	   (old_value-ARRAY['Revision','RevisionObservedAt','RevisionUntil','PlannedUntil','ReservedAt','CaptureBackedAt','ReadyAt','ReconciledAt','PreviousDigest','ReconciledDigest']) AND
+	   v->'PreviousDigest'=old_value->'ReconciledDigest' AND v->'CaptureBackedAt'='null'::jsonb AND v->'ReadyAt'='null'::jsonb AND v->'ReconciledAt'='null'::jsonb AND
+	   (v->>'RevisionObservedAt')::timestamptz<=(old_value->>'ReconciledAt')::timestamptz AND (old_value->>'ReconciledAt')::timestamptz<=(v->>'ReservedAt')::timestamptz AND (v->>'RevisionObservedAt')::timestamptz<=n AND n<(v->>'RevisionUntil')::timestamptz AND (v->>'ReservedAt')::timestamptz<=n AND
+	   (v->>'PlannedUntil')::timestamptz>(old_value->>'PlannedUntil')::timestamptz AND
+	   (v->>'PlannedUntil')::timestamptz=(v->>'RevisionObservedAt')::timestamptz+make_interval(secs=>(new_row.root_plan->'Input'->>'AdmissionSeconds')::double precision);
+	 END IF;
+	 IF old_value->'ReconciledAt'<>'null'::jsonb AND v IS DISTINCT FROM old_value THEN RETURN false;END IF;
+	 FOREACH k IN ARRAY ARRAY['CaptureBackedAt','ReadyAt','ReconciledAt'] LOOP
+	  IF old_value->k<>'null'::jsonb AND v->k IS DISTINCT FROM old_value->k THEN RETURN false;END IF;
+	  IF v->k IS DISTINCT FROM old_value->k AND ((v->>k)::timestamptz>n OR k='CaptureBackedAt' AND NOT capture OR k<>'CaptureBackedAt' AND NOT general) THEN RETURN false;END IF;
+	 END LOOP;
+	 IF old_value->'ReconciledAt'<>'null'::jsonb AND v->'ReconciledDigest' IS DISTINCT FROM old_value->'ReconciledDigest' THEN RETURN false;END IF;
+	 RETURN true;
+	EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
+	END $$;
+	
+	CREATE FUNCTION require_capacity_root_marker_closed() RETURNS trigger
+	LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+	BEGIN
+	 IF TG_TABLE_SCHEMA<>'public' OR TG_RELID<>'public.capacity_source'::regclass OR TG_WHEN<>'AFTER' OR TG_LEVEL<>'ROW' OR TG_OP NOT IN ('INSERT','UPDATE') THEN RAISE EXCEPTION 'invalid capacity root marker source' USING ERRCODE='23514';END IF;
+	 IF EXISTS(SELECT 1 FROM public.capacity_source WHERE root_id=NEW.root_id AND root_mutation_xid IS NOT NULL) THEN RAISE EXCEPTION 'capacity root configuration remains open' USING ERRCODE='23514';END IF;
+	 RETURN NEW;
+	END $$;

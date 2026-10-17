@@ -1,0 +1,42 @@
+{
+  "scope": "Only current-after-final deciding diagnostic and exact native fixture logging; unexecuted tests",
+  "at": "2026-10-14T00:23:46.604292+00:00",
+  "files": [
+    {
+      "path": "internal/adapters/postgres/owner_projection_diagnostic.go",
+      "baseSHA256": "40b7b16454edf0ab8d68940c8637fed9aeaaa933d0328ff8421643298f170f69",
+      "payloadSHA256": "f58c32af7f385f6669970082439c346e6b19b6d0308e015c83c4f54123a06b57",
+      "new": false
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_final_current_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "4cfae7912cfa3613763f818b46ae5564ad0d37053207cf0697c6d9dfb9f596c7",
+      "new": true
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_operation.go",
+      "baseSHA256": "36c0a2c1ebb0bf6be00317b5b96959347c974f72bc1a0b6c8d30d1e98b6f86ab",
+      "payloadSHA256": "899ed8de6904308a237600b5d8bd86ffad0a480055ab7e76b3d869e75f189894",
+      "new": false
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "baseSHA256": "e44e59d8e58e608f12fe623db0bd20c43def0ee0a6e6fd924529fa1e5a2d3104",
+      "payloadSHA256": "00cc21882992ed4a6d740f43346a2aff03f3617c31a2af2006df7930f5179405",
+      "new": false
+    }
+  ],
+  "manifestSHA256": "7a9bf0b15485d918fd66b27b9d6755d87937d658ae89cdc55373df808c72436a",
+  "patchSHA256": "8243aa6d1df45e81bc14b4ddc6b7ffb8b6cf6bd25fdccf5937d889f389d3bbe1",
+  "verification": "pending",
+  "archiveHashes": {
+    "payloads/test/integration/initial_runtime_owner_pair_native_test.go.txt": "00cc21882992ed4a6d740f43346a2aff03f3617c31a2af2006df7930f5179405",
+    "payloads/internal/adapters/postgres/owner_projection_diagnostic.go.txt": "f58c32af7f385f6669970082439c346e6b19b6d0308e015c83c4f54123a06b57",
+    "payloads/internal/adapters/postgres/owner_projection_final_current_test.go.txt": "4cfae7912cfa3613763f818b46ae5564ad0d37053207cf0697c6d9dfb9f596c7",
+    "payloads/internal/adapters/postgres/owner_projection_operation.go.txt": "899ed8de6904308a237600b5d8bd86ffad0a480055ab7e76b3d869e75f189894",
+    "before/test/integration/initial_runtime_owner_pair_native_test.go.txt": "e44e59d8e58e608f12fe623db0bd20c43def0ee0a6e6fd924529fa1e5a2d3104",
+    "before/internal/adapters/postgres/owner_projection_diagnostic.go.txt": "40b7b16454edf0ab8d68940c8637fed9aeaaa933d0328ff8421643298f170f69",
+    "before/internal/adapters/postgres/owner_projection_operation.go.txt": "36c0a2c1ebb0bf6be00317b5b96959347c974f72bc1a0b6c8d30d1e98b6f86ab"
+  }
+}

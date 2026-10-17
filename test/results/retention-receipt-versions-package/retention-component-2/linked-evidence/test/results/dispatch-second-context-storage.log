@@ -1,0 +1,154 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+    authority_test.go:54: run make custody-integration for owned real-service fixtures
+--- SKIP: TestPermissionAuthorityWithRealServices (0.00s)
+=== RUN   TestBootstrapChannelWithRealOpenBao
+    bootstrap_channel_test.go:23: run make fleet-integration
+--- SKIP: TestBootstrapChannelWithRealOpenBao (0.00s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+    bootstrap_issuance_test.go:33: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapIssuanceWithRealServices (0.00s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+    bootstrap_reservation_test.go:25: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapReservationsWithRealServices (0.00s)
+=== RUN   TestContextAdmissionWithRealServices
+    capture_admission_test.go:52: run make custody-integration
+--- SKIP: TestContextAdmissionWithRealServices (0.00s)
+=== RUN   TestContextCommitWithRealServices
+=== RUN   TestContextCommitWithRealServices/cluster-1
+    context_commit_test.go:225: native=353, encrypted manifest=4703, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+=== RUN   TestContextCommitWithRealServices/cluster-2
+    context_commit_test.go:225: native=353, encrypted manifest=4707, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+--- PASS: TestContextCommitWithRealServices (20.15s)
+    --- PASS: TestContextCommitWithRealServices/cluster-1 (10.01s)
+    --- PASS: TestContextCommitWithRealServices/cluster-2 (10.01s)
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:314: nativeBytes=353 dataBytes=325 indexBytes=367 wrappedMetadataBytes=1820; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:314: nativeBytes=353 dataBytes=327 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.61s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.41s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.18s)
+=== RUN   TestCustodyWithRealServices
+    custody_test.go:111: run make custody-integration for owned real-service fixtures
+--- SKIP: TestCustodyWithRealServices (0.00s)
+=== RUN   TestDownloadJobsWithRealKubernetes
+    download_jobs_kube_test.go:219: synthetic worker event FailedCreate: Error creating: pods "asservat-download-10000000-0000-4000-8000-000000000022-" is forbidden: the string value of PreemptionPolicy (Never) must not be provided in pod spec; priority admission controller computed PreemptLowerPriority from the given PriorityClass name
+    download_jobs_kube_test.go:229: actual worker observation download unavailable
+--- FAIL: TestDownloadJobsWithRealKubernetes (27.73s)
+=== RUN   TestDownloadWorkerProofWithRealKubernetesTLS
+    download_peer_kube_test.go:306: real dedicated-audience TokenReview, pod binding, live Job/account/spec checks, verified mTLS identity, API role separation and deleting-pod rejection passed; dispatch and certificate issuance remain fixtures
+--- PASS: TestDownloadWorkerProofWithRealKubernetesTLS (2.42s)
+=== RUN   TestEnrollmentSigningWithRealServices
+    enrollment_signing_test.go:77: run make custody-integration
+--- SKIP: TestEnrollmentSigningWithRealServices (0.00s)
+=== RUN   TestEnrollmentWithRealServices
+    enrollment_test.go:33: run make custody-integration
+--- SKIP: TestEnrollmentWithRealServices (0.00s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+    fleet_observation_test.go:22: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentFleetObservationWithRealPostgres (0.00s)
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:151: run make identity-integration
+--- SKIP: TestKeycloakProvider (0.00s)
+=== RUN   TestLocalKeyServiceTLSIsolationAndRevocation
+    key_service_test.go:250: real TLS wrap/read; exact binding and authority; collector/publisher/hub unwrap denial; current revocation on existing TLS connection
+--- PASS: TestLocalKeyServiceTLSIsolationAndRevocation (0.09s)
+=== RUN   TestLocalKeyServicePurposeAndSigning
+=== RUN   TestLocalKeyServicePurposeAndSigning/audit
+=== RUN   TestLocalKeyServicePurposeAndSigning/browser-credentials
+=== RUN   TestLocalKeyServicePurposeAndSigning/policy-submission
+--- PASS: TestLocalKeyServicePurposeAndSigning (0.10s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/audit (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/browser-credentials (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/policy-submission (0.03s)
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/duplicate
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/trailing
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/oversized
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/null-input
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/unknown
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/alias
+--- PASS: TestLocalKeyServiceRejectsWireSubstitution (0.06s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/duplicate (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/trailing (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/oversized (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/null-input (0.00s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/unknown (0.00s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/alias (0.01s)
+=== RUN   TestLocalKeyClientRejectsMalformedResponses
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/digest
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/expired
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/operation
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/unknown
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/duplicate
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/oversized
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/redirect
+--- PASS: TestLocalKeyClientRejectsMalformedResponses (0.16s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/digest (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/expired (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/operation (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/unknown (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/duplicate (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/oversized (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/redirect (0.02s)
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue
+--- PASS: TestLocalKeyServiceBoundsAndCurrentTLS (0.05s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection (0.02s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue (0.03s)
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/changed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/removed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked
+=== NAME  TestLocalKeyLifecycleWithRealKubernetesSQL
+    local_key_lifecycle_test.go:408: real Kubernetes named RBAC, immutable Secret pins, SQL rotation history, mTLS wrap/unwrap, old-process fencing, retained-key reads, rollback/suspension, lock expiry and recovery denial passed; operation approvals remain synthetic
+--- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL (6.01s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/changed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/removed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock (0.81s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked (0.01s)
+=== RUN   TestLocalKeysWithRealStorage
+    local_keys_storage_test.go:159: local wrapping, encrypted manifest reload and TLS S3: exact 8389341-byte native file/hash and cross-frame range
+--- PASS: TestLocalKeysWithRealStorage (1.17s)
+=== RUN   TestLocalStartWithRealKubernetes
+    local_start_test.go:36: run make permission-integration
+--- SKIP: TestLocalStartWithRealKubernetes (0.00s)
+=== RUN   TestPeerRegistryWithRealServices
+    peer_registry_test.go:23: run make custody-integration
+--- SKIP: TestPeerRegistryWithRealServices (0.00s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+    permission_admission_test.go:29: run make permission-integration
+--- SKIP: TestPermissionAdmissionWithRealKubernetes (0.00s)
+=== RUN   TestPermissionsWithRealKubernetes
+    permissions_test.go:28: owned Kubernetes fixture required; run make permission-integration
+--- SKIP: TestPermissionsWithRealKubernetes (0.00s)
+=== RUN   TestConnectorPKIWithRealOpenBao
+=== RUN   TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate
+=== RUN   TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit
+=== RUN   TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS
+=== RUN   TestConnectorPKIWithRealOpenBao/provider-role-and-revocation
+--- PASS: TestConnectorPKIWithRealOpenBao (0.83s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS (0.77s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/provider-role-and-revocation (0.01s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+    policy_authority_test.go:43: run make custody-integration
+--- SKIP: TestPermissionAuthorityPoliciesWithRealServices (0.00s)
+=== RUN   TestRetentionWithRealKubernetes
+    retention_test.go:30: run make permission-integration
+--- SKIP: TestRetentionWithRealKubernetes (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	59.435s
+FAIL

@@ -1,0 +1,5 @@
+{
+  "recordedAt": 1791832580.8286948,
+  "cpuPressure": "some avg10=2.63 avg60=2.24 avg300=2.17 total=5303010261\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+  "scope": "point-in-time host observation; not exclusive-host or performance qualification"
+}

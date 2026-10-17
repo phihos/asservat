@@ -1,0 +1,12 @@
+[
+  {
+    "path": "internal/transport/native/closure_test.go",
+    "base": "dedaad83572995bb6e81c91a1a2201cff792f9469bf48b6aec4de8eb4aa46b7b",
+    "sha256": "0966a763142ff99548d98a5f71c1a0a5d95e1cba6f5fe3c82cbb753cd710f103"
+  },
+  {
+    "path": "internal/transport/native/relay_receive.go",
+    "base": "bc477939e969b99660bfe6c97061bc07357a1c11641f3be006fd6805eadbc876",
+    "sha256": "0d91de615baa852632c169422fb49f693ab16a3c25a48d8b0cf6aea25a2ad1de"
+  }
+]

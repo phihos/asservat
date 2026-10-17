@@ -1,0 +1,6 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:208: fixture admin PUT /admin/realms/asservat-test/groups/25284b0f-0f33-404f-8664-93d7366c03fb status 400
+--- FAIL: TestKeycloakProvider (1.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.063s
+FAIL

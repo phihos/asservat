@@ -1,0 +1,83 @@
+# Owner operation / projection / launch component handoff
+
+The corrected 30-path owner overlay passed its bounded local component qualification. The production payloads are byte-identical to the preserved failed `owner-projection-1`; only the two fixture corrections recorded in `owner-projection-fixture-correction.json` changed. This is not actual PostgreSQL/Kubernetes qualification, original 20 QPS availability, an installed owner process, or runtime selection.
+
+## Original failure and corrected fixture
+
+The immutable 158-path `owner-projection-1` ended 1, handle 84825. Its controlled-before variant reproduced both exact original-root replacement defects; corrected operation tests passed, but new projection/driver tests stopped before effects because raw synthetic Deployment responses omitted the four already-qualified API scalar defaults. The original result, logs, manifest and before evidence are hash-pinned by this checkpoint's `prior-evidence.json`; none was rewritten or repeated.
+
+The corrected fixture models DNSPolicy, SchedulerName, TerminationMessagePath and TerminationMessagePolicy after computing the original builder claim digest. It changes no product decoder, template matcher, guard, original caller pin, role grant, deadline or limiter. The provider helper has nonsecret failure-stage labels. The exact original-provider helper test is now selected by its actual name, `TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput`.
+
+The integrated tree supplies 127 exact former foundation payloads. Its reviewed stronger canonical owner-provider-selection schema remains a live dependency, rather than being replaced with the old foundation copy. The remaining 30 payload bases match the exact current live tree; `integration-resolution.json` records each disposition.
+
+## Implemented phase composition
+
+- A concrete original root owns fresh native initial/final brackets, actual post-lock mutable reads, current accepted owner configuration, exact original resource/source/service/issuer pins and an opaque single-use PostgreSQL-to-Kubernetes phase handle. Shorter admitted deadlines persist; cancellation is rechecked after mutex acquisition.
+- Public one-use intent claims precede the stronger exact four-role SQL check. They do not grant creation/launch rights. Role CREATE plus grants/provenance/final checks commits a pending original result; a separate current phase authenticates that same committed role and acknowledges it. Unknown commit stays lookup-only.
+- Credential Secret and public ConfigMap each have separately persisted original attempts, one possible CREATE and independently acknowledged exact receipts. A current historical acknowledgement never backdates timely creation or renews the original effect. The original joint receipt precedes one zero-to-one owner Deployment CAS and a separate launch acknowledgement.
+- The automatic driver admits at most 18 normal calls and one invocation-wide read-only inspection. Known spent attempts stop, missing uncertain objects cannot be recreated, unknown receipt CAS cannot repeat within this controller, and shutdown joins admitted native work before dependency closure. Completion is the exact original launch receipt, not Pod readiness or provider/runtime health.
+
+## Actual verification
+
+Handle 11291 was polled to terminal exit 0. `result.json` and `evidence/runner.log` retain actual commands and exits. The runner used GOMAXPROCS=2, -p=2, a fresh owned /tmp directory after >=4 GiB free and write+fsync checks, finite 600s build wrappers, original 180s Kubernetes and 30s PostgreSQL test bounds. Only that owned temporary directory was removed.
+
+| Phase | Exit | Wall time | Actual selected coverage |
+| --- | --- | --- | --- |
+| compile | 0 | 21.096s | Kubernetes, PostgreSQL, bootstrap and integration packages compile; native opt-ins absent |
+| owner-projection-race | 0 | 132.932s | 27 required top-level / 48 named PASS; package 119.077s |
+| owner-operation-sql-race | 0 | 15.317s | 1 top-level / 5 named PASS (four zero-handle boundaries); package 1.046s |
+| vet | 0 | 3.519s | Kubernetes, PostgreSQL and bootstrap |
+| go-architecture | 0 | 1.366s | 53 packages / 302 internal edges; exact PG-to-Kubernetes C21 edge |
+
+All 30 payload/base hashes, 2,551 dependencies and inventory, and referenced prior evidence match before, after and between phases. No required selected test is missing. No live files were changed and no native lab ran.
+
+The composed loopback fixture invokes real retained/source native readers and real pinned TLS SetupReader requests, with explicit synthetic API admission/SQL/provider facts. Its accepted value is independently stored and refreshed only by a finite one-second / 15-tick fixture observer; operation reads never refresh it. The fixture uses an unlimited API limiter, so passing durations do not qualify the original shared 20 QPS path. Complete-and-launch verifies nine independent phases each perform exactly sixteen fixed provider GETs and one full synthetic four-role verification.
+
+## Remaining qualification and next task
+
+Keep current native worker CompleteInputs qualification separate. Then compose the real worker launch and joined configuration observer before opening the actual owner root: no fixture write-on-read acceptance and no fabricated role receipts. Extend the original pair fixture with actual four-purpose SQL creation/authentication, generated owner provider recipe inspection, exact selected scoped audit Secret and original real owner-pki roots, projection/launch receipts, unknown replies and mutation/expiry negatives. Measure each complete operation with existing shared client rate buckets and the earliest already-aged accepted/source/SQL cutoff; do not assume a fresh whole five seconds.
+
+The old owner runtime shutdown delta, actual owner process / automatic provider lifetime, ADR150 observation selection, independent scoped audit accounting/retirement/recovery and initial/restore/legacy versioned bootstrap composition remain separate gates. No command/chart/public runtime switch is included here.
+
+## Exact immutable evidence
+
+- `manifest.json` SHA256 `cd174c056a308586ca21e1e770cca69675e3ae00ace77bf234b9a1f4b33876b1`
+- `dependencies.json` SHA256 `0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38`
+- `run.py` SHA256 `5f1527f9dee42a19a24bf6c6196eb9ea410fbf21beae8ef77fbf110eaf982cd2`
+- `result.json` SHA256 `74aa167639247a07b192dc97b16e88b53f4a941012ed3b3190f490ac883f7e93`
+- `prior-evidence.json` SHA256 `03c0df3c320e57eb57d772a8e082cedc3f52eaba2bae2abd17addc7a56f55e52`
+- `integration-resolution.json` SHA256 `ed28cb1bab1608989e1d973f9ab579b63d21486f1ef5fd6931a6f9af2df54d37`
+- `required-tests.json` SHA256 `ae24bb1c5a2e0b80e55fbb64b53da9b4dc7289f06ec0f1d51049fa279d1bbc79`
+
+## Payload inventory
+
+- `internal/adapters/kubernetes/initial_preparer_conflicts_test.go`
+- `internal/adapters/kubernetes/initial_preparer_provider_fixture_test.go`
+- `internal/adapters/kubernetes/owner_identity_operation.go`
+- `internal/adapters/kubernetes/owner_identity_operation_composed_test.go`
+- `internal/adapters/kubernetes/owner_identity_operation_current.go`
+- `internal/adapters/kubernetes/owner_identity_operation_fixture_test.go`
+- `internal/adapters/kubernetes/owner_identity_operation_material.go`
+- `internal/adapters/kubernetes/owner_identity_operation_native.go`
+- `internal/adapters/kubernetes/owner_identity_operation_open.go`
+- `internal/adapters/kubernetes/owner_identity_operation_retry_test.go`
+- `internal/adapters/kubernetes/owner_identity_operation_roles.go`
+- `internal/adapters/kubernetes/owner_identity_operation_root.go`
+- `internal/adapters/kubernetes/owner_identity_operation_test.go`
+- `internal/adapters/kubernetes/owner_identity_roles.go`
+- `internal/adapters/kubernetes/owner_installation_driver.go`
+- `internal/adapters/kubernetes/owner_installation_driver_test.go`
+- `internal/adapters/kubernetes/owner_installation_outcome.go`
+- `internal/adapters/kubernetes/owner_projection_operation.go`
+- `internal/adapters/kubernetes/owner_projection_operation_composed_test.go`
+- `internal/adapters/kubernetes/owner_projection_operation_effects.go`
+- `internal/adapters/kubernetes/owner_projection_operation_fixture_test.go`
+- `internal/adapters/kubernetes/owner_projection_operation_inspect.go`
+- `internal/adapters/kubernetes/owner_projection_operation_native.go`
+- `internal/adapters/kubernetes/owner_projection_operation_plan.go`
+- `internal/adapters/kubernetes/owner_projection_operation_provider_test.go`
+- `internal/adapters/kubernetes/owner_projection_operation_test.go`
+- `internal/adapters/postgres/owner_identity_operation.go`
+- `internal/adapters/postgres/owner_identity_operation_roles.go`
+- `internal/adapters/postgres/owner_identity_operation_test.go`
+- `internal/adapters/postgres/owner_projection_operation.go`

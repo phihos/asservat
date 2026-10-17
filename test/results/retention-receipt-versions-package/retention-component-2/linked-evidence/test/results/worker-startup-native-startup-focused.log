@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/adapters/mtls	1.093s
+ok  	asservat.local/asservat/internal/bootstrap	1.086s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.180s
+ok  	asservat.local/asservat/internal/domain/authorization	1.011s [no tests to run]

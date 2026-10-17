@@ -1,0 +1,97 @@
+Creating owned synthetic cluster 1
+Name:             fixture-5464c7465c-fqmx7
+Namespace:        synthetic
+Priority:         0
+Service Account:  default
+Node:             asservat-context-evkjies8-0-control-plane/172.18.0.2
+Start Time:       Thu, 15 Oct 2026 16:57:16 +0200
+Labels:           app=fixture
+                  pod-template-hash=5464c7465c
+Annotations:      synthetic-user-data: MUST-NOT-LEAK
+Status:           Pending
+SeccompProfile:   RuntimeDefault
+IP:               10.244.0.5
+IPs:
+  IP:           10.244.0.5
+Controlled By:  ReplicaSet/fixture-5464c7465c
+Containers:
+  fixture:
+    Container ID:   
+    Image:          registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a
+    Image ID:       
+    Port:           <none>
+    Host Port:      <none>
+    State:          Waiting
+      Reason:       ImagePullBackOff
+    Ready:          False
+    Restart Count:  0
+    Limits:
+      cpu:     50m
+      memory:  32Mi
+    Requests:
+      cpu:     5m
+      memory:  8Mi
+    Environment:
+      SYNTHETIC_SECRET:  MUST-NOT-LEAK
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-jzk5z (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-jzk5z:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  90s                default-scheduler  Successfully assigned synthetic/fixture-5464c7465c-fqmx7 to asservat-context-evkjies8-0-control-plane
+  Warning  Failed     30s                kubelet            spec.containers{fixture}: Failed to pull image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": rpc error: code = DeadlineExceeded desc = failed to pull and unpack image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": failed to resolve reference "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": failed to do request: Head "https://registry.k8s.io/v2/pause/manifests/sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": dial tcp 34.96.108.209:443: i/o timeout
+  Warning  Failed     30s                kubelet            spec.containers{fixture}: Error: ErrImagePull
+  Normal   BackOff    30s                kubelet            spec.containers{fixture}: Back-off pulling image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+  Warning  Failed     30s                kubelet            spec.containers{fixture}: Error: ImagePullBackOff
+  Normal   Pulling    16s (x2 over 90s)  kubelet            spec.containers{fixture}: Pulling image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+LAST SEEN   TYPE      REASON              OBJECT                          MESSAGE
+90s         Normal    Scheduled           pod/fixture-5464c7465c-fqmx7    Successfully assigned synthetic/fixture-5464c7465c-fqmx7 to asservat-context-evkjies8-0-control-plane
+90s         Normal    SuccessfulCreate    replicaset/fixture-5464c7465c   Created pod: fixture-5464c7465c-fqmx7
+90s         Normal    ScalingReplicaSet   deployment/fixture              Scaled up replica set fixture-5464c7465c from 0 to 1
+30s         Warning   Failed              pod/fixture-5464c7465c-fqmx7    Failed to pull image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": rpc error: code = DeadlineExceeded desc = failed to pull and unpack image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": failed to resolve reference "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": failed to do request: Head "https://registry.k8s.io/v2/pause/manifests/sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a": dial tcp 34.96.108.209:443: i/o timeout
+30s         Warning   Failed              pod/fixture-5464c7465c-fqmx7    Error: ErrImagePull
+30s         Normal    BackOff             pod/fixture-5464c7465c-fqmx7    Back-off pulling image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+30s         Warning   Failed              pod/fixture-5464c7465c-fqmx7    Error: ImagePullBackOff
+16s         Normal    Pulling             pod/fixture-5464c7465c-fqmx7    Pulling image "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+NAME                                        STATUS   ROLES           AGE    VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION            CONTAINER-RUNTIME
+asservat-context-evkjies8-0-control-plane   Ready    control-plane   112s   v1.37.0   172.18.0.2    <none>        Debian GNU/Linux 13 (trixie)   7.2.9-2-cachyos (amd64)   containerd://2.3.4
+Fixture command failed: error: timed out waiting for the condition
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 630, in <module>
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 446, in main
+    run(k+["-n", "synthetic", "rollout", "status", "deployment/fixture", "--timeout=90s"])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 34, in run
+    return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['kubectl', '--kubeconfig', '/home/phil/.cache/asservat-build/context-evkjies8/kube-0', '--request-timeout=15s', '-n', 'synthetic', 'rollout', 'status', 'deployment/fixture', '--timeout=90s']' returned non-zero exit status 1.
+exit=1

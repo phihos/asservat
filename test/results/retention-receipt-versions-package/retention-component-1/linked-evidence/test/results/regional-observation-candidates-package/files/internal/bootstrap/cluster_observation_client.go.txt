@@ -1,0 +1,252 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	wire "asservat.local/asservat/internal/transport/clusterobservation"
+)
+
+// InstalledClusterObservationClient is the installed HWORK local hop. The dial
+// hint is derived only from the original same-cluster Service, while ordinary
+// TLS verifies its separately derived common name. No projected token is read
+// or transmitted until the actual selected owner passes current SQL, Ready
+// route, native guard and original template checks. Role70 reads finish before
+// a caller opens its capacity transaction; this client owns no SQL pool.
+type InstalledClusterObservationClient struct {
+	root                             context.Context
+	cancel                           context.CancelFunc
+	pin                              value.OwnerObservationPin
+	podUID, address, authority, name string
+	roots                            *x509.CertPool
+	verifier                         *mtls.OwnerPeerVerifier
+	candidates                       *app.OwnerObservationCandidateSelection
+	owners                           *app.OwnerAuthenticator
+	workloads                        app.OwnerObservationWorkloadReader
+	tokens                           app.ClusterObservationTokenReader
+	now                              func() time.Time
+	mu                               sync.Mutex
+	closed                           bool
+	maximum, active                  int
+	joined                           sync.WaitGroup
+}
+
+var _ app.ClusterObservationExchange = (*InstalledClusterObservationClient)(nil)
+
+func NewInstalledClusterObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID string, roots *x509.CertPool, registry *postgres.OwnerEnrollments, configuration *postgres.OwnerConfigurations, endpoints *kube.OwnerEndpoints, protection *kube.OwnerWorkloadProtection, workloads *kube.OwnerObservationWorkload, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*InstalledClusterObservationClient, error) {
+	if registry == nil || configuration == nil || endpoints == nil || protection == nil || workloads == nil {
+		return nil, value.ErrInvalid
+	}
+	routes := &app.OwnerRoutes{Configurations: configuration, Endpoints: endpoints, Now: now}
+	owners := &app.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: protection, Now: now}
+	address := net.JoinHostPort(pin.Pool.Service+"."+pin.Pool.Namespace+".svc", strconv.Itoa(pin.Pool.NativePort))
+	return newInstalledClusterObservationClient(ctx, pin, podUID, address, roots, registry, owners, workloads, tokens, maximum, now)
+}
+
+// Address/port overrides exist only on this private test seam. Production has
+// no callback, alternate endpoint or retry-selected owner.
+func newInstalledClusterObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID, address string, roots *x509.CertPool, candidates app.OwnerObservationCandidateSource, owners *app.OwnerAuthenticator, workloads app.OwnerObservationWorkloadReader, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*InstalledClusterObservationClient, error) {
+	if ctx == nil || ctx.Err() != nil || !pin.Valid() || !authorization.UUID(podUID) || pin.Pool.Port != 9443 || pin.Pool.NativePort != contracts.OwnerInstalledNativePort || roots == nil || len(roots.Subjects()) == 0 || candidates == nil || owners == nil || workloads == nil || tokens == nil || maximum < 1 || maximum > 2 || now == nil {
+		return nil, value.ErrInvalid
+	}
+	name, e := mtls.OwnerBootstrapServerName(pin.Pool)
+	if e != nil {
+		return nil, e
+	}
+	v, e := mtls.NewOwnerPeerVerifierForPool(roots, pin.Pool, now)
+	if e != nil {
+		return nil, e
+	}
+	selected, e := app.NewOwnerObservationCandidateSelection(pin.Pool, candidates)
+	if e != nil {
+		return nil, e
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &InstalledClusterObservationClient{root: root, cancel: cancel, pin: pin, podUID: podUID, address: address, name: name, authority: net.JoinHostPort(name, strconv.Itoa(pin.Pool.NativePort)), roots: roots.Clone(), verifier: v, candidates: selected, owners: owners, workloads: workloads, tokens: tokens, maximum: maximum, now: now}, nil
+}
+
+func (c *InstalledClusterObservationClient) enter() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.root.Err() != nil || c.active >= c.maximum {
+		return false
+	}
+	c.active++
+	c.joined.Add(1)
+	return true
+}
+func (c *InstalledClusterObservationClient) leave() {
+	c.mu.Lock()
+	c.active--
+	c.mu.Unlock()
+	c.joined.Done()
+}
+func (c *InstalledClusterObservationClient) Close() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.closed = true
+	c.cancel()
+	c.mu.Unlock()
+	c.joined.Wait()
+}
+
+func (c *InstalledClusterObservationClient) selected(ctx context.Context, connection *mtls.OwnerBootstrapConnection) (value.AuthenticatedOwner, value.OwnerObservationWorkload, error) {
+	var a value.AuthenticatedOwner
+	var w value.OwnerObservationWorkload
+	a, e := c.owners.AuthenticateOwner(ctx, connection)
+	if e != nil || !a.Valid(c.now()) || a.Pool != c.pin.Pool || a.ConfigurationRevision.UID != c.pin.SourceUID || a.ProtectionDigest != c.pin.ProtectionDigest {
+		return value.AuthenticatedOwner{}, w, value.ErrUnavailable
+	}
+	call, end := context.WithDeadline(ctx, a.ValidUntil)
+	defer end()
+	w, e = c.workloads.ObserveOwnerWorkload(call, a.Certificate.Binding, a.Pod)
+	if e != nil || !w.Valid(c.now()) || w.Pin != c.pin || w.Binding != a.Certificate.Binding || w.Pod != a.Pod || w.ReplicaSetUID != a.ReplicaSetUID || !a.Valid(c.now()) || call.Err() != nil {
+		return value.AuthenticatedOwner{}, value.OwnerObservationWorkload{}, value.ErrUnavailable
+	}
+	return a, w, nil
+}
+
+func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, request value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+	var zero value.ClusterObservationResult
+	if c == nil || ctx == nil || ctx.Err() != nil || !request.Valid(c.now()) || request.RootID != c.pin.RootID || !c.enter() {
+		return zero, value.ErrUnavailable
+	}
+	defer c.leave()
+	request = request.Clone()
+	started := c.now()
+	until := identity.Earlier(started.Add(5*time.Second), request.NotAfter)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	rootDone := make(chan struct{})
+	stopRoot := context.AfterFunc(c.root, func() { cancel(); close(rootDone) })
+	defer func() {
+		if !stopRoot() {
+			<-rootDone
+		}
+	}()
+	candidates, e := c.candidates.ReadOwnerObservationCandidates(call)
+	if e != nil || !candidates.Valid(c.now()) || candidates.Pool != c.pin.Pool || len(candidates.Owners) == 0 {
+		return zero, value.ErrUnavailable
+	}
+	candidates.Owners = append([]value.OwnerBinding(nil), candidates.Owners...)
+	until = identity.Earlier(until, candidates.ValidUntil)
+	bounded, end := context.WithDeadline(call, until)
+	defer end()
+	raw, e := (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext(bounded, "tcp", c.address)
+	if e != nil || raw == nil {
+		return zero, value.ErrUnavailable
+	}
+	defer raw.Close()
+	if raw.SetDeadline(until) != nil {
+		return zero, value.ErrUnavailable
+	}
+	ioDone := make(chan struct{})
+	stopIO := context.AfterFunc(bounded, func() { _ = raw.Close(); close(ioDone) })
+	defer func() {
+		if !stopIO() {
+			<-ioDone
+		}
+	}()
+	socket := tls.Client(raw, &tls.Config{RootCAs: c.roots.Clone(), ServerName: c.name, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, SessionTicketsDisabled: true, Time: c.now})
+	if socket.HandshakeContext(bounded) != nil {
+		return zero, value.ErrDenied
+	}
+	state := socket.ConnectionState()
+	connection, e := mtls.NewOwnerBootstrapConnection(c.verifier, &state, candidates)
+	if e != nil {
+		return zero, value.ErrDenied
+	}
+	before, workload, e := c.selected(bounded, connection)
+	if e != nil {
+		return zero, e
+	}
+	until = identity.Earlier(until, identity.Earlier(before.ValidUntil, workload.FreshUntil))
+	current, stopCurrent := context.WithDeadline(bounded, until)
+	defer stopCurrent()
+	if raw.SetDeadline(until) != nil {
+		return zero, value.ErrUnavailable
+	}
+	// Reading the dedicated token is deliberately after actual peer acceptance.
+	token, e := c.tokens.ReadClusterObservationToken(current)
+	defer clear(token)
+	if e != nil || len(token) < 1 || len(token) > 16<<10 || bytes.ContainsAny(token, " \t\r\n") || current.Err() != nil || !before.Valid(c.now()) || !workload.Valid(c.now()) || !c.now().Before(until) {
+		return zero, value.ErrUnavailable
+	}
+	digest, e := wire.RequestDigest(request)
+	if e != nil {
+		return zero, e
+	}
+	body, e := contracts.EncodeClusterObservationLocalRequest(contracts.ClusterObservationLocalRequest{Format: contracts.ClusterObservationLocalFormat, PodUID: c.podUID, Observation: wire.RequestWire(request)})
+	if e != nil {
+		return zero, e
+	}
+	var delivered atomic.Bool
+	tr := &http.Transport{ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, MaxResponseHeaderBytes: 4096, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: c.roots.Clone(), ServerName: c.name}, DialTLSContext: func(dial context.Context, network, address string) (net.Conn, error) {
+		if network != "tcp" || address != c.authority || dial.Err() != nil || current.Err() != nil || !delivered.CompareAndSwap(false, true) {
+			return nil, value.ErrDenied
+		}
+		return socket, nil
+	}}
+	defer tr.CloseIdleConnections()
+	client := &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	r, e := http.NewRequestWithContext(current, http.MethodPost, "https://"+c.authority+contracts.ClusterObservationLocalPath, io.NopCloser(bytes.NewReader(body)))
+	if e != nil {
+		return zero, value.ErrInvalid
+	}
+	r.ContentLength = int64(len(body))
+	r.Header.Set("Authorization", "Bearer "+string(token))
+	r.Header.Set("Content-Type", contracts.ClusterObservationLocalMedia)
+	r.Header.Set("Accept", contracts.ClusterObservationLocalMedia)
+	response, e := client.Do(r)
+	if e != nil {
+		return zero, value.ErrUnavailable
+	}
+	defer response.Body.Close()
+	if response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.TLS == nil || response.TLS.ServerName != c.name || response.ContentLength < 1 || response.ContentLength > contracts.ClusterObservationBytes || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.ClusterObservationLocalMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
+		return zero, value.ErrUnavailable
+	}
+	data, e := io.ReadAll(io.LimitReader(response.Body, contracts.ClusterObservationBytes+1))
+	if e != nil || len(data) != int(response.ContentLength) || len(data) > contracts.ClusterObservationBytes || current.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	w, e := contracts.DecodeClusterObservationResult(data)
+	if e != nil {
+		return zero, value.ErrUnavailable
+	}
+	result, e := wire.ParseResult(w, request, digest, c.now())
+	if e != nil {
+		return zero, e
+	}
+	after, latest, e := c.selected(current, connection)
+	if e != nil || after.Certificate != before.Certificate || after.EnrollmentID != before.EnrollmentID || after.ConfigurationRevision != before.ConfigurationRevision || after.ProtectionDigest != before.ProtectionDigest || after.Pod != before.Pod || after.ReplicaSetUID != before.ReplicaSetUID || latest.WorkloadDigest != workload.WorkloadDigest || latest.Binding != workload.Binding || !workload.Valid(c.now()) || !before.Valid(c.now()) || current.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	until = identity.Earlier(until, identity.Earlier(after.ValidUntil, latest.FreshUntil))
+	result = result.Restrict(started, until)
+	if !result.Matches(request, digest, c.now()) || current.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	return result, nil
+}

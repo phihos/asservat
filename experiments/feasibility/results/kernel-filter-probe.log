@@ -1,0 +1,1 @@
+{"cases":11,"result":"pass","scope":"real libpcap cBPF -\u003e Gadget's cbpfc dependency -\u003e VM kernel verifier and BPF_PROG_TEST_RUN, Ethernet corpus only; not Gadget operator injection or live kernel attachment"}

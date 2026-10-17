@@ -1,0 +1,117 @@
+{
+  "mode": "owner",
+  "qualificationScope": "original installed-owner native path after ADR161; actual bootstrap, provider worker and owner phases; no public workflow or release claim",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair",
+    "--runtime-provider-worker",
+    "--runtime-provider-owner"
+  ],
+  "runnerSHA256": "06f5df608de26a538b61201bafbd40b7d5548bf829bec2cf307a33a21166a85b",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 3075,
+  "sourceSnapshotSHA256": "f1b9be007892c7d741f696d6d9f2e3fdf7e7cc13f472dc420255c2fb7273eddc",
+  "expectedHarnessSourceCount": 2326,
+  "requiredPassedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "expectedSkippedTests": [],
+  "scratch": "/home/phil/.cache/asservat-build/runtime-provider-owner-native-11-tmp",
+  "validationErrors": [
+    "gate command failed",
+    "missing required selected PASS names",
+    "native test exit/source stability failed",
+    "exact original owner parent/leaf RUN/PASS inventory failed"
+  ],
+  "processJoined": true,
+  "diskBeforeBytes": 419049304064,
+  "tmpFreeBeforeBytes": 16779939840,
+  "reviewedPayloadsSHA256": "77c6aeffadbae1c508acdd7636db198e4bb0e0a40b324045a96f4a8b66d1042a",
+  "reviewedPayloadsMatch": true,
+  "processPID": 1244394,
+  "processGroup": 1244394,
+  "processGroupAbsentAfterCommand": true,
+  "commandExit": 1,
+  "seconds": 542.619,
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "missingRequiredTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity"
+  ],
+  "cleanupFailures": [],
+  "testExit": 1,
+  "exactHarnessSources": true,
+  "requiredLogTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "startedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "loggedPassedTests": [
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "exactSelectedRUNAndPASSNames": false,
+  "failedOrSkippedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity"
+  ],
+  "fixtureScratchNormalizedLabel": "context--q1nqrw3",
+  "fixtureScratchRemainingMatches": [],
+  "fixtureScratchRemoved": true,
+  "buildScratchRemoved": true,
+  "ownedDockerCleanup": {
+    "container": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "network": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "volume": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "image": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "kindNodes": {
+      "exit": 0,
+      "remainingNames": []
+    }
+  },
+  "signalReceived": null,
+  "runnerUnchanged": true,
+  "reviewedPayloadsUnchanged": true,
+  "finalProcessGroupAbsent": true,
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "f1b9be007892c7d741f696d6d9f2e3fdf7e7cc13f472dc420255c2fb7273eddc",
+    "runner.py": "06f5df608de26a538b61201bafbd40b7d5548bf829bec2cf307a33a21166a85b",
+    "expected-harness-sources.json": "7391fd3e37cf81a5ebd5908544bdb4b564c3053ccb730ba34d3b47033455c550",
+    "reviewed-payloads.json": "77c6aeffadbae1c508acdd7636db198e4bb0e0a40b324045a96f4a8b66d1042a",
+    "gate.log": "7200312114c4ba2fd2efd8a11ddb3372f9fd9d5bc92c00944e966838822ac3b8",
+    "context-storage.log": "36941121ff93209219bcfee0be14d9f1509f40326fb51f95d994099f70bf7662",
+    "context-storage-environment.json": "8027dc28651bd70f0b119b3bdba3ffa378aa3c40ad55782108b422b527d8d81e",
+    "context-storage-kubelet.log": "562b5d7c4acb0134a564abf004da372e0fadacb7a7d984954d7a06b79096f968",
+    "context-storage-postgres.log": "d10d8a949e0f35288ccd5a5a6a118fcdaf60fd6fb910786ec6f1ab80efac4fcb"
+  },
+  "exit": 1
+}

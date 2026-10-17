@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/authorization	0.003s
+ok  	asservat.local/asservat/internal/adapters/kms	0.195s
+ok  	asservat.local/asservat/internal/adapters/mtls	0.122s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]

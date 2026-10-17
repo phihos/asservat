@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/transport/native/admission.go",
+    "base": "448cb6bade0dea387a7352beb44400fa05e30de9f7e49d6031ceedd1bcbbc69e",
+    "sha256": "3f7b1a76896b85f26bdc327c9b27c7beb42227150067a2a0a581896495819146"
+  },
+  {
+    "path": "internal/transport/native/connector_admission_test.go",
+    "base": null,
+    "sha256": "45550ae7dde533f1da4bedba67ff971fc9b17ffecda5b471f73a23a148e20a4c"
+  },
+  {
+    "path": "internal/transport/native/flow_test.go",
+    "base": "30657ce7c63c42c5e72b7abe3343ba77f08b1efbe93d1e4198f725af2b12a904",
+    "sha256": "3f0244e420330d24e7eda6b75d5ebe9b68f6b0172c190397510df6974debb898"
+  },
+  {
+    "path": "migrations/00045_native_exchange.sql",
+    "base": "80b4f45c9336c022a5942fe6764b2894600c303b9ba6d5643b9946694955cdc5",
+    "sha256": "c3da3ceb053cee6887fd761ac2eb41bf1366a7dc6579d8f221544dedcf990a6b"
+  }
+]

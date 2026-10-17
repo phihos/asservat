@@ -1,0 +1,204 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+func (s *OwnerProjectionOperation) AdmittedOwnerIdentityRoles(ctx context.Context, root *OwnerIdentityRoleRoot) (contracts.OwnerIdentityRoleSnapshot, error) {
+	if s == nil || s.self != s || s.owner == nil {
+		return contracts.OwnerIdentityRoleSnapshot{}, cfg.ErrUnavailable
+	}
+	return s.owner.AdmittedOwnerIdentityRoles(ctx, root)
+}
+
+// This is actual post-lock native I/O under the original negative proof, not
+// cached authority and not a third renewed enforcement interval.
+func (s *OwnerProjectionOperation) ReadOwnerProjectionAfterLock(ctx context.Context, root *OwnerIdentityRoleRoot) (result contracts.OwnerIdentityRoleSnapshot, failure error) {
+	check := projectionCheckCurrentBegin
+	defer func() { s.diagnosticReturn(check, &failure) }()
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if s == nil || s.self != s || s.owner == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	o := s.owner
+	if err := o.begin(ctx, root, ownerIdentityOperationRoleLock, ownerIdentityOperationReadingCurrent); err != nil {
+		return zero, err
+	}
+	defer o.work.Done()
+	o.mu.Lock()
+	until := o.until
+	o.mu.Unlock()
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	check = projectionCheckCurrentNative
+	actual, err := root.readOwnerIdentityOperationCurrent(call, o.initial, s.resources, o.expected)
+	if err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckCurrentInput
+	if err = s.projection.originalOperationInput(call, actual); err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckCurrentMaterial
+	if err = s.projection.operationProviderMaterial(call, actual, s.provider); err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckCurrentFinish
+	out, err := o.roleCopy(actual.roles)
+	if err != nil || o.finish(call, root, ownerIdentityOperationReadingCurrent, ownerIdentityOperationCurrent, &actual) != nil {
+		o.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	return out, nil
+}
+
+// The concrete SQL producer invokes this only after exact four-role checks.
+// No arbitrary callback/object/path is accepted, and this phase is single use.
+func (s *OwnerProjectionOperation) ApplyOwnerProjection(ctx context.Context, root *OwnerIdentityRoleRoot) (failure error) {
+	check := projectionCheckApplyBegin
+	defer func() { s.diagnosticReturn(check, &failure) }()
+	if s == nil || s.self != s || s.owner == nil {
+		return cfg.ErrUnavailable
+	}
+	o := s.owner
+	if err := o.begin(ctx, root, ownerIdentityOperationCurrent, ownerIdentityOperationReadingProjection); err != nil {
+		return err
+	}
+	defer o.work.Done()
+	o.mu.Lock()
+	until := o.until
+	o.mu.Unlock()
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	check = projectionCheckApplyProviderBound
+	if !s.projection.providerCheckValid(call, s.provider) || initialHandoverDeadline(call, root.resources.now, until) != nil {
+		o.poison()
+		return cfg.ErrUnavailable
+	}
+	check = projectionCheckApplyEffect
+	if err := s.apply(call); err != nil {
+		o.poison()
+		return err
+	}
+	check = projectionCheckApplyFinish
+	if err := o.finish(call, root, ownerIdentityOperationReadingProjection, ownerIdentityOperationProjectionApplied, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Exact object reads precede the genuine final native bracket. Its new denied
+// probes and full source/journal/accepted checks follow every effect or receipt
+// CAS. PostgreSQL still verifies current incarnation and commits afterward.
+func (s *OwnerProjectionOperation) ReadOwnerProjectionFinal(ctx context.Context, root *OwnerIdentityRoleRoot) (result contracts.OwnerIdentityRoleSnapshot, failure error) {
+	check := projectionCheckFinalBegin
+	defer func() { s.diagnosticReturn(check, &failure) }()
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if s == nil || s.self != s || s.owner == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	o := s.owner
+	if err := o.begin(ctx, root, ownerIdentityOperationProjectionApplied, ownerIdentityOperationReadingFinal); err != nil {
+		return zero, err
+	}
+	defer o.work.Done()
+	o.mu.Lock()
+	until := o.until
+	o.mu.Unlock()
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	check = projectionCheckFinalChildren
+	if err := s.readFinalChildren(call); err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckFinalNative
+	actual, err := root.readOwnerIdentityOperationNative(call, root.input.LayoutDigest, true)
+	// Only this operation's acknowledged resource CAS changes the expected
+	// resource snapshot. Every other original/sibling byte remains pinned.
+	expected := o.initial
+	expected.retained.resources = s.resources
+	if err != nil {
+		o.poison()
+		native, _ := err.(*ownerOperationDiagnostic)
+		return zero, &ownerProjectionDiagnostic{check: projectionCheckFinalNative, cause: cfg.ErrUnavailable, native: projectionNativeCodes(native)}
+	}
+	check = projectionCheckFinalOriginals
+	if !ownerIdentityOperationOriginalsEqual(expected, actual) {
+		o.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	check = projectionCheckFinalRoles
+	if actual.roles.UID != o.expected.UID || actual.roles.ResourceVersion != o.expected.ResourceVersion || !equalJSON(actual.roles.State, o.expected.State) {
+		o.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	check = projectionCheckFinalLaunch
+	if (s.step == ownerProjectionLaunch || s.step == ownerProjectionAcknowledgeLaunch || s.step == ownerProjectionReadLaunch || s.step == ownerProjectionInspectLaunch) && !ownerIdentityClaimedLaunchObject(actual.source.ownerDeployment, actual.retained.resources.State, root.input) {
+		o.poison()
+		return zero, cfg.ErrChanged
+	}
+	check = projectionCheckFinalInput
+	if err = s.projection.originalOperationInput(call, actual); err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckFinalMaterial
+	if err = s.projection.operationProviderMaterial(call, actual, s.provider); err != nil {
+		o.poison()
+		return zero, err
+	}
+	actual.roles.ValidUntil = identity.Earlier(actual.roles.ValidUntil, until)
+	check = projectionCheckFinalFinish
+	out, err := o.roleCopy(actual.roles)
+	if err != nil || o.finish(call, root, ownerIdentityOperationReadingFinal, ownerIdentityOperationFinal, &actual) != nil {
+		o.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	return out, nil
+}
+
+// Result is local bounded copying only. It does not perform new provider/SQL
+// work or restore an expired effect. The outer owner independently checks it.
+func (s *OwnerProjectionOperation) OwnerProjectionResult(ctx context.Context, root *OwnerIdentityRoleRoot) (result OwnerProjectionAdvance, failure error) {
+	check := projectionCheckResultBegin
+	defer func() { s.diagnosticReturn(check, &failure) }()
+	var zero OwnerProjectionAdvance
+	if s == nil || s.self != s || s.owner == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	o := s.owner
+	if err := o.begin(ctx, root, ownerIdentityOperationFinal, ownerIdentityOperationReadingProjectionResult); err != nil {
+		return zero, err
+	}
+	defer o.work.Done()
+	snapshot := s.resources
+	o.mu.Lock()
+	snapshot.ValidUntil = identity.Earlier(snapshot.ValidUntil, o.until)
+	o.mu.Unlock()
+	// Decode into a fresh destination so retained output never aliases the owner.
+	check = projectionCheckResultEncode
+	raw, err := json.Marshal(snapshot.State)
+	if err != nil {
+		o.poison()
+		return zero, err
+	}
+	check = projectionCheckResultFinish
+	state, err := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(raw))
+	snapshot.State = state
+	out := snapshot
+	if err != nil || o.finish(ctx, root, ownerIdentityOperationReadingProjectionResult, ownerIdentityOperationProjectionComplete, nil) != nil {
+		o.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	return OwnerProjectionAdvance{Status: s.result, Snapshot: out}, nil
+}

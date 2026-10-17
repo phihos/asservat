@@ -1,0 +1,33 @@
+{
+  "format": "asservat-source-integration/v1",
+  "files": [
+    {
+      "path": "internal/adapters/postgres/owner_configuration.go",
+      "baseSha256": "38f47b650aa0510353a8437466b5b41f077ea05b4803cfe1c3e1e6099f5f896e",
+      "payloadSha256": "310a17756d45bdfbc83f47e44a2213bc6f16b90992507bb1fca270d046c8c3c1"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_configuration_read_diagnostic.go",
+      "baseSha256": null,
+      "payloadSha256": "19c47d50aa8c23fa3a5ed9c9d177934fc44fee901a79c06e8876d462b0317ca8"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_configuration_read_diagnostic_test.go",
+      "baseSha256": null,
+      "payloadSha256": "02039a92d02b9560ae4bc8d1e49db941cf351ce21d3080a9081790475697bb1a"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "baseSha256": "147192f7fa86aec8ff896cd1f505aea700caa34b5ffcbf35ae083f689082b191",
+      "payloadSha256": "d281685c1f0b874aad990c5968d712c1e23f73959f878b67c57b332639977d1f"
+    }
+  ],
+  "componentResult": "test/results/owner-accepted-read-diagnostics-package/checks/component-1/result.json",
+  "componentResultSHA256": "d3a328e689578235961d1d1b75bed924bf1a2a2b45dbfa539bcaf84597206aaf",
+  "qualification": "101 top-level and 636 named PostgreSQL race passes; integration compile and vet; canonical gates",
+  "nativeQualification": "Original owner rerun exits 1 and identifies fleet-interval/expired-interval at the original SQL clock; startup remains unqualified",
+  "nativeResult": "test/results/runtime-provider-owner-native-4/result.json",
+  "nativeResultSHA256": "0745ea57251fd0218fd94fdd49fb652525197128ecb4d64f9ed139a6097b5869",
+  "behavior": "fixed same-read SQL/predicate diagnostics; original authority/query/clock/retry/deadline semantics unchanged",
+  "runtimeEnablement": false
+}

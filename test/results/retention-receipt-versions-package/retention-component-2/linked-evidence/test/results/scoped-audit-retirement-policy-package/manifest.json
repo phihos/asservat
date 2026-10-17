@@ -1,0 +1,12 @@
+[
+  {
+    "path": "scripts/test-custody.py",
+    "baseSHA256": "aa5228b8180c81359cd067ba2db4fcd7dd74347b155e6de428c77603c828dc3c",
+    "payloadSHA256": "4c89db87a1e982082864335c687b66bf06d6987468154b3f8116d2b40be0dbe1"
+  },
+  {
+    "path": "test/integration/scoped_audit_storage_test.go",
+    "baseSHA256": "8b93664ea48f8782e93a0f0922e61dc33285c201a4f06083ca8666e1190c86eb",
+    "payloadSHA256": "8ab16fd8b4af066c82522dfb2118eb80a6e76507c27962fcabc3034bcd5200d4"
+  }
+]

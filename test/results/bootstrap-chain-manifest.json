@@ -1,0 +1,60 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "scope": "ADR131 private tmpfs child and actual fixed command chain qualification source",
+  "files": [
+    {
+      "path": "docs/architecture/initial-bootstrap-command.md",
+      "base_sha256": "da372524510ef57826bd39bfc917973103d8bdb1a042dacc3f6cb7a0e2c8b7ca",
+      "payload_sha256": "cb8fb0e03067f7e8e284048b23c8d36473bfd8853081e56c4ad833cc235c4cf6",
+      "bytes": 10188
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap.go",
+      "base_sha256": "669c7b26b76f7f281771a36bfe5c28813bfb1bb97d82872adf202aa5bd1da546",
+      "payload_sha256": "2c4da1810d67fb2995a95615a4ec9bb5d5023511462f644e1663c97597c94de1",
+      "bytes": 11160
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_files.go",
+      "base_sha256": "2edbc6c847fa4b6b54f2c82e31a07a72ea028e0a106f16ee7d4c60a893c0f93b",
+      "payload_sha256": "47067525e05f76061d24e14b56a4d8a8e3df86f0aa23ecfb6184fa170b62c94e",
+      "bytes": 5044
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_retire.go",
+      "base_sha256": "5d3ef36b68eafb7b0233d6459aa81542c10b61f3862fb005f65555112f585465",
+      "payload_sha256": "38b736443228b655e5946f2de53e08ea22598eabce16026037efc11fa9df684e",
+      "bytes": 3228
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_scratch.go",
+      "base_sha256": null,
+      "payload_sha256": "5219dce6a309e6e2df20d09a33f030ee2bb0eb2d2743ec7cd0fb08d9e22728cf",
+      "bytes": 2858
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_scratch_test.go",
+      "base_sha256": null,
+      "payload_sha256": "55d049ffc2f30e5ff5b5333cdedbdb48d2eb8df9c1d4eeb9de455b8fa5172681",
+      "bytes": 3298
+    },
+    {
+      "path": "scripts/test-context-storage.py",
+      "base_sha256": "0680dbfcfc7898535fa20ebb1640aa07119609b38d3c2cd20b4e178e75a74df3",
+      "payload_sha256": "78fb2f3e713339a57df748028b6bedcb883583320fb3ffee74836328ca058e53",
+      "bytes": 24223
+    },
+    {
+      "path": "scripts/test-initial-bootstrap-selection.py",
+      "base_sha256": null,
+      "payload_sha256": "19a7bd1aed4e9229d7ea9936e60e2a232e9ed19f06a23ed672431205cb73058a",
+      "bytes": 2066
+    },
+    {
+      "path": "test/integration/initial_bootstrap_chain_test.go",
+      "base_sha256": null,
+      "payload_sha256": "6b0f485312e9b2491e074ce044b4e4ac022358cdafb7f16236474796ca193f35",
+      "bytes": 32867
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "adr181-go-check-1",
+  "exit": 2,
+  "status": "failed",
+  "cause": "kubernetes group 7: TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact expected every non-hub purpose to be a worker purpose; publicRuntimeWorkerPurpose did not include the new ADR-181 publisher compartment. Fixed by adding PublicRuntimePublisherPurposes to the predicate (outside the hub projection).",
+  "groupsPassed": "1-6",
+  "sourceHashBefore": "28030661a3e55335d1e481347fe7e9010142a491d0e1034b9d25ff103855d256",
+  "sourceHashAfter": "28030661a3e55335d1e481347fe7e9010142a491d0e1034b9d25ff103855d256",
+  "log": "go-check.log"
+}

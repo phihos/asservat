@@ -1,0 +1,11 @@
+{
+  "HANDOFF.md": "1f1c32c160b183e0ad3205051a76e146c0dd38c84bca9489723fe16bef8c45d1",
+  "evidence/architecture.json": "00d25469caa1f69a206dccb789607a74fa0c17962b96f73d7e186f78be393fb6",
+  "evidence/architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "evidence/compile.json": "cf28ec6061b28d207e737c8e40ab6dd61aaceef58076f06270cafcc3d8850414",
+  "evidence/compile.log": "e1d3208137a4009f12b6b05239d6435f0f0b49597241cc50f7adc86763ebcd08",
+  "evidence/race.json": "e0e59e7f012aeccebd7815635667dd74a1bbb78448cdac0ae79156961edbe14d",
+  "evidence/race.log": "6955b14291f296076656f5340779c092378a5ca9b4d22d64c3d4d5ae43010ee4",
+  "evidence/vet.json": "166a4cfb6ba2fddbbd9939eb7a7a09930c9d31769dfd554212a3683e60a95b00",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,5 @@
+{
+  "test/integration/owner_observation_native_cost_counter_test.go": "be6c378da298af9caf619c9f192768a705caa6e17b4b3dcb2bf374b5db74c9bc",
+  "test/integration/owner_observation_native_cost_fixture_test.go": "6fb2987c9f5a11b3789b90a46946c87e4e075b67b6fa422cc44fafbb680e2d4d",
+  "test/integration/owner_observation_native_cost_test.go": "5fa7949502251b74a6926ac7a2db1a8a810a461117c994c5f995e2e8aa1234a1"
+}

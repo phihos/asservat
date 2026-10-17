@@ -1,0 +1,6 @@
+--- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition (0.00s)
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup (0.00s)
+        download_worker_native_test.go:122: unexpected replay: opens=1 token reads=1
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.048s
+FAIL

@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/application/fleet	1.031s
+ok  	asservat.local/asservat/internal/adapters/postgres	0.002s
+ok  	asservat.local/asservat/internal/adapters/objectstore	0.070s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	2.950s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	0.053s

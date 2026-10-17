@@ -1,0 +1,13 @@
+ok  	asservat.local/asservat/internal/domain/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/configuration	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/privacy	0.001s [no tests to run]
+# asservat.local/asservat/internal/adapters/postgres
+internal/adapters/postgres/retention_observation.go:167:6: invalid operation: operator ! not defined on complete (variable of struct type pgtype.Bool)
+# asservat.local/asservat/internal/adapters/postgres [asservat.local/asservat/internal/adapters/postgres.test]
+internal/adapters/postgres/retention_observation.go:167:6: invalid operation: operator ! not defined on complete (variable of struct type pgtype.Bool)
+FAIL	asservat.local/asservat/internal/adapters/postgres [build failed]
+FAIL	asservat.local/asservat/internal/adapters/objectstore [build failed]
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	0.005s [no tests to run]
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

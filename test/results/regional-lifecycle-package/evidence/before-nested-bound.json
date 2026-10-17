@@ -1,0 +1,74 @@
+{
+  "accepted": true,
+  "admittedBeforeFailure": true,
+  "after": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "command": [
+    "/tmp/asservat-connector-lifecycle-s4gspneh/before-kubernetes.test",
+    "-test.run=^TestConnectorLifecycleEnrollmentWithinOriginalBound$",
+    "-test.v",
+    "-test.timeout=20s"
+  ],
+  "exit": 1,
+  "expectedTests": [],
+  "failedTop": [
+    "TestConnectorLifecycleEnrollmentWithinOriginalBound"
+  ],
+  "intentionalFailure": true,
+  "markerPresent": true,
+  "namedPass": 0,
+  "nativePhases": [
+    [
+      "1",
+      "1.836915897s",
+      "3.163054715s",
+      "54",
+      "12",
+      "false"
+    ],
+    [
+      "2",
+      "2.699917398s",
+      "463.028886ms",
+      "54",
+      "12",
+      "false"
+    ],
+    [
+      "3",
+      "451.999001ms",
+      "10.619873ms",
+      "9",
+      "3",
+      "true"
+    ]
+  ],
+  "passedTop": [],
+  "phase": "before-nested-bound",
+  "seconds": 5.94,
+  "skips": []
+}

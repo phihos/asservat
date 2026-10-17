@@ -1,0 +1,32 @@
+[
+  {
+    "path": "docs/architecture/public-context-composition.md",
+    "original": null,
+    "payload": "dd81c7bd9fda59881bfc4c8714607f5752b6359c4b951d55aa75de19a434b9cc",
+    "qualification": "factory compiles against frozen ADR136 HTTP snapshot; installed/provider qualification pending"
+  },
+  {
+    "path": "docs/decisions/138-public-context-endpoint-composition.md",
+    "original": null,
+    "payload": "377ac044dfde3a7aaa468f3c32d7c07bb6b65b17b903fc3864ee5094f45a509b",
+    "qualification": "factory compiles against frozen ADR136 HTTP snapshot; installed/provider qualification pending"
+  },
+  {
+    "path": "internal/bootstrap/public_context.go",
+    "original": null,
+    "payload": "8af0f7fe46d29756b65b98dacbc850ab076effaba6c8d81fd0b4bbdcefbf5ca9",
+    "qualification": "factory compiles against frozen ADR136 HTTP snapshot; installed/provider qualification pending"
+  },
+  {
+    "path": "internal/bootstrap/public_context_routes.go",
+    "original": null,
+    "payload": "f626e5a28ee2e3977d940e9dcd621c81ea81d4e42252884a15831ac4bc822dd6",
+    "qualification": "routing component race/TLS tested"
+  },
+  {
+    "path": "internal/bootstrap/public_context_routes_test.go",
+    "original": null,
+    "payload": "0cedec5c3fe90d0f77b9a27986e6ff764b86796ba9b3a0f83c822564eef0313b",
+    "qualification": "routing component race/TLS tested"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "schema": "asservat-guarded-stage/v1",
+  "scope": "ADR139 narrow actual native idle response delivery correction; no authority or deadline changes",
+  "created_utc": "2026-10-12T11:59:12.346138+00:00",
+  "live_root": "/home/phil/Projekte/asservat",
+  "payload_root": "changes",
+  "base_root": "bases",
+  "files": [
+    {
+      "path": "internal/transport/native/server.go",
+      "action": "modify",
+      "base_sha256": "99dd01ade75449065b667412daf8a4f71e5e1ce4038c05f341cfaf93831f7cd2",
+      "payload_sha256": "6a3f99c70a92d3d048ddb5747c336d01b9009c6e951467588b821e675cd4af54",
+      "bytes": 12006
+    },
+    {
+      "path": "internal/transport/native/server_idle_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "9e448820f76c5cf0a46eb49ca8c38d29b3316acfb0450237d55c59b3e93b52be",
+      "bytes": 5828
+    }
+  ]
+}

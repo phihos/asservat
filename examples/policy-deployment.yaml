@@ -1,0 +1,61 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: suspicious-api
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: api
+    maxPods: 1
+    selection: triggeringPod
+    adoption: pinUID
+  detectors:
+  - id: panic-log
+    kind: log
+    options:
+      stream: stderr
+      pattern: panic|fatal error|connection reset
+      match: regexp
+      maxRecordBytes: 65536
+  - id: memory-high
+    kind: resource
+    options:
+      metric: memoryLimitRatio
+      operator: gte
+      threshold: 0.85
+      sampleInterval: 5s
+  - id: probe-failed
+    kind: probe
+    options:
+      probeType: Liveness
+      minimumFailures: 1
+      window: 30s
+      source: auto
+  when:
+    any:
+    - detector: panic-log
+    - for:
+        expression:
+          detector: memory-high
+        duration: 20s
+    - detector: probe-failed
+  recipeRef:
+    name: incident-context
+    digest: 15421a58e7aacf180c36598de312a5b7a8bfbdcc6acb5d0a2271731bbf24e8f2
+  budgets:
+    cooldown: 5m
+    burst: 2
+    maxOccurrencesPerHour: 12
+    maxConcurrentActions: 3
+  retention: 72h
+  suspended: false
+  observation:
+    mode: allAuthorized
+  evaluation:
+    scope: pod
+    fireOnActivation: true
+    rearmFor: 10s

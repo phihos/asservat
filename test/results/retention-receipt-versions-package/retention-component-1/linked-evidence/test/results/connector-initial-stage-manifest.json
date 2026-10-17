@@ -1,0 +1,27 @@
+[
+  {
+    "path": "docs/architecture/connector-credentials.md",
+    "base": null,
+    "sha256": "c6e8d8b956b7e2705a59d955a340936d9afd4fca330034a5cdd582d5541f675a"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_credentials.go",
+    "base": null,
+    "sha256": "492e5add9af0d19a66beefac967ca3a32a940841b587ff5c7be8ccd3a68da772"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_credentials_test.go",
+    "base": null,
+    "sha256": "9f74c4f0816551d41da1e01c091201c276a220704e4be1f4769c44dca2eaf53c"
+  },
+  {
+    "path": "internal/adapters/mtls/native_connector.go",
+    "base": "ff8a425757222f5f0b923e107e5f8b6ef56ec28bc79f12d6526b2a8d6b99d3cf",
+    "sha256": "46c18f41671f3bf1f7afb939b746fb542bde8255863af767edeffd957d62e667"
+  },
+  {
+    "path": "internal/application/fleet/connector_credentials.go",
+    "base": null,
+    "sha256": "14e65cf1a50f4cef48cf5f8c3431d5c62ab70fad99ce5ba165c509ab654854c7"
+  }
+]

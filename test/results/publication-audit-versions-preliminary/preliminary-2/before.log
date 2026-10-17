@@ -1,0 +1,89 @@
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/empty
+    context_receipt_versions_test.go:25: current receipt validity=true, want false
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/null
+    context_receipt_versions_test.go:25: current receipt validity=true, want false
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/valid
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/max
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/oversize
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/newline
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/empty
+    context_receipt_versions_test.go:25: current receipt validity=true, want false
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/null
+    context_receipt_versions_test.go:25: current receipt validity=true, want false
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/valid
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/max
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/oversize
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/newline
+--- FAIL: TestContextEffectReceiptsRequireImmutableVersions (0.00s)
+    --- FAIL: TestContextEffectReceiptsRequireImmutableVersions/capture/empty (0.00s)
+    --- FAIL: TestContextEffectReceiptsRequireImmutableVersions/capture/null (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/valid (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/max (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/oversize (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/newline (0.00s)
+    --- FAIL: TestContextEffectReceiptsRequireImmutableVersions/verification/empty (0.00s)
+    --- FAIL: TestContextEffectReceiptsRequireImmutableVersions/verification/null (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/valid (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/max (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/oversize (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/newline (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.006s
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/null
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/sql-null
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-key
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-protocol
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-hash
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/truncated-hash
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-bytes
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/empty
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-protocol
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-hash
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/truncated-hash
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-bytes
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/empty
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/null
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/sql-null
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-key
+    context_receipt_before_test.go:59: historical or nonmatching receipt authorized current publication
+--- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt (0.02s)
+    --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy (0.01s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/null (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/sql-null (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-key (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-protocol (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-hash (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/truncated-hash (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-bytes (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/empty (0.00s)
+    --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation (0.01s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-protocol (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-hash (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/truncated-hash (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-bytes (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/empty (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/null (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/sql-null (0.00s)
+        --- FAIL: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-key (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.066s
+FAIL

@@ -1,0 +1,34 @@
+{
+  "manifestSHA256": "c0b66d656f5fb97ec82e316d170bf570640d9a5dcca74fb7607f8f391a23108c",
+  "dependenciesSHA256": "2f3127b0dced709001ec74e929878fc934f7e3efccf0aae1b764cf85291e10c2",
+  "dependenciesVerified": 1702,
+  "paths": [
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_bridge.go",
+      "base_sha256": "77563d2ca89f3b97c02991bea44ff516cc55519437923de69d58d99f7eb8a05c",
+      "payload_sha256": "6e0ecde0dd8622ba3106ddd284b079f3c26b980edc6d9cb650dc366a1440a4ab"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_bridge_history.go",
+      "base_sha256": "8beb01c03838b49bc1445f126ad08a884ccc85c70aad842331d1b787f6d1d47b",
+      "payload_sha256": "166baf7189c22f0d1a7649ed96784ea635771c62988251174626c65168ba717d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_bridge_transition.go",
+      "base_sha256": "6467a48e1a64f8097df2b97083d714378060361870f6d74c6a000cf1dbe9ad6d",
+      "payload_sha256": "4230a311a9cbaea895c3bcb9db77e8329acd6e25360c8e31905f0c8122135e6c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+      "base_sha256": "3fd0a9093d79101a02f8485a80bba8c2e59f87664ac73ad0a57594fa8dfde4e6",
+      "payload_sha256": "97c1da037cdfd85142c61fc009ccb7775c647254e02c7eaf4945664724629c35"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_root_pin_test.go",
+      "base_sha256": null,
+      "payload_sha256": "873328ca343f08762debbf4121aabde02497df728ad36fc1cd8837c4a2620630"
+    }
+  ],
+  "resultSHA256": "b8d4f023cd6955bc413f3036e798a4c0c85982babec5f8ac039373508ed6637b",
+  "scope": "five reviewed root-pin source paths integrated; native handover still unqualified"
+}

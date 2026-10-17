@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/bootstrap	4.495s
+ok  	asservat.local/asservat/internal/transport/native	2.318s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.216s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.561s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	148.968s
+ok  	asservat.local/asservat/internal/domain/fleet	1.008s
+ok  	asservat.local/asservat/internal/contracts	1.310s

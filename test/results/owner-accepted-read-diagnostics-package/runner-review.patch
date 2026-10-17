@@ -1,0 +1,51 @@
+--- qualified-epoch-codec-runner
++++ owner-read-diagnostic-runner
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Qualify only after parent allocation and integration of ADR156 value types."""
++"""Qualify fixed accepted-owner read diagnostics in an isolated mirror."""
+ from pathlib import Path
+ from urllib.parse import urlsplit, unquote
+ import hashlib,json,os,re,shutil,signal,subprocess,sys,tempfile,time
+@@ -37,9 +37,8 @@
+ def check_interrupt():
+  if interrupt_signal is not None:raise InterruptedError('qualification signal '+str(interrupt_signal))
+ signal.signal(signal.SIGINT,interrupt);signal.signal(signal.SIGTERM,interrupt)
+-assert sha(STAGE/'manifest.json')=='448730dada2bbe492ac5489f4a2e0951267833f1c45abb2762cb890820ddb8ff'
+-assert (ROOT/'internal/domain/fleet/owner_audit_epoch.go').is_file(), 'ADR156 types are not integrated'
+-manifest=json.loads((STAGE/'manifest.json').read_text())
++assert sha(STAGE/'manifest.json')=='df10d445e1e8bbeafbeda3fce1e65dab16be4051073d44e7288c4e008f992b3c'
++manifest={v['path']:{'baseSHA256':v['baseSha256'],'sha256':v['payloadSha256']} for v in json.loads((STAGE/'manifest.json').read_text())['files']}
+ for n,v in manifest.items():
+  assert sha(ROOT/n)==v['baseSHA256'] and sha(STAGE/'files'/n)==v['sha256'],n
+ inventory=names();deps={n:sha(ROOT/n) for n in inventory};directories={};queue=[n for n in inventory if n.endswith('.md')];seen=set()
+@@ -55,14 +54,14 @@
+   else:
+    assert p.is_file(),(n,link);deps[rel]=sha(p)
+    if rel.endswith('.md'):queue.append(rel)
+-metadata={n:sha(STAGE/n) for n in ('manifest.json','REVIEW.md','run-component.py')}
++metadata={n:sha(STAGE/n) for n in ('manifest.json','HANDOFF.md','review.patch','source-evidence.json','run-component.py')}
+ out=STAGE/'checks/component-1';out.mkdir(parents=True)
+ for n,v in [('dependencies.json',deps),('inventory.json',inventory),('linked-directories.json',directories),('metadata.json',metadata)]:save(out/n,v)
+ shutil.copytree(STAGE/'files',out/'files');shutil.copyfile(STAGE/'manifest.json',out/'manifest.json');shutil.copyfile(__file__,out/'run.py')
+ def verify():
+  return {'deps':[n for n,h in deps.items() if sha(ROOT/n)!=h], 'sets':sorted(set(names())^set(inventory)), 'directories':[n for n,c in directories.items() if not (ROOT/n).is_dir() or sorted(p.name for p in (ROOT/n).iterdir())!=c], 'metadata':[n for n,h in metadata.items() if sha(STAGE/n)!=h], 'payloads':[n for n,v in manifest.items() if sha(STAGE/'files'/n)!=v['sha256'] or sha(ROOT/n)!=v['baseSHA256']]}
+ assert shutil.disk_usage('/tmp').free>=4*1024**3 and shutil.disk_usage(ROOT).free>=32*1024**3
+-scratch=Path(tempfile.mkdtemp(prefix='asservat-epoch-codec-',dir='/tmp'));mirror=scratch/'mirror';tmp=scratch/'go-tmp';tmp.mkdir()
++scratch=Path(tempfile.mkdtemp(prefix='asservat-owner-read-',dir='/tmp'));mirror=scratch/'mirror';tmp=scratch/'go-tmp';tmp.mkdir()
+ report={'native':False,'runtimeSelected':False,'metadata':metadata,'dependencyCount':len(deps),'scratch':str(scratch),'bootID':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'before':verify(),'phases':[]}
+ assert not any(report['before'].values())
+ child=None;code=2;baseline={};validation=None;validation_pending=False
+@@ -98,9 +97,9 @@
+  with (out/'validation-original.json').open('xb') as f:f.write(validation)
+  report['originalValidationSHA256']=hashlib.sha256(validation).hexdigest()
+  env={k:v for k,v in os.environ.items() if not k.startswith('ASSERVAT_')};env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(tmp),PYTHONDONTWRITEBYTECODE='1')
+- package='./internal/adapters/objectstore/framed'
+- phases=[('compile',['go','test','-vet=off','-run=^$','-count=1',package,'./test/integration']),('races',['go','test','-json','-race','-vet=off','-count=1','-timeout=6m',package]),('vet',['go','vet',package]),('canonical',['make','spec-check','architecture-check','design-check','go-architecture-check','PYTHON='+PYTHON])]
+- required={'TestOwnerEpochCodecExactSnapshotAndPurpose','TestOwnerEpochCodecRejectsMalformedBeforeKeyUse','TestOwnerEpochCodecMaximumConfigurationRemainsBounded','TestOwnerEpochCodecPreservesCancellationAcrossKeyCalls','TestOwnerConfigurationAuditExactPurposeAndSnapshot'}
++ package='./internal/adapters/postgres'
++ phases=[('compile',['go','test','-vet=off','-run=^$','-count=1',package,'./test/integration']),('races',['go','test','-json','-race','-vet=off','-count=1','-timeout=6m',package]),('vet',['go','vet',package,'./test/integration']),('canonical',['make','spec-check','architecture-check','design-check','go-architecture-check','PYTHON='+PYTHON])]
++ required={'TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock','TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset','TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity'}
+  for phase,cmd in phases:
+   check_interrupt()
+   assert not any(verify().values())

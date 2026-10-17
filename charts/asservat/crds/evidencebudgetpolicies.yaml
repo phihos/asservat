@@ -1,0 +1,364 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "evidencebudgetpolicies.asservat.io"
+  },
+  "spec": {
+    "group": "asservat.io",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "evidencebudgetpolicies",
+      "singular": "evidencebudgetpolicy",
+      "kind": "EvidenceBudgetPolicy",
+      "categories": [
+        "asservat"
+      ]
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "additionalPrinterColumns": [
+          {
+            "name": "Age",
+            "type": "date",
+            "jsonPath": ".metadata.creationTimestamp"
+          }
+        ],
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "required": [
+              "spec"
+            ],
+            "properties": {
+              "apiVersion": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "poolRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "scope": {
+                    "type": "object",
+                    "properties": {
+                      "clusterID": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "namespaceSelector": {
+                        "type": "object",
+                        "properties": {
+                          "matchLabels": {
+                            "type": "object",
+                            "minProperties": 1,
+                            "maxProperties": 16,
+                            "additionalProperties": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63
+                            },
+                            "x-kubernetes-validations": [
+                              {
+                                "rule": "self.all(k, size(k) <= 253)",
+                                "message": "Label keys are at most 253 characters."
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "matchLabels"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "clusterID",
+                      "namespaceSelector"
+                    ]
+                  },
+                  "namespaceEnvelope": {
+                    "type": "object",
+                    "properties": {
+                      "maxWorkloadAccounts": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "maxStoredBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1125899906842624
+                      },
+                      "maxObjects": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "maxWorkloadAccounts",
+                      "maxStoredBytes",
+                      "maxObjects"
+                    ]
+                  },
+                  "workload": {
+                    "type": "object",
+                    "properties": {
+                      "protected": {
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "objects": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000000
+                          }
+                        },
+                        "required": [
+                          "bytes",
+                          "objects"
+                        ]
+                      },
+                      "hardLimit": {
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "objects": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000000
+                          }
+                        },
+                        "required": [
+                          "bytes",
+                          "objects"
+                        ]
+                      },
+                      "contextReserve": {
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "objects": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000000
+                          }
+                        },
+                        "required": [
+                          "bytes",
+                          "objects"
+                        ]
+                      },
+                      "dump": {
+                        "type": "object",
+                        "properties": {
+                          "burst": {
+                            "enum": [
+                              1
+                            ],
+                            "type": "integer"
+                          },
+                          "minimumIntervalSeconds": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 86400
+                          },
+                          "maxStartsPerRollingHour": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          "maxInputBytesPerRollingHour": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "maxProcessesPerEpisode": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 64,
+                            "default": 1
+                          }
+                        },
+                        "required": [
+                          "burst",
+                          "minimumIntervalSeconds",
+                          "maxStartsPerRollingHour",
+                          "maxInputBytesPerRollingHour"
+                        ]
+                      },
+                      "maxConcurrentExpensive": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "maxQueuedExpensive": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "maxQueueAgeSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300
+                      },
+                      "upload": {
+                        "type": "object",
+                        "properties": {
+                          "bytesPerSecond": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "burstBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          }
+                        },
+                        "required": [
+                          "bytesPerSecond",
+                          "burstBytes"
+                        ]
+                      },
+                      "maxUploadRequestsPerSecond": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "maxSpoolBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1125899906842624
+                      },
+                      "onFull": {
+                        "enum": [
+                          "RejectNewExpensive",
+                          "DeleteOldestEligibleInAccount"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "protected",
+                      "hardLimit",
+                      "contextReserve",
+                      "dump",
+                      "maxConcurrentExpensive",
+                      "maxQueuedExpensive",
+                      "maxQueueAgeSeconds",
+                      "upload",
+                      "maxUploadRequestsPerSecond",
+                      "maxSpoolBytes",
+                      "onFull"
+                    ]
+                  },
+                  "node": {
+                    "type": "object",
+                    "properties": {
+                      "maxConcurrentExpensive": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "maxQueuedExpensive": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                      },
+                      "upload": {
+                        "type": "object",
+                        "properties": {
+                          "bytesPerSecond": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          },
+                          "burstBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1125899906842624
+                          }
+                        },
+                        "required": [
+                          "bytesPerSecond",
+                          "burstBytes"
+                        ]
+                      },
+                      "maxSpoolBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1125899906842624
+                      },
+                      "impactProfileRef": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "unhealthySamples": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      },
+                      "sampleIntervalSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      },
+                      "recoveryHealthySeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3600
+                      }
+                    },
+                    "required": [
+                      "maxConcurrentExpensive",
+                      "maxQueuedExpensive",
+                      "upload",
+                      "maxSpoolBytes",
+                      "impactProfileRef",
+                      "unhealthySamples",
+                      "sampleIntervalSeconds",
+                      "recoveryHealthySeconds"
+                    ]
+                  }
+                },
+                "required": [
+                  "poolRef",
+                  "scope",
+                  "namespaceEnvelope",
+                  "workload",
+                  "node"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "started_at": 1791852803.0353947,
+  "before": [],
+  "runner_sha256": "3d0ba4a0f506acff2364cf3bf4298d41ffed2256b0993a1b3dbc11149ca9bfe3",
+  "phases": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^TestPublicRoleProjectionExcludesReconcilerCredentials$",
+        "-count=1",
+        "-timeout=2m",
+        "-v"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 2.4940385818481445,
+      "log_sha256": "8e4f38eed9c56b8e872d9f958d042000fdf02d90b35953a90a7c29eedf1afcf6"
+    },
+    {
+      "name": "after",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/public-worker-fixture-scope-20261013/overlay.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^TestPublic(Role|Runtime)",
+        "-count=1",
+        "-timeout=3m",
+        "-v"
+      ],
+      "exit": 1,
+      "expected": 0,
+      "seconds": 188.96634888648987,
+      "log_sha256": "dce0624eaba3cc0571ca18d16d39fb78a6a0e9f1c19f8eb60434af045b6a48be"
+    }
+  ],
+  "terminal_exit": 1,
+  "error": "after did not reach expected verdict",
+  "after": [],
+  "ended_at": 1791852994.9686382
+}

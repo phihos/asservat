@@ -1,0 +1,22 @@
+[
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "base_sha256": "15ca662972e4a4b1bca68081ddc4b81618c278c8f318609f2b59d560c8a97ebc",
+    "payload_sha256": "3e4ef751e343048982ae5b9c911ff4dcb2eb4b32282bca68ea7ac549f876ccd3"
+  },
+  {
+    "path": "test/integration/context_publication_test.go",
+    "base_sha256": "b77053e8183ee1ab9ec4c02f7d5bf6d7fdc2a6f3450b7a0a62c88772f3429da8",
+    "payload_sha256": "06aa8f615af0528864276203d3500e0b63527059ae4d8ddc61cef4bdbae3e698"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "base_sha256": "4353d6ab18089b04c4042f6015fff415e9e5dec5f58974826d079aff6077622d",
+    "payload_sha256": "5cbb4608f7fd90f5fbb40c9cc2e03be68e9bbd22b65054f07d317a2b92e67418"
+  },
+  {
+    "path": "test/integration/native_retention_observer_test.go",
+    "base_sha256": null,
+    "payload_sha256": "976e770c3610039f3fb00fe67de7ad6687573436b1b999de0b931b55b34bb90b"
+  }
+]

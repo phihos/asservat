@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/application/evidence	1.071s
+ok  	asservat.local/asservat/internal/domain/artifact	1.006s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.192s
+
+EXIT=0

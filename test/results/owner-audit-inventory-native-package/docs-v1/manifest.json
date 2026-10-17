@@ -1,0 +1,11 @@
+{
+  "status": "source-only documentation patch; apply with measured native integration and parent progress links",
+  "files": [
+    {
+      "path": "docs/architecture/owner-configuration.md",
+      "base": "62a7d9c271f30cc73ccaf13225b5db80777ef4371c8d5733b26ba284a9e9b883",
+      "payload": "674400becee843215e198c4e4fccd8fc8e27a93720ab04c32da94fee93ceff94"
+    }
+  ],
+  "nativeResult": "a94876fecd9d2a7346cdfcc99a490cdb0df945ec97a06d41c3e493c55bf0f95b"
+}

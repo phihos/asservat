@@ -1,0 +1,168 @@
+package contracts
+
+import (
+	"io"
+	"time"
+)
+
+const ConfigurationRuntimeRolesFormat = "asservat-configuration-runtime-roles/v1"
+const ConfigurationRuntimeRoleStateFormat = "asservat-configuration-runtime-role-state/v1"
+const ConfigurationRuntimeRoleManifestFile = "configuration-roles.json"
+const ConfigurationRuntimeRoleMaxBytes = 16 << 10
+const ConfigurationRuntimeRetainedProcesses = 2
+const ConfigurationRuntimeRoleConnections = ConfigurationRuntimeRetainedProcesses + 1
+
+// Separate credential-bootstrap inventory. None is a public hub role or a
+// capacity role, and callers cannot supply an alternative role list.
+func ConfigurationRuntimeRolePurposes() []string {
+	return []string{"configuration-fleet", "configuration-source", "configuration-audit"}
+}
+func ConfigurationRuntimeRoleOrdinal(purpose string) (int, bool) {
+	switch purpose {
+	case "configuration-fleet":
+		return 0, true
+	case "configuration-source":
+		return 1, true
+	case "configuration-audit":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+// Generated protected installer input. Deployment/ServiceAccount identify the
+// reconciler, independently of the owner Deployment named by OwnerSource.
+// Source references are not claims that SQL has accepted those configurations.
+type ConfigurationRuntimeRoles struct {
+	Format         string                `json:"format"`
+	InstallationID string                `json:"installationID"`
+	InitialClaimID string                `json:"initialClaimID"`
+	ClusterID      string                `json:"clusterID"`
+	Namespace      WorkerObjectReference `json:"namespace"`
+	Deployment     WorkerObjectReference `json:"deployment"`
+	ServiceAccount WorkerObjectReference `json:"serviceAccount"`
+	FleetSource    WorkerObjectReference `json:"fleetSource"`
+	OwnerSource    WorkerObjectReference `json:"ownerSource"`
+	LayoutDigest   string                `json:"layoutDigest"`
+}
+
+// These original observation intervals are carried to the exact credential
+// transaction. A serialized value is not independently accepted authority;
+// the producer must obtain/recheck it through its actual protected root.
+type ConfigurationRoleSourceRevision struct {
+	UID        string    `json:"uid"`
+	Generation int64     `json:"generation"`
+	Digest     string    `json:"digest"`
+	ObservedAt time.Time `json:"observedAt"`
+	FreshUntil time.Time `json:"freshUntil"`
+}
+type ConfigurationRoleObservation struct {
+	InstallationID string                          `json:"installationID"`
+	ClusterID      string                          `json:"clusterID"`
+	IssuerEpoch    string                          `json:"issuerEpoch"`
+	NamespaceUID   string                          `json:"namespaceUID"`
+	DeploymentUID  string                          `json:"deploymentUID"`
+	AccountUID     string                          `json:"accountUID"`
+	WorkloadDigest string                          `json:"workloadDigest"`
+	GuardDigest    string                          `json:"guardDigest"`
+	Fleet          ConfigurationRoleSourceRevision `json:"fleet"`
+	Owner          ConfigurationRoleSourceRevision `json:"owner"`
+	ObservedAt     time.Time                       `json:"observedAt"`
+	FreshUntil     time.Time                       `json:"freshUntil"`
+}
+
+func DecodeConfigurationRuntimeRoles(r io.Reader) (ConfigurationRuntimeRoles, error) {
+	return decodeClosedRPC[ConfigurationRuntimeRoles](r, 8192)
+}
+
+// Original one-use private installation state. Unlike the public role root,
+// this compartment has no audit/account seeds or public runtime credentials.
+type ConfigurationRuntimeRoleState struct {
+	Format      string                             `json:"format"`
+	Input       ConfigurationRuntimeRoles          `json:"input"`
+	OperationID string                             `json:"operationID"`
+	CreatedAt   time.Time                          `json:"createdAt"`
+	Until       time.Time                          `json:"until"`
+	Roles       []ConfigurationRuntimeRoleMaterial `json:"roles"`
+	Projection  *PublicRuntimeProjectionClaim      `json:"projection,omitempty"`
+	Launch      *ConfigurationRuntimeLaunch        `json:"launch,omitempty"`
+}
+
+// This disposition belongs to the original installation continuation, never
+// runtime readiness or recovery. Only the acknowledged original claim can
+// perform the exact inert-to-running CAS. A retained claim without a receipt
+// permits observation, not another launch or credential creation.
+type ConfigurationRuntimeLaunch struct {
+	OperationID          string                             `json:"operationID"`
+	ClaimedAt            time.Time                          `json:"claimedAt"`
+	Until                time.Time                          `json:"until"`
+	Sources              ConfigurationRoleObservation       `json:"sources"`
+	InertResourceVersion string                             `json:"inertResourceVersion"`
+	RunningDigest        string                             `json:"runningDigest"`
+	ProjectionUID        string                             `json:"projectionUID"`
+	Configuration        WorkerObjectReference              `json:"configuration"`
+	Providers            WorkerObjectReference              `json:"providers"`
+	Receipt              *ConfigurationRuntimeLaunchReceipt `json:"receipt,omitempty"`
+}
+
+type ConfigurationRuntimeLaunchReceipt struct {
+	ResourceVersion string    `json:"resourceVersion"`
+	ObservedAt      time.Time `json:"observedAt"`
+}
+type ConfigurationRuntimeRoleMaterial struct {
+	Purpose  string                         `json:"purpose"`
+	Password string                         `json:"password"`
+	Claim    *ConfigurationRuntimeRoleClaim `json:"claim,omitempty"`
+	Receipt  *PublicRuntimeRoleReceipt      `json:"receipt,omitempty"`
+}
+type ConfigurationRuntimeRoleClaim struct {
+	OperationID  string                       `json:"operationID"`
+	ClaimedAt    time.Time                    `json:"claimedAt"`
+	Until        time.Time                    `json:"until"`
+	DatabaseOID  uint32                       `json:"databaseOID"`
+	PostmasterAt time.Time                    `json:"postmasterAt"`
+	Sources      ConfigurationRoleObservation `json:"sources"`
+}
+type ConfigurationRuntimeRoleSnapshot struct {
+	State                  ConfigurationRuntimeRoleState
+	UID, ResourceVersion   string
+	ObservedAt, ValidUntil time.Time
+	Sources                ConfigurationRoleObservation
+}
+
+func DecodeConfigurationRuntimeRoleState(r io.Reader) (ConfigurationRuntimeRoleState, error) {
+	return decodeClosedRPC[ConfigurationRuntimeRoleState](r, ConfigurationRuntimeRoleMaxBytes)
+}
+func (ConfigurationRuntimeRoleState) String() string   { return "protected configuration role state" }
+func (ConfigurationRuntimeRoleState) GoString() string { return "protected configuration role state" }
+func (ConfigurationRuntimeRoleMaterial) String() string {
+	return "protected configuration role material"
+}
+func (ConfigurationRuntimeRoleMaterial) GoString() string {
+	return "protected configuration role material"
+}
+func (ConfigurationRuntimeRoleSnapshot) String() string {
+	return "protected configuration role snapshot"
+}
+func (ConfigurationRuntimeRoleSnapshot) GoString() string {
+	return "protected configuration role snapshot"
+}
+
+const ConfigurationRuntimeCredentialManifestFormat = "asservat-configuration-runtime-credentials/v1"
+
+type ConfigurationRuntimeCredentialManifest struct {
+	Format  string                                `json:"format"`
+	Input   ConfigurationRuntimeRoles             `json:"input"`
+	RootUID string                                `json:"rootUID"`
+	SetupID string                                `json:"setupID"`
+	Roles   []ConfigurationRuntimeCredentialProof `json:"roles"`
+}
+type ConfigurationRuntimeCredentialProof struct {
+	Purpose string                        `json:"purpose"`
+	Claim   ConfigurationRuntimeRoleClaim `json:"claim"`
+	Receipt PublicRuntimeRoleReceipt      `json:"receipt"`
+}
+
+func DecodeConfigurationRuntimeCredentialManifest(r io.Reader) (ConfigurationRuntimeCredentialManifest, error) {
+	return decodeClosedRPC[ConfigurationRuntimeCredentialManifest](r, ConfigurationRuntimeRoleMaxBytes)
+}

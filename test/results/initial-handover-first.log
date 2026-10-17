@@ -1,0 +1,11 @@
+=== RUN   TestInitialPreparationHandoverWithRealServices
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission
+    initial_preparer_handover_test.go:53: Pod "installer" is invalid: spec.nodeName: Forbidden: cannot be set until all schedulingGates have been cleared
+    initial_handover_admission_test.go:69: resource name may not be empty
+=== NAME  TestInitialPreparationHandoverWithRealServices
+    initial_preparer_handover_test.go:317: actual handover loader initial preparation loader sql-material: unavailable
+--- FAIL: TestInitialPreparationHandoverWithRealServices (6.88s)
+    --- FAIL: TestInitialPreparationHandoverWithRealServices/native-handover-admission (0.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.932s
+FAIL

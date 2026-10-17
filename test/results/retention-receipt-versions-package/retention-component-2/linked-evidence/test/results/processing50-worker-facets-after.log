@@ -1,0 +1,110 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release
+=== RUN   TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    download_sessions_test.go:654: native diagnostic preparation started
+    native_exchange_test.go:480: native diagnostic worker opening 0
+    native_exchange_test.go:385: native diagnostic connector admission entered
+    native_exchange_test.go:386: native diagnostic connector admission terminal 21.40481ms no native command admitted
+    native_exchange_test.go:482: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:480: native diagnostic worker opening 1
+    native_exchange_test.go:385: native diagnostic connector admission entered
+    native_exchange_test.go:412: native diagnostic connector origin accepted 3.572007734s
+    native_exchange_test.go:385: native diagnostic hub admission entered
+    native_exchange_test.go:401: native diagnostic hub origin accepted 3.523177273s
+    native_exchange_test.go:386: native diagnostic hub admission terminal 662.757737ms <nil>
+    native_exchange_test.go:386: native diagnostic connector admission terminal 838.178227ms <nil>
+    native_exchange_test.go:482: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:489: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:654: native diagnostic preparation terminal <nil>
+    native_exchange_test.go:480: native diagnostic worker opening 2
+    native_exchange_test.go:385: native diagnostic connector admission entered
+    native_exchange_test.go:412: native diagnostic connector origin accepted 3.397090598s
+    native_exchange_test.go:385: native diagnostic hub admission entered
+    native_exchange_test.go:401: native diagnostic hub origin accepted 3.355182382s
+    native_exchange_test.go:386: native diagnostic hub admission terminal 621.939946ms <nil>
+    native_exchange_test.go:386: native diagnostic connector admission terminal 780.811775ms <nil>
+    native_exchange_test.go:482: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:489: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:480: native diagnostic worker opening 3
+    native_exchange_test.go:385: native diagnostic connector admission entered
+    native_exchange_test.go:412: native diagnostic connector origin accepted 3.872388502s
+    native_exchange_test.go:385: native diagnostic hub admission entered
+    native_exchange_test.go:401: native diagnostic hub origin accepted 3.829389413s
+    native_exchange_test.go:386: native diagnostic hub admission terminal 666.225639ms <nil>
+    native_exchange_test.go:386: native diagnostic connector admission terminal 827.450097ms <nil>
+    native_exchange_test.go:482: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:489: native diagnostic worker conversation terminal 3 Joined <nil>
+    download_sessions_test.go:654: actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=352; synthetic identity/issuer/Pod/bootstrap facts
+=== RUN   TestContextAdmissionWithRealServices/download-worker-routing-two-clusters
+=== RUN   TestContextAdmissionWithRealServices/download-worker-request-owners
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-channel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-current-request
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-replay
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-budget
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-parallel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-change-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock
+=== RUN   TestContextAdmissionWithRealServices/download-worker-missing-configuration
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-mutated
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fence-order
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-rollback
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-suspended
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fenced
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-short-runtime
+=== RUN   TestContextAdmissionWithRealServices/download-worker-parallel-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-binding-replacement
+=== RUN   TestContextAdmissionWithRealServices/download-worker-capacity-held
+=== RUN   TestContextAdmissionWithRealServices/download-worker-expired-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+--- PASS: TestContextAdmissionWithRealServices (76.22s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release (1.63s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output (1.19s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-exchange (11.73s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-routing-two-clusters (1.97s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-request-owners (4.44s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-channel (3.38s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-current-request (3.62s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-replay (2.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited (2.41s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-budget (2.37s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-parallel (1.76s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-change-key (2.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-roles (2.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse (2.96s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock (1.81s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-missing-configuration (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-mutated (0.81s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-unaudited-rollout (0.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-roles (0.86s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-audit-reuse (0.78s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fence-order (0.79s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-identity-expired (2.74s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-rollback (0.85s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-suspended (0.86s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fenced (0.84s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired (1.20s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (2.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (2.87s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-short-runtime (0.84s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-parallel-claim (1.17s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-unaudited (0.93s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-binding-replacement (2.43s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-capacity-held (1.27s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-expired-claim (1.40s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (2.39s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.43s)
+PASS
+ok  	asservat.local/asservat/test/integration	77.280s

@@ -1,0 +1,55 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-generation
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-digest
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-issuer
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-after-lock
+    initial_installation_test.go:623: actual owner bridge wait edge: waiter=139 blocker=116
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-recovery-after-lock
+    initial_installation_test.go:623: actual owner bridge wait edge: waiter=140 blocker=116
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-expired-after-lock
+    initial_installation_test.go:623: actual owner bridge wait edge: waiter=141 blocker=116
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-caller-expired-after-lock
+    initial_installation_test.go:623: actual owner bridge wait edge: waiter=144 blocker=116
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current-end
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-late-callback
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-concurrent-observers
+    initial_runtime_bridge_sql_test.go:534: actual ordinary fleet writer wait edge: waiter=153 blocker=149
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:627: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (4.11s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator (0.43s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock (0.20s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock (0.09s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback (0.18s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-generation (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-digest (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-issuer (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-after-lock (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-recovery-after-lock (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-source-expired-after-lock (0.30s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-caller-expired-after-lock (0.30s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-current-end (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-late-callback (0.28s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-owner-concurrent-observers (1.20s)
+PASS
+ok  	asservat.local/asservat/test/integration	5.162s

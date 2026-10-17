@@ -1,0 +1,6 @@
+{
+  "path": "recorder/owner_provider_recipe_record_test.go",
+  "sha256": "3aef4c12bcc53cb66f40fa0ccec2ee822aa1691dfe989ad13ed4d0d5474fcb3e",
+  "production_path": "internal/adapters/kms/owner_provider_recipe.go",
+  "production_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af"
+}

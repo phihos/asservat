@@ -1,0 +1,75 @@
+from pathlib import Path
+import hashlib, json, os, signal, subprocess, time
+
+C = Path(__file__).resolve().parent
+L = Path('/home/phil/Projekte/asservat')
+h = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+manifest = json.loads((C/'manifest.json').read_text())
+deps = json.loads((C/'dependencies.json').read_text())
+aux = json.loads((C/'auxiliary.json').read_text())
+
+def check():
+    return {
+        'dependencies': [p for p,v in deps.items() if h(L/p) != v],
+        'bases': [v['path'] for v in manifest if h(L/v['path']) != v['base_sha256']],
+        'payloads': [v['path'] for v in manifest if h(C/'files'/v['path']) != v['payload_sha256']],
+        'auxiliary': [p for p,v in aux.items() if h(C/p) != v],
+    }
+
+with (C/'evidence/started').open('x'): pass
+env = {k:v for k,v in os.environ.items() if not k.startswith('ASSERVAT_')}
+env.update(GOMAXPROCS='2', GOFLAGS='-p=2', TMPDIR=str(C/'tmp'))
+overlay = '-overlay='+str(C/'overlay.json')
+deployment_before = '-overlay='+str(C/'before-deployment-overlay.json')
+router_before = '-overlay='+str(C/'before-router-overlay.json')
+packages = ['./internal/application/evidence','./internal/bootstrap']
+selection = '^Test(OwnerDeployment|OwnerRuntime|OwnerMounted|OwnerInput|OwnerTrust|WorkerRoutes|WorkerOwner|WorkerCurrent)'
+steps = [
+    ('compile', ['go','test',overlay,'-run','^$',*packages], 0),
+    ('before-deployment', ['go','test',deployment_before,'-race','-count=1','-timeout=90s','-v','-run','^TestOwnerDeployment(ExternalClose|CloseBeforeRun)','./internal/bootstrap'], 1),
+    ('before-router', ['go','test',router_before,'-race','-count=1','-timeout=90s','-v','-run','^TestWorker(RoutesCloseAndJoin|OwnerWrappersJoin)','./internal/application/evidence'], 1),
+    ('focused-races', ['go','test',overlay,'-race','-count=1','-timeout=90s','-v','-run',selection,*packages], 0),
+    ('vet', ['go','vet',overlay,*packages], 0),
+]
+result = {'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'runner_sha256':h(C/'run.py'),'paths':len(manifest),'dependencies':len(deps),'native_executed':False,'status':'Legacy owner deployment and existing router wrapper lifetime ownership only; no fresh profile/runtime enablement','commands':[]}
+terminal = 0
+for name, command, expected in steps:
+    before = check()
+    if any(before.values()):
+        result['before_failure'] = before
+        terminal = 1
+        break
+    start = time.monotonic()
+    log_path = C/'evidence'/f'{name}.log'
+    with log_path.open('x') as log:
+        process = subprocess.Popen(command, cwd=L, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        print(json.dumps({'phase':name,'pid':process.pid}), flush=True)
+        try:
+            code = process.wait(timeout=180)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGTERM)
+            try: process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid,signal.SIGKILL)
+                process.wait()
+            code = 124
+    after = check()
+    body = log_path.read_text()
+    intended_before = True
+    if name == 'before-deployment':
+        intended_before = ('legacy Close returned before the admitted Runtime joined' in body or 'legacy dependencies closed while readiness retained them' in body) and 'closed legacy deployment entered Runtime or repeated resource close' in body
+    if name == 'before-router':
+        intended_before = all(message in body for message in ['router join returned with registration I/O still active', 'router join returned before its busy enrollment released', 'router closed dependencies before admitted wrapper SQL joined']) and body.count('router closed dependencies before admitted wrapper SQL joined') == 3
+    item = {'phase':name,'command':command,'exit':code,'expected_exit':expected,'intended_before':intended_before,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+    result['commands'].append(item)
+    with (C/'evidence'/f'{name}.json').open('x') as f: json.dump(item,f,indent=2); f.write('\n')
+    print(json.dumps(item),flush=True)
+    if code != expected or not intended_before or any(after.values()):
+        terminal = 1
+        break
+result['final_hash_check'] = check()
+if any(result['final_hash_check'].values()): terminal = 1
+result['terminal_exit'] = terminal
+with (C/'result.json').open('x') as f: json.dump(result,f,indent=2); f.write('\n')
+print(json.dumps(result),flush=True)
+raise SystemExit(terminal)

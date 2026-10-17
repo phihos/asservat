@@ -1,0 +1,7 @@
+{
+  "internal/adapters/kubernetes/cluster_observation_metadata.go": null,
+  "internal/adapters/kubernetes/cluster_observation_metadata_test.go": null,
+  "internal/transport/native/owner_observation_operation_lifetime_test.go": null,
+  "internal/transport/native/owner_observation_operation_server.go": null,
+  "internal/transport/native/owner_observation_operation_server_test.go": null
+}

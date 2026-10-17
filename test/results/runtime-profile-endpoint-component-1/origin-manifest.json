@@ -1,0 +1,121 @@
+{
+  "status": "frozen staged v2 source; no builds/tests executed",
+  "previous_manifest_sha256": "6a178f8e694a6ffacbf6ad8fcfc9c981f65b5116a50219eb8c3220941f6ae637",
+  "scope": "Mixed-scope-safe passive named Go endpoint resolution and exact-Pod network observation",
+  "files": [
+    {
+      "path": "internal/domain/planning/go_profile_endpoint.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "819a1deb7b9d6fb10971e1dfb5734a83990cc4710b692a35f201f434d7388716",
+      "payload_sha256": "e613a3ff37dda2d17973901fac7be1ef3dcf175fd85915e9f5587228ed54b8be",
+      "bytes": 8821
+    },
+    {
+      "path": "internal/domain/planning/go_profile_endpoint_test.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "fade9f658c963843c5146dc85ce4cf73e789d1aae8a240f60fb5fa0172e7c61b",
+      "payload_sha256": "79f95f52b5604dfaf1b562fe508676ad5e440721f1eaff858febd2399fad98be",
+      "bytes": 4224
+    },
+    {
+      "path": "internal/domain/targets/profile_network.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "1a404a8242adcf2df44b46c6f1651aa5502f332c93b828927c45db1afe624813",
+      "payload_sha256": "1a404a8242adcf2df44b46c6f1651aa5502f332c93b828927c45db1afe624813",
+      "bytes": 2261
+    },
+    {
+      "path": "internal/domain/targets/profile_network_test.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "053d126dbbc083e47f7144d792a8ffd5e1e91172358d51b02949435b2bdfa870",
+      "payload_sha256": "053d126dbbc083e47f7144d792a8ffd5e1e91172358d51b02949435b2bdfa870",
+      "bytes": 2879
+    },
+    {
+      "path": "internal/application/planning/go_profile_endpoint.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "44ebe0902af6ca6e4220c8e344354640029d350a5da3982885f4913d0674af6d",
+      "payload_sha256": "c5ed08a53ba98c76d9054e8826207348ceb2e3992d04c664bd75ce06ca7a5061",
+      "bytes": 7785
+    },
+    {
+      "path": "internal/application/planning/go_profile_endpoint_test.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "42b3805e10158a67d2dc90b8049fe53e7a7f23b4fdba974aa222afa3191b40b4",
+      "payload_sha256": "9baee9f277f349832745fee0525bfdfe4c6aed9771c7b75a95f38f739c2575b7",
+      "bytes": 17281
+    },
+    {
+      "path": "internal/application/targets/profile_network.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "f40d84028d1248c670a1474980c0fe4abf09c60f3b180cfb6f81f43e7602e1a6",
+      "payload_sha256": "f40d84028d1248c670a1474980c0fe4abf09c60f3b180cfb6f81f43e7602e1a6",
+      "bytes": 379
+    },
+    {
+      "path": "internal/adapters/kubernetes/profile_network.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "c18df66f8302d354de68e8cc3f5ad9583e7d97f308f353544516a6ef8eaa56c1",
+      "payload_sha256": "02ef9dc624ddbaa7dcd4c5b640f88a677a98183294ee7f6b4d6ae3ce0066e004",
+      "bytes": 6162
+    },
+    {
+      "path": "internal/adapters/kubernetes/profile_network_test.go",
+      "base_sha256": null,
+      "v1_payload_sha256": "c6a807eeaba2ed930ee279de006d81d800e1dfa94edc0895668612eee9a6ffe6",
+      "payload_sha256": "61720a001706e41391fd6d9036a549e55e261efefc86df7f7dc28ffbdb9f7336",
+      "bytes": 13401
+    },
+    {
+      "path": "docs/architecture/runtime-profiles.md",
+      "base_sha256": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+      "v1_payload_sha256": "95f6c36a661bdb8dc84fd0d0d552266cb4eead702ad703c758b118ef1f1dca1f",
+      "payload_sha256": "fe281d8810b3b14808b7880843e379450ab117ef930b3f390ca7ecb73f51d3ed",
+      "bytes": 15752
+    },
+    {
+      "path": "specs/profiles.md",
+      "base_sha256": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56",
+      "v1_payload_sha256": "54b10dbc643e3a25a5c8c8aba53b86a80e4647f502ab7f96e3ad2b52024d7c81",
+      "payload_sha256": "6757175460b7cff42d81e3027d27fdd7de80f3edb2624059069967f6ade6fda1",
+      "bytes": 15155
+    }
+  ],
+  "patch_sha256": "7c055d88544f7d36e560ec22d325566595719823f204df60eda35b27b3c06fe7",
+  "v1_delta_sha256": "3b17419ebaf3e07a20abb43cdb87803f9e1529f952b1a262ede462e10e807c5c",
+  "handoff_sha256": "be57a0f26c0acd7eb57254d5f820fe2bf38478a30453bc10964886eec2697d99",
+  "new_tests": {
+    "internal/domain/planning/go_profile_endpoint_test.go": [
+      "TestGoEndpointDefinitionRejectsUnsafeConfiguration",
+      "TestGoEndpointBindingsKeepExistingRecipeShape",
+      "TestGoEndpointReferenceUsesDocumentedInternalStringBounds"
+    ],
+    "internal/domain/targets/profile_network_test.go": [
+      "TestProfileNetworkRetainsPodWideRoutingFacts"
+    ],
+    "internal/application/planning/go_profile_endpoint_test.go": [
+      "TestGoEndpointResolvesExistingRecipeAndAdministratorProfiles",
+      "TestGoEndpointRejectsAmbiguityAndCredentialRedirection",
+      "TestGoEndpointDigestBindsResolvedRouteAndPolicyWithoutFreshnessRenewal",
+      "TestGoEndpointPlanMatchesExistingAcquisitionContractOnly",
+      "TestGoEndpointMixedCatalogDoesNotDisableSelectedScope"
+    ],
+    "internal/adapters/kubernetes/profile_network_test.go": [
+      "TestProfileNetworkExactWholePodObservation",
+      "TestProfileNetworkRejectsMalformedAndUnboundedFields",
+      "TestProfileNetworkPreservesCallerCancellationAndDeadline",
+      "TestProfileNetworkNormalizesEquivalentIPAddresses"
+    ]
+  },
+  "new_parent_count": 13,
+  "verified_primary_contract_hashes": {
+    "specs/contracts/recipe.schema.json": "5358df9cc9139a32c524ed437e81fb54fe1304941b1f5fdfef2570d929714800",
+    "specs/contracts/action.schema.json": "d11434144490f04ff3862ca2c5187dff4c2e3a96d8deb3bbcb365a0e12fd72fb",
+    "go.mod": "693025c52045be6507972e5bc0849812a0838371572bac62e9c77fc996119b56",
+    "/home/phil/go/pkg/mod/k8s.io/apimachinery@v0.37.0/pkg/util/validation/ip.go": "a0194f918ba71da23ca670f2cd51ef2c9a9781a35e34cef5bbe78c2b4c4e1941"
+  },
+  "dependencies_changed": false,
+  "public_capabilities_enabled": false,
+  "new_production_authority": false,
+  "gate_status": "pending root allocation"
+}

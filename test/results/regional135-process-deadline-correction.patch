@@ -1,0 +1,22 @@
+--- internal/adapters/kubernetes/connector_api_process.go
++++ internal/adapters/kubernetes/connector_api_process.go
+@@ -331,7 +331,10 @@
+ 	if p == nil || ctx == nil || p.parent.Err() != nil {
+ 		return zero, value.ErrUnavailable
+ 	}
+-	call, cancel := context.WithCancel(ctx)
++	// The enclosing observation owns its original five-second interval. The
++	// guard starts later and must not return a deadline beyond CheckedAt + 5s.
++	start := p.guard.attester.client.now()
++	call, cancel := context.WithDeadline(ctx, start.Add(5*time.Second))
+ 	defer cancel()
+ 	done := make(chan struct{})
+ 	stop := context.AfterFunc(p.parent, func() { cancel(); close(done) })
+@@ -340,7 +343,6 @@
+ 			<-done
+ 		}
+ 	}()
+-	start := p.guard.attester.client.now()
+ 	b, until, e := p.guard.current(call)
+ 	if e != nil || b != p.connector {
+ 		return zero, value.ErrUnavailable

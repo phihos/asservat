@@ -1,0 +1,145 @@
+package contracts
+
+import "io"
+
+const OwnerDeploymentFormat = "asservat-owner-deployment/v1"
+const OwnerDeploymentRoot = "/run/asservat/hub"
+const OwnerDeploymentMaxBytes = 256 << 10
+const OwnerPodUIDEnvironment = "ASSERVAT_HUB_POD_UID"
+const OwnerWorkerTrustFormat = "asservat-owner-worker-trust/v1"
+
+type OwnerWorkerTrust struct {
+	Format   string   `json:"format"`
+	Controls [][]byte `json:"controls"`
+}
+
+func DecodeOwnerWorkerTrust(r io.Reader) (OwnerWorkerTrust, error) {
+	return decodeClosedRPC[OwnerWorkerTrust](r, 16<<20)
+}
+
+// Installation-owned public startup inputs. Credentials have fixed, separate
+// projected filenames and cannot be embedded or redirected through this DTO.
+type OwnerDeployment struct {
+	Format                 string                           `json:"format"`
+	InstallationID         string                           `json:"installationID"`
+	ClusterID              string                           `json:"clusterID"`
+	PermissionRootID       string                           `json:"permissionRootID"`
+	Namespace              WorkerObjectReference            `json:"namespace"`
+	ConfigurationUID       string                           `json:"configurationUID"`
+	Kubernetes             OwnerProviderEndpoint            `json:"kubernetes"`
+	WorkloadGuard          OwnerDeploymentGuard             `json:"workloadGuard"`
+	ConfigurationProbes    []OwnerConfigurationProbe        `json:"configurationProbes"`
+	SchedulingLeases       []OwnerSchedulingLease           `json:"schedulingLeases"`
+	APIContextStarts       *OwnerDeploymentAPIContextStarts `json:"apiContextStarts,omitempty"`
+	CapacityProbe          *OwnerDeploymentCapacityProbe    `json:"capacityProbe,omitempty"`
+	InitialHistoryProbe    *OwnerInitialHistoryProbe        `json:"initialHistoryProbe,omitempty"`
+	Postgres               OwnerPostgresEndpoint            `json:"postgres"`
+	AuditStore             OwnerAuditStore                  `json:"auditStore"`
+	KeyService             OwnerKeyService                  `json:"keyService"`
+	Connections            int                              `json:"connections"`
+	Concurrency            int                              `json:"concurrency"`
+	Native                 *OwnerNativeDeployment           `json:"native,omitzero"`
+	ProviderAuthentication *OwnerProviderAuthentication     `json:"providerAuthentication,omitempty"`
+	Observation            *OwnerObservationBootstrap       `json:"observation,omitempty"`
+}
+
+// Only the acknowledged original bootstrap account may observe the retained
+// initial guard through this purpose-fixed exception. It permits no writes.
+type OwnerInitialHistoryProbe struct {
+	Namespace      WorkerObjectReference `json:"namespace"`
+	ServiceAccount WorkerObjectReference `json:"serviceAccount"`
+	Configuration  string                `json:"configuration"`
+}
+
+// Optional protected native listener dependencies. The accepted owner pool
+// independently supplies NativePort; these inputs cannot select a route/owner.
+type OwnerNativeDeployment struct {
+	ConnectorRoots      [][]byte               `json:"connectorRoots"`
+	WorkerAPIs          []OwnerNativeWorkerAPI `json:"workerAPIs"`
+	RetentionTopologies []OwnerNativeTopology  `json:"retentionTopologies"`
+	Connections         int                    `json:"connections"`
+	Concurrency         int                    `json:"concurrency"`
+}
+type OwnerNativeWorkerAPI struct {
+	ClusterID  string                `json:"clusterID"`
+	Namespace  WorkerObjectReference `json:"namespace"`
+	Kubernetes OwnerProviderEndpoint `json:"kubernetes"`
+}
+type OwnerNativeTopology struct {
+	TargetClusterID string `json:"targetClusterID"`
+	Name            string `json:"name"`
+	UID             string `json:"uid"`
+	SHA256          string `json:"sha256"`
+}
+type OwnerConfigurationProbe struct {
+	ConfigMap      string `json:"configMap"`
+	ServiceAccount string `json:"serviceAccount"`
+}
+type OwnerSchedulingLease struct {
+	Lease          string `json:"lease"`
+	ServiceAccount string `json:"serviceAccount"`
+}
+type OwnerProviderEndpoint struct {
+	Endpoint string   `json:"endpoint"`
+	Roots    [][]byte `json:"roots"`
+}
+type OwnerDeploymentGuard struct {
+	Name                   string                 `json:"name"`
+	PolicyUID              string                 `json:"policyUID"`
+	PolicyGeneration       int64                  `json:"policyGeneration"`
+	BindingUID             string                 `json:"bindingUID"`
+	BindingResourceVersion string                 `json:"bindingResourceVersion"`
+	Administrators         []OwnerDeploymentActor `json:"administrators"`
+}
+type OwnerDeploymentActor struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+type OwnerPostgresEndpoint struct {
+	Host           string   `json:"host"`
+	Port           int      `json:"port"`
+	Database       string   `json:"database"`
+	Roots          [][]byte `json:"roots"`
+	MaxConnections int32    `json:"maxConnections"`
+}
+type OwnerAuditStore struct {
+	Endpoint string   `json:"endpoint"`
+	Roots    [][]byte `json:"roots"`
+	Region   string   `json:"region"`
+	Bucket   string   `json:"bucket"`
+}
+type OwnerKeyService struct {
+	Endpoint   string   `json:"endpoint"`
+	Roots      [][]byte `json:"roots"`
+	AuditMount string   `json:"auditMount"`
+	AuditKey   string   `json:"auditKey"`
+	PKIMount   string   `json:"pkiMount"`
+	ServerRole string   `json:"serverRole"`
+	ClientRole string   `json:"clientRole"`
+}
+type OwnerSQLCredential struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+type OwnerStorageCredential struct {
+	AccessKeyID     string `json:"accessKeyID"`
+	SecretAccessKey string `json:"secretAccessKey"`
+	SessionToken    string `json:"sessionToken"`
+}
+
+func DecodeOwnerDeployment(r io.Reader) (OwnerDeployment, error) {
+	return decodeClosedRPC[OwnerDeployment](r, OwnerDeploymentMaxBytes)
+}
+func DecodeOwnerSQLCredential(r io.Reader) (OwnerSQLCredential, error) {
+	return decodeClosedRPC[OwnerSQLCredential](r, 16<<10)
+}
+func DecodeOwnerStorageCredential(r io.Reader) (OwnerStorageCredential, error) {
+	return decodeClosedRPC[OwnerStorageCredential](r, 32<<10)
+}
+
+// Explicit original guard scope only. It neither grants RBAC nor replaces the
+// independent start admission and original installation journal acceptance.
+type OwnerDeploymentAPIContextStarts struct {
+	CapacityAccount  WorkerObjectReference `json:"capacityAccount"`
+	ExecutionAccount WorkerObjectReference `json:"executionAccount"`
+}

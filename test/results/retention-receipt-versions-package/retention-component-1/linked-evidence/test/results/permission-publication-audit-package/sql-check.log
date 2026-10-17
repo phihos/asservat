@@ -1,0 +1,2 @@
+TMPDIR="/home/phil/.cache/asservat-build/asservat-permission-publication-50s5dcwu/build" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 48 files match sqlc v1.31.1

@@ -1,0 +1,40 @@
+package audit
+
+import (
+	"strconv"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// This new unselected record cannot be decoded as v1 configuration authority.
+// Codec, current SQL and physical reserve/retirement producers are still absent.
+const OwnerConfigurationEpochFormat = "asservat-owner-configuration-epoch/v1"
+
+type OwnerConfigurationEpoch struct {
+	Format string
+	Epoch  fleet.OwnerAuditEpoch
+}
+
+func (r OwnerConfigurationEpoch) Valid() bool {
+	return r.Format == OwnerConfigurationEpochFormat && r.Epoch.WellFormed()
+}
+func (r OwnerConfigurationEpoch) Clone() OwnerConfigurationEpoch { r.Epoch = r.Epoch.Clone(); return r }
+func (r OwnerConfigurationEpoch) Equal(other OwnerConfigurationEpoch) bool {
+	return r.Format == other.Format && r.Epoch.Equal(other.Epoch)
+}
+func OwnerConfigurationEpochKey(r OwnerConfigurationEpoch) string {
+	if !r.Valid() {
+		return ""
+	}
+	e := r.Epoch
+	return "hub-owner-configuration-epoch/v1/" + e.Reserve.InstallationID + "/" + e.Reserve.ClusterID + "/" + e.Reserve.SourceUID + "/" + e.Reserve.ID + "/" + strconv.FormatInt(e.Ordinal, 10) + "/" + e.ID
+}
+
+// Receipt structure/key matching is necessary, not verification of ciphertext
+// contents or acknowledgement. The concrete codec and SQL owner must bind the
+// complete record, original stored claim and immutable actual object version.
+func (r Receipt) ValidOwnerConfigurationEpoch(record OwnerConfigurationEpoch) bool {
+	return record.Valid() && r.Key == OwnerConfigurationEpochKey(record) && r.Version != "null" && identity.Text(r.Version, 1024) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.Bytes <= record.Epoch.Reserve.Policy.PerEpoch.CiphertextBytes && r.SHA256 != (artifact.Digest{})
+}

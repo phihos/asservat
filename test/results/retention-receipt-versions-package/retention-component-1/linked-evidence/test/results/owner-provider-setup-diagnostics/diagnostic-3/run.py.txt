@@ -1,0 +1,63 @@
+from pathlib import Path
+import subprocess,json,time,uuid
+out=Path(__file__).parent;name='asservat-setup-shape-'+uuid.uuid4().hex[:12]
+image='quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf'
+report={'container':name,'image':image,'observations':[],'cleanupFailures':[]};created=False
+def bao(args,token='synthetic-root',stdin=None):
+ return subprocess.run(['docker','exec','-i','--env','BAO_ADDR=http://127.0.0.1:8200','--env','BAO_TOKEN='+token,name,'bao',*args],input=stdin,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+try:
+ p=subprocess.run(['docker','run','--detach','--rm','--network','none','--name',name,'--env','BAO_DEV_ROOT_TOKEN_ID=synthetic-root',image,'server','-dev','-dev-listen-address=127.0.0.1:8200'],capture_output=True,text=True,timeout=30)
+ if p.returncode:raise RuntimeError('owned provider creation failed')
+ created=True
+ for attempt in range(30):
+  r=bao(['status','-format=json'])
+  if r.returncode==0:break
+  time.sleep(.2)
+ else:raise RuntimeError('owned provider readiness failed')
+ recipe=json.loads((out/'synthetic-recipe.json').read_text())
+ for args in [['auth','enable','-path=owner-auth','kubernetes'],['secrets','enable','-path=transit','transit'],['write','transit/keys/audit','type=aes256-gcm96'],['secrets','enable','-path=pki','pki'],['write','pki/root/generate/internal','common_name=synthetic-setup-probe','ttl=1h','key_type=ec','key_bits=256']]:
+  r=bao(args);assert r.returncode==0,r.stderr
+ import base64
+ encode=lambda v:base64.urlsafe_b64encode(json.dumps(v).encode()).rstrip(b'=')
+ jwt=b'.'.join([encode({'alg':'RS256','typ':'JWT'}),encode({'iss':'synthetic-only','exp':int(time.time())+3600}),base64.urlsafe_b64encode(bytes(256)).rstrip(b'=')]).decode()
+ config=recipe['authConfiguration'];config['token_reviewer_jwt']=jwt
+ r=bao(['write','auth/owner-auth/config','-'],stdin=json.dumps(config));assert r.returncode==0,r.stderr
+ for role in recipe['authentication']['Roles']:
+  r=bao(['write','auth/owner-auth/role/'+role['name'],'-'],stdin=json.dumps(role['role']));assert r.returncode==0,r.stderr
+  r=bao(['policy','write',role['name'],'-'],stdin=json.dumps(role['policy']));assert r.returncode==0,r.stderr
+ for role in recipe['pkiRoles']:
+  r=bao(['write','pki/roles/'+role['name'],'-'],stdin=json.dumps(role['role']));assert r.returncode==0,r.stderr
+ paths=list(recipe['inspectionPolicy']['path'])
+ policy='\n'.join('path "'+p+'" { capabilities = ["read"] }' for p in paths)
+ r=bao(['policy','write','inspection','-'],stdin=policy);assert r.returncode==0,r.stderr
+ r=bao(['write','-format=json','auth/token/create','policies=inspection','no_default_policy=true','ttl=60s','renewable=false']);assert r.returncode==0,r.stderr
+ token=json.loads(r.stdout)['auth']['client_token']
+ for path in paths:
+  for label,credential in [('named-read-only',token)]:
+   r=bao(['read','-format=json',path],credential)
+   row={'path':path,'credentialScope':label,'exit':r.returncode,'stderr':r.stderr}
+   if r.returncode==0:
+    row['publicData']=json.loads(r.stdout)['data'];assert 'token_reviewer_jwt' not in row['publicData']
+   report['observations'].append(row)
+ from datetime import datetime,timedelta,timezone
+ r=bao(['write','-format=json','auth/token/create','policies='+recipe['authentication']['Roles'][2]['name'],'no_default_policy=true','ttl=60s','renewable=false']);assert r.returncode==0,r.stderr
+ signing=json.loads(r.stdout)['auth']['client_token']
+ report['signingBounds']=[]
+ for label,seconds,start_override,want in [('within-early-renewal-maximum',1230,False,0),('beyond-maximum',1320,False,2),('caller-selected-not-before',1200,True,2)]:
+  now=datetime.now(timezone.utc)
+  payload={'csr':recipe['ProbeCSR'],'alt_names':recipe['ProbeDNS'],'uri_sans':recipe['ProbeURI'],'not_after':(now+timedelta(seconds=seconds)).strftime('%Y-%m-%dT%H:%M:%SZ')}
+  if start_override:payload['not_before']=(now-timedelta(seconds=10)).strftime('%Y-%m-%dT%H:%M:%SZ')
+  r=bao(['write','-format=json','pki/sign/server','-'],signing,stdin=json.dumps(payload))
+  entry={'case':label,'exit':r.returncode,'expectedExit':want,'stderr':r.stderr}
+  if r.returncode==0:entry['publicCertificate']=json.loads(r.stdout)['data']['certificate']
+  report['signingBounds'].append(entry)
+  assert r.returncode==want,(label,r.stderr)
+ r=bao(['token','revoke',signing]);assert r.returncode==0,r.stderr
+ r=bao(['token','revoke',token]);assert r.returncode==0,r.stderr
+ report['exit']=0
+finally:
+ if created:
+  r=subprocess.run(['docker','rm','--force',name],capture_output=True,text=True,timeout=30)
+  if r.returncode:report['cleanupFailures'].append('owned provider removal failed')
+ with (out/'result.json').open('x') as f:json.dump(report,f,indent=2);f.write('\n')
+ print(json.dumps({'exit':report.get('exit'),'reads':len(report['observations']),'failed':[(r['path'],r['exit']) for r in report['observations'] if r['exit']],'cleanupFailures':report['cleanupFailures'],'signingBounds':[{'case':r['case'],'exit':r['exit']} for r in report.get('signingBounds',[])]}),flush=True)

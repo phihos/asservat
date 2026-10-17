@@ -1,0 +1,25 @@
+# Runtime sustainability component 2 result
+
+Terminal: session 58940, exit 1. This checkpoint remains immutable. No live integration, native run or runtime enablement.
+
+| Phase | Actual exit | Seconds | Result |
+| --- | ---: | ---: | --- |
+| selectors | 0 | 0.501 | pass |
+| compile | 0 | 21.506 | pass |
+| before-owner-selection | 1 | 1.501 | intended old ordering failure |
+| fleet-capacity-races | 0 | 17.505 | pass |
+| kubernetes-races | 0 | 42.510 | pass |
+| kms-races | 1 | 21.506 | unexpected failure |
+
+All 59 payload/base paths, 4,182 dependencies, auxiliary inputs and linked-directory inventory matched before and after. The exact mirror was unchanged and owned scratch was removed.
+
+KMS failure: TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue called immediately after a successful refresh, inside the existing one-second anti-spin interval. Both this and admission-4 use the same blocked-before-healthy check. Admission-4 never reached its KMS phase. No provider work was dispatched by the failed local hint.
+
+Bootstrap races, vet, Go architecture and canonical gates were not run after this failure. No full graph or native availability qualification is claimed. The passing native-work contention tests still use explicitly synthetic SQL/audit sinks and omit actual provider HTTP/four recovery reads.
+
+Next source-only correction changes only the synthetic fixture clock: assert the retained immediate anti-spin denial, then evaluate the healthy hint at the original next instant, with original credential dates unchanged. Production scheduling/authority/rate limits stay unchanged. A new bounded checkpoint must run the changed KMS case and previously unrun gates; unchanged passed matrices need no repetition.
+
+Manifest: d4977442b71cbbb08a73609ad2c56a85adc47766359aba0c73bddcaae81c5bd9
+Dependencies: a038e8274e52ea4e54dce07cbfbf8b49672af0c002390d499a7f0149e0fba280
+Runner: 00b156d526ed53220d1d6553c9c32c736b434694c0008256506480c1a68441cd
+Result: 7f403fc3c9f0aa116461ce3dd871a3ed176341e2ea91a7a73adde2ed8748ba60

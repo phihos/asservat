@@ -1,0 +1,255 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-12 05:05:29.889 UTC [133] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 05:05:29.889 UTC [133] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 05:05:29.899 UTC [145] LOG:  database system was shut down at 2026-10-12 05:05:27 UTC
+2026-10-12 05:05:29.911 UTC [133] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-12 05:05:30.069 UTC [133] LOG:  received fast shutdown request
+.2026-10-12 05:05:30.072 UTC [133] LOG:  aborting any active transactions
+2026-10-12 05:05:30.073 UTC [133] LOG:  background worker "logical replication launcher" (PID 148) exited with exit code 1
+2026-10-12 05:05:30.074 UTC [143] LOG:  shutting down
+2026-10-12 05:05:30.077 UTC [143] LOG:  checkpoint starting: shutdown immediate
+2026-10-12 05:05:30.544 UTC [143] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.029 s, sync=0.423 s, total=0.471 s; sync files=303, longest=0.157 s, average=0.002 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-12 05:05:30.559 UTC [133] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-12 05:05:30.590 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 05:05:30.590 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-12 05:05:30.590 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-12 05:05:30.593 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 05:05:30.600 UTC [185] LOG:  database system was shut down at 2026-10-12 05:05:30 UTC
+2026-10-12 05:05:30.606 UTC [1] LOG:  database system is ready to accept connections
+2026-10-12 05:05:30.733 UTC [196] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-12 05:05:30.733 UTC [196] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-12 05:05:39.869 UTC [213] ERROR:  role "asservat_init_10000000000040008000000000000005_prepare" cannot be dropped because some objects depend on it
+2026-10-12 05:05:39.869 UTC [213] DETAIL:  privileges for schema public
+	privileges for table goose_db_version
+	privileges for table custody_pool
+	privileges for table custody_allocation
+	privileges for table custody_attempt
+	privileges for table custody_copy
+	privileges for table custody_event
+	privileges for table permission_stream
+	privileges for table permission_basis
+	privileges for table permission_assignment
+	privileges for table permission_acceptance
+	privileges for table authority_audit
+	privileges for table context_storage_binding
+	privileges for table context_capture
+	privileges for table fleet_trust
+	privileges for column installation_id of table fleet_trust
+	privileges for column issuer_epoch of table fleet_trust
+	privileges for column source_uid of table fleet_trust
+	privileges for column source_generation of table fleet_trust
+	privileges for column source_digest of table fleet_trust
+	privileges for column observed_at of table fleet_trust
+	privileges for column fresh_until of table fleet_trust
+	privileges for table fleet_peer
+	privileges for table fleet_peer_certificate
+	privileges for table fleet_bootstrap
+	privileges for table fleet_certificate_issue
+	privileges for table fleet_bootstrap_intent
+	privileges for table context_verification
+	privileges for table context_catalog
+	privileges for table download_allocation
+	privileges for table artifact_download
+	privileges for table download_batch
+	privileges for table retention_decision
+	privileges for table retention_source
+	privileges for table retention_checkpoint
+	privileges for table retention_source_epoch
+	privileges for table retention_catchup
+	privileges for table retention_catchup_effect
+	privileges for table policy_source
+	privileges for table policy_acceptance
+	privileges for table browser_session_root
+	privileges for table browser_login
+	privileges for table browser_session
+	privileges for table browser_logout
+	privileges for table browser_session_epoch
+	privileges for table download_key_binding
+	privileges for table local_key_configuration
+	privileges for table local_key_version
+	privileges for table download_worker
+	privileges for table download_worker_configuration
+	privileges for table download_worker_configuration_revision
+	privileges for table download_worker_enrollment
+	privileges for table download_worker_certificate
+	privileges for table download_worker_owner
+	privileges for table hub_owner_configuration
+	privileges for table hub_owner_configuration_revision
+	privileges for table hub_owner_enrollment
+	privileges for table hub_owner_certificate
+	privileges for table fleet_initial_activation
+	privileges for column singleton of table fleet_initial_activation
+	privileges for table context_preview
+	privileges for table context_execution
+	privileges for table context_preview_fence
+	privileges for table context_control_pool
+	privileges for table context_control_account
+	privileges for table context_control_charge
+	privileges for table context_case_locator
+	privileges for table context_writer_completion
+	privileges for table context_deletion_checkpoint
+	privileges for table operation_audit_pool
+	privileges for table operation_audit_account
+	privileges for table operation_audit
+	privileges for table operation_audit_lifecycle
+	privileges for table operation_audit_history
+	privileges for table download_control_allocation
+	privileges for table download_response
+	privileges for table download_window
+	privileges for table browser_refresh_owner
+	privileges for table browser_refresh_consumer
+	privileges for table download_native_backing
+	privileges for table download_native_owner
+	privileges for table download_native_key
+	privileges for table download_stop_pool
+	privileges for table download_stop_backing
+	privileges for table download_stop
+	privileges for table download_stop_lifecycle
+	privileges for table download_stop_history
+	privileges for table connector_identity_root
+	privileges for table connector_identity_profile
+	privileges for table connector_identity_process
+	privileges for table connector_credential_attempt
+	privileges for table connector_backing_transition
+2026-10-12 05:05:39.869 UTC [213] STATEMENT:  DROP ROLE "asservat_init_10000000000040008000000000000005_prepare"
+2026-10-12 05:05:39.881 UTC [213] ERROR:  role "asservat_init_10000000000040008000000000000005_audit" cannot be dropped because some objects depend on it
+2026-10-12 05:05:39.881 UTC [213] DETAIL:  privileges for schema public
+	privileges for table goose_db_version
+	privileges for table fleet_initial_activation
+	privileges for column audit_receipt_json of table fleet_initial_activation
+2026-10-12 05:05:39.881 UTC [213] STATEMENT:  DROP ROLE "asservat_init_10000000000040008000000000000005_audit"
+2026-10-12 05:05:39.892 UTC [213] ERROR:  role "asservat_init_10000000000040008000000000000005_activate" cannot be dropped because some objects depend on it
+2026-10-12 05:05:39.892 UTC [213] DETAIL:  privileges for schema public
+	privileges for table goose_db_version
+	privileges for table custody_pool
+	privileges for table custody_allocation
+	privileges for table custody_attempt
+	privileges for table custody_copy
+	privileges for table custody_event
+	privileges for table permission_stream
+	privileges for table permission_basis
+	privileges for table permission_assignment
+	privileges for table permission_acceptance
+	privileges for table authority_audit
+	privileges for table context_storage_binding
+	privileges for table context_capture
+	privileges for table fleet_trust
+	privileges for column suspended of table fleet_trust
+	privileges for column recovery_blocked of table fleet_trust
+	privileges for column observed_at of table fleet_trust
+	privileges for column fresh_until of table fleet_trust
+	privileges for column activated_postmaster_at of table fleet_trust
+	privileges for column activated_database_oid of table fleet_trust
+	privileges for table fleet_peer
+	privileges for table fleet_peer_certificate
+	privileges for table fleet_bootstrap
+	privileges for table fleet_certificate_issue
+	privileges for table fleet_bootstrap_intent
+	privileges for table context_verification
+	privileges for table context_catalog
+	privileges for table download_allocation
+	privileges for table artifact_download
+	privileges for table download_batch
+	privileges for table retention_decision
+	privileges for table retention_source
+	privileges for table retention_checkpoint
+	privileges for table retention_source_epoch
+	privileges for table retention_catchup
+	privileges for table retention_catchup_effect
+	privileges for table policy_source
+	privileges for table policy_acceptance
+	privileges for table browser_session_root
+	privileges for table browser_login
+	privileges for table browser_session
+	privileges for table browser_logout
+	privileges for table browser_session_epoch
+	privileges for table download_key_binding
+	privileges for table local_key_configuration
+	privileges for table local_key_version
+	privileges for table download_worker
+	privileges for table download_worker_configuration
+	privileges for table download_worker_configuration_revision
+	privileges for table download_worker_enrollment
+	privileges for table download_worker_certificate
+	privileges for table download_worker_owner
+	privileges for table hub_owner_configuration
+	privileges for table hub_owner_configuration_revision
+	privileges for table hub_owner_enrollment
+	privileges for table hub_owner_certificate
+	privileges for view fleet_current_trust
+	privileges for table fleet_initial_activation
+	privileges for column activated_at of table fleet_initial_activation
+	privileges for table context_preview
+	privileges for table context_execution
+	privileges for table context_preview_fence
+	privileges for table context_control_pool
+	privileges for table context_control_account
+	privileges for table context_control_charge
+	privileges for table context_case_locator
+	privileges for table context_writer_completion
+	privileges for table context_deletion_checkpoint
+	privileges for table operation_audit_pool
+	privileges for table operation_audit_account
+	privileges for table operation_audit
+	privileges for table operation_audit_lifecycle
+	privileges for table operation_audit_history
+	privileges for table download_control_allocation
+	privileges for table download_response
+	privileges for table download_window
+	privileges for table browser_refresh_owner
+	privileges for table browser_refresh_consumer
+	privileges for table download_native_backing
+	privileges for table download_native_owner
+	privileges for table download_native_key
+	privileges for table download_stop_pool
+	privileges for table download_stop_backing
+	privileges for table download_stop
+	privileges for table download_stop_lifecycle
+	privileges for table download_stop_history
+	privileges for table connector_identity_root
+	privileges for table connector_identity_profile
+	privileges for table connector_identity_process
+	privileges for table connector_credential_attempt
+	privileges for table connector_backing_transition
+2026-10-12 05:05:39.892 UTC [213] STATEMENT:  DROP ROLE "asservat_init_10000000000040008000000000000005_activate"
+2026-10-12 05:05:39.900 UTC [183] LOG:  checkpoint starting: immediate force wait
+2026-10-12 05:05:41.443 UTC [183] LOG:  checkpoint complete: wrote 700 buffers (4.3%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.027 s, sync=1.496 s, total=1.543 s; sync files=499, longest=0.007 s, average=0.003 s; distance=17560 kB, estimate=17560 kB; lsn=0/2CBB078, redo lsn=0/2CBB020

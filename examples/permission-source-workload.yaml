@@ -1,0 +1,35 @@
+apiVersion: asservat.io/v1alpha1
+kind: PermissionSource
+metadata:
+  name: shared-namespace-maintainers
+  namespace: asservat-system
+spec:
+  enabled: true
+  clusterID: 00000000-0000-4000-8000-000000000001
+  type: workloadMetadata
+  namespaceSelector:
+    matchLabels:
+      platform.example.invalid/shared: 'true'
+  excludedNamespaces:
+  - kube-system
+  - asservat-system
+  workloadSelector:
+    matchLabels:
+      platform.example.invalid/ownership-managed: 'true'
+  role: workload-maintainer
+  maxDecisionAgeSeconds: 30
+  maxNamespaces: 50
+  protection:
+    mode: admissionEnforced
+    reviewRef: platform-review/workload-ownership-2026-10
+    guardRef: workload-owner-guard-v1
+  metadataMapping:
+    field: annotation
+    key: platform.example.invalid/owner-team
+    mode: valueMap
+    issuer: https://identity.example.invalid/realms/company
+    values:
+      payments:
+      - group-payments-123
+      payroll:
+      - group-payroll-456

@@ -1,0 +1,10 @@
+{
+  "source_manifest": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+  "dependencies": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+  "component_result": "c98fd4a738b4c8c6019a81919b042dc34016e46f4628a59e8953d4f13918931a",
+  "component_runner": "95f4da320337af77d9f93494598d20741147a36d9f2b0ad198efa558f83974fc",
+  "required_tests": "c062b5fb00e83886651b901e667545699b8f683569c51acbc89382aa5bb8fde9",
+  "status": "unrun",
+  "expected_native_sources": "dd8ebe254a08a74fd529c46e77f3cd88f758241107af7b4b764706a048a0be19",
+  "native_source_count": 2253
+}

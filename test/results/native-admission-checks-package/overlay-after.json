@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/evidence/native_exchange.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/application/evidence/native_exchange.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/admission_budget_test.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/admission_budget_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/admission_check.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/admission_check.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/admission_check_test.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/admission_check_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/operation.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/operation.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/registration.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/registration.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/router.go": "/home/phil/.cache/asservat-build/planning/native-admission-checks-20261012/changes/internal/transport/native/router.go"
+  }
+}

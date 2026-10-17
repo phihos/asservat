@@ -1,0 +1,277 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 34.929899ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 38.839107ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 2.923551113s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 2.834536144s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 950.414029ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 1.274650792s <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Uncertain native exchange unavailable
+    download_sessions_test.go:732: original preparation continuation {false} download unavailable
+    native_exchange_test.go:284: worker terminal uncertain original native conversation: native exchange unavailable
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.249608ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.754377436s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.708885957s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 789.617704ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 1.955810762s <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Uncertain download unavailable
+    download_sessions_test.go:732: original preparation continuation {false} download unavailable
+    native_exchange_test.go:284: worker terminal uncertain original native conversation: download unavailable
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:95: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.982501ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:95: native context pending metadata read completed
+    native_exchange_test.go:95: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.935792157s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.890896051s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 481.459789ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 645.224797ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.767507513s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.569855882s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 835.739795ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 1.202726202s <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 22.968811ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 4
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 25.794964ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 5
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.982561ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 6
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.556284ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 7
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.398669ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 8
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.047846ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 9
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 25.645174ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 10
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.056102ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 11
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.247388ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 11 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 12
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.678069559s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.635813396s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 649.218175ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 813.484916ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 12 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 12 Uncertain native exchange unavailable
+    native_exchange_test.go:284: worker terminal uncertain original native conversation: native exchange unavailable
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:106: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.69634ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:106: native context pending metadata read completed
+    native_exchange_test.go:106: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.816856752s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.771212002s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 491.024993ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 657.347534ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.716628436s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.673915451s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 454.705398ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 614.096255ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 360.263283ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 4
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.490099ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 5
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 17.967176ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 6
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.784575ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 7
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.441199ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 8
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.312368ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 9
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.823521ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 10
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.531069ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 11
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.122666ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 11 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 12
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.674380186s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.632770026s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 487.822967ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 643.373656ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 12 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 12 Joined <nil>
+    native_exchange_test.go:106: actual h2 client cancellation retained old uncertainty; explicit fresh audited preparation and new content path reconstructed Range/If-Match bytes with unchanged artifact SHA; synthetic authority/bootstrap inputs remain explicit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-races
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.58646ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.899541948s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.853750668s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 486.944242ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 662.123915ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:732: already-closed exact native operation denied within original current lease, charges unchanged
+    download_sessions_test.go:732: wrong fence/sequence and held-row original-deadline completion denied, owner and charges unchanged
+    download_sessions_test.go:732: incomplete closed response denies both concurrent admissions, all prior spend retained
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-admission-race
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.81469ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.384583ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 2.074433365s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 2.028865206s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 482.48652ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 648.998301ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    download_sessions_test.go:732: completed preparation must still have its original current interval for closed-state test
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    download_sessions_test.go:732: native diagnostic preparation started
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.357003ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.792069137s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.745900935s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 510.917846ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 689.597775ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:732: native diagnostic preparation terminal <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.707816456s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.663523454s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 479.741506ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 646.745378ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.259815808s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.21854026s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 498.794997ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 666.294892ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 3 Joined <nil>
+    download_sessions_test.go:732: actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=352; synthetic identity/issuer/Pod/bootstrap facts
+--- FAIL: TestContextAdmissionWithRealServices (93.85s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content (11.56s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-resume (8.41s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (43.22s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session (22.03s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session (19.73s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-control-races (11.32s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-control-admission-race (7.08s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-exchange (11.67s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	93.977s
+FAIL

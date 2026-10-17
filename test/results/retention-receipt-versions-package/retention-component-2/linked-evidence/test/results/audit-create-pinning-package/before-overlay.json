@@ -1,0 +1,22 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/audit_create.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/audit_create.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/audit_create_test.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/audit_create_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/authority.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/authority.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/bootstrap.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/bootstrap.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/capture_intent.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/capture_intent.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/context_deletion.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/context_deletion.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/context_verification.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/context_verification.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/download_audit.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/download_audit.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/download_stop.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/download_stop.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/download_worker.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/download_worker.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/enrollment.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/enrollment.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/lifecycle.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/lifecycle.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/operation_audit.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/operation_audit.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/owner_configuration.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/owner_configuration.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/policy_acceptance.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/policy_acceptance.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/retention_acceptance.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/retention_acceptance.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/worker_configuration.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/worker_configuration.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/worker_enrollment.go": "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/files/internal/adapters/objectstore/worker_enrollment.go"
+  }
+}

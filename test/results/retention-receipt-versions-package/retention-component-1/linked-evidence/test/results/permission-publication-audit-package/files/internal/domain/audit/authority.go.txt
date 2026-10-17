@@ -1,0 +1,105 @@
+// Package audit defines bounded, content-minimized durable audit records.
+package audit
+
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"time"
+)
+
+// Permission changes record assignment identities, never group membership lists,
+// Kubernetes free text, tokens or collected evidence. Source digests link config.
+type AssignmentChange struct {
+	ID, Change  string
+	Audience    artifact.AudienceAssignment
+	ScopeDigest artifact.Digest
+}
+type AuthorityRecord struct {
+	ID, RootID, Epoch, Kind string
+	Sequence                int64
+	InputDigest             artifact.Digest
+	CreatedAt               time.Time
+	Changes                 []AssignmentChange
+	Bootstrap               *PermissionBootstrap
+	Automation              []AutomationDelegation `json:",omitempty"`
+}
+
+// Complete minimized delegation snapshot for this accepted configuration. It
+// records envelopes, not personal group membership or authored free text.
+type AutomationDelegation struct {
+	BasisKey    string
+	Revision    identity.Revision
+	ScopeDigest artifact.Digest
+	Envelope    authorization.AutomationEnvelope
+}
+
+// Minimized first-acceptance provenance. Reviewer is an attested actor label,
+// never an authorization decision. Empty installations have no review fields.
+type PermissionBootstrap struct {
+	ClusterID, NamespaceUID            string
+	BindingsDigest                     artifact.Digest
+	BindingCount                       int
+	ReviewUID, ReviewVersion, Reviewer string
+	ReviewDigest                       artifact.Digest
+	ReviewedAt, ExpiresAt              time.Time
+}
+
+func (r AuthorityRecord) Valid() bool {
+	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || !authorization.UUID(r.Epoch) || r.Sequence < 0 || r.CreatedAt.IsZero() || r.InputDigest == (artifact.Digest{}) || len(r.Changes) > 8192 {
+		return false
+	}
+	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" {
+		return false
+	}
+	if len(r.Automation) > 1024 || (len(r.Automation) > 0 && r.Kind != "permission-change") {
+		return false
+	}
+	delegations := map[string]bool{}
+	for _, a := range r.Automation {
+		if !identity.Text(a.BasisKey, 256) || delegations[a.BasisKey] || !a.Revision.Valid() || a.ScopeDigest == (artifact.Digest{}) || !a.Envelope.Valid() {
+			return false
+		}
+		delegations[a.BasisKey] = true
+	}
+	if p := r.Bootstrap; p != nil {
+		if r.Kind != "permission-change" || !authorization.UUID(p.ClusterID) || !identity.Text(p.NamespaceUID, 64) || p.BindingsDigest == (artifact.Digest{}) || p.BindingCount < 0 || p.BindingCount > 1024 {
+			return false
+		}
+		if p.BindingCount == 0 {
+			if p.ReviewUID != "" || p.ReviewVersion != "" || p.Reviewer != "" || p.ReviewDigest != (artifact.Digest{}) || !p.ReviewedAt.IsZero() || !p.ExpiresAt.IsZero() {
+				return false
+			}
+		} else if !identity.Text(p.ReviewUID, 64) || !identity.Text(p.ReviewVersion, 128) || !identity.Text(p.Reviewer, 256) || p.ReviewDigest == (artifact.Digest{}) || !identity.Fresh(p.ReviewedAt, p.ExpiresAt, r.CreatedAt, time.Hour) {
+			return false
+		}
+	}
+	seen := map[string]bool{}
+	for _, c := range r.Changes {
+		a := c.Audience
+		if !authorization.UUID(c.ID) || seen[c.ID] || c.ID != a.AssignmentID || (c.Change != "added" && c.Change != "retired") || c.ScopeDigest == (artifact.Digest{}) {
+			return false
+		}
+		if (a.Kind != "User" && a.Kind != "Group" && a.Kind != "Workload") || !identity.Text(a.Issuer, 2048) || !identity.Text(a.SubjectID, 256) || (a.BasisKind != "AccessBinding" && a.BasisKind != "PermissionSource") || !identity.Text(a.BasisUID, 64) || a.BasisDigest == (artifact.Digest{}) {
+			return false
+		}
+		if a.Role != "workload-maintainer" && a.Role != "evidence-reader" && a.Role != "evidence-owner" && a.Role != "action-approver" {
+			return false
+		}
+		seen[c.ID] = true
+	}
+	return true
+}
+
+type Receipt struct {
+	Key, Version, ETag string
+	Bytes              int64
+	SHA256             artifact.Digest
+}
+
+func AuthorityKey(root, event string) string {
+	return "authority/v1/" + root + "/" + event + "/record"
+}
+func (r Receipt) Valid(root, event string) bool {
+	return authorization.UUID(root) && authorization.UUID(event) && r.Key == AuthorityKey(root, event) && r.Version != "null" && identity.Text(r.Version, 1024) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 16<<20 && r.SHA256 != (artifact.Digest{})
+}

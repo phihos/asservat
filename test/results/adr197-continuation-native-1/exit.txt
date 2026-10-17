@@ -1,0 +1,1 @@
+exit=interrupted (host power outage during owned kind cluster creation; no test ran; its own kind clusters, containers, networks, three volumes and temp dir were removed after reboot)

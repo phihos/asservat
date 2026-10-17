@@ -1,0 +1,44 @@
+{
+  "phases": [
+    {
+      "name": "retirement",
+      "command": [
+        "python",
+        "scripts/test-custody.py",
+        "--run",
+        "^TestContextAdmissionWithRealServices$/^prepaid-stop-positive-retirement-backup-history-and-unknown-writers$"
+      ],
+      "exit": 0,
+      "seconds": 75.081,
+      "sourceCount": 2128,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 0,
+      "passedTests": [
+        "TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers"
+      ],
+      "testPhases": [
+        {
+          "phase": "suite",
+          "testExit": 0,
+          "incarnation": {
+            "serverStart": "2026-10-13T11:07:10.287722+00:00",
+            "databaseOID": "16384"
+          },
+          "passedTestNames": [
+            "TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers"
+          ],
+          "testElapsedSeconds": 67.77833506399975,
+          "qualificationExit": 0
+        }
+      ],
+      "archiveHashes": {
+        "harness.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+        "custody-environment.json": "8aad91c3c2f0e5fbf6869d99fd32cc1bd678d26e3548af242cb873ec2bc7af06",
+        "custody.log": "9110d0e1c73b3fae80a574bd392652ce8a330a3bcde3ff4c98c56ad1140c2f73"
+      }
+    }
+  ],
+  "scope": "Actual SQL/S3 initial audit readback and original operation/download-stop retirement; synthetic current application authority, no installed public workflow",
+  "exit": 0
+}

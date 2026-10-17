@@ -1,0 +1,110 @@
+[
+  {
+    "path": "docs/architecture/operation-audit-lifecycle.md",
+    "base_sha256": "32ec00e35b6193b2a898a0258b5e62f57ebb0b78285011e02c873527efd84abd",
+    "sha256": "98c5442b9cdb004aa7e7cd868d149618a90049c39e425ae487487380a7503eda",
+    "bytes": 17338
+  },
+  {
+    "path": "docs/decisions/125-prepaid-operation-certificate-verification.md",
+    "base_sha256": null,
+    "sha256": "a21a24f10d5065e354612ead4902562b5a3e384f29dd39572d04f9832cbc7127",
+    "bytes": 4430
+  },
+  {
+    "path": "internal/adapters/postgres/custody.go",
+    "base_sha256": "f712e68d0cacf620625afceab4a72c3b8d90cc5abc45a4d18dec678b626c7b93",
+    "sha256": "cb27b29c526f30d3aecaeffdc4e0dac065e965c86acbc483c2faf23120f46b11",
+    "bytes": 16876
+  },
+  {
+    "path": "internal/adapters/postgres/operation_audit.go",
+    "base_sha256": "136b8a78531aa2e1e03b94a92bd9dc873dcb871590ea2706f52103c5cb3d3587",
+    "sha256": "a8e2fe85ec755e97e90a1c16732b1e533777e1cecd0ae8bae9aee48c6fa3b3a6",
+    "bytes": 15480
+  },
+  {
+    "path": "internal/adapters/postgres/operation_lifecycle.go",
+    "base_sha256": "93a5e3a54b199c087d24faba50e34ec83227cde4a31ed335ad128af7eed00a62",
+    "sha256": "b65b83180a0b86e11e2ee8139f94d43debe81ce649628a5d410549049e06fe65",
+    "bytes": 29819
+  },
+  {
+    "path": "internal/application/audit/operation_lifecycle.go",
+    "base_sha256": "16e573cf00fe1c18fa7e88c3d4c68474eb59b02ade544c7b64cad350b3db9256",
+    "sha256": "c57ae60c4145b05c90f71081e3afe22cdb6e7fcb9aa3506380ea9375c21bb180",
+    "bytes": 12871
+  },
+  {
+    "path": "internal/application/audit/operation_lifecycle_test.go",
+    "base_sha256": "f5cb64394785a48d6cd5373616bbfa768b19d1f1fac7e12d432f6c6ee21b50b9",
+    "sha256": "bc690473172bfb917d41c19304f0fb9354766df599860f1bffa519326a3801e2",
+    "bytes": 9638
+  },
+  {
+    "path": "internal/application/audit/operation_verification_budget_test.go",
+    "base_sha256": null,
+    "sha256": "452bb7a5b9e43532a9c0a53314b866b9f08dc1eb904b5489056b88da57b90b09",
+    "bytes": 7944
+  },
+  {
+    "path": "internal/domain/audit/operation_lifecycle.go",
+    "base_sha256": "2e528aed17d4a51074c6b421df567685cb11eb44ce6cbc01b7a7829ef124d048",
+    "sha256": "a93be3c371594d5b3ce9d627bd255dc1f1255e1242d19cb840be4ddfb553dd9b",
+    "bytes": 13383
+  },
+  {
+    "path": "internal/domain/audit/operation_verification_test.go",
+    "base_sha256": null,
+    "sha256": "d5334874795445d4eb715a93fb5636f151598c84cb2858ae8350adffc243ef87",
+    "bytes": 2127
+  },
+  {
+    "path": "internal/transport/presentation/operation_audit_healthy_test.go",
+    "base_sha256": "c5295f04fa3e1e7e6068097b54ed3ac79a680a40c0e19508ccdc43fd9c477763",
+    "sha256": "2a003053159b8024abacebe8d2169cfecd8afaf0b2b00b99125dede8507a7505",
+    "bytes": 3575
+  },
+  {
+    "path": "migrations/00048_operation_certificate_verification.sql",
+    "base_sha256": null,
+    "sha256": "53040d78e7f05501f6eb4ac3ab344a432115e5977627628f123b819cfe8325d7",
+    "bytes": 28034
+  },
+  {
+    "path": "migrations/queries/operation_audit_lifecycle.sql",
+    "base_sha256": "3dae38f30424a2d56240e1002add8659d956815ba7c6cbc77881f89209bf2795",
+    "sha256": "6c5ee999ef97828b7f9c6c0120e571763f134425f6ed2595a0a1d8b911df9e5f",
+    "bytes": 2699
+  },
+  {
+    "path": "test/fixtures/sql/runtime-roles.sql",
+    "base_sha256": "9625cc11576de3c55e5a1cfb3211db71d5c7cba6c974a70f5b7454727eba4ed6",
+    "sha256": "6cdbbf0edfb8ff006ac12ae8fc34120d58b5205a1055e195e3f171ece12ce52f",
+    "bytes": 62925
+  },
+  {
+    "path": "test/integration/operation_audit_lifecycle_test.go",
+    "base_sha256": "aed6cae60cf006c12dcb06e922db1f2748f821e8c73c92db973cfa9db1d882c5",
+    "sha256": "3937d7183f55be1b4864adda91bcbb3ed6fc755996ae0cee4af42791fe6922cd",
+    "bytes": 32215
+  },
+  {
+    "path": "test/integration/operation_audit_overdue_test.go",
+    "base_sha256": "0e2c503257607770efe13661364877134a39a891eda185cf9545b59b5701ab15",
+    "sha256": "1ef77d15f574dc4a00412c57603efaf215f08e0b0818c9009b14774eb039fd1a",
+    "bytes": 14695
+  },
+  {
+    "path": "test/integration/operation_verification_budget_test.go",
+    "base_sha256": null,
+    "sha256": "a36f6e9c899fef2c1176669c3239d522cb7876aa07567a87a04c63733c9db17c",
+    "bytes": 5454
+  },
+  {
+    "path": "test/integration/operation_verification_migration_test.go",
+    "base_sha256": null,
+    "sha256": "574cef5281f71b01cb49ac998129f58a3ca304adace2d63f086c811dab1d7241",
+    "bytes": 16459
+  }
+]

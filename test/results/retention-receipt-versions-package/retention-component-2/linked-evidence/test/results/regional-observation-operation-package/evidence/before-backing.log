@@ -1,0 +1,11 @@
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking/expired
+    connector_observation_operation_test.go:499: current full configuration backing predicate omitted
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking/deployment-budget
+    connector_observation_operation_test.go:499: current full configuration backing predicate omitted
+--- FAIL: TestConnectorObservationOperationRequiresCurrentBacking (0.78s)
+    --- FAIL: TestConnectorObservationOperationRequiresCurrentBacking/expired (0.39s)
+    --- FAIL: TestConnectorObservationOperationRequiresCurrentBacking/deployment-budget (0.39s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.880s
+FAIL

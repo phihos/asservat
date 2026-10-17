@@ -1,0 +1,9 @@
+complete PASS max reap ms 65.418
+Traceback (most recent call last):
+  File "/opt/asservat-lab/run.py", line 101, in <module>
+    one_case('complete');one_case('nested-pid',nested=True)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/asservat-lab/run.py", line 76, in one_case
+    assert len(reports)==1 and reports[0]['Complete'] and reports[0]['NativeVerified'],result
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'name': 'nested-pid', 'mode': 'normal', 'timings': [{'pid': 2456, 'namespacePID': 1, 'returnCode': 0, 'reapMilliseconds': 1.394}], 'reports': [], 'spentEntries': 0, 'encryptedBytes': 0, 'networkNamespace': 'receiver has no external network interfaces'}

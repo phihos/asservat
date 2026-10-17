@@ -1,0 +1,7 @@
+# asservat.local/asservat/internal/bootstrap [asservat.local/asservat/internal/bootstrap.test]
+internal/bootstrap/owner_runtime.go:76:5: undefined: protectWorkerProcess
+ok  	asservat.local/asservat/internal/application/fleet	0.008s
+ok  	asservat.local/asservat/internal/adapters/mtls	5.451s
+FAIL	asservat.local/asservat/internal/bootstrap [build failed]
+ok  	asservat.local/asservat/test/integration	0.384s
+FAIL

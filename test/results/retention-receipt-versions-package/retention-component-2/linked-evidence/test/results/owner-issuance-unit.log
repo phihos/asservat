@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/adapters/mtls	1.726s
+ok  	asservat.local/asservat/internal/adapters/kms	1.889s
+ok  	asservat.local/asservat/internal/domain/fleet	1.008s
+ok  	asservat.local/asservat/internal/application/fleet	1.011s

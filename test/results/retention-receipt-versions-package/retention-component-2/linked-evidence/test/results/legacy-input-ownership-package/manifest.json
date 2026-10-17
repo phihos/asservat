@@ -1,0 +1,37 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/capture_cleanup_projection.go",
+    "base_sha256": "76ce5065c0ba9810549554c9763e538e0fe5a89bce395030a52c0b8f6393c4e1",
+    "payload_sha256": "aa9d9487eb12e1834f7e97146fb017168cfcdcc5aacea5f42b4d36ac606750df"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_bootstrap.go",
+    "base_sha256": "50f3e6afb4ef8e4a47e095a80db82f38d12004106a35e61e7b40d49ee2d2c03f",
+    "payload_sha256": "c061b88fb4cb956885816f6a623303f593092e48b6c95d979ecaa390729aa5ba"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_bootstrap_observation.go",
+    "base_sha256": "df1a2675603567cdd17e8b197dce51790f4a392907d953da8ee0e1cf0ad90460",
+    "payload_sha256": "1ce3b438b1e4551175e1b00b5442f1a98ae56fedd1619d87947e815a24ce4246"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_bootstrap_state.go",
+    "base_sha256": "45a3615fad55602b4742094fabea3c7547f934f443dce33bc95362fd25593a76",
+    "payload_sha256": "06bbb5b16ce8a60206ef6bab0e260bca890ddefc1c3962fe23c92bb5bb843d23"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge.go",
+    "base_sha256": "70a3f0412fec66c5ff7670b74ae648c25eebcf23586c6ca5f6b6568d04eeded5",
+    "payload_sha256": "01ac8b02f337041ef80c3c1b78077bbb080397da6f2059894ec50667cf724528"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go",
+    "base_sha256": "8cc5837211ad85c872d4f92115c1f88bde618eb2ec331235782ae183c46663f5",
+    "payload_sha256": "dbf3efb2e57b0e3a82e1e25e9b66e4f71e7cee266044f660c29cd9c92cccb7ad"
+  },
+  {
+    "path": "internal/adapters/kubernetes/legacy_input_ownership_test.go",
+    "base_sha256": null,
+    "payload_sha256": "cab2d8335358cdd8218ec99ca0c8a3fb30075a56df4fb0970e8f628f1d8ca127"
+  }
+]

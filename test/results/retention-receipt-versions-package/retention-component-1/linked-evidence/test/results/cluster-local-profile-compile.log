@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/test/integration	0.012s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.013s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/kms	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/mtls	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/native	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/clusterobservation	0.005s [no tests to run]

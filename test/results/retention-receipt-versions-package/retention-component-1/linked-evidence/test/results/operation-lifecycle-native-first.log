@@ -1,0 +1,11 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend
+    operation_audit_lifecycle_test.go:159: healthy Begin durable audit unavailable
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend
+    operation_audit_lifecycle_test.go:159: healthy Begin durable audit unavailable
+--- FAIL: TestContextAdmissionWithRealServices (1.12s)
+    --- FAIL: TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend (0.55s)
+    --- FAIL: TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend (0.21s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.177s
+FAIL

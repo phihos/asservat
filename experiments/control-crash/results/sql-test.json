@@ -1,0 +1,26 @@
+{
+  "scope": "Isolated single-primary SQL experiment. Synthetic units/identities; no production authorization or HA qualification.",
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-v",
+    "-timeout",
+    "2m",
+    "./..."
+  ],
+  "fixtureID": "27d43945bfbe62f6f1a770d755a32de10daa30b4c4bbd9994f9e5a8807765618",
+  "image": "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+  "startedUnix": 1791574088.8843298,
+  "inputSHA256": {
+    "experiments/control-crash/go/admission.go": "e7012a6c4c12e90867d25431304c9eb33dbdeed09ef565bd382fc2379531ae22",
+    "experiments/control-crash/go/admission_test.go": "3ebbb21726d04f8710e393c131f5e984bfa7d6e9e1207ea7c79922fdac8278ac",
+    "experiments/control-crash/go/cmd/receiver/main.go": "08a72b26d4d1ef88376a55d29d4144a6960ad37cbddcc8b9bd5f0ffa2e2481b0",
+    "experiments/control-crash/go/go.mod": "84b9c68cb5ffe0603f5846c1605cd8ac37eeeb37503f164362ce8c1ff68f146a",
+    "experiments/control-crash/go/go.sum": "ce39a7bb086113e949dd1fdec8005ca0559e222b1f027d9da98417182760c0fa",
+    "experiments/control-crash/go/schema.sql": "903e2081c133cedb5198f6bb30b30d4c36b4f7b39b512ab1e86d56d3d037017d"
+  },
+  "exit": 0,
+  "seconds": 4.488853931427002
+}

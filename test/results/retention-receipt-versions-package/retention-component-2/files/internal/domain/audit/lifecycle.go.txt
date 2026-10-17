@@ -1,0 +1,12 @@
+package audit
+
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+func LifecycleKey(root, event string) string { return "lifecycle/v1/" + root + "/" + event + "/record" }
+func (r Receipt) ValidLifecycle(root, event string) bool {
+	return authorization.UUID(root) && authorization.UUID(event) && r.Key == LifecycleKey(root, event) && r.Version != "null" && identity.Text(r.Version, 1024) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
+}

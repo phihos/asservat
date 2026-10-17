@@ -1,0 +1,15 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 43 schemas, 48 MCP tools, 155 examples, 171 requirements, 171 scenarios, 11 tasks, 909 local links, 329 rejected invalid examples (7179 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 10, "components": 24, "interfaces": 13, "domainEntitiesMapped": 47, "requirementsMapped": 171, "positiveChecks": 822, "rejectedInvalidCases": 120}
+/tmp/asservat-openapi-validation/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 47 domain entities, 72 browser operations, 48 MCP schema pairs, 329 resolved references.
+/tmp/asservat-openapi-validation/bin/python scripts/check-openapi.py
+PASS: OpenAPI 3.1.1 specification validation with all canonical references bundled locally.
+/tmp/asservat-openapi-validation/bin/python scripts/check-downloads.py
+PASS: {"scope": "Synthetic download DTO checks only; real streams/local tools NOT RUN", "positiveChecks": 15, "rejectedInvalidCases": 28}
+/tmp/asservat-openapi-validation/bin/python scripts/check-investigation.py
+PASS: {"scope": "Synthetic paired request/grant/commit contracts only; real authorization, concurrency and local-tool workflow NOT RUN", "positiveChecks": 9, "rejectedInvalidCases": 18}
+/tmp/asservat-openapi-validation/bin/python scripts/check-live-watch.py
+PASS: 45 live schema/timeline checks; raw content, hidden predicates, renewed lifetimes, invalid replay and scope drift rejected. Runtime checks remain pending.

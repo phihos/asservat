@@ -1,0 +1,25 @@
+--- FAIL: TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL (0.00s)
+panic: runtime error: invalid memory address or nil pointer dereference [recovered, repanicked]
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x8cc350]
+
+goroutine 43 [running]:
+testing.tRunner.func1.2({0xe405e0, 0xe9e970})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2125 +0x419
+testing.tRunner.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2128 +0x65f
+panic({0xe405e0?, 0xe9e970?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/panic.go:859 +0x125
+asservat.local/asservat/internal/application/evidence.(*ContextNativeRuntime).beginRequest(_, {_, _}, {_, _}, {{0xa542b1, 0x18}, {0xa59963, 0x24}, {0xa59963, ...}, ...})
+	/home/phil/Projekte/asservat/internal/application/evidence/context_native_runtime.go:121 +0x4f0
+asservat.local/asservat/internal/application/evidence.(*ContextNativeRuntime).prepared(_, {_, _}, {_, _}, {{0xa542b1, 0x18}, {0xa59963, 0x24}, {0xa59963, ...}, ...}, ...)
+	/home/phil/Projekte/asservat/internal/application/evidence/context_native_runtime.go:267 +0x1b7
+asservat.local/asservat/internal/application/evidence.(*ContextNativeRuntime).ReadPreparedContextDownload(_, {_, _}, {_, _}, {{0xa542b1, 0x18}, {0xa59963, 0x24}, {0xa59963, ...}, ...})
+	/home/phil/Projekte/asservat/internal/application/evidence/context_native_runtime.go:251 +0x138
+asservat.local/asservat/internal/application/evidence.TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL(0xc0000efb08)
+	/home/phil/Projekte/asservat/internal/application/evidence/context_native_runtime_test.go:64 +0x305
+testing.tRunner(0xc0000efb08, 0xe7d6c8)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+FAIL	asservat.local/asservat/internal/application/evidence	0.017s
+FAIL

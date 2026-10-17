@@ -1,0 +1,50 @@
+{
+  "integratedAt": "2026-10-13T23:48:05.829605+00:00",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation.go",
+      "baseSHA256": "4c52a2568f40d5715506da32127cb161cc8a04a40dfe5c433c54ada2da172eae",
+      "payloadSHA256": "902932ff1398a1abf35b472bd91689954b67c8e8dc5e6634c1e48ee8668ed0b0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_preflight.go",
+      "baseSHA256": null,
+      "payloadSHA256": "0f0c21dd0e0b9178213cae42fd461d7393867a8b1aa4cb4c77bc368090c210d4"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_preflight_source.go",
+      "baseSHA256": null,
+      "payloadSHA256": "9093158fe389e6c703843e27534210e9f7f82fbb96f6d67d2d490994aa49245e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_preflight_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "a31ea928d3110fd53840177ace2851af80b23a961021475fb3150d2f9e1785f4"
+    }
+  ],
+  "stages": [
+    [
+      "production",
+      "d22a377db9e3926508867aac1bb080874b027c6249cf93e5e07d80f08605735e",
+      "558612374f2d8baf9bacb4cf7d91c736f3138687420bf16d7ee3cd4237549674"
+    ],
+    [
+      "test",
+      "c64d1cff07d3dddf3e0555cd764633944cd50b822fca8904369dc4f8ba0608c4",
+      "9aeb17f19d86110d6d767e4e41146dde35bda6d6ed963f67450146981250cebd"
+    ]
+  ],
+  "qualification": "pending",
+  "scope": "Projection-only original source bracket across the recovery bridge; later first private root selection. Original postclaim/final checks, deadlines, rates and uncertainty spend remain binding.",
+  "beforeEvidence": {
+    "path": "test/results/runtime-provider-owner-native-8/result.json",
+    "sha256": "fa492b932ae19f8221f8cfe8ef07684ac64a57d59d4b44d7bc3e83574263f5f9"
+  },
+  "archiveHashes": {
+    "payload/internal/adapters/kubernetes/owner_projection_operation.go.txt": "902932ff1398a1abf35b472bd91689954b67c8e8dc5e6634c1e48ee8668ed0b0",
+    "payload/internal/adapters/kubernetes/owner_projection_preflight.go.txt": "0f0c21dd0e0b9178213cae42fd461d7393867a8b1aa4cb4c77bc368090c210d4",
+    "payload/internal/adapters/kubernetes/owner_projection_preflight_source.go.txt": "9093158fe389e6c703843e27534210e9f7f82fbb96f6d67d2d490994aa49245e",
+    "payload/internal/adapters/kubernetes/owner_projection_preflight_test.go.txt": "a31ea928d3110fd53840177ace2851af80b23a961021475fb3150d2f9e1785f4",
+    "before/internal/adapters/kubernetes/owner_projection_operation.go.txt": "4c52a2568f40d5715506da32127cb161cc8a04a40dfe5c433c54ada2da172eae"
+  }
+}

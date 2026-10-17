@@ -1,0 +1,101 @@
+// Owned HTTPS fixture only: synthetic session/C14/file source. No SQL, encrypted
+// audit, regional worker, provider, native evidence or installed-runtime claim.
+import { chromium, expect } from '@playwright/test';
+import axe from 'axe-core';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+const origin = process.argv[2], url = new URL(origin);
+assert.equal(url.protocol, 'https:'); assert.equal(url.hostname, '127.0.0.1');
+const output = fileURLToPath(new URL('../../test/results/console-native-restart/', import.meta.url));
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
+const context = await browser.newContext({ ignoreHTTPSErrors: true, acceptDownloads: true, viewport: { width: 1200, height: 900 } });
+const page = await context.newPage(), errors = [], external = [], checks = [], violations = [], requests = [];
+page.on('pageerror', e => errors.push(e.message));
+page.on('console', message => { if (/violates.*Content Security Policy|Refused to (execute|apply|load)/i.test(message.text())) errors.push(message.text()); });
+page.on('request', r => { if (new URL(r.url()).origin !== origin) external.push(r.url()); if (/\/api\/v1\/downloads\/.+\/content$/.test(new URL(r.url()).pathname)) requests.push(r.url()); });
+const stats = async () => { const r = await page.request.get(origin + '/test/restart-stats'); assert.equal(r.status(), 200); return r.json(); };
+const scan = async name => { await page.evaluate(axe.source); const result = await page.evaluate(async () => window.axe.run({ runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } })); violations.push(...result.violations.map(v => ({ name, id: v.id, impact: v.impact }))); };
+try {
+  const response = await page.goto(origin + '/cases/00000000-0000-4000-8000-000000000080');
+  assert.match(response.headers()['content-security-policy'], /script-src 'self'/);
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Download', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Ready to download', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start a new download', exact: true })).toHaveCount(0);
+  const first = await stats(); assert.equal(first.accepted, 1); assert.equal(first.prepare_keys.length, 1);
+  const failedEvent = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download native file', exact: true }).click();
+  const failed = await failedEvent;
+  assert.equal(failed.suggestedFilename(), 'synthetic-pod-status.json');
+  assert(await failed.failure(), 'actual browser attachment must fail after a real short HTTP response');
+  await expect(page.getByRole('heading', { name: 'Ready to download', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start a new download', exact: true })).toBeVisible();
+  await expect(page.getByText('Starts the browser download from the beginning and stops the previous request. Both attempts count toward your download limit.', { exact: true })).toBeVisible();
+  const failedState = await stats();
+  assert.deepEqual(failedState.prepare_keys, first.prepare_keys); assert.equal(failedState.native_ids.length, 1);
+  assert((failedState.statuses ?? []).every(s => s === 'Ready'));
+  await scan('failed-native-ready');
+  await page.screenshot({ path: output + '/failed-native-ready.png', fullPage: true });
+  checks.push('actual native anchor request and browser download failure; Ready remains visible without an operation error; explicit full restart is immediately available');
+
+  // The service positively records Stop, then closes the actual HTTP connection
+  // before the canonical reply reaches the browser. No new preparation is legal.
+  await page.getByRole('button', { name: 'Start a new download', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start a new download', exact: true })).toBeEnabled();
+  const stoppedUnknown = await stats();
+  assert.equal(stoppedUnknown.lost_stop, true); assert.equal(stoppedUnknown.stop_positive, false);
+  assert.equal(stoppedUnknown.stop_keys.length, 1); assert.deepEqual(stoppedUnknown.prepare_keys, first.prepare_keys);
+  assert.equal(requests.length, 1);
+  checks.push('lost actual Stop reply retains the old key and starts no new preparation or content request');
+
+  const positiveStop = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/cancel_artifact_download' && r.status() === 200)
+    .then(async r => ({ wire: await r.json(), body: r.request().postDataJSON() }));
+  await page.getByRole('button', { name: 'Start a new download', exact: true }).click();
+  const stopReply = await positiveStop;
+  assert.equal(stopReply.wire.status, 'ok');
+  assert.equal(stopReply.wire.data.download_id, '00000000-0000-4000-8000-000000000090');
+  assert.equal(stopReply.wire.data.state, 'Cancelled'); assert.equal(stopReply.wire.data.audit_state, 'pending');
+  assert.equal(stopReply.body.idempotency_key, stoppedUnknown.stop_keys[0]);
+  await expect(page.getByRole('button', { name: 'Retry same download request', exact: true })).toBeEnabled();
+  await expect(page.getByRole('alert')).toBeVisible();
+  const prepareUnknown = await stats();
+  assert.deepEqual(prepareUnknown.stop_keys, [stoppedUnknown.stop_keys[0], stoppedUnknown.stop_keys[0]]);
+  assert.equal(prepareUnknown.stop_positive, true); assert.equal(prepareUnknown.lost_prepare, true);
+  assert.equal(prepareUnknown.accepted, 2); assert.equal(prepareUnknown.prepare_keys.length, 2);
+  assert.notEqual(prepareUnknown.prepare_keys[0], prepareUnknown.prepare_keys[1]);
+  assert.deepEqual(prepareUnknown.events, ['prepare', 'stop', 'stop', 'prepare']);
+  assert.equal(requests.length, 1);
+  await scan('unknown-new-preparation');
+  checks.push('positive exact minimal Stop receipt precedes the one fresh key; lost new-prepare reply creates no extra session or implicit GET');
+
+  await page.getByRole('button', { name: 'Retry same download request', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Ready to download', exact: true })).toBeVisible();
+  const confirmed = await stats();
+  assert.equal(confirmed.accepted, 2);
+  assert.deepEqual(confirmed.prepare_keys, [prepareUnknown.prepare_keys[0], prepareUnknown.prepare_keys[1], prepareUnknown.prepare_keys[1]]);
+  assert.deepEqual(confirmed.stop_keys, prepareUnknown.stop_keys);
+  assert.equal(requests.length, 1);
+  const link = page.getByRole('link', { name: 'Download native file', exact: true });
+  await expect(link).toHaveAttribute('href', '/api/v1/downloads/00000000-0000-4000-8000-000000000091/content');
+  const nextEvent = page.waitForEvent('download'); await link.click(); const next = await nextEvent;
+  assert.equal(await next.failure(), null);
+  const stream = await next.createReadStream(); const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  assert.equal(Buffer.concat(chunks).toString(), 'synthetic browser restart fixture bytes only\n');
+  assert.equal(requests.length, 2); assert.notEqual(requests[0], requests[1]);
+  assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
+  checks.push('same new-prepare key reconciles lost reply; only a second explicit anchor click starts the new whole-file browser download; no web storage');
+  assert.deepEqual(errors, []); assert.deepEqual(external, []); assert.deepEqual(violations, []);
+  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'Synthetic session/C14/file bytes; actual packaged React, canonical Go browser transport, TLS, failed attachment and explicit restart. No SQL, encrypted audit, regional worker, IdP or installed authority qualification.' }, null, 2) + '\n');
+  console.log(`Built native-restart checks passed: ${checks.length} boundaries,2 accessibility scans, actual failed browser attachment and explicit fresh full-file download.`);
+} catch (error) {
+  const visiblePage = await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable');
+  await writeFile(output + '/failed-report.json', JSON.stringify({ passed: false, checks, errors, external, violations, failure: String(error), visiblePage }, null, 2) + '\n');
+  throw error;
+} finally { await context.close(); await browser.close(); }

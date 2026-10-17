@@ -1,0 +1,70 @@
+{
+  "manifest_sha256": "ea54426a9b729c130f564426589c8231a9d9b55bcd2ae4d90779fd27f6ef1523",
+  "dependencies_sha256": "1bbe7e524e991e41fa844f9cd8857519331271f73c76402d60db46f56de794c6",
+  "commands": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/before-overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "seconds": 7.971813484997256
+    },
+    {
+      "name": "after",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(InitialRuntime|OwnerWorkload|HubWorkerWorkload|ConfigurationLaunch)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 87.29665531798673
+    },
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 11.504179609997664
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.536041091007064
+    }
+  ],
+  "source_changes": [],
+  "paths": 5,
+  "dependencies": 1533,
+  "terminal_exit": 0
+}

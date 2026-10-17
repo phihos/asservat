@@ -1,0 +1,267 @@
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/valid
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/suspended
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring-live
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-retiring
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-overdue
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-budget
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/public-layout
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/short-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-suspended
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/duplicate
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/trailing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-root
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-cluster
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-peer
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/invalid-role
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/same-role
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/empty-roots
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wrong-root
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wildcard
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/ip-name
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/mixed-case-name
+--- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority (1.07s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/valid (0.05s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/suspended (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring-live (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-retiring (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-overdue (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-budget (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/public-layout (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/short-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-suspended (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/duplicate (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/trailing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-root (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-cluster (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-peer (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/invalid-role (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/same-role (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/empty-roots (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wrong-root (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wildcard (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/ip-name (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/mixed-case-name (0.04s)
+=== RUN   TestConnectorObservationOperationFourActualValues
+    connector_observation_operation_test.go:201: invalid signed control work
+--- FAIL: TestConnectorObservationOperationFourActualValues (0.15s)
+=== RUN   TestConnectorObservationOperationSourceMutationCloses
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/roles
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/backing
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/revision
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/roots
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/suspended
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/retiring
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/deployment
+    connector_observation_operation_test.go:229: invalid signed control work
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/source-unknown
+    connector_observation_operation_test.go:229: invalid signed control work
+--- FAIL: TestConnectorObservationOperationSourceMutationCloses (1.15s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/roles (0.14s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/backing (0.15s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/revision (0.14s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/roots (0.14s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/suspended (0.14s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/retiring (0.14s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/deployment (0.15s)
+    --- FAIL: TestConnectorObservationOperationSourceMutationCloses/source-unknown (0.14s)
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/source-guard
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/source-denial
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/workload-guard
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/workload-denial
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/account
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/pod
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/template
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/review
+    connector_observation_operation_test.go:270: invalid signed control work
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/expiry
+    connector_observation_operation_test.go:270: invalid signed control work
+--- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses (1.28s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/source-guard (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/source-denial (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/workload-guard (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/workload-denial (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/account (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/pod (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/template (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/review (0.14s)
+    --- FAIL: TestConnectorObservationOperationFinalNativeMutationCloses/expiry (0.14s)
+=== RUN   TestConnectorObservationOperationCloseJoinsValueRead
+    connector_observation_operation_test.go:313: invalid signed control work
+--- FAIL: TestConnectorObservationOperationCloseJoinsValueRead (0.14s)
+=== RUN   TestConnectorObservationOperationFinalValueFollowsNativeBracket
+    connector_observation_operation_test.go:338: invalid signed control work
+--- FAIL: TestConnectorObservationOperationFinalValueFollowsNativeBracket (0.15s)
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/0
+    connector_observation_operation_test.go:359: invalid signed control work
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/2
+    connector_observation_operation_test.go:359: invalid signed control work
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/4
+    connector_observation_operation_test.go:359: invalid signed control work
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/5
+    connector_observation_operation_test.go:359: invalid signed control work
+--- FAIL: TestConnectorObservationOperationOrdinalCannotBeReused (0.57s)
+    --- FAIL: TestConnectorObservationOperationOrdinalCannotBeReused/0 (0.14s)
+    --- FAIL: TestConnectorObservationOperationOrdinalCannotBeReused/2 (0.14s)
+    --- FAIL: TestConnectorObservationOperationOrdinalCannotBeReused/4 (0.14s)
+    --- FAIL: TestConnectorObservationOperationOrdinalCannotBeReused/5 (0.15s)
+=== RUN   TestConnectorObservationOperationCurrentCallerOnlyShortens
+    connector_observation_operation_test.go:373: invalid signed control work
+--- FAIL: TestConnectorObservationOperationCurrentCallerOnlyShortens (0.14s)
+=== RUN   TestConnectorObservationOperationCallerCancellationJoins
+    connector_observation_operation_test.go:389: invalid signed control work
+--- FAIL: TestConnectorObservationOperationCallerCancellationJoins (0.14s)
+=== RUN   TestConnectorObservationOperationConcurrentReadClosesBoth
+    connector_observation_operation_test.go:417: invalid signed control work
+--- FAIL: TestConnectorObservationOperationConcurrentReadClosesBoth (0.14s)
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/root
+    connector_observation_operation_test.go:447: invalid signed control work
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/process
+    connector_observation_operation_test.go:447: invalid signed control work
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/unbounded
+    connector_observation_operation_test.go:447: invalid signed control work
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/cancelled
+    connector_observation_operation_test.go:447: invalid signed control work
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/expired
+    connector_observation_operation_test.go:447: invalid signed control work
+--- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO (0.72s)
+    --- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO/root (0.14s)
+    --- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO/process (0.14s)
+    --- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO/unbounded (0.14s)
+    --- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO/cancelled (0.14s)
+    --- FAIL: TestConnectorObservationOperationWrongBeginHasNoIO/expired (0.14s)
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled
+--- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection (7.71s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection (0.12s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection (0.12s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled (0.07s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	13.425s
+FAIL

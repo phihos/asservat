@@ -1,0 +1,5 @@
+=== RUN   TestWorkloadTargetsWithRealKubernetes
+    workload_targets_test.go:34: run make context-integration for owned real Kubernetes fixtures
+--- SKIP: TestWorkloadTargetsWithRealKubernetes (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	0.012s

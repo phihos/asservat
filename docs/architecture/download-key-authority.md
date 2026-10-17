@@ -1,0 +1,38 @@
+# Local keys for current downloads
+
+[ADR-066](../decisions/066-download-key-authority.md) connects the I-14 local key service to the existing [download sessions](download-sessions.md). C-14 owns the download and its private child key binding; C-03 consumes it through `KeyOperationAuthorizer`. C-21 implements the primary-database transactions, remote key facet and object reader. C-24 remains the owner of pure shared values. This adds no user-visible permission, CRD, approval or artifact format.
+
+## Flow and authority
+
+1. The ordinary download authorizer checks the authenticated human/client, current rights, original audience, published immutable artifact, retained privacy obligations, region and recovery. The SQL ledger reserves read/output work and starts a generation-bound batch.
+2. The batch's exact encrypted intent is acknowledged, and its current SQL permit passes. The trusted coordinator obtains the [current worker proof](download-worker-attestation.md) and binds its exact acquisition peer/certificate and configured artifact key to that batch. A peer identifier supplied by a public client is never sufficient; production dispatch must mediate this operation using its verified acquisition identity.
+3. The acquisition reader calls `RemoteOpener` with the batch UUID as `authorityID`. A-KEY verifies actual mTLS identity, then `postgres.DownloadKeys.Resolve` loads that exact binding and its parent. The UUID is only a lookup key.
+4. The resolver repeats current recovery, permission, complete retention-source, published-artifact/version and active-batch checks under locks. It derives the three allowed canonical key bindings from the catalog's verified expectation. A different artifact, attempt, cluster, media type or key role fails before consumption.
+5. A transaction consumes that key role once. The resulting permit binds the full request hash and exact certificate, with the original intersected deadline. Only after commit does the key service unwrap; the coordinator and handler repeat expiry/cancellation checks before returning output.
+6. The acquisition reader decrypts and verifies the native file locally. Current download permits and accounting still precede delivery. The child key binding cannot grant bytes, publish metadata, skip audit or extend retention.
+
+## Persistence and locks
+
+Migration `00022_download_key_bindings.sql` stores one `download_key_binding` per batch: immutable parent/root/installation/key/peer/certificate identity, the accepted minimized download decision, creation/expiry and a three-bit spent mask. No wrapping root, clear keyset, encrypted key payload, token, native checksum, filename or evidence body enters this table. The existing control-history and backup-retention obligations apply; the child does not invent an indefinite audit/retention exception. Full historical cleanup remains part of the parent download lifecycle work.
+
+`download_key_bind_runtime` may insert a binding after the parent's current checks. It cannot change expiry or spend, create downloads, mark intent audit, change permissions or remove recovery blocking. `download_key_read_runtime` may read the same required fence projections and update only spent key slots; it cannot insert bindings. The database rejects decreases of the mask, including a direct attempted reset. Neither identity has DDL, table ownership, delete or root-key privileges.
+
+Migration 24 adds the original minimized worker proof. The binder and consumer check its certificate/session scope and freshness after locks; the child deadline cannot exceed that proof. Neither runtime role may rewrite it. Retries preserve its original bytes/deadline, and pre-migration children without proofs deny access. The Kubernetes source and SQL consumer are components; protected dispatch, issuer and control mediation remain required.
+
+The order is current recovery → permission root → download session → key binding, followed by the existing retention/catalog checks. All blocking operations stay inside the caller's original five-second bound. The initial parent-discovery SELECT is not authorization: the binding/authority is checked again while holding the parent locks. A generation change, finished/cancelled batch, unacknowledged audit, new deny/revision, closed effective cutoff or recovery change refuses consumption. The last transaction checks use current database time after lock waits.
+
+Each of `data-key`, `index-key` and `manifest-key` gets exactly one bit. Concurrent requests cannot obtain the same slot twice. A malformed wrapper or unavailable crypto backend after committed consumption does not refund the slot. A lost SQL/HTTP response likewise does not prove the operation unused. Recovery may start a separately admitted batch when the parent session remains eligible; it cannot refill/replay this batch's slots. Binding replay preserves the exact initial decision, deadline and peer; a changed decision needs new current work.
+
+## Reader composition and format compatibility
+
+`ContextDownloadWorker` selects exactly one of its external-provider `Native` reader or local-provider `BatchNative` reader. `objectstore.LocalKeyContextReader` implements the latter and requires an independently supplied `DownloadKeyGrants` coordinator port, fixed HTTPS endpoint, configured key scope and current acquisition certificate identity. It binds only after audit/current permission, constructs the opener for the batch ID, and closes that client's idle transport pool after the bounded read. Failure does not switch to another provider or an in-process root key.
+
+The shared `evidence.ArtifactKeyBinding` function now supplies the already-fixed framed/v1 key AAD to the codec and the authorization resolver. A golden test pins the historical canonical bytes for all three key roles, including the manifest's fixed media type. Data/index/manifest layouts and native files are unchanged. The SQL resolver does not need to decrypt evidence to authorize its keys.
+
+The initial full pod-status file is at most 4096 bytes, so each preparation/content reader fits one existing batch. This is **not** a design for one KMS call per payload frame or per 1 MiB delivery batch. Larger-file workers must retain their bounded, currently authorized acquisition reader across delivery batches, while checking output rights and spend at every boundary. No cross-operation plaintext key cache or longer authority is implied. That large-file composition remains unimplemented.
+
+## Evidence and remaining work
+
+The first owned SQL/S3/TLS run passed wrong-peer, foreign-artifact, unaudited, cancellation, permission-change, recovery-block and expiry-after-lock cases. Eight simultaneous requests released exactly one paid data-key operation; repeated binding did not refill it, and direct SQL spend reset was rejected. A locally encrypted native context was published to real S3 and downloaded through real TLS and this SQL resolver with a verified file hash; preparation and content used separate batches with three unwraps each. These use synthetic collection/identity/configuration inputs and test-issued peer certificates, not a production installer or public ingress. Subsequent retention/failed-crypto checks and final suite exits are recorded in [implementation progress](../implementation-progress.md).
+
+Still required: protected acquisition-job registration/issuance and control mediation, protected key/issuer source acceptance and stale-process fencing, binding/history cleanup and backup horizons, runtime/chart bootstrap, other-purpose wrap/sign/credential/audit authorities, general raw/share download readers, public browser/MCP and regional relay composition. No complete S-02 or small-deployment profile is claimed.

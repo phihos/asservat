@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-31",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "All six shipped CRDs, including the two generated capacity CRDs, were accepted by the real API server. The test's operator budget policy object was rejected because 'spec.node.recoveryHealthySeconds' is required. The test object now carries it. Both test objects and the repository examples were validated against the contract schemas locally before run 32.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; the continuation subtest stopped at the operator capacity objects.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

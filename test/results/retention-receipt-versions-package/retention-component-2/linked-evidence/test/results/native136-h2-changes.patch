@@ -1,0 +1,391 @@
+--- a/internal/application/evidence/download_content_audit.go
++++ b/internal/application/evidence/download_content_audit.go
+@@ -77,3 +77,10 @@
+ // a metadata-only conditional reply within the still-original audit interval,
+ // not a body write or another reservation. Body writes retain byte leases.
+ type DownloadContentPreflightReceiver interface{ DownloadContentPreflightComplete(time.Time) }
++
++// A successful preflight may enter a bounded no-output body setup phase. This
++// changes only the socket idle bound; it grants neither identity nor bytes.
++// Conditional and failed preflights never enter this phase.
++type DownloadContentBodyReceiver interface {
++	BeginDownloadContentBody(context.Context, time.Time) error
++}
+--- /dev/null
++++ b/internal/application/evidence/download_content_body_phase_test.go
+@@ -0,0 +1,68 @@
++package evidence
++
++import (
++	"context"
++	"errors"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++)
++
++type contentBodyPhaseFixture struct {
++	*contentAuditFixture
++	calls    int
++	until    time.Time
++	failBody bool
++}
++
++func (f *contentBodyPhaseFixture) BeginDownloadContentBody(ctx context.Context, until time.Time) error {
++	f.calls++
++	f.until = until
++	if f.finished != 1 || f.notified != 1 || f.status != DownloadContentReady || f.batches != 1 || f.begins != 0 || f.emitted != 0 {
++		return errors.New("body setup outside acknowledged phase boundary")
++	}
++	if d, ok := ctx.Deadline(); !ok || until.After(d) || until.After(f.s.Deadline) || until.After(f.a.AccessUntil) {
++		return errors.New("original response bounds lost")
++	}
++	if f.failBody {
++		return artifact.ErrDownloadUnavailable
++	}
++	return nil
++}
++func TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority(t *testing.T) {
++	for _, mode := range []string{"ready", "conditional", "finish-failed", "finish-shortened", "body-failed"} {
++		t.Run(mode, func(t *testing.T) {
++			base, transfer, request := newResponseTransferFixture(t, 17)
++			request.HardUntil = base.now.Add(30 * time.Second)
++			f := &contentBodyPhaseFixture{contentAuditFixture: &contentAuditFixture{responseTransferFixture: base, mode: mode}, failBody: mode == "body-failed"}
++			if mode == "conditional" {
++				f.condition = errors.New("not modified")
++			}
++			ctx, end := context.WithDeadline(t.Context(), base.now.Add(20*time.Second))
++			defer end()
++			e := transfer.TransferAudited(ctx, base, request, f, f, f)
++			switch mode {
++			case "ready", "finish-shortened":
++				if e != nil || f.calls != 1 || f.batches != 2 || f.emitted != 17 {
++					t.Fatalf("phase missing/out of order: %v calls=%d batches=%d bytes=%d", e, f.calls, f.batches, f.emitted)
++				}
++				want := base.now.Add(20 * time.Second)
++				if mode == "finish-shortened" {
++					want = f.a.AccessUntil
++				}
++				if !f.until.Equal(want) {
++					t.Fatal("deadline changed", f.until, want)
++				}
++			case "body-failed":
++				if e == nil || f.calls != 1 || f.batches != 1 || f.begins != 0 || f.emitted != 0 {
++					t.Fatal("failed socket transition admitted body")
++				}
++			default:
++				if e == nil || f.calls != 0 || f.begins != 0 || f.emitted != 0 {
++					t.Fatal("failed/conditional preflight entered body phase")
++				}
++			}
++		})
++	}
++}
+--- a/internal/application/evidence/download_response_transfer.go
++++ b/internal/application/evidence/download_response_transfer.go
+@@ -238,6 +238,18 @@
+ 	}
+ 	if e = finishPreflight(DownloadContentReady); e != nil {
+ 		return e
++	}
++	// End the socket's short metadata phase before waiting for a fresh body
++	// observation. The original response/caller/retention end bounds this idle
++	// phase; every actual write still requires its separate current byte lease.
++	until = identityvalue.Earlier(until, current.value.AccessUntil)
++	if d, ok := work.Deadline(); ok {
++		until = identityvalue.Earlier(until, d)
++	}
++	if receive, ok := destination.(DownloadContentBodyReceiver); ok {
++		if e = receive.BeginDownloadContentBody(work, until); e != nil {
++			return e
++		}
+ 	}
+ 	// Metadata observation has positively joined. Its verified immutable facts
+ 	// remain usable, but its initial identity lease may be nearly exhausted.
+--- a/internal/transport/browser/download_content.go
++++ b/internal/transport/browser/download_content.go
+@@ -280,11 +280,12 @@
+ }
+ 
+ type contentResponseFactory struct {
+-	writer   http.ResponseWriter
+-	request  *http.Request
+-	metadata artifact.NativeDownloadMetadata
+-	until    time.Time
+-	sink     *HTTPDownloadResponse
++	writer    http.ResponseWriter
++	request   *http.Request
++	metadata  artifact.NativeDownloadMetadata
++	until     time.Time
++	bodyUntil time.Time
++	sink      *HTTPDownloadResponse
+ }
+ 
+ func (f *contentResponseFactory) SelectDownloadResponse(m artifact.NativeDownloadMetadata) (artifact.DownloadSelection, error) {
+@@ -305,7 +306,7 @@
+ 	return selected, &evidence.DownloadContentSelectionError{Status: status, Cause: e}
+ }
+ func (f *contentResponseFactory) OpenDownloadResponse(ctx context.Context, m artifact.NativeDownloadMetadata, r artifact.DownloadResponse) (evidence.DownloadResponseSink, error) {
+-	if ctx.Err() != nil {
++	if ctx.Err() != nil || f.bodyUntil.IsZero() || r.Until.After(f.bodyUntil) {
+ 		return nil, artifact.ErrDownloadExpired
+ 	}
+ 	sink, e := NewHTTPDownloadResponse(f.writer, f.request, m, r)
+@@ -315,7 +316,36 @@
+ 	return sink, e
+ }
+ func (f *contentResponseFactory) DownloadContentPreflightComplete(until time.Time) { f.until = until }
+-func (f *contentResponseFactory) sent() bool                                       { return f.sink != nil && f.sink.HeadersSent() }
++
++// Re-arm only after acknowledged preflight, before its existing deadline can
++// expire. HTTP/2 resets an expired stream even if no body write has started.
++// This idle bound cannot authorize bytes or extend any original response end.
++func (f *contentResponseFactory) BeginDownloadContentBody(ctx context.Context, until time.Time) error {
++	now := time.Now()
++	if ctx == nil || ctx.Err() != nil || f.request == nil || f.request.Context().Err() != nil || !f.bodyUntil.IsZero() || f.sink != nil || !now.Before(f.until) || !now.Before(until) {
++		return artifact.ErrDownloadExpired
++	}
++	for _, owner := range []context.Context{ctx, f.request.Context()} {
++		if d, ok := owner.Deadline(); ok {
++			until = identity.Earlier(until, d)
++		}
++	}
++	if !now.Before(until) {
++		return artifact.ErrDownloadExpired
++	}
++	control := http.NewResponseController(f.writer)
++	if e := control.SetWriteDeadline(until); e != nil {
++		return e
++	}
++	if ctx.Err() != nil || f.request.Context().Err() != nil || !time.Now().Before(f.until) || !time.Now().Before(until) {
++		_ = control.SetWriteDeadline(time.Now())
++		return artifact.ErrDownloadExpired
++	}
++	f.bodyUntil = until
++	return nil
++}
++
++func (f *contentResponseFactory) sent() bool { return f.sink != nil && f.sink.HeadersSent() }
+ func (f *contentResponseFactory) conditional(owner context.Context, status int, now func() time.Time) error {
+ 	ctx, cancel := context.WithDeadline(owner, f.until)
+ 	defer cancel()
+--- /dev/null
++++ b/internal/transport/browser/download_content_deadline_test.go
+@@ -0,0 +1,216 @@
++package browser
++
++import (
++	"context"
++	"errors"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++)
++
++// Actual TLS/HTTP2 transport and product factory/sink; the manually supplied
++// metadata/response/leases are synthetic authority, not native worker proof.
++// The structural assertion intentionally compiles before the new phase method
++// exists, reproducing the original socket timeout rather than a compile error.
++func TestNativeContentHTTP2BodySetupSurvivesOriginalPreflightDeadline(t *testing.T) {
++	done := make(chan error, 1)
++	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
++		run := func() error {
++			if req.ProtoMajor != 2 {
++				return errors.New("HTTP2 was not negotiated")
++			}
++			preflightUntil := time.Now().Add(150 * time.Millisecond)
++			if e := http.NewResponseController(w).SetWriteDeadline(preflightUntil); e != nil {
++				return e
++			}
++			owner, cancel := context.WithTimeout(req.Context(), 3*time.Second)
++			defer cancel()
++			f := &contentResponseFactory{writer: w, request: req.WithContext(owner)}
++			f.DownloadContentPreflightComplete(preflightUntil)
++			originalEnd, _ := owner.Deadline()
++			if receiver, ok := any(f).(interface {
++				BeginDownloadContentBody(context.Context, time.Time) error
++			}); ok {
++				if e := receiver.BeginDownloadContentBody(owner, originalEnd); e != nil {
++					return e
++				}
++			}
++			// Fresh authority setup has no output. It completes after the old metadata
++			// deadline, while the original whole response and new byte lease remain live.
++			wait := time.NewTimer(time.Until(preflightUntil.Add(100 * time.Millisecond)))
++			defer wait.Stop()
++			select {
++			case <-wait.C:
++			case <-owner.Done():
++				return owner.Err()
++			}
++			response, lease := responseDeliveryFixture(3, artifact.DownloadSelection{Length: 3})
++			response.Until = originalEnd
++			metadata := artifact.NativeDownloadMetadata{Filename: "context.json", ETag: `"original"`, Size: 3}
++			sink, e := f.OpenDownloadResponse(owner, metadata, response)
++			if e != nil {
++				return e
++			}
++			defer sink.Close()
++			piece, stop := context.WithDeadline(owner, lease.Until)
++			defer stop()
++			n, e := sink.WriteChunk(piece, lease, 0, []byte("abc"))
++			if e != nil {
++				return e
++			}
++			if n != 3 {
++				return errors.New("incomplete native bytes")
++			}
++			return sink.Finish(owner)
++		}
++		done <- run()
++	}))
++	server.EnableHTTP2 = true
++	server.StartTLS()
++	defer server.Close()
++	response, e := server.Client().Get(server.URL)
++	if e != nil {
++		<-done
++		t.Fatalf("valid fresh content phase failed after old preflight deadline: %v", e)
++	}
++	defer response.Body.Close()
++	body, e := io.ReadAll(response.Body)
++	if e != nil || response.ProtoMajor != 2 || response.StatusCode != 200 || string(body) != "abc" {
++		t.Fatalf("content: status=%d h2=%d bytes=%q error=%v", response.StatusCode, response.ProtoMajor, body, e)
++	}
++	if e = <-done; e != nil {
++		t.Fatal(e)
++	}
++}
++
++func TestNativeHTTP2ResponseIdleBetweenFreshByteLeases(t *testing.T) {
++	done := make(chan error, 1)
++	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
++		run := func() error {
++			if req.ProtoMajor != 2 {
++				return errors.New("HTTP2 was not negotiated")
++			}
++			response, first := responseDeliveryFixture(6, artifact.DownloadSelection{Length: 6})
++			response.Until = time.Now().Add(3 * time.Second)
++			first.Until = time.Now().Add(150 * time.Millisecond)
++			first.Authority.ValidUntil = first.Until
++			sink, e := NewHTTPDownloadResponse(w, req, artifact.NativeDownloadMetadata{Filename: "context.json", ETag: `"original"`, Size: 6}, response)
++			if e != nil {
++				return e
++			}
++			defer sink.Close()
++			piece, stop := context.WithDeadline(req.Context(), first.Until)
++			_, e = sink.WriteChunk(piece, first, 0, []byte("abc"))
++			stop()
++			if e != nil {
++				return e
++			}
++			wait := time.NewTimer(time.Until(first.Until.Add(100 * time.Millisecond)))
++			defer wait.Stop()
++			select {
++			case <-wait.C:
++			case <-req.Context().Done():
++				return req.Context().Err()
++			}
++			// A new current lease, rather than an extension of the old handle.
++			_, next := responseDeliveryFixture(6, artifact.DownloadSelection{Length: 6})
++			next.Sequence = 2
++			next.Until = response.Until
++			next.Authority.ValidUntil = next.Until
++			piece, stop = context.WithDeadline(req.Context(), next.Until)
++			defer stop()
++			_, e = sink.WriteChunk(piece, next, 3, []byte("def"))
++			if e != nil {
++				return e
++			}
++			return sink.Finish(req.Context())
++		}
++		done <- run()
++	}))
++	server.EnableHTTP2 = true
++	server.StartTLS()
++	defer server.Close()
++	response, e := server.Client().Get(server.URL)
++	if e != nil {
++		<-done
++		t.Fatal(e)
++	}
++	defer response.Body.Close()
++	body, e := io.ReadAll(response.Body)
++	if e != nil || string(body) != "abcdef" || response.ProtoMajor != 2 {
++		t.Fatalf("idle renewal: %q %v", body, e)
++	}
++	if e = <-done; e != nil {
++		t.Fatal(e)
++	}
++}
++
++type contentBodyDeadlineWriter struct {
++	*httptest.ResponseRecorder
++	deadlines []time.Time
++	during    func()
++}
++
++func (w *contentBodyDeadlineWriter) SetWriteDeadline(d time.Time) error {
++	w.deadlines = append(w.deadlines, d)
++	if w.during != nil {
++		w.during()
++	}
++	return nil
++}
++
++func TestNativeContentBodyPhaseKeepsOriginalBoundsAndRejectsRenewal(t *testing.T) {
++	for _, mode := range []string{"bounded", "missing-ack", "expired-ack", "cancelled", "cancel-during-set", "repeat", "conditional"} {
++		t.Run(mode, func(t *testing.T) {
++			now := time.Now()
++			owner, cancel := context.WithDeadline(t.Context(), now.Add(2*time.Second))
++			defer cancel()
++			caller, end := context.WithDeadline(t.Context(), now.Add(time.Second))
++			defer end()
++			request := httptest.NewRequest("GET", "https://console.invalid/content", nil).WithContext(owner)
++			w := &contentBodyDeadlineWriter{ResponseRecorder: httptest.NewRecorder()}
++			f := &contentResponseFactory{writer: w, request: request}
++			switch mode {
++			case "missing-ack":
++			case "expired-ack":
++				f.DownloadContentPreflightComplete(now.Add(-time.Second))
++			default:
++				f.DownloadContentPreflightComplete(now.Add(500 * time.Millisecond))
++			}
++			if mode == "cancelled" {
++				cancel()
++			}
++			if mode == "cancel-during-set" {
++				w.during = cancel
++			}
++			if mode == "conditional" {
++				if e := f.conditional(owner, 412, time.Now); e != nil {
++					t.Fatal(e)
++				}
++				if len(w.deadlines) != 1 || !w.deadlines[0].Equal(f.until) || !f.bodyUntil.IsZero() {
++					t.Fatal("conditional renewed the socket")
++				}
++				return
++			}
++			e := f.BeginDownloadContentBody(caller, now.Add(time.Hour))
++			if mode == "bounded" || mode == "repeat" {
++				if e != nil {
++					t.Fatal(e)
++				}
++				want, _ := caller.Deadline()
++				if !f.bodyUntil.Equal(want) || len(w.deadlines) != 1 || !w.deadlines[0].Equal(want) {
++					t.Fatal("lost original caller bound")
++				}
++				if mode == "repeat" && f.BeginDownloadContentBody(caller, now.Add(2*time.Hour)) == nil {
++					t.Fatal("body phase renewed")
++				}
++			} else if e == nil || !f.bodyUntil.IsZero() {
++				t.Fatal("unacknowledged/expired/cancelled phase accepted")
++			}
++		})
++	}
++}

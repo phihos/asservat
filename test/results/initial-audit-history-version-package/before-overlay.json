@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_root_pin_test.go": "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/files/internal/adapters/kubernetes/initial_runtime_root_pin_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/initial_installation_read_test.go": "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/files/internal/adapters/postgres/initial_installation_read_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/audit/initial_installation_test.go": "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/files/internal/domain/audit/initial_installation_test.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_installation_test.go": "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/files/test/integration/initial_installation_test.go"
+  }
+}

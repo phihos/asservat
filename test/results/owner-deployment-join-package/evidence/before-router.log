@@ -1,0 +1,23 @@
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim
+    worker_owners_join_test.go:115: router closed dependencies before admitted wrapper SQL joined
+    worker_owners_join_test.go:26: dependency closed before original wrapper SQL call returned
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup
+    worker_owners_join_test.go:115: router closed dependencies before admitted wrapper SQL joined
+    worker_owners_join_test.go:26: dependency closed before original wrapper SQL call returned
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release
+    worker_owners_join_test.go:115: router closed dependencies before admitted wrapper SQL joined
+    worker_owners_join_test.go:26: dependency closed before original wrapper SQL call returned
+--- FAIL: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose (0.00s)
+    --- FAIL: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim (0.00s)
+    --- FAIL: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup (0.00s)
+    --- FAIL: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release (0.00s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsRegistrationIO
+    worker_routes_join_test.go:50: router join returned with registration I/O still active
+--- FAIL: TestWorkerRoutesCloseAndJoinRetainsRegistrationIO (0.00s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment
+    worker_routes_join_test.go:115: router join returned before its busy enrollment released
+--- FAIL: TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.010s
+FAIL

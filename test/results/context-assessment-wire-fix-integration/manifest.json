@@ -1,0 +1,17 @@
+{
+  "scope": "One API assessment explanation copy correction; real compiler/assessment to canonical and public preview regression. Test-only integration first; original production must reproduce failure before fix.",
+  "paths": [
+    {
+      "path": "internal/application/planning/context_assessment.go",
+      "base_sha256": "b4cea0c305c8d06777deabe8f8ec9ae7c6c7c3e7c8b935986744efb86ae5f375",
+      "payload_sha256": "6feedf172f61bc27792f2d9c336a97f3b4dc5e1434df65a28a68047b23e9e186"
+    },
+    {
+      "path": "internal/transport/presentation/context_compiled_assessment_test.go",
+      "base_sha256": null,
+      "payload_sha256": "bc8abf9f84472196b17a18e665593903e18a20637bfe690bb4e593cb22fda716"
+    }
+  ],
+  "review_patch_sha256": "23ecdeec693f34aec37773423e26f84cb86d61961292e6f21d13fb3a288d17d3",
+  "original_native_result_sha256": "5fceb63afbbfd1e4d3a4fd91eeeb2a0eb8695b59f2b60b7dbdac01721c89be7e"
+}

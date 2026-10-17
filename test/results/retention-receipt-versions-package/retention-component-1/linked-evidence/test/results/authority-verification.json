@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-09T23:27:48.349957+00:00",
+  "scope": "Permission acceptance, native admission and encrypted authority-audit components only; public runtime and source bootstrap remain pending",
+  "commands": {
+    "make permission-integration": 0,
+    "make custody-integration": 0,
+    "make go-check": 0,
+    "make go-architecture-check": 0,
+    "make sql-check": 0
+  },
+  "reports": {
+    "custody-environment.json": "02d6fa12435ce78ddda611169e107e92f5a8f158119301804e47832fe591a176",
+    "permission-kubernetes-environment.json": "f722c5ccabf2e8019f1f08c5066516cfce2149ada26212235de31c3148aae6d0"
+  },
+  "limitations": [
+    "Synthetic in-memory audit KMS in SQL/S3 fixture; not production OpenBao role qualification",
+    "Disposable Kind admission profile only; not every managed provider",
+    "No protected initial-value review or continuous reconciler yet",
+    "No public collection/disclosure path",
+    "Control-history retention, audit storage quota and restore qualification pending"
+  ]
+}

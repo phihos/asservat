@@ -1,0 +1,16 @@
+{
+  "basesSHA256": "4744f5703717a115d40bccd455ed7158596fec3b7d822c0918716c68dcf06c35",
+  "correction": "Only rename the local JSON value variable to wire, avoiding domain alias shadowing",
+  "deletedPaths": [
+    "internal/domain/fleet/cluster_observation_digest.go"
+  ],
+  "dependenciesSHA256": "72e266a335e504669b7588bab565226fab8ff18d2e6c1cfdc305a5eb60dfcd39",
+  "liveDependencies": 1833,
+  "overlaySHA256": "4836785c8e92b577b024787a0ff5c1a38e72653c57237e6c2434531fc58fdd9d",
+  "ownedPaths": 7,
+  "payloadSHA256": "bf05db38dd47afd82d374df049703b2655ef74983ad539456b52081b2077f281",
+  "priorBeforeEvidence": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-20261013/evidence/before-architecture.json",
+  "priorCompileFailure": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-20261013/evidence/race.json",
+  "scope": "Move shared deterministic digest from pure domain to C-04 application; same exact v1 bytes and validation behavior",
+  "status": "frozen before checks"
+}

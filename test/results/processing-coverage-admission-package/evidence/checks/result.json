@@ -1,0 +1,142 @@
+{
+  "manifest": "3329d2defaa7a7c7f682d370f36c4cc69383ff982f818123a0ed8860a054d970",
+  "dependencies": "1e14056e474ca0dc0fa5214ba743df4194d9c7b29f6e6ac63a75d4b2820f450d",
+  "runner": "e66225cd5335b7d8df37589cb9324ef0540cca98f7296f03762fe632ec53acdc",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "retained_bases": []
+  },
+  "phases": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/before-overlay.json",
+        "./internal/application/capture",
+        "-run",
+        "^TestContextProcessingCoveragePrecedesPreviewAndAdmission$",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "expected": 1,
+      "seconds": 2.502072334289551,
+      "log_sha256": "284e3b584a4dc436350690301359aeb39342d231468f39e285c308ee7a5a512e"
+    },
+    {
+      "name": "capture-presentation-bootstrap",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/overlay.json",
+        "./internal/application/capture",
+        "./internal/transport/presentation",
+        "./internal/bootstrap",
+        "-count=1",
+        "-timeout=10m",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 29.845880270004272,
+      "log_sha256": "cfb0f670e466ec86bc87d6d1a9a999ea63a09688e33cb131da145f21cc661b06"
+    },
+    {
+      "name": "processing-roles-domain",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/overlay.json",
+        "./internal/adapters/postgres",
+        "./internal/domain/capture",
+        "-run",
+        "Test(ProcessingCapture|PublicRuntimeRolePlan|PublicDownloadSourceRole|CapacityRolePlans|FixedRuntimeRoleFunctionAlias|CaptureCleanupPlans)|^TestContext",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 7.004806756973267,
+      "log_sha256": "87821016f988f44c1ca87a359db83cd1e794463e7a1e646f619a28438f3623e9"
+    },
+    {
+      "name": "integration-compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/overlay.json",
+        "./test/integration",
+        "-run",
+        "^$",
+        "-count=1"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 13.453428506851196,
+      "log_sha256": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/overlay.json",
+        "./internal/domain/capture",
+        "./internal/application/capture",
+        "./internal/transport/presentation",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 2.377037525177002,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "architecture-spec",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "architecture-check",
+        "spec-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "cwd": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/checks/coverage-v2/architecture-tree",
+      "exit": 2,
+      "expected": 0,
+      "seconds": 6.581277370452881,
+      "log_sha256": "456be0673cb21df9d66d92a054b1b3ceec12e5997660927f5e5a4176c6b594cd"
+    }
+  ],
+  "started_at": 1791846470.1849916,
+  "terminal_exit": 1,
+  "error": "architecture-spec unexpected exit",
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "retained_bases": []
+  },
+  "ended_at": 1791846533.6909866
+}

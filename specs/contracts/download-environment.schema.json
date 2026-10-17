@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/download-environment.schema.json",
+  "title": "Protected ordinary context download environment",
+  "description": "Private administrator policy; observed content is not protected source acceptance or processing completeness. Exact admitted deployment paths are independently pinned. Empty clients, paths or regions explicitly deny. Kubernetes admission protection and durable processing decisions are mandatory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "rootID",
+    "installationID",
+    "recoveryEpoch",
+    "revision",
+    "suspended",
+    "permittedRegions",
+    "paths",
+    "clients",
+    "operators"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-download-environment/v1"
+    },
+    "rootID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "installationID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recoveryEpoch": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "permittedRegions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 63
+      },
+      "minItems": 0,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/path"
+      },
+      "minItems": 0,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "clients": {
+      "type": "array",
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/client"
+      },
+      "minItems": 0,
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "operators": {
+      "type": "array",
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/operator"
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "generation",
+        "sha256"
+      ],
+      "properties": {
+        "uid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "targetClusterID",
+        "storeID",
+        "storageRegion",
+        "acquisitionClusterID",
+        "acquisitionRegion",
+        "connectorClusterID",
+        "connectorRegion",
+        "hubClusterID",
+        "hubRegion",
+        "workerConfiguration",
+        "hubConfiguration"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "targetClusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "storeID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "storageRegion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "acquisitionClusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "acquisitionRegion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "connectorClusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "connectorRegion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "hubClusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "hubRegion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "workerConfiguration": {
+          "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/revision"
+        },
+        "hubConfiguration": {
+          "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/revision"
+        }
+      }
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "id",
+        "kind",
+        "dataClasses",
+        "privacyClasses",
+        "evidenceTypes",
+        "purposes",
+        "pathIDs"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "maxLength": 2048
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "human",
+            "workload"
+          ]
+        },
+        "dataClasses": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "metadata"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "uniqueItems": true
+        },
+        "privacyClasses": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "potentialPersonalData"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "uniqueItems": true
+        },
+        "evidenceTypes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "context"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "uniqueItems": true
+        },
+        "purposes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "pathIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "clientID",
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "maxLength": 2048
+        },
+        "clientID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "User",
+            "Group"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}

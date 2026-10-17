@@ -1,0 +1,5 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 52 packages, 280 internal import edges; catalog ownership and layer/dependency rules checked
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+FAIL: Unregistered schema reference: #/$defs/sources
+make: *** [Makefile:5: spec-check] Error 1

@@ -1,0 +1,167 @@
+{
+  "inspected_at": "2026-10-09",
+  "method": "GitHub repository license API and individually identified primary documentation; metadata is not a complete distribution audit",
+  "dependencies": [
+    {
+      "repository": "golang/go",
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/golang/go/blob/master/LICENSE",
+      "blob_sha": "2a7cf70da6e498df9c11ab6a5eaa2ddd7af34da4",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "kubernetes-sigs/controller-runtime",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/kubernetes-sigs/controller-runtime/blob/main/LICENSE",
+      "blob_sha": "8dada3edaf50dbc082c9a125058f25def75e625a",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "modelcontextprotocol/go-sdk",
+      "spdx": "NOASSERTION",
+      "url": "https://github.com/modelcontextprotocol/go-sdk/blob/main/LICENSE",
+      "blob_sha": "5791499cb05de764964be318abf88ff59b9a82c6",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "inspektor-gadget/inspektor-gadget",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/inspektor-gadget/inspektor-gadget/blob/main/LICENSE",
+      "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "openbao/openbao",
+      "spdx": "MPL-2.0",
+      "url": "https://github.com/openbao/openbao/blob/main/LICENSE",
+      "blob_sha": "f4f97ee5853a2b2ba9121ea21589c706edf7a1cc",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "keycloak/keycloak",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/keycloak/keycloak/blob/main/LICENSE.txt",
+      "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "ceph/ceph",
+      "spdx": "NOASSERTION",
+      "url": "https://github.com/ceph/ceph/blob/main/COPYING",
+      "blob_sha": "52394f5bcb57bb5ae5bf80f047862cc89dd8b50a",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "tink-crypto/tink-go",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/tink-crypto/tink-go/blob/main/LICENSE",
+      "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "klauspost/compress",
+      "spdx": "NOASSERTION",
+      "url": "https://github.com/klauspost/compress/blob/master/LICENSE",
+      "blob_sha": "87d55747778c572bda5a21a2e9ad4578b088e832",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "aws/aws-sdk-go-v2",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/aws/aws-sdk-go-v2/blob/main/LICENSE.txt",
+      "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "google/cel-go",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/google/cel-go/blob/main/LICENSE",
+      "blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "blevesearch/bleve",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/blevesearch/bleve/blob/master/LICENSE",
+      "blob_sha": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "cloudevents/sdk-go",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/cloudevents/sdk-go/blob/main/LICENSE",
+      "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "standard-webhooks/standard-webhooks",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/standard-webhooks/standard-webhooks/blob/main/LICENSE",
+      "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "go-delve/delve",
+      "spdx": "MIT",
+      "url": "https://github.com/go-delve/delve/blob/master/LICENSE",
+      "blob_sha": "5ee9d2f1c38997318d4603f45b75386a67777174",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "dotnet/diagnostics",
+      "spdx": "MIT",
+      "url": "https://github.com/dotnet/diagnostics/blob/main/LICENSE.TXT",
+      "blob_sha": "984713a49622a96da110443c15477613bc12656b",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "bloomberg/pystack",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/bloomberg/pystack/blob/main/LICENSE",
+      "blob_sha": "a038215ec4d758f172a2ca5c8bd070bc7710450c",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "benfred/py-spy",
+      "spdx": "MIT",
+      "url": "https://github.com/benfred/py-spy/blob/master/LICENSE",
+      "blob_sha": "dc6b266240189e247b1797a1d2d834774aacb51d",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "wireshark/wireshark",
+      "spdx": "GPL-2.0",
+      "url": "https://github.com/wireshark/wireshark/blob/master/COPYING",
+      "blob_sha": "9efa6fbc962836e243e20f7f23db062e2c077d28",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "zeek/zeek",
+      "spdx": "NOASSERTION",
+      "url": "https://github.com/zeek/zeek/blob/master/COPYING",
+      "blob_sha": "fb540c0eb084e4b35c0cf5016583abb36dce92fc",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "sigstore/cosign",
+      "spdx": "Apache-2.0",
+      "url": "https://github.com/sigstore/cosign/blob/main/LICENSE",
+      "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "status": "metadata-inspected-not-transitive-audit"
+    },
+    {
+      "repository": "postgres/postgres",
+      "spdx": "PostgreSQL",
+      "url": "https://www.postgresql.org/about/licence/",
+      "blob_sha": null,
+      "status": "official-license-page-inspected-not-image-or-transitive-audit"
+    },
+    {
+      "repository": "jackc/pgx",
+      "spdx": "MIT",
+      "url": "https://pkg.go.dev/github.com/jackc/pgx/v5/stdlib",
+      "blob_sha": null,
+      "status": "package-documentation-license-metadata-inspected-exact-version-audit-pending"
+    }
+  ]
+}

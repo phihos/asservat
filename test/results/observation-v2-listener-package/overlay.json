@@ -1,0 +1,9 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/cluster_observation_metadata.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/files/internal/adapters/kubernetes/cluster_observation_metadata.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/cluster_observation_metadata_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/files/internal/adapters/kubernetes/cluster_observation_metadata_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_observation_operation_lifetime_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/files/internal/transport/native/owner_observation_operation_lifetime_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_observation_operation_server.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/files/internal/transport/native/owner_observation_operation_server.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_observation_operation_server_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/files/internal/transport/native/owner_observation_operation_server_test.go"
+  }
+}

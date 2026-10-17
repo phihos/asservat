@@ -1,0 +1,134 @@
+{
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 9.283,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/before-overlay.json",
+        "-vet=off",
+        "-count=1",
+        "-v",
+        "-run",
+        "^TestInitialAuditAcknowledgesTheSuccessfulPUTVersion$",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 1.64,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 1,
+      "skips": 0,
+      "intendedMarkers": true
+    },
+    {
+      "name": "races",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/objectstore",
+        "./internal/adapters/objectstore/framed"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 9.902,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 57,
+      "namedPass": 177,
+      "skips": 0
+    },
+    {
+      "name": "installer",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "-run",
+        "^TestInitialInstaller",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 5.81,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 4,
+      "namedPass": 30,
+      "skips": 0
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-version-pinning-20261013/checks-1/overlay.json",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 1.206,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "native": false,
+  "sourceCount": 3018,
+  "scratch": "/tmp/asservat-audit-pinning-u9up02lc",
+  "manifest": "7d335bb812aa0bf0924af45bb3ca82dc88cb0bd01a162b184fc301e20ddb239b",
+  "exit": 0,
+  "scratchRemoved": true,
+  "sourceChanged": [],
+  "files": {
+    "dependencies.json": "9d4df755b125d847938797c7d725be2c0324e4fc23f87b8f20cff6f15643a3c2",
+    "manifest.json": "7d335bb812aa0bf0924af45bb3ca82dc88cb0bd01a162b184fc301e20ddb239b",
+    "overlay.json": "54bc1f5a071e7366774b5c33f5005cbdd3142614f0cae99a390a92c97268fed4",
+    "before-overlay.json": "8143a7eb1423933314ed95fb2ffbd3f1463c3e3a4d4eadf92909c63191a8b83c",
+    "compile.log": "19c1d677dd554f3456fe260d2c92d91efbdd12b7d71a5c68d414a2054d9ac533",
+    "before.log": "53e9b0b18e60326e66f5c9506d24467e63e206506bc0ab4d13c4664cabeb5934",
+    "races.log": "af45c38d25003c07e14100d471fab5374b4928751d584f2396160873f45492a5",
+    "installer.log": "eeb79e11df2954304d24b589609faa3ce11add6d27e5dad348771766db23840a",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

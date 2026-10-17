@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap.schema.json",
+  "title": "Trusted initial bootstrap static input v1",
+  "description": "At most 48 KiB. Static administrator input contains no dynamic pins or credentials. Fresh installations select v4 required immutable audit versions plus positive copy closure. Exact existing v2/v3 roots retain their original profile; unknown or incomplete history never authorizes an upgrade.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "name",
+    "bootstrapNamespace",
+    "targetNamespace",
+    "image",
+    "administrators",
+    "probeAudience",
+    "kubernetes",
+    "postgres",
+    "auditStore",
+    "keyService",
+    "fleet",
+    "providers"
+  ],
+  "properties": {
+    "format": {
+      "enum": [
+        "asservat-initial-bootstrap/v1",
+        "asservat-initial-bootstrap/v2",
+        "asservat-initial-bootstrap/v3",
+        "asservat-initial-bootstrap/v4"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 30
+    },
+    "bootstrapNamespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "targetNamespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "image": {
+      "type": "string",
+      "maxLength": 1024,
+      "pattern": "^[^\\s]+@sha256:[a-f0-9]{64}$"
+    },
+    "administrators": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard/properties/administrators"
+    },
+    "probeAudience": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json#/properties/kubernetes"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json#/properties/postgres"
+    },
+    "auditStore": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json#/properties/auditStore"
+    },
+    "keyService": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json#/properties/keyService"
+    },
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "clients",
+        "subjects",
+        "groups",
+        "deliveryProfiles",
+        "maxActiveBootstraps",
+        "maxBootstrapHistory",
+        "maxClusters"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "clients": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1
+        },
+        "subjects": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "kind": {
+                "enum": [
+                  "human",
+                  "workload"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ]
+          }
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "deliveryProfiles": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "maxActiveBootstraps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "maxBootstrapHistory": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "maxClusters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuerPolicy",
+        "wrapRole",
+        "wrapPolicy",
+        "unwrapRole",
+        "unwrapPolicy"
+      ],
+      "properties": {
+        "issuerPolicy": {
+          "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/$defs/providerName"
+        },
+        "wrapRole": {
+          "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/$defs/providerName"
+        },
+        "wrapPolicy": {
+          "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/$defs/providerName"
+        },
+        "unwrapRole": {
+          "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/$defs/providerName"
+        },
+        "unwrapPolicy": {
+          "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/$defs/providerName"
+        }
+      },
+      "description": "All five names must be distinct; runtime validation checks cross-field uniqueness before bootstrap effects."
+    },
+    "registryAuthentication": {
+      "const": "dockerconfigjson/v1",
+      "description": "Fresh v3/v4 only. Exact provider projection supplies the pinned activation image registry; credential data remains private."
+    }
+  },
+  "$defs": {
+    "providerName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "registryAuthentication"
+        ]
+      },
+      "then": {
+        "properties": {
+          "format": {
+            "enum": [
+              "asservat-initial-bootstrap/v3",
+              "asservat-initial-bootstrap/v4"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

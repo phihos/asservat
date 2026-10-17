@@ -1,0 +1,6 @@
+{
+  "path": "test/fixtures/sql/runtime-roles.sql",
+  "baseSHA256": "f22a6ad9a579fba303af5248145689db6c90970c186584b2c0a6c066e0ec43a4",
+  "payloadSHA256": "18405c9b5993749d67d4adfaa596b65750babf190deb593709459c5068de61c1",
+  "reason": "Real full-custody run denied ReadManagedCapacityAdmission for capture_operation_admit_runtime. Match existing production capture-admit grant at public_runtime_role_plan.go:103; no runtime grant change."
+}

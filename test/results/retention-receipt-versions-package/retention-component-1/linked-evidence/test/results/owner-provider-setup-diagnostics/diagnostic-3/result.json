@@ -1,0 +1,472 @@
+{
+  "container": "asservat-setup-shape-4ae34923a7bd",
+  "image": "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf",
+  "observations": [
+    {
+      "path": "auth/owner-auth/config",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "disable_iss_validation": true,
+        "disable_local_ca_jwt": true,
+        "issuer": "",
+        "kubernetes_ca_cert": "-----BEGIN CERTIFICATE-----\nMIIBRjCB7aADAgECAgMBfQ8wCgYIKoZIzj0EAwIwADAeFw0yNjEwMTMwMjI4MzNa\nFw0yNjEwMTMwMzI5MzNaMAAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATqDdCa\n/ruGvXmw/rw2/mSFXoevPXQoKi1ddm6A9i06WkJ5scFGCgsCM4ElHgwsfTzyZxu2\n47KAzXQJZPlHHmQxo1YwVDAOBgNVHQ8BAf8EBAMCAoQwDwYDVR0TAQH/BAUwAwEB\n/zAdBgNVHQ4EFgQU/KhGmseWHh7JyAgFKrpdiM1XsT4wEgYDVR0RAQH/BAgwBocE\nfwAAATAKBggqhkjOPQQDAgNIADBFAiBfA4t6/HNdihf5y1MXNXKDGpdcWYAab9VU\nd/zR7EdEHwIhALiYly+FrxK1XRTiZJYOPAhs4hfZsYYxbipqQZX2/NHh\n-----END CERTIFICATE-----\n",
+        "kubernetes_host": "https://kubernetes.invalid",
+        "pem_keys": [],
+        "token_reviewer_jwt_set": true
+      }
+    },
+    {
+      "path": "auth/owner-auth/role/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-unwrap",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "alias_name_source": "serviceaccount_uid",
+        "audience": "https://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/owner-provider/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1",
+        "bound_service_account_names": [
+          "owner"
+        ],
+        "bound_service_account_namespace_selector": "",
+        "bound_service_account_namespaces": [
+          "original-hub"
+        ],
+        "token_bound_cidrs": [],
+        "token_explicit_max_ttl": 900,
+        "token_max_ttl": 900,
+        "token_no_default_policy": true,
+        "token_num_uses": 0,
+        "token_period": 0,
+        "token_policies": [
+          "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-unwrap"
+        ],
+        "token_strictly_bind_ip": false,
+        "token_ttl": 300,
+        "token_type": "service"
+      }
+    },
+    {
+      "path": "auth/owner-auth/role/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-wrap",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "alias_name_source": "serviceaccount_uid",
+        "audience": "https://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/owner-provider/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1",
+        "bound_service_account_names": [
+          "owner"
+        ],
+        "bound_service_account_namespace_selector": "",
+        "bound_service_account_namespaces": [
+          "original-hub"
+        ],
+        "token_bound_cidrs": [],
+        "token_explicit_max_ttl": 900,
+        "token_max_ttl": 900,
+        "token_no_default_policy": true,
+        "token_num_uses": 0,
+        "token_period": 0,
+        "token_policies": [
+          "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-wrap"
+        ],
+        "token_strictly_bind_ip": false,
+        "token_ttl": 300,
+        "token_type": "service"
+      }
+    },
+    {
+      "path": "auth/owner-auth/role/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-client-sign",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "alias_name_source": "serviceaccount_uid",
+        "audience": "https://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/owner-provider/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1",
+        "bound_service_account_names": [
+          "owner"
+        ],
+        "bound_service_account_namespace_selector": "",
+        "bound_service_account_namespaces": [
+          "original-hub"
+        ],
+        "token_bound_cidrs": [],
+        "token_explicit_max_ttl": 900,
+        "token_max_ttl": 900,
+        "token_no_default_policy": true,
+        "token_num_uses": 0,
+        "token_period": 0,
+        "token_policies": [
+          "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-client-sign"
+        ],
+        "token_strictly_bind_ip": false,
+        "token_ttl": 300,
+        "token_type": "service"
+      }
+    },
+    {
+      "path": "auth/owner-auth/role/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-server-sign",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "alias_name_source": "serviceaccount_uid",
+        "audience": "https://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/owner-provider/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1",
+        "bound_service_account_names": [
+          "owner"
+        ],
+        "bound_service_account_namespace_selector": "",
+        "bound_service_account_namespaces": [
+          "original-hub"
+        ],
+        "token_bound_cidrs": [],
+        "token_explicit_max_ttl": 900,
+        "token_max_ttl": 900,
+        "token_no_default_policy": true,
+        "token_num_uses": 0,
+        "token_period": 0,
+        "token_policies": [
+          "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-server-sign"
+        ],
+        "token_strictly_bind_ip": false,
+        "token_ttl": 300,
+        "token_type": "service"
+      }
+    },
+    {
+      "path": "pki/cert/ca",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "certificate": "-----BEGIN CERTIFICATE-----\nMIIByjCCAW+gAwIBAgIUaSfjDZReXo08LcwO+uRL+NtIhCcwCgYIKoZIzj0EAwIw\nIDEeMBwGA1UEAxMVc3ludGhldGljLXNldHVwLXByb2JlMB4XDTI2MTAxMzAyMjk1\nMFoXDTI2MTAxMzAzMzAyMFowIDEeMBwGA1UEAxMVc3ludGhldGljLXNldHVwLXBy\nb2JlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYf2dalPl6RM0nOz2HKiq+/Fa\nKtjicl/7Tj5TPMuWOrv2+vACWcLquWq05tBPokXgzfqnvY1rGOzNqhsJcK9MdKOB\nhjCBgzAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQU\nIJrKeska/gb3z9r8WqdC5t4nslUwHwYDVR0jBBgwFoAUIJrKeska/gb3z9r8WqdC\n5t4nslUwIAYDVR0RBBkwF4IVc3ludGhldGljLXNldHVwLXByb2JlMAoGCCqGSM49\nBAMCA0kAMEYCIQDbhtm28alsvo46zFhmrHQ4IzttWGv8G2QyMYwroKCgqQIhAI+Y\no74BQyESYkBBSWINceGLT7U9GQ1xIrTfgJ0pDlWA\n-----END CERTIFICATE-----",
+        "revocation_time": 0,
+        "revocation_time_rfc3339": ""
+      }
+    },
+    {
+      "path": "pki/roles/client",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_any_name": false,
+        "allow_bare_domains": false,
+        "allow_glob_domains": false,
+        "allow_globs_in_identity_templates": false,
+        "allow_ip_sans": false,
+        "allow_localhost": false,
+        "allow_subdomains": false,
+        "allow_token_displayname": false,
+        "allow_wildcard_certificates": false,
+        "allowed_domains": [],
+        "allowed_domains_template": false,
+        "allowed_ip_sans_cidr": [],
+        "allowed_other_sans": [],
+        "allowed_serial_numbers": [],
+        "allowed_uri_sans": [
+          "spiffe://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/hub/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1/issuer/4b44f0b1-0967-4597-b4a6-979399559201/pod/*/process/*"
+        ],
+        "allowed_uri_sans_template": false,
+        "allowed_user_ids": [],
+        "basic_constraints_valid_for_non_ca": true,
+        "client_flag": true,
+        "cn_validations": [
+          "email",
+          "hostname"
+        ],
+        "code_signing_flag": false,
+        "country": [],
+        "email_protection_flag": false,
+        "enforce_hostnames": true,
+        "ext_key_usage": [],
+        "ext_key_usage_oids": [],
+        "generate_lease": false,
+        "issuer_ref": "default",
+        "key_bits": 256,
+        "key_type": "ec",
+        "key_usage": [
+          "DigitalSignature"
+        ],
+        "locality": [],
+        "max_ttl": 1260,
+        "no_store": false,
+        "not_after": "",
+        "not_after_bound": "ttl-limited",
+        "not_before": "",
+        "not_before_bound": "forbid",
+        "not_before_duration": 30,
+        "organization": [],
+        "ou": [],
+        "policy_identifiers": [],
+        "postal_code": [],
+        "province": [],
+        "require_cn": false,
+        "server_flag": false,
+        "signature_bits": 0,
+        "street_address": [],
+        "ttl": 1260,
+        "use_csr_common_name": false,
+        "use_csr_sans": false,
+        "use_pss": false
+      }
+    },
+    {
+      "path": "pki/roles/server",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_any_name": false,
+        "allow_bare_domains": true,
+        "allow_glob_domains": true,
+        "allow_globs_in_identity_templates": false,
+        "allow_ip_sans": false,
+        "allow_localhost": false,
+        "allow_subdomains": false,
+        "allow_token_displayname": false,
+        "allow_wildcard_certificates": false,
+        "allowed_domains": [
+          "p-*.e-*.hub.b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1.asservat.0705b266-4cc6-4dfd-a445-b30017dc2623",
+          "s-13e3def3-f72e-4521-89e6-24a5781fc608.e-4b44f0b1-0967-4597-b4a6-979399559201.hub-bootstrap.b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1.asservat.0705b266-4cc6-4dfd-a445-b30017dc2623"
+        ],
+        "allowed_domains_template": false,
+        "allowed_ip_sans_cidr": [],
+        "allowed_other_sans": [],
+        "allowed_serial_numbers": [],
+        "allowed_uri_sans": [
+          "spiffe://asservat.0705b266-4cc6-4dfd-a445-b30017dc2623/hub/b9c67d6f-cc85-4a86-a21d-d7f375d2e5e1/issuer/4b44f0b1-0967-4597-b4a6-979399559201/pod/*/process/*"
+        ],
+        "allowed_uri_sans_template": false,
+        "allowed_user_ids": [],
+        "basic_constraints_valid_for_non_ca": true,
+        "client_flag": false,
+        "cn_validations": [
+          "email",
+          "hostname"
+        ],
+        "code_signing_flag": false,
+        "country": [],
+        "email_protection_flag": false,
+        "enforce_hostnames": true,
+        "ext_key_usage": [],
+        "ext_key_usage_oids": [],
+        "generate_lease": false,
+        "issuer_ref": "default",
+        "key_bits": 256,
+        "key_type": "ec",
+        "key_usage": [
+          "DigitalSignature"
+        ],
+        "locality": [],
+        "max_ttl": 1260,
+        "no_store": false,
+        "not_after": "",
+        "not_after_bound": "ttl-limited",
+        "not_before": "",
+        "not_before_bound": "forbid",
+        "not_before_duration": 30,
+        "organization": [],
+        "ou": [],
+        "policy_identifiers": [],
+        "postal_code": [],
+        "province": [],
+        "require_cn": false,
+        "server_flag": true,
+        "signature_bits": 0,
+        "street_address": [],
+        "ttl": 1260,
+        "use_csr_common_name": false,
+        "use_csr_sans": false,
+        "use_pss": false
+      }
+    },
+    {
+      "path": "sys/mounts/auth/owner-auth",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "auth_kubernetes_b04e5613",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0,
+          "token_type": "default-service"
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "kubernetes",
+        "uuid": "0e2de861-df19-f473-370f-b38d355ad853"
+      }
+    },
+    {
+      "path": "sys/mounts/pki",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "pki_525d78d0",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "pki",
+        "uuid": "6cbb7b69-ac19-064e-47d8-62d0c85acf69"
+      }
+    },
+    {
+      "path": "sys/mounts/transit",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "transit_62c5608b",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "transit",
+        "uuid": "4319f252-4c89-4469-3f18-9c988896009a"
+      }
+    },
+    {
+      "path": "sys/policies/acl/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-unwrap",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_slashes_in_identity_templates": false,
+        "allow_wildcards_in_identity_templates": false,
+        "cas_required": false,
+        "modified": "2026-10-13T02:30:20.535413103Z",
+        "name": "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-unwrap",
+        "policy": "{\"path\": {\"auth/token/lookup-self\": {\"capabilities\": [\"read\"]}, \"auth/token/renew-self\": {\"capabilities\": [\"update\"]}, \"auth/token/revoke-self\": {\"capabilities\": [\"update\"]}, \"transit/decrypt/audit\": {\"capabilities\": [\"update\"]}}}",
+        "version": 1
+      }
+    },
+    {
+      "path": "sys/policies/acl/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-wrap",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_slashes_in_identity_templates": false,
+        "allow_wildcards_in_identity_templates": false,
+        "cas_required": false,
+        "modified": "2026-10-13T02:30:20.3232792Z",
+        "name": "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-audit-wrap",
+        "policy": "{\"path\": {\"auth/token/lookup-self\": {\"capabilities\": [\"read\"]}, \"auth/token/renew-self\": {\"capabilities\": [\"update\"]}, \"auth/token/revoke-self\": {\"capabilities\": [\"update\"]}, \"transit/encrypt/audit\": {\"capabilities\": [\"update\"]}}}",
+        "version": 1
+      }
+    },
+    {
+      "path": "sys/policies/acl/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-client-sign",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_slashes_in_identity_templates": false,
+        "allow_wildcards_in_identity_templates": false,
+        "cas_required": false,
+        "modified": "2026-10-13T02:30:20.96017616Z",
+        "name": "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-client-sign",
+        "policy": "{\"path\": {\"auth/token/lookup-self\": {\"capabilities\": [\"read\"]}, \"auth/token/renew-self\": {\"capabilities\": [\"update\"]}, \"auth/token/revoke-self\": {\"capabilities\": [\"update\"]}, \"pki/sign/client\": {\"capabilities\": [\"update\"]}}}",
+        "version": 1
+      }
+    },
+    {
+      "path": "sys/policies/acl/asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-server-sign",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_slashes_in_identity_templates": false,
+        "allow_wildcards_in_identity_templates": false,
+        "cas_required": false,
+        "modified": "2026-10-13T02:30:20.747606486Z",
+        "name": "asservat-owner-2048a31e186c2e8aa1cbd1da40bd09fbd6d5bed16c35ef8530033de4cd1aa2b5-server-sign",
+        "policy": "{\"path\": {\"auth/token/lookup-self\": {\"capabilities\": [\"read\"]}, \"auth/token/renew-self\": {\"capabilities\": [\"update\"]}, \"auth/token/revoke-self\": {\"capabilities\": [\"update\"]}, \"pki/sign/server\": {\"capabilities\": [\"update\"]}}}",
+        "version": 1
+      }
+    },
+    {
+      "path": "transit/keys/audit",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_plaintext_backup": false,
+        "auto_rotate_period": 0,
+        "deletion_allowed": false,
+        "derived": false,
+        "exportable": false,
+        "imported_key": false,
+        "keys": {
+          "1": 1791858619
+        },
+        "latest_version": 1,
+        "min_available_version": 0,
+        "min_decryption_version": 1,
+        "min_encryption_version": 0,
+        "name": "audit",
+        "soft_deleted": false,
+        "supports_decryption": true,
+        "supports_derivation": true,
+        "supports_encryption": true,
+        "supports_signing": false,
+        "type": "aes256-gcm96"
+      }
+    }
+  ],
+  "cleanupFailures": [],
+  "signingBounds": [
+    {
+      "case": "within-early-renewal-maximum",
+      "exit": 0,
+      "expectedExit": 0,
+      "stderr": "",
+      "publicCertificate": "-----BEGIN CERTIFICATE-----\nMIIDOjCCAuCgAwIBAgIUEMinSoV3kin9+DkWI0Cy8laLSM0wCgYIKoZIzj0EAwIw\nIDEeMBwGA1UEAxMVc3ludGhldGljLXNldHVwLXByb2JlMB4XDTI2MTAxMzAyMjk1\nM1oXDTI2MTAxMzAyNTA1M1owADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABC8k\n5yZhQgP3RQrCkNh3JQdWSa0IAWb5Sk3jPVuwtrFDuN6Bi0+dHK0VMEgqYAVgJFaw\nMjrBWIVGFkV9eToRA5OjggIWMIICEjAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAww\nCgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQU9Vt9ACXVkA30tND4\nKUkKIJfsb0gwHwYDVR0jBBgwFoAUIJrKeska/gb3z9r8WqdC5t4nslUwggGbBgNV\nHREBAf8EggGPMIIBi4KBpHAtMjQ4NGUyNTUtNDk4ZC00ZWY1LTkwNTItOTMyOGUx\nMGEwMzAxLmUtYzhlNTA5YjQtNmMyYy00ODViLWJlNmYtMjMyNDA2MTIxMjFiLmh1\nYi5iOWM2N2Q2Zi1jYzg1LTRhODYtYTIxZC1kN2YzNzVkMmU1ZTEuYXNzZXJ2YXQu\nMDcwNWIyNjYtNGNjNi00ZGZkLWE0NDUtYjMwMDE3ZGMyNjIzhoHhc3BpZmZlOi8v\nYXNzZXJ2YXQuMDcwNWIyNjYtNGNjNi00ZGZkLWE0NDUtYjMwMDE3ZGMyNjIzL2h1\nYi9iOWM2N2Q2Zi1jYzg1LTRhODYtYTIxZC1kN2YzNzVkMmU1ZTEvaXNzdWVyLzRi\nNDRmMGIxLTA5NjctNDU5Ny1iNGE2LTk3OTM5OTU1OTIwMS9wb2QvMjQ4NGUyNTUt\nNDk4ZC00ZWY1LTkwNTItOTMyOGUxMGEwMzAxL3Byb2Nlc3MvYzhlNTA5YjQtNmMy\nYy00ODViLWJlNmYtMjMyNDA2MTIxMjFiMAoGCCqGSM49BAMCA0gAMEUCIHiGfHPT\n60Or9tVnyUFWgfDCVQ3/MUdawMFLMU7wY785AiEA/FOh5Vwm8NYI1J14PcQT9OQC\nLCzTo8J+M4Bywp+6yag=\n-----END CERTIFICATE-----"
+    },
+    {
+      "case": "beyond-maximum",
+      "exit": 2,
+      "expectedExit": 2,
+      "stderr": "Error writing data to pki/sign/server: Error making API request.\n\nURL: PUT http://127.0.0.1:8200/v1/pki/sign/server\nCode: 400. Errors:\n\n* not_after_bound is set to ttl-limited. Cannot satisfy request as that would result in notAfter of 2026-10-13T02:52:23Z that is beyond the TTL of 21m0s\n"
+    },
+    {
+      "case": "caller-selected-not-before",
+      "exit": 2,
+      "expectedExit": 2,
+      "stderr": "Error writing data to pki/sign/server: Error making API request.\n\nURL: PUT http://127.0.0.1:8200/v1/pki/sign/server\nCode: 400. Errors:\n\n* not_before_bound is set to forbid. not_before cannot be provided.\n"
+    }
+  ],
+  "exit": 0
+}

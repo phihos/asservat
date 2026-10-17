@@ -1,0 +1,6 @@
+{
+  "go": "go version go1.27.1-X:nodwarf5 linux/amd64",
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+  "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
+  "helperELF": "/home/phil/.cache/asservat-control-crash-20261009/helper-target/release/asservat-crash-spike: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), static-pie linked, for GNU/Linux 6.1.0, BuildID[sha1]=e5f58477a27f54aa7334a89f4ff347a1acae0b0c, stripped"
+}

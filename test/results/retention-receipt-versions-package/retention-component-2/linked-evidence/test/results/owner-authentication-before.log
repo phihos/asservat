@@ -1,0 +1,9 @@
+# asservat.local/asservat/internal/application/fleet [asservat.local/asservat/internal/application/fleet.test]
+internal/application/fleet/owner_authentication_test.go:17:74: undefined: value.OwnerProtection
+internal/application/fleet/owner_authentication_test.go:18:97: undefined: value.OwnerProtection
+internal/application/fleet/owner_authentication_test.go:38:7: undefined: OwnerAuthenticator
+internal/application/fleet/owner_authentication_test.go:45:89: undefined: value.OwnerProtection
+internal/application/fleet/owner_authentication_test.go:46:25: undefined: value.OwnerProtection
+internal/application/fleet/owner_authentication_test.go:62:81: undefined: value.AuthenticatedOwner
+FAIL	asservat.local/asservat/internal/application/fleet [build failed]
+FAIL

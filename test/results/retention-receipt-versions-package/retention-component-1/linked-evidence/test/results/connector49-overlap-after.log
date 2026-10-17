@@ -1,0 +1,15 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+    connector_identity_test.go:404: ERROR: role "ci_100000000000_source" already exists (SQLSTATE 42710)
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+    connector_identity_test.go:404: ERROR: role "ci_100000000000_source" already exists (SQLSTATE 42710)
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:442: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+--- FAIL: TestContextAdmissionWithRealServices (2.26s)
+    --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast (1.92s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.12s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.11s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.309s
+FAIL

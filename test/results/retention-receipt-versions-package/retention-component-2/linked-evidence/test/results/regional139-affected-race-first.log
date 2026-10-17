@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/bootstrap	9.716s
+--- FAIL: TestNativeSharedPortActualH2StandbyAndIndependentPurpose (10.60s)
+    server_context_test.go:153: native purpose did not use exact unchanged handler native exchange unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	12.858s
+FAIL

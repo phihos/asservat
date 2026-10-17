@@ -1,0 +1,96 @@
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/finite
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v1
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v2
+--- PASS: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority (0.10s)
+    --- PASS: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/finite (0.04s)
+    --- PASS: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v1 (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v2 (0.03s)
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/wrong-name
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:49106: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/wrong-roots
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:43200: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/excluded-candidate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/wrong-name
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:51620: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/wrong-roots
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:41706: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/excluded-candidate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/wrong-name
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:38850: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/wrong-roots
+2026/10/13 21:47:07 http: TLS handshake error from 127.0.0.1:37612: remote error: tls: bad certificate
+=== RUN   TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/excluded-candidate
+--- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial (0.23s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/wrong-name (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/wrong-roots (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/finite/excluded-candidate (0.02s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/wrong-name (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/wrong-roots (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v1/excluded-candidate (0.02s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/wrong-name (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/wrong-roots (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial/v2/excluded-candidate (0.02s)
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/finite/redirect
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/finite/unavailable
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v1/redirect
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v1/unavailable
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v2/redirect
+=== RUN   TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v2/unavailable
+--- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST (0.18s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/finite/redirect (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/finite/unavailable (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v1/redirect (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v1/unavailable (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v2/redirect (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST/v2/unavailable (0.03s)
+=== RUN   TestOwnerObservationTranslatedDialCancellationJoins
+=== RUN   TestOwnerObservationTranslatedDialCancellationJoins/finite
+=== RUN   TestOwnerObservationTranslatedDialCancellationJoins/v1
+=== RUN   TestOwnerObservationTranslatedDialCancellationJoins/v2
+--- PASS: TestOwnerObservationTranslatedDialCancellationJoins (0.09s)
+    --- PASS: TestOwnerObservationTranslatedDialCancellationJoins/finite (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialCancellationJoins/v1 (0.03s)
+    --- PASS: TestOwnerObservationTranslatedDialCancellationJoins/v2 (0.03s)
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/#00
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/https://localhost:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:0
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:65536
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:-1
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:nope
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:1.5
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost:1e3
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost/path:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/localhost_:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/user@localhost:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/[fe80::1%eth0]:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/127.0.0.1:9444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/127.0.0.1:30444
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/example.invalid:443
+=== RUN   TestOwnerObservationDialConstructorStillBoundsInput/[::1]:65535
+--- PASS: TestOwnerObservationDialConstructorStillBoundsInput (0.02s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/#00 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/https://localhost:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:0 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:65536 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:-1 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:nope (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:1.5 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost:1e3 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost/path:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/localhost_:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/user@localhost:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/[fe80::1%eth0]:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/127.0.0.1:9444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/127.0.0.1:30444 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/example.invalid:443 (0.00s)
+    --- PASS: TestOwnerObservationDialConstructorStillBoundsInput/[::1]:65535 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	1.650s

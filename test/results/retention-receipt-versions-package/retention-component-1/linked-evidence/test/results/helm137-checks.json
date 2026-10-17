@@ -1,0 +1,78 @@
+{
+  "format": "asservat-staged-checks/v1",
+  "native_qualification": "not run",
+  "checks": [
+    {
+      "handle": 33180,
+      "exit": 1,
+      "expected": "failing-before",
+      "log": "registry-before.log",
+      "command": "go test -count=1 -run '^TestInitialRegistryRequestedActivationPullIsNotSilentlyOmitted$' ./internal/adapters/kubernetes"
+    },
+    {
+      "handle": 80858,
+      "exit": 0,
+      "log": "first-race.log",
+      "scope": "first affected six-package selection; PublicCompiler separately selected below"
+    },
+    {
+      "handle": 11133,
+      "exit": 1,
+      "log": "helm-first.log",
+      "scope": "synthetic subject fixture used wrong preexisting DTO shape; fixture corrected only"
+    },
+    {
+      "handle": 63331,
+      "exit": 0,
+      "log": "helm-second.log",
+      "scope": "first offline Helm schema/render/package"
+    },
+    {
+      "handle": 93383,
+      "exit": 0,
+      "logs": [
+        "compiler-race.log",
+        "first-vet.log"
+      ],
+      "scope": "explicit PublicCompiler race PASS plus affected vet"
+    },
+    {
+      "handle": 51837,
+      "exit": 0,
+      "logs": [
+        "spec-first.log",
+        "architecture-first.log"
+      ],
+      "scope": "initial spec and Go layer checks"
+    },
+    {
+      "handle": 25854,
+      "exit": 0,
+      "logs": [
+        "final-integration-compile.log",
+        "final-race.log",
+        "final-vet.log"
+      ],
+      "script": "final-check.sh",
+      "scope": "native source compile only, final narrow races and affected vet; no native test executed"
+    },
+    {
+      "handle": 65603,
+      "exit": 0,
+      "logs": [
+        "final-fixture-selection.log",
+        "final-helm.log",
+        "final-spec.log",
+        "final-architecture.log",
+        "final-design.log"
+      ],
+      "scope": "offline Python/Helm/spec/catalog/design; no Go or native lab"
+    },
+    {
+      "exec_chunk": "d239ca",
+      "exit": 0,
+      "log": "final-registry-cleanup.log",
+      "scope": "three final pure registry/selection/cleanup regressions after explicit cleanup reporting addition"
+    }
+  ]
+}

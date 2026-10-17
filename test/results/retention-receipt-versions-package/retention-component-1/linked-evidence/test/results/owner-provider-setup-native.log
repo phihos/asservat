@@ -1,0 +1,17 @@
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/four-standard-logins-and-renewals
+    owner_provider_native_test.go:49: audit-wrap actual standard login+renewal 0.018s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: audit-unwrap actual standard login+renewal 0.009s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: server-sign actual standard login+renewal 0.009s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: client-sign actual standard login+renewal 0.009s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/first-effects-and-cross-purpose-denials
+    owner_provider_native_test.go:54: real generated four-purpose ACLs permit their first exact Transit/PKI effect and deny every other purpose and token creation; no installed effect authority inferred
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/leased-maintained-effects-and-joined-retirement
+    owner_provider_native_test.go:57: actual named provider setup reads provider setup unavailable or does not match the selected profile: authentication mount
+--- FAIL: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao (0.45s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/four-standard-logins-and-renewals (0.05s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/first-effects-and-cross-purpose-denials (0.06s)
+    --- FAIL: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/leased-maintained-effects-and-joined-retirement (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.495s
+FAIL

@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/privacy-common.schema.json",
+  "title": "Asservat privacy-common v1",
+  "$defs": {
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "potentialPersonalData",
+            "personalData",
+            "specialCategoryPossible",
+            "verifiedNonPersonal"
+          ]
+        },
+        "evidenceType": {
+          "type": "string",
+          "enum": [
+            "coreDump",
+            "heapDump",
+            "packetCapture",
+            "logs",
+            "files",
+            "profile",
+            "commandOutput",
+            "context",
+            "other",
+            "syscallTrace"
+          ]
+        },
+        "purposeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "classificationSource": {
+          "type": "string",
+          "enum": [
+            "default",
+            "protectedWorkload",
+            "reviewedTransform",
+            "inherited"
+          ]
+        },
+        "assessmentRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "classification",
+        "evidenceType",
+        "purposeRef",
+        "classificationSource"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "verifiedNonPersonal"
+              }
+            },
+            "required": [
+              "classification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "classificationSource": {
+                "const": "reviewedTransform"
+              }
+            },
+            "required": [
+              "assessmentRef"
+            ]
+          }
+        }
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "anchorAt": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "anchorBasis": {
+          "type": "string",
+          "enum": [
+            "acquisition",
+            "sourceCreation",
+            "oldestRingSegment",
+            "parent"
+          ]
+        },
+        "requestedAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 315360000
+        },
+        "resolvedMaxAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 315360000
+        },
+        "deletionBudgetSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "deleteBy": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "policyRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "digest": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+              }
+            },
+            "required": [
+              "uid",
+              "generation",
+              "digest"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "parentExpiresAt": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "parentDeleteBy": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        }
+      },
+      "required": [
+        "anchorAt",
+        "anchorBasis",
+        "requestedAgeSeconds",
+        "resolvedMaxAgeSeconds",
+        "deletionBudgetSeconds",
+        "deleteBy",
+        "policyRefs"
+      ]
+    }
+  }
+}

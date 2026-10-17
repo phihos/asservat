@@ -1,0 +1,52 @@
+apiVersion: asservat.io/v1alpha1
+kind: CaptureProfile
+metadata:
+  name: process-context-v1
+  namespace: asservat-builtin-profiles
+spec:
+  name: process-context
+  version: v1
+  definition:
+    displayName: Process and socket context
+    description: Process and socket context without arguments, environment or attachment.
+    recipe:
+      description: Process and socket context without arguments, environment or attachment.
+      actions:
+      - id: processes
+        kind: processSnapshot
+        parameters:
+          include:
+          - identity
+          - status
+          - cgroups
+        required: true
+        impact: observe
+        limits:
+          maxBytes: 1048576
+          timeout: 5s
+        executionMode: onTrigger
+      - id: sockets
+        kind: networkSnapshot
+        parameters:
+          include:
+          - sockets
+          - counters
+          - socketOwners
+        required: false
+        impact: observe
+        limits:
+          maxBytes: 1048576
+          timeout: 5s
+        executionMode: onTrigger
+      maxTotalBytes: 2097152
+      maxDuration: 10s
+    editableFields:
+    - actionID: processes
+      field: actionMaxBytes
+      label: Process output limit
+    - actionID: sockets
+      field: actionMaxBytes
+      label: Socket output limit
+  availability:
+    enabled: true
+    deprecated: false

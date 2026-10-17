@@ -1,0 +1,15 @@
+{
+  "scope": "test-only ADR134 request boundary diagnostics",
+  "files": [
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "base_sha256": "70125639dccfaf7561e6417fa1f1e6a4d5c24aaa35a020f9c2119c7f623b16d3",
+      "sha256": "752964ed5e69bdd8713397226dca3fa16fa76d444a5f6078ade5b0d0f12d242f"
+    },
+    {
+      "path": "test/integration/context_continuation_native_test.go",
+      "base_sha256": "d82c5fa2a08fce297021a678849d91f7aad22cbfc3d4736c5d5c785ec15fcb91",
+      "sha256": "8e36ef5f0ffa61e02abb6b73ab8828bc34703679dd389aa9e8afc4150623cf25"
+    }
+  ]
+}

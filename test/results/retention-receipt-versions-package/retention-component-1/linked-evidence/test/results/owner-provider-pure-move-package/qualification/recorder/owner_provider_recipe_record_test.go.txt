@@ -1,0 +1,53 @@
+package kms
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+)
+
+// Disposable recorder: run only against the unchanged original production
+// recipe function, before the pure-move overlay. It is not an integration file.
+func TestRecordOriginalOwnerProviderRecipeGolden(t *testing.T) {
+	directory := os.Getenv("ASSERVAT_RECIPE_GOLDEN_OUTPUT")
+	if directory == "" {
+		t.Fatal("explicit create-only output directory required")
+	}
+	raw, err := os.ReadFile(filepath.Join(directory, "inputs.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name                      string
+		Now                       time.Time
+		Input                     contracts.OwnerDeployment
+		Account, AuditCredentials contracts.WorkerObjectReference
+		Mount, Accessor           string
+	}
+	if json.Unmarshal(raw, &cases) != nil || len(cases) != 5 {
+		t.Fatal("public fixed corpus")
+	}
+	for _, c := range cases {
+		result, err := OwnerProviderRecipeFor(c.Input, c.Mount, c.Accessor, c.Account, c.AuditCredentials, c.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err := os.OpenFile(filepath.Join(directory, c.Name+".json"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, writeErr := f.Write(append(raw, '\n'))
+		closeErr := f.Close()
+		if writeErr != nil || closeErr != nil {
+			t.Fatal(writeErr, closeErr)
+		}
+	}
+}

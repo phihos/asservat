@@ -1,0 +1,44 @@
+{
+  "name": "owner",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair",
+    "--runtime-provider-worker",
+    "--runtime-provider-owner"
+  ],
+  "exit": 1,
+  "seconds": 470.467,
+  "diskBeforeBytes": 423974764544,
+  "sourceSnapshotUnchanged": true,
+  "requiredPassedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "missingRequiredTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity"
+  ],
+  "validationErrors": [
+    "native test exit missing or nonzero",
+    "missing required selected PASS names"
+  ],
+  "harnessSourceMismatches": [],
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "testExit": 1,
+  "archiveHashes": {
+    "harness.log": "7200312114c4ba2fd2efd8a11ddb3372f9fd9d5bc92c00944e966838822ac3b8",
+    "context-storage.log": "e751cc62860242e8e67d0bf624cb0f519e2ad9f1765299643df6236d0d546b2f",
+    "context-storage-environment.json": "e94c45752e2c490d0c3b9c597f5d9c6efb5d5c1ffac0da98a9da5b7506e784ba",
+    "context-storage-kubelet.log": "eddfbcefeee66463577254b3c2c3ea4af4694048648ece49417366f7449d196a",
+    "context-storage-postgres.log": "fd8d596d50d7911e941f9778db72cfc7bbb4adf063f27e9b9fed5c982d19dc55"
+  }
+}

@@ -1,0 +1,15 @@
+# Inventory component handoff
+
+Three new objectstore adapter/test paths; no live edits, schema, role, input, public route, producer, retirement or refund changes. The concrete read-only diagnostic binds historical original owner configuration and StoreID plus a separately credentialed Store. Three first-page LISTs each use the exact original derived key prefix and at most 128 rows under the caller-shortened original five-second interval. Generation neighbors are excluded without losing truncation; actual versions/null/zero bytes/markers/uploads remain distinct. Failed later reads return validated earlier entries with an error and incomplete flags.
+
+Session 22314 completed with actual exit 0. Compile 10.380s; four selected regressions failed as intended against the prior unrun draft (1.516s); corrected races 21.344s; vet 1.366s; Go architecture 0.815s. Ten top-level and 42 named race passes. The negative variant is controlled prior-draft evidence, not a prior production vulnerability claim.
+
+Exact source manifest: ecfa23db4b82a5400a6a8bb7717e31f592818ea45b37a31e9bed319b3026c53e.
+2,299 dependencies: 7686b652d43ea65b307c05dd4cdaea3e16fe948c637f3288dd2b64036e831e22.
+Runner: 1f0493fde446d6b341fce12bb82ef4fb8a5408b45efa0ca0c635a51ca1c63759.
+Result: f1ae091eb208c5b9f6491b3212a2a830d7148c608246d6ea2dbe4b5a0b04cd03.
+All payload/base/dependency/inventory hashes stayed exact; no mirror source changes; owned scratch removed after subprocess terminal. Logs and per-phase exits are in result.json and adjacent phase logs.
+
+This is component qualification against actual SDK and loopback TLS with synthetic responses. Native backend shape/scoped credential qualification, all-page inventory, durable physical accounting, writer quiescence, retirement and capacity release remain separate. No production caller is wired. The future original installer reserve and finite SQL29 acceptance rollover remain source design only.
+
+Next authorized work: stage one focused real SeaweedFS scoped-credential inventory fixture in the custody harness, without launching a native lab. Include several original-key versions, actual marker/upload, neighboring generations, historical expired source and independently checked bytes/counts. Preserve original five-second call bound and read-only credential behavior. Then submit the unchanged-source finite acceptance rollover contract before any reserve effects.

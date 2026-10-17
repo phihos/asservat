@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Run connector-identity-fast with ADR-168 checks once; parent owns the slot."""
+from pathlib import Path
+import hashlib, json, os, re, shutil, subprocess, sys, time
+ROOT = Path('/home/phil/Projekte/asservat'); CACHE = Path('/home/phil/.cache/asservat-build')
+assert len(sys.argv) == 3 and sys.argv[2] == '--parent-exclusive-slot-allocated'
+name = sys.argv[1]; assert re.fullmatch(r'[a-z0-9][a-z0-9-]*', name)
+MODES = ['connector-identity-fast']
+PATTERN = '^TestContextAdmissionWithRealServices$/^connector-identity-fast$'
+out = ROOT / 'test/results' / name; out.mkdir()
+tmp = CACHE / (name + '-tmp'); tmp.mkdir()
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+(out / 'runner.py').write_bytes(Path(__file__).read_bytes())
+env = dict(os.environ, GOMAXPROCS='2', GOFLAGS='-p=2', TMPDIR=str(tmp), ASSERVAT_BUILD_TMP=str(tmp), PYTHONDONTWRITEBYTECODE='1')
+for k in list(env):
+    if k.startswith('ASSERVAT_') and k != 'ASSERVAT_BUILD_TMP': del env[k]
+cmd = ['python3', 'scripts/test-custody.py', '--run', PATTERN]
+start = time.monotonic()
+with (out / 'gate.log').open('x') as log:
+    p = subprocess.run(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+report = {'command': cmd, 'exit': p.returncode, 'seconds': round(time.monotonic() - start, 3), 'requiredPassed': ['TestContextAdmissionWithRealServices/' + m for m in MODES]}
+for f in ('custody.log', 'custody-environment.json', 'custody-postgres.log'):
+    src = ROOT / 'test/results' / f
+    if src.exists() and src.stat().st_mtime > time.time() - report['seconds'] - 60:
+        shutil.copyfile(src, out / f)
+env_report = json.loads((out / 'custody-environment.json').read_text()) if (out / 'custody-environment.json').exists() else {}
+passed = set(env_report.get('passedTestNames', []))
+report['missing'] = [t for t in report['requiredPassed'] if t not in passed]
+report['cleanupFailures'] = env_report.get('cleanupFailures')
+report['sourceUnchangedDuringTest'] = env_report.get('sourceUnchangedDuringTest')
+shutil.rmtree(tmp, ignore_errors=True); report['scratchRemoved'] = not tmp.exists()
+report['status'] = 'passed' if p.returncode == 0 and not report['missing'] and report['cleanupFailures'] == [] and report['sourceUnchangedDuringTest'] else 'failed'
+(out / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
+print(json.dumps(report))
+sys.exit(0 if report['status'] == 'passed' else 1)

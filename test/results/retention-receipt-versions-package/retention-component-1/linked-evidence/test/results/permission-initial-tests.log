@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/domain/authorization	0.003s
+ok  	asservat.local/asservat/internal/application/authorization	0.003s
+ok  	asservat.local/asservat/internal/adapters/oidc	1.277s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.030s
+?   	asservat.local/asservat/internal/application/configuration	[no test files]
+?   	asservat.local/asservat/api/v1alpha1	[no test files]

@@ -1,0 +1,20 @@
+{
+  "scope": "fixture-only complete storage target and structural false-positive rejection for storage/legacy admission",
+  "files": [
+    {
+      "path": "test/integration/capacity_sql_matrix_test.go",
+      "base_sha256": "6854eaf76adf815f1f04c8d39a0ceeb65afd3204bde939452eee49715b1570fd",
+      "payload_sha256": "55f9656075af7f417b39e9d734fe42e570d88e509c2b15b73c84ea634fccc50d"
+    },
+    {
+      "path": "test/integration/capacity_storage_target_test.go",
+      "base_sha256": null,
+      "payload_sha256": "09406c7945649e02d92e75bac7873cb84501ba6fcd1daccecdf91530bdb71d82"
+    }
+  ],
+  "before": {
+    "test/integration/capacity_storage_target_test.go": "829ee2749851b2bdc11a841e5e0e9439e1ee06ae3e4e8bfa13982f00bf9c14c8"
+  },
+  "snapshot": "v2 after exact parent owner/workflow69 integration, same two payloads and original bases",
+  "prior_manifest_sha256": "3f7e5a4c104c35b3c82e8681cc5097d7d837534d4072c6a6ac04283c3ca558d6"
+}

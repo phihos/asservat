@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/domain/fleet	0.063s [no tests to run]
+ok  	asservat.local/asservat/internal/application/fleet	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.027s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/mtls	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.032s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.013s [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.012s [no tests to run]

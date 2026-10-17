@@ -1,0 +1,26 @@
+{
+  "scope": "SQL54 lifecycle policy UTC JSON producer correction; preserve exact SQL52 equality and original cutoffs",
+  "files": [
+    {
+      "path": "docs/architecture/capacity-production.md",
+      "base_sha256": "b6dffec22c5ce9e5c59a868f5ca55e3fde8e89459526213a88cd3f4745a4d178",
+      "payload_sha256": "3a721c305b827cb618beb2aa445600452d4625b4ebcbbc9e9151fb27d6dcf199"
+    },
+    {
+      "path": "migrations/00054_protected_capacity.sql",
+      "base_sha256": "5844e911703801290593c8df205975bafad7811f99323597e962e8d4919ae3b5",
+      "payload_sha256": "2431fb290d2613cbc6d96877c047813c54d9af85496c89c86b184d8ea7bd1b11"
+    },
+    {
+      "path": "test/integration/capacity_policy_time_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7b32e9a532dc59eb34793a1706c745da54412e94f61f2b41cffb0bedba917835"
+    },
+    {
+      "path": "test/integration/capacity_sql_matrix_test.go",
+      "base_sha256": "55f9656075af7f417b39e9d734fe42e570d88e509c2b15b73c84ea634fccc50d",
+      "payload_sha256": "d4bca6614bd24fdcd328496163717c55fc3336f5b5186cb53962b10e8287cd2e"
+    }
+  ],
+  "actual_before": "native38265: exact=false non_time_fields=true same_cutoff=true, terminal1,44PASS,1763 unchanged hashes,clean cleanup"
+}

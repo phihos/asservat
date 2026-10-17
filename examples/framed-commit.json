@@ -1,0 +1,19 @@
+{
+  "format": "artifact-commit/v1",
+  "storageFormat": "asservat-framed/v1",
+  "clusterID": "00000000-0000-4000-8000-000000000001",
+  "artifactID": "00000000-0000-4000-8000-000000000093",
+  "attemptID": "00000000-0000-4000-8000-000000000094",
+  "manifest": {
+    "identity": {
+      "etag": "\"synthetic-manifest\"",
+      "versionID": "synthetic-manifest-version"
+    },
+    "ciphertextBytes": 8192,
+    "ciphertextSHA256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "key": {
+      "reference": "transit/evidence",
+      "ciphertext": "SYNTHETIC-DISTINCT-MANIFEST-KEY"
+    }
+  }
+}

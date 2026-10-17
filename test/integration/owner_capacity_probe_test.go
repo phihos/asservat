@@ -1,0 +1,337 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"reflect"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+)
+
+// This qualifies the real policy composition and exact probe actor, not complete
+// capacity CRD validation or installed HWORK execution. The two permissive CRDs
+// below exist only in this disposable fixture; their synthetic spec is not an
+// accepted source, storage qualification, capacity allocation or runtime grant.
+func TestOwnerCapacityProbeWithRealKubernetes(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+	if path == "" {
+		t.Skip("owned context integration required")
+	}
+	b, e := os.ReadFile(path)
+	var f fixture
+	if e != nil || json.Unmarshal(b, &f) != nil || len(f.Clusters) == 0 {
+		t.Fatal("fixture missing")
+	}
+	clear(b)
+	ctx, stop := context.WithTimeout(context.Background(), 90*time.Second)
+	defer stop()
+	config, e := clientcmd.BuildConfigFromFlags("", f.Clusters[0].Config)
+	if e != nil {
+		t.Fatal(e)
+	}
+	admin, e := kubernetes.NewForConfig(config)
+	if e != nil {
+		t.Fatal(e)
+	}
+	objects, e := dynamic.NewForConfig(config)
+	if e != nil {
+		t.Fatal(e)
+	}
+	who, e := admin.AuthenticationV1().SelfSubjectReviews().Create(ctx, &auth.SelfSubjectReview{}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ns, e := admin.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "owner-capacity-probe", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		cleanup, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		if e := admin.CoreV1().Namespaces().Delete(cleanup, ns.Name, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+			t.Error("namespace cleanup", e)
+		}
+	})
+	crds := objects.Resource(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"})
+	resources := []struct{ resource, kind string }{{"evidencestoragepools", "EvidenceStoragePool"}, {"evidencebudgetpolicies", "EvidenceBudgetPolicy"}}
+	for _, r := range resources {
+		versions := []any{}
+		for _, version := range []string{"v1alpha1", "v1alpha2"} {
+			versions = append(versions, map[string]any{"name": version, "served": true, "storage": version == "v1alpha1", "subresources": map[string]any{"status": map[string]any{}}, "schema": map[string]any{"openAPIV3Schema": map[string]any{"type": "object", "properties": map[string]any{"spec": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}, "status": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}}}}})
+		}
+		crd := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]any{"name": r.resource + ".asservat.io"}, "spec": map[string]any{"group": "asservat.io", "scope": "Namespaced", "names": map[string]any{"plural": r.resource, "singular": r.resource[:len(r.resource)-1], "kind": r.kind}, "versions": versions}}}
+		if _, e = crds.Create(ctx, crd, meta.CreateOptions{}); e != nil {
+			t.Fatal(e)
+		}
+		name := crd.GetName()
+		t.Cleanup(func() {
+			cleanup, end := context.WithTimeout(context.Background(), 5*time.Second)
+			defer end()
+			if e := crds.Delete(cleanup, name, meta.DeleteOptions{}); e != nil {
+				t.Error("CRD cleanup", e)
+			}
+		})
+		until := time.Now().Add(10 * time.Second)
+		for {
+			v, e := crds.Get(ctx, name, meta.GetOptions{})
+			if e != nil {
+				t.Fatal(e)
+			}
+			conditions, _, _ := unstructured.NestedSlice(v.Object, "status", "conditions")
+			ready := false
+			for _, c := range conditions {
+				m, _ := c.(map[string]any)
+				ready = ready || m["type"] == "Established" && m["status"] == "True"
+			}
+			if ready {
+				break
+			}
+			if time.Now().After(until) {
+				t.Fatal("fixture CRD not established")
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	account, e := admin.CoreV1().ServiceAccounts(ns.Name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "configuration-worker"}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	outsider, e := admin.CoreV1().ServiceAccounts(ns.Name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "outsider"}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Deliberately broader attack rights than installed runtime, so denial must
+	// come from the exact admission boundary, not a preceding RBAC failure.
+	rules := []rbac.PolicyRule{{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies", "evidencestoragepools/status", "evidencebudgetpolicies/status"}, Verbs: []string{"create", "update", "delete", "get", "list"}}, {APIGroups: []string{""}, Resources: []string{"configmaps", "secrets"}, Verbs: []string{"create"}}}
+	if _, e = admin.RbacV1().Roles(ns.Name).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: "probe-fixture"}, Rules: rules}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.RbacV1().RoleBindings(ns.Name).Create(ctx, &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: "probe-fixture"}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "probe-fixture"}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: account.Name, Namespace: ns.Name}, {Kind: "ServiceAccount", Name: outsider.Name, Namespace: ns.Name}}}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	actor := func(name string) (*rest.Config, dynamic.Interface, kubernetes.Interface) {
+		t.Helper()
+		token, e := admin.CoreV1().ServiceAccounts(ns.Name).CreateToken(ctx, name, &auth.TokenRequest{}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		c := &rest.Config{Host: config.Host, BearerToken: token.Status.Token, TLSClientConfig: rest.TLSClientConfig{CAData: config.CAData, CAFile: config.CAFile}}
+		d, e := dynamic.NewForConfig(c)
+		if e != nil {
+			t.Fatal(e)
+		}
+		k, e := kubernetes.NewForConfig(c)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return c, d, k
+	}
+	workerConfig, worker, workerCore := actor(account.Name)
+	_, foreign, _ := actor(outsider.Name)
+	// Test-only administrator impersonation proves the UID condition independently
+	// of the username-based ServiceAccount RBAC binding.
+	replacedConfig := rest.CopyConfig(config)
+	replacedConfig.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + ns.Name + ":" + account.Name, UID: "33333333-3333-4333-8333-333333333333", Groups: []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + ns.Name}}
+	replaced, e := dynamic.NewForConfig(replacedConfig)
+	if e != nil {
+		t.Fatal(e)
+	}
+	control := cfg.NamespaceRef{Name: ns.Name, UID: string(ns.UID)}
+	ownerPlan := cfg.OwnerWorkloadAdministration{Name: "owner-capacity-namespace", Deployment: "inert-owner", DeploymentUID: "11111111-1111-4111-8111-111111111111", ControlNamespace: control, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}}
+	ownerPolicy, ownerBinding, e := kube.OwnerWorkloadAdmission(ownerPlan)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ownerPolicy, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, ownerPolicy, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, ownerBinding, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	cleanupPolicy := func(name string) {
+		t.Cleanup(func() {
+			cleanup, end := context.WithTimeout(context.Background(), 5*time.Second)
+			defer end()
+			if e := admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(cleanup, name, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+				t.Error(e)
+			}
+			if e := admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(cleanup, name, meta.DeleteOptions{}); e != nil {
+				t.Error(e)
+			}
+		})
+	}
+	cleanupPolicy(ownerPlan.Name)
+	hasDenial := func(e error, name, message string) bool {
+		var status apierrors.APIStatus
+		if (!apierrors.IsInvalid(e) && !apierrors.IsForbidden(e)) || !errors.As(e, &status) || status.Status().Details == nil {
+			return false
+		}
+		for _, c := range status.Status().Details.Causes {
+			if c.Message == "ValidatingAdmissionPolicy '"+name+"' with binding '"+name+"' denied request: "+message {
+				return true
+			}
+		}
+		return false
+	}
+	ownerMessage := "Asservat private hub namespace requires an installation administrator or a qualified Kubernetes controller operation."
+	makeObject := func(kind, name, version string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/" + version, "kind": kind, "metadata": map[string]any{"name": name, "namespace": ns.Name}, "spec": map[string]any{"synthetic": true}}}
+	}
+	dry := meta.CreateOptions{DryRun: []string{meta.DryRunAll}, FieldValidation: "Strict"}
+	gvr := func(resource, version string) schema.GroupVersionResource {
+		return schema.GroupVersionResource{Group: "asservat.io", Version: version, Resource: resource}
+	}
+	// With only the old namespace guard installed, establish the actual blocker.
+	until := time.Now().Add(10 * time.Second)
+	for {
+		_, e = worker.Resource(gvr(resources[0].resource, "v1alpha1")).Namespace(ns.Name).Create(ctx, makeObject(resources[0].kind, "before", "v1alpha1"), dry)
+		if hasDenial(e, ownerPlan.Name, ownerMessage) {
+			break
+		}
+		if e != nil || time.Now().After(until) {
+			t.Fatal("old namespace admission did not enforce expected denial", e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	ownerPlan.CapacityProbe = &cfg.OwnerCapacityProbe{ServiceAccount: account.Name, ServiceAccountUID: string(account.UID)}
+	replacement, _, e := kube.OwnerWorkloadAdmission(ownerPlan)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// The admission type-checking controller may have updated status since
+	// CREATE. Retain the exact original UID/spec/generation, but use its current
+	// resourceVersion for this fixture administrator's deliberate policy change.
+	current, e := admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, ownerPolicy.Name, meta.GetOptions{})
+	if e != nil || current.UID != ownerPolicy.UID || current.Generation != ownerPolicy.Generation || !reflect.DeepEqual(current.Spec, ownerPolicy.Spec) {
+		t.Fatal("original namespace policy changed before fixture update", e)
+	}
+	desiredSpec := replacement.Spec
+	replacement = current.DeepCopy()
+	replacement.Spec = desiredSpec
+	ownerPolicy, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Update(ctx, replacement, meta.UpdateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Qualify this one branch before installing the independent capacity guard.
+	// No unrelated policy can accidentally satisfy this successful dry-run.
+	until = time.Now().Add(10 * time.Second)
+	for {
+		_, e = worker.Resource(gvr(resources[0].resource, "v1alpha1")).Namespace(ns.Name).Create(ctx, makeObject(resources[0].kind, "after", "v1alpha1"), dry)
+		if e == nil {
+			break
+		}
+		if !hasDenial(e, ownerPlan.Name, ownerMessage) || time.Now().After(until) {
+			t.Fatal("exact dry-run branch unavailable", e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	for _, r := range resources {
+		_, e = worker.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).Create(ctx, makeObject(r.kind, "nonpersistent", "v1alpha1"), dry)
+		if e != nil {
+			t.Fatal("exact dry-run denied", e)
+		}
+		if _, e = objects.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).Get(ctx, "nonpersistent", meta.GetOptions{}); !apierrors.IsNotFound(e) {
+			t.Fatal("dry-run persisted", e)
+		}
+		for _, tc := range []struct {
+			name, version string
+			client        dynamic.Interface
+			options       meta.CreateOptions
+		}{{"persistent", "v1alpha1", worker, meta.CreateOptions{}}, {"foreign-account", "v1alpha1", foreign, dry}, {"replaced-account", "v1alpha1", replaced, dry}, {"wrong-version", "v1alpha2", worker, dry}} {
+			_, e = tc.client.Resource(gvr(r.resource, tc.version)).Namespace(ns.Name).Create(ctx, makeObject(r.kind, tc.name, tc.version), tc.options)
+			if !hasDenial(e, ownerPlan.Name, ownerMessage) {
+				t.Fatal(tc.name, "not denied by namespace policy", e)
+			}
+		}
+		saved, e := objects.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).Create(ctx, makeObject(r.kind, "existing", "v1alpha1"), meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		_, e = worker.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).Update(ctx, saved, meta.UpdateOptions{DryRun: []string{meta.DryRunAll}})
+		if !hasDenial(e, ownerPlan.Name, ownerMessage) {
+			t.Fatal("UPDATE escaped", e)
+		}
+		_, e = worker.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).UpdateStatus(ctx, saved, meta.UpdateOptions{DryRun: []string{meta.DryRunAll}})
+		if !hasDenial(e, ownerPlan.Name, ownerMessage) {
+			t.Fatal("status escaped", e)
+		}
+		e = worker.Resource(gvr(r.resource, "v1alpha1")).Namespace(ns.Name).Delete(ctx, "existing", meta.DeleteOptions{DryRun: []string{meta.DryRunAll}})
+		if !hasDenial(e, ownerPlan.Name, ownerMessage) {
+			t.Fatal("DELETE escaped", e)
+		}
+	}
+	_, e = workerCore.CoreV1().Secrets(ns.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "not-a-capacity-probe"}}, dry)
+	if !hasDenial(e, ownerPlan.Name, ownerMessage) {
+		t.Fatal("Secret escaped", e)
+	}
+	cp := cfg.CapacityAdministration{Name: "owner-capacity-source", ControlNamespace: control, Administrators: ownerPlan.Administrators, StatusUsers: []string{"synthetic-status-writer"}, ProbeAccount: cfg.NamespaceRef{Name: account.Name, UID: string(account.UID)}}
+	policy, binding, e := kube.CapacityAdmission(cp)
+	if e != nil {
+		t.Fatal(e)
+	}
+	policy, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, policy, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	binding, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	cleanupPolicy(cp.Name)
+	cluster := "22222222-2222-4222-8222-222222222222"
+	observer, e := kube.NewPermissionClient(config, cluster, control, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	probe, e := kube.NewPermissionClient(workerConfig, cluster, control, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	guard, e := kube.NewCapacityGuard(observer, probe, cp, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Initial source-policy cache propagation only. The namespace's probe branch
+	// was independently proven above, never retried until another policy won.
+	until = time.Now().Add(10 * time.Second)
+	for {
+		_, e = guard.CapacityProtection(ctx)
+		if e == nil {
+			break
+		}
+		if time.Now().After(until) {
+			p, _ := admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, cp.Name, meta.GetOptions{})
+			t.Fatalf("independent capacity protection: %v; status=%+v", e, p.Status)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	for i := 0; i < 3; i++ {
+		proof, e := guard.CapacityProtection(ctx)
+		if e != nil || proof.FreshUntil.Sub(proof.ObservedAt) > 5*time.Second {
+			t.Fatal("combined current proof", e)
+		}
+	}
+	if e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, cp.Name, meta.DeleteOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = guard.CapacityProtection(ctx); e == nil {
+		t.Fatal("missing capacity policy accepted namespace denial")
+	}
+}

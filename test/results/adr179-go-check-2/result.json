@@ -1,0 +1,11 @@
+{
+  "name": "adr179-go-check-2",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "scope": "Full Go gate after ADR-176 (key wraps, key service), ADR-177 (22 hub extension roles), ADR-179 (fences, hub-held capability, context-start target queries)",
+  "results": "55 full packages and 543 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (TestInitialRuntimeObjectRoundTripWithRealKubernetes, group 4)",
+  "previousAttempt": "adr179-go-check-1-failed-vet: exit 2 at go vet (an integration test passed a ResolvePod-only resolver as RegionalLocal.Targets); fixed with regionalQueryTargets",
+  "sourceHashBefore": "906a40d650903b169a1597b8eeb5bf81388919a39388cb938055916e44491de5",
+  "sourceHashAfter": "906a40d650903b169a1597b8eeb5bf81388919a39388cb938055916e44491de5",
+  "log": "go-check.log"
+}

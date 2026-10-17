@@ -1,0 +1,26 @@
+=== RUN   TestKeycloakProvider
+=== RUN   TestKeycloakProvider/product-browser-sessions
+=== RUN   TestKeycloakProvider/product-browser-sessions/signed-policy-submission
+    browser_sessions_test.go:298: real browser identity, JWS through nonexportable OpenBao key, sign-only ACL, explicit versions, provider retirement and current-key revocation passed
+=== NAME  TestKeycloakProvider/product-browser-sessions
+    identity_provider_test.go:227: actual confidential OIDC/S256/nonce, opaque cookies, encrypted SQL credentials, current identity and single refresh across eight callers passed
+=== RUN   TestKeycloakProvider/product-browser-sessions/protected-settings
+    browser_sessions_test.go:406: current settings, source continuity, role separation, monotonic lifetime, outage logout, lock expiry and never-reused epochs passed
+=== RUN   TestKeycloakProvider/product-browser-sessions/SQL-fences
+=== RUN   TestKeycloakProvider/product-browser-sessions/bounded-cleanup-role
+=== NAME  TestKeycloakProvider/product-browser-sessions
+    identity_provider_test.go:227: browser group removal, local and actual provider back-channel logout, SQL replay/expiry/epoch/role fences and OpenBao credential encryption passed; protected bootstrap remains unqualified
+=== NAME  TestKeycloakProvider
+    identity_provider_test.go:284: authorization code+S256, ID/refresh rejection, rotating refresh and current stable group rename/add/removal passed
+    identity_provider_test.go:306: nested stable group IDs, ancestor inheritance, direct/inherited deduplication, slash-containing names and removal passed
+    identity_provider_test.go:333: ordinary profile update allowed; user cannot self-assign authority-bearing stable group IDs
+    identity_provider_test.go:353: real authorization code replay and wrong PKCE verifier rejected
+    identity_provider_test.go:361: separate human/workload clients, password grant denial and disabled-user refresh denial passed; existing JWT remains valid only within original application freshness bounds
+--- PASS: TestKeycloakProvider (3.28s)
+    --- PASS: TestKeycloakProvider/product-browser-sessions (1.68s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/signed-policy-submission (0.04s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/protected-settings (0.32s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/SQL-fences (0.30s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/bounded-cleanup-role (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.331s

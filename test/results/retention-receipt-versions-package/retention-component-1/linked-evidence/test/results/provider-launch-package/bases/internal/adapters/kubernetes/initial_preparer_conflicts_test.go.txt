@@ -1,0 +1,440 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+func syntheticHandoverConflict(group, resource, name string) []byte {
+	raw, _ := json.Marshal(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Code: 409, Reason: meta.StatusReasonConflict, Message: "synthetic resourceVersion conflict", Details: &meta.StatusDetails{Group: group, Kind: resource, Name: name}})
+	return raw
+}
+
+func TestInitialHandoverConflictRequiresExactOriginalAPIStatus(t *testing.T) {
+	for _, target := range []struct{ group, resource, name string }{{"", "pods", "initial"}, {"admissionregistration.k8s.io", "validatingadmissionpolicies", "staging-guard"}} {
+		raw := syntheticHandoverConflict(target.group, target.resource, target.name)
+		if !initialHandoverConflictStatus(raw, 409, target.group, target.resource, target.name) {
+			t.Fatal("qualified status rejected")
+		}
+		for _, change := range []func(*meta.Status){
+			func(v *meta.Status) { v.Kind = "Other" }, func(v *meta.Status) { v.APIVersion = "unknown" }, func(v *meta.Status) { v.Status = meta.StatusSuccess }, func(v *meta.Status) { v.Reason = meta.StatusReasonAlreadyExists }, func(v *meta.Status) { v.Code = 503 }, func(v *meta.Status) { v.Details = nil }, func(v *meta.Status) { v.Details.Group = "other" }, func(v *meta.Status) { v.Details.Name = "other" }, func(v *meta.Status) { v.Details.Kind = "other" }, func(v *meta.Status) { v.Details.UID = types.UID(ownerID(990)) }, func(v *meta.Status) { v.Details.RetryAfterSeconds = 1 }, func(v *meta.Status) { v.Details.Causes = []meta.StatusCause{{Message: "ambiguous"}} },
+		} {
+			var v meta.Status
+			_ = json.Unmarshal(raw, &v)
+			change(&v)
+			bad, _ := json.Marshal(v)
+			if initialHandoverConflictStatus(bad, 409, target.group, target.resource, target.name) {
+				t.Fatal("unqualified status accepted")
+			}
+		}
+		for _, bad := range [][]byte{[]byte(`{}`), append(raw, []byte(`{}`)...), []byte(strings.Replace(string(raw), `"status":"Failure"`, `"extra":"forbidden","status":"Failure"`, 1)), []byte(strings.Replace(string(raw), `"reason":"Conflict"`, `"reason":"Other","reason":"Conflict"`, 1)), []byte("not-json")} {
+			if initialHandoverConflictStatus(bad, 409, target.group, target.resource, target.name) {
+				t.Fatal("malformed status accepted")
+			}
+		}
+		if initialHandoverConflictStatus(raw, 503, target.group, target.resource, target.name) {
+			t.Fatal("body supplied HTTP outcome")
+		}
+	}
+}
+
+// This TLS API fixture synthesizes protected original facts solely for the
+// conditional-update state machine. It performs no SQL activation, provider
+// issuance or real Kubernetes admission; those qualifications remain separate.
+func handoverConflictFixture(t *testing.T) (*preparerFixture, *InitialPreparer, contracts.InitialPreparationRoot) {
+	t.Helper()
+	plan := handoverTestPlan()
+	f := newPreparerFixturePlan(t, "", plan)
+	var fleet contracts.FleetSettings
+	raw, e := os.ReadFile("../../../examples/fleet-settings.json")
+	if e != nil || json.Unmarshal(raw, &fleet) != nil {
+		t.Fatal("synthetic fleet unavailable")
+	}
+	fleet.InstallationID = plan.InstallationID
+	f.config.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: [][]byte{f.server.Certificate().Raw}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: [][]byte{f.server.Certificate().Raw}, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "transit", AuditKey: "audit"}}
+	f.config.SQLMaterial = &contracts.WorkerObjectReference{Name: "sql-material", UID: ownerID(910)}
+	f.config.Providers = &contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: "provider-material", UID: ownerID(911)}, IssuerPolicy: "issuer", WrapRole: "wrap-role", WrapPolicy: "wrap-policy", UnwrapRole: "unwrap-role", UnwrapPolicy: "unwrap-policy"}
+	f.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/apis/authentication.k8s.io/v1/selfsubjectreviews" && r.Header.Get("Authorization") == "Bearer probe" {
+			permissionReply(w, auth.SelfSubjectReview{Status: auth.SelfSubjectReviewStatus{UserInfo: auth.UserInfo{Username: "system:serviceaccount:" + plan.BootstrapNamespace.Name + ":" + plan.HistoryProbe.Name, UID: plan.HistoryProbe.UID, Groups: []string{"system:authenticated"}}}})
+			return true
+		}
+		if r.Method == "GET" && strings.Contains(r.URL.Path, "admissionregistration.k8s.io/") {
+			if v, ok := f.objects[r.URL.Path]; ok {
+				permissionReply(w, v)
+				return true
+			}
+		}
+		if r.Method == "PUT" && r.URL.Query().Get("dryRun") == "All" && strings.HasSuffix(r.URL.Path, "/configmaps/"+plan.Workload.Configuration) {
+			f.status(w, 403, meta.StatusReasonForbidden, "configmaps", "ValidatingAdmissionPolicy '"+plan.Workload.WorkloadGuard+"' with binding '"+plan.Workload.WorkloadGuard+"' denied request: "+initialWorkloadDenial)
+			return true
+		}
+		if r.Method == "PUT" && r.URL.Path == "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/"+plan.Workload.StagingGuard {
+			raw, _ := io.ReadAll(r.Body)
+			var next map[string]any
+			_ = json.Unmarshal(raw, &next)
+			old := f.objects[r.URL.Path]
+			if old == nil || next["metadata"].(map[string]any)["resourceVersion"] != old["metadata"].(map[string]any)["resourceVersion"] {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(409)
+				_, _ = w.Write(syntheticHandoverConflict("admissionregistration.k8s.io", "validatingadmissionpolicies", plan.Workload.StagingGuard))
+				return true
+			}
+			f.serial++
+			next["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+			next["metadata"].(map[string]any)["generation"] = float64(2)
+			next["status"] = map[string]any{"observedGeneration": float64(2), "typeChecking": map[string]any{}}
+			f.objects[r.URL.Path] = next
+			permissionReply(w, next)
+			return true
+		}
+		if r.Method == "POST" && (strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicies") || strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings")) {
+			raw, _ := io.ReadAll(r.Body)
+			var v map[string]any
+			if json.Unmarshal(raw, &v) != nil {
+				t.Error("synthetic input")
+				return true
+			}
+			name := v["metadata"].(map[string]any)["name"].(string)
+			path := r.URL.Path + "/" + name
+			f.posts[path]++
+			f.store(path, raw)
+			if v["kind"] == "ValidatingAdmissionPolicy" {
+				f.objects[path]["metadata"].(map[string]any)["generation"] = float64(1)
+				f.objects[path]["status"] = map[string]any{"observedGeneration": float64(1), "typeChecking": map[string]any{}}
+			}
+			w.WriteHeader(201)
+			permissionReply(w, f.objects[path])
+			return true
+		}
+		return false
+	}
+	account := core.ServiceAccount{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"}, ObjectMeta: meta.ObjectMeta{Name: plan.HistoryProbe.Name, Namespace: plan.BootstrapNamespace.Name, UID: types.UID(plan.HistoryProbe.UID), ResourceVersion: "1"}}
+	raw, _ = json.Marshal(account)
+	var obj map[string]any
+	_ = json.Unmarshal(raw, &obj)
+	f.objects["/api/v1/namespaces/bootstrap/serviceaccounts/"+plan.HistoryProbe.Name] = obj
+	p := f.preparer(t)
+	t.Cleanup(p.Close)
+	if _, e = p.Declare(context.Background()); e != nil {
+		t.Fatal("synthetic declaration", e)
+	}
+	if _, e = p.PrepareGatedPod(context.Background()); e != nil {
+		t.Fatal("synthetic gated Pod", e)
+	}
+	root, e := p.PrepareFinalInputs(context.Background())
+	if e != nil {
+		t.Fatal("synthetic final inputs", e)
+	}
+	config, e := p.inputConfiguration(root)
+	if e != nil {
+		t.Fatal(e)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	root.Activation.Credentials = &contracts.InitialPreparationCredentialBinding{Material: *f.config.SQLMaterial, StartupDigest: preparationDigest(config), NotBefore: now, NotAfter: now.Add(15 * time.Minute)}
+	root.Activation.Handover = &contracts.InitialPreparationHandover{OperationID: ownerID(950), StartupDigest: preparationDigest(config), Input: contracts.WorkerObjectReference{Name: plan.Workload.Configuration, UID: root.Activation.Inputs.Creates[8].Receipt.UID}, Credentials: contracts.WorkerObjectReference{Name: plan.Workload.Credentials, UID: ownerID(951)}, ReviewedAt: now}
+	setSyntheticHandoverRoot(t, f, p, root)
+	// The server's original pinned staging policy is copied as synthetic mutable
+	// API state; only a same-UID conditional update may replace its spec below.
+	stagePath := "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + plan.Workload.StagingGuard
+	stageRaw, e := p.creator.raw(context.Background(), stagePath, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var stage map[string]any
+	_ = json.Unmarshal(stageRaw, &stage)
+	f.mu.Lock()
+	f.objects[stagePath] = stage
+	f.mu.Unlock()
+	if _, _, _, _, e = p.currentHandover(context.Background()); e != nil {
+		t.Fatal("synthetic current handover", e)
+	}
+	return f, p, root
+}
+func setSyntheticHandoverRoot(t *testing.T, f *preparerFixture, p *InitialPreparer, root contracts.InitialPreparationRoot) {
+	t.Helper()
+	if !p.validActivation(root) {
+		t.Fatal("invalid synthetic handover root")
+	}
+	raw, _ := json.Marshal(root)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	v := f.objects[p.rootPath()]
+	v["data"].(map[string]any)["root.json"] = string(raw)
+	f.serial++
+	v["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+}
+
+func TestInitialHandoverStagingConditionalConflictDoesNotRenewAuthority(t *testing.T) {
+	for _, mode := range []string{"exact-conflict", "unknown-503", "already-exists", "changed-spec", "changed-uid", "late-negative", "retry-conflict"} {
+		t.Run(mode, func(t *testing.T) {
+			f, p, _ := handoverConflictFixture(t)
+			path := "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + f.plan.Workload.StagingGuard
+			raw, e := p.creator.raw(context.Background(), path, nil)
+			if e != nil {
+				t.Fatal(e)
+			}
+			var policy map[string]any
+			_ = json.Unmarshal(raw, &policy)
+			f.mu.Lock()
+			f.objects[path] = policy
+			prior := f.extra
+			puts := 0
+			f.extra = func(w http.ResponseWriter, r *http.Request) bool {
+				if r.URL.Path == path && r.Method == "PUT" {
+					puts++
+					raw, _ := io.ReadAll(r.Body)
+					if puts == 1 || mode == "retry-conflict" {
+						f.serial++
+						f.objects[path]["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+						if mode == "changed-uid" {
+							f.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(992)
+						}
+						if mode == "changed-spec" {
+							f.objects[path]["spec"].(map[string]any)["failurePolicy"] = "Ignore"
+						}
+						if mode == "late-negative" {
+							f.shift = 6 * time.Second
+						}
+						code := 409
+						body := syntheticHandoverConflict("admissionregistration.k8s.io", "validatingadmissionpolicies", f.plan.Workload.StagingGuard)
+						if mode == "unknown-503" {
+							code = 503
+						}
+						if mode == "already-exists" {
+							body = []byte(strings.Replace(string(body), `"reason":"Conflict"`, `"reason":"AlreadyExists"`, 1))
+						}
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(code)
+						_, _ = w.Write(body)
+						return true
+					}
+					var next map[string]any
+					_ = json.Unmarshal(raw, &next)
+					old := f.objects[path]["metadata"].(map[string]any)
+					if next["metadata"].(map[string]any)["resourceVersion"] != old["resourceVersion"] {
+						t.Error("retry did not use current exact revision")
+					}
+					f.serial++
+					next["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+					next["metadata"].(map[string]any)["generation"] = float64(2)
+					next["status"] = map[string]any{"observedGeneration": float64(2), "typeChecking": map[string]any{}}
+					f.objects[path] = next
+					permissionReply(w, next)
+					return true
+				}
+				return prior(w, r)
+			}
+			f.mu.Unlock()
+			got, e := p.RetireStaging(context.Background())
+			if mode == "exact-conflict" {
+				if e != nil || got.Activation.Handover.Staging.FirstConflict == nil || got.Activation.Handover.Staging.Retry == nil || got.Activation.Handover.Staging.Receipt == nil {
+					t.Fatal("exact conflict was not recovered", e)
+				}
+				claim := got.Activation.Handover.Staging
+				if claim.Until.Sub(claim.StartedAt) > 5*time.Second || !claim.Retry.ClaimedAt.Before(claim.Until) {
+					t.Fatal("authority interval renewed")
+				}
+				if _, e = p.RetireStaging(context.Background()); e != nil {
+					t.Fatal("original replay unavailable", e)
+				}
+			} else if e == nil {
+				t.Fatal("unqualified effect reply enabled retry")
+			}
+			f.mu.Lock()
+			count := puts
+			f.mu.Unlock()
+			want := 1
+			if mode == "exact-conflict" || mode == "retry-conflict" {
+				want = 2
+			}
+			if count != want {
+				t.Fatalf("conditional updates=%d want=%d", count, want)
+			}
+			if mode != "exact-conflict" {
+				_, _ = p.RetireStaging(context.Background())
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if puts != count {
+					t.Fatal("lookup replay issued another conditional update")
+				}
+			}
+		})
+	}
+}
+
+func TestInitialHandoverLaunchRetryRetainsOriginalClaimAndNegativeOwner(t *testing.T) {
+	for _, mode := range []string{"healthy", "lost-negative-before", "lost-negative-after", "concurrent", "changed-uid", "changed-spec", "late-negative", "retry-lost-before", "retry-lost-after", "retry-claim-lost-before", "retry-claim-lost-after"} {
+		t.Run(mode, func(t *testing.T) {
+			f, p, _ := handoverConflictFixture(t)
+			root, e := p.RetireStaging(context.Background())
+			if e != nil {
+				t.Fatal("synthetic original staging retirement", e)
+			}
+			path := p.handoverPodPath()
+			original, e := p.creator.raw(context.Background(), path, nil)
+			if e != nil {
+				t.Fatal(e)
+			}
+			var pod core.Pod
+			_ = json.Unmarshal(original, &pod)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			claim := contracts.InitialPreparationLaunch{ID: ownerID(960), PodResourceVersion: pod.ResourceVersion, StartedAt: now, Until: now.Add(5 * time.Second)}
+			root.Activation.Handover.Launch = &claim
+			setSyntheticHandoverRoot(t, f, p, root)
+			f.mu.Lock()
+			prior := f.extra
+			puts := 0
+			lostAck := false
+			f.extra = func(w http.ResponseWriter, r *http.Request) bool {
+				if r.Method == "PUT" && r.URL.Path == p.rootPath() && !lostAck && (strings.HasPrefix(mode, "lost-negative-") || strings.HasPrefix(mode, "retry-claim-lost-")) {
+					raw, _ := io.ReadAll(r.Body)
+					r.Body = io.NopCloser(strings.NewReader(string(raw)))
+					var cm core.ConfigMap
+					_ = json.Unmarshal(raw, &cm)
+					var next contracts.InitialPreparationRoot
+					_ = json.Unmarshal([]byte(cm.Data["root.json"]), &next)
+					isNegative := next.Activation.Handover.Launch.FirstConflict != nil && next.Activation.Handover.Launch.Retry == nil
+					isRetry := next.Activation.Handover.Launch.Retry != nil
+					if strings.HasPrefix(mode, "lost-negative-") && isNegative || strings.HasPrefix(mode, "retry-claim-lost-") && isRetry {
+						lostAck = true
+						if mode == "lost-negative-after" || mode == "retry-claim-lost-after" {
+							var obj map[string]any
+							_ = json.Unmarshal(raw, &obj)
+							f.serial++
+							obj["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+							f.objects[r.URL.Path] = obj
+						}
+						f.status(w, 503, meta.StatusReasonServiceUnavailable, "", "")
+						return true
+					}
+				}
+				if r.Method == "PUT" && r.URL.Path == path {
+					puts++
+					if puts == 1 {
+						f.serial++
+						f.objects[path]["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+						if mode == "changed-uid" {
+							f.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(999)
+						}
+						if mode == "changed-spec" {
+							f.objects[path]["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["image"] = "example.invalid/replacement@sha256:" + strings.Repeat("a", 64)
+						}
+						if mode == "late-negative" {
+							f.shift = 6 * time.Second
+						}
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(409)
+						_, _ = w.Write(syntheticHandoverConflict("", "pods", f.plan.Workload.Name))
+						return true
+					}
+					if mode == "retry-lost-before" || mode == "retry-lost-after" {
+						if mode == "retry-lost-after" {
+							raw, _ := io.ReadAll(r.Body)
+							var obj map[string]any
+							_ = json.Unmarshal(raw, &obj)
+							f.serial++
+							obj["metadata"].(map[string]any)["resourceVersion"] = strconv.Itoa(f.serial)
+							f.objects[path] = obj
+						}
+						f.status(w, 503, meta.StatusReasonServiceUnavailable, "", "")
+						return true
+					}
+				}
+				return prior(w, r)
+			}
+			f.mu.Unlock()
+			// A synthetic original admitted claim owns this actual TLS conditional
+			// request. Only its completed raw response can seed the private negative.
+			pod.Spec.SchedulingGates = nil
+			body, _ := json.Marshal(pod)
+			raw, status, e := p.conditionalHandoverPut(context.Background(), path, body)
+			if e == nil || status != 409 {
+				t.Fatal("original API request did not complete as a conflict")
+			}
+			retained := p.retainHandoverConflict(context.Background(), root, "launch", raw, status)
+			if retained == (mode == "late-negative") {
+				t.Fatal("original response deadline qualification differs")
+			}
+			if strings.HasPrefix(mode, "lost-negative-") || strings.HasPrefix(mode, "retry-claim-lost-") {
+				if _, e = p.LaunchOriginalPod(context.Background()); e == nil {
+					t.Fatal("lost negative acknowledgement returned success")
+				}
+				f.mu.Lock()
+				count := puts
+				f.mu.Unlock()
+				if count != 1 {
+					t.Fatal("retry sent before acknowledged negative")
+				}
+			}
+			var results []contracts.InitialPreparationRoot
+			var failures []error
+			var resultMu sync.Mutex
+			run := func() {
+				got, e := p.LaunchOriginalPod(context.Background())
+				resultMu.Lock()
+				results = append(results, got)
+				failures = append(failures, e)
+				resultMu.Unlock()
+			}
+			if mode == "concurrent" {
+				var wg sync.WaitGroup
+				for range 4 {
+					wg.Add(1)
+					go func() { defer wg.Done(); run() }()
+				}
+				wg.Wait()
+			} else {
+				run()
+			}
+			expectedSuccess := mode == "healthy" || strings.HasPrefix(mode, "lost-negative-") || mode == "concurrent" || mode == "retry-claim-lost-before"
+			success := false
+			for i, e := range failures {
+				if e != nil {
+					continue
+				}
+				success = true
+				got := results[i].Activation.Handover.Launch
+				if got.ID != claim.ID || got.PodResourceVersion != claim.PodResourceVersion || !got.StartedAt.Equal(claim.StartedAt) || !got.Until.Equal(claim.Until) || got.FirstConflict == nil || got.Retry == nil || !got.Observed {
+					t.Fatal("original claim changed or completion missing")
+				}
+			}
+			if success != expectedSuccess {
+				t.Fatalf("success=%v expected=%v errors=%v", success, expectedSuccess, failures)
+			}
+			// A missing retry response never permits another UPDATE. If its exact
+			// original object is already ungated, lookup may acknowledge that fact.
+			replay, e := p.LaunchOriginalPod(context.Background())
+			if mode == "retry-lost-after" && (e != nil || !replay.Activation.Handover.Launch.Observed) {
+				t.Fatal("original successful update could not be observed", e)
+			}
+			if !expectedSuccess && mode != "retry-lost-after" && e == nil {
+				t.Fatal("unknown/changed original silently resumed")
+			}
+			f.mu.Lock()
+			count := puts
+			f.mu.Unlock()
+			want := 2
+			if mode == "changed-uid" || mode == "changed-spec" || mode == "late-negative" || mode == "retry-claim-lost-after" {
+				want = 1
+			}
+			if count != want {
+				t.Fatalf("conditional requests=%d want=%d", count, want)
+			}
+		})
+	}
+}

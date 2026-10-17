@@ -1,0 +1,92 @@
+[
+  {
+    "path": "scripts/check-specs.py",
+    "base_sha256": "dbcc9e2a1c36b3f9f0aacb507493bc7d4cbb46ff5b80a9fc6925a01f75439efa",
+    "payload_sha256": "18203ef3306b69254d3ca7143a24080adb82afb93e562dd48c6b8ffe07dc261f",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/configuration-provider-auth.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "faa8c09ca02cd42c72c4e33eaaf871168729b27581aaa30a934fd8b84a5924b0",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/configuration-provider-selection.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "85bf436c3f275b09c774187a3ddd58d0152de8eed34b4ac3becd892e096f71f1",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-input-claim.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "0539964630414d6bec0c06c06f6715035a87dd04374c6937acaf37c499b5a79c",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-input-provenance.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "73752b741b563a46728a6993e4ed2c55e488c10ff9480df4dd09e72331597e40",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/configuration-worker-provider-binding.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "c99a93dfc0ca3a923df8e6996feea5baf40b232620635c5ceded3811ce3cf3b9",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/hub-worker-activation.schema.json",
+    "base_sha256": "bbd7162fb359aeecd986b21123b3942e755729e27f8c3889398eb60dac2633db",
+    "payload_sha256": "269fd7f50298829bc885ee27bf21409e2446493427dc3711dfd322b506986a40",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/hub-worker-deployment.schema.json",
+    "base_sha256": "bbb2685866ab0b6ff90e15c8e08907f78e0fa4d573c6c4f76868dc2b425dea48",
+    "payload_sha256": "bd3c2bcfed970ae9294a074d8617a5f1c92fd1c9e95bc47027c867355b025f62",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "specs/contracts/initial-runtime-resources.schema.json",
+    "base_sha256": "ecaf0e1b5aba82b4ffc8ed79663dc9ed1ccc657cbdc3232fe156f80922f74f40",
+    "payload_sha256": "f143d977aa83032f8c037b0634932e285fb1f8ba6add1e4eb67c1d294c918be1",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-configuration.schema.json",
+    "base_sha256": "54f2c88ea5145fa0aef1d075254a00b0ff75952110b2facb64534eea973dcf0c",
+    "payload_sha256": "23c76f4c8e07a4af07b512f03ed664641f69c1a3a40fb38e338ee59fc3924ca3",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-deployment.schema.json",
+    "base_sha256": "cb5cac7afe7d0db52ad91417b3b71ee7e5524d6d4f0ab6a4258607c7956022ce",
+    "payload_sha256": "ca95d2209cb2cc6b025d2f58f55a696b29f8019fc2a891416b24b04aebedac00",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-identity-roles.schema.json",
+    "base_sha256": "185d37d9888708c98bbbff079de977b39e8a60c88f15618f9bf0c1fb35a08f23",
+    "payload_sha256": "ea2233f95a58193270de24711c83f16903fcbd5f4ea175c97cb2777566be1617",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-provider-selection.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "561c513f4a38df765a90c3c4effa4d7f6580e63648468a3ca856c0ba610f56ea",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/public-runtime-roles.schema.json",
+    "base_sha256": "bb03c2ad80c90096bb9cad39945fa52a8848517d7a04d3a5d10b08cf2f69e0d7",
+    "payload_sha256": "1716800b1aa9ec318ff9e496920d049f266338a841b3a5bea21e951ee298eb2d",
+    "owner": "mcp-schemas-v1"
+  },
+  {
+    "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+    "base_sha256": null,
+    "payload_sha256": "fcf56365055e9b1629a2ec3ae950f085025e42366ac2fb37b1e9ac180f1bd3f6",
+    "owner": "console-decision-proposal"
+  }
+]

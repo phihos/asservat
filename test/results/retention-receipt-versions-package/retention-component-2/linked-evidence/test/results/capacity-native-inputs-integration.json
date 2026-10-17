@@ -1,0 +1,40 @@
+{
+  "manifest": {
+    "scope": "fixture-only protected safety/burst and per-session request corrections; shared native pure shape preflight",
+    "files": [
+      {
+        "path": "test/integration/capacity_context_test.go",
+        "base_sha256": "3dbd4d05d11c5409e7920e967b421f231023d9383e8e213389c307f98fadbf90",
+        "payload_sha256": "aab8c427de9b35877663cef73a13ed159cbbb14bd664a8c35f5e6217a6935e9b"
+      },
+      {
+        "path": "test/integration/capacity_native_inputs_test.go",
+        "base_sha256": "77bb1da6ab7183fd68f95c900dca85d97d15302f5f24bc04e9d6f19194ccf84a",
+        "payload_sha256": "2c1d4f129035d8060d3ebf15d4ffdc0e444d54896c1f725be4efe1452ce6185c"
+      },
+      {
+        "path": "test/integration/capacity_native_preflight_test.go",
+        "base_sha256": null,
+        "payload_sha256": "0c36e62a6c4240e743f61b4adf066c0030450f4ee0135cae28a609a38d6b48bf"
+      },
+      {
+        "path": "test/integration/capacity_native_shapes_test.go",
+        "base_sha256": null,
+        "payload_sha256": "e7c0c19599f8f7753fbd519abfd8ecb8462fc72322e3a75b3cb3970f15dc4e13"
+      },
+      {
+        "path": "test/integration/capacity_session_test.go",
+        "base_sha256": "8589cb6339917c691b0a7c68624f9e0d4b78040278a58d934483d5b2c3e1dfd0",
+        "payload_sha256": "7aae359cb3b3280d5e5e728dfa67f31e9c6d0ca8713d61084f8b242418745f97"
+      },
+      {
+        "path": "test/integration/capacity_sql_fixture_test.go",
+        "base_sha256": "42b3a6b8bf8ac6e4170cab3de208ddec37998a56fcb471a30ed9520e8dce2eb8",
+        "payload_sha256": "d9882cb72a3793140e72704caeda20ecaad162a154e75e229d6e9c28c9ff0caf"
+      }
+    ]
+  },
+  "dependencies": 2727,
+  "reviewedPriorVerifierCorrection": {},
+  "scope": "Source integration only; combined gates and native qualification follow"
+}

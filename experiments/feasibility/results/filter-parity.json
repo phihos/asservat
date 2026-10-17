@@ -1,0 +1,90 @@
+[
+  {
+    "Filter": "tcp dst port 443",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "tcp dst port 443",
+    "IPv6": true,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "udp port 53",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "udp port 53",
+    "IPv6": true,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "tcp and host 192.0.2.2",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "ip6 and dst host 2001:db8::2",
+    "IPv6": true,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": null,
+    "GadgetError": "cannot jump 13 instructions; jumping past program bounds"
+  },
+  {
+    "Filter": "tcp[tcpflags] \u0026 tcp-syn != 0",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "udp dst portrange 50-60",
+    "IPv6": true,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "tcp port 80 or udp port 53",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "not udp",
+    "IPv6": false,
+    "Expected": true,
+    "Libpcap": true,
+    "GadgetMatch": true,
+    "GadgetError": ""
+  },
+  {
+    "Filter": "tcp dst port 80",
+    "IPv6": false,
+    "Expected": false,
+    "Libpcap": false,
+    "GadgetMatch": false,
+    "GadgetError": ""
+  }
+]

@@ -1,0 +1,350 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"reflect"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// OwnerIdentityRoleRoot is the private pre-Ready installer compartment. Its
+// current proof binds the original inert resources or spent exact launch; it
+// never weakens PublicRuntimeRoleRoot's separate running-owner requirement.
+type OwnerIdentityRoleRoot struct {
+	bridge                           *InitialRuntimeBridge
+	resources                        *InitialRuntimeResources
+	accepted                         fleetapp.OwnerConfigurationReader
+	input                            contracts.OwnerIdentityRoles
+	resourceCreatedAt, resourceUntil time.Time
+	attemptedClaims                  map[string]bool
+	attemptedRoleReceipts            map[string]bool // fresh operation receipt attempts, root serialized
+	operationRootUID                 string
+	pendingOperationRoot             *contracts.OwnerIdentityRoleState
+	ctx                              context.Context
+	cancel                           context.CancelFunc
+	mu                               sync.Mutex
+	closed, busy, createAttempted    bool
+	joined                           sync.WaitGroup
+	ownerOperation                   *OwnerIdentityOperation  // fresh-only admitted phase; guarded by mu
+	splitProjection                  *ProviderOwnerProjection // one controller retains all uncertain projection spend
+}
+
+func (s *OwnerIdentityRoleRoot) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+}
+func (s *OwnerIdentityRoleRoot) operation(ctx context.Context, run func(context.Context) error) error {
+	if run == nil {
+		return cfg.ErrUnavailable
+	}
+	return s.withOwnerLifetime(ctx, func(call context.Context) error { return s.bridge.operation(call, run) })
+}
+
+// Ownership and resource lifetime span both the fresh native preflight and the
+// later SQL-locked phase. Legacy operations still enter their original bridge.
+func (s *OwnerIdentityRoleRoot) withOwnerLifetime(ctx context.Context, run func(context.Context) error) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || run == nil {
+		return cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil || s.splitProjection != nil && ctx.Value(ownerProjectionControllerKey{}) != s.splitProjection {
+		s.mu.Unlock()
+		return cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	call, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(done) })
+	defer func() {
+		cancel()
+		if !stop() {
+			<-done
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+	}()
+	call, release, err := s.resources.borrowWorkerProjection(call)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return run(call)
+}
+func (s *OwnerIdentityRoleRoot) name() string {
+	return "asservat-owner-identity-roles-" + strings.ReplaceAll(s.input.InstallationID, "-", "")
+}
+func (s *OwnerIdentityRoleRoot) path() string {
+	return "/api/v1/namespaces/" + s.input.Namespace.Name + "/secrets"
+}
+
+func ownerIdentityRoleStateValid(in contracts.OwnerIdentityRoles, v contracts.OwnerIdentityRoleState, now time.Time) bool {
+	if v.Format != contracts.OwnerIdentityRoleStateFormat || v.Input != in || !authorization.UUID(v.OperationID) || v.OperationID == in.ResourceSetupID || v.OperationID == in.InitialClaimID || !ownerIdentityMicrotime(v.CreatedAt) || v.CreatedAt.After(now) || !ownerIdentityMicrotime(v.Until) || !v.Until.After(v.CreatedAt) || v.Until.Sub(v.CreatedAt) > 30*time.Minute {
+		return false
+	}
+	purposes := contracts.OwnerIdentityRolePurposes()
+	if len(v.Roles) != len(purposes) {
+		return false
+	}
+	passwords := map[string]bool{}
+	ids := map[string]bool{v.OperationID: true, in.ResourceSetupID: true}
+	oids := map[uint32]bool{}
+	for i, r := range v.Roles {
+		b, e := base64.RawURLEncoding.DecodeString(r.Password)
+		valid := e == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == r.Password && !bytes.Equal(b, make([]byte, 32))
+		clear(b)
+		if r.Purpose != purposes[i] || !valid || passwords[r.Password] {
+			return false
+		}
+		passwords[r.Password] = true
+		if c := r.Claim; c != nil {
+			if !authorization.UUID(c.OperationID) || ids[c.OperationID] || c.DatabaseOID == 0 || !ownerIdentityMicrotime(c.PostmasterAt) || c.PostmasterAt.After(c.ClaimedAt) || !ownerIdentityInterval(c.ClaimedAt, c.Until, v.CreatedAt, v.Until, now) {
+				return false
+			}
+			ids[c.OperationID] = true
+		}
+		if receipt := r.Receipt; receipt != nil {
+			ordinal, _ := contracts.OwnerIdentityRoleOrdinal(r.Purpose)
+			name := "as_" + strings.ReplaceAll(in.InstallationID, "-", "") + "_own_0" + string(rune('0'+ordinal))
+			if r.Claim == nil || receipt.RoleName != name || receipt.RoleOID == 0 || receipt.RoleOID == 10 || oids[receipt.RoleOID] || receipt.LayoutDigest != in.LayoutDigest {
+				return false
+			}
+			oids[receipt.RoleOID] = true
+		}
+	}
+	return true
+}
+func (s *OwnerIdentityRoleRoot) decode(raw []byte, until time.Time) (contracts.OwnerIdentityRoleSnapshot, *core.Secret, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	var obj core.Secret
+	if permissionJSON(raw, contracts.OwnerIdentityRoleMaxBytes*2, 32768) != nil || strictGuardJSON(raw, &obj) != nil || obj.APIVersion != "v1" || obj.Kind != "Secret" || !ownerMetadata(obj.ObjectMeta, s.input.Namespace.Name, s.name(), string(obj.UID)) || !authorization.UUID(string(obj.UID)) || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || len(obj.Labels) != 0 || len(obj.Annotations) != 0 || obj.Type != core.SecretTypeOpaque || obj.Immutable != nil && *obj.Immutable || len(obj.Data) != 1 || len(obj.StringData) != 0 {
+		return zero, nil, cfg.ErrChanged
+	}
+	state, e := contracts.DecodeOwnerIdentityRoleState(bytes.NewReader(obj.Data["state.json"]))
+	if e != nil || !ownerIdentityRoleStateValid(s.input, state, s.resources.now()) || state.CreatedAt.Before(s.resourceCreatedAt) || !state.Until.Equal(s.resourceUntil) || !s.resources.now().Before(until) {
+		return zero, nil, cfg.ErrChanged
+	}
+	return contracts.OwnerIdentityRoleSnapshot{State: state, UID: string(obj.UID), ResourceVersion: obj.ResourceVersion, ValidUntil: until}, &obj, nil
+}
+func (s *OwnerIdentityRoleRoot) read(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, *core.Secret, bool, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	until, launched, err := s.current(ctx)
+	if err != nil {
+		return zero, nil, false, err
+	}
+	call, end := context.WithDeadline(ctx, until)
+	defer end()
+	raw, err := s.bridge.source.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(call)
+	defer clear(raw)
+	if err != nil {
+		return zero, nil, launched, err
+	}
+	out, obj, err := s.decode(raw, until)
+	if err != nil {
+		return zero, nil, launched, err
+	}
+	current, nowLaunched, err := s.current(call)
+	out.ValidUntil = identity.Earlier(out.ValidUntil, current)
+	if err != nil || launched != nowLaunched || initialHandoverDeadline(call, s.resources.now, out.ValidUntil) != nil {
+		return zero, nil, launched, cfg.ErrUnavailable
+	}
+	return out, obj, launched, nil
+}
+func (s *OwnerIdentityRoleRoot) ReadOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var out contracts.OwnerIdentityRoleSnapshot
+	err := s.operation(ctx, func(call context.Context) error { var e error; out, _, _, e = s.read(call); return e })
+	return out, err
+}
+func (s *OwnerIdentityRoleRoot) OpenOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var out contracts.OwnerIdentityRoleSnapshot
+	err := s.operation(ctx, func(call context.Context) error {
+		old, _, launched, e := s.read(call)
+		if e == nil {
+			out = old
+			return nil
+		}
+		if !apierrors.IsNotFound(e) {
+			return e
+		}
+		if launched || s.createAttempted {
+			return cfg.ErrUnavailable
+		}
+		original, _, e := s.readResources(call)
+		if e != nil {
+			return e
+		}
+		now := s.resources.now().UTC().Truncate(time.Microsecond)
+		if !now.Before(original.State.Until) || original.State.OwnerIdentity != nil || original.State.OwnerLaunch != nil {
+			return cfg.ErrUnavailable
+		}
+		state := contracts.OwnerIdentityRoleState{Format: contracts.OwnerIdentityRoleStateFormat, Input: s.input, OperationID: uuid.NewString(), CreatedAt: now, Until: original.State.Until}
+		for _, purpose := range contracts.OwnerIdentityRolePurposes() {
+			var p [32]byte
+			if _, e = rand.Read(p[:]); e != nil {
+				return cfg.ErrUnavailable
+			}
+			state.Roles = append(state.Roles, contracts.PublicRuntimeRoleMaterial{Purpose: purpose, Password: base64.RawURLEncoding.EncodeToString(p[:])})
+			clear(p[:])
+		}
+		if !ownerIdentityRoleStateValid(s.input, state, now) {
+			return cfg.ErrUnavailable
+		}
+		until, launched, e := s.current(call)
+		if e != nil || launched {
+			return cfg.ErrUnavailable
+		}
+		bounded, end := context.WithDeadline(call, until)
+		defer end()
+		b, e := json.Marshal(state)
+		if e != nil || len(b) > contracts.OwnerIdentityRoleMaxBytes {
+			return cfg.ErrUnavailable
+		}
+		defer clear(b)
+		object := &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: s.name(), Namespace: s.input.Namespace.Name}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": b}}
+		s.createAttempted = true
+		raw, e := s.bridge.source.client.api.Post().AbsPath(s.path()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
+		defer clear(raw)
+		if e == nil {
+			ack, _, e := s.decode(raw, until)
+			if e != nil || !reflect.DeepEqual(ack.State, state) {
+				return cfg.ErrChanged
+			}
+		}
+		// Unknown CREATE is only inspected. No role claim exists in a new root.
+		observed, _, _, e := s.read(bounded)
+		if e != nil || !reflect.DeepEqual(observed.State, state) {
+			return cfg.ErrUnavailable
+		}
+		out = observed
+		return nil
+	})
+	return out, err
+}
+func (s *OwnerIdentityRoleRoot) ClaimOwnerIdentityRole(ctx context.Context, purpose string, database uint32, postmaster time.Time) (contracts.OwnerIdentityRoleSnapshot, bool, error) {
+	var out contracts.OwnerIdentityRoleSnapshot
+	fresh := false
+	err := s.operation(ctx, func(call context.Context) error {
+		old, obj, launched, e := s.read(call)
+		if e != nil {
+			return e
+		}
+		n := slices.Index(contracts.OwnerIdentityRolePurposes(), purpose)
+		if n < 0 || database == 0 || !ownerIdentityMicrotime(postmaster) {
+			return cfg.ErrInvalid
+		}
+		if old.State.Roles[n].Claim != nil {
+			out = old
+			return nil
+		}
+		if launched || s.attemptedClaims[purpose] {
+			return cfg.ErrUnavailable
+		}
+		now := s.resources.now().UTC().Truncate(time.Microsecond)
+		until := identity.Earlier(old.ValidUntil, old.State.Until).UTC().Truncate(time.Microsecond)
+		if !now.Before(until) || postmaster.After(now) {
+			return cfg.ErrUnavailable
+		}
+		next := old.State
+		next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), next.Roles...)
+		next.Roles[n].Claim = &contracts.PublicRuntimeRoleClaim{OperationID: uuid.NewString(), ClaimedAt: now, Until: until, DatabaseOID: database, PostmasterAt: postmaster.UTC()}
+		if s.attemptedClaims == nil {
+			s.attemptedClaims = map[string]bool{}
+		}
+		s.attemptedClaims[purpose] = true
+		out, e = s.update(call, old, obj, next, until)
+		if e == nil {
+			fresh = true
+		}
+		return e
+	})
+	return out, fresh, err
+}
+func (s *OwnerIdentityRoleRoot) CompleteOwnerIdentityRole(ctx context.Context, original contracts.OwnerIdentityRoleSnapshot, purpose string, receipt contracts.PublicRuntimeRoleReceipt) error {
+	return s.operation(ctx, func(call context.Context) error {
+		old, obj, launched, e := s.read(call)
+		if e != nil {
+			return e
+		}
+		n := slices.Index(contracts.OwnerIdentityRolePurposes(), purpose)
+		if n < 0 || old.UID != original.UID || old.State.OperationID != original.State.OperationID || len(original.State.Roles) != len(old.State.Roles) || old.State.Roles[n].Claim == nil || !equalJSON(old.State.Roles[n].Claim, original.State.Roles[n].Claim) || old.State.Roles[n].Password != original.State.Roles[n].Password {
+			return cfg.ErrChanged
+		}
+		if r := old.State.Roles[n].Receipt; r != nil {
+			if *r == receipt {
+				return nil
+			}
+			return cfg.ErrChanged
+		}
+		if launched || !s.resources.now().Before(old.State.Until) {
+			return cfg.ErrUnavailable
+		}
+		next := old.State
+		next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), next.Roles...)
+		next.Roles[n].Receipt = &receipt
+		_, e = s.update(call, old, obj, next, identity.Earlier(old.ValidUntil, old.State.Until))
+		return e
+	})
+}
+func (s *OwnerIdentityRoleRoot) update(ctx context.Context, old contracts.OwnerIdentityRoleSnapshot, obj *core.Secret, next contracts.OwnerIdentityRoleState, until time.Time) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if !ownerIdentityRoleStateValid(s.input, next, s.resources.now()) {
+		return zero, cfg.ErrInvalid
+	}
+	call, end := context.WithDeadline(ctx, until)
+	defer end()
+	// A fresh full proof precedes every role claim/receipt mutation. Reads and
+	// writes after it remain bounded by its original earliest end.
+	current, launched, e := s.current(call)
+	if e != nil || launched {
+		return zero, cfg.ErrUnavailable
+	}
+	call, narrow := context.WithDeadline(call, current)
+	defer narrow()
+	b, e := json.Marshal(next)
+	if e != nil || len(b) > contracts.OwnerIdentityRoleMaxBytes {
+		return zero, cfg.ErrUnavailable
+	}
+	defer clear(b)
+	object := obj.DeepCopy()
+	object.Data = map[string][]byte{"state.json": b}
+	raw, e := s.bridge.source.client.api.Put().AbsPath(s.path()+"/"+s.name()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(call)
+	defer clear(raw)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	out, _, e := s.decode(raw, identity.Earlier(until, current))
+	if e != nil || out.UID != old.UID || out.ResourceVersion == old.ResourceVersion || !reflect.DeepEqual(out.State, next) || initialHandoverDeadline(call, s.resources.now, out.ValidUntil) != nil {
+		return zero, cfg.ErrChanged
+	}
+	after, launched, e := s.current(call)
+	out.ValidUntil = identity.Earlier(out.ValidUntil, after)
+	if e != nil || launched || initialHandoverDeadline(call, s.resources.now, out.ValidUntil) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return out, nil
+}

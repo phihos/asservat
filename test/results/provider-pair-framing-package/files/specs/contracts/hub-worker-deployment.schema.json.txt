@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/hub-worker-deployment.schema.json",
+  "title": "Private configuration reconciliation worker startup v1",
+  "description": "Fixed installation-owned deployment.json, at most 256 KiB. Three separate SQL roles, protected source/guard pins and scheduling Lease. No recovery activation or owner enrollment credential. Runtime validates roots, names, distinct source/guard identities and current authority. Credentials remain separate files.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "clusterID",
+    "namespace",
+    "fleetSource",
+    "ownerSource",
+    "leaderLease",
+    "fleetGuard",
+    "ownerGuard",
+    "kubernetes",
+    "postgres",
+    "auditStore",
+    "keyService"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-hub-worker-deployment/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "fleetSource": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "ownerSource": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "leaderLease": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "fleetGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "ownerGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/postgres"
+    },
+    "auditStore": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/auditStore"
+    },
+    "keyService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "roots",
+        "auditMount",
+        "auditKey"
+      ],
+      "properties": {
+        "endpoint": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/keyService/properties/endpoint"
+        },
+        "roots": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/keyService/properties/roots"
+        },
+        "auditMount": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/keyService/properties/auditMount"
+        },
+        "auditKey": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/keyService/properties/auditKey"
+        }
+      }
+    },
+    "activation": {
+      "$ref": "https://asservat.io/spec/v1/hub-worker-activation.schema.json"
+    },
+    "providerAuthentication": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-auth.schema.json"
+    },
+    "providerInputs": {
+      "$ref": "https://asservat.io/spec/v1/configuration-worker-input-provenance.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "activation"
+        ],
+        "properties": {
+          "activation": {
+            "required": [
+              "workerLayout"
+            ],
+            "properties": {
+              "workerLayout": {
+                "const": "asservat-hub-worker-installed/v2"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "providerAuthentication",
+          "providerInputs"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "providerAuthentication"
+              ]
+            },
+            {
+              "required": [
+                "providerInputs"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

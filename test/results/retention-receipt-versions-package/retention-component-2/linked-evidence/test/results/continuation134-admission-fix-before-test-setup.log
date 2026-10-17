@@ -1,0 +1,12 @@
+--- FAIL: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown (0.00s)
+    --- FAIL: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/1.000000001s (0.00s)
+        capture_operation_admission_test.go:21: live request bound rejected: durable audit unavailable
+    --- FAIL: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/4.999999999s (0.00s)
+        capture_operation_admission_test.go:21: live request bound rejected: durable audit unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.002s
+--- FAIL: TestNativeContinuationAuditBackingCoversOriginalWriteInterval (0.00s)
+    context_continuation_backing_test.go:25: invalid synthetic fixture inputs
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.012s
+FAIL

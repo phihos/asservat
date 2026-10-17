@@ -1,0 +1,11 @@
+npm notice run @asservat/console@0.0.0 npx
+npm notice run 'vitest' run src/auth/session.test.ts
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  23:33:04
+   Duration  723ms (environment 56%, tests 36%, transform 6%, import 2%)
+

@@ -1,0 +1,29 @@
+cd web && npm run check
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+   Start at  17:14:05
+   Duration  1.13s (environment 52%, import 22%, tests 21%, transform 4%)
+
+cd web && npm run build
+npm notice run @asservat/console@0.0.0 build
+npm notice run npm run contracts && tsc --noEmit && vite build
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1337 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.51 kB │ gzip:  0.31 kB
+dist/assets/index-pEDccbQz.css    1.65 kB │ gzip:  0.74 kB
+dist/assets/index-DoQD73Wa.js   279.12 kB │ gzip: 86.48 kB
+
+✓ built in 133ms

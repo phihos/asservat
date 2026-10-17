@@ -1,0 +1,9 @@
+{
+  "busy-go-before.log": 1,
+  "csrf-before.log": 1,
+  "busy-web-before-final.log": 1,
+  "busy-independent-go-final.log": 0,
+  "busy-web-final.log": 0,
+  "busy-typescript-final.log": 0,
+  "busy-contracts-final.log": 0
+}

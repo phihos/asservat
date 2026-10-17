@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/owner_provider_setup.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/files/internal/adapters/providerconfig/owner_provider_setup.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/owner_provider_setup_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/files/internal/adapters/providerconfig/owner_provider_setup_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/setup_reader.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/files/internal/adapters/providerconfig/setup_reader.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/setup_values.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/files/internal/adapters/providerconfig/setup_values.go"
+  }
+}

@@ -1,0 +1,96 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-reset-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-reset-null
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-initial-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-initial-null
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-assignment-empty
+=== RUN   TestPermissionAuthorityWithRealServices/retained-audit-assignment-null
+=== RUN   TestPermissionAuthorityWithRealServices/foreign-audit-root-disables-allow-without-hiding-deny
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication
+=== RUN   TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry
+=== RUN   TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect
+=== RUN   TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles
+=== RUN   TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec
+=== RUN   TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version
+=== RUN   TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit
+=== RUN   TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit
+=== RUN   TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart
+=== RUN   TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock
+--- PASS: TestPermissionAuthorityWithRealServices (1.90s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-reset-empty (0.32s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-reset-null (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-initial-empty (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-initial-null (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-assignment-empty (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/retained-audit-assignment-null (0.08s)
+    --- PASS: TestPermissionAuthorityWithRealServices/foreign-audit-root-disables-allow-without-hiding-deny (0.08s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart (0.12s)
+    --- PASS: TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock (0.26s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-empty
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-null
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-empty
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-null
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/deleted
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expired-source
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/scope-tamper
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/actor-substitution
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/removed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/team-deny
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/role-boundaries
+--- PASS: TestPermissionAuthorityPoliciesWithRealServices (3.13s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/audit-gated-durable-and-no-personal-session-dependency (0.44s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-empty (0.14s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-automation-envelope-null (0.13s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-empty (0.12s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/retained-policy-acceptance-null (0.14s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/concurrent-nonce-replay-is-one-immutable-acceptance (0.19s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/binding-revision-and-audit-are-independent-of-historical-owner (0.12s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/pause-resume-does-not-create-new-authority (0.10s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/current-team-editor-keeps-creator-and-pins-replacement (0.11s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/deleted (0.09s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expired-source (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/recovery-blocked (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/issuer-epoch (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/scope-tamper (0.07s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/departed-at-acceptance (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/actor-substitution (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/removed-envelope (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/team-deny (0.08s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/envelope (0.30s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/expiry-after-lock-wait-rolls-back-all-acceptance/signature-trust (0.30s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/signed-submission-to-atomic-acceptance (0.06s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/missing (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/changed-envelope (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-installation (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/submission-verification/wrong-epoch (0.05s)
+    --- PASS: TestPermissionAuthorityPoliciesWithRealServices/role-boundaries (0.06s)
+PASS
+ok  	asservat.local/asservat/test/integration	6.083s

@@ -1,0 +1,40 @@
+--- before
++++ after
+@@ -79,6 +79,37 @@
+ // an installed connector executable, real SSO or large-artifact qualification.
+ func qualifyNativeExchange(t *testing.T, ctx context.Context, f nativeExchangeFixture) {
+ 	t.Helper()
++	if f.content == nil || f.content.mode != "native-content-interrupted" {
++		qualifyNativeExchangePhase(t, ctx, f)
++		return
++	}
++	// Each exchange owns its listeners, result, worker and purpose-specific SQL
++	// pools. Finish all first-phase cleanups before constructing another worker.
++	// Only the original client bytes, immutable SQL records and shared HTTP audit
++	// owner survive; the new phase cannot refund or revive the old exchange.
++	ctx, stop := context.WithTimeout(ctx, 2*time.Minute)
++	defer stop()
++	state := &nativeInterruptedState{owner: t}
++	f.content.retry = state
++	if !t.Run("original-interrupted-session", func(t *testing.T) {
++		qualifyNativeExchangePhase(t, ctx, f)
++	}) {
++		return
++	}
++	if !state.second || state.nextWorker == nil {
++		t.Fatal("interrupted phase did not acknowledge a distinct next worker")
++	}
++	nativeFixtureSQLUsage(t, ctx, f.admin, "after-first-phase-cleanup")
++	t.Run("explicit-new-session", func(t *testing.T) {
++		next := f
++		next.worker = *state.nextWorker
++		next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.guards, f.store, f.keys, f.gate)
++		qualifyNativeExchangePhase(t, ctx, next)
++	})
++}
++
++func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExchangeFixture) {
++	t.Helper()
+ 	fixtureDuration := 20 * time.Second
+ 	if f.content != nil && (f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted") {
+ 		// Multiple distinct requests, expiry crossing and a fresh session can

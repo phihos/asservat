@@ -1,0 +1,13 @@
+--- a/test/integration/context_native_content_test.go
++++ b/test/integration/context_native_content_test.go
+@@ -335,7 +335,9 @@
+ 
+ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativeExchangeFixture, en value.WorkerEnrollment, nativeOwners *postgres.FirstContextNativeOperations, responses *postgres.FirstContextResponses, runtime *evidence.ContextNativeRuntime, prep artifact.DownloadPreparation, pod, epoch string) {
+ 	t.Helper()
+-	qualifyNativeCompletionClosed(t, ctx, f, nativeOwners)
++	if f.content.mode == "native-control-races" {
++		qualifyNativeCompletionClosed(t, ctx, f, nativeOwners)
++	}
+ 	// A second independent adapter/pool represents another replica. Both locks
+ 	// must serialize through SQL; no shared Go mutex supplies correctness.
+ 	secondPool := f.poolFor("download_runtime", "synthetic-download")

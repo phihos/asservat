@@ -1,0 +1,21 @@
+{
+  "HANDOFF.md": "a0d48abe74ed6018a8a6651d090058f1a62e7aa73fb960238c9bfaefed2d7db2",
+  "RESULT.json": "cb1349fbd41359fd8bf1954cc090fcf5db7db5c1efee90f6f0b47f89b8a8c569",
+  "SCOPE.md": "97dd9b32f2730c1fb135537a837e1b979c87df3fb39fd5548aaf07b1925a4870",
+  "bases.json": "5feaddf5344fcd4277a3514edf8c0826bcd529075a78a38210bcf9fa169d802b",
+  "dependencies.json": "9b0240a5e3b21f90d482871077a01dc4e95286732fe42d3d7182d2efbcfa6241",
+  "evidence/compile.json": "9025646998e42b5f5fd7cfc9179311ecf29a4ac40dcd8dff071cc8991b4fc970",
+  "evidence/compile.log": "c1920a5edbe953c92a38354620445d04eb34025e73821d8cc095f9f95d9c9c1c",
+  "evidence/go-architecture.json": "67822a9c26d78dfc8e46967561e795482b23cae33427434211811066690d1483",
+  "evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+  "evidence/race.json": "4c7be61a54bf5e6b29f93a165ce23623933441d28cb55e4219ddf7057235e09b",
+  "evidence/race.log": "c655637092816604486bbe926366ae850d1c94175f13e7551af38e625194d730",
+  "evidence/vet.json": "26e0516bc754ac500c5f35b603bb7a1fe9930c0e7e6848cee72fbb1122383540",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "freeze.json": "4eb76b8215e4f0f9f041284649ef7d691f07bfb7862b55995a3b433c7e847080",
+  "manifest.json": "26410dc3ea62ff4d354fdb9d4606581bbf1344e73a5e9b4741bc5f2cdad7d7da",
+  "mirror-manifest.json": "a0482f74a5a2b91f92787d0fe4f774b14573ba244716bc28ed66812aceaa5155",
+  "overlay.json": "54bea3aa538bf863180368686bbc0e5dcae61539855f4414b414decbeef1d5cd",
+  "payload.json": "60eee370131184edf1a4d8a80172c7d7d8cbc0bf9bc2bacf29440e51ab15bb5a",
+  "run.py": "5b6eade9708769f2f439bb51db5b4ea003d19fadaf7487262c4e9a94e050941d"
+}

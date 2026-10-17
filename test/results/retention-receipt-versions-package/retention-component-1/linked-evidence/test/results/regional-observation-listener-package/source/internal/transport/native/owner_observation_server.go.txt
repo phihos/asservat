@@ -1,0 +1,208 @@
+package native
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"slices"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/transport/clusterobservation"
+	"golang.org/x/net/netutil"
+)
+
+// ServeOwnerObservation is a distinct startup phase on the original NativePort.
+// It owns only the fixed own-owner proof route. It never constructs a native,
+// worker, context-start or public router and has no route-enabling callback.
+// The shared socket primitive retains original residency and joined Close.
+func ServeOwnerObservation(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *clusterobservation.OwnerHandler, connections int) error {
+	return serveOwnerObservation(ctx, listener, roots, credentials, handler, nil, connections)
+}
+
+// ServeOwnerLocalObservation is selected only after the original local backend
+// projection has been independently acknowledged by bootstrap. It has exactly
+// two typed paths, not a caller-populated mux. It cannot share NativePort with
+// the observation-only or full native listener; the caller owns that lifecycle.
+func ServeOwnerLocalObservation(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, own *clusterobservation.OwnerHandler, local *clusterobservation.LocalHandler, connections int) error {
+	if own == nil || local == nil || own.Authority() != local.Authority() {
+		return contracts.ErrNativeProtocol
+	}
+	return serveOwnerObservation(ctx, listener, roots, credentials, own, local, connections)
+}
+
+func serveOwnerObservation(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *clusterobservation.OwnerHandler, local *clusterobservation.LocalHandler, connections int) error {
+	return serveOwnerObservationPurposes(ctx, listener, roots, credentials, handler, local, nil, connections, 0)
+}
+
+func serveOwnerObservationPurposes(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *clusterobservation.OwnerHandler, local *clusterobservation.LocalHandler, regional *clusterobservation.HubObservationHandler, proofConnections, regionalConnections int) error {
+	connections := proofConnections + regionalConnections
+	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 || credentials == nil || handler == nil || proofConnections < 1 || proofConnections > 64 || regionalConnections < 0 || regionalConnections > 64 || connections > 64 || (regional == nil) != (regionalConnections == 0) {
+		return contracts.ErrNativeProtocol
+	}
+	name, _, e := net.SplitHostPort(handler.Authority())
+	if e != nil || name == "" || net.ParseIP(name) != nil {
+		return contracts.ErrNativeProtocol
+	}
+	root, cancel := context.WithCancel(ctx)
+	defer cancel()
+	residency, prelude := 5*time.Second, time.Duration(0)
+	if regional != nil {
+		residency, prelude = 30*time.Second, 2*time.Second
+	}
+	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root, residency: residency, prelude: prelude}
+	proofSlots, regionalSlots := make(chan struct{}, proofConnections), make(chan struct{}, regionalConnections)
+	defer owned.Close()
+	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots.Clone(), SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
+	if local != nil {
+		config.ClientAuth = tls.VerifyClientCertIfGiven
+	}
+	config.VerifyConnection = func(s tls.ConnectionState) error {
+		if root.Err() != nil || s.DidResume || s.Version != tls.VersionTLS13 || s.NegotiatedProtocol != "h2" || s.ServerName != name || (local == nil || len(s.PeerCertificates) > 0) && len(s.VerifiedChains) == 0 {
+			return contracts.ErrNativeProtocol
+		}
+		return nil
+	}
+	config.GetCertificate = func(h *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if h == nil || h.ServerName != name || !slices.Contains(h.SupportedProtos, "h2") || root.Err() != nil {
+			return nil, contracts.ErrNativeProtocol
+		}
+		connection, ok := h.Conn.(*nativeConn)
+		if !ok || connection.ctx.Err() != nil {
+			return nil, contracts.ErrNativeProtocol
+		}
+		cert, e := credentials.GetCertificate(h)
+		if e != nil || cert == nil || cert.PrivateKey == nil || len(cert.Certificate) < 1 || len(cert.Certificate) > 4 {
+			return nil, contracts.ErrNativeProtocol
+		}
+		leaf, e := x509.ParseCertificate(cert.Certificate[0])
+		now := time.Now()
+		if e != nil || leaf.IsCA || len(leaf.ExtKeyUsage) != 1 || leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth || len(leaf.UnknownExtKeyUsage) != 0 || now.Before(leaf.NotBefore) || !now.Before(leaf.NotAfter) || leaf.VerifyHostname(name) != nil || connection.ctx.Err() != nil || root.Err() != nil || connection.shorten(leaf.NotAfter) != nil {
+			return nil, contracts.ErrNativeProtocol
+		}
+		return cert, nil
+	}
+	protocols := &http.Protocols{}
+	protocols.SetHTTP2(true)
+	server := &http.Server{TLSConfig: config, Protocols: protocols, HTTP2: &http.HTTP2Config{MaxConcurrentStreams: 1, MaxDecoderHeaderTableSize: 4096, MaxEncoderHeaderTableSize: 4096, MaxReadFrameSize: 16 << 10, MaxReceiveBufferPerConnection: 16 << 10, MaxReceiveBufferPerStream: 16 << 10}, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: residency, WriteTimeout: residency, IdleTimeout: time.Second, MaxHeaderBytes: 8 << 10, ErrorLog: log.New(io.Discard, "", 0)}
+	server.BaseContext = func(net.Listener) context.Context { return root }
+	server.ConnContext = func(_ context.Context, c net.Conn) context.Context {
+		if t, ok := c.(*tls.Conn); ok {
+			if b, ok := t.NetConn().(*nativeConn); ok {
+				return context.WithValue(b.ctx, nativeConnectionKey{}, b)
+			}
+		}
+		denied, stop := context.WithCancel(root)
+		stop()
+		return denied
+	}
+	server.SetKeepAlivesEnabled(false)
+	var mu sync.Mutex
+	var active sync.WaitGroup
+	closing := false
+	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		connection, ok := r.Context().Value(nativeConnectionKey{}).(*nativeConn)
+		if !ok || !connection.beginRequest() {
+			return
+		}
+		defer close(connection.handlerDone)
+		// Both the socket and handler use the actual SNI, not merely HTTP Host.
+		if r.TLS == nil || r.TLS.ServerName != name || r.Host != handler.Authority() || (r.RequestURI != contracts.OwnerObservationPath && (local == nil || r.RequestURI != contracts.ClusterObservationLocalPath) && (regional == nil || r.RequestURI != contracts.ClusterObservationExchangePath)) {
+			unavailable(w)
+			return
+		}
+		if regional != nil {
+			// Original accept time owns both purposes. Selecting a valid path
+			// can only shorten residency; idle standby cannot consume the
+			// separately prepaid finite-proof slots.
+			lifetime, slots := 5*time.Second, proofSlots
+			if r.RequestURI == contracts.ClusterObservationExchangePath {
+				lifetime, slots = 30*time.Second, regionalSlots
+			}
+			select {
+			case slots <- struct{}{}:
+				connection.mu.Lock()
+				connection.release = func() { <-slots }
+				connection.mu.Unlock()
+			default:
+				unavailable(w)
+				return
+			}
+			if connection.finishPrelude() != nil || connection.shorten(connection.accepted.Add(lifetime)) != nil {
+				return
+			}
+			// The TLS pre-authentication root union does not select a peer.
+			// The concrete per-path handler verifies its installed identity;
+			// even before that, a presented leaf may only shorten this socket.
+			if len(r.TLS.PeerCertificates) > 0 && connection.shorten(r.TLS.PeerCertificates[0].NotAfter) != nil {
+				return
+			}
+			connection.mu.Lock()
+			until := connection.until
+			connection.mu.Unlock()
+			call, end := context.WithDeadline(r.Context(), until)
+			interrupted := make(chan struct{})
+			stopCall := context.AfterFunc(call, func() {
+				connection.cancel()
+				_ = connection.Conn.Close()
+				close(interrupted)
+			})
+			defer func() {
+				if !stopCall() {
+					<-interrupted
+				}
+				end()
+			}()
+			r = r.WithContext(call)
+		}
+		mu.Lock()
+		if closing || root.Err() != nil || r.Context().Err() != nil {
+			mu.Unlock()
+			unavailable(w)
+			return
+		}
+		active.Add(1)
+		mu.Unlock()
+		defer active.Done()
+		if r.RequestURI == contracts.ClusterObservationLocalPath {
+			local.ServeHTTP(w, r)
+			return
+		}
+		// Certificate-free TLS is allowed only for the fixed online-token local
+		// path. Every own-peer request still requires verified mutual TLS.
+		if len(r.TLS.PeerCertificates) == 0 || len(r.TLS.VerifiedChains) == 0 {
+			unavailable(w)
+			return
+		}
+		if regional != nil && r.RequestURI == contracts.ClusterObservationExchangePath {
+			regional.ServeHTTP(w, r)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+	done := make(chan struct{})
+	stop := context.AfterFunc(root, func() { _ = server.Close(); close(done) })
+	err := server.Serve(tls.NewListener(owned, config))
+	cancel()
+	_ = server.Close()
+	if !stop() {
+		<-done
+	}
+	mu.Lock()
+	closing = true
+	mu.Unlock()
+	active.Wait()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, http.ErrServerClosed) {
+		return contracts.ErrNativeProtocol
+	}
+	return err
+}

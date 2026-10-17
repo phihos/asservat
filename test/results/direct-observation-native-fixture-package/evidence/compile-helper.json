@@ -1,0 +1,41 @@
+{
+  "phase": "compile-helper",
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-buildvcs=false",
+    "-o",
+    "/tmp/asservat-direct-har-k3xddyq8/observation-native",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/data.go",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/enrollment.go",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/inputs.go",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/main.go",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/metrics.go",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror/test/fixtures/observation-native/runtime.go"
+  ],
+  "exit": 0,
+  "seconds": 11.045,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "namedPass": 0,
+  "skips": 0
+}

@@ -1,0 +1,11 @@
+{
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "go-architecture-check"
+  ],
+  "exit": 0,
+  "seconds": 7.582
+}

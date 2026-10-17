@@ -1,0 +1,5 @@
+{
+  "scope": "Fixture-only activation of both client and server leaf required by SQL49 serving; ordinary registry verifies complete setup before v2",
+  "base": "701ff1709ac294470e1eff50433b34c92d844e0f4718e3505fe165c73c8e37aa",
+  "payload": "01427f4a217a01e7db8f5485822c558435b616363f3460615bdeb906e9da20db"
+}

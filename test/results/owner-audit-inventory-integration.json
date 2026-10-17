@@ -1,0 +1,24 @@
+{
+  "scope": "Read-only historical owner inventory; component qualification only",
+  "paths": [
+    {
+      "path": "internal/adapters/objectstore/owner_audit_inventory.go",
+      "base": null,
+      "payload": "5a1fec843b52ef3d0f3b3767651ffabbcbc36160a841e61c798621235a3f2228"
+    },
+    {
+      "path": "internal/adapters/objectstore/owner_audit_inventory_scope_test.go",
+      "base": null,
+      "payload": "234531d9cbac4a308522c103563f3ebca816b0a472059a338b20d6db96c6ccca"
+    },
+    {
+      "path": "internal/adapters/objectstore/owner_audit_inventory_test.go",
+      "base": null,
+      "payload": "447b31ef29fa24a8378a24a24b7d39989363af0044290cae2bd917b65b5ed242"
+    }
+  ],
+  "resultSHA256": "f1ae091eb208c5b9f6491b3212a2a830d7148c608246d6ea2dbe4b5a0b04cd03",
+  "handoffSHA256": "864b08d319e3ec5069af081f1fc40a1b973e1c97e203b88d175795e40cfe4888",
+  "archive": "test/results/owner-audit-inventory-package",
+  "native": false
+}

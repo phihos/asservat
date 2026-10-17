@@ -1,0 +1,91 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: trigger-lifecycles
+  namespace: payments
+spec:
+  description: Record packets and syscalls while armed; save windows and take bounded
+    live cores on an admitted trigger.
+  actions:
+  - id: traffic
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: networkHeaders
+      before: 30s
+      after: 10s
+      ring:
+        maxAge: 30s
+        maxBytes: 4194304
+        segmentBytes: 1048576
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - cidrs:
+          - 0.0.0.0/0
+          - ::/0
+        protocol: any
+        resolution: frozen
+        maxEndpoints: 1
+        maxStaleness: 5s
+      maxFrozenBytes: 4194304
+      maxConcurrentSnapshots: 1
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 4194304
+      timeout: 15s
+    executionMode: ongoing
+  - id: syscalls
+    kind: syscallTrace
+    parameters:
+      processes: allPodProcesses
+      mode: metadata
+      before: 30s
+      after: 10s
+      syscalls:
+        mode: all
+      result: all
+      ring:
+        maxAge: 30s
+        maxBytes: 8388608
+        segmentBytes: 2097152
+        maxSegments: 4
+        medium: memory
+      maxFrozenBytes: 16777216
+      maxConcurrentSnapshots: 1
+      maxEvents: 100000
+      maxEventsPerSecond: 10000
+      maxTrackedThreads: 4096
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 16777216
+      timeout: 20s
+    executionMode: ongoing
+  - id: core
+    kind: liveCore
+    parameters:
+      profileRef: native-small
+      process: matchedProcesses
+      processSelector:
+        match:
+          executablePath: /app/bin/worker
+        includeDescendants: true
+        maxDepth: 2
+        resolve: atDispatch
+      batch:
+        maxProcesses: 2
+        maxBytesPerProcess: 268435456
+        maxStopPerProcess: 10s
+        maxTotalStop: 20s
+        consistency: sequential
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 536870912
+      timeout: 30s
+    executionMode: onTrigger
+  maxTotalBytes: 557842432
+  maxDuration: 45s

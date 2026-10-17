@@ -1,0 +1,8 @@
+--- FAIL: TestDownloadPeerProofCannotRenewOrSubstituteAuthority (0.00s)
+    --- FAIL: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/wrong-session (0.00s)
+        download_peer_test.go:74: unsafe proof accepted
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.027s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	14.693s
+ok  	asservat.local/asservat/test/integration	1.525s
+FAIL

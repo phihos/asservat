@@ -1,0 +1,162 @@
+package kubernetes
+
+import (
+	"context"
+	"sync"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+)
+
+// Actual reads after the role lock, under the original independently proved
+// interval. This method cannot create a native proof or advance a phase. The
+// operation owns expectedResource/expectedRoles after its exact positive CAS.
+// C4/S17 includes a trailing namespace check and the original owner Service.
+func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationCurrent(ctx context.Context, initial ownerIdentityOperationNative, expectedResource contracts.InitialRuntimeResourceSnapshot, expectedRoles contracts.OwnerIdentityRoleSnapshot) (ownerIdentityOperationNative, error) {
+	return s.readOwnerIdentityOperationCurrentScope(ctx, initial, expectedResource, expectedRoles, true, false)
+}
+
+// The pre-effect bridge guard reuses the existing actual post-role-lock graph.
+// Before role creation, continued absence is meaningful only if the full first
+// native bracket saw it and no original role root has ever been pinned.
+func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationCurrentScope(ctx context.Context, initial ownerIdentityOperationNative, expectedResource contracts.InitialRuntimeResourceSnapshot, expectedRoles contracts.OwnerIdentityRoleSnapshot, withRoles, missing bool) (ownerIdentityOperationNative, error) {
+	var zero ownerIdentityOperationNative
+	if s == nil || ctx == nil || ctx.Err() != nil || initial.input != s.input || initial.source.proof.native == nil || !s.resources.now().Before(initial.until) {
+		return zero, ownerOperationError(ownerCurrentEntry, cfg.ErrUnavailable)
+	}
+	call, stop := context.WithDeadline(ctx, initial.until)
+	defer stop()
+	call, cancel := context.WithCancel(call)
+	defer cancel()
+	var source configurationWorkerNative
+	var retained initialRuntimeRetainedResources
+	var failures [2]error
+	var joined sync.WaitGroup
+	joined.Add(2)
+	go func() {
+		defer joined.Done()
+		source, failures[0] = s.bridge.source.readConfigurationWorkerCurrent(call, initial.source)
+		if failures[0] != nil {
+			cancel()
+		}
+	}()
+	go func() {
+		defer joined.Done()
+		retained, failures[1] = s.readOwnerIdentityOperationJournals(call, initial.retained, expectedResource)
+		if failures[1] != nil {
+			cancel()
+		}
+	}()
+	joined.Wait()
+	for i, err := range failures {
+		if err != nil {
+			return zero, ownerOperationError([2]ownerOperationCheck{ownerCurrentSource, ownerCurrentJournals}[i], err)
+		}
+	}
+	deadline, _ := call.Deadline()
+	until := identity.Earlier(deadline, identity.Earlier(initial.until, identity.Earlier(retained.until, source.proof.observation.FreshUntil)))
+	bounded, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	reader := &OwnerEndpoints{client: s.bridge.source.client, pool: initial.accepted.Configuration.Pool}
+	deployment, err := ownerResource[apps.Deployment](reader, bounded, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
+	if err != nil {
+		return zero, ownerOperationError(ownerCurrentDeploymentRead, err)
+	}
+	if err = s.ownerIdentityOperationDeployment(bounded, deployment, retained.resources.State, s.input); err != nil {
+		return zero, ownerOperationError(ownerCurrentDeployment, err)
+	}
+	source.ownerDeployment = deployment
+	account, err := ownerResource[core.ServiceAccount](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+	if err != nil {
+		return zero, ownerOperationError(ownerCurrentAccountRead, err)
+	}
+	if !equalJSON(account, initial.account) || s.ownerIdentityOperationOriginalObject(bounded, account, retained.resources.State, 0) != nil {
+		return zero, ownerOperationError(ownerCurrentAccount, cfg.ErrChanged)
+	}
+	service, err := ownerResource[core.Service](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/services/"+initial.service.Name, "v1", "Service")
+	if err != nil {
+		return zero, ownerOperationError(ownerCurrentServiceRead, err)
+	}
+	if !equalJSON(service, initial.service) || s.ownerIdentityOperationOriginalObject(bounded, service, retained.resources.State, 12) != nil {
+		return zero, ownerOperationError(ownerCurrentService, cfg.ErrChanged)
+	}
+	var roles contracts.OwnerIdentityRoleSnapshot
+	var object *core.Secret
+	if withRoles {
+		raw, readErr := s.bridge.source.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(bounded)
+		defer clear(raw)
+		if missing {
+			if !initial.missing || s.operationRootUID != "" || !apierrors.IsNotFound(readErr) {
+				return zero, ownerOperationError(ownerCurrentRoles, cfg.ErrChanged)
+			}
+		} else {
+			if readErr != nil {
+				return zero, ownerOperationError(ownerCurrentRolesRead, readErr)
+			}
+			roles, object, err = s.decode(raw, until)
+			if err != nil || roles.UID != expectedRoles.UID || roles.ResourceVersion != expectedRoles.ResourceVersion || !equalJSON(roles.State, expectedRoles.State) {
+				return zero, ownerOperationError(ownerCurrentRoles, cfg.ErrChanged)
+			}
+		}
+	}
+	ns, err := s.bridge.source.client.namespace(bounded, s.bridge.source.client.control)
+	if err != nil || ns.Deleting {
+		return zero, ownerOperationError(ownerCurrentNamespace, cfg.ErrChanged)
+	}
+	accepted, err := s.accepted.ReadOwnerConfiguration(bounded)
+	until = identity.Earlier(until, accepted.FreshUntil)
+	// Ordered closed causes for the former single conjunction.
+	switch {
+	case err != nil:
+		return zero, ownerOperationError(ownerCurrentAcceptedRead, cfg.ErrUnavailable)
+	case !accepted.Valid(s.resources.now()):
+		return zero, ownerOperationError(ownerCurrentAcceptedValid, cfg.ErrUnavailable)
+	case !accepted.Configuration.Equal(initial.accepted.Configuration) || !accepted.Configuration.Equal(source.owner):
+		return zero, ownerOperationError(ownerCurrentAcceptedEqual, cfg.ErrUnavailable)
+	case !ownerIdentityOriginalConfiguration(s.resources, retained.resources.State, accepted.Configuration):
+		return zero, ownerOperationError(ownerCurrentAcceptedOriginal, cfg.ErrUnavailable)
+	case initialHandoverDeadline(bounded, s.resources.now, until) != nil:
+		return zero, ownerOperationError(ownerCurrentDeadline, cfg.ErrUnavailable)
+	}
+	if withRoles && !missing {
+		roles.ValidUntil = identity.Earlier(roles.ValidUntil, until)
+	}
+	return ownerIdentityOperationNative{retained: retained, source: source, input: s.input, accepted: accepted, account: account, service: service, roles: roles, object: object, missing: missing, until: until}, nil
+}
+
+// This is the four-read mutable journal/phase comparison, not the complete
+// retained native bracket. The latter remains mandatory independently before
+// and after the operation, including its actual negative requests.
+func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationJournals(ctx context.Context, initial initialRuntimeRetainedResources, expected contracts.InitialRuntimeResourceSnapshot) (initialRuntimeRetainedResources, error) {
+	var zero initialRuntimeRetainedResources
+	bridge, _, err := s.bridge.read(ctx)
+	if err != nil || bridge.UID != initial.bridge.UID || bridge.ResourceVersion != initial.bridge.ResourceVersion || !equalJSON(bridge.State, initial.bridge.State) {
+		return zero, cfg.ErrChanged
+	}
+	before, phase, err := s.bridge.phasePolicy(ctx, bridge.State)
+	if err != nil || phase != 2 {
+		return zero, cfg.ErrChanged
+	}
+	current, object, err := s.resources.read(ctx)
+	if err != nil || current.UID != expected.UID || current.ResourceVersion != expected.ResourceVersion || !equalJSON(current.State, expected.State) {
+		return zero, cfg.ErrChanged
+	}
+	after, lastPhase, err := s.bridge.phasePolicy(ctx, bridge.State)
+	if err != nil || lastPhase != 2 || before.Generation != after.Generation || !equalJSON(before.Spec, after.Spec) {
+		return zero, cfg.ErrChanged
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return zero, cfg.ErrUnavailable
+	}
+	until := identity.Earlier(deadline, identity.Earlier(initial.until, identity.Earlier(bridge.ValidUntil, current.ValidUntil)))
+	if initialHandoverDeadline(ctx, s.resources.now, until) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	bridge.ValidUntil, current.ValidUntil = until, until
+	return initialRuntimeRetainedResources{bridge: bridge, resources: current, object: object, until: until}, nil
+}

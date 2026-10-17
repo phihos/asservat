@@ -1,0 +1,102 @@
+{
+  "baseRoot": "/home/phil/Projekte/asservat",
+  "adr": 118,
+  "paths": [
+    {
+      "path": "docs/architecture/initial-preparation-state.md",
+      "baseSha256": null,
+      "newSha256": "6c9712996e997f04cbeac4138406fb9beef4d32cde618150fc604b44a790d7a0",
+      "bytes": 6042
+    },
+    {
+      "path": "docs/decisions/118-retained-private-installation-state.md",
+      "baseSha256": null,
+      "newSha256": "8b07a9fe03b668b04941123f87cade46e1c7c8d8ec430bb8a7709989a750ba4b",
+      "bytes": 2989
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_credentials_test.go",
+      "baseSha256": "9fb0776f43797541f4962b53c646b88bea07679bd2d9ccf985c3e846fe9efdfd",
+      "newSha256": "e899419fa65036f8e0656767f5df41dc0baf1b0f6fce1cc6b53f5060700e6ec9",
+      "bytes": 10893
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_installation_read.go",
+      "baseSha256": null,
+      "newSha256": "0395b8a01b651d1a7dfb1f71a744addbb70c181bd0479c9c49ffa9f51efcdeaa",
+      "bytes": 3874
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_sql_material.go",
+      "baseSha256": null,
+      "newSha256": "3cb4ea4ea640775129a3c5d59b1cdd7cf786947c0da1a46a9409d8788a047b84",
+      "bytes": 3228
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_sql_material_test.go",
+      "baseSha256": null,
+      "newSha256": "350300c111a6aa4448a5931d84d7364a9c49884f5409d31362dbabf072926386",
+      "bytes": 3424
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_read.go",
+      "baseSha256": null,
+      "newSha256": "25d74d31b5f05aaa32f5be153878c303aad27739f5868b6d2517d283b7dc61e9",
+      "bytes": 4869
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_read_test.go",
+      "baseSha256": null,
+      "newSha256": "b86fc53bbea01ba149cb35be21e9ae463c17870d39bac286c80a3cbd846296a6",
+      "bytes": 3076
+    },
+    {
+      "path": "internal/adapters/postgres/initial_sql_material.go",
+      "baseSha256": null,
+      "newSha256": "b19264e6a4700f6ae729bb40b9782ffd6f19465ebc6c73158b987affaeefc1e3",
+      "bytes": 2359
+    },
+    {
+      "path": "internal/adapters/postgres/initial_sql_material_test.go",
+      "baseSha256": null,
+      "newSha256": "7d36d6b8d8e0ad7da9b2e94e497fe4abdf4b63f04b6d7154a452161b9d8d1768",
+      "bytes": 2277
+    },
+    {
+      "path": "internal/application/fleet/initial_installation_read.go",
+      "baseSha256": null,
+      "newSha256": "d4c5a85bae31004b5a6aaeb9430babf53afaa90e12dcf297e9d17f3aaf5012e1",
+      "bytes": 1645
+    },
+    {
+      "path": "internal/contracts/initial_sql_material.go",
+      "baseSha256": null,
+      "newSha256": "2135790e8878fa174ca21e73f5f128a60a5c92cfb1f02181f03636c5aca23a4e",
+      "bytes": 976
+    },
+    {
+      "path": "specs/contracts/initial-sql-material.schema.json",
+      "baseSha256": null,
+      "newSha256": "2c7dde6f561ed5abbc1c399a4890a2c5c3a4302cd2e775e90ad1c0e9a77b6d43",
+      "bytes": 1315
+    },
+    {
+      "path": "test/integration/initial_installation_read_test.go",
+      "baseSha256": null,
+      "newSha256": "1ffbb8cb74b7bd8d5a3d4c399128ca4539aa73b97767e306442c4cc4826bee4e",
+      "bytes": 7227
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "baseSha256": "870fc654f317813cf4fa6ee9b52ca90be079fbe73c1624b4424eceae670239fe",
+      "newSha256": "91f307f7574f10cc59c9ae791f4305f5500fa2cb4a33bd4dca17c04f1b7b922f",
+      "bytes": 20111
+    },
+    {
+      "path": "test/integration/initial_installer_pod_test.go",
+      "baseSha256": "25eed8f1e7978691b68f3e8c4324d5b5a9b8f1b9f788904951229f82c8af9b98",
+      "newSha256": "fa3fa7a39726f1dc0f931df684cbbf3ee34f07a8031131604d286b799dc1ba48",
+      "bytes": 22788
+    }
+  ]
+}

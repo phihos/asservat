@@ -1,0 +1,42 @@
+{
+  "phase": "before-utc",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-v2-framed-20261013/checkpoint-v4/before-overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^TestConnectorOperationStreamCanonicalUTCEmission$",
+    "-v",
+    "./internal/adapters/mtls"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 1,
+  "expectedExit": 1,
+  "expectedFailureOccurrences": null,
+  "seconds": 3.237,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  }
+}

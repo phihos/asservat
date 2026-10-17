@@ -1,0 +1,18 @@
+=== RUN   TestFilterCompilerParity
+    packets_test.go:40: 11 corpus cases; libpcap matches reference expectations; 1 Gadget compiler differences/errors (measurement, not a parity pass)
+--- PASS: TestFilterCompilerParity (0.00s)
+=== RUN   TestNativePCAPNGFixture
+--- PASS: TestNativePCAPNGFixture (0.00s)
+=== RUN   TestS3MultipartNativeRangesAndIntegrity
+    storage_test.go:137: 17 MiB native object: multipart + exact full/range bytes, bounded reads, cancellation, invalid ranges, index/cipher corruption passed
+--- PASS: TestS3MultipartNativeRangesAndIntegrity (0.83s)
+=== RUN   TestAuthenticatedTLSDownloadResumeAndCutoff
+    storage_test.go:204: TLS native resume, If-Range, invalid/multiple ranges, cumulative bytes and 1 MiB cutoff tested with in-memory authority; SQL/OIDC integration not tested
+--- PASS: TestAuthenticatedTLSDownloadResumeAndCutoff (0.47s)
+=== RUN   TestDecoderExpansionBound
+--- PASS: TestDecoderExpansionBound (0.00s)
+=== RUN   TestStorageMeasurements
+    storage_test.go:224: explicit measurement run
+--- SKIP: TestStorageMeasurements (0.00s)
+PASS
+ok  	asservat.local/experiments/feasibility	1.312s

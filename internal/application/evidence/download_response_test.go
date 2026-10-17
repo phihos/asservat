@@ -1,0 +1,274 @@
+package evidence
+
+import (
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"testing"
+	"time"
+)
+
+// Explicit synthetic SQL/source/identity ports test the coordinator, not a
+// production native worker or a generic artifact authorization implementation.
+type responseTransferFixture struct {
+	*downloadWorkerFixture
+	r                                                          artifact.DownloadResponse
+	w                                                          artifact.DownloadWindow
+	wi                                                         audit.DownloadWindowIntent
+	size                                                       int64
+	chunks, batches, leases, begins, intents, outcomes, closed int
+	emitted                                                    int64
+	active                                                     bool
+	fail                                                       string
+	badHash, unverified                                        bool
+	advanceBetweenWindows                                      bool
+	backing                                                    []byte
+}
+type responseTestBatch struct {
+	f      *responseTransferFixture
+	until  time.Time
+	closed bool
+}
+
+func (b *responseTestBatch) ResolveIdentity(context.Context) (identity.Identity, error) {
+	if b.closed {
+		return identity.Identity{}, artifact.ErrDownloadExpired
+	}
+	return identity.Identity{Principal: b.f.s.Scope.Principal, Policy: b.f.a.IdentityRevision, VerifiedAt: b.f.now, ValidUntil: b.until, Scopes: []string{"evidence:read", "evidence:download"}}, nil
+}
+func (b *responseTestBatch) Close() {
+	if !b.closed {
+		b.closed = true
+		b.f.active = false
+	}
+}
+func (f *responseTransferFixture) BeginBatch(context.Context) (identities.IdentityBatch, error) {
+	if f.active {
+		return nil, identities.ErrReaderBusy
+	}
+	if f.fail == "identity" {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	f.active = true
+	f.batches++
+	return &responseTestBatch{f: f, until: f.now.Add(5 * time.Second)}, nil
+}
+func (f *responseTransferFixture) Close() { f.closed++ }
+func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	i, e := b.ResolveIdentity(ctx)
+	if e != nil {
+		return artifact.DownloadAuthority{}, e
+	}
+	a := f.a
+	a.CheckedAt = f.now
+	a.ValidUntil = i.ValidUntil
+	if f.fail == "authority" {
+		return a, artifact.ErrDownloadUnavailable
+	}
+	return a, nil
+}
+func (f *responseTransferFixture) BeginDownloadResponse(_ context.Context, _ string, a artifact.DownloadAuthority, r artifact.DownloadResponse) (artifact.DownloadResponse, error) {
+	f.begins++
+	var e error
+	f.s, f.r, e = f.s.BeginResponse(a, r, f.now)
+	return f.r, e
+}
+func (f *responseTransferFixture) BeginDownloadWindow(_ context.Context, _, _, _, id string, a artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
+	var e error
+	f.s, f.r, f.w, e = f.r.BeginWindow(f.s, a, id, f.s.ID, f.s.Deadline.Add(time.Minute), f.now)
+	f.wi = audit.DownloadWindowIntent{Response: f.r, Window: f.w}
+	return f.wi, e
+}
+func (f *responseTransferFixture) LeaseDownloadResponse(_ context.Context, _, _, _, _ string, a artifact.DownloadAuthority) (artifact.DownloadDeliveryLease, error) {
+	f.leases++
+	var l artifact.DownloadDeliveryLease
+	var e error
+	f.r, l, e = f.r.Lease(f.s, f.w, a, f.r.OwnerID, f.now)
+	return l, e
+}
+func (f *responseTransferFixture) FinishDownloadWindow(_ context.Context, i audit.DownloadWindowIntent, o artifact.DownloadWindowOutcome) (audit.DownloadWindowAuditOutcome, error) {
+	var e error
+	f.s, f.r, f.w, e = f.r.RecordWindow(f.s, f.w, o, f.now)
+	if e != nil {
+		return audit.DownloadWindowAuditOutcome{}, e
+	}
+	return audit.DownloadWindowAuditOutcome{Intent: i, Outcome: *f.w.Outcome}, nil
+}
+func (f *responseTransferFixture) CloseDownloadResponse(context.Context, string, string, string) error {
+	f.r.Closed = true
+	return nil
+}
+func (f *responseTransferFixture) windowReceipt(i audit.DownloadWindowIntent, phase string) audit.DownloadWindowWriteResult {
+	return audit.DownloadWindowWriteResult{Receipt: audit.Receipt{Key: audit.DownloadWindowAuditKey(f.s.Scope.RootID, i.Response.ID, i.Window.ID, phase), Version: "synthetic-original-version", ETag: "synthetic", Bytes: 128, SHA256: artifact.Digest{3}}}
+}
+func (f *responseTransferFixture) CreateDownloadWindowIntent(_ context.Context, i audit.DownloadWindowIntent) (audit.DownloadWindowWriteResult, error) {
+	f.intents++
+	if f.fail == "intent" {
+		return audit.DownloadWindowWriteResult{}, artifact.ErrDownloadUnavailable
+	}
+	return f.windowReceipt(i, "intent"), nil
+}
+func (f *responseTransferFixture) FindDownloadWindowIntent(context.Context, audit.DownloadWindowIntent) (audit.Receipt, error) {
+	panic("no automatic intent replay")
+}
+func (f *responseTransferFixture) CreateDownloadWindowOutcome(_ context.Context, o audit.DownloadWindowAuditOutcome) (audit.DownloadWindowWriteResult, error) {
+	f.outcomes++
+	if f.fail == "outcome" {
+		return audit.DownloadWindowWriteResult{}, artifact.ErrDownloadUnavailable
+	}
+	return f.windowReceipt(o.Intent, "outcome"), nil
+}
+func (f *responseTransferFixture) FindDownloadWindowOutcome(context.Context, audit.DownloadWindowAuditOutcome) (audit.Receipt, error) {
+	panic("no automatic outcome replay")
+}
+func (f *responseTransferFixture) AcknowledgeDownloadWindowIntent(context.Context, audit.DownloadWindowIntent, audit.DownloadWindowWriteResult) error {
+	if f.fail == "intent-ack" {
+		return artifact.ErrDownloadUnavailable
+	}
+	f.w.IntentAcknowledged = true
+	return nil
+}
+func (f *responseTransferFixture) AcknowledgeDownloadWindowOutcome(context.Context, audit.DownloadWindowAuditOutcome, audit.DownloadWindowWriteResult) error {
+	if f.fail == "outcome-ack" {
+		return artifact.ErrDownloadUnavailable
+	}
+	var e error
+	f.s, f.r, f.w, e = f.r.AcknowledgeWindow(f.s, f.w, f.now)
+	if f.advanceBetweenWindows && !f.r.Closed {
+		f.now = f.now.Add(6 * time.Second)
+	}
+	return e
+}
+func syntheticResponseHash(size int64) artifact.Digest {
+	h := sha256.New()
+	b := make([]byte, artifact.DeliveryBytes)
+	for at := int64(0); at < size; {
+		n := min(int64(len(b)), size-at)
+		h.Write(b[:n])
+		at += n
+	}
+	return artifact.Digest(h.Sum(nil))
+}
+func (f *responseTransferFixture) Describe(context.Context, artifact.DownloadSession, artifact.DownloadAuthority) (artifact.NativeDownloadMetadata, int64, error) {
+	if f.fail == "source" {
+		return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadUnavailable
+	}
+	sum := syntheticResponseHash(f.size)
+	if f.badHash {
+		sum[0]++
+	}
+	return artifact.NativeDownloadMetadata{Filename: "synthetic.core", ETag: `"v1"`, Size: f.size, SHA256: sum, ReadUntil: f.a.AccessUntil, DeleteBy: f.a.DeleteBy}, artifact.DownloadWindowBytes, nil
+}
+func (f *responseTransferFixture) ReadChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
+	if !f.w.IntentAcknowledged || !l.Allows(offset, length, f.now) {
+		return NativeResponseChunk{}, artifact.ErrDownloadExpired
+	}
+	if f.fail == "read" {
+		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+	}
+	f.backing = make([]byte, length)
+	return NativeResponseChunk{Bytes: f.backing, ReadWork: length, FinalVerified: offset+length == f.size && !f.unverified}, nil
+}
+func (f *responseTransferFixture) SelectDownloadResponse(m artifact.NativeDownloadMetadata) (artifact.DownloadSelection, error) {
+	return artifact.DownloadSelection{Length: m.Size}, nil
+}
+func (f *responseTransferFixture) OpenDownloadResponse(context.Context, artifact.NativeDownloadMetadata, artifact.DownloadResponse) (DownloadResponseSink, error) {
+	return f, nil
+}
+func (f *responseTransferFixture) WriteChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset int64, b []byte) (int64, error) {
+	if !l.Allows(offset, int64(len(b)), f.now) || !f.w.IntentAcknowledged || offset != f.emitted {
+		return 0, artifact.ErrDownloadExpired
+	}
+	f.chunks++
+	if f.fail == "write" {
+		f.emitted++
+		return 1, artifact.ErrDownloadUnavailable
+	}
+	f.emitted += int64(len(b))
+	return int64(len(b)), nil
+}
+func (f *responseTransferFixture) Finish(context.Context) error {
+	if f.emitted != f.size {
+		return artifact.ErrIntegrity
+	}
+	return nil
+}
+func newResponseTransferFixture(t *testing.T, size int64) (*responseTransferFixture, DownloadResponseTransfer, DownloadResponseRequest) {
+	base, _, _ := downloadWorkerTest(t)
+	base.s.State = artifact.DownloadReady
+	base.s.OutputLimit = max(1, size)
+	base.s.ReadLimit = 2 * artifact.DownloadWindowBytes
+	base.s.Requests = 1
+	f := &responseTransferFixture{downloadWorkerFixture: base, size: size}
+	count := 0
+	service := DownloadResponseTransfer{Sessions: f, Responses: f, Authority: f, Objects: f, Audit: f, Now: func() time.Time { return f.now }, NewID: func() string { count++; return fmt.Sprintf("22222222-2222-4222-8222-%012d", count) }}
+	req := DownloadResponseRequest{SessionID: f.s.ID, ResponseID: f.s.ID, OwnerID: f.s.ID, HardUntil: f.s.Deadline}
+	return f, service, req
+}
+func TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile(t *testing.T) {
+	f, service, req := newResponseTransferFixture(t, artifact.DownloadWindowBytes+17)
+	f.advanceBetweenWindows = true
+	if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
+		t.Fatal(e)
+	}
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.chunks != 65 || f.intents != 2 || f.outcomes != 2 || f.leases != 2 || f.batches != 3 || f.s.Requests != 1 || f.s.ChargedOutput != f.size {
+		t.Fatalf("state=%s chunks=%d leases=%d batches=%d intent=%d outcome=%d", f.s.State, f.chunks, f.leases, f.batches, f.intents, f.outcomes)
+	}
+	for _, b := range f.backing {
+		if b != 0 {
+			t.Fatal("native buffer retained")
+		}
+	}
+}
+func TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry(t *testing.T) {
+	for _, failure := range []string{"identity", "authority", "source", "intent", "intent-ack", "read", "write", "outcome", "outcome-ack"} {
+		t.Run(failure, func(t *testing.T) {
+			f, s, r := newResponseTransferFixture(t, 2)
+			f.fail = failure
+			if e := s.Transfer(context.Background(), f, r, f, f); e == nil {
+				t.Fatal("failure succeeded")
+			}
+			if f.s.State == artifact.DownloadCompleted {
+				t.Fatal("uncertain transfer completed")
+			}
+			preflight := failure == "identity" || failure == "authority" || failure == "source"
+			if preflight && (f.begins != 0 || f.s.ChargedOutput != 0) {
+				t.Fatal("preflight spent")
+			}
+			if !preflight && (f.s.ChargedOutput != 2 || f.intents != 1) {
+				t.Fatal("uncertainty refunded/retried", f.intents, f.s.ChargedOutput)
+			}
+			if failure == "write" && f.s.EmittedBytes != 1 {
+				t.Fatal("partial write missing from historical accounting")
+			}
+		})
+	}
+}
+func TestResponseTransferVerifiesFinalBeforeLastBytes(t *testing.T) {
+	for _, which := range []string{"hash", "range-proof"} {
+		t.Run(which, func(t *testing.T) {
+			f, s, r := newResponseTransferFixture(t, artifact.DeliveryBytes+5)
+			f.badHash = which == "hash"
+			f.unverified = which == "range-proof"
+			if e := s.Transfer(context.Background(), f, r, f, f); e == nil {
+				t.Fatal("bad integrity succeeded")
+			}
+			if f.emitted != artifact.DeliveryBytes || f.s.State == artifact.DownloadCompleted {
+				t.Fatal("unverified last bytes emitted")
+			}
+		})
+	}
+}
+func TestResponseTransferEmptyNativeStillHasOneAuditedWindow(t *testing.T) {
+	f, s, r := newResponseTransferFixture(t, 0)
+	if e := s.Transfer(context.Background(), f, r, f, f); e != nil {
+		t.Fatal(e)
+	}
+	if f.s.State != artifact.DownloadCompleted || f.intents != 1 || f.outcomes != 1 || f.chunks != 1 {
+		t.Fatal("empty response lacks bounded completion")
+	}
+}

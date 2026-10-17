@@ -1,0 +1,409 @@
+{
+  "scope": "ADR161 source integration only; qualification pending",
+  "manifests": [
+    {
+      "folder": "fleet-freshness-20261014",
+      "manifest": "production-manifest.json",
+      "sha256": "e4616cd446b096abfe950bd5d1bb707b1e28dd5d631befb4fb200c29e2bc31e9"
+    },
+    {
+      "folder": "fleet-freshness-20261014",
+      "manifest": "test-manifest.json",
+      "sha256": "de2f2b7aca22e62ebb36450747788d556177835606abe221b6d1bf577ba7e231"
+    },
+    {
+      "folder": "fleet-fixture-observation-20261014",
+      "manifest": "manifest.json",
+      "sha256": "7b389229bc1f48f5409edaff22b5d05a41b9dfce327bb1cbc9138ae0edd811ab"
+    },
+    {
+      "folder": "fleet-freshness-20261014/native-tests",
+      "manifest": "manifest.json",
+      "sha256": "92820317f762175dc645c85c26bd789efcf5e0ae9d2d3bf40a17f9d352367428"
+    }
+  ],
+  "files": [
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_role_plan.go",
+      "before": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938",
+      "after": "4fc21d41b11611c7189d59d7d6bda1016099597bd70171a50cd9ebcd889c20e4"
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "before": "a9340e515e639318ee62b18fb083ba4dd90d07b9f2b24c7f542c1c1007cea5a8",
+      "after": "627f38ada7a5cccbff6864e5abe1d624b0e87a3d1ca47d4f56ebd2028de6ca52"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/fleet.sql.go",
+      "before": "59d7af3a88352aeee3c2627ee4c0d0a1d379956979a1ebe3459b5b578d3223df",
+      "after": "03c4e38dae5c1fa7efb4fb63288a09c934a580a6cb2d1d55c64bd12a09a08c26"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/models.go",
+      "before": "ccf9d91fef27bb6eab5b852f21cce3bdc126d5fcc4ccbfa4d312248152a36820",
+      "after": "b9725700a0cb5c0acc79ce326685b6c53547a925258e86474b0ac91d43549df7"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation.go",
+      "before": "2d1d8d3327191f637b0dd68576a9bb2cc0609a321d7f93efcd99788b81bf4653",
+      "after": "8fdd2dcc5dd0dff5cdefd7707e23ef37c4aa5fab3607b8b0d4759a22b7ff1558"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation_basis.go",
+      "before": null,
+      "after": "a55cfa40b08e0f9edc49fa8f70717f467a81bcbfd63cb3c5909cd4d997797ba1"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation_contention.go",
+      "before": "2b5c2215199002ff72635e43e86e76e92aae2c00ae400a1557d80814fba28e36",
+      "after": "4c3a548d67334bcba6f6cd0da5ef812465c2c02bd3287169f7a0cfdc3d212704"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation.go",
+      "before": "9a3969c6b47609ad2c408ddeb1620caea3b24c81c0655860fb735252cfa02334",
+      "after": "86be16c02e7c8d82bfa855339098c0c1b237092df40cd5e0013c8a909bfbf547"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_tables.go",
+      "before": "f98981559094fdad2ef67ed7b7aed885282e1cb42d4754dcd89da08f8f2fd082",
+      "after": "dc0dc2d6aa64662db21f5f37feecfe49cd8fb8419b7c47235fc456881a167a61"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_roles.go",
+      "before": "f2e8d8ff296ab7ac8f15e2f3706b6817cfd26c26e7bab1e5afe854c220a59ad6",
+      "after": "d4e765250e84634a0784e4b637f416aa9d42f632e7880ffc4ccf518a082f9683"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer.go",
+      "before": "eac2caf3f540351d58c1c7dc24d242378fd90345ab2364cb3d3e696eea5e28cf",
+      "after": "4a236c486015456b42cabbd56f0aa8e3e60072080a7f45814934473a5a7ea4a7"
+    },
+    {
+      "path": "internal/bootstrap/configuration_runtime_source_notice.go",
+      "before": "03595b562d8d40ae6320fd17f174760236a08f4982a06adad6a3ea11a6a45e25",
+      "after": "80eba48f60d628cc62018f231b7689151cf308428ecf0ca1a8e13c7b32609ba5"
+    },
+    {
+      "path": "internal/domain/fleet/observation_basis.go",
+      "before": null,
+      "after": "87dfa47f8c162ff0085c8fb9dd38b77816fb9aea141d329eb6ef3ebc5f7c45f8"
+    },
+    {
+      "path": "migrations/00059_fleet_observation_separation.sql",
+      "before": null,
+      "after": "7c8deaa4bd9ab8f8a4f3100167cc6de6a66c652e593343f7e11124e20a38aa8e"
+    },
+    {
+      "path": "migrations/queries/fleet.sql",
+      "before": "494ec19ef4e939ed4af9149e5d9c723bac5bf05997cdcb1019761f4e0cf38752",
+      "after": "ca8c0dbad3923c7531d5ea944533e9873f4a49350b6a5fd43debe28bf69b4de0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_provider_contention_test.go",
+      "before": "8b3bb764c26463248fc5889ca8138f072246e536234ec7801be43e7d5ffd5855",
+      "after": "1de10803e75708ec33e196718857b70abeebe15921f61da84b3f58f74c187830"
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_role_plan_test.go",
+      "before": "f240e58c09857c460b153f6fb05bf42c9dd477bca6934f2b6afcc9f5d9faf1f1",
+      "after": "9772d52114fe4432378ad236bf30fbb420667aef5588da942f596da353522386"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_schema_test.go",
+      "before": "5eb6156684621b7dfa454275c5bea05112abad85ffee9b996667c7ce948f90db",
+      "after": "f0cc1943c79a7afce4656a4aee151d56ec2ed852995abb3ccd5d36481dbc0ddf"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer_contention_test.go",
+      "before": "06779de06f3600dcbbfb916df1987fd2a2958b899bf5c87abd2b1225f8b87ac2",
+      "after": "81362ce78dad0da52a7f7a065536d4061fa18a494f4a01ff56db35cbbdc7b39d"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer_test.go",
+      "before": "0f9b95adc6c6cb86a1c9e1d25230d846a4abfe289d486e2b1db421b2272c9a52",
+      "after": "2ec7e3955933026c2b28e6305ebd6933fbadbaac9358f661bc79721a20c8d39e"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer_unknown_commit_test.go",
+      "before": null,
+      "after": "30da98bcde725af3abd6d0886a867823d1205fad400a9b4eddae9d9da84b0b84"
+    },
+    {
+      "path": "internal/domain/fleet/observation_basis_test.go",
+      "before": null,
+      "after": "f7492708a516215a57a3e24eac69fab66a75d818f414e1eeb71ee465da717e77"
+    },
+    {
+      "path": "test/fixtures/sql/runtime-roles.sql",
+      "before": "18e9de2e017fc99650ea755005268fc90b158c27e94fd302a158e57e42979b9c",
+      "after": "99aca95f63794421ab69913fdf92527dbdf8c77b027cdd4d2da23a879f5f8214"
+    },
+    {
+      "path": "test/integration/capacity_sql_fixture_test.go",
+      "before": "d9882cb72a3793140e72704caeda20ecaad162a154e75e229d6e9c28c9ff0caf",
+      "after": "f56199deae1c69ffdc486e015bdcb3710845d8b9d5dcd9733a3b7480c4ca7179"
+    },
+    {
+      "path": "test/integration/configuration_role_reconciliation_test.go",
+      "before": "4e14b1262ee77fe409659c14e4dcdc1ae348a9dfe4ff8d6951b3b1ccb8e568d9",
+      "after": "cd7356d651aa5d0df485bfad013935701b36f641f12062fdedb7024b33ae567f"
+    },
+    {
+      "path": "test/integration/connector_identity_test.go",
+      "before": "079a4795877287a79d92137d150295074a1fb9543b01dfb280adc1de6411e52f",
+      "after": "a40473af362ba6ed0a906111d18ffe98793848e61b3ede82d84431029317c3e8"
+    },
+    {
+      "path": "test/integration/database_recovery_test.go",
+      "before": "f955e707f5ca3d11854df88180430e028916411dec8e6e7ccc969204626a1fe9",
+      "after": "3a391096be192e9534faf446b03f2af09cde4a9781512174cafe3b9d9c0042ec"
+    },
+    {
+      "path": "test/integration/direct_observation_native_sql_test.go",
+      "before": "f12ca85f6dc5cf50e55291657e7ee88e5b0ddad5776300c0304b3f8f9baf4fcd",
+      "after": "fe521a11d4ff3408e9c0591edf82387956c40ab450817df5d8df7c9b4cccfc20"
+    },
+    {
+      "path": "test/integration/fleet_observation_basis_fixture_test.go",
+      "before": null,
+      "after": "55f18a963a8225cb2299facaef105ad51258caea8a091c3089df5ba66a24d10a"
+    },
+    {
+      "path": "test/integration/fleet_observation_commit_reply_test.go",
+      "before": "1b076f2d1232cd1f3da5256de1d43bf5d015cae4ce25079f0e0365d6629c71a1",
+      "after": "e74510462e684fb617b258712c7d780e8eb97eadf9dbfac412c45962c754f3a8"
+    },
+    {
+      "path": "test/integration/fleet_observation_contention_test.go",
+      "before": "0c105eded110eed457ea46a5cdfa84cf3f34fd2a2dcdc6e95f9985d43773ea62",
+      "after": "a5a1f60c03f8dd5095a88b2d7ce1828c02f78078bbe5096e8694b9d6ecb70c5e"
+    },
+    {
+      "path": "test/integration/fleet_observation_test.go",
+      "before": "82ba9278b6b8b1f09aca431f715e7499a0c84f6417bafda14810122f6618abe4",
+      "after": "9e92349b7a142ba7586dca758e6cc308b4754c8fcd5b681e021f6686ff7897cc"
+    },
+    {
+      "path": "test/integration/initial_runtime_bridge_sql_test.go",
+      "before": "9e2ed3f8dedc065aa6a678a188f0b0e4351a0a3b13e0d35c84c6e6f1926aaf0d",
+      "after": "e1da2a359461fb35c4d0af18778df4a52cac2c548063a26f5d20fd3f94a055b4"
+    },
+    {
+      "path": "test/integration/owner_identity_constructor_current_test.go",
+      "before": "1ac1521f15ed22a1a5006a8728d2fce35853ecf1931bcf0672a71b99dd0f4034",
+      "after": "90589ea86acc7000da68a96cb163b953610ad01a04f7b6882c6969c5d8ffd65a"
+    },
+    {
+      "path": "test/integration/owner_identity_roles_test.go",
+      "before": "525db7a382b8a4bd710255f504ce903d7ef4b6b78040182f8b26c4728c84ea8f",
+      "after": "09a3818830f2fb9c3ef06e264cfce6e5420cc2742b6f70d634f68c64be0eac58"
+    },
+    {
+      "path": "test/integration/public_runtime_roles_test.go",
+      "before": "74b9155a1fac7b68a56261ff479a401ef7ea865570057a82b11cea6eae779ca6",
+      "after": "b5ec20019c6c00f615c2bf3d2d59fd5d03337a831eab20767849dc8d7fa1baa8"
+    },
+    {
+      "path": "test/integration/bootstrap_issuance_test.go",
+      "before": "b0f5899db886b989ba927999b6e2881b72f166b49096228b7a00504c518bd14e",
+      "after": "e2d04f4aacd262f097f01b55835c658cb59f36ddc379d9ac24d2c84f5a2da7f4"
+    },
+    {
+      "path": "test/integration/bootstrap_reservation_test.go",
+      "before": "d56e0111e97015763b1d8b63d3c13c9ec694da9494c69e0a155018ed1bc26ed9",
+      "after": "a03a33769d964dd652a2c03cf99119b2136c4a83d685d30346958826f39bb0a9"
+    },
+    {
+      "path": "test/integration/capacity_context_test.go",
+      "before": "f692bab1efc0ef4813c40a82cfb02892e5f9fb8d836c360154d87f84b38edc9e",
+      "after": "43354b4f901e023562977ab43e0ae729ba5257bca3261ea9b01fdd60349b8f07"
+    },
+    {
+      "path": "test/integration/capacity_owner_registry_test.go",
+      "before": "b40e756c7869de4c3a08ba659c54d12c87a2f170324a8e31a10ca7b505dbf7a8",
+      "after": "8717212f3fb24a21ad9a0d43a6f4820cd20fb74c357a092a6d7cd46b0684cf5a"
+    },
+    {
+      "path": "test/integration/capacity_producer_test.go",
+      "before": "e01211c306c46eb1d92e4283e3b6d7eb572a4e026d5e67dbf156ab18bed8909e",
+      "after": "4e1862f12f7b534b58156a03bcbe47643059c0406324f5c65b77071b9ebba47b"
+    },
+    {
+      "path": "test/integration/capture_intent_lifecycle_test.go",
+      "before": "1ff01b2c1c2d5fcb24ce7a571cb6d2e4488d818d40103260a6bac33d48a20701",
+      "after": "7e2a3eed3b8615c9c08c3e5d07afd210451da60beffc5b11c515cf37d17a2b71"
+    },
+    {
+      "path": "test/integration/connector_observation_operation_sql_test.go",
+      "before": "01427f4a217a01e7db8f5485822c558435b616363f3460615bdeb906e9da20db",
+      "after": "857833c1dbc4d872eca0b042424d17ab2195f31148efa39d266314471737b3a6"
+    },
+    {
+      "path": "test/integration/context_deletion_test.go",
+      "before": "6a4d2b530ad0cfcc7eaccc3273e5bb5de4ee96bddc711bff3248bc8c7f8c9e4c",
+      "after": "ad70ccd3a658e09092c8e36987d88a5cd39dac471d08a7c617877b33bf0b2669"
+    },
+    {
+      "path": "test/integration/context_start_exchange_test.go",
+      "before": "a563af78c191a3737ac470a4053101aabb3f8b223203d0430f808f7fea1d9c85",
+      "after": "0619cb37a5659130e42c94f9405c36dfce330721c161ac45d22f7400f1ad374a"
+    },
+    {
+      "path": "test/integration/context_start_owners_test.go",
+      "before": "227d602af886c24a36cbc95dca526358967c5d16fb76023e016314a5623fcee7",
+      "after": "73454cda47eb3a3f21b257aa4f85238b07f84a6bb585a4bf2f5985a64a8c4eff"
+    },
+    {
+      "path": "test/integration/download_sessions_test.go",
+      "before": "518282b0f1286c664f52dde7229fffa684553a5b155180ef8bb8a1a94e2503a7",
+      "after": "dcae0e568794e1b00589be60e79eea98fb69aa32d05e3fd379fbffa9e94a4138"
+    },
+    {
+      "path": "test/integration/download_stop_lifecycle_test.go",
+      "before": "6acf66d5ede471c664df4858176626d4e398c8bb26bce22d3352a7d625977225",
+      "after": "7f2d839ad70f02c4b3778124f78592658bd2897150e0c7041db2b42b9c685635"
+    },
+    {
+      "path": "test/integration/enrollment_provider_test.go",
+      "before": "79371674a77927be23e719d5d2cce0bdb74732d39b676fcbf53b926c43d87931",
+      "after": "65dc357ba448d09727c42748a431bf07a79b1ed7296769b529e3b8e2514689ee"
+    },
+    {
+      "path": "test/integration/enrollment_signing_test.go",
+      "before": "e7b79811ea5ebc3a5581a64c32bf4c83d58def7c703ee66fc635b75447cc3893",
+      "after": "e99aea91a69215c3a3998f2710e96e3cfaad9f47cc46c627288b30bab32dfadd"
+    },
+    {
+      "path": "test/integration/enrollment_test.go",
+      "before": "c204cc74cca1100a61a9b73ca8538fff94996039d8c0aef1ce531a09e0fd62c2",
+      "after": "93aef2455201b4221b60735af2dfbde7c61dbd66828ec77b154d6a0b9c374dfa"
+    },
+    {
+      "path": "test/integration/fleet_observation_fixture_sql_test.go",
+      "before": null,
+      "after": "a49dbdf1bb3ee1e9e99cd8d8113bc234d8c987c61a8d653d94404af5c91e719b"
+    },
+    {
+      "path": "test/integration/fleet_observation_fixture_test.go",
+      "before": null,
+      "after": "c8a9df7d4fdc0958e29500dc3e4c674266c98220f2648891cbbd1e11148a0c33"
+    },
+    {
+      "path": "test/integration/hub_worker_test.go",
+      "before": "e9f60bbe961e59e033ca877787b67f267f879dfed10f5dbb94b971679e73f9dc",
+      "after": "ad959c6102cc8f3a712de7f09c17777c01c8b3eb40a2d34971e13c4cda2b48b0"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "before": "340cdec228ea870935acdc0d6907ca49af893a678cb165fc2825782bc3d323aa",
+      "after": "573b0169dc3297b61c35c8b79a83e96ffd6b97d2ec94446e309542c1c8d42afd"
+    },
+    {
+      "path": "test/integration/initial_installer_pod_test.go",
+      "before": "fa3fa7a39726f1dc0f931df684cbbf3ee34f07a8031131604d286b799dc1ba48",
+      "after": "943e8e7d334777805ec5557dddce47e722643dbf379e30f68a00c4f29dadf008"
+    },
+    {
+      "path": "test/integration/initial_sql_roles_test.go",
+      "before": "f5df65ccdf64115579f787abc536d090c5411209ce5b4ce6aa30c82044ed1a2f",
+      "after": "42ebdade563adb8b2407b8ea06d328630797653b26d8daf3b0c3fba89de00a35"
+    },
+    {
+      "path": "test/integration/local_key_lifecycle_test.go",
+      "before": "4d7c9e7fbd6927053a7f69039eaf2374d7839f0cca1385b3a6ff261eda616f58",
+      "after": "941fd104574a40aad17b482967cb649370b6d11c5cead450cc46804ccb0b94c2"
+    },
+    {
+      "path": "test/integration/native_retention_observer_test.go",
+      "before": "976e770c3610039f3fb00fe67de7ad6687573436b1b999de0b931b55b34bb90b",
+      "after": "2be83b7ac399c6c7a9b91f11d4fb42a3dde9c4ca5700f06dc02f3368f6cb9e27"
+    },
+    {
+      "path": "test/integration/operation_audit_lifecycle_test.go",
+      "before": "a749bdfc7caa6340afb9591bef02b6a257904ca08a9da89889fa959d0d598470",
+      "after": "79cb6df34bfadbb5dab3f751b349038b36cd630d5079222f8c43e386684ea86d"
+    },
+    {
+      "path": "test/integration/operation_audit_overdue_test.go",
+      "before": "5ade4aef908d43c0f9de1f9a85679b3c09f79071600c34242779a9f555c7d866",
+      "after": "0916bb6c2bfb238033f83478e431c106bac5125b2ae423bdcf0f2a750ab4da5e"
+    },
+    {
+      "path": "test/integration/operation_verification_budget_test.go",
+      "before": "a36f6e9c899fef2c1176669c3239d522cb7876aa07567a87a04c63733c9db17c",
+      "after": "e4ae65e8fcf550b0cf5a49aff9dab2abf986f516105addae1623a4353fb72667"
+    },
+    {
+      "path": "test/integration/owner_configuration_sql_test.go",
+      "before": "1e016fe84e2a8f64b4d8ce15590641d7fc53aa954d7e42fbe84ef393d5dfcc60",
+      "after": "74663a7605dda1f28e5df1548e9f0f522cf3fc5dbc84e0922863f37f5e1346ae"
+    },
+    {
+      "path": "test/integration/owner_native_activation_test.go",
+      "before": "47bbd6023fe33d2a7618e6b87a1e6a38955ed124f69ee77f22350761f9c5c978",
+      "after": "953e6b874dd9251a3eddfdda2efdf36fbeb671972efb4a62f1c46bf58cad828d"
+    },
+    {
+      "path": "test/integration/owner_registration_test.go",
+      "before": "28939bf7b64d7e1f08ec789208e3154f6343ae4e697f4b4c88fbcc805b8bb61a",
+      "after": "744b1d1231d39be27f4beaed709717cb173a9c3d7b511ff6821108bcf7f15ac1"
+    },
+    {
+      "path": "test/integration/peer_registry_test.go",
+      "before": "044bd33ee2199292ff09af29acc106b6f2c99bfe6d773865a65e131f9b8c126d",
+      "after": "7c317a85716c8579b431d644f21afec4734cc02f655afd4d769f689dc18c03e4"
+    },
+    {
+      "path": "test/integration/policy_authority_test.go",
+      "before": "ccdb6fed98a20a472c391237600cbe9d5b9b59c7db1c1cacc1b0f69374c129d5",
+      "after": "cc02976fa28619d7f76b884d2c8846a72016a7331e8518bc01aafb181ee0aaaf"
+    },
+    {
+      "path": "test/integration/recovery_effect_fixture_test.go",
+      "before": "2880f32c5f35f7a45de62d51c57682591f01f5605734c0d6a1cca249723481ea",
+      "after": "a86d0c5d41462712baf5ce9309285c51c0668cd23b38f6c81cee6846f2826788"
+    },
+    {
+      "path": "test/integration/worker_configuration_kube_test.go",
+      "before": "050589e1adc64d2f6677d3afe8328f5ab10ae662bf2493b366042e5d213531d5",
+      "after": "d09572b0f88eca6ec172e633fa635e89dc74dea9eb18c08ae2ccf080b2da1817"
+    },
+    {
+      "path": "test/integration/fleet_freshness_native_test.go",
+      "before": null,
+      "after": "82af1ba6416fce87a0f9390f39885c4ed533d07dd5080ba35354ead4936b8630"
+    }
+  ],
+  "contracts": [
+    {
+      "path": "docs/architecture/fleet-observation.md",
+      "before": "f325980cd1a3c84ee37e51d7cde755be39d6e1d3762b7cf45da516a4d12daf86",
+      "after": "2631e2ea8647d2978a5875aafe3a1fcf36f9871ad2f0803a9e894f5fc458305a"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "before": "e15059b65fb1e866eeec3405ededb586c7f798c7a9f7cf39baf7b330bef59edb",
+      "after": "3cc7d63f3ae11ecc5847e18783de6c34e502477df93a8d5378f5e63b55cf811c"
+    },
+    {
+      "path": "docs/decisions/155-unchanged-fleet-persistence-contention.md",
+      "before": "cccefd7fcf00c3becf84cae60a7d846e88552d3c19a621325221a36e989ca029",
+      "after": "b72ee6bd348faf1882044a2d6d8223107e351a9fbe4f00e746fe4a5149ac5b94"
+    },
+    {
+      "path": "docs/implementation-progress.md",
+      "before": "1e2e80c7665375cab0b359e7f0f11f10dc9ed13dcf14df9ab68450e0cdb49555",
+      "after": "0317c7c4a0b5d6fc798c4ec6a3ac9ee3b0ca1db8bbcf23508fc5605fc3152694"
+    },
+    {
+      "path": "specs/federation.md",
+      "before": "d4d2ec2fa206a90f1efd1303f64d43a2d76cfee304aba7f4033dece885fc690a",
+      "after": "49d622f3b7031ac55edbacfa50a2a0d4554db135e6adb98326800ca1c5fadf62"
+    },
+    {
+      "path": "docs/decisions/161-fleet-observation-separation.md",
+      "before": null,
+      "after": "ebdbba0ab17688c8e80ff1bd826e435a35483de0bd0b4428625f05b35aad90b9"
+    }
+  ]
+}

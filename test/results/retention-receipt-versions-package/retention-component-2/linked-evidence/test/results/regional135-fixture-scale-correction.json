@@ -1,0 +1,9 @@
+{
+  "path": "test/integration/context_start_connector_test.go",
+  "beforeSHA256": "d38c37a5c34a64b0d5763a0cf2e55de94b19dbedc62f1c0807cc742637722988",
+  "afterSHA256": "0493bab4db84fed08f2bf8083f4344e732c6dcf2031f45e62cfa41f400c73642",
+  "scope": "fixture-only definite resourceVersion conflict handling; original UID and complete spec must match",
+  "beforeRun": "regional135-native-reader-first-check.log",
+  "afterRun": "regional135-native-reader-after-scale-fix-check.log",
+  "scopeVerdict": "original Deployment setup passes; enclosing native test fails later at process observation"
+}

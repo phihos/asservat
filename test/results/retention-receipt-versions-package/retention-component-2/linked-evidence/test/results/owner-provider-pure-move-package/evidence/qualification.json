@@ -1,0 +1,18 @@
+{
+  "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1",
+  "manifest_sha256": "cba3a766c04853ad1bc0572db3dac8fdb9b7a5f975c030b557d412449e679595",
+  "result_sha256": "958fd7eb0544481a9ab5d60557f30e7c055319769e5a0ae1d49cbcab259d65f4",
+  "runner_sha256": "d9ec24878ee77a73a954d8f9d9f300517901216d2ea0ca39226871a9a151a6bf",
+  "original_function_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+  "counts": {
+    "race-kms": {
+      "top_level_pass": 29,
+      "top_level_skip": 1
+    },
+    "race-providerconfig": {
+      "top_level_pass": 5,
+      "top_level_skip": 0
+    }
+  },
+  "goldens_sha256": "07c6773c1e44d993bb4a56fa84f91886fe2664997c066f285eae4d02d4778a65"
+}

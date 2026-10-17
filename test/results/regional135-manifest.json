@@ -1,0 +1,325 @@
+{
+  "schema": "asservat-guarded-stage/v1",
+  "scope": "ADR135 live regional API-context start; no public enablement",
+  "created_utc": "2026-10-12T09:46:53.643047+00:00",
+  "live_root": "/home/phil/Projekte/asservat",
+  "payload_root": "changes",
+  "base_root": "bases",
+  "files": [
+    {
+      "path": "docs/architecture/regional-context-start.md",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "92068d5a4bfd390468308183f11106d52eac02c8459b4c2bfd84c6d3867059a9",
+      "bytes": 10306
+    },
+    {
+      "path": "docs/decisions/135-live-regional-api-context-start.md",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "89b286a11cb31172ed25bbebbcd03f33a279bd36588b07f83c7ba50e086133a4",
+      "bytes": 4464
+    },
+    {
+      "path": "internal/adapters/jose/api_context_work.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "3ff77736cac1aff3ac20a907be36a7e5c3a1181c5d4c05df6e79a0df8dc8bf0d",
+      "bytes": 11300
+    },
+    {
+      "path": "internal/adapters/jose/api_context_work_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "51c10e5a59326ac7a82e4e13cf1c348d25ca1e64888d6048ab9bf7374153c76f",
+      "bytes": 10564
+    },
+    {
+      "path": "internal/adapters/kubernetes/api_context_trust.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "329c6b8c868d1f8d9c8b1aace6efd6aa43ce97699cd52f7286798c65f21339e1",
+      "bytes": 6768
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_inputs.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "beac88cd70db5f6ccbe2f5da9063ea01c87f8ec4df415f999ef73f564b391bc4",
+      "bytes": 5215
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_process.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "cbe58505388eeb187a157744743d2e220c860fd33751694db31f4a2baf741f85",
+      "bytes": 15693
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_start.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "6d69b0b0bd60a157a3e8d60c4fea08658a4ccde2274c5c551f9c7b59450bd61f",
+      "bytes": 7114
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_template.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "c0ec9d07c12d19ff24939489922da28aebff3a6ab5e5fe936dd409d40671fad4",
+      "bytes": 5321
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_template_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "7a74c66fd7a0f13c2810cc14927caf78dff4f895f82875a02efb910b78200801",
+      "bytes": 12211
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+      "action": "modify",
+      "base_sha256": "3fda1b970178d78d19dcb2a85542418e30b4bc1f04e9d327b190a51f995ea7ca",
+      "payload_sha256": "430c8d2ceaf1703b6b2c7c5aa74820e869bc94d2cb79ecc093f29112464d39cc",
+      "bytes": 20202
+    },
+    {
+      "path": "internal/adapters/mtls/connector_process_observation.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "4bafe7a015cd4ce58f3120869d99bdf22504abd85beeee4a0eaa583d5d3da827",
+      "bytes": 3716
+    },
+    {
+      "path": "internal/adapters/mtls/connector_process_observation_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "7c6f81bab713d2ee41319297ded43ee21dd571918ae06e3dc32dd4a6cc4adeca",
+      "bytes": 1260
+    },
+    {
+      "path": "internal/adapters/mtls/context_start_client.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "afd060df47f730cc6efac386ca911a8e49dfc6413422c657c0dadf188e505d17",
+      "bytes": 17780
+    },
+    {
+      "path": "internal/adapters/mtls/context_start_ingress.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "ae3f54044a33691482c705cfdecfcb90ee54abd29742a135bdd0951d39267501",
+      "bytes": 10158
+    },
+    {
+      "path": "internal/adapters/mtls/context_start_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "cf722aa9f387d817a189ba6b4fb49027dc79c459f8a02f18886f65b2a74dbbc0",
+      "bytes": 17965
+    },
+    {
+      "path": "internal/adapters/postgres/context_start_owners.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "0296dfbbd051afb4c83e3e4756bb52fafbc421f8b7544b9eafef30cb92a2dfdf",
+      "bytes": 2331
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/context_start_owners.sql.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "87bedc73b6c99211f0ff9c804dbd4dfd83b9e2adf6b99fa7c8cb4eaef89e7019",
+      "bytes": 1922
+    },
+    {
+      "path": "internal/application/execution/api_context_reference.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "a45d07cca49de4dbee58d154f2eb8331d2b02412a6786ecc8fa98ccc40f13b1c",
+      "bytes": 8191
+    },
+    {
+      "path": "internal/application/fleet/api_context_work.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "2f1eaa200e9f82dde163e7bfa1ccade6eb22e4e306a42214644b80d062dec01e",
+      "bytes": 1173
+    },
+    {
+      "path": "internal/bootstrap/context_regional_start.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "166ede1aee439b59f2a58e5db266c9db076a5dea314f0e777393295d5b29f8ab",
+      "bytes": 8209
+    },
+    {
+      "path": "internal/contracts/api_context_frames.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "e8ae6ac904000ef05c74322313c888efa01ad1aba7dcc761fc7c702fee59ce5e",
+      "bytes": 3921
+    },
+    {
+      "path": "internal/contracts/api_context_frames_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "232b44e9f05777b9706a76b1f6bb256a8695d535c77ef8659b16d619c6ce7033",
+      "bytes": 1337
+    },
+    {
+      "path": "internal/contracts/api_context_start.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "f7b12ba310788554a3e5f33ab05316ee5b24a0845dc7702286088b09d92a9c46",
+      "bytes": 5725
+    },
+    {
+      "path": "internal/contracts/api_context_start_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "541513274b5e5765a3d825927976e72ee64c7fbeea593e6eb72261b97b25fac8",
+      "bytes": 3588
+    },
+    {
+      "path": "internal/contracts/api_context_trust.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "115fd0a0af2c079440fd9484a63db293163b8d9488258f3e2c06dbada4675c37",
+      "bytes": 1406
+    },
+    {
+      "path": "internal/contracts/connector_api_context.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "52e005f95fcb77ccc8092ed2505a2104272cf835805291409741b3a89e7bf76b",
+      "bytes": 2843
+    },
+    {
+      "path": "internal/domain/configuration/owner_administration.go",
+      "action": "modify",
+      "base_sha256": "4477ac32973027f19afcdecb72cbb15d31f7694139c172492a40bb52bf863bcc",
+      "payload_sha256": "a620af2e673a5ec582793c555dcce5c0d8ea8537ac79ae67e575eca0c396205a",
+      "bytes": 2747
+    },
+    {
+      "path": "internal/domain/fleet/api_context_work.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "5ccd710942cb56eab421b0bd4cdf8273b7ea1f82ef49d30aeb85b2f0a37ffc14",
+      "bytes": 5922
+    },
+    {
+      "path": "internal/transport/contextstart/client_stream.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "d79e0f16e04b17b14872ec55810cb99a4d9763970bc608fb7d727c4fe61a8b81",
+      "bytes": 1920
+    },
+    {
+      "path": "internal/transport/contextstart/conversation.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "944ca8a440e3c3ea4c08a7eab61b34d1d889404525b8cba1e639dfdd790aeb2e",
+      "bytes": 8808
+    },
+    {
+      "path": "internal/transport/contextstart/handler.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "1ef495eb17ab4a41fce8e6774943f3f199ed42bae6ac12fb809ac7329194c8b5",
+      "bytes": 4915
+    },
+    {
+      "path": "internal/transport/contextstart/identity.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "2e558d0ad1ba40b3b330069c02388f0d8c7ce71939871c535c6cc720e96097a1",
+      "bytes": 9386
+    },
+    {
+      "path": "internal/transport/contextstart/identity_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "6dc34ff5df0911fd27585b128e87b937f094a69b67ee8a625253b96eb7b219ad",
+      "bytes": 9286
+    },
+    {
+      "path": "internal/transport/contextstart/router.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "57cac91edd2b062e64df33147841c6c102d43923fd0178a5ece210cfdd63e132",
+      "bytes": 9730
+    },
+    {
+      "path": "internal/transport/contextstart/router_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "601daa7cbfbee6489893c4a5c7c9dc6f09be51f13b08aceb04b9307b0be2af9a",
+      "bytes": 3264
+    },
+    {
+      "path": "internal/transport/contextstart/stream.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "9abad52d556513c2831eacc97acd229b5aae86c18b7c8d4f559a8a1b62bbde19",
+      "bytes": 9945
+    },
+    {
+      "path": "internal/transport/contextstart/stream_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "607921420a8e4d6c84816ac2cbcd1fb860acd03e19c529da5955984267081bc5",
+      "bytes": 6308
+    },
+    {
+      "path": "migrations/queries/context_start_owners.sql",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "74789018109c8ea9ab23c29cbe4180070885b758ed139f3d7ce8d2fb8bb69f6c",
+      "bytes": 810
+    },
+    {
+      "path": "specs/contracts/api-context-exchange.schema.json",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "a56b3f77f1443f2d2aafdfe195bf5c404472a506f983970f2ca7726a56fcd973",
+      "bytes": 11474
+    },
+    {
+      "path": "specs/contracts/api-context-work-trust.schema.json",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "fb3ff73e0c040e905dfa6f5fc795aaac25227eefdcd9f7097588d73cc45069a8",
+      "bytes": 2043
+    },
+    {
+      "path": "specs/contracts/api-context-work.schema.json",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "8b310294fd4041bf6d91b0c55d7f34e085d989d5735cca960b7efb60a2604103",
+      "bytes": 8648
+    },
+    {
+      "path": "specs/contracts/connector-api-context.schema.json",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "2b7b20ffe397ae199b2fa80ed5d9edbe411bcf1214f9e2d70b8cdda09baef477",
+      "bytes": 6324
+    },
+    {
+      "path": "test/integration/context_start_connector_fixture_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "91932b5eae07ad3f7f1d9d132783a36441dc1a35ef1c819d3eccc349e88fc60d",
+      "bytes": 5423
+    },
+    {
+      "path": "test/integration/context_start_connector_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "d38c37a5c34a64b0d5763a0cf2e55de94b19dbedc62f1c0807cc742637722988",
+      "bytes": 26556
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+--- FAIL: TestInitialWorkloadRejectsInvalidDerivedRBACNames (0.00s)
+    initial_workload_test.go:28: accepted a plan whose derived Role name cannot be created
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.009s
+FAIL

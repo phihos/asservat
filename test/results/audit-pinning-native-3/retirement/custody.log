@@ -1,0 +1,12 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers
+    context_publication_test.go:162: context admission unavailable
+--- FAIL: TestContextAdmissionWithRealServices (61.22s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend (29.99s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend (30.74s)
+    --- FAIL: TestContextAdmissionWithRealServices/prepaid-stop-positive-retirement-backup-history-and-unknown-writers (0.12s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	61.273s
+FAIL

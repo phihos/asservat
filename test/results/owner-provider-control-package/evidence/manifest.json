@@ -1,0 +1,32 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_control.go",
+    "base_sha256": null,
+    "payload_sha256": "ba947130f6bcc39b4b3896f130b8e002fc33edbb5da052a5e536fc4ed66ad30f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_control_test.go",
+    "base_sha256": null,
+    "payload_sha256": "3502062c7228a82c4a844b695a002e839af5825249b430acc4794828968e04b0",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control_test.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_control_validation.go",
+    "base_sha256": null,
+    "payload_sha256": "11cecdd7bfc72aa59eaf67178ee8f72673890dbc908bae9c12137e2737f1f1ac",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control_validation.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_lease.go",
+    "base_sha256": null,
+    "payload_sha256": "a320c8c9df1f1a3fb5dfd861063a378ad718b6058586618c4cc739bd199d817d",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_lease.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_lease_test.go",
+    "base_sha256": null,
+    "payload_sha256": "8a9fb7cf4920e9fc314c11e7a06a9497e702ba598178ceb21534e6e9044ab8ee",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_lease_test.go"
+  }
+]

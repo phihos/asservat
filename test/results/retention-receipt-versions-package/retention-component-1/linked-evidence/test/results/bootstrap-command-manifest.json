@@ -1,0 +1,174 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "scope": "ADR131 fixed bootstrap phases and v2 passive history",
+  "files": [
+    {
+      "path": "cmd/asservat/main.go",
+      "base_sha256": "2252e406c395234d5d19c6787cc21cf800b5d2336f1b337293e89fe28a41f4f6",
+      "payload_sha256": "d08931bd0830c27ebb671c4281ec7b832a630a43ff054e471a7841addfbc09c7",
+      "bytes": 3094
+    },
+    {
+      "path": "docs/architecture/initial-bootstrap-command.md",
+      "base_sha256": null,
+      "payload_sha256": "44e28542ea96454d58635acae980ed693eed33bc9843947c994c7d2e89962714",
+      "bytes": 8940
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap.go",
+      "base_sha256": "ade5770575b47d8f9a5073cfbd1d13aa479f909a665c157c3c22739ba285e1d4",
+      "payload_sha256": "c4ab831b8fe7e2dd95034bb809c2bea745b58c328014cb9043d52941795de5cc",
+      "bytes": 11638
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_observation.go",
+      "base_sha256": null,
+      "payload_sha256": "df1a2675603567cdd17e8b197dce51790f4a392907d953da8ee0e1cf0ad90460",
+      "bytes": 8605
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_observation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8f6eeca731356e30caeb6a60b14a0c3f8298e9d546da297cd3a5315317bcf3fb",
+      "bytes": 11063
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_open.go",
+      "base_sha256": "721b88280da0738e621658e4877934d4c663d4403a9f66c926dccaa224abd0d6",
+      "payload_sha256": "f89a810751c89ee730e4147d67841db6fcf566cff43d1d8ac067b501008fd2a5",
+      "bytes": 11906
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_passive.go",
+      "base_sha256": null,
+      "payload_sha256": "3bce6c66661c7acc11dc42c7d9d0c2081c5c6bb54817b2e68cdd27c4121145e5",
+      "bytes": 13193
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_passive_test.go",
+      "base_sha256": null,
+      "payload_sha256": "bd73b45e6aa01f827822020b950e32494a43caa987b0239111c8b8ea7be4b2de",
+      "bytes": 17878
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+      "base_sha256": "334c6f25e897ce04bc4cd76e099e5366eb01376971e05174fe9bd583c4f1fb02",
+      "payload_sha256": "5ce60fbf5ebc537bda2cff1f03919d15a0296725eceb4dd15cba1bff24f1e93b",
+      "bytes": 13636
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_state.go",
+      "base_sha256": "525c2132e2839f1533c3b6f8572e73b729bcd05716fb35cf9b6c54d9b3c1fa43",
+      "payload_sha256": "0d5676d2a50033af3964978a3b5f30964f37e9949d49ee620df4a9083dde115a",
+      "bytes": 10023
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap.go",
+      "base_sha256": null,
+      "payload_sha256": "669c7b26b76f7f281771a36bfe5c28813bfb1bb97d82872adf202aa5bd1da546",
+      "bytes": 11164
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_files.go",
+      "base_sha256": null,
+      "payload_sha256": "2edbc6c847fa4b6b54f2c82e31a07a72ea028e0a106f16ee7d4c60a893c0f93b",
+      "bytes": 4970
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_files_test.go",
+      "base_sha256": null,
+      "payload_sha256": "dbe1b3ca15bdcee3d27cd2c6b4676c18a63a67cb7b55c3de5446de801d8f1e52",
+      "bytes": 5146
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_retire.go",
+      "base_sha256": null,
+      "payload_sha256": "5d3ef36b68eafb7b0233d6459aa81542c10b61f3862fb005f65555112f585465",
+      "bytes": 3232
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_schema.go",
+      "base_sha256": null,
+      "payload_sha256": "c1e611f1cc3919291e8ba833ce276ebd3ee0439de18b47f4a5bab806207a8db2",
+      "bytes": 8583
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_schema_test.go",
+      "base_sha256": null,
+      "payload_sha256": "37b656d0d8e6433ea12037776a6a4ebe25b5a0cff7837d96f9d6da69a8712f4a",
+      "bytes": 5211
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer.go",
+      "base_sha256": "19808c668fe7db3fdf479b3df8bdb9a72f98cd3734c268bd05f4628d22dad786",
+      "payload_sha256": "652840ead9385adbbc57266617298ed23576a83fbea2a5bc53966cc5385fbdea",
+      "bytes": 12862
+    },
+    {
+      "path": "internal/bootstrap/initial_schema.go",
+      "base_sha256": "384d999e8c3be58835e2ac5348f0be313ec461e7efc6a0750845090b2e257fd2",
+      "payload_sha256": "90728cb6ca5b96861f3a0551222d0d04182733add35d9d4c16bc00235a7f8409",
+      "bytes": 4510
+    },
+    {
+      "path": "internal/bootstrap/owner_inputs.go",
+      "base_sha256": "90e8de2b278e2695e66a5c049d0b4bd3f7267933dbded7038259aa6755fccd56",
+      "payload_sha256": "93a35c6beda7710eec2c10bfeef584f9ed9402668bb6f63dffa104eca9ece31a",
+      "bytes": 11365
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap.go",
+      "base_sha256": "33fbe6506bacb47e3e86d942183216b1863e061be9112f5d9564f9298d03341e",
+      "payload_sha256": "d4def48711a265d2f9f0bd0426fbc302134462f804ecdd39927dd7949c421272",
+      "bytes": 6951
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap_observation.go",
+      "base_sha256": null,
+      "payload_sha256": "fcc114a7842b7a01aa00dccb69fc2fb64306925e1a931c366642889a08255ecf",
+      "bytes": 1315
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap_passive.go",
+      "base_sha256": null,
+      "payload_sha256": "77ae84f9dad1e4122911877b041d67921f0125b6961e5890e4a50f0e022ded61",
+      "bytes": 1994
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-observation.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "2f7597836b0189625aab5566f8ea201b9ea804cf79fe613bd8c1f07ceff7c548",
+      "bytes": 1921
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-passive-history.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "f3d12734e50d08b6514c14b62d424ff2f62813f695965d34a5d493c83a49070f",
+      "bytes": 1480
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-passive-locator.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "8b53f05a96e7c7e5240dc0107ccd8a0a40d3a3e29fa38ef544174c0f22b450b2",
+      "bytes": 1506
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-state.schema.json",
+      "base_sha256": "56597b8f8886fba0dc1f622cb2c14ae909ad96ac3832c2ba724b885f6fa80cf0",
+      "payload_sha256": "a653fd852098f13b48b138e6e2d4e29e3b53226308895cc907e9246d5533da7a",
+      "bytes": 8661
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap.schema.json",
+      "base_sha256": "fc4c3ed70ef0e23463caf9882c7245c550897cacd21726f085be015ad0cfe5b9",
+      "payload_sha256": "d297a87429e5c4a8d842e1ecd3b3069132905ee3a6fbfd048218490c0bf6ee60",
+      "bytes": 5295
+    },
+    {
+      "path": "test/integration/initial_bootstrap_passive_test.go",
+      "base_sha256": null,
+      "payload_sha256": "50b2a607477784e3716c0d1ca2d33bbd9e253f8e240ef785fadb7e609f9548c4",
+      "bytes": 10508
+    }
+  ]
+}

@@ -1,0 +1,173 @@
+=== RUN   TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor
+--- PASS: TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor (0.01s)
+=== RUN   TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation
+--- PASS: TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation (0.02s)
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/batch
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/ttl
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/parent
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/default
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/direct
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/identity
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/account
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/metadata
+--- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority (0.11s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/batch (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/ttl (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/parent (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/default (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/direct (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/identity (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/account (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/metadata (0.01s)
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/other-token
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/identity
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/policy
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/unbounded
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/extended-max
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/wrong-mount
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/expired
+--- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd (0.10s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/other-token (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/identity (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/policy (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/unbounded (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/extended-max (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/wrong-mount (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/expired (0.01s)
+=== RUN   TestOwnerProviderUnverifiedJWTOnlyShortensReauthenticationScheduling
+--- PASS: TestOwnerProviderUnverifiedJWTOnlyShortensReauthenticationScheduling (0.00s)
+=== RUN   TestOwnerProviderControlCannotInheritTLSBypassHooks
+--- PASS: TestOwnerProviderControlCannotInheritTLSBypassHooks (0.01s)
+=== RUN   TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential
+--- PASS: TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential (0.02s)
+=== RUN   TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure
+2026/10/13 04:14:17 http: TLS handshake error from 127.0.0.1:54016: remote error: tls: bad certificate
+--- PASS: TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure (0.02s)
+=== RUN   TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure
+2026/10/13 04:14:17 http: TLS handshake error from 127.0.0.1:60758: remote error: tls: bad certificate
+--- PASS: TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure (0.02s)
+=== RUN   TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath
+--- PASS: TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath (0.06s)
+=== RUN   TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow
+--- PASS: TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow (0.04s)
+=== RUN   TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning
+--- PASS: TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning (0.06s)
+=== RUN   TestOwnerProviderLeaseExpiresDuringActualTLSBody
+--- PASS: TestOwnerProviderLeaseExpiresDuringActualTLSBody (0.35s)
+=== RUN   TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins
+--- PASS: TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins (0.00s)
+=== RUN   TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd
+--- PASS: TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd (0.00s)
+=== RUN   TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential
+--- PASS: TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential (0.02s)
+=== RUN   TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline
+--- PASS: TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline (0.01s)
+=== RUN   TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup
+--- PASS: TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup (0.01s)
+=== RUN   TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken
+--- PASS: TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken (0.02s)
+=== RUN   TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication
+--- PASS: TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication (0.01s)
+=== RUN   TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow
+--- PASS: TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow (0.04s)
+=== RUN   TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath
+--- PASS: TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath (0.01s)
+=== RUN   TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned
+--- PASS: TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned (0.04s)
+=== RUN   TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining
+--- PASS: TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining (0.03s)
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao
+    owner_provider_native_test.go:30: requires the closed owned context provider-auth mode
+--- SKIP: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao (0.00s)
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes/original
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes/namespace-uid
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes/account-uid
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes/server-role
+=== RUN   TestOwnerProviderRecipeMovePreservesOriginalBytes/audit-key
+--- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes (0.03s)
+    --- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes/original (0.00s)
+    --- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes/namespace-uid (0.00s)
+    --- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes/account-uid (0.01s)
+    --- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes/server-role (0.01s)
+    --- PASS: TestOwnerProviderRecipeMovePreservesOriginalBytes/audit-key (0.01s)
+=== RUN   TestOwnerProviderRecipeHasOnlyFourSeparatedEffects
+--- PASS: TestOwnerProviderRecipeHasOnlyFourSeparatedEffects (0.01s)
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/store
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/mount-replaced
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/uppercase-digest
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/format
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/installation
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/kubernetes
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/bao
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/transit-key
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/cluster
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/mount
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/account-recreated
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/audit-secret-replaced
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/namespace-name
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/server-role
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/bucket
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/zero-digest
+=== RUN   TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/namespace-uid
+--- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope (0.04s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/store (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/mount-replaced (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/uppercase-digest (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/format (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/installation (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/kubernetes (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/bao (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/transit-key (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/cluster (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/mount (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/account-recreated (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/audit-secret-replaced (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/namespace-name (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/server-role (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/bucket (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/zero-digest (0.00s)
+    --- PASS: TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope/namespace-uid (0.00s)
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-account-uid
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-secret
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/auth-path
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/token-auth
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/plaintext
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/wildcard-account
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-object-uid
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-accessor
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-pki-role
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-engine
+=== RUN   TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/wildcard-key
+--- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-account-uid (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-secret (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/auth-path (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/token-auth (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/plaintext (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/wildcard-account (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-object-uid (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/missing-accessor (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-pki-role (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/same-engine (0.00s)
+    --- PASS: TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration/wildcard-key (0.00s)
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/installation
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/namespace
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/namespace-recreated
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/account
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/account-recreated
+=== RUN   TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/cluster
+--- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes (0.02s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/installation (0.00s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/namespace (0.00s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/namespace-recreated (0.00s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/account (0.00s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/account-recreated (0.00s)
+    --- PASS: TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes/cluster (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kms	2.163s

@@ -1,0 +1,47 @@
+# ADR156 reserve and SQL facet proposal
+
+Source design only, separate from the standalone value/port stage. No migration number, SQL function, grant or deployment selector is reserved or implemented. The existing SQL29 source/revision and old receipt bytes remain unchanged. Review this contract before schema work.
+
+## Provisioning and capacity identity
+
+Provision one dedicated control-audit reserve after the original source14/store/account identities and actual provider/storage qualification exist, before immutable worker inputs and their first audit-capable launch. The concrete installer must verify the actual qualified physical system allocation and bind its identity, pool, capacity, store, original installation root, source and complete policy. A caller-supplied digest/reference cannot allocate anything. This does not reuse an evidence or processing lane implicitly. Later system capacity adoption references and charges this same original allocation once, rather than adding its nominal bytes to a second reserve.
+
+Routine rollover, reconciliation and positive cleanup run automatically under the protected administrator policy; no per-epoch human approval or semantic source mutation is required.
+
+The policy supplies finite per-epoch ciphertext, data-version, marker, upload, part and metadata maxima, maximum open epochs/dependencies, fixed automatic interval, explicit uncertainty allowance and original lifecycle horizons. A configured open-slot limit below ceil(full residual horizon / interval) + one pending + uncertainty allowance rejects with that computed minimum. Do not silently allocate more capacity. Actual cleanup availability remains unqualified. Structural multiplication checks avoid overflow; physical compatibility, provider overhead, backup/WAL footprint, available capacity and measured cleanup/overlap remain separate qualification. Reconcile actual known copies plus uncertain worst-case spend before admission. Observed out-of-contract copies or exhausted headroom stop new claims and remain recorded/charged. No provider-wide quota or protection against a compromised external administrator is claimed.
+
+## Purpose-fixed durable state
+
+- Original reserve: immutable root/source/store/allocation/qualification/policy identity, finite allocation capacities, provisioning acknowledgement and conservative spend. Revocation/retirement cannot mutate original provenance or silently replace backing.
+- Source head: current semantic revision and monotonic negative watermark stay separate from epoch selection. Add an explicit epoch head and nonreusable ordinal high-watermark to the new selected layout only. Keep one pending attempt and bounded current/retiring set; no read of all prior history per effect.
+- Epoch: original complete public configuration, reserve/epoch/attempt/ordinal, original anchor/dates, claim disposition, positive encrypted exact-version receipt and separate head-selection disposition. A valid claim consumes a slot before I/O; failed/unknown work cannot reset its attempt or receive another PUT.
+- Dependency: exact dependency ID, concrete purpose-owned effect/attempt ID and epoch reference, admission interval, maximum original possible dependency end and terminal uncertainty. Per-purpose concrete effect owners insert this before their effect in the same current transaction. Counts stay bounded by the original reserve policy. A generic caller-provided dependency record cannot confer authority.
+- Physical obligation: exact epoch-derived key/store, observed data version or marker or multipart identity, known byte count versus unknown reservation, and current inventory/cleanup disposition. Historical `null` and zero-byte data remain physical rows although they can never become current receipts. Reuse the generic custody ledger only if its ownership and foreign-key contract can represent this purpose without a fabricated artifact; the current artifact-owned rows do not.
+
+The existing bounded first-page reader is diagnostic. Retirement requires a separate original-key pagination protocol with complete page continuity, positive writer closure and independently scoped current cleanup authorization. It must continue identifying old bytes after source/root expiry/deletion. Store/key provenance is immutable; current provider credentials and bounded operation lifetime are separate. Listing is not a stable absence proof while a writer can still act.
+
+## Facets and transitions
+
+| Facet | Exact permitted effects | Must not gain |
+| --- | --- | --- |
+| Protected reserve provisioner | Acknowledge one actually qualified allocation and policy under original installer authority | Runtime source acceptance, audit writes, recovery activation |
+| Epoch claim producer | Under current recovery/source/reserve and cadence, consume one new pending ordinal/slot and immutable attempt | Provision capacity, repeat an unknown write, delete/refund |
+| Epoch audit result/activation | Record exact encrypted immutable result; separately select it only while current and within original admission bound | Renew source/claim/dates, replace old receipt, clear recovery |
+| Current effect admission | Lock recovery/source then current epoch/reserve; insert exact original finite dependency before effect | Reopen prior attempt, read arbitrary keys, provision or refund capacity |
+| Admitted effect continuation | Lock current recovery/source and exact original dependency/epoch; check non-revocation, current retention and original end | Require a head switch merely to finish, substitute successor epoch, extend old end |
+| Historical inventory | Read exact original physical identities after source expiry, using separate current provider LIST rights | New source authority, deletion, quota release |
+| Retirement/release | Independently prove writer quiescence, complete inventory, exact deletion/abort and absence; finish original dependency and residual obligations | Runtime audit writes, delete ancestry still needed by enrollment, expiry-only refunds |
+
+These are separate consumer-owned SQL capabilities. Proposed implementations must use fixed tables/functions and narrow actual role plans/provenance checks, not a general credential broker. No role names/grants are added in this source plan. Current observer roles cannot become reserve administrators or retirement writers. No public EXECUTE is proposed for state-changing functions.
+
+All current operations retain the existing original proof/caller bound after every blocking lock/read. Provider I/O stays outside SQL locks under its already-spent immutable attempt. Acknowledgement is not a second provider effect. Lost commit responses resolve exact retained claim/receipt/head; they do not refill count/bytes or retry CREATE/PUT. A completed object can remain historical when source/recovery/admission changed. A new head only admits new work: exact old dependencies continue if independently non-revoked and retained, under their original ends.
+
+Retention can monotonically shorten the current retained cutoff without changing the original epoch. Both reader results carry that current cutoff and cap the original observation by it. A longer returned cutoff than the original retain bound is invalid. Concrete SQL must prove it, never infer it from caller values. A missing current retention/non-revocation record fails closed. A new dependency must fit its entire original possible lifecycle inside that current retained cutoff; current source freshness alone is insufficient. Already admitted work may finish only inside its separately narrowed continuation interval.
+
+## Removal, restore and qualification
+
+Do not remove an old epoch because it is no longer selected. Independently close every original dependency/uncertain issuer/writer and track/delete every physical version, marker and upload. Missing source, expired observation, no current key, a first-page empty LIST, or missing SQL metadata cannot refund. Long-lived registration/enrollment ancestry stays separately charged; discovery of an unbounded dependency blocks release until its own lifecycle is resolved. Residual metadata/backups have independent original finite cutoffs and positive completion. No cleanup operation creates an unbounded chain of audit ancestors.
+
+The constant-size monotonic ordinal/source watermark survives bounded epoch removal until installation retirement. Recovery checkpoints must independently cover it and all unresolved physical spend before a restored runtime can activate. No missing/older head may recreate prior ordinal or authority. A new record/key prefix also needs a deliberately selected provider recipe and encryption codec; existing v1 IAM and receipts cannot silently stand in for it.
+
+Before SQL implementation, qualify the exact allocation accounting and lock order, current versus historical role grants, bounded query plans, interrupted claim/write/ack/select, no duplicate attempt after unknown outcomes, same-source successor with valid old inflight work, current revocation/retention shortening, capacity/cadence exhaustion, writer closure and complete multi-page physical deletion, plus restore nonreuse. Test finite long-running rollover and actual source-age headroom with service-backed observations. Standalone value tests and the passing scoped inventory test prove none of these reserve/effect/retirement properties.

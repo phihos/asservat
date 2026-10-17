@@ -1,0 +1,6 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:115: separate client enrollment current signing trust unavailable
+--- FAIL: TestEnrollmentOwnerPKIWithRealServices (5.72s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.768s
+FAIL

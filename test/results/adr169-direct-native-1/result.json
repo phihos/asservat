@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestDirectHolderObservationWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "seconds": 157.751,
+  "requiredPassed": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "scope": "ADR-169 delegated regional enrollment: owner Pod hosts the lifecycle channel with real ADR-153 runners, SQL, encrypted audit and the ADR-168 SQL store; regional Pod presents its Secret credential and answers native/source reads. fixtureIssuer and synthetic setup roots remain.",
+  "missing": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "failed"
+}

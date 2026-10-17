@@ -1,0 +1,11 @@
+{
+  "status": "integrated",
+  "manifestSHA256": "ed6c207b9d13387a45468e4f861657f179c4674ca651e593ba2f601dfba21634",
+  "files": [
+    {
+      "path": "internal/adapters/diagnostics/go_profile.go",
+      "base_sha256": "f3e85ca5012552ee546b98b4c5dac6e420ee2365382694910a60b141abe686c5",
+      "payload_sha256": "7f639d8f3961cfc75c04045cb96daac11fb498fd529089987d0f89ec76d8f0b5"
+    }
+  ]
+}

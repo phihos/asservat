@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/fleet-settings.schema.json",
+  "title": "Protected installation fleet administration v1",
+  "description": "The fleet.json content of a pinned administrator-protected ConfigMap. This cannot assign workload evidence access or attest its own protection. Not a public HTTP configuration API.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "fleet-settings/v1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "installationID": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "issuerEpoch": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "issuer": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "clients": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      },
+      "minItems": 1
+    },
+    "subjects": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "enum": [
+              "human",
+              "workload"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ]
+      }
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "deliveryProfiles": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      }
+    },
+    "maxActiveBootstraps": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "maxBootstrapHistory": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "maxClusters": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "installationID",
+    "issuerEpoch",
+    "issuer",
+    "suspended",
+    "clients",
+    "subjects",
+    "groups",
+    "deliveryProfiles",
+    "maxActiveBootstraps",
+    "maxBootstrapHistory",
+    "maxClusters"
+  ]
+}

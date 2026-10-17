@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:286: initial request did not stop after current52 acknowledgement before unavailable regional start context admission unavailable 0
+--- FAIL: TestContextAdmissionWithRealServices (4.98s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-api-runner (4.89s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.038s
+FAIL

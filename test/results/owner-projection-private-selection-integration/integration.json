@@ -1,0 +1,9 @@
+{
+  "status": "integrated; unqualified",
+  "paths": {
+    "internal/adapters/kubernetes/owner_projection_preflight_test.go": {
+      "beforeSHA256": "5dd91497bd32a8526a22de5655c2b16b77de2123dc77090091cc9c8f9d78591e",
+      "afterSHA256": "3f7b1a546d41405c0926a59559688c481076ffc30c74e1abf905d686e03f196a"
+    }
+  }
+}

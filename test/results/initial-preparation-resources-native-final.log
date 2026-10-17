@@ -1,0 +1,5 @@
+=== RUN   TestInitialNamespaceProtectionWithRealKubernetes
+    initial_namespace_test.go:375: product creator, durable journal and account/RBAC producer retain one concurrent create intent, exact receipts and lookup-only resumption; all seven predefined setup resources survive repeated Ensure; plan/guard replacement deny; no Pod, provider credentials or activation
+--- PASS: TestInitialNamespaceProtectionWithRealKubernetes (35.14s)
+PASS
+ok  	asservat.local/asservat/test/integration	36.195s

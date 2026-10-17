@@ -1,0 +1,267 @@
+[
+  {
+    "path": "docs/architecture/native-exchange.md",
+    "base": null,
+    "sha256": "2f1d862f98a03daebc8fb46dbdbcf46d5ce6e1495cbfd770844fb3b79e7d4522"
+  },
+  {
+    "path": "docs/decisions/116-context-native-exchange.md",
+    "base": null,
+    "sha256": "ec5e75b4a432a89a21f81d6513a199d22be2cc564143c74d84ef363196221035"
+  },
+  {
+    "path": "internal/adapters/mtls/native_connector.go",
+    "base": null,
+    "sha256": "ff8a425757222f5f0b923e107e5f8b6ef56ec28bc79f12d6526b2a8d6b99d3cf"
+  },
+  {
+    "path": "internal/adapters/mtls/native_encode.go",
+    "base": null,
+    "sha256": "108752b9be5136eb06e7adf912f9e08e233857ea54507baea11a8527cf880256"
+  },
+  {
+    "path": "internal/adapters/mtls/native_forwarder.go",
+    "base": null,
+    "sha256": "b4b528035839b24cf9f1ed8ac95c652b51fc156a1b0ef48bd8efad708c1ccdd9"
+  },
+  {
+    "path": "internal/adapters/mtls/native_idle_test.go",
+    "base": null,
+    "sha256": "cfd631aa12d9577ada4d7d650ae1bfd21daad056b6665b2d68b597df3170443e"
+  },
+  {
+    "path": "internal/adapters/mtls/native_peers.go",
+    "base": null,
+    "sha256": "5ccc986c995896f13934ff2f71b5da2dec5149af8d1e6bef3ecab3c9790831c7"
+  },
+  {
+    "path": "internal/adapters/mtls/native_stream.go",
+    "base": null,
+    "sha256": "4d47b08fd17b70a31b31c23583dab86cf4f6f9d195f3c0acfc6bf834d19a7d8d"
+  },
+  {
+    "path": "internal/adapters/mtls/native_stream_test.go",
+    "base": null,
+    "sha256": "49e1ac10633a69c38ccbcb234218571c887321ec702896cd6eb2e70de6f62eab"
+  },
+  {
+    "path": "internal/adapters/objectstore/native_context.go",
+    "base": null,
+    "sha256": "ef5a4f76c81ba93c26b11d4c220fd9c310f317e184a93b19e0ac1308f6934006"
+  },
+  {
+    "path": "internal/adapters/postgres/custodydb/native_exchange.sql.go",
+    "base": null,
+    "sha256": "536f562dcb177523a343803e6d9aa06a9cb61767b51c77cd823fc5d62cac2ab3"
+  },
+  {
+    "path": "internal/adapters/postgres/native_exchange.go",
+    "base": null,
+    "sha256": "f921cb7e3306333d39e933b24cb45e38127ed226d499b7d59f04485684debd21"
+  },
+  {
+    "path": "internal/adapters/postgres/native_history.go",
+    "base": null,
+    "sha256": "3429a342f44ad4c85ee6dc3bf87c127d92c8e49f40472ca73c5ed22cac8d5b2c"
+  },
+  {
+    "path": "internal/adapters/postgres/native_key_authority.go",
+    "base": null,
+    "sha256": "afc301ed910cf722b4487d19af49e51069986b731f35980641851d4186283ef1"
+  },
+  {
+    "path": "internal/adapters/postgres/native_keys.go",
+    "base": null,
+    "sha256": "7245aea23930d212f33b52e24f1be8579a0582ae733693224e36960c83e1a8b7"
+  },
+  {
+    "path": "internal/application/evidence/context_download.go",
+    "base": "89c43eef2c4e25aba73bf05b67e1c5a32c5aa40fc2881b39e22fedd751665209",
+    "sha256": "3907fe3dde92dc048ea57f8015e60dac21123eca0d6a94b62c90fe9937bb97e0"
+  },
+  {
+    "path": "internal/application/evidence/download_response.go",
+    "base": "cfc4030400037169ef2b2d0981225e64de966af3f96ddf610cfaf437d64d9042",
+    "sha256": "aaebf0483c4fa60080b6b2123a21a0dd203237c92c38bddb9cb0f785081f19c1"
+  },
+  {
+    "path": "internal/application/evidence/download_response_pause.go",
+    "base": null,
+    "sha256": "0bfaf6be5fe30d3e37928a905923f9ba11bbc27735e18e590c568669733bf69e"
+  },
+  {
+    "path": "internal/application/evidence/download_response_pause_test.go",
+    "base": null,
+    "sha256": "c2a3bd9da3e56ebbc876e9ea4605dcf987e1ece3dc5fca3b93b7dae3a150e87c"
+  },
+  {
+    "path": "internal/application/evidence/download_response_transfer.go",
+    "base": "79f2ad94ef55d2cd53c8e67c5eb899fa6bc01f8afcc653d963d5af7ca7baad35",
+    "sha256": "a5271c6df120a37fdc8dc1dd82b787b30ef417ddd56af475bdc0b6468ef4171d"
+  },
+  {
+    "path": "internal/application/evidence/native_attachment.go",
+    "base": null,
+    "sha256": "76f139d26c0435c358c4c174ee9e300c4ebd60c01e1795d150b715cfac4cbb41"
+  },
+  {
+    "path": "internal/application/evidence/native_context.go",
+    "base": null,
+    "sha256": "bbe04d9f8b8ed83f9e0313ad4a8515aa17ac589ff2744af03317db06e60dad94"
+  },
+  {
+    "path": "internal/application/evidence/native_context_test.go",
+    "base": null,
+    "sha256": "5556e1e19eec64ed71b303ca60307c48ae6e70628f7ec8b1bc9551d902b41af9"
+  },
+  {
+    "path": "internal/application/evidence/native_delivery_test.go",
+    "base": null,
+    "sha256": "707b0db7c8d0fc7705a06d43f661cff246da1c292a2fb9fbb135a7cfdee23664"
+  },
+  {
+    "path": "internal/application/evidence/native_exchange.go",
+    "base": null,
+    "sha256": "acb966891b27b7b6dad69f3e4813f7a504000cfd319247679933d2ab2ab815f4"
+  },
+  {
+    "path": "internal/application/evidence/native_exchange_test.go",
+    "base": null,
+    "sha256": "cd5fdc7958ac4548ccc4c6959273f38df154fdee93eb07498b003776e077cd1f"
+  },
+  {
+    "path": "internal/application/evidence/native_idle.go",
+    "base": null,
+    "sha256": "882ede3fffa7135bbfbada21e647feb402d23cb3ef23235e695d6e05cb7fbdaf"
+  },
+  {
+    "path": "internal/application/evidence/native_origin.go",
+    "base": null,
+    "sha256": "8e1dd177db27b26828c47ea74196c7a667fc2f192524ad65381ebf5403eade4b"
+  },
+  {
+    "path": "internal/application/evidence/native_preparation.go",
+    "base": null,
+    "sha256": "248f16c1a20537d7fa62800459af03720006d90367a3114aa1524bc79ff62280"
+  },
+  {
+    "path": "internal/application/evidence/native_preparation_test.go",
+    "base": null,
+    "sha256": "0dfc6f57b14272561a63ae127cb1766b4bb0581462d55ab8fdc7be83cefb3c83"
+  },
+  {
+    "path": "internal/application/evidence/native_response_source.go",
+    "base": null,
+    "sha256": "3e60e8641363898f8b15b73c366ee1896d526face0eff52ee59cfeba17afe7d0"
+  },
+  {
+    "path": "internal/contracts/native_disposition.go",
+    "base": null,
+    "sha256": "0d5ad40f86a98fc83c7697ce4883138922157b89fbdb28ea4c3738c734cd196d"
+  },
+  {
+    "path": "internal/contracts/native_exchange.go",
+    "base": null,
+    "sha256": "a77bb511443e368f1ce5febd4e8b7e9b5e8ad7850d19eecacf96246ecfb92718"
+  },
+  {
+    "path": "internal/contracts/native_exchange_test.go",
+    "base": null,
+    "sha256": "9e8b7efe2475ee37759b4b80debca645af67f159ee76e83acb92515fa41815b2"
+  },
+  {
+    "path": "internal/domain/authorization/native_exchange.go",
+    "base": null,
+    "sha256": "e452f0af3f5b9ea7cd581bd340bfa3fa64b9639ece7e87bfa5a719a412ffc6b3"
+  },
+  {
+    "path": "internal/domain/authorization/native_exchange_test.go",
+    "base": null,
+    "sha256": "cdc513af6a95b65f512daa13095ebf01be92b183f2d32d30cb1f6f76eeb9b188"
+  },
+  {
+    "path": "internal/transport/native/admission.go",
+    "base": null,
+    "sha256": "448cb6bade0dea387a7352beb44400fa05e30de9f7e49d6031ceedd1bcbbc69e"
+  },
+  {
+    "path": "internal/transport/native/cancellation_test.go",
+    "base": null,
+    "sha256": "a0647418333041e25e77b2ed9b03d89ea46aa745c8a3b036e61acc6f31286657"
+  },
+  {
+    "path": "internal/transport/native/command_limits_test.go",
+    "base": null,
+    "sha256": "865b6e18a544cee10030cb2ff257fb624c19dc7f6c87e148fca4613a9d6736f0"
+  },
+  {
+    "path": "internal/transport/native/flow_test.go",
+    "base": null,
+    "sha256": "30657ce7c63c42c5e72b7abe3343ba77f08b1efbe93d1e4198f725af2b12a904"
+  },
+  {
+    "path": "internal/transport/native/handler.go",
+    "base": null,
+    "sha256": "86e3281409143617101eaabf4640b5af2f07dab956277234e1db86c546539d18"
+  },
+  {
+    "path": "internal/transport/native/handler_test.go",
+    "base": null,
+    "sha256": "f16b45a7eaa998f99ebab1c5c17e6637c2405cee550782f8a179cdbe21ac5495"
+  },
+  {
+    "path": "internal/transport/native/operation.go",
+    "base": null,
+    "sha256": "a75fcb88c4b99ffda213d278fe551b2874ccdfbbb7a7dd0511a3c903097b5518"
+  },
+  {
+    "path": "internal/transport/native/registration.go",
+    "base": null,
+    "sha256": "76dc5804045bbb0fe261a8eb21c15f8fe6c736ffd580d56bd20d56ee9a7df141"
+  },
+  {
+    "path": "internal/transport/native/relay.go",
+    "base": null,
+    "sha256": "a421310887685b40f6024dfbdde78ed3ee9b523bd0fa1201e5d834b512d1d7eb"
+  },
+  {
+    "path": "internal/transport/native/relay_receive.go",
+    "base": null,
+    "sha256": "82c1e39cd61a72e2d5efeedbb0188383107383c0eb655fbaeaa224b50c2a2672"
+  },
+  {
+    "path": "internal/transport/native/router.go",
+    "base": null,
+    "sha256": "6421fa677e1621193750bd5a29adff2d0b110d43039e3c5a15b9eece9e15e81c"
+  },
+  {
+    "path": "internal/transport/native/router_test.go",
+    "base": null,
+    "sha256": "b59cd1b8b567ea9b69a05600ae01bdcabca624942df567737a05ab8dfaef323f"
+  },
+  {
+    "path": "internal/transport/native/worker.go",
+    "base": null,
+    "sha256": "65c3ea950af4fd787982ec60719c79e8e5ff81314e6fb133cca820cdf742780d"
+  },
+  {
+    "path": "migrations/00045_native_exchange.sql",
+    "base": null,
+    "sha256": "80b4f45c9336c022a5942fe6764b2894600c303b9ba6d5643b9946694955cdc5"
+  },
+  {
+    "path": "migrations/queries/native_exchange.sql",
+    "base": null,
+    "sha256": "68dccdf31ed04f461a886648ffdbf77a7f247bd4c658ecbafb114905fd184422"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "base": "a878fa6bbcecd89c4544a17b4e518ae8650f0e2216f8e46a5efeed1d75505831",
+    "sha256": "14a459d090495abc51a83d0a4c8b50886a6f8bf259a28e4039c18a3bcedc268d"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base": null,
+    "sha256": "787f60c0860d9dad051eacb328a2a5c7a45cfbd110c9e143f314fcb3a657f539"
+  }
+]

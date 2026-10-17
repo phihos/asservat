@@ -1,0 +1,257 @@
+{
+  "manifest": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+  "dependencies": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+  "runner": "4a918a3b1fd065bcb884bda12dba7d6066f12ee18785d47d7ae118bdf1a4d7ca",
+  "started": 1791886710.9303856,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": [],
+    "variants": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 12.003294944763184,
+      "log_sha256": "3d5f2587042e16f00901720230e8e3e68073fb300fa025ab1703416d4e5fa216",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "before-selection",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/before-overlay.json",
+        "-count=1",
+        "-timeout=60s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 10.002892971038818,
+      "log_sha256": "88044b677e9afdbf76ba9a34894ba8abb25aef914e5cd5d213e61485155e4f8f",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": [],
+      "intended_assertion": true
+    },
+    {
+      "name": "bootstrap-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "-run=^TestOwnerBootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 59.014371395111084,
+      "log_sha256": "7ab3e7f4830fbb338e763b8040760048fc9c07955c7cb3af9f2864c6ce4a36c9",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 52,
+      "missing_required_passes": []
+    },
+    {
+      "name": "affected-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^(TestProviderOwnerProjectionOperation|TestProviderOwnerNativeObjectReaders|TestProviderOwnerAuditRead|TestProviderOwnerInstallation)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 96.52851581573486,
+      "log_sha256": "22b2e90484a023e907726baaaddb44cca196b6436706902c2c1e21530898e6cf",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 43,
+      "missing_required_passes": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 3.001258373260498,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.0006988048553467,
+      "log_sha256": "b85daac7b1fa0e2d768c96595df06ded3dc38ed97d76950dd78ae9a12b2b759d",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "schemas",
+      "command": [
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-4/schema-regressions.py"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.000720739364624,
+      "log_sha256": "c4c4dd496699c6d499946278c128df28823ecbe2e2884a2ca52c7b7613a20d64",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 2,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 3.5019140243530273,
+      "log_sha256": "1eb7d05908572109094e14327ae630dbd71161b4b7267d12f2cd1509ece102ab",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": [],
+        "variants": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    }
+  ],
+  "native": false,
+  "boot_id": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "prior_freeze_failure": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-1/freeze-infrastructure-failure.json",
+  "tmpdir": "/tmp/asservat-owner-bootstrap-selection-4-scratch-__wxf1ey",
+  "tmpdir_free_before": 15709982720,
+  "mirror_changed": [],
+  "exit": 2,
+  "ended": 1791886898.6622245,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": [],
+    "variants": []
+  },
+  "tmpdir_removed": true
+}

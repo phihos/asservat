@@ -1,0 +1,113 @@
+=== RUN   TestInitialBootstrapV3LegacyFullWireCompatibility
+=== RUN   TestInitialBootstrapV3LegacyFullWireCompatibility/asservat-initial-bootstrap/v1
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged policy bytes: 8852
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged binding bytes: 352
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged role bytes: 394
+=== RUN   TestInitialBootstrapV3LegacyFullWireCompatibility/asservat-initial-bootstrap/v2
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged policy bytes: 11887
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged binding bytes: 352
+    bootstrap_legacy_compatibility_evidence_test.go:94: exact unchanged role bytes: 394
+--- PASS: TestInitialBootstrapV3LegacyFullWireCompatibility (0.14s)
+    --- PASS: TestInitialBootstrapV3LegacyFullWireCompatibility/asservat-initial-bootstrap/v1 (0.07s)
+    --- PASS: TestInitialBootstrapV3LegacyFullWireCompatibility/asservat-initial-bootstrap/v2 (0.07s)
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/false
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/true
+--- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate (2.87s)
+    --- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/false (1.46s)
+    --- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/true (1.41s)
+=== RUN   TestInitialBootstrapCopySanitizationIsOneExactImmutableCAS
+--- PASS: TestInitialBootstrapCopySanitizationIsOneExactImmutableCAS (1.46s)
+=== RUN   TestInitialBootstrapCopyCASRetainsOriginalCancellation
+--- PASS: TestInitialBootstrapCopyCASRetainsOriginalCancellation (1.41s)
+=== RUN   TestInitialBootstrapCopyGuardLostClaimNeverPostsOrReclaims
+--- PASS: TestInitialBootstrapCopyGuardLostClaimNeverPostsOrReclaims (1.51s)
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-positive-removal
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-original-create
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-guard
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/replaced-seed
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/future-completion
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-manager
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-copy-mark
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/changed-public-copy
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/malformed-claim
+--- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts (0.03s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-positive-removal (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-original-create (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-guard (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/replaced-seed (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/future-completion (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-manager (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-copy-mark (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/changed-public-copy (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/malformed-claim (0.00s)
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/renew-interval
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-delete-rv
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/alias-guard
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-manager-close
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/extra-claim-field
+--- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS (0.02s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/renew-interval (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-delete-rv (0.01s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/alias-guard (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-manager-close (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/extra-claim-field (0.00s)
+=== RUN   TestInitialBootstrapV3DoesNotRewriteLegacyGuardOrPrelude
+--- PASS: TestInitialBootstrapV3DoesNotRewriteLegacyGuardOrPrelude (0.11s)
+=== RUN   TestInitialBootstrapRouterRecoversProtectedPreSeedVersion
+--- PASS: TestInitialBootstrapRouterRecoversProtectedPreSeedVersion (2.50s)
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/missing-binding
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/changed-policy
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/known-root
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/old-v1
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/unknown-read
+--- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude (1.46s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/missing-binding (0.61s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/changed-policy (0.33s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/known-root (0.11s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/old-v1 (0.29s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/unknown-read (0.11s)
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/#00
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/account
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/binding
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/anchor
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/copy-marker
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/private-copy
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/target
+--- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence (2.92s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/#00 (0.76s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/account (0.31s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/binding (0.66s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/anchor (0.51s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/copy-marker (0.45s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/private-copy (0.11s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/target (0.12s)
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/#00
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/wrong-uid
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/full-secret
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/unknown-digest
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/unsupported
+--- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback (0.56s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/#00 (0.11s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/wrong-uid (0.11s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/full-secret (0.11s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/unknown-digest (0.11s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/unsupported (0.12s)
+=== RUN   TestInitialBootstrapRouterRetainsParentDeadline
+--- PASS: TestInitialBootstrapRouterRetainsParentDeadline (0.08s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	16.103s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.051s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.024s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/test/integration	1.051s [no tests to run]

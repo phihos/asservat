@@ -1,0 +1,84 @@
+# Configuration reconciler launch candidate
+
+Frozen source: eleven paths (nine Go, two canonical schemas). Manifest SHA256
+`8d8599f895f475eef9555848bac0e88dbbc69cbc94f4bca72f25264b0e678d15`.
+Dependency manifest SHA256
+`8d347914f9cd35d51226c376a5d92ffcd92f8c74ffca885048ce398cfbeee549`.
+No SQL migration, generated query, main-command switch, public listener or chart
+enablement is included. The pending bridge, public role expansion, capture cleanup
+and request-owned audit selection are excluded.
+
+## Behavior and contract
+
+The original configuration-role Secret can retain one optional launch disposition
+only after its three positive role receipts and immutable projection are present.
+An acknowledged first CAS permits exactly one inert-to-running Deployment UPDATE.
+The original spec, object UIDs, resourceVersion, launch marker, immutable inputs,
+original five-second interval, current source and independently current SQL
+activation/recovery/role inventory remain binding. Unknown claim/UPDATE replies
+are lookup-only. The original role claims are never rewritten for replicas one.
+
+Successful replay checks the original launch result without provisioning roles
+again. The separate SQL verification facet retains actual OID, authenticated
+login, ACL, provenance, incarnation, epoch and recovery checks. It accepts only
+the exact recorded zero-to-one spec transition; the credential creation method
+has no such exception. The configuration-role CLI handles that retained branch.
+The installed hub-worker constructor switch still requires actual generated
+object/input handoff qualification.
+
+ReadLaunched retains its complete post-lock source proof and performs exact
+original-state/deadline checks after passive object reads. Record compares the
+same original snapshot and freshly rechecks all enforcement/source facts before
+the receipt CAS. This removes duplicate complete proof passes within the original
+interval without caching authority between independent operations. Existing
+receipt replay also performs the full current check.
+
+## Actual verification
+
+All jobs used GOMAXPROCS=2, GOFLAGS=-p=2 and an explicit build TMPDIR. Sources and
+dependencies were hash-verified before and after each run.
+
+| Run | Actual result |
+| --- | --- |
+| launch-1, handle96691 | Compile and vet passed; focused race failed. Positive launch finished in 4.696s, then duplicate proof work prevented receipt recording. The unknown-claim fake omitted the API's response TypeMeta. Original evidence retained. |
+| launch-3, handle50946 | Corrected positive/replay/uncertain/enforcement cases passed; race timed out at180s while httptest.Server.Close waited on the deliberately blocked PUT fake. Product/client code had returned. Compile and vet passed; all1501 dependencies unchanged. |
+| launch-4, handle43930 | Compile passed6.898s, all focused races passed82.027s (Kubernetes74.959s), vet passed0.783s. Both blocked input-read and receipt-CAS cases enforce original expiry and no mutation. Fixture-owned teardown release joins the fake handler before server Close. All eleven payload/base entries and1501 dependencies unchanged. |
+
+Exact commands and durations are in evidence/launch-4/result.json. The race
+selector was `^TestConfigurationLaunch`, with the unchanged finite180s package
+budget. Production deadline bounds were never extended. Other affected packages
+were compiled/vetted but have no tests matching this selector.
+
+The fixture uses real loopback TLS and the configured API rate, with explicitly
+synthetic precompleted SQL role receipts and provider objects. These results do
+not establish actual Kubernetes admission, SQL launch inventory, generated
+credentials, in-Pod startup, aggregate role capacity or installed service success.
+
+## Integration
+
+Verify each live base and package payload in manifest.json. In particular retain
+the current canonical full-document schema references already corrected by the
+parent; the two schema bases match those corrections. The only differences from
+the previous dependency checkpoint are the parent's seven native admission files
+and expanded hashing of seven overlay base files; parent-dependency-changes.json
+records the exact values. Temporary SQL timing diagnostics are not in payload.
+
+The nine Go source paths have no overlap with current native fixture edits. The
+shared schema paths are configuration-role-installer.schema.json and
+configuration-runtime-role-state.schema.json. There is no sqlc output or schema
+version change. Run integrated affected checks and canonical spec/design gates.
+
+Update the current ADR140 architecture/progress sections additively with this
+candidate and its exact loopback-only result; do not replace newer native results.
+PLAN.md and INSTALLED-RESOURCE-HANDOFF.md remain design context for the unfinished
+producer, not claimed implemented behavior.
+
+## Remaining work owned by console_delivery
+
+The concrete post-activation object journal, fixed inert owner/workload producer,
+two-phase initial-to-owner guard bridge and historical recognition are still
+source-stage work. Actual launch/current-role SQL qualification, Kubernetes
+Secret/admission/unknown-result cases and in-Pod strict-manifest startup remain
+pending. The complete ADR140 public graph, provider and connection inventory,
+generated resource projections and command wiring are not complete. Parent owns
+integration and native labs; this handoff does not end ADR140 ownership.

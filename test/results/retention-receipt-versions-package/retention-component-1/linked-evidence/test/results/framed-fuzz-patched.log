@@ -1,0 +1,10 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/20 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 20/20 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 44518 (14837/sec), new interesting: 68 (total: 88)
+fuzz: elapsed: 6s, execs: 87595 (14361/sec), new interesting: 108 (total: 128)
+fuzz: elapsed: 9s, execs: 132465 (14956/sec), new interesting: 147 (total: 167)
+fuzz: elapsed: 12s, execs: 372348 (79965/sec), new interesting: 167 (total: 187)
+fuzz: elapsed: 15s, execs: 395345 (7662/sec), new interesting: 171 (total: 191)
+fuzz: elapsed: 16s, execs: 395345 (0/sec), new interesting: 171 (total: 191)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	15.931s

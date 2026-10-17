@@ -1,0 +1,9 @@
+{
+  "internal/application/evidence/native_exchange.go": "9520254a39a515f868edf3e12e755a173d7584019e04afc8fbd117d4e0724b36",
+  "internal/transport/native/admission_budget_test.go": null,
+  "internal/transport/native/admission_check.go": null,
+  "internal/transport/native/admission_check_test.go": null,
+  "internal/transport/native/operation.go": "dcc871ca7e3a9d37c1e4315b2cfad5b039da4ca5d0dc974b9ba6dac315216815",
+  "internal/transport/native/registration.go": "aac903fde4097fb5e00a1c1d372701443861dbd75a33a6d361b8ff96dd518ca4",
+  "internal/transport/native/router.go": "6421fa677e1621193750bd5a29adff2d0b110d43039e3c5a15b9eece9e15e81c"
+}

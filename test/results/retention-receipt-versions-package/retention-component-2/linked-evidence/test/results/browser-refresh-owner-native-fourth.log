@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity
+    browser_refresh_owners_test.go:240: one-use owned claim identity authority unavailable
+--- FAIL: TestContextAdmissionWithRealServices (2.29s)
+    --- FAIL: TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity (1.95s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.343s
+FAIL

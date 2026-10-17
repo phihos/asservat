@@ -1,0 +1,87 @@
+{
+  "manifest_sha256": "73f5dd55e76858baba452538e68bfa01ed8dc4a47be251b0d40e1b4ec330bf57",
+  "dependencies_sha256": "7e01a447664d550c879ac3c1cfaa898140af6124b9367e9d2ad6ff62cd29b462",
+  "runner_sha256": "1eb4298ffbb784a301ee8f9d6b7935b4e2ad3a4382d3941674690fcaf32b2991",
+  "paths": 2,
+  "dependencies": 1984,
+  "native_executed": false,
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 2.453,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "-run",
+        "^TestOwnerProvider",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 4.809,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1/overlay.json",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 0.499,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    }
+  ],
+  "terminal_exit": 0,
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

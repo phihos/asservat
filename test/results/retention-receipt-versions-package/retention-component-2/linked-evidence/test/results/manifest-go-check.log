@@ -1,0 +1,21 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+Manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+go vet ./...
+go test -race -count=1 ./...
+ok  	asservat.local/asservat/internal/adapters/kms	1.043s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.115s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.758s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.793s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.401s
+?   	asservat.local/asservat/internal/adapters/postgres	[no test files]
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+ok  	asservat.local/asservat/internal/application/privacy	1.009s
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+ok  	asservat.local/asservat/test/integration	1.054s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 12 packages, 19 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 3 files match sqlc v1.31.1
+make: Nothing to be done for 'manifest-schema-check'.

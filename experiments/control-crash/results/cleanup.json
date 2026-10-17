@@ -1,0 +1,38 @@
+{
+  "finishedUTC": "2026-10-09T19:31:48.997299+00:00",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "experiments/control-crash/vm/lab.py",
+        "down"
+      ],
+      "exit": 0,
+      "output": "Stopped only this lab VM",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "experiments/control-crash/postgres.py",
+        "down"
+      ],
+      "exit": 0,
+      "output": "Removed only owned PostgreSQL container, anonymous volume and network",
+      "stderr": ""
+    }
+  ],
+  "checks": {
+    "vmStopped": true,
+    "container:27d43945bfbe62f6f1a770d755a32de10daa30b4c4bbd9994f9e5a8807765618": "absent",
+    "network:asservat-control-crash-20261009": "absent",
+    "volume:8123b89e902a2732f9cf1a816be09ca6e070dd16742060cdd698cd89a4439e05": "absent",
+    "privateCacheAndSSHKeysRemoved": true,
+    "hostCrashSettingsUnchanged": true
+  },
+  "hostAfter": {
+    "corePattern": "core\n",
+    "corePipeLimit": "16\n"
+  },
+  "scope": "Only this lab VM/private cache/keys and labelled PostgreSQL container/anonymous volume/internal network removed. Shared image/build caches untouched. No physical-media erasure claim."
+}

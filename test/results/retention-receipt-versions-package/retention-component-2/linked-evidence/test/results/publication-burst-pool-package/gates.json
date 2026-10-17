@@ -1,0 +1,28 @@
+{
+  "phases": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 15.599
+    },
+    {
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 14.141
+    }
+  ],
+  "exit": 0,
+  "scratchRemoved": true
+}

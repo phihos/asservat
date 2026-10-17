@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^(download-worker-native-content|download-worker-native-content-resume|download-worker-native-content-interrupted)$"
+  ],
+  "exit": 0,
+  "seconds": 101.675,
+  "requiredPassed": [
+    "TestContextAdmissionWithRealServices/download-worker-native-content",
+    "TestContextAdmissionWithRealServices/download-worker-native-content-resume",
+    "TestContextAdmissionWithRealServices/download-worker-native-content-interrupted"
+  ],
+  "missing": [],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "passed"
+}

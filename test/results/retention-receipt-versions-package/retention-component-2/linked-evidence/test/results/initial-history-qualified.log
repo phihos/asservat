@@ -1,0 +1,27 @@
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/original-creator-membership-survives-revoke
+    initial_history_role_test.go:81: creator grant before_count=1 before_exact=true after_count=1 after_exact=true
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-creator-inherit
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-creator-set
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-missing-admin
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-missing-original-grant
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-extra-incoming-member
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-outgoing-membership
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-additional-manager-grantor
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-extra-write
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/reject-replaced-manager-name
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/passive-after-manager-retirement
+--- PASS: TestInitialSQLHistoryRoleWithRealPostgres (0.58s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/original-creator-membership-survives-revoke (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-creator-inherit (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-creator-set (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-missing-admin (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-missing-original-grant (0.01s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-extra-incoming-member (0.01s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-outgoing-membership (0.03s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-additional-manager-grantor (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-extra-write (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/reject-replaced-manager-name (0.02s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/passive-after-manager-retirement (0.01s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.624s

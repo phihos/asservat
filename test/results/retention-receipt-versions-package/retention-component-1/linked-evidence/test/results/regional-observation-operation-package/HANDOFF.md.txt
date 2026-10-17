@@ -1,0 +1,37 @@
+# ADR150 regional native operation — checkpoint v2
+
+Three new Go paths, no live repository changes. Requires the already integrated owner operation primitive's private proveObject extraction. This is concrete component qualification with actual TLS fake API calls and explicit synthetic authority, not complete native regional routing or installed availability.
+
+The purpose-fixed concrete reader owns deep copies of the installed source/workload guard plans and full regional pin. Begin takes the first independent source guard and workload/account/Pod/RS/Deployment/template/online-token bracket. Four ordered Read calls each spend their ordinal before one actual namespace-bracketed full source decode. Ordinal four first takes the final independent native bracket, then performs its actual full source decode, so changes during native guard probing are compared before output. Full backing, roles, source UID/revision, roots and installed compatibility remain checked. Original request/native/caller/token/root/backing deadlines only shorten. Mutation/unknown/expiry/cancellation closes the operation permanently; Close joins actual admitted reads. This implements no existing full-attestation interface, and source values are never relabeled fresh full native proofs.
+
+The successful counted fixture uses 50 observer requests plus 12 independent probe requests: two native brackets (19/6 each), plus four actual full source reads (3 each). The six source ConfigMap GETs include two guard-probe GETs and four separately decoded values. Four online TokenReviews remain real. This is a request-count result, not an actual Kubernetes latency measurement or a sustained availability claim. Current SQL49/leaf/root/process-owned-key/TLS/channel checks remain separate mandatory consumers.
+
+## Changes from failed v1
+
+V1 runner86049 compiled, then failed common fixture setup before Begin because connectorTestBacking received time.Now nanoseconds while the existing lifecycle contract requires SQL microsecond precision. Its compile14.639s/race24.380s exit1 logs and immutable source remain in ../checkpoint-v1. V2 truncates only that synthetic backing policy timestamp to microseconds, asserts backing.Valid and labels strict decode/constructor errors. Native/request/token clocks and all original five-second intervals remain unchanged.
+
+Source review also found a new-component omission: snapshotConfiguration checks syntax but the old full source reader additionally requires configuration.Valid, including current backing expiry and SupportsDeployment. The before overlay pins the exact v1 production file with the corrected fixture and two new regression children. Both now reach Read and fail specifically with 'current full configuration backing predicate omitted'. V2 restores the same full configuration validity check and caps dates to the independently observed backing expiry. No legacy predicate is relaxed or changed.
+
+## Actual immutable checks
+
+Runner6028 terminal0. All 1,805 dependencies, new-path absence bases, payloads, file sets and frozen files stayed unchanged before/after every phase.
+
+| Phase | Actual exit | Expected exit | Wall seconds |
+|---|---:|---:|---:|
+| Original new-component backing regression | 1 | 1 | 10.885 |
+| Corrected compile-only | 0 | 0 | 6.829 |
+| Regional lifecycle + legacy source/process races | 0 | 0 | 42.728 |
+| Kubernetes package vet | 0 | 0 | 1.612 |
+| Go architecture | 0 | 0 | 1.470 |
+
+14 top-level / 120 named PASS entries in the after race log. Exact commands, logs and actual exits are in evidence/. Before report requires exactly two intended semantic failures; it is not called a passing implementation. Tests cover four actual value decodes, complete source mutations, final native loss, changed source during final guard probe, observed backing expiry, original caller shortening, ordinal replay/concurrency denial and joining actual native HTTP reads after cancellation/Close. Existing source/ordinary process attestation tests also pass.
+
+## Package and scope
+
+manifest.json, bases.json, payload.json and overlay.json define the three integration paths. dependencies.json covers the actual compiled live graph. before-overlay.json and before/ retain the original v1 production file for the meaningful failure. freeze.json pins tested files/runner/SCOPE; HANDOFF.md, RESULT.json and evidence-hashes.json are added after completion without rewriting that set.
+
+Original real availability failure remains test/results/regional-observation-native-cost*: first full pair3.715292s, second unavailable under its original bound. It is not resolved by these component results. No new rate limiter, deadline, pool, SQL role, migration, protocol negotiation, installed selector or old-port cache was added. No wire/runtime route is enabled.
+
+## Next
+
+Connect these concrete owner and regional primitives through an explicit closed v2 application/transport contract, preserving all actual current SQL/TLS/key checks and four ordinals. The fresh worker2+owner2 pair selects the existing fixed owner-observation/v2 Format only when complete consumers/native qualification exist. Retained locator state must own its original finite context across GET completion with explicit delivery/cancellation bookkeeping, one exact claim and joined cleanup. Full concrete two-cluster <=5s native availability remains required.

@@ -1,0 +1,6 @@
+--- FAIL: TestOwnerEndpointBoundedDiscovery (0.05s)
+    --- FAIL: TestOwnerEndpointBoundedDiscovery/omitted-target-version (0.05s)
+        owner_endpoint_test.go:202: success=false error=current signing trust unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.090s
+FAIL

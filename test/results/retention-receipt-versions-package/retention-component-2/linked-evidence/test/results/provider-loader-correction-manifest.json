@@ -1,0 +1,40 @@
+{
+  "baseRoot": "/home/phil/Projekte/asservat",
+  "files": [
+    {
+      "path": "docs/architecture/initial-provider-provisioning.md",
+      "baseSha256": "baa115b41639d63e6bbf832624f824247826ab96d8a36f6361bacf041e334a5d",
+      "newSha256": "444d29544d3c5c940ab10f074f298a18f2b23d54dd5b3eaca7217f37ee41cce0"
+    },
+    {
+      "path": "docs/decisions/128-initial-provider-provisioning.md",
+      "baseSha256": "7087003b5beda94e13fdbf38d12c537378efda093ed8bb07c90a53a9f67f8de8",
+      "newSha256": "2e94467c903a5c27def82af2a8637e1d523b64bb75611e1a0a9a55ed5fe09f42"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider.go",
+      "baseSha256": "c02f4ba06ba51ba1ee50c2f9122e4d32deb5e78e1ddf8948d10551391896d481",
+      "newSha256": "2ba5a2eea74eeaf3479309eb25d952ce11ecf10a8c43f07a77238c60bb081db8"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider_diagnostic_test.go",
+      "baseSha256": null,
+      "newSha256": "f32ff4df2ddf512ba794e76e7148f3745a45f01c76cacc1b14517c19885ce0fc"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider_test.go",
+      "baseSha256": "babfdf2316a2c7b88ff8e7a711db51ea50a6fa33ee220930e0fbb31d3f9099c6",
+      "newSha256": "259bd67b4285a76bb4844020b381d0db865cb2dafbc27f0529513e859656fbc7"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer.go",
+      "baseSha256": "3aa246b6c6a07de96c3c1b8e8b2293c7897e3478ffc7c6a9c091778e506f5f7d",
+      "newSha256": "d51fb7a4d82e61557be043cf36f6eabf7263debc1e25439722ac59283bc6a808"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_diagnostic_test.go",
+      "baseSha256": null,
+      "newSha256": "85e84220a4e1472394132a9fcb57792cc4795d48aaf13b04c10caafa1cf6cfe5"
+    }
+  ]
+}

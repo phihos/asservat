@@ -1,0 +1,5 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/owner_forwarder_test.go:12:2: "encoding/json" imported and not used
+internal/adapters/mtls/owner_forwarder_test.go:27:2: "asservat.local/asservat/internal/contracts" imported and not used
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL

@@ -1,0 +1,32 @@
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/epoch
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/source-uid
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/regressed-generation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/expired-lock
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer
+--- PASS: TestEnrollmentFleetObservationWithRealPostgres (0.53s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database (0.05s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/epoch (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/source-uid (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/regressed-generation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest (0.04s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/expired-lock (0.31s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer (0.01s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.583s

@@ -1,0 +1,1772 @@
+package integration
+
+import (
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	authorizationapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	privacyvalue "asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/transport/browser"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// Identity and current regional/recovery qualification are explicitly synthetic.
+// The gate, catalog, permission, retained-policy and SQL effect checks are real.
+type downloadTestIdentity struct{ value identity.Identity }
+
+func (i downloadTestIdentity) Resolve(_ context.Context, credential string) (identity.Identity, error) {
+	if credential != "synthetic-reference" {
+		return identity.Identity{}, identity.ErrDenied
+	}
+	return i.value, nil
+}
+
+// This fixed-lifetime synthetic provider supports the longer native fixture.
+// It returns a fresh bounded observation, not a two-minute Identity value.
+// Product identity/source/session behavior is exercised in its separate suite.
+type nativeDownloadTestIdentity struct {
+	value   identity.Identity
+	expires time.Time
+}
+
+func (i nativeDownloadTestIdentity) Resolve(ctx context.Context, credential string) (identity.Identity, error) {
+	now := time.Now().UTC()
+	if ctx.Err() != nil || credential != "synthetic-reference" || !now.Before(i.expires) {
+		return identity.Identity{}, identity.ErrDenied
+	}
+	observed := i.value
+	observed.Groups, observed.Scopes = slices.Clone(i.value.Groups), slices.Clone(i.value.Scopes)
+	observed.VerifiedAt, observed.ValidUntil = now, identity.Earlier(now.Add(5*time.Second), i.expires)
+	return observed, nil
+}
+
+type downloadTestEnvironment struct {
+	root, installation, epoch string
+	registration              artifact.Registration
+	recovery                  *postgres.RecoveryReader
+	processing                *postgres.ProcessingReads
+	path                      *artifact.DownloadPath
+}
+
+func (e downloadTestEnvironment) DownloadEnvironment(ctx context.Context, record authorizationapp.ContextDownloadEvidence, p identity.Principal) (artifact.DownloadEnvironment, error) {
+	r := record.Retained.Registration
+	if r != e.registration || e.processing == nil || e.path == nil {
+		return artifact.DownloadEnvironment{}, artifact.ErrDownloadUnavailable
+	}
+	// Only the independently accepted installation input is synthetic here.
+	// The policy evaluator, recovery reads and durable processing checks use
+	// the actual production composition, including its final rereads.
+	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: e.root, InstallationID: e.installation, RecoveryEpoch: e.epoch, Revision: identity.Revision{UID: e.path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{*e.path}, Clients: []privacyvalue.DownloadClient{{Issuer: p.Issuer, ID: p.ClientID, Kind: p.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{record.PurposeRef}, PathIDs: []string{e.path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: p.Issuer, ClientID: p.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
+	return (authorizationapp.CurrentDownloadEnvironment{RootID: e.root, InstallationID: e.installation, Policies: policy, Recovery: e.recovery, Processing: e.processing, Now: time.Now}).DownloadEnvironment(ctx, record, p)
+}
+
+// Real PostgreSQL/S3/encrypted audit against actual published synthetic context.
+// Human identity, protected installation observations, regional/recovery
+// authorization and capacities remain fixture inputs. This does not confer public download authority or qualify HTTP relay.
+func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext)) {
+	t.Helper()
+	runtimePool := poolFor("download_runtime", "synthetic-download")
+	auditPool := poolFor("download_audit_runtime", "synthetic-download-audit")
+	configPool := poolFor("download_config_runtime", "synthetic-download-config")
+	recoveryPool := poolFor("peer_read_runtime", "synthetic-peer-read")
+	defer recoveryPool.Close()
+	catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
+	defer catalogPool.Close()
+	defer runtimePool.Close()
+	defer auditPool.Close()
+	defer configPool.Close()
+	objects := &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}
+	for _, check := range []struct {
+		pool  *pgxpool.Pool
+		query string
+	}{
+		{runtimePool, "UPDATE artifact_download SET deadline=deadline"},
+		{runtimePool, "UPDATE fleet_trust SET recovery_blocked=false"},
+		{runtimePool, "UPDATE fleet_trust SET issuer_epoch=issuer_epoch"},
+		{runtimePool, "UPDATE fleet_trust SET fresh_until=clock_timestamp()"},
+		{recoveryPool, "UPDATE fleet_trust SET recovery_blocked=false"},
+		{runtimePool, "UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()"},
+		{runtimePool, "UPDATE download_allocation SET output_limit=output_limit"},
+		{auditPool, "UPDATE artifact_download SET charged_output=0"},
+		{auditPool, "UPDATE download_batch SET outcome_json=outcome_json"},
+		{configPool, "UPDATE artifact_download SET state='Ready'"},
+	} {
+		if _, err := check.pool.Exec(ctx, check.query); err == nil {
+			t.Fatal("excess download privilege")
+		}
+	}
+	type fixture struct {
+		s                      captureAdmissionScenario
+		p                      artifact.PublishedContext
+		runtime, audit, config *postgres.Downloads
+		allocation             artifact.DownloadAllocation
+		authority              func() artifact.DownloadAuthority
+		gate                   authorizationapp.ContextDownloadAuthority
+		guards                 postgres.DownloadTransactionGuards
+		installation           string
+	}
+	setupWithKeys := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener)) fixture {
+		t.Helper()
+		ctx := ctx
+		s, p := create(t, provider)
+		if s.nativeSources != nil {
+			ctx = s.nativeSources.ctx
+		}
+		f := fixture{s: s, p: p, installation: s.recovery.installation}
+		f.guards = postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+		for _, pair := range []struct {
+			pool *pgxpool.Pool
+			dst  **postgres.Downloads
+		}{{runtimePool, &f.runtime}, {auditPool, &f.audit}, {configPool, &f.config}} {
+			v, err := postgres.NewDownloads(ctx, pair.pool, s.a.RootID, f.guards)
+			if err != nil {
+				t.Fatal(err)
+			}
+			*pair.dst = v
+		}
+		e := p.Expectation
+		f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: s.a.RootID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, SessionLimit: 64, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
+		if err := f.config.BindDownloadAllocation(ctx, f.allocation); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.config.BindDownloadAllocation(ctx, f.allocation); err != nil {
+			t.Fatal("allocation replay", err)
+		}
+		catalog, err := postgres.NewContextPublications(ctx, catalogPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor := s.a.Eligibility.VerifiedIdentity
+		actor.Scopes = []string{"evidence:read", "evidence:download"}
+		f.gate = authorizationapp.ContextDownloadAuthority{RootID: s.a.RootID, Identities: downloadTestIdentity{actor}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureRetainedPolicies(s), Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, catalogPool, s, e.Registration), Now: time.Now}
+		if provider != nil {
+			// The login has one fixed end. Every observed identity and request
+			// retains its own original short interval through blocking work.
+			f.gate.Identities = nativeDownloadTestIdentity{value: actor, expires: time.Now().UTC().Add(2 * time.Minute)}
+		}
+		f.authority = func() artifact.DownloadAuthority {
+			scope := artifact.DownloadScope{RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(p.Copies), Principal: s.a.Plan.Input.Executor}
+			a, err := f.gate.CheckDownload(ctx, "synthetic-reference", scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return a
+		}
+
+		return f
+	}
+	setup := func(t *testing.T) fixture { return setupWithKeys(t, nil) }
+	request := func(f fixture, a artifact.DownloadAuthority) evidence.DownloadReservation {
+		return evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: f.allocation.ID, Scope: a.Scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}, IdempotencyDigest: artifact.Digest{9}, Authority: a}
+	}
+
+	for _, mode := range []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+		t.Run("download-worker-"+mode, func(t *testing.T) {
+			ctx := ctx // This subtest owns any native source-observer cancellation.
+			var nativeScope authorization.KeyScope
+			var nativeBackend *kms.LocalOperations
+			var f fixture
+			if strings.HasPrefix(mode, "native-") {
+				f = setupWithKeys(t, func(installation string) (evidence.KeySealer, evidence.KeyOpener) {
+					var wrapping *kms.LocalKeyBackend
+					nativeScope, wrapping, nativeBackend = localDownloadKeys(t, installation)
+					return wrapping, wrapping
+				})
+			} else {
+				f = setup(t)
+			}
+			if f.s.nativeSources != nil {
+				ctx = f.s.nativeSources.ctx
+				defer f.s.nativeSources.Close()
+			}
+			if mode == "native-retention-observation" {
+				qualifyNativeRetentionObservation(t, admin, f.s, f.gate)
+				return
+			}
+			profile := syntheticWorkerProfile(f.installation)
+			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" {
+				// Protected native credential projection pins remain explicit synthetic inputs.
+				profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "native-store", custodyID()
+			}
+			placement := f.gate.Environment.(downloadTestEnvironment).path
+			placement.AcquisitionClusterID, placement.ConnectorClusterID, placement.WorkerConfiguration = profile.ClusterID, profile.ClusterID, profile.Configuration
+			a := f.authority()
+			pool := poolFor("download_worker_runtime", "synthetic-download-worker")
+			defer pool.Close()
+			auditPool := poolFor("download_worker_audit_runtime", "synthetic-download-worker-audit")
+			defer auditPool.Close()
+			identityPool := poolFor("download_worker_identity_runtime", "synthetic-download-worker-identity")
+			defer identityPool.Close()
+			ledger, e := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, profile, f.guards)
+			if e != nil {
+				t.Fatal(e)
+			}
+			ack, e := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, profile, f.guards)
+			if e != nil {
+				t.Fatal(e)
+			}
+			identities, e := postgres.NewDownloadWorkers(ctx, identityPool, f.s.a.RootID, profile, f.guards)
+			if e != nil {
+				t.Fatal(e)
+			}
+			objectAudit := &objectstore.DownloadWorkerAuditObjects{Store: store, Seal: keys, Open: keys}
+			r := request(f, a)
+			if mode == "native-content-resume" || mode == "native-content-interrupted" {
+				// Original preparation plus two independently charged content reads.
+				// This is funded before reservation, never a resume-time refill.
+				r.Session.ReadLimit = 12 << 20
+			}
+			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" {
+				bindContextNativeStopFixture(t, ctx, f.config, f.allocation, f.installation, f.p.Expectation.Registration.StoreID, f.guards, poolFor)
+				r.Session.StopProtocol = artifact.DownloadStopProtocol
+			}
+			session, e := f.runtime.ReserveDownload(ctx, r)
+			if e != nil {
+				t.Fatal(e)
+			}
+			intentID := custodyID()
+			if mode == "missing-configuration" {
+				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, a, profile); e == nil {
+					t.Fatal("constructor profile authorized dispatch without accepted configuration")
+				}
+				return
+			}
+			configuration, configurationReader, observer, settings := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, profile, a.Environment.RecoveryEpoch)
+			if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e != nil {
+				t.Fatal("current accepted worker configuration", e)
+			}
+
+			if strings.HasPrefix(mode, "native-") {
+				if f.s.nativeSources == nil {
+					t.Fatal("native source owner missing")
+				}
+				// Register only the already accepted exact worker configuration.
+				// Source observations stay owned by the setup-to-shutdown loop.
+				f.s.nativeSources.SetWorker(t, observer.Observe)
+			}
+			if mode == "configuration-mutated" {
+				settings.Profile.CPUMillis++
+				if e = observer.Observe(ctx); e == nil {
+					t.Fatal("same-revision replacement accepted")
+				}
+				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
+					t.Fatal("mutated configuration authorized")
+				}
+				return
+			}
+			if mode == "configuration-unaudited-rollout" {
+				settings.Profile.Configuration.Generation++
+				settings.Profile.Configuration.Digest[0]++
+				o, e := observer.Reader.ReadWorkerConfiguration(ctx)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, acknowledged, e := configuration.ObserveWorkerConfiguration(ctx, o); e != nil || acknowledged {
+					t.Fatal("staging new revision", e)
+				}
+				for _, p := range []authorization.DownloadWorkerProfile{profile, settings.Profile} {
+					if _, e = configurationReader.CurrentWorkerConfiguration(ctx, p); e == nil {
+						t.Fatal("unaudited rollout authorized old or new revision")
+					}
+				}
+				if e = observer.Observe(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
+					t.Fatal("audited rollout", e)
+				}
+				return
+			}
+			if mode == "configuration-audit-reuse" {
+				counted := &countedWorkerConfigurationAudit{writer: observer.Audit}
+				observer.Audit = counted
+				for range 3 {
+					if e = observer.Observe(ctx); e != nil {
+						t.Fatal(e)
+					}
+				}
+				if counted.writes != 0 {
+					t.Fatal("refresh repeated encrypted audit", counted.writes)
+				}
+				return
+			}
+			if mode == "configuration-fence-order" {
+				olderFailure := time.Now().UTC()
+				if e = observer.Observe(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if e = configuration.FenceWorkerConfiguration(ctx, olderFailure); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e != nil {
+					t.Fatal("old failed observer fenced newer success", e)
+				}
+				return
+			}
+			if mode == "configuration-roles" {
+				for _, role := range [][2]string{{"worker_configuration_runtime", "synthetic-worker-configuration"}, {"worker_configuration_audit_runtime", "synthetic-worker-configuration-audit"}, {"worker_configuration_read_runtime", "synthetic-worker-configuration-read"}, {"download_worker_runtime", "synthetic-download-worker"}, {"download_worker_identity_runtime", "synthetic-download-worker-identity"}} {
+					rp := poolFor(role[0], role[1])
+					defer rp.Close()
+					for _, q := range []string{
+						"DELETE FROM download_worker_configuration WHERE installation_id=$1",
+						"UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1",
+						"UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1",
+					} {
+						if _, e = rp.Exec(ctx, q, profile.InstallationID); e == nil {
+							t.Fatal("role changed immutable history", role[0], q)
+						}
+					}
+					if role[0] != "worker_configuration_runtime" {
+						if _, e = rp.Exec(ctx, "UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1", profile.InstallationID); e == nil {
+							t.Fatal("consumer refreshed authority", role[0])
+						}
+					}
+					if role[0] != "worker_configuration_audit_runtime" {
+						if _, e = rp.Exec(ctx, "UPDATE download_worker_configuration_revision SET audit_receipt_json=audit_receipt_json WHERE installation_id=$1", profile.InstallationID); e == nil {
+							t.Fatal("role gained audit acknowledgement", role[0])
+						}
+					}
+				}
+				return
+			}
+			if mode == "configuration-rollback" || mode == "configuration-suspended" {
+				original := *settings
+				settings.Profile.Configuration.Generation++
+				settings.Profile.Configuration.Digest[0]++
+				settings.Suspended = mode == "configuration-suspended"
+				if e = observer.Observe(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = configurationReader.CurrentWorkerConfiguration(ctx, profile); e == nil {
+					t.Fatal("stale configuration remained current")
+				}
+				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, f.authority(), profile); e == nil {
+					t.Fatal("stale dispatcher reserved a worker")
+				}
+				if mode == "configuration-rollback" {
+					if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e != nil {
+						t.Fatal(e)
+					}
+					*settings = original
+					if e = observer.Observe(ctx); e == nil {
+						t.Fatal("accepted configuration rolled back")
+					}
+				} else if _, e = configurationReader.CurrentWorkerConfiguration(ctx, settings.Profile); e == nil {
+					t.Fatal("suspended configuration remained current")
+				}
+				return
+			}
+			if mode == "configuration-fenced" {
+				if e = configuration.FenceWorkerConfiguration(ctx, time.Now().UTC()); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, f.authority(), profile); e == nil {
+					t.Fatal("fenced source still dispatched")
+				}
+				return
+			}
+			if mode == "configuration-lock-expired" {
+				tx, e := admin.Begin(ctx)
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer tx.Rollback(ctx)
+				if _, e = tx.Exec(ctx, "SELECT source_uid FROM download_worker_configuration WHERE installation_id=$1 FOR UPDATE", profile.InstallationID); e != nil {
+					t.Fatal(e)
+				}
+				now := time.Now().UTC()
+				o := authorization.DownloadWorkerObservation{Configuration: *settings, ObservedAt: now, FreshUntil: now.Add(300 * time.Millisecond)}
+				done := make(chan error, 1)
+				go func() { _, _, e := configuration.ObserveWorkerConfiguration(ctx, o); done <- e }()
+				time.Sleep(400 * time.Millisecond)
+				if e = tx.Commit(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if e = <-done; e == nil {
+					t.Fatal("expired profile observation accepted after lock")
+				}
+				return
+			}
+			if mode == "short-runtime" {
+				a = f.authority()
+				a.AccessUntil = time.Now().UTC().Add(500 * time.Millisecond)
+				a.ValidUntil = a.AccessUntil
+				if _, e = ledger.ReserveDownloadWorker(ctx, session.ID, intentID, a, profile); e == nil {
+					t.Fatal("reserved worker with less than one second to run")
+				}
+				var count int
+				if e = admin.QueryRow(ctx, "SELECT count(*) FROM download_worker WHERE session_id=$1", session.ID).Scan(&count); e != nil || count != 0 {
+					t.Fatal("unusable worker consumed capacity", count, e)
+				}
+				return
+			}
+			if strings.HasPrefix(mode, "native-") {
+				// This is a new independent admission after fixture setup, not
+				// an extension of the earlier session-reservation observation.
+				a = f.authority()
+			}
+			i, e := ledger.ReserveDownloadWorker(ctx, session.ID, intentID, a, profile)
+			if e != nil {
+				t.Fatal("reserve worker", e)
+			}
+			replay, e := ledger.ReserveDownloadWorker(ctx, session.ID, custodyID(), f.authority(), profile)
+			if e != nil || replay.ID != i.ID || !replay.RunUntil.Equal(i.RunUntil) {
+				t.Fatal("replay replaced intent", e)
+			}
+			if _, e = ledger.ClaimDownloadWorker(ctx, i, f.authority()); e == nil {
+				t.Fatal("unaudited worker started")
+			}
+			if _, ok, e := ledger.ReadDownloadWorkerIntentReceipt(ctx, i); e != nil || ok {
+				t.Fatal("missing acknowledgement treated as durable", e)
+			}
+			if mode == "unaudited" {
+				return
+			}
+			if mode != "fresh-audit" {
+				receipt, e := objectAudit.WriteDownloadWorkerIntent(ctx, i)
+				if e != nil {
+					t.Fatal("worker audit", e)
+				}
+				if e = ack.AcknowledgeDownloadWorkerIntent(ctx, i, receipt); e != nil {
+					t.Fatal(e)
+				}
+				if got, ok, e := ledger.ReadDownloadWorkerIntentReceipt(ctx, i); e != nil || !ok || got != receipt {
+					t.Fatal("durable audit receipt lost", e)
+				}
+				changed := i
+				changed.ID = custodyID()
+				if _, _, e := ledger.ReadDownloadWorkerIntentReceipt(ctx, changed); e == nil {
+					t.Fatal("another intent inherited an acknowledgement")
+				}
+			}
+			if _, e = pool.Exec(ctx, "UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1", i.ID); e == nil {
+				t.Fatal("dispatcher gained audit authority")
+			}
+			if _, e = identityPool.Exec(ctx, "UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1", i.ID); e == nil {
+				t.Fatal("identity reader gained launch authority")
+			}
+			if mode == "parallel-claim" {
+				results := make(chan authorization.DownloadWorkerLaunch, 8)
+				errs := make(chan error, 8)
+				for j := 0; j < 8; j++ {
+					go func() { v, e := ledger.ClaimDownloadWorker(ctx, i, a); results <- v; errs <- e }()
+				}
+				count := 0
+				for j := 0; j < 8; j++ {
+					v, e := <-results, <-errs
+					if e != nil {
+						t.Fatal(e)
+					}
+					if v.MayCreate {
+						count++
+					}
+				}
+				if count != 1 {
+					t.Fatal("duplicate Job creation rights", count)
+				}
+				if _, e = pool.Exec(ctx, "UPDATE download_worker SET claimed_at=NULL WHERE id=$1", i.ID); e == nil {
+					t.Fatal("reset launch claim")
+				}
+				return
+			}
+			if mode == "expired-claim" {
+				a = f.authority()
+				a.ValidUntil = time.Now().UTC().Add(300 * time.Millisecond)
+				tx, e := admin.Begin(ctx)
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer tx.Rollback(ctx)
+				if _, e = tx.Exec(ctx, "SELECT id FROM download_worker WHERE id=$1 FOR UPDATE", i.ID); e != nil {
+					t.Fatal(e)
+				}
+				done := make(chan error, 1)
+				go func() { _, e := ledger.ClaimDownloadWorker(ctx, i, a); done <- e }()
+				time.Sleep(400 * time.Millisecond)
+				if e = tx.Commit(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if e = <-done; e == nil {
+					t.Fatal("expired launch")
+				}
+				var claimed bool
+				if e = admin.QueryRow(ctx, "SELECT claimed_at IS NOT NULL FROM download_worker WHERE id=$1", i.ID).Scan(&claimed); e != nil || claimed {
+					t.Fatal("stale claim consumed", e)
+				}
+				return
+			}
+			if mode == "capacity-held" {
+				r2 := request(f, f.authority())
+				r2.IdempotencyDigest[0]++
+				s2, e := f.runtime.ReserveDownload(ctx, r2)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, e = ledger.ReserveDownloadWorker(ctx, s2.ID, custodyID(), f.authority(), profile); e != nil {
+					t.Fatal(e)
+				}
+				r3 := request(f, f.authority())
+				r3.IdempotencyDigest[0] += 2
+				s3, e := f.runtime.ReserveDownload(ctx, r3)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, e = ledger.ReserveDownloadWorker(ctx, s3.ID, custodyID(), f.authority(), profile); !errors.Is(e, artifact.ErrDownloadCapacity) {
+					t.Fatal("pending jobs escaped worker budget", e)
+				}
+				if _, e = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = ledger.ReserveDownloadWorker(ctx, s3.ID, custodyID(), f.authority(), profile); !errors.Is(e, artifact.ErrDownloadCapacity) {
+					t.Fatal("cancellation refunded unknown worker", e)
+				}
+				return
+			}
+			jobs := &syntheticDownloadJobs{loseCreate: mode == "coordinator-recovery"}
+			countedAudit := &countedWorkerAudit{writer: objectAudit}
+			service := &evidence.DownloadDispatcher{Ledger: ledger, Jobs: jobs, Audit: countedAudit, Acknowledgements: ack, Authority: f.gate, Profile: profile, Now: time.Now}
+			var w authorization.DownloadWorker
+			if mode == "enrollment-current-request" {
+				service.CurrentAuthority = f.gate
+				current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+				w, e = service.EnsureCurrent(ctx, current, session.ID, intentID, a.Scope)
+			} else {
+				w, e = service.Ensure(ctx, "synthetic-reference", session.ID, intentID, a.Scope)
+			}
+			if mode == "coordinator-recovery" {
+				if e == nil {
+					t.Fatal("lost create response not reported")
+				}
+				w, e = service.Ensure(ctx, "synthetic-reference", session.ID, intentID, a.Scope)
+			}
+			if e != nil || !w.Valid() || jobs.creates != 1 {
+				t.Fatal("dispatch", e, jobs.creates)
+			}
+			expectedWrites := 0
+			if mode == "fresh-audit" {
+				expectedWrites = 1
+				if _, e = service.Ensure(ctx, "synthetic-reference", session.ID, intentID, a.Scope); e != nil {
+					t.Fatal("fresh audit replay", e)
+				}
+			}
+			if countedAudit.writes != expectedWrites {
+				t.Fatal("acknowledged intent repeated encrypted audit work", countedAudit.writes)
+			}
+			if mode == "routing-two-clusters" {
+				rp := poolFor("worker_routing_read_runtime", "synthetic-worker-routing-read")
+				defer rp.Close()
+				routing, err := postgres.NewWorkerRouting(ctx, rp, f.s.a.RootID, f.installation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				p2 := syntheticWorkerProfile(f.installation)
+				_, _, observer2, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, p2, a.Environment.RecoveryEpoch)
+				secondLedger, err := postgres.NewDownloadWorkers(ctx, pool, f.s.a.RootID, p2, f.guards)
+				if err != nil {
+					t.Fatal(err)
+				}
+				secondAck, err := postgres.NewDownloadWorkers(ctx, auditPool, f.s.a.RootID, p2, f.guards)
+				if err != nil {
+					t.Fatal(err)
+				}
+				placement.AcquisitionClusterID, placement.ConnectorClusterID, placement.WorkerConfiguration = p2.ClusterID, p2.ClusterID, p2.Configuration
+				r2 := request(f, f.authority())
+				r2.IdempotencyDigest[0]++
+				s2, err := f.runtime.ReserveDownload(ctx, r2)
+				if err != nil {
+					t.Fatal(err)
+				}
+				second := evidence.DownloadDispatcher{Ledger: secondLedger, Jobs: &syntheticDownloadJobs{}, Audit: objectAudit, Acknowledgements: secondAck, Authority: f.gate, Profile: p2, Now: time.Now}
+				w2, err := second.Ensure(ctx, "synthetic-reference", s2.ID, custodyID(), a.Scope)
+				if err != nil {
+					t.Fatal("second cluster dispatch", err)
+				}
+				if err = observer.Observe(ctx); err != nil {
+					t.Fatal(err)
+				}
+				for _, worker := range []authorization.DownloadWorker{w, w2} {
+					result, err := routing.ReadDownloadWorkerEnrollment(ctx, worker.Intent.SessionID, worker.Intent.ID)
+					if err != nil || result.Worker.Intent.Profile != worker.Intent.Profile {
+						t.Fatal("hub profile selection", err)
+					}
+				}
+				if _, err = identities.ReadDownloadWorkerEnrollment(ctx, s2.ID, w2.Intent.ID); err == nil {
+					t.Fatal("profile-scoped facet widened to another cluster")
+				}
+				for _, scope := range [][2]string{{custodyID(), f.installation}, {f.s.a.RootID, custodyID()}} {
+					foreign, err := postgres.NewWorkerRouting(ctx, rp, scope[0], scope[1])
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err = foreign.ReadDownloadWorkerEnrollment(ctx, session.ID, w.Intent.ID); err == nil {
+						t.Fatal("foreign routing scope accepted")
+					}
+				}
+				if _, err = routing.ReadDownloadWorkerEnrollment(ctx, session.ID, w2.Intent.ID); err == nil {
+					t.Fatal("foreign worker accepted")
+				}
+				short, stop := context.WithTimeout(ctx, time.Second)
+				cutoff, _ := short.Deadline()
+				result, err := routing.ReadDownloadWorkerEnrollment(short, session.ID, w.Intent.ID)
+				stop()
+				if err != nil || result.FreshUntil.After(cutoff) || result.FreshUntil.After(session.Deadline) {
+					t.Fatal("routing extended original caller/session deadline", err)
+				}
+				for _, query := range []string{
+					"UPDATE download_worker SET claimed_at=NULL WHERE id=$1",
+					"UPDATE download_worker_owner SET released_at=clock_timestamp() WHERE worker_id=$1",
+					"DELETE FROM download_worker WHERE id=$1",
+					"UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1",
+					"UPDATE fleet_trust SET installation_id='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1",
+				} {
+					id := w.Intent.ID
+					if strings.Contains(query, "installation_id") {
+						id = f.installation
+					}
+					if _, err = rp.Exec(ctx, query, id); err == nil {
+						t.Fatal("routing role performed mutation", query)
+					}
+				}
+				if err = configuration.FenceWorkerConfiguration(ctx, time.Now()); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = routing.ReadDownloadWorkerEnrollment(ctx, session.ID, w.Intent.ID); err == nil {
+					t.Fatal("fenced profile accepted")
+				}
+				if err = observer2.Observe(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = routing.ReadDownloadWorkerEnrollment(ctx, s2.ID, w2.Intent.ID); err != nil {
+					t.Fatal("one cluster fencing denied unrelated worker", err)
+				}
+				if err = observer.Observe(ctx); err != nil {
+					t.Fatal(err)
+				}
+				tx, err := admin.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback(ctx)
+				if _, err = tx.Exec(ctx, "SELECT source_uid FROM download_worker_configuration WHERE source_uid=$1 FOR UPDATE", profile.Configuration.UID); err != nil {
+					t.Fatal(err)
+				}
+				done := make(chan error, 1)
+				go func() { _, err := routing.ReadDownloadWorkerEnrollment(ctx, session.ID, w.Intent.ID); done <- err }()
+				waiting := false
+				limit := time.Now().Add(time.Second)
+				for time.Now().Before(limit) {
+					if err = admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE usename='worker_routing_read_runtime' AND wait_event_type='Lock')").Scan(&waiting); err != nil {
+						t.Fatal(err)
+					}
+					if waiting {
+						break
+					}
+					time.Sleep(time.Millisecond)
+				}
+				if !waiting {
+					t.Fatal("routing read never waited on configuration")
+				}
+				if _, err = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); err != nil {
+					t.Fatal(err)
+				}
+				if err = tx.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err = <-done; err == nil {
+					t.Fatal("parent cancelled during configuration wait still routed")
+				}
+				return
+			}
+			peer := authorization.KeyPeer{InstallationID: f.installation, PeerID: w.Binding.PodUID, Role: "acquisition", Certificate: artifact.Digest{9}, NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Minute)}
+			if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
+				t.Fatal("unregistered certificate became worker identity")
+			}
+			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, f.guards, store, keys, f.gate)
+			if strings.HasPrefix(mode, "native-") {
+				var content *nativeContextFixture
+				if mode != "native-exchange" {
+					service.CurrentAuthority = f.gate
+					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader, recovery: f.s.recovery.reader}
+				}
+				qualifyNativeExchange(t, ctx, nativeExchangeFixture{content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+				return
+			}
+			if mode == "request-owners" {
+				qualifyWorkerOwners(t, ctx, w, enrollment, f.guards, f.authority, func() error { return observer.Observe(ctx) }, func() error { _, err := f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); return err }, admin, poolFor)
+				return
+			}
+			if workerEnrollmentCase(t, ctx, mode, w, enrollment, f.authority, func() error { return observer.Observe(ctx) }, admin, poolFor) {
+				return
+			}
+			certificate, e := enrollment.enroll(ctx, w)
+			if e != nil {
+				t.Fatal("worker certificate enrollment", e)
+			}
+			peer = certificate.Peer
+			identity, e := identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer)
+			if e != nil || identity.Worker.Binding != w.Binding || !identity.Valid(time.Now()) {
+				t.Fatal("worker identity", e)
+			}
+
+			if mode == "configuration-identity-expired" {
+				now := time.Now().UTC()
+				o := authorization.DownloadWorkerObservation{Configuration: *settings, ObservedAt: now, FreshUntil: now.Add(300 * time.Millisecond)}
+				if _, _, e = configuration.ObserveWorkerConfiguration(ctx, o); e != nil {
+					t.Fatal(e)
+				}
+				bounded, e := identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer)
+				if e != nil || bounded.FreshUntil.After(o.FreshUntil) {
+					t.Fatal("identity extended original configuration deadline", e)
+				}
+				time.Sleep(400 * time.Millisecond)
+				if bounded.Valid(time.Now()) {
+					t.Fatal("expired observation still valid")
+				}
+				if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
+					t.Fatal("expired configuration yielded new worker identity")
+				}
+				jobs.stopped = true
+				if e = service.Retire(ctx, w); e != nil {
+					t.Fatal("expired configuration prevented historical cleanup", e)
+				}
+				return
+			}
+			if mode == "binding-replacement" {
+				changed := w
+				changed.Binding.PodUID = custodyID()
+				if e = ledger.BindDownloadWorker(ctx, changed, f.authority()); e == nil {
+					t.Fatal("replacement pod inherited worker identity")
+				}
+				return
+			}
+			if mode == "cancelled-parent" {
+				if _, e = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); e != nil {
+					t.Fatal(e)
+				}
+				if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
+					t.Fatal("cancelled worker identity")
+				}
+				return
+			}
+			if e = service.Retire(ctx, w); e == nil {
+				t.Fatal("live worker refunded")
+			}
+			jobs.stopped = true
+			jobs.loseDelete = true
+			if e = service.Retire(ctx, w); e == nil {
+				t.Fatal("uncertain deletion refunded")
+			}
+			// Losing the process-local termination snapshot is harmless: SQL holds it.
+			jobs.stopped = false
+			if e = service.Retire(ctx, w); e != nil {
+				t.Fatal("retirement reconciliation", e)
+			}
+			if jobs.terminations != 2 || jobs.deletes != 2 {
+				t.Fatal("lost durable termination", jobs.terminations, jobs.deletes)
+			}
+			if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
+				t.Fatal("retired worker identity")
+			}
+			next, e := ledger.ReserveDownloadWorker(ctx, session.ID, custodyID(), f.authority(), profile)
+			if e != nil || next.Generation != 2 || next.ID == i.ID {
+				t.Fatal("resume with a new accounted worker", e)
+			}
+		})
+	}
+	ackIntent := func(t *testing.T, f fixture, i audit.DownloadIntent) {
+		t.Helper()
+		r, err := objects.WriteDownloadIntent(ctx, i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = f.audit.AcknowledgeDownloadIntent(ctx, i, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ackOutcome := func(t *testing.T, f fixture, o audit.DownloadOutcome) {
+		t.Helper()
+		r, err := objects.WriteDownloadOutcome(ctx, o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = f.audit.AcknowledgeDownloadOutcome(ctx, o, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prepare := func(t *testing.T, f fixture, r evidence.DownloadReservation) artifact.DownloadSession {
+		t.Helper()
+		s, err := f.runtime.ReserveDownload(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, r.Authority, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackIntent(t, f, i)
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, r.Authority, i.Batch.ID, i.Batch.Generation); err != nil {
+			t.Fatal(err)
+		}
+		o, err := f.runtime.FinishDownloadBatch(ctx, s.ID, i.Batch.ID, i.Batch.Generation, 0, true, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pending, err := f.runtime.LookupDownload(ctx, s.ID, s.Scope.Principal)
+		if err != nil || pending.State != artifact.DownloadPreparing {
+			t.Fatal("ready before outcome audit", pending.State, err)
+		}
+		ackOutcome(t, f, o)
+		s, err = f.runtime.LookupDownload(ctx, s.ID, s.Scope.Principal)
+		if err != nil || s.State != artifact.DownloadReady {
+			t.Fatal(s.State, err)
+		}
+		return s
+	}
+
+	for _, change := range []struct{ name, sql string }{
+		{"blocked", "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"},
+		{"suspended", "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"},
+		{"epoch", "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"},
+		{"revision", "UPDATE fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1"},
+		{"expired", "UPDATE fleet_trust SET observed_at=statement_timestamp()-interval '31 seconds',fresh_until=statement_timestamp()-interval '1 second' WHERE installation_id=$1"},
+	} {
+		t.Run("download-recovery-"+change.name+"-fences-prepaid-output", func(t *testing.T) {
+			f := setup(t)
+			a := f.authority()
+			s := prepare(t, f, request(f, a))
+			b := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 1024, ReadBytes: 2 << 20}
+			i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ackIntent(t, f, i)
+			if _, err = admin.Exec(ctx, change.sql, f.installation); err != nil {
+				t.Fatal(err)
+			}
+			if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, i.Batch.Generation); err == nil {
+				t.Fatal("old recovery proof emitted")
+			}
+			if _, err = f.runtime.ReserveDownload(ctx, request(f, a)); err == nil {
+				t.Fatal("old recovery proof reserved")
+			}
+			got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
+			if err != nil || got.ChargedOutput != 1024 || got.EmittedBytes != 0 {
+				t.Fatal("recovery rejection changed uncertain spend", got, err)
+			}
+			if change.name == "blocked" || change.name == "suspended" || change.name == "expired" {
+				if _, err = f.gate.CheckDownload(ctx, "synthetic-reference", a.Scope); err == nil {
+					t.Fatal("unready recovery produced new authority")
+				}
+			}
+		})
+	}
+	t.Run("download-recovery-waiter-expiry-and-installation-binding", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		s, err := f.runtime.ReserveDownload(ctx, request(f, a))
+		if err != nil {
+			t.Fatal(err)
+		}
+		bad := a
+		bad.Environment.InstallationID = custodyID()
+		if _, err = f.runtime.ReserveDownload(ctx, request(f, bad)); err == nil {
+			t.Fatal("caller selected recovery installation")
+		}
+		tx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", f.installation); err != nil {
+			t.Fatal(err)
+		}
+		a.CheckedAt = time.Now().UTC()
+		a.ValidUntil = a.CheckedAt.Add(100 * time.Millisecond)
+		done := make(chan error, 1)
+		go func() {
+			_, e := f.runtime.BeginDownloadBatch(ctx, s.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+			done <- e
+		}()
+		time.Sleep(200 * time.Millisecond)
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-done; err == nil {
+			t.Fatal("recovery lock wait extended authority")
+		}
+		got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
+		if err != nil || got.ChargedRead != 0 {
+			t.Fatal("expired waiter changed spend", got, err)
+		}
+	})
+	t.Run("download-retention-source-fences-prepaid-output", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		r := request(f, a)
+		bad := r
+		bad.Authority.Retention = artifact.RetentionProof{}
+		if _, err := f.runtime.ReserveDownload(ctx, bad); err == nil {
+			t.Fatal("session without retention proof")
+		}
+		session := prepare(t, f, r)
+		batch := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 1024, ReadBytes: 2 << 20}
+		intent, err := f.runtime.BeginDownloadBatch(ctx, session.ID, a, batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackIntent(t, f, intent)
+		if err = f.s.retention.sources.SuspendRetention(ctx, f.s.retention.fence); err != nil {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, session.ID, a, batch.ID, intent.Batch.Generation); err == nil {
+			t.Fatal("revoked retention permits content")
+		}
+		if _, err = f.runtime.ReserveDownload(ctx, r); err == nil {
+			t.Fatal("revoked retention permits session replay")
+		}
+		current, err := f.runtime.LookupDownload(ctx, session.ID, a.Scope.Principal)
+		if err != nil || current.ChargedOutput != 1024 || current.EmittedBytes != 0 {
+			t.Fatal("failure refunded uncertain spend", current, err)
+		}
+	})
+	t.Run("download-retention-shortening-fences-an-active-transfer", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		s := prepare(t, f, request(f, a))
+		b := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 1024, ReadBytes: 2 << 20}
+		intent, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackIntent(t, f, intent)
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, intent.Batch.Generation); err != nil {
+			t.Fatal(err)
+		}
+		pool := poolFor("retention_runtime", "synthetic-retention")
+		defer pool.Close()
+		retention, err := postgres.NewRetention(ctx, pool, f.s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reg := f.p.Expectation.Registration
+		d := retentionTestDecision(t, ctx, retention, reg.Location, reg.ExpiresAt.Add(-time.Minute), reg.DeleteBy.Add(-time.Minute))
+		if err = retention.TightenRetention(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, intent.Batch.Generation); err == nil {
+			t.Fatal("old disclosure cutoff survived shortening")
+		}
+		a.AccessUntil = d.Effective.ExpiresAt
+		a.DeleteBy = d.Effective.DeleteBy
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, intent.Batch.Generation); err != nil {
+			t.Fatal("fresh shorter authority rejected", err)
+		}
+		overdue := retentionTestDecision(t, ctx, retention, reg.Location, reg.AnchorAt.Add(time.Microsecond), reg.AnchorAt.Add(2*time.Microsecond))
+		if err = retention.TightenRetention(ctx, overdue); err != nil {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, intent.Batch.Generation); err == nil {
+			t.Fatal("expired content emitted")
+		}
+		o, err := f.runtime.FinishDownloadBatch(ctx, s.ID, b.ID, intent.Batch.Generation, 0, false, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackOutcome(t, f, o)
+		got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
+		if err != nil || got.ChargedOutput != 1024 || got.EmittedBytes != 0 {
+			t.Fatal("retention refunded uncertain transfer", err)
+		}
+	})
+	t.Run("download-concurrent-preparation-one-reservation-and-restart", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		r := request(f, a)
+		var wg sync.WaitGroup
+		out := make(chan artifact.DownloadSession, 8)
+		errs := make(chan error, 8)
+		for range 8 {
+			wg.Add(1)
+			go func() { defer wg.Done(); s, e := f.runtime.ReserveDownload(ctx, r); out <- s; errs <- e }()
+		}
+		wg.Wait()
+		close(out)
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		for s := range out {
+			if s.ID != r.Session.ID {
+				t.Fatal("duplicate session")
+			}
+		}
+		var count, output, read int64
+		if err := admin.QueryRow(ctx, "SELECT reserved_sessions,reserved_output,reserved_read FROM download_allocation WHERE id=$1", f.allocation.ID).Scan(&count, &output, &read); err != nil || count != 1 || output != r.Session.OutputLimit || read != r.Session.ReadLimit {
+			t.Fatal(count, output, read, err)
+		}
+		again, err := postgres.NewDownloads(ctx, runtimePool, f.s.a.RootID, f.guards)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Session.ID = custodyID()
+		r.Session.Deadline = r.Session.Deadline.Add(time.Minute)
+		s, err := again.ReserveDownload(ctx, r)
+		if err != nil || s.Deadline.Equal(r.Session.Deadline) || s.ID == r.Session.ID {
+			t.Fatal("restart moved original limits", err)
+		}
+		r.Session.RequestDigest[0]++
+		if _, err = again.ReserveDownload(ctx, r); err == nil {
+			t.Fatal("different intent replayed")
+		}
+		other := a.Scope.Principal
+		other.ClientID = "other-client"
+		if _, err = again.LookupDownload(ctx, s.ID, other); err == nil {
+			t.Fatal("cross-client lookup")
+		}
+		if _, err = again.CancelDownload(ctx, s.ID, other); err == nil {
+			t.Fatal("cross-client cancel")
+		}
+	})
+	t.Run("download-audit-native-read-cancel-uncertain-spend", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		s := prepare(t, f, request(f, a))
+		b := artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 4096, ReadBytes: 2 << 20}
+		i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, i.Batch.Generation); err == nil {
+			t.Fatal("unaudited content")
+		}
+		if _, err = f.runtime.BeginDownloadBatch(ctx, s.ID, a, b); err == nil {
+			t.Fatal("duplicate started writer")
+		}
+		ackIntent(t, f, i)
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, i.Batch.Generation); err != nil {
+			t.Fatal(err)
+		}
+		bound, err := store.ForCustody(f.p.Expectation.Registration.StoreID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		native, err := objectstore.NewContextNativeReader(bound, keys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := native.ReadContext(ctx, f.p.Expectation, f.p.Copies, i.Batch.LeaseUntil)
+		if err != nil || len(body) == 0 || len(body) > 4096 {
+			t.Fatal("native bytes", err)
+		}
+		clear(body)
+		cancelled, err := f.runtime.CancelDownload(ctx, s.ID, a.Scope.Principal)
+		if err != nil || cancelled.State != artifact.DownloadCancelled {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, b.ID, i.Batch.Generation); err == nil {
+			t.Fatal("cancelled output")
+		}
+		o, err := f.runtime.FinishDownloadBatch(ctx, s.ID, b.ID, i.Batch.Generation, 512, false, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackOutcome(t, f, o)
+		if _, err = f.runtime.FinishDownloadBatch(ctx, s.ID, b.ID, i.Batch.Generation, 512, false, false); err != nil {
+			t.Fatal("lost finish reply", err)
+		}
+		if _, err = f.runtime.FinishDownloadBatch(ctx, s.ID, b.ID, i.Batch.Generation, 513, false, false); err == nil {
+			t.Fatal("outcome rewritten")
+		}
+		got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
+		if err != nil || got.State != artifact.DownloadCancelled || got.EmittedBytes != 512 || got.ChargedOutput != 4096 || got.ChargedRead != 4<<20 {
+			t.Fatal(got.State, got.ChargedOutput, got.ChargedRead, err)
+		}
+		if _, err = admin.Exec(ctx, "UPDATE artifact_download SET state='Ready' WHERE id=$1", s.ID); err == nil {
+			t.Fatal("revived cancelled session")
+		}
+		if _, err = admin.Exec(ctx, "UPDATE artifact_download SET charged_output=0 WHERE id=$1", s.ID); err == nil {
+			t.Fatal("refunded uncertain spend")
+		}
+	})
+	for _, mode := range []string{"three-slots", "parallel-slot", "unaudited", "peer-mismatch", "foreign-artifact", "cancelled", "recovery-blocked", "permission-changed", "retention-shortened", "crypto-failure-keeps-spend", "expired-after-lock", "missing-worker-proof", "expired-worker-proof", "different-worker-proof", "worker-expired-after-lock", "worker-expired-after-child-lock", "legacy-worker-proof"} {
+		t.Run("download-key-"+mode, func(t *testing.T) {
+			f := setup(t)
+			scope, wrapping, backend := localDownloadKeys(t, f.installation)
+			bindPool := poolFor("download_key_bind_runtime", "synthetic-download-key-bind")
+			defer bindPool.Close()
+			readPool := poolFor("download_key_read_runtime", "synthetic-download-key-read")
+			defer readPool.Close()
+			bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope, f.guards)
+			if err != nil {
+				t.Fatal(err)
+			}
+			binder := fixtureAttestedDownloadGrants(bindings)
+			resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope, f.guards)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tlsFixture := newKeyTLSFor(t, f.installation, "artifact", resolver, backend, nil)
+			peer := keyPeerForTest(t, tlsFixture, "acquisition")
+			a := f.authority()
+			if mode == "expired-after-lock" {
+				a.ValidUntil = time.Now().Add(800 * time.Millisecond)
+			}
+			session, err := f.runtime.ReserveDownload(ctx, request(f, a))
+			if err != nil {
+				t.Fatal(err)
+			}
+			i, err := f.runtime.BeginDownloadBatch(ctx, session.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode != "unaudited" {
+				ackIntent(t, f, i)
+			}
+			if mode == "missing-worker-proof" || mode == "expired-worker-proof" || mode == "different-worker-proof" {
+				p, _ := (fixtureDownloadPeerProofs{}).ReadDownloadPeerProof(ctx, session.ID, peer)
+				switch mode {
+				case "missing-worker-proof":
+					p = authorization.KeyWorkerProof{}
+				case "expired-worker-proof":
+					p.ObservedAt = time.Now().Add(-6 * time.Second)
+					p.FreshUntil = p.ObservedAt.Add(5 * time.Second)
+				case "different-worker-proof":
+					p.Binding.PodUID = custodyID()
+				}
+				if e := bindings.BindAttestedDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer, p); e == nil {
+					t.Fatal("SQL accepted missing/stale/foreign worker proof")
+				}
+				return
+			}
+			if mode == "worker-expired-after-lock" || mode == "worker-expired-after-child-lock" {
+				binder.Proofs = fixtureDownloadPeerProofs{Lifetime: 800 * time.Millisecond}
+			}
+			err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer)
+			if mode == "unaudited" {
+				if err == nil {
+					t.Fatal("unaudited key authority")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal("bind", err)
+			}
+			var originalProof []byte
+			var originalUntil time.Time
+			if err = admin.QueryRow(ctx, "SELECT worker_proof_json,valid_until FROM download_key_binding WHERE batch_id=$1", i.Batch.ID).Scan(&originalProof, &originalUntil); err != nil {
+				t.Fatal(err)
+			}
+			if err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer); err != nil {
+				t.Fatal("same binding replay", err)
+			}
+			var replayProof []byte
+			var replayUntil time.Time
+			if err = admin.QueryRow(ctx, "SELECT worker_proof_json,valid_until FROM download_key_binding WHERE batch_id=$1", i.Batch.ID).Scan(&replayProof, &replayUntil); err != nil || !bytes.Equal(originalProof, replayProof) || !originalUntil.Equal(replayUntil) {
+				t.Fatal("retry replaced original proof/deadline", err)
+			}
+			changed := peer
+			changed.Certificate[0]++
+			if err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, changed); err == nil {
+				t.Fatal("rebound key reader")
+			}
+			if _, err = readPool.Exec(ctx, "UPDATE download_key_binding SET valid_until=valid_until WHERE batch_id=$1", i.Batch.ID); err == nil {
+				t.Fatal("key service can change expiry")
+			}
+			if _, err = readPool.Exec(ctx, "DELETE FROM download_key_binding WHERE batch_id=$1", i.Batch.ID); err == nil {
+				t.Fatal("key service can erase spend")
+			}
+			if _, err = bindPool.Exec(ctx, "UPDATE download_key_binding SET used_roles=7 WHERE batch_id=$1", i.Batch.ID); err == nil {
+				t.Fatal("binder can mutate spend")
+			}
+			for _, pool := range []*pgxpool.Pool{bindPool, readPool} {
+				if _, err = pool.Exec(ctx, "UPDATE download_key_binding SET worker_proof_json=worker_proof_json WHERE batch_id=$1", i.Batch.ID); err == nil {
+					t.Fatal("runtime can rewrite worker proof")
+				}
+			}
+			if mode == "legacy-worker-proof" {
+				// Migration leaves old children without proofs. Only the fixture's
+				// schema owner can simulate that state; runtime cannot backfill it.
+				if _, err = admin.Exec(ctx, "UPDATE download_key_binding SET worker_proof_json=NULL WHERE batch_id=$1", i.Batch.ID); err != nil {
+					t.Fatal(err)
+				}
+				if err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer); err == nil {
+					t.Fatal("legacy child gained fabricated worker authority")
+				}
+			}
+			sendCtx := ctx
+			client := tlsFixture.clients["acquisition"]
+			if mode == "peer-mismatch" {
+				transport := client.Transport.(*http.Transport).Clone()
+				transport.TLSClientConfig.Certificates = []tls.Certificate{tlsFixture.certificate(t, "acquisition")}
+				defer transport.CloseIdleConnections()
+				client = &http.Client{Transport: transport}
+			}
+			opener, err := kms.NewRemoteOpener(tlsFixture.server.URL, scope, i.Batch.ID, client)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer opener.Close()
+			binding, err := evidence.ArtifactKeyBinding(f.p.Expectation.Binding(), "data-key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "foreign-artifact" {
+				foreign := f.p.Expectation.Binding()
+				foreign.ArtifactID = custodyID()
+				binding, err = evidence.ArtifactKeyBinding(foreign, "data-key")
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			sealed, err := wrapping.Seal(ctx, []byte("synthetic keyset"), binding)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "cancelled" {
+				if _, err = f.runtime.CancelDownload(ctx, session.ID, a.Scope.Principal); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "recovery-blocked" {
+				if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", f.installation); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "retention-shortened" {
+				retentionPool := poolFor("retention_runtime", "synthetic-retention")
+				defer retentionPool.Close()
+				retention, err := postgres.NewRetention(ctx, retentionPool, f.s.a.RootID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				registration := f.p.Expectation.Registration
+				decision := retentionTestDecision(t, ctx, retention, registration.Location, registration.AnchorAt, registration.DeleteBy)
+				if err = retention.TightenRetention(ctx, decision); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "crypto-failure-keeps-spend" {
+				bad := sealed
+				bad.Ciphertext = "AAAA"
+				if _, err = opener.Open(ctx, bad, binding); err == nil {
+					t.Fatal("malformed wrapper opened")
+				}
+				if _, err = opener.Open(ctx, sealed, binding); err == nil {
+					t.Fatal("crypto failure refunded slot")
+				}
+				var spent int
+				if err = admin.QueryRow(ctx, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", i.Batch.ID).Scan(&spent); err != nil || spent != 1 {
+					t.Fatal("uncertain operation lost spend", spent, err)
+				}
+				return
+			}
+			if mode == "permission-changed" {
+				if _, err = admin.Exec(ctx, "UPDATE permission_stream SET sequence=sequence+1 WHERE id=$1", f.s.a.RootID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "expired-after-lock" || mode == "worker-expired-after-lock" || mode == "worker-expired-after-child-lock" {
+				tx, err := admin.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback(ctx)
+				lockSQL, lockID := "SELECT id FROM artifact_download WHERE id=$1 FOR UPDATE", session.ID
+				if mode == "worker-expired-after-child-lock" {
+					lockSQL, lockID = "SELECT batch_id FROM download_key_binding WHERE batch_id=$1 FOR UPDATE", i.Batch.ID
+				}
+				if _, err = tx.Exec(ctx, lockSQL, lockID); err != nil {
+					t.Fatal(err)
+				}
+				done := make(chan error, 1)
+				go func() { _, e := opener.Open(sendCtx, sealed, binding); done <- e }()
+				time.Sleep(900 * time.Millisecond)
+				if err = tx.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err = <-done; err == nil {
+					t.Fatal("expired after blocking lock")
+				}
+				var spent int
+				if err = admin.QueryRow(ctx, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", i.Batch.ID).Scan(&spent); err != nil || spent != 0 {
+					t.Fatal("expired request consumed slot", spent, err)
+				}
+				if mode != "expired-after-lock" {
+					if err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer); err == nil {
+						t.Fatal("fresh observation revived expired worker proof")
+					}
+				}
+				return
+			}
+			if mode == "parallel-slot" {
+				results := make(chan error, 8)
+				for j := 0; j < 8; j++ {
+					go func() { _, e := opener.Open(sendCtx, sealed, binding); results <- e }()
+				}
+				passed := 0
+				for j := 0; j < 8; j++ {
+					if <-results == nil {
+						passed++
+					}
+				}
+				if passed != 1 {
+					t.Fatalf("one paid slot allowed %d operations", passed)
+				}
+				return
+			}
+			got, err := opener.Open(sendCtx, sealed, binding)
+			if mode != "three-slots" {
+				if err == nil || len(got) != 0 {
+					t.Fatal("invalid key scope disclosed")
+				}
+				return
+			}
+			if err != nil || string(got) != "synthetic keyset" {
+				t.Fatal("unwrap", err)
+			}
+			if _, err = opener.Open(ctx, sealed, binding); err == nil {
+				t.Fatal("reused paid key slot")
+			}
+			if err = binder.BindDownloadKeys(ctx, session.ID, a, i.Batch.ID, i.Batch.Generation, scope, peer); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = opener.Open(ctx, sealed, binding); err == nil {
+				t.Fatal("binding replay refilled spend")
+			}
+			if _, err = readPool.Exec(ctx, "UPDATE download_key_binding SET used_roles=0 WHERE batch_id=$1", i.Batch.ID); err == nil {
+				t.Fatal("refunded key spend")
+			}
+			for _, role := range []string{"index-key", "manifest-key"} {
+				ad, err := evidence.ArtifactKeyBinding(f.p.Expectation.Binding(), role)
+				if err != nil {
+					t.Fatal(err)
+				}
+				key, err := wrapping.Seal(ctx, []byte("synthetic keyset"), ad)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = opener.Open(ctx, key, ad); err != nil {
+					t.Fatal(role, err)
+				}
+			}
+			var used int
+			if err = admin.QueryRow(ctx, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", i.Batch.ID).Scan(&used); err != nil || used != 7 {
+				t.Fatal("three roles", used, err)
+			}
+		})
+	}
+	t.Run("local-key-download-real-sql-tls-s3", func(t *testing.T) {
+		var scope authorization.KeyScope
+		var local *kms.LocalKeyBackend
+		var backend *kms.LocalOperations
+		f := setupWithKeys(t, func(installation string) (evidence.KeySealer, evidence.KeyOpener) {
+			scope, local, backend = localDownloadKeys(t, installation)
+			return local, local
+		})
+		bindPool := poolFor("download_key_bind_runtime", "synthetic-download-key-bind")
+		defer bindPool.Close()
+		readPool := poolFor("download_key_read_runtime", "synthetic-download-key-read")
+		defer readPool.Close()
+		bindings, err := postgres.NewDownloadKeys(ctx, bindPool, f.s.a.RootID, scope, f.guards)
+		if err != nil {
+			t.Fatal(err)
+		}
+		binder := fixtureAttestedDownloadGrants(bindings)
+		resolver, err := postgres.NewDownloadKeys(ctx, readPool, f.s.a.RootID, scope, f.guards)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tlsFixture := newKeyTLSFor(t, f.installation, "artifact", resolver, backend, nil)
+		bound, err := store.ForCustody(f.p.Expectation.Registration.StoreID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := objectstore.NewLocalKeyContextReader(bound, binder, scope, keyPeerForTest(t, tlsFixture, "acquisition"), tlsFixture.server.URL, tlsFixture.clients["acquisition"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := f.authority()
+		r := request(f, a)
+		r.Session.ReadLimit = 16 << 20
+		session, err := f.runtime.ReserveDownload(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: objects, Authority: f.gate, BatchNative: reader, Now: time.Now, NewID: custodyID}
+		work := evidence.ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies}
+		metadata, err := worker.Prepare(ctx, "synthetic-reference", work)
+		if err != nil {
+			t.Fatal("prepare through local key service", err)
+		}
+		var native bytes.Buffer
+		dest := downloadBytesDestination{w: &native}
+		if err = worker.Transfer(ctx, "synthetic-reference", work, evidence.DownloadSelection{Length: metadata.Size}, dest); err != nil {
+			t.Fatal("native bytes", err)
+		}
+		if int64(native.Len()) != metadata.Size || artifact.Digest(sha256.Sum256(native.Bytes())) != metadata.SHA256 {
+			t.Fatal("native checksum")
+		}
+		var count, spent int
+		if err = admin.QueryRow(ctx, "SELECT count(*),sum(used_roles) FROM download_key_binding WHERE session_id=$1", session.ID).Scan(&count, &spent); err != nil || count != 2 || spent != 14 {
+			t.Fatal("independent prepare/content key bounds", count, spent, err)
+		}
+		t.Logf("local service: actual TLS, SQL authority and S3 nativeBytes=%d; two batches, three unwraps each", native.Len())
+	})
+
+	t.Run("download-worker-real-encryption-audit-and-native-https", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		r := request(f, a)
+		r.Session.ReadLimit = 16 << 20
+		s, err := f.runtime.ReserveDownload(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bound, err := store.ForCustody(f.p.Expectation.Registration.StoreID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := objectstore.NewContextNativeReader(bound, keys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: objects, Authority: f.gate, Native: reader, Now: time.Now, NewID: custodyID}
+		work := evidence.ContextDownloadRequest{SessionID: s.ID, Scope: s.Scope, Expectation: f.p.Expectation, Copies: f.p.Copies}
+		metadata, err := worker.Prepare(ctx, "synthetic-reference", work)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if metadata.Size < 30 || metadata.Size > 4096 || metadata.ETag == "" || metadata.SHA256 == (artifact.Digest{}) {
+			t.Fatal("verified metadata missing")
+		}
+		completed := make(chan struct{}, 1)
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() { completed <- struct{}{} }()
+			// Fixture-only identity. The real browser/OAuth ingress is NOT
+			// supplied by this composed SQL/S3/HTTPS component experiment.
+			selection, err := browser.ResolveDownloadSelection(metadata.Size, metadata.ETag, r.Header)
+			if err != nil {
+				w.WriteHeader(browser.DownloadConditionStatus(err))
+				return
+			}
+			sink := &browser.HTTPDownloadDestination{Writer: w, Request: r}
+			if err = worker.Transfer(r.Context(), "synthetic-reference", work, selection, sink); err != nil {
+				t.Errorf("native transfer: %v", err)
+				if sink.HeadersSent() {
+					panic(http.ErrAbortHandler)
+				}
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}
+		}))
+		defer server.Close()
+		get := func(rangeHeader, match string) (int, []byte) {
+			t.Helper()
+			req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
+			req.Header.Set("Range", rangeHeader)
+			if match != "" {
+				req.Header.Set("If-Match", match)
+			}
+			response, err := server.Client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			b, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.StatusCode == 200 || response.StatusCode == 206 {
+				if response.Header.Get("ETag") != metadata.ETag || response.Header.Get("Content-Type") != "application/octet-stream" || response.Header.Get("Cache-Control") != "no-store, private" || response.ContentLength != int64(len(b)) {
+					t.Fatal("unsafe native headers")
+				}
+			}
+			select {
+			case <-completed:
+			case <-time.After(5 * time.Second):
+				t.Fatal("server accounting did not finish")
+			}
+			return response.StatusCode, b
+		}
+		if status, b := get("bytes=5-", "\"wrong-version\""); status != 412 || len(b) != 0 {
+			t.Fatal("mismatch disclosed file", status)
+		}
+		status, partial := get("bytes=5-", metadata.ETag)
+		if status != 206 || int64(len(partial)) != metadata.Size-5 {
+			t.Fatal("wrong partial", status)
+		}
+		status, body := get("", metadata.ETag)
+		if status != 200 || int64(len(body)) != metadata.Size || sha256.Sum256(body) != metadata.SHA256 || !json.Valid(body) {
+			t.Fatal("native JSON/hash mismatch", status)
+		}
+		if string(partial) != string(body[5:]) {
+			t.Fatal("resume did not preserve native bytes")
+		}
+		// Synthetic local-file workflow, outside managed evidence storage.
+		local := filepath.Join(t.TempDir(), metadata.Filename)
+		if err = os.WriteFile(local, body, 0600); err != nil {
+			t.Fatal(err)
+		}
+		saved, err := os.ReadFile(local)
+		if err != nil || sha256.Sum256(saved) != metadata.SHA256 {
+			t.Fatal("local checksum", err)
+		}
+		clear(saved)
+		clear(body)
+		clear(partial)
+		final, err := f.runtime.LookupDownload(ctx, s.ID, s.Scope.Principal)
+		if err != nil || final.State != artifact.DownloadCompleted || final.ChargedRead != 3*evidence.ContextDownloadReadWork || final.EmittedBytes != 2*metadata.Size-5 {
+			t.Fatal("final accounting", final.State, err)
+		}
+	})
+	t.Run("download-one-active-generation-and-expiry-after-lock", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		r := request(f, a)
+		s, err := f.runtime.ReserveDownload(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		results := make(chan error, 8)
+		for range 8 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+				results <- err
+			}()
+		}
+		wg.Wait()
+		close(results)
+		success := 0
+		for err := range results {
+			if err == nil {
+				success++
+			}
+		}
+		if success != 1 {
+			t.Fatal("writer count", success)
+		}
+		fresh := request(f, a)
+		fresh.IdempotencyDigest[0]++
+		s2, err := f.runtime.ReserveDownload(ctx, fresh)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SELECT id FROM artifact_download WHERE id=$1 FOR UPDATE", s2.ID); err != nil {
+			t.Fatal(err)
+		}
+		a.CheckedAt = time.Now().UTC()
+		a.ValidUntil = a.CheckedAt.Add(100 * time.Millisecond)
+		done := make(chan error, 1)
+		go func() {
+			_, e := f.runtime.BeginDownloadBatch(ctx, s2.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+			done <- e
+		}()
+		time.Sleep(200 * time.Millisecond)
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-done; err == nil {
+			t.Fatal("expired lock waiter")
+		}
+		got, err := f.runtime.LookupDownload(ctx, s2.ID, s2.Scope.Principal)
+		if err != nil || got.ChargedRead != 0 {
+			t.Fatal("failed begin changed spend", err)
+		}
+	})
+	t.Run("download-principal-limit-spans-clients-cancellation-does-not-free-writer", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		var sessions []artifact.DownloadSession
+		var intents []audit.DownloadIntent
+		for n := 0; n < 3; n++ {
+			other := a
+			other.Scope.Principal.ClientID = string(rune('a' + n))
+			other.Environment.Principal = other.Scope.Principal
+			r := request(f, other)
+			s, err := f.runtime.ReserveDownload(ctx, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sessions = append(sessions, s)
+		}
+		for n, s := range sessions {
+			other := a
+			other.Scope = s.Scope
+			other.Environment.Principal = other.Scope.Principal
+			i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+			if n == 2 {
+				if !errors.Is(err, artifact.ErrDownloadCapacity) {
+					t.Fatal("principal limit", err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				intents = append(intents, i)
+			}
+		}
+		if _, err := f.runtime.CancelDownload(ctx, sessions[0].ID, sessions[0].Scope.Principal); err != nil {
+			t.Fatal(err)
+		}
+		other := a
+		other.Scope = sessions[2].Scope
+		other.Environment.Principal = other.Scope.Principal
+		if _, err := f.runtime.BeginDownloadBatch(ctx, sessions[2].ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20}); !errors.Is(err, artifact.ErrDownloadCapacity) {
+			t.Fatal("cancel freed still-live writer", err)
+		}
+		i := intents[0]
+		if _, err := f.runtime.FinishDownloadBatch(ctx, i.SessionID, i.Batch.ID, i.Batch.Generation, 0, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.runtime.BeginDownloadBatch(ctx, sessions[2].ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20}); err != nil {
+			t.Fatal("writer slot never released", err)
+		}
+	})
+	t.Run("download-allocation-isolation-and-current-revocation", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		small := f.allocation
+		small.ID = custodyID()
+		small.OutputLimit = 8192
+		small.ReadLimit = 8 << 20
+		small.SessionLimit = 1
+		if err := f.config.BindDownloadAllocation(ctx, small); err != nil {
+			t.Fatal(err)
+		}
+		r := request(f, a)
+		r.Session.AllocationID = small.ID
+		s := prepare(t, f, r)
+		r.Session.ID = custodyID()
+		r.IdempotencyDigest[0]++
+		if _, err := f.runtime.ReserveDownload(ctx, r); !errors.Is(err, artifact.ErrDownloadCapacity) {
+			t.Fatal(err)
+		}
+		r.Session.AllocationID = f.allocation.ID
+		if _, err := f.runtime.ReserveDownload(ctx, r); err != nil {
+			t.Fatal("separate allocation lost capacity", err)
+		}
+		bad := f.allocation
+		bad.ID = custodyID()
+		bad.WorkloadUID = "other-workload"
+		if err := f.config.BindDownloadAllocation(ctx, bad); err != nil {
+			t.Fatal(err)
+		}
+		r.Session.ID = custodyID()
+		r.Session.AllocationID = bad.ID
+		r.IdempotencyDigest[0]++
+		if _, err := f.runtime.ReserveDownload(ctx, r); err == nil {
+			t.Fatal("borrowed another workload allocation")
+		}
+		i, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadContent, OutputBytes: 100, ReadBytes: 2 << 20})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackIntent(t, f, i)
+		if _, err = admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", f.s.a.RootID); err != nil {
+			t.Fatal(err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, i.Batch.ID, i.Batch.Generation); err == nil {
+			t.Fatal("revoked authority emitted")
+		}
+		if _, err = f.runtime.CancelDownload(ctx, s.ID, a.Scope.Principal); err != nil {
+			t.Fatal("revocation prevented owner cancellation", err)
+		}
+	})
+	t.Run("download-installation-stream-cap-and-late-generation", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		for n := 0; n < 17; n++ {
+			other := a
+			other.Scope.Principal.Subject = string(rune('a' + n))
+			other.Environment.Principal = other.Scope.Principal
+			r := request(f, other)
+			s, err := f.runtime.ReserveDownload(ctx, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = f.runtime.BeginDownloadBatch(ctx, s.ID, other, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+			if n < 16 && err != nil {
+				t.Fatal("premature installation ceiling", n, err)
+			}
+			if n == 16 && !errors.Is(err, artifact.ErrDownloadCapacity) {
+				t.Fatal("installation ceiling", err)
+			}
+		}
+	})
+	t.Run("download-old-result-cannot-take-over-new-generation", func(t *testing.T) {
+		f := setup(t)
+		a := f.authority()
+		r := request(f, a)
+		s, err := f.runtime.ReserveDownload(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		short := a
+		short.CheckedAt = time.Now().UTC()
+		short.ValidUntil = short.CheckedAt.Add(100 * time.Millisecond)
+		old, err := f.runtime.BeginDownloadBatch(ctx, s.ID, short, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(150 * time.Millisecond)
+		a = f.authority()
+		next, err := f.runtime.BeginDownloadBatch(ctx, s.ID, a, artifact.DownloadBatch{ID: custodyID(), Purpose: artifact.DownloadMetadata, ReadBytes: 2 << 20})
+		if err != nil {
+			t.Fatal(err)
+		}
+		outcome, err := f.runtime.FinishDownloadBatch(ctx, s.ID, old.Batch.ID, old.Batch.Generation, 0, false, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ackOutcome(t, f, outcome)
+		got, err := f.runtime.LookupDownload(ctx, s.ID, a.Scope.Principal)
+		if err != nil || got.Generation != next.Batch.Generation || got.Active == nil || got.Active.ID != next.Batch.ID || got.ChargedRead != 4<<20 {
+			t.Fatal("old generation took over", err)
+		}
+		if err = f.runtime.PermitDownloadBatch(ctx, s.ID, a, old.Batch.ID, old.Batch.Generation); err == nil {
+			t.Fatal("expired batch revived")
+		}
+	})
+}
+
+// Owned native destination for SQL/TLS/S3 qualification; never a product fallback.
+type downloadBytesDestination struct{ w *bytes.Buffer }
+
+func (d downloadBytesDestination) Send(ctx context.Context, _ evidence.DownloadMetadata, _ evidence.DownloadSelection, b []byte) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, e := d.w.Write(b)
+	return int64(n), e
+}

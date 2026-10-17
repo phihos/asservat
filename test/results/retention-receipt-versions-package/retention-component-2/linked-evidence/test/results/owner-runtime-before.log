@@ -1,0 +1,6 @@
+# asservat.local/asservat/internal/application/fleet [asservat.local/asservat/internal/application/fleet.test]
+internal/application/fleet/owner_runtime_test.go:32:37: undefined: OwnerCredentialSupervisor
+internal/application/fleet/owner_runtime_test.go:39:5: undefined: OwnerCredentialSupervisor
+internal/application/fleet/owner_runtime_test.go:48:28: undefined: OwnerCredentialStatus
+FAIL	asservat.local/asservat/internal/application/fleet [build failed]
+FAIL

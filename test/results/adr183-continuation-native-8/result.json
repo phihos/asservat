@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-8",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Per-step durations: resources/advance 61.8 s for 19 objects, bridge/probe 4.4 s, bridge/retained 4.9 s, worker phase 1 about 2 s. Stopped at complete:configuration-fleet after 4.05 s with 950 ms left on the claim, class unavailable: consistent with the source observation's original window (started before provisionRole) lapsing. Run 9 traces current/claim/role/authenticate timings and the operation deadline.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

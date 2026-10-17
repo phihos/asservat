@@ -1,0 +1,6 @@
+=== RUN   TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim
+    context_native_active_enrollment_test.go:89: already active preparation used enrollment or missed original first batch false 1 0 synthetic enrollment owner must not be used
+--- FAIL: TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.009s
+FAIL

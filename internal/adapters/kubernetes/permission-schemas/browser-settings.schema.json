@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/browser-settings.schema.json",
+  "title": "Protected browser session settings v1",
+  "description": "Content of browser.json in a pinned administrator-protected ConfigMap. No credentials or public configuration API. Epoch changes invalidate existing browser credentials; current user permissions remain independently required.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "browser-settings/v1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "rootID": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "sessionEpoch": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "issuer": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "clientID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+    },
+    "origin": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "maxLifetimeSeconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 86400
+    },
+    "maxLogins": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "maxSessions": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "maxLogoutEvents": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "rootID",
+    "sessionEpoch",
+    "issuer",
+    "clientID",
+    "origin",
+    "suspended",
+    "maxLifetimeSeconds",
+    "maxLogins",
+    "maxSessions",
+    "maxLogoutEvents"
+  ]
+}

@@ -1,0 +1,23 @@
+=== RUN   TestInitialSchemaWithRealPostgres
+=== RUN   TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim
+=== RUN   TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion
+    initial_schema_test.go:168: first transactional prefix not retained
+=== RUN   TestInitialSchemaWithRealPostgres/runtime-manager-has-only-exact-grant-union
+    initial_schema_test.go:189: hostile grant unavailable
+=== RUN   TestInitialSchemaWithRealPostgres/reject-foreign-down-or-reordered-history
+=== RUN   TestInitialSchemaWithRealPostgres/changed-instance-bundle-and-expired-root-deny
+=== RUN   TestInitialSchemaWithRealPostgres/held-original-session-lock-never-taken-over
+    initial_schema_test.go:252: original owner replay unavailable initial schema inspection: unavailable
+=== RUN   TestInitialSchemaWithRealPostgres/completed-schema-read-only-resume-after-child-creation
+    initial_schema_test.go:277: read-only original completed schema unavailable permission source identity changed
+--- FAIL: TestInitialSchemaWithRealPostgres (1.77s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim (0.03s)
+    --- FAIL: TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion (0.03s)
+    --- FAIL: TestInitialSchemaWithRealPostgres/runtime-manager-has-only-exact-grant-union (0.04s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-foreign-down-or-reordered-history (0.05s)
+    --- PASS: TestInitialSchemaWithRealPostgres/changed-instance-bundle-and-expired-root-deny (0.05s)
+    --- FAIL: TestInitialSchemaWithRealPostgres/held-original-session-lock-never-taken-over (0.02s)
+    --- FAIL: TestInitialSchemaWithRealPostgres/completed-schema-read-only-resume-after-child-creation (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.824s
+FAIL

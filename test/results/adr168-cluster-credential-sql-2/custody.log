@@ -1,0 +1,16 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:429: ADR-168 cluster enrollment credential: enroll, admission, rotation, replay, fork fence, append-only guard, reenrollment and revocation on real PostgreSQL
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:494: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+--- PASS: TestContextAdmissionWithRealServices (3.76s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast (3.41s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.70s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.81s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.818s

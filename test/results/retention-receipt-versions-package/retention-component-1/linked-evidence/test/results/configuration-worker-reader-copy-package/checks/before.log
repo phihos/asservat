@@ -1,0 +1,7 @@
+=== RUN   TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput
+    capacity_projection_reader_copy_test.go:36: caller mutation changed the reader's original protected input
+    capacity_projection_reader_copy_test.go:40: caller mutation changed independently observed original receipt: ready=false err=permission source identity changed
+--- FAIL: TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput (0.13s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.173s
+FAIL

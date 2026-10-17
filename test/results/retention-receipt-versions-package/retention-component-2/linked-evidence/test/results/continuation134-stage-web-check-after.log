@@ -1,0 +1,40 @@
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+Native ESM auth and all five capture operation validators passed positive and negative checks.
+Native ESM case and download validators passed positive and negative checks.
+Native ESM download terminal-only status and complete native metadata guards passed for all three operations.
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/context-acquisition-continuation-20261012/validation/web
+
+ ❯ src/capture/investigation.test.ts (29 tests | 1 failed) 58ms
+   × continues accepted acquisition only on an explicit action using the same receipt 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/capture/investigation.test.ts > continues accepted acquisition only on an explicit action using the same receipt
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/capture/investigation.test.ts:240:45
+    238|   scope.abort(); controller.attach(session, new AbortController().sign…
+    239|   expect(client.calls.filter(call => call.name === 'request_capture'))…
+    240|   expect(controller.snapshot().canContinue).toBe(true);
+       |                                             ^
+    241|   await controller.continueAcquisition();
+    242|   const submissions = client.calls.filter(call => call.name === 'reque…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 7 passed (8)
+      Tests  1 failed | 124 passed (125)
+   Start at  09:49:36
+   Duration  2.01s (environment 40%, tests 27%, transform 18%, import 14%)
+

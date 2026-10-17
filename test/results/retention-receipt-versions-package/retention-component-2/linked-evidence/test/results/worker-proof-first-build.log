@@ -1,0 +1,17 @@
+# asservat.local/asservat/internal/adapters/postgres [asservat.local/asservat/internal/adapters/postgres.test]
+internal/adapters/postgres/download_keys.go:187:7: e redeclared in this block
+	internal/adapters/postgres/download_keys.go:179:11: other declaration of e
+internal/adapters/postgres/download_keys.go:188:64: e.Validate undefined (type error has no field or method Validate)
+internal/adapters/postgres/download_keys.go:188:87: e.DataClass undefined (type error has no field or method DataClass)
+internal/adapters/postgres/download_keys.go:193:50: e.Binding undefined (type error has no field or method Binding)
+# asservat.local/asservat/internal/adapters/postgres
+internal/adapters/postgres/download_keys.go:187:7: e redeclared in this block
+	internal/adapters/postgres/download_keys.go:179:11: other declaration of e
+internal/adapters/postgres/download_keys.go:188:64: e.Validate undefined (type error has no field or method Validate)
+internal/adapters/postgres/download_keys.go:188:87: e.DataClass undefined (type error has no field or method DataClass)
+internal/adapters/postgres/download_keys.go:193:50: e.Binding undefined (type error has no field or method Binding)
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.303s
+FAIL	asservat.local/asservat/internal/adapters/postgres [build failed]
+ok  	asservat.local/asservat/internal/application/evidence	0.004s
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

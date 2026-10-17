@@ -1,0 +1,13 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugCapture
+metadata:
+  name: api-context-001
+  namespace: payments
+spec:
+  presetRef:
+    name: incident-context
+    version: v1
+  target:
+    workloadRef:
+      kind: Deployment
+      name: api

@@ -1,0 +1,12 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source
+    initial_installation_test.go:584: actual constructor refused original unavailable fleet source without role effects; no authority retry or deadline change
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention
+    initial_installation_test.go:584: actual constructor refused original unavailable fleet source without role effects; no authority retry or deadline change
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:607: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (1.95s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source (0.72s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention (1.17s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.003s

@@ -1,0 +1,12 @@
+{
+  "manifest": [
+    {
+      "path": "internal/adapters/postgres/initial_runtime_bridge.go",
+      "base_sha256": "00645eb6ae45a5d3988a5413b29773d222d439241096bdc312b86f23daec0d6c",
+      "payload_sha256": "0c2b70ffba308b373f939102f60d844ce315cf9a39e5c674a55456a8c2f1fb31"
+    }
+  ],
+  "beforeNativeExit": 1,
+  "beforeNativeSourceUnchanged": true,
+  "beforeNativeCleanupFailures": []
+}

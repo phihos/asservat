@@ -1,0 +1,12 @@
+[
+  {
+    "path": "internal/adapters/kms/configuration_provider_refresh_test.go",
+    "before_payload_sha256": "bb4e0faaf49e6f23d110a5c7ce202d97611ea92539c7890f366e38675fa8c26e",
+    "final_payload_sha256": "dfafe30c406bf36e170d1d670ea5025d636124928b05f069f1ac86740459ce52"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_operation.go",
+    "before_payload_sha256": "bea6cfdfe29959412690e07d46a74988bf7fdaf3d0cb3b3f69e2d3e83977d3c3",
+    "final_payload_sha256": "440deff485476949eeca7b690f86fa30236c75fd5b861de05ca4eccc8a20ad5c"
+  }
+]

@@ -1,0 +1,88 @@
+package fleet
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// The blocked callback models cancellation cleanup, not extended authority:
+// it performs no effect after cancellation and keeps its owner until release.
+func TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	entered, cancelled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	s := &ConfigurationReconciler{
+		Fleet: &TrustObserver{Settings: administrationFunc(func(call context.Context) (value.Administration, error) {
+			if end, ok := call.Deadline(); !ok || time.Until(end) > 5*time.Second {
+				t.Error("original observation bound changed")
+			}
+			close(entered)
+			<-call.Done()
+			close(cancelled)
+			<-release
+			return value.Administration{}, call.Err()
+		}), Projection: &trustObservationFixture{}, Now: time.Now},
+		Owner: &OwnerConfigurationObserver{
+			Reader: ownerConfigFunc(func(context.Context) (value.OwnerConfigurationObservation, error) {
+				return value.OwnerConfigurationObservation{}, value.ErrUnavailable
+			}),
+			Ledger: ownerLedgerFake{fence: func(context.Context, time.Time) error { return nil }},
+			Audit: ownerAuditFunc(func(context.Context, value.OwnerConfiguration) (audit.Receipt, error) {
+				t.Error("unavailable source reached audit")
+				return audit.Receipt{}, value.ErrDenied
+			}),
+			Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error {
+				return value.ErrDenied
+			}), Now: time.Now,
+		},
+	}
+	joined := make(chan struct{})
+	var result error
+	go func() { result = s.Run(ctx); close(joined) }()
+	defer func() {
+		cancel()
+		unblock()
+		select {
+		case <-joined:
+		case <-time.After(2 * time.Second):
+			t.Error("released observer did not join")
+		}
+	}()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("observer did not start")
+	}
+	cancel()
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("cancellation did not reach observer")
+	}
+	// Exercise the old six-second branch with the real implementation's timer.
+	// No test clock or changed operation deadline is used.
+	select {
+	case <-joined:
+		t.Error("reconciler returned while cancelled observer still owned work")
+	case <-time.After(6250 * time.Millisecond):
+	}
+	if err := s.Run(context.Background()); err == nil {
+		t.Error("old owner admitted replacement loops")
+	}
+	unblock()
+	select {
+	case <-joined:
+		if !errors.Is(result, context.Canceled) {
+			t.Errorf("joined result = %v; want original cancellation", result)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("observer release did not complete shutdown")
+	}
+}

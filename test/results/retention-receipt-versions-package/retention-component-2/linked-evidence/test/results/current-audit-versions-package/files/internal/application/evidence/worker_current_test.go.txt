@@ -1,0 +1,651 @@
+package evidence
+
+import (
+	"context"
+	"crypto/sha256"
+	"slices"
+	"sync"
+	"testing"
+	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// Explicit synthetic providers/SQL for request propagation only. The actual
+// browser CurrentIdentity implementation is used, with no provider token exposed.
+type workerLifecycleFixture struct {
+	DownloadWorkerLedger
+	WorkerEnrollmentLedger
+	WorkerCertificateActivator
+	mu                                sync.Mutex
+	now                               time.Time
+	i                                 identity.Identity
+	a                                 artifact.DownloadAuthority
+	w                                 value.DownloadWorker
+	calls                             []string
+	deadlines                         map[string]time.Time
+	hooks                             map[string]func()
+	created, acknowledged, lostCreate bool
+	enrollment                        value.WorkerEnrollment
+	attempt                           value.WorkerCertificateAttempt
+	certificate                       value.WorkerCertificate
+}
+
+type workerLifecycleJobs struct{ f *workerLifecycleFixture }
+
+func (s workerLifecycleJobs) CreateDownloadWorker(c context.Context, l value.DownloadWorkerLaunch) (value.DownloadWorkerJob, error) {
+	return s.f.CreateDownloadWorker(c, l)
+}
+func (s workerLifecycleJobs) FindDownloadWorkerJob(c context.Context, i value.DownloadWorkerIntent) (value.DownloadWorkerJob, error) {
+	return s.f.FindDownloadWorkerJob(c, i)
+}
+func (s workerLifecycleJobs) ObserveDownloadWorker(c context.Context, i value.DownloadWorkerIntent, j value.DownloadWorkerJob) (value.DownloadWorker, error) {
+	return s.f.ObserveDownloadWorker(c, i, j)
+}
+func (workerLifecycleJobs) ObserveDownloadWorkerTermination(context.Context, value.DownloadWorker) (value.DownloadWorkerTermination, error) {
+	panic("unexpected retirement")
+}
+func (workerLifecycleJobs) RetireDownloadWorker(context.Context, value.DownloadWorkerTermination) (value.DownloadWorkerRetirement, error) {
+	panic("unexpected retirement")
+}
+
+func (f *workerLifecycleFixture) Now() time.Time { f.mu.Lock(); defer f.mu.Unlock(); return f.now }
+func (f *workerLifecycleFixture) step(ctx context.Context, name string) error {
+	f.mu.Lock()
+	f.calls = append(f.calls, name)
+	if d, ok := ctx.Deadline(); ok {
+		f.deadlines[name] = d
+	}
+	hook := f.hooks[name]
+	delete(f.hooks, name)
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	return ctx.Err()
+}
+func (f *workerLifecycleFixture) count(name string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, v := range f.calls {
+		if v == name {
+			n++
+		}
+	}
+	return n
+}
+func (f *workerLifecycleFixture) change(fn func()) { f.mu.Lock(); defer f.mu.Unlock(); fn() }
+func (f *workerLifecycleFixture) Resolve(ctx context.Context, cookie string, refresh bool) (identities.SessionView, error) {
+	if cookie != "synthetic-session-cookie" || refresh || ctx.Err() != nil {
+		return identities.SessionView{}, identity.ErrDenied
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	i := f.i
+	i.Groups = slices.Clone(i.Groups)
+	i.Scopes = slices.Clone(i.Scopes)
+	i.VerifiedAt = f.now
+	i.ValidUntil = identity.Earlier(i.ValidUntil, f.now.Add(5*time.Second))
+	return identities.SessionView{Identity: i, ExpiresAt: f.w.Intent.RunUntil}, nil
+}
+func (f *workerLifecycleFixture) CheckDownloadCurrent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	if e := f.step(ctx, "authority"); e != nil {
+		return artifact.DownloadAuthority{}, e
+	}
+	i, e := current.ResolveIdentity(ctx)
+	if e != nil {
+		return artifact.DownloadAuthority{}, e
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if i.Principal != scope.Principal || scope != f.a.Scope {
+		return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+	}
+	a := f.a
+	a.CheckedAt = f.now
+	a.ValidUntil = identity.Earlier(a.ValidUntil, f.now.Add(5*time.Second))
+	a.Environment.ObservedAt = f.now
+	a.Environment.ValidUntil = a.ValidUntil
+	a.Retention.ObservedAt = f.now
+	a.Retention.ValidUntil = a.ValidUntil
+	return a, nil
+}
+func (f *workerLifecycleFixture) CheckDownload(context.Context, string, artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	panic("typed lifecycle used a bearer credential")
+}
+func workerReceipt(key string) audit.Receipt {
+	return audit.Receipt{Key: key, Version: "synthetic-original-version", ETag: "synthetic", Bytes: 1, SHA256: artifact.Digest{1}}
+}
+func (f *workerLifecycleFixture) ReserveDownloadWorker(ctx context.Context, session, id string, a artifact.DownloadAuthority, p value.DownloadWorkerProfile) (value.DownloadWorkerIntent, error) {
+	if err := f.step(ctx, "reserve-worker"); err != nil {
+		return value.DownloadWorkerIntent{}, err
+	}
+	if session != f.w.Intent.SessionID || id != f.w.Intent.ID || p != f.w.Intent.Profile || a.Scope != f.w.Intent.Authority.Scope {
+		return value.DownloadWorkerIntent{}, artifact.ErrIntegrity
+	}
+	return f.w.Intent, nil
+}
+func (f *workerLifecycleFixture) ReadDownloadWorkerIntentReceipt(ctx context.Context, i value.DownloadWorkerIntent) (audit.Receipt, bool, error) {
+	e := f.step(ctx, "read-worker-audit")
+	return workerReceipt(audit.DownloadWorkerAuditKey(i)), f.acknowledged, e
+}
+func (f *workerLifecycleFixture) WriteDownloadWorkerIntent(ctx context.Context, i value.DownloadWorkerIntent) (audit.Receipt, error) {
+	e := f.step(ctx, "write-worker-audit")
+	return workerReceipt(audit.DownloadWorkerAuditKey(i)), e
+}
+func (f *workerLifecycleFixture) AcknowledgeDownloadWorkerIntent(ctx context.Context, _ value.DownloadWorkerIntent, _ audit.Receipt) error {
+	e := f.step(ctx, "ack-worker-audit")
+	if e == nil {
+		f.acknowledged = true
+	}
+	return e
+}
+func (f *workerLifecycleFixture) ClaimDownloadWorker(ctx context.Context, i value.DownloadWorkerIntent, a artifact.DownloadAuthority) (value.DownloadWorkerLaunch, error) {
+	e := f.step(ctx, "claim-worker")
+	return value.DownloadWorkerLaunch{Intent: i, CheckedAt: f.Now(), MayCreate: !f.created, Until: a.ValidUntil}, e
+}
+func (f *workerLifecycleFixture) CreateDownloadWorker(ctx context.Context, _ value.DownloadWorkerLaunch) (value.DownloadWorkerJob, error) {
+	e := f.step(ctx, "create-job")
+	f.created = true
+	if f.lostCreate {
+		f.lostCreate = false
+		return value.DownloadWorkerJob{}, artifact.ErrDownloadUnavailable
+	}
+	return f.w.Job, e
+}
+func (f *workerLifecycleFixture) FindDownloadWorkerJob(ctx context.Context, _ value.DownloadWorkerIntent) (value.DownloadWorkerJob, error) {
+	e := f.step(ctx, "find-job")
+	return f.w.Job, e
+}
+func (f *workerLifecycleFixture) RecordDownloadWorkerJob(ctx context.Context, _ value.DownloadWorkerIntent, _ value.DownloadWorkerJob) error {
+	return f.step(ctx, "record-job")
+}
+func (f *workerLifecycleFixture) ObserveDownloadWorker(ctx context.Context, _ value.DownloadWorkerIntent, _ value.DownloadWorkerJob) (value.DownloadWorker, error) {
+	e := f.step(ctx, "observe-job")
+	return f.w, e
+}
+func (f *workerLifecycleFixture) BindDownloadWorker(ctx context.Context, _ value.DownloadWorker, _ artifact.DownloadAuthority) error {
+	return f.step(ctx, "bind-worker")
+}
+func (f *workerLifecycleFixture) ReadDownloadWorker(ctx context.Context, _ string, _ artifact.DownloadAuthority) (value.DownloadWorker, error) {
+	e := f.step(ctx, "read-worker")
+	return f.w, e
+}
+func (f *workerLifecycleFixture) ReadDownloadWorkerEnrollment(ctx context.Context, session, worker string) (value.DownloadWorkerIdentity, error) {
+	e := f.step(ctx, "read-enrollment")
+	if session != f.w.Intent.SessionID || worker != f.w.Intent.ID {
+		return value.DownloadWorkerIdentity{}, artifact.ErrInvalid
+	}
+	n := f.Now()
+	return value.DownloadWorkerIdentity{Worker: f.w, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, e
+}
+func (f *workerLifecycleFixture) EnrollmentKey(csr []byte) (artifact.Digest, error) {
+	return sha256.Sum256(csr), nil
+}
+func (f *workerLifecycleFixture) ReadWorkerEnrollmentProof(ctx context.Context, session, worker string, key artifact.Digest) (value.WorkerEnrollmentProof, error) {
+	e := f.step(ctx, "proof")
+	n := f.Now()
+	if session != f.w.Intent.SessionID || worker != f.w.Intent.ID {
+		return value.WorkerEnrollmentProof{}, artifact.ErrInvalid
+	}
+	return value.WorkerEnrollmentProof{Worker: f.w, PublicKeyDigest: key, TokenDigest: artifact.Digest{1}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, e
+}
+func (f *workerLifecycleFixture) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof, _ artifact.DownloadAuthority) (value.WorkerEnrollment, audit.Receipt, bool, error) {
+	e := f.step(ctx, "claim-enrollment")
+	if f.enrollment.PublicKeyDigest == (artifact.Digest{}) {
+		f.enrollment = value.WorkerEnrollment{Worker: p.Worker, PublicKeyDigest: p.PublicKeyDigest, ClaimedAt: f.Now()}
+	}
+	return f.enrollment, audit.Receipt{}, false, e
+}
+func (f *workerLifecycleFixture) WriteWorkerEnrollment(ctx context.Context, e value.WorkerEnrollment) (audit.Receipt, error) {
+	err := f.step(ctx, "write-enrollment-audit")
+	return workerReceipt(audit.WorkerEnrollmentKey(e)), err
+}
+func (f *workerLifecycleFixture) AcknowledgeWorkerEnrollment(ctx context.Context, _ value.WorkerEnrollment, _ audit.Receipt) error {
+	return f.step(ctx, "ack-enrollment-audit")
+}
+func (f *workerLifecycleFixture) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
+	e := f.step(ctx, "prepare-certificate")
+	n := f.Now()
+	epoch, until, err := value.WorkerCertificateEpoch(f.w, n)
+	if err != nil {
+		return value.WorkerCertificateProgress{}, err
+	}
+	f.attempt = value.WorkerCertificateAttempt{ID: f.w.Intent.ID, Epoch: epoch, Ordinal: 1, Enrollment: f.enrollment, Proof: p, RecoveryEpoch: a.Environment.RecoveryEpoch, EnrollmentAudit: artifact.Digest{1}, CheckedAt: n, SignBefore: identity.Earlier(p.FreshUntil, a.ValidUntil), CertificateNotAfter: until}
+	return value.WorkerCertificateProgress{Attempt: f.attempt, MaySign: true}, e
+}
+func (f *workerLifecycleFixture) SignWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, _ []byte) (value.WorkerCertificate, error) {
+	e := f.step(ctx, "sign")
+	der := []byte("synthetic-certificate-not-a-real-provider")
+	return value.WorkerCertificate{DER: der, ChainDER: [][]byte{}, Peer: value.KeyPeer{InstallationID: f.w.Binding.InstallationID, Role: "acquisition", PeerID: f.w.Binding.PodUID, Certificate: sha256.Sum256(der), NotBefore: f.Now().Add(-time.Second), NotAfter: a.CertificateNotAfter}}, e
+}
+func (f *workerLifecycleFixture) StoreWorkerCertificate(ctx context.Context, _ value.WorkerCertificateAttempt, c value.WorkerCertificate, _ artifact.DownloadAuthority) error {
+	e := f.step(ctx, "store-certificate")
+	f.certificate = c
+	return e
+}
+func (f *workerLifecycleFixture) ReadWorkerCertificateReceipt(ctx context.Context, _ audit.WorkerCertificate) (audit.Receipt, bool, error) {
+	return audit.Receipt{}, false, f.step(ctx, "read-certificate-audit")
+}
+func (f *workerLifecycleFixture) WriteWorkerCertificate(ctx context.Context, c audit.WorkerCertificate) (audit.Receipt, error) {
+	e := f.step(ctx, "write-certificate-audit")
+	return workerReceipt(audit.WorkerCertificateKey(c)), e
+}
+func (f *workerLifecycleFixture) AcknowledgeWorkerCertificate(ctx context.Context, _ audit.WorkerCertificate, _ audit.Receipt) error {
+	return f.step(ctx, "ack-certificate-audit")
+}
+func (f *workerLifecycleFixture) ActivateWorkerCertificate(ctx context.Context, _ value.WorkerEnrollmentProof, _ value.WorkerCertificateAttempt, _ artifact.DownloadAuthority) (value.WorkerCertificate, error) {
+	return f.certificate, f.step(ctx, "activate")
+}
+func newWorkerLifecycleFixture(t *testing.T) (*workerLifecycleFixture, *DownloadDispatcher, WorkerEnrollmentCoordinator, identities.CurrentIdentity) {
+	t.Helper()
+	cf, _ := newDownloadControlFixture(t)
+	w := routeTestWorker(t, 1)
+	w.Intent.Authority = cf.a
+	w.Intent.CreatedAt = cf.now
+	w.Intent.RunUntil = cf.now.Add(time.Minute)
+	w.Intent.Authority.Environment.InstallationID = w.Binding.InstallationID
+	f := &workerLifecycleFixture{now: cf.now, i: cf.i, a: w.Intent.Authority, w: w, hooks: map[string]func(){}, deadlines: map[string]time.Time{}}
+	d := &DownloadDispatcher{Ledger: f, Jobs: workerLifecycleJobs{f}, Audit: f, Acknowledgements: f, Authority: f, CurrentAuthority: f, Profile: w.Intent.Profile, Now: f.Now}
+	service := WorkerEnrollmentCoordinator{CSR: f, Proofs: f, Ledger: f, Activation: f, Audit: f, Acknowledgements: f, Issuer: f, Authority: f, CurrentAuthority: f, Now: f.Now}
+	current, _, err := identities.NewBrowserRequest(context.Background(), f, "synthetic-session-cookie", false, f.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f, d, service, current
+}
+
+func TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer(t *testing.T) {
+	f, d, service, current := newWorkerLifecycleFixture(t)
+	w, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+	if err != nil || w != f.w {
+		t.Fatal("browser current identity did not dispatch", err)
+	}
+	cert, err := service.EnrollCurrent(context.Background(), current, w.Intent.SessionID, w.Intent.ID, f.a.Scope, []byte("same-process-csr"))
+	if err != nil || cert.Peer.Role != "acquisition" || f.count("sign") != 1 {
+		t.Fatal("browser current identity did not enroll", err)
+	}
+}
+func currentWorkerOperation(t *testing.T, f *workerLifecycleFixture, service WorkerEnrollmentCoordinator, current identities.CurrentIdentity) *WorkerEnrollmentOperation {
+	t.Helper()
+	op, err := NewCurrentWorkerEnrollmentOperation(context.Background(), service, func(tokens DownloadPeerToken) (WorkerEnrollmentProofReader, error) {
+		b, e := tokens.ReadDownloadPeerToken(context.Background())
+		defer clear(b)
+		if e != nil || string(b) != "pod-token" {
+			return nil, artifact.ErrInvalid
+		}
+		return f, nil
+	}, current, workerTarget(f.w), f.a.Scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return op
+}
+func currentWorkerOwners(t *testing.T, f *workerLifecycleFixture, op *WorkerEnrollmentOperation) (*WorkerRequestOwners, *WorkerOwnerRegistration) {
+	t.Helper()
+	router, err := NewWorkerEnrollmentRouter(context.Background(), f.w.Binding.InstallationID, f, f.Now, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(router.Close)
+	var lease value.WorkerOwnerLease
+	store := testWorkerOwnerStore{claim: func(ctx context.Context, r value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
+		e := f.step(ctx, "claim-owner")
+		lease = value.WorkerOwnerLease{Request: r, Fence: 1, Started: f.Now()}
+		return lease, e
+	}, read: func(ctx context.Context, _, _ string) (value.WorkerOwnerLease, error) {
+		return lease, f.step(ctx, "read-owner")
+	}, release: func(ctx context.Context, _ value.WorkerOwnerLease) error { return f.step(ctx, "release-owner") }}
+	owners := &WorkerRequestOwners{Router: router, Store: store, PodUID: f.w.Binding.PodUID, ProcessEpoch: f.w.Intent.ID, NewID: func() string { return f.w.Intent.ID }}
+	h, err := owners.Register(context.Background(), op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if e := h.Close(context.Background()); e != nil {
+			t.Error(e)
+		}
+	})
+	return owners, h
+}
+func TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery(t *testing.T) {
+	f, _, s, current := newWorkerLifecycleFixture(t)
+	op := currentWorkerOperation(t, f, s, current)
+	first := op.pinned
+	until := first.Deadline()
+	f.change(func() { f.now = f.now.Add(time.Second) })
+	owners, h := currentWorkerOwners(t, f, op)
+	if h.Lease().Request.Until.After(until) || op.pinned != first {
+		t.Fatal("registration renewed or replaced the original identity check")
+	}
+	d, err := owners.BeginOwnedWorkerEnrollment(context.Background(), h.Lease(), []byte("pod-token"), []byte("same-csr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	bound, ok := d.Context().Deadline()
+	if !ok || bound.After(until) {
+		t.Fatal("delivery outlived original check")
+	}
+	if f.count("sign") != 1 {
+		t.Fatal("no actual enrollment effects")
+	}
+	for _, name := range []string{"claim-owner", "claim-enrollment", "prepare-certificate", "sign", "activate"} {
+		if f.deadlines[name].IsZero() || f.deadlines[name].After(until) {
+			t.Fatal("effect renewed original interval", name, f.deadlines[name], until)
+		}
+	}
+}
+func TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls(t *testing.T) {
+	for _, phase := range []string{"read-worker-audit", "claim-worker", "observe-job", "read-worker"} {
+		for _, change := range []string{"groups", "scopes", "policy", "expiry"} {
+			t.Run(phase+"/"+change, func(t *testing.T) {
+				f, d, _, current := newWorkerLifecycleFixture(t)
+				f.hooks[phase] = func() {
+					f.change(func() {
+						switch change {
+						case "groups":
+							f.i.Groups = []string{"changed"}
+						case "scopes":
+							f.i.Scopes = []string{"evidence:read"}
+						case "policy":
+							f.i.Policy.Generation++
+						case "expiry":
+							f.now = f.now.Add(6 * time.Second)
+							f.i.VerifiedAt = f.now
+							f.i.ValidUntil = f.now.Add(5 * time.Second)
+							f.a.CheckedAt = f.now
+							f.a.ValidUntil = f.now.Add(5 * time.Second)
+						}
+					})
+				}
+				if _, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope); err == nil {
+					t.Fatal("changed/expired current request accepted")
+				}
+				if phase == "read-worker-audit" && f.count("write-worker-audit") != 0 {
+					t.Fatal("audit effect after original request lost authority")
+				}
+				if phase == "claim-worker" && f.count("create-job") != 0 {
+					t.Fatal("create after original authority lost")
+				}
+				if phase == "observe-job" && f.count("bind-worker") != 0 {
+					t.Fatal("bind after observed identity change")
+				}
+			})
+		}
+	}
+}
+func TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery(t *testing.T) {
+	for _, phase := range []string{"proof", "prepare-certificate", "sign", "activate"} {
+		t.Run(phase, func(t *testing.T) {
+			f, _, s, current := newWorkerLifecycleFixture(t)
+			f.hooks[phase] = func() { f.change(func() { f.i.Groups = []string{"revoked-group"} }) }
+			if _, err := s.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr")); err == nil {
+				t.Fatal("changed identity accepted")
+			}
+			if phase == "proof" && f.count("claim-enrollment") != 0 {
+				t.Fatal("claimed after proof lost identity")
+			}
+			if phase == "prepare-certificate" && f.count("sign") != 0 {
+				t.Fatal("signed after current identity changed")
+			}
+			if phase == "sign" && f.count("store-certificate") != 0 {
+				t.Fatal("stored using changed identity")
+			}
+		})
+	}
+}
+func TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate(t *testing.T) {
+	f, d, _, current := newWorkerLifecycleFixture(t)
+	f.lostCreate = true
+	if _, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope); err == nil {
+		t.Fatal("lost create reply fabricated success")
+	}
+	w, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+	if err != nil || w != f.w || f.count("create-job") != 1 || f.count("find-job") != 1 || f.count("write-worker-audit") != 1 {
+		t.Fatal("retry replaced original creation/audit", err, f.calls)
+	}
+}
+func TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner(t *testing.T) {
+	for _, change := range []string{"expiry", "groups", "shorter"} {
+		t.Run(change, func(t *testing.T) {
+			f, _, s, current := newWorkerLifecycleFixture(t)
+			op := currentWorkerOperation(t, f, s, current)
+			r, err := NewWorkerEnrollmentRouter(context.Background(), f.w.Binding.InstallationID, f, f.Now, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			released := 0
+			store := testWorkerOwnerStore{claim: func(ctx context.Context, request value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
+				lease := value.WorkerOwnerLease{Request: request, Fence: 1, Started: f.Now()}
+				f.change(func() {
+					switch change {
+					case "expiry":
+						f.now = f.now.Add(6 * time.Second)
+						f.i.VerifiedAt = f.now
+						f.i.ValidUntil = f.now.Add(5 * time.Second)
+						f.a.CheckedAt = f.now
+						f.a.ValidUntil = f.now.Add(5 * time.Second)
+					case "groups":
+						f.i.Groups = []string{"changed"}
+					case "shorter":
+						f.i.ValidUntil = f.now.Add(time.Second)
+					}
+				})
+				return lease, nil
+			}, release: func(context.Context, value.WorkerOwnerLease) error { released++; return nil }}
+			o := &WorkerRequestOwners{Router: r, Store: store, PodUID: f.w.Binding.PodUID, ProcessEpoch: f.w.Intent.ID, NewID: func() string { return f.w.Intent.ID }}
+			h, err := o.Register(context.Background(), op)
+			if err == nil || h != nil {
+				t.Fatal("stale locator returned")
+			}
+			if released != 1 {
+				t.Fatal("known exact claim was not restricted", released)
+			}
+			r.mu.Lock()
+			used := r.used
+			r.mu.Unlock()
+			if used != 0 {
+				t.Fatal("failed registration retained local slot")
+			}
+		})
+	}
+}
+
+type workerCurrentGateFunc func(context.Context, identities.CurrentIdentity, artifact.DownloadScope) (artifact.DownloadAuthority, error)
+
+func (f workerCurrentGateFunc) CheckDownloadCurrent(c context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	return f(c, i, s)
+}
+
+type workerCurrentSourceFunc func(context.Context) (identity.Identity, error)
+
+func (f workerCurrentSourceFunc) ResolveIdentity(c context.Context) (identity.Identity, error) {
+	return f(c)
+}
+func TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound(t *testing.T) {
+	f, _, _, current := newWorkerLifecycleFixture(t)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var blocking bool
+	var mu sync.Mutex
+	gate := workerCurrentGateFunc(func(ctx context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+		a, e := f.CheckDownloadCurrent(ctx, i, s)
+		mu.Lock()
+		block := blocking
+		blocking = false
+		mu.Unlock()
+		if block {
+			close(entered)
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+		}
+		return a, e
+	})
+	check, err := newWorkerCurrentCheck(context.Background(), current, gate, f.a.Scope, f.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	blocking = true
+	mu.Unlock()
+	done := make(chan artifact.DownloadAuthority, 1)
+	errs := make(chan error, 1)
+	go func() { a, e := check.Check(context.Background()); done <- a; errs <- e }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("authority did not block")
+	}
+	short := f.Now().Add(time.Second)
+	f.change(func() { f.a.ValidUntil = short })
+	a, err := check.Check(context.Background())
+	if err != nil || a.ValidUntil != short {
+		t.Fatal(err, a.ValidUntil)
+	}
+	f.change(func() { f.a.ValidUntil = f.now.Add(5 * time.Second) })
+	close(release)
+	old := <-done
+	if err := <-errs; err != nil || old.ValidUntil != short || check.Deadline() != short {
+		t.Fatal("old read extended current observation", err, old.ValidUntil)
+	}
+}
+func TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck(t *testing.T) {
+	f, _, _, current := newWorkerLifecycleFixture(t)
+	owner, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var blocked bool
+	entered := make(chan struct{})
+	gate := workerCurrentGateFunc(func(ctx context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+		if blocked {
+			close(entered)
+			<-ctx.Done()
+			return artifact.DownloadAuthority{}, ctx.Err()
+		}
+		return f.CheckDownloadCurrent(ctx, i, s)
+	})
+	check, err := newWorkerCurrentCheck(owner, current, gate, f.a.Scope, f.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocked = true
+	done := make(chan error, 1)
+	go func() { _, e := check.Check(context.Background()); done <- e }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("not blocked")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("cancelled owner accepted")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Background detached owning request")
+	}
+}
+func TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation(t *testing.T) {
+	for _, field := range []string{"groups", "scopes"} {
+		t.Run(field, func(t *testing.T) {
+			f, _, _, _ := newWorkerLifecycleFixture(t)
+			f.i.Groups = []string{"original"}
+			raw := f.i
+			source := workerCurrentSourceFunc(func(context.Context) (identity.Identity, error) { return raw, nil })
+			check, err := newWorkerCurrentCheck(context.Background(), source, f, f.a.Scope, f.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if field == "groups" {
+				raw.Groups[0] = "changed"
+			} else {
+				raw.Scopes[0] = "changed"
+			}
+			if _, err = check.Check(context.Background()); err == nil {
+				t.Fatal("caller changed the pinned original claim slice")
+			}
+		})
+	}
+}
+func TestWorkerCurrentShorterObservationBoundsLaterEffectContexts(t *testing.T) {
+	for _, step := range []string{"dispatch", "enrollment"} {
+		t.Run(step, func(t *testing.T) {
+			f, d, s, current := newWorkerLifecycleFixture(t)
+			short := f.Now().Add(time.Second)
+			hook, effect := "read-worker-audit", "write-worker-audit"
+			if step == "enrollment" {
+				hook, effect = "proof", "claim-enrollment"
+			}
+			f.hooks[hook] = func() { f.change(func() { f.i.ValidUntil = short }) }
+			var err error
+			if step == "dispatch" {
+				_, err = d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+			} else {
+				_, err = s.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr"))
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := f.deadlines[effect]; got.IsZero() || got.After(short) {
+				t.Fatal("effect retained the older longer deadline", effect, got, short)
+			}
+		})
+	}
+}
+func TestWorkerCurrentCheckCannotStartOverAfterBlockingProof(t *testing.T) {
+	f, _, s, current := newWorkerLifecycleFixture(t)
+	op := currentWorkerOperation(t, f, s, current)
+	until := op.bound()
+	f.hooks["proof"] = func() {
+		f.change(func() {
+			f.now = f.now.Add(6 * time.Second)
+			f.i.VerifiedAt = f.now
+			f.i.ValidUntil = f.now.Add(5 * time.Second)
+			f.a.CheckedAt = f.now
+			f.a.ValidUntil = f.now.Add(5 * time.Second)
+		})
+	}
+	if _, err := op.EnrollWorker(context.Background(), op.target.InstallationID, op.target.SessionID, op.target.WorkerID, []byte("pod-token"), []byte("csr")); err == nil {
+		t.Fatal("proof observation renewed request")
+	}
+	if f.count("claim-enrollment") != 0 || op.bound().After(until) {
+		t.Fatal("expired operation gained effects")
+	}
+}
+func TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery(t *testing.T) {
+	f, _, s, current := newWorkerLifecycleFixture(t)
+	op := currentWorkerOperation(t, f, s, current)
+	short := f.Now().Add(time.Second)
+	f.hooks["activate"] = func() { f.change(func() { f.i.ValidUntil = short }) }
+	d, err := op.BeginWorkerEnrollment(context.Background(), op.target.InstallationID, op.target.SessionID, op.target.WorkerID, []byte("pod-token"), []byte("csr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	until, ok := d.Context().Deadline()
+	if !ok || until.After(short) {
+		t.Fatal("delivery ignored shorter final identity", until, short)
+	}
+}
+
+func TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound(t *testing.T) {
+	f, _, s, current := newWorkerLifecycleFixture(t)
+	op := currentWorkerOperation(t, f, s, current)
+	short := f.Now().Add(time.Second)
+	f.change(func() { f.i.ValidUntil = short })
+	_, h := currentWorkerOwners(t, f, op)
+	if got, ok := h.route.ctx.Deadline(); !ok || got.After(short) {
+		t.Fatal("route retained longer bound", got)
+	}
+	if got := f.deadlines["claim-owner"]; got.IsZero() || got.After(short) {
+		t.Fatal("locator claim retained longer bound", got)
+	}
+}

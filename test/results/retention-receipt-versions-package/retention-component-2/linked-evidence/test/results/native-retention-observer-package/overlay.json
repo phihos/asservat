@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/capture_admission_test.go": "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/changes/test/integration/capture_admission_test.go",
+    "/home/phil/Projekte/asservat/test/integration/context_publication_test.go": "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/changes/test/integration/context_publication_test.go",
+    "/home/phil/Projekte/asservat/test/integration/download_sessions_test.go": "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/changes/test/integration/download_sessions_test.go",
+    "/home/phil/Projekte/asservat/test/integration/native_retention_observer_test.go": "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/changes/test/integration/native_retention_observer_test.go"
+  }
+}

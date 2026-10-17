@@ -1,0 +1,5 @@
+--- FAIL: TestNativeContentFixtureUsesItsExactHTTPCookie (0.00s)
+    context_native_fixture_test.go:42: HTTP fixture cookie rejected before real C02 reader identity not eligible
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.014s
+FAIL

@@ -1,0 +1,147 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+type ownerProjectionDiagnosticVerification struct {
+	*ownerProjectionSQLFixture
+	advance func(context.Context, *OwnerProjectionOperation) (OwnerProjectionAdvance, error)
+}
+
+func (s ownerProjectionDiagnosticVerification) AdvanceOwnerProjectionOperation(ctx context.Context, op *OwnerProjectionOperation) (OwnerProjectionAdvance, error) {
+	return s.advance(ctx, op)
+}
+
+func TestOwnerProjectionDiagnosticPreservesFirstExecuteAndOnlyFinalization(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	calls := 0
+	var failed *OwnerProjectionOperation
+	f.verification.beforeEffect = func() {
+		if calls == 3 {
+			f.lose.Store(4)
+		}
+	}
+	f.projection.verification = ownerProjectionDiagnosticVerification{ownerProjectionSQLFixture: f.verification, advance: func(ctx context.Context, op *OwnerProjectionOperation) (OwnerProjectionAdvance, error) {
+		calls++
+		out, err := f.verification.AdvanceOwnerProjectionOperation(ctx, op)
+		if err != nil {
+			failed = op
+			f.provider.deny.Store(true)
+			// The actual SQL facet normalizes the native failure; its fixed slot must
+			// preserve the deciding code without retaining an error's private text.
+			return OwnerProjectionAdvance{}, cfg.ErrUnavailable
+		}
+		return out, nil
+	}}
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer driver.Close()
+	out, err := driver.Run(context.Background())
+	if err == nil || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || out.Complete || out.Stop != OwnerInstallationUnverified || out.Phase != "projection" || out.Calls != 20 || out.Inspections != 1 || out.Finalizations != 3 || calls != 3 {
+		t.Fatal("diagnostic changed bounded sequence", out, err, calls)
+	}
+	message := err.Error()
+	first, second := strings.Index(message, "projection.apply-effect"), strings.Index(message, "projection.provider-observe")
+	if first < 0 || second <= first || !strings.Contains(message, "owner projection advance:") || !strings.Contains(message, "; inspection:") {
+		t.Fatal("first failure overwritten", message)
+	}
+	if failed == nil || failed.failure.first.Load() == nil {
+		t.Fatal("normalizer dropped fixed execution code")
+	}
+	assertProjectionCodesOnly(t, failed.failure.first.Load())
+	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || f.journalWrites.Load() != 3 || f.creates[0].Load() != 1 || f.creates[1].Load() != 0 || f.launches.Load() != 0 {
+		t.Fatal("diagnostic repeated or continued effects")
+	}
+}
+
+func TestOwnerProjectionDiagnosticClosedCodesKeepOriginalErrorsIs(t *testing.T) {
+	private := errors.New("synthetic-private-provider-password-and-sql-value")
+	native := ownerOperationError(ownerNativeAcceptedRead, private)
+	normalized := &ownerProjectionDiagnostic{check: projectionCheckFinalNative, cause: cfg.ErrUnavailable, native: projectionNativeCodes(native.(*ownerOperationDiagnostic))}
+	if !errors.Is(normalized, cfg.ErrUnavailable) || errors.Is(normalized, private) || strings.Contains(normalized.Error(), private.Error()) {
+		t.Fatal("normalization exposed hidden native cause", normalized)
+	}
+	first := projectionDiagnostic(projectionCheckFinalMaterial, private)
+	inspection := projectionDiagnostic(projectionCheckPlan, cfg.ErrChanged)
+	result := &ownerProjectionInspectionDiagnostic{cause: inspection, first: projectionFixedCodes(first), inspection: projectionFixedCodes(inspection)}
+	if !errors.Is(result, cfg.ErrChanged) || errors.Is(result, private) || errors.Is(result, cfg.ErrUnavailable) || strings.Contains(result.Error(), private.Error()) {
+		t.Fatal("retained first diagnostic changed final inspection identity", result)
+	}
+	assertProjectionCodesOnly(t, result.first)
+	assertProjectionCodesOnly(t, result.inspection)
+	// Even a caller-defined Error method is never invoked to build diagnostics.
+	hostile := projectionDiagnostic(projectionCheckSqlOperation, ownerProjectionHostileError{})
+	if hostile.Error() != projectionCheckSqlOperation.String() {
+		t.Fatal("arbitrary error rendered")
+	}
+}
+
+type ownerProjectionHostileError struct{}
+
+func (ownerProjectionHostileError) Error() string { panic("private error text must never be rendered") }
+
+func assertProjectionCodesOnly(t *testing.T, d *ownerProjectionDiagnostic) {
+	t.Helper()
+	for d != nil {
+		if d.cause != nil {
+			t.Fatal("retained driver value instead of fixed code")
+		}
+		for n := d.native; n != nil; n = n.detail {
+			if n.cause != nil {
+				t.Fatal("retained native error cause")
+			}
+		}
+		d = d.inner
+	}
+}
+
+func TestOwnerProjectionDiagnosticSlotRejectsCopiedAndLaterFailures(t *testing.T) {
+	op := &OwnerProjectionOperation{failure: &ownerProjectionDiagnosticSlot{}}
+	op.self = op
+	copied := *op
+	first := error(cfg.ErrChanged)
+	copied.diagnosticReturn(projectionCheckFinalOriginals, &first)
+	if op.failure.first.Load() != nil {
+		t.Fatal("copied handle wrote original operation's diagnostic slot")
+	}
+	first = projectionDiagnostic(projectionCheckFinalNative, ownerOperationError(ownerNativeAcceptedRead, errors.New("synthetic-private-driver")))
+	op.diagnosticReturn(projectionCheckFinalNative, &first)
+	recorded := op.failure.first.Load()
+	if recorded == nil {
+		t.Fatal("actual failed operation dropped fixed codes")
+	}
+	assertProjectionCodesOnly(t, recorded)
+	later := error(cfg.ErrUnavailable)
+	op.diagnosticReturn(projectionCheckResultFinish, &later)
+	if op.failure.first.Load() != recorded || recorded.check != projectionCheckFinalNative {
+		t.Fatal("later failure replaced deciding check")
+	}
+	empty := &OwnerProjectionOperation{}
+	empty.self = empty
+	empty.diagnosticReturn(projectionCheckEnter, &later) // inert test handle, no slot
+	var absent *OwnerProjectionOperation
+	absent.diagnosticReturn(projectionCheckEnter, &later)
+}
+
+func TestOwnerProjectionDiagnosticUnknownEnumsRemainFixed(t *testing.T) {
+	seen := map[string]bool{}
+	for check := projectionCheckEnter; check <= projectionCheckResultFinish; check++ {
+		text := check.String()
+		if text == "projection.unknown" || seen[text] {
+			t.Fatal("non-unique projection code", check, text)
+		}
+		seen[text] = true
+	}
+	if ownerProjectionCheck(255).String() != "projection.unknown" {
+		t.Fatal("unrecognized code disclosed value")
+	}
+}

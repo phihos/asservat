@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_role_source.go": "/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/source/internal/adapters/kubernetes/configuration_role_source.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_role_source_path_test.go": "/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/source/internal/adapters/kubernetes/configuration_role_source_path_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_role_inert_test.go": "/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/source/internal/adapters/kubernetes/configuration_role_inert_test.go"
+  }
+}

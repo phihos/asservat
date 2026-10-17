@@ -1,0 +1,47 @@
+[
+  {
+    "path": "docs/architecture/native-exchange.md",
+    "base": "10bf8f54f5aeede42f666b1e692476c4b274662d212d0b4e572385576f8e4edc",
+    "sha256": "4ffa1d5cc36f7e56b3f939ee80af8b16b669249ec6dbc5e991c536a10a362710"
+  },
+  {
+    "path": "internal/application/evidence/native_exchange.go",
+    "base": "acb966891b27b7b6dad69f3e4813f7a504000cfd319247679933d2ab2ab815f4",
+    "sha256": "32f8948ea527264fd0dc07dc2e7906f4dcaeb1bcdc5c794024e6d4f8ec4b216d"
+  },
+  {
+    "path": "internal/application/evidence/native_terminal_test.go",
+    "base": null,
+    "sha256": "ae53c8205ccba6ccf3f37ccffccc4cdfbcb42643ec88db88e5b91f8193c3fd31"
+  },
+  {
+    "path": "internal/transport/native/closure_test.go",
+    "base": null,
+    "sha256": "dedaad83572995bb6e81c91a1a2201cff792f9469bf48b6aec4de8eb4aa46b7b"
+  },
+  {
+    "path": "internal/transport/native/flow_test.go",
+    "base": "3f0244e420330d24e7eda6b75d5ebe9b68f6b0172c190397510df6974debb898",
+    "sha256": "bce0dcc18c827fe5afc83d34035772bbf3663da6093dd866456d42eedbda3b75"
+  },
+  {
+    "path": "internal/transport/native/handler.go",
+    "base": "ea99ec192d9fd9a5149f81795a96378472cd2fc3bcafa91b149d6a0ffbf3ea2c",
+    "sha256": "a48335bd147ff8512a5c902e5f7bb766d1a506563147d83203990cbe1cc6927c"
+  },
+  {
+    "path": "internal/transport/native/relay.go",
+    "base": "a421310887685b40f6024dfbdde78ed3ee9b523bd0fa1201e5d834b512d1d7eb",
+    "sha256": "026d1b8ea6c5a1468270249f70ffc6f06bec5d991e1f69964126824d2cc0e287"
+  },
+  {
+    "path": "internal/transport/native/relay_receive.go",
+    "base": "82c1e39cd61a72e2d5efeedbb0188383107383c0eb655fbaeaa224b50c2a2672",
+    "sha256": "bc477939e969b99660bfe6c97061bc07357a1c11641f3be006fd6805eadbc876"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base": "53a12b0c6add5426af69a3612202cf21035d62982fa0e95a8df45646c2be0d75",
+    "sha256": "bd6621f50d3fa36871cfcc80976da0cb5bd3156dbc40eb3b63ef65ae6a481e6b"
+  }
+]

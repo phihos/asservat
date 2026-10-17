@@ -1,0 +1,15 @@
+package audit
+
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"strconv"
+)
+
+func OwnerConfigurationAuditKey(c fleet.OwnerConfiguration) string {
+	return "hub-owner-configuration/v1/" + c.Pool.InstallationID + "/" + c.Pool.ClusterID + "/" + c.Revision.UID + "/" + strconv.FormatInt(c.Revision.Generation, 10)
+}
+func (r Receipt) ValidOwnerConfiguration(c fleet.OwnerConfiguration) bool {
+	return c.Valid() && r.Key == OwnerConfigurationAuditKey(c) && (r.Version == "" || identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
+}

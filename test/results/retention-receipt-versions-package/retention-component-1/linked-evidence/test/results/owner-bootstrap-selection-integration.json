@@ -1,0 +1,204 @@
+{
+  "integratedAt": "2026-10-13T10:34:41.699846+00:00",
+  "source": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-schema-6",
+  "manifestSHA256": "ce9f8b8e499c196ae268dc1a512dc7803e22edfbb456846ee338522e21da0664",
+  "resultSHA256": "54e4e0c4b6e025cac67a3bd28c0b2cc546a8f6e297bd3a97760fd20bf15562ce",
+  "files": [
+    {
+      "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+      "base_sha256": "6b860412d70208b3288a8112e9771d5ea69a68e2c34f759f57fa0beff6c8e24e",
+      "payload_sha256": "e1a771e9b0dd61638571ae9facac71142196f549220fae9be55d82281182e94a"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_current.go",
+      "base_sha256": null,
+      "payload_sha256": "763111848056ac4234cb21dccfb46254263284953a5c229f14bd080b76cf8930"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_deployment.go",
+      "base_sha256": null,
+      "payload_sha256": "5986f252156a10cb65408918d57f9922bea990c3cc811a3019f07278a4789b04"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_fixture_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0209a48503f1e4263964523d0136591722d600cf2aa3f96f0d1fd24dce72d42e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_objects.go",
+      "base_sha256": null,
+      "payload_sha256": "4aaf81253d62b87467e3cd183acdef8dfabb0a925e26d819d2118e77ef478b7c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_selection.go",
+      "base_sha256": null,
+      "payload_sha256": "6e366159d8c80fee2d004338298fa3b786b5fdfc5d2f28a480bc4ac9fbae7b9c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_selection_test.go",
+      "base_sha256": null,
+      "payload_sha256": "9570fe30b1d41e7ab2dd1dbaa560516f48dfbce7dc6913db03a0cbf9005cc6bd"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_state.go",
+      "base_sha256": null,
+      "payload_sha256": "efc2aba9b8b6716ed5ccaa964b5dc7aac9bc0365b2a34694b427c70cf801a785"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_state_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0258ca353b1bdd878b62a4e178e07611b6935d03c52d73255dacfc98925fcf26"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_values.go",
+      "base_sha256": null,
+      "payload_sha256": "3781d8740cdc05a8f1ea0e45b27e215227011a19301f41d4db438e522acc18a8"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_material.go",
+      "base_sha256": "2ff442abca9efa7156a93aa44d893ca11560b4aff03fcd7b476cb3f839f5ee52",
+      "payload_sha256": "d9f82bdf30bb577f02cf12c92c3224863fb09c66eecd34e0d41398a922352bfe"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_input.go",
+      "base_sha256": "00afa761e626b567d5ae88f107ee826c86b8d10b4a543aa6c3fc7def0af87a2c",
+      "payload_sha256": "4a9c6f7a5d845d29321dd6ecf2fae412c784badc354029789024ee06c60bf901"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_provider_test.go",
+      "base_sha256": "09844fe0c4f5808584392cf6dd09743d9f5a1068bcf68394e08b03f75e8a98d4",
+      "payload_sha256": "b11d3fa4f7b42da427310a1417b7180344254d395247abeed9697a352ec9b7ca"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_provider_binding.go",
+      "base_sha256": "9a8fb040b3d87b407b01ca3643ae67b2ecbe307bc81a2f248c6ce1276c79053e",
+      "payload_sha256": "08258592510ea1e1e62643a0e95c8bb6de5cb73f76c5859bf32e010ecc85eef9"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_provider_objects_test.go",
+      "base_sha256": "100f7207da6767ab869e6009efada8264565b33596b8353d142bb42041dc818c",
+      "payload_sha256": "51d77ae63b6203f66c11c66002fbe15d9ae3e9154eb181c508c611435d85b550"
+    },
+    {
+      "path": "internal/adapters/kubernetes/worker_projection_state.go",
+      "base_sha256": "dd8ddea80475ede7d65bad9859b7df208a8a5d8b03dd55cfea8069022636e85e",
+      "payload_sha256": "025fba86e5c36935052f23d121eed66e01853515d324377761eecb2257dd2463"
+    },
+    {
+      "path": "internal/contracts/initial_runtime_resources.go",
+      "base_sha256": "fd2103310d43b1282e5a8ef5b8e7156b0782e7d01918efb09c286c9b584f4bd7",
+      "payload_sha256": "333ef0ae694a5a11d11ed11b5d28461b0b7ba6a966c6464be929ce3f44d59f1a"
+    },
+    {
+      "path": "internal/contracts/owner_bootstrap_selection.go",
+      "base_sha256": null,
+      "payload_sha256": "a7c9393b481a3068be86e3b09fe4c2674ca1cd87733abda279e0b794a8a75f26"
+    },
+    {
+      "path": "internal/contracts/owner_bootstrap_selection_test.go",
+      "base_sha256": null,
+      "payload_sha256": "6e5194f5798feea3899926443db84a4d8fd2363ffcc2353996a7cdd0780dd52f"
+    },
+    {
+      "path": "specs/contracts/initial-runtime-resources.schema.json",
+      "base_sha256": "f143d977aa83032f8c037b0634932e285fb1f8ba6add1e4eb67c1d294c918be1",
+      "payload_sha256": "c7e3a81f81614c20fcb5aa1c39b22eecf27e01501868e40528ef8ea27fc93813"
+    },
+    {
+      "path": "specs/contracts/owner-bootstrap-selection.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "21952c43241db5c894e24b54fc3033a7dbbb8e46137ac76ad144c712c74e128d"
+    }
+  ],
+  "nativeQualification": false,
+  "scope": "Exact component payloads; native composition and installed runtime remain pending",
+  "archives": {
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/manifest.json": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/dependencies.json": "6189c161203419766dea365e7cebdc3ace92136e5728ad002cfe70071e9791ee",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/prior-evidence.json": "604df501b56c5b77788b122c091b652a881f10d7116f8a71d4e3a822c47dd0c3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/overlay.json": "0d6a746a61bf0945ac0a811be5528994bbce1dc65cc99894cb5d2a111602e8d9",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/before-overlay.json": "8697fba196f546a80f951043ff5f6a6a965ba019de2d748af871521fbad47a7b",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/schema-regressions.py": "9a0981aa77298084e2863d629f9047efdd5f949017f30b21911c00550c9986e0",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/freeze-infrastructure-failure.json": "d3b12a94859832b0a0b61e772b7e37cb79854c3bfe5120744d2ae33eb74d6bd7",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/variants-manifest.json": "3c6238d35e6ca8225427682747f67f493544da1ebfc6a5fec607c7193c0ef06e",
+    "test/results/owner-bootstrap-selection-package/checks/selection-1/required-tests.json": "8c98d3bc4f845f861d57978e7f4c216dbd9f1a167ab53832b66b5de69125ee42",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/manifest.json": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/prior-evidence.json": "604df501b56c5b77788b122c091b652a881f10d7116f8a71d4e3a822c47dd0c3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/required-tests.json": "8c98d3bc4f845f861d57978e7f4c216dbd9f1a167ab53832b66b5de69125ee42",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/variants-manifest.json": "3c6238d35e6ca8225427682747f67f493544da1ebfc6a5fec607c7193c0ef06e",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/schema-regressions.py": "03eac1c99460de15374ebf4edceecc253468e2e689705683e36509f6818b4687",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/overlay.json": "0d4ec72f7d1ea690f49fa6dce634c39e337a05105d5b26f4a04a536a83f5a63b",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/before-overlay.json": "8284ec7bcb0ea06535c02b6aaaa887d753340a9f9ff306665e5ba5d773bb3d0f",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/dependency-args.json": "a872ae8e7ab46c8acbe41d32ee5cd9c1772aac39060b682037f2df4a81699176",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/dependencies.json": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/run.py": "300d3dce3285b355b70c1d2016c80f9331b35e8edb93c0572779b4b513fb5eda",
+    "test/results/owner-bootstrap-selection-package/checks/selection-2/result.json": "05006b76ac529073213fe609dee80c543ebf80f950de79213d1f57f313337c9b",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/manifest.json": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/dependencies.json": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/dependency-args.json": "a872ae8e7ab46c8acbe41d32ee5cd9c1772aac39060b682037f2df4a81699176",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/prior-evidence.json": "604df501b56c5b77788b122c091b652a881f10d7116f8a71d4e3a822c47dd0c3",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/required-tests.json": "8c98d3bc4f845f861d57978e7f4c216dbd9f1a167ab53832b66b5de69125ee42",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/variants-manifest.json": "3c6238d35e6ca8225427682747f67f493544da1ebfc6a5fec607c7193c0ef06e",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/schema-regressions.py": "03eac1c99460de15374ebf4edceecc253468e2e689705683e36509f6818b4687",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/overlay.json": "a767a85900cb33c6f877fb990a1f7a2beb399c6834b0ac82e9f21049f34b7e58",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/before-overlay.json": "f35fffa80317a4b003bd10d172acb0c8e979abeffc1c074b98750f2b770a49fa",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/run.py": "4a918a3b1fd065bcb884bda12dba7d6066f12ee18785d47d7ae118bdf1a4d7ca",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/interrupted-selection3.json": "a2d7d22cf4b61fc90922056e46236479808ab5bb18f7086d94e05fc8d4cde350",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/mirror-manifest.json": "24aa078544bcefa682923131186839664afa4976d979d7e1e4f11478a4639f7a",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/result.json": "2f2438495288b13cb4a769b8699bfe8f2c549d602fc74dfcb00ffe192fb0daf6",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/manifest.json": "ce9f8b8e499c196ae268dc1a512dc7803e22edfbb456846ee338522e21da0664",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/dependencies.json": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/dependency-args.json": "a872ae8e7ab46c8acbe41d32ee5cd9c1772aac39060b682037f2df4a81699176",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/schema-regressions.py": "f3855b245324527b55ead3889fd174934cef16c27b74a4577bedc7cc674f0147",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/prior.json": "ac1409a37a76318388c3ea3ce6a91bb03d29d1fb1829af51712d91b2b81e9332",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/run.py": "b129d42deeb2584df58f00cf38312ce75747aa428ebe2a4b0ea961b3e3f9ec9c",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/mirror-manifest.json": "4336c943c34ea867b38747d0f2725b7820ee72d8b13ac146f57cd4acf037fd50",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/result.json": "1b2b776646e9ecc0eba96506905ca286716203d5729b569123723054d137a4a6",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/root-overlap.json": "21d25cbc9ccf139d2a48601e91ab988b94bf6acd6098878fd84ae9d6e7651962",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/manifest.json": "ce9f8b8e499c196ae268dc1a512dc7803e22edfbb456846ee338522e21da0664",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/dependencies.json": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/dependency-args.json": "a872ae8e7ab46c8acbe41d32ee5cd9c1772aac39060b682037f2df4a81699176",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/schema-regressions.py": "f3855b245324527b55ead3889fd174934cef16c27b74a4577bedc7cc674f0147",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/prior.json": "ac1409a37a76318388c3ea3ce6a91bb03d29d1fb1829af51712d91b2b81e9332",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/link-dependencies.json": "65d30dadd6b89253158a1949075de9b218cc0225ef7ac134105308d04756a087",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/link-directories.json": "1a1e4a35473c2a299c1df57934fd5f26b02f4e0b2537a2eff8d270848bde8d38",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/run.py": "cabef0070b704269040c2331d9c8c8dc884f8a642f3ce8c851cc10e363ecfdb9",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/mirror-manifest.json": "602e5f6b911371df73d4d3684e9acb5cf71c24f50a7e80aff347f366c4620df2",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/result.json": "54e4e0c4b6e025cac67a3bd28c0b2cc546a8f6e297bd3a97760fd20bf15562ce",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/HANDOFF.md": "82328f6ed38a93191ed2a44ecf2232dcec346391078dd5754050cb2ae0604c07",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/handoff-hashes.json": "21c1752d1bc955d293b3af61be9c91a68a4426f5bc14ef9521b1712de1adf25c",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/evidence/schema-regressions.log": "f61e9afdd86534e61ec2b73e5f9261d19cc7888697a5a93b59149e6358556c12",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-6/evidence/contracts.log": "e1cbb8de03fc92239f8f561e11b9e64dd3a915f2ff7d1f103692852ce541959b",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/evidence/schema-regressions.log": "f61e9afdd86534e61ec2b73e5f9261d19cc7888697a5a93b59149e6358556c12",
+    "test/results/owner-bootstrap-selection-package/checks/selection-schema-5/evidence/contracts.log": "f2ef387ccc562aaa803542d5f51fbfd3b8206d8b1f3e6b5c447d27682d4df8df",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/compile.log": "3d5f2587042e16f00901720230e8e3e68073fb300fa025ab1703416d4e5fa216",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/before-selection.log": "88044b677e9afdbf76ba9a34894ba8abb25aef914e5cd5d213e61485155e4f8f",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/bootstrap-race.log": "7ab3e7f4830fbb338e763b8040760048fc9c07955c7cb3af9f2864c6ce4a36c9",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/affected-race.log": "22b2e90484a023e907726baaaddb44cca196b6436706902c2c1e21530898e6cf",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/go-architecture.log": "b85daac7b1fa0e2d768c96595df06ded3dc38ed97d76950dd78ae9a12b2b759d",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/schemas.log": "c4c4dd496699c6d499946278c128df28823ecbe2e2884a2ca52c7b7613a20d64",
+    "test/results/owner-bootstrap-selection-package/checks/selection-4/evidence/contracts.log": "1eb7d05908572109094e14327ae630dbd71161b4b7267d12f2cd1509ece102ab",
+    "test/results/owner-bootstrap-selection-package/payloads/specs/contracts/initial-runtime-resources.schema.json.txt": "c7e3a81f81614c20fcb5aa1c39b22eecf27e01501868e40528ef8ea27fc93813",
+    "test/results/owner-bootstrap-selection-package/payloads/specs/contracts/owner-bootstrap-selection.schema.json.txt": "21952c43241db5c894e24b54fc3033a7dbbb8e46137ac76ad144c712c74e128d",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/contracts/initial_runtime_resources.go.txt": "333ef0ae694a5a11d11ed11b5d28461b0b7ba6a966c6464be929ce3f44d59f1a",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/contracts/owner_bootstrap_selection.go.txt": "a7c9393b481a3068be86e3b09fe4c2674ca1cd87733abda279e0b794a8a75f26",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/contracts/owner_bootstrap_selection_test.go.txt": "6e5194f5798feea3899926443db84a4d8fd2363ffcc2353996a7cdd0780dd52f",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_current.go.txt": "763111848056ac4234cb21dccfb46254263284953a5c229f14bd080b76cf8930",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_deployment.go.txt": "5986f252156a10cb65408918d57f9922bea990c3cc811a3019f07278a4789b04",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_fixture_test.go.txt": "0209a48503f1e4263964523d0136591722d600cf2aa3f96f0d1fd24dce72d42e",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_objects.go.txt": "4aaf81253d62b87467e3cd183acdef8dfabb0a925e26d819d2118e77ef478b7c",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_selection.go.txt": "6e366159d8c80fee2d004338298fa3b786b5fdfc5d2f28a480bc4ac9fbae7b9c",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_selection_test.go.txt": "9570fe30b1d41e7ab2dd1dbaa560516f48dfbce7dc6913db03a0cbf9005cc6bd",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_state.go.txt": "efc2aba9b8b6716ed5ccaa964b5dc7aac9bc0365b2a34694b427c70cf801a785",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_state_test.go.txt": "0258ca353b1bdd878b62a4e178e07611b6935d03c52d73255dacfc98925fcf26",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_bootstrap_values.go.txt": "3781d8740cdc05a8f1ea0e45b27e215227011a19301f41d4db438e522acc18a8",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_identity_operation_material.go.txt": "d9f82bdf30bb577f02cf12c92c3224863fb09c66eecd34e0d41398a922352bfe",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_identity_projection_input.go.txt": "4a9c6f7a5d845d29321dd6ecf2fae412c784badc354029789024ee06c60bf901",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_projection_operation_provider_test.go.txt": "b11d3fa4f7b42da427310a1417b7180344254d395247abeed9697a352ec9b7ca",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_provider_binding.go.txt": "08258592510ea1e1e62643a0e95c8bb6de5cb73f76c5859bf32e010ecc85eef9",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/owner_provider_objects_test.go.txt": "51d77ae63b6203f66c11c66002fbe15d9ae3e9154eb181c508c611435d85b550",
+    "test/results/owner-bootstrap-selection-package/payloads/internal/adapters/kubernetes/worker_projection_state.go.txt": "025fba86e5c36935052f23d121eed66e01853515d324377761eecb2257dd2463",
+    "test/results/owner-bootstrap-selection-package/payloads/docs/decisions/149-fresh-provider-installed-pair.md.txt": "e1a771e9b0dd61638571ae9facac71142196f549220fae9be55d82281182e94a"
+  }
+}

@@ -1,0 +1,273 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/pem"
+	"net"
+	"net/http"
+	"net/netip"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
+)
+
+var ownerProviderName = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+var ownerDNSName = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$`)
+
+// providerInputs is shared only by protected installation bootstraps. It
+// carries provider connections, never accepted configuration or user authority.
+type providerInputs struct {
+	mu                 sync.Mutex
+	transports         []http.RoundTripper
+	files              *os.Root
+	kubernetesEndpoint contracts.OwnerProviderEndpoint
+	postgresEndpoint   contracts.OwnerPostgresEndpoint
+}
+type ownerInputs struct {
+	*providerInputs
+	config contracts.OwnerDeployment
+}
+
+func ownerEndpoint(endpoint string) bool {
+	u, err := url.Parse(endpoint)
+	return err == nil && len(endpoint) <= 2048 && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Opaque == "" && u.RawQuery == "" && !u.ForceQuery && !strings.Contains(endpoint, "#") && u.RawPath == "" && (u.Path == "" || u.Path == "/")
+}
+func ownerHTTP(endpoint string, raw [][]byte) (*http.Client, error) {
+	if !ownerEndpoint(endpoint) {
+		return nil, mounts.ErrUnavailable
+	}
+	roots, _, err := mtls.OwnerTrustRoots(raw, time.Now())
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	return &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return mounts.ErrUnavailable }, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxIdleConns: 4, MaxIdleConnsPerHost: 4, MaxConnsPerHost: 16, DisableCompression: true}}, nil
+}
+
+func readOwnerInputs(ctx context.Context, files *os.Root) (*ownerInputs, error) {
+	b, err := mounts.Read(ctx, files, "deployment.json", contracts.OwnerDeploymentMaxBytes)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	defer clear(b)
+	c, err := contracts.DecodeOwnerDeployment(bytes.NewReader(b))
+	if err != nil || c.Format != contracts.OwnerDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PermissionRootID) || !authorization.UUID(c.Namespace.UID) || !authorization.UUID(c.ConfigurationUID) || !identity.Text(c.Namespace.Name, 63) || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections {
+		return nil, mounts.ErrUnavailable
+	}
+	if !ownerProviderName.MatchString(c.KeyService.AuditMount) || !ownerProviderName.MatchString(c.KeyService.AuditKey) || !ownerProviderName.MatchString(c.KeyService.PKIMount) || !ownerProviderName.MatchString(c.KeyService.ServerRole) || !ownerProviderName.MatchString(c.KeyService.ClientRole) || c.KeyService.ServerRole == c.KeyService.ClientRole || c.KeyService.AuditMount == c.KeyService.PKIMount || !identity.Text(c.AuditStore.Region, 128) || !identity.Text(c.AuditStore.Bucket, 63) {
+		return nil, mounts.ErrUnavailable
+	}
+	for _, ep := range []contracts.OwnerProviderEndpoint{c.Kubernetes, {Endpoint: c.AuditStore.Endpoint, Roots: c.AuditStore.Roots}, {Endpoint: c.KeyService.Endpoint, Roots: c.KeyService.Roots}} {
+		if !ownerEndpoint(ep.Endpoint) {
+			return nil, mounts.ErrUnavailable
+		}
+		if _, _, err = mtls.OwnerTrustRoots(ep.Roots, time.Now()); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	if !identity.Text(c.Postgres.Database, 63) || c.Postgres.Port < 1 || c.Postgres.Port > 65535 || c.Postgres.MaxConnections < 1 || c.Postgres.MaxConnections > 4 {
+		return nil, mounts.ErrUnavailable
+	}
+	if _, err = netip.ParseAddr(c.Postgres.Host); err != nil && !ownerDNSName.MatchString(c.Postgres.Host) {
+		return nil, mounts.ErrUnavailable
+	}
+	if _, _, err = mtls.OwnerTrustRoots(c.Postgres.Roots, time.Now()); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	g := c.WorkloadGuard
+	if p := c.InitialHistoryProbe; p != nil {
+		if !authorization.UUID(p.Namespace.UID) || !authorization.UUID(p.ServiceAccount.UID) || p.Namespace.Name == c.Namespace.Name || p.Namespace.UID == c.Namespace.UID || len(validation.IsDNS1123Label(p.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(p.ServiceAccount.Name)) != 0 || len(validation.IsDNS1123Subdomain(p.Configuration)) != 0 {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	if c.SchedulingLeases == nil || len(c.SchedulingLeases) > 4 {
+		return nil, mounts.ErrUnavailable
+	}
+	leases := map[contracts.OwnerSchedulingLease]bool{}
+	for _, lease := range c.SchedulingLeases {
+		if len(validation.IsDNS1123Subdomain(lease.Lease)) != 0 || len(validation.IsDNS1123Subdomain(lease.ServiceAccount)) != 0 || leases[lease] {
+			return nil, mounts.ErrUnavailable
+		}
+		leases[lease] = true
+	}
+	if c.ConfigurationProbes == nil || len(c.ConfigurationProbes) > 8 {
+		return nil, mounts.ErrUnavailable
+	}
+	probes := map[contracts.OwnerConfigurationProbe]bool{}
+	for _, probe := range c.ConfigurationProbes {
+		if len(validation.IsDNS1123Subdomain(probe.ConfigMap)) != 0 || len(validation.IsDNS1123Subdomain(probe.ServiceAccount)) != 0 || probes[probe] {
+			return nil, mounts.ErrUnavailable
+		}
+		probes[probe] = true
+	}
+	if !identity.Text(g.Name, 253) || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || !identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || g.PolicyGeneration >= 1<<53 || len(g.Administrators) < 1 || len(g.Administrators) > 32 {
+		return nil, mounts.ErrUnavailable
+	}
+	seen := map[contracts.OwnerDeploymentActor]bool{}
+	for _, a := range g.Administrators {
+		if (a.Kind != "User" && a.Kind != "Group") || !identity.Text(a.Name, 256) || seen[a] {
+			return nil, mounts.ErrUnavailable
+		}
+		seen[a] = true
+	}
+	if validateOwnerNativeInputs(c.Native) != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c}, nil
+}
+
+func (s *providerInputs) token(name string) kms.TokenSource {
+	return func(ctx context.Context) ([]byte, error) {
+		b, err := mounts.Read(ctx, s.files, name, 16384)
+		if err != nil || !kms.ValidProviderToken(b) {
+			clear(b)
+			return nil, mounts.ErrUnavailable
+		}
+		return b, nil
+	}
+}
+
+type mountedOwnerPodToken struct{ inputs *ownerInputs }
+
+func (s mountedOwnerPodToken) ReadOwnerPodToken(ctx context.Context) ([]byte, error) {
+	b, err := s.inputs.token("owner-pod.token")(ctx)
+	if err != nil || !contracts.ValidWorkerToken(b) {
+		clear(b)
+		return nil, mounts.ErrUnavailable
+	}
+	return b, nil
+}
+
+type ownerBearerTransport struct {
+	http.RoundTripper
+	token kms.TokenSource
+}
+
+func (s ownerBearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	b, err := s.token(r.Context())
+	defer clear(b)
+	if err != nil || r.Context().Err() != nil || !contracts.ValidWorkerToken(b) {
+		return nil, mounts.ErrUnavailable
+	}
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+string(b))
+	return s.RoundTripper.RoundTrip(r)
+}
+func (s *providerInputs) kubernetes(name string) *rest.Config {
+	return s.kubernetesToken(s.token(name))
+}
+
+// The bootstrap observation source is concrete and installation-owned; no
+// public request may supply a token callback. Other credentials retain mounted
+// per-request reads and their original purpose.
+func (s *providerInputs) kubernetesToken(source kms.TokenSource) *rest.Config {
+	var ca bytes.Buffer
+	for _, der := range s.kubernetesEndpoint.Roots {
+		_ = pem.Encode(&ca, &pem.Block{Type: "CERTIFICATE", Bytes: der})
+	}
+	return &rest.Config{Host: s.kubernetesEndpoint.Endpoint, TLSClientConfig: rest.TLSClientConfig{CAData: ca.Bytes()}, WrapTransport: func(t http.RoundTripper) http.RoundTripper {
+		s.mu.Lock()
+		s.transports = append(s.transports, t)
+		s.mu.Unlock()
+		return ownerBearerTransport{t, source}
+	}}
+}
+
+func (s *providerInputs) sqlCredential(ctx context.Context, name string) (contracts.OwnerSQLCredential, error) {
+	var zero contracts.OwnerSQLCredential
+	b, err := mounts.Read(ctx, s.files, name, 16<<10)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	defer clear(b)
+	c, err := contracts.DecodeOwnerSQLCredential(bytes.NewReader(b))
+	if err != nil || !identity.Text(c.Username, 63) || len(c.Password) < 1 || len(c.Password) > 4096 || strings.ContainsRune(c.Password, 0) {
+		return zero, mounts.ErrUnavailable
+	}
+	return c, nil
+}
+
+// Bootstrap never parses a secret-bearing DSN or imports PG* settings. A fixed
+// harmless parse initializes pgx's internal invariants before explicit fields
+// replace it; TLS and all fallback/runtime settings are independently supplied.
+func (s *providerInputs) sqlConfig(ctx context.Context, name string) (*pgxpool.Config, error) {
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PG") {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	c, err := pgxpool.ParseConfig("host=localhost port=1 user=unused password=unused dbname=unused sslmode=disable")
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	p := s.postgresEndpoint
+	roots, _, err := mtls.OwnerTrustRoots(p.Roots, time.Now())
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	credential, err := s.sqlCredential(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	c.ConnConfig.Host, c.ConnConfig.Port, c.ConnConfig.Database = p.Host, uint16(p.Port), p.Database
+	c.ConnConfig.User, c.ConnConfig.Password = credential.Username, credential.Password
+	c.ConnConfig.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS13, ServerName: p.Host, RootCAs: roots}
+	c.ConnConfig.Fallbacks = nil
+	c.ConnConfig.RuntimeParams = map[string]string{"application_name": "asservat-owner"}
+	c.ConnConfig.ConnectTimeout = 5 * time.Second
+	c.ConnConfig.Tracer = nil
+	c.ConnConfig.ValidateConnect, c.ConnConfig.AfterConnect = nil, nil
+	c.MaxConns, c.MinConns = p.MaxConnections, 0
+	c.MaxConnLifetime, c.MaxConnLifetimeJitter, c.MaxConnIdleTime = 5*time.Minute, 30*time.Second, 30*time.Second
+	c.BeforeConnect = func(ctx context.Context, c *pgx.ConnConfig) error {
+		next, err := s.sqlCredential(ctx, name)
+		if err != nil || next.Username != credential.Username {
+			return mounts.ErrUnavailable
+		}
+		c.Password = next.Password
+		return nil
+	}
+	return c, nil
+}
+
+type mountedStorage struct{ inputs *providerInputs }
+
+func (s mountedStorage) Retrieve(ctx context.Context) (aws.Credentials, error) {
+	var zero aws.Credentials
+	b, err := mounts.Read(ctx, s.inputs.files, "audit-storage.json", 32<<10)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	defer clear(b)
+	c, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b))
+	if err != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 4096) || (c.SessionToken != "" && !identity.Text(c.SessionToken, 16384)) {
+		return zero, mounts.ErrUnavailable
+	}
+	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "protected-owner-projection"}, nil
+}
+
+func (s *providerInputs) closeHTTP() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, t := range s.transports {
+		if c, ok := t.(interface{ CloseIdleConnections() }); ok {
+			c.CloseIdleConnections()
+		}
+	}
+}

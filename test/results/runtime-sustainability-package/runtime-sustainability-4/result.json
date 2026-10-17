@@ -1,0 +1,153 @@
+{
+  "started": 1791902511.4345012,
+  "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-4",
+  "manifest": "1ad63d3d45aa00f3410eeaba9637ab97ada8f11c43995a4202bfdba585cffc64",
+  "dependencies": "1535516585f63bc91fff33880dd6feb8fa6fa37723711370ccb5f7e3559e2d42",
+  "runner": "eef6def07511d6c68f25a902c269a42b4d3baba04ca882b20eb54a8ffc780bbb",
+  "auxiliary": "1f3c8070d0148367809eb81edfb6706b92d308388ad8c15a21e7f10dbfdc9ce2",
+  "native": false,
+  "runtime_enablement": false,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": [],
+    "linked_directories": []
+  },
+  "phases": [
+    {
+      "name": "kubernetes-binding-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-4/overlay.json",
+        "-count=1",
+        "-timeout=8m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^(TestConfigurationWorkerObserverHasOneExplicitFixedCapacity|TestConfigurationWorkerTokensObserveActualBearerAndOriginalClients|TestConfigurationProviderRuntimeCopyAndForeignReaderDoNotConsumeOriginal|TestConfigurationProviderRuntimeInitialProbeStillRequiresOriginalAccount)$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 15.505581617355347,
+      "log_sha256": "9ada2ca823ad9777f8d3508518423e29731d23f241218d14cdf476337635b757",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 4,
+      "named_pass": 4
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-4/overlay.json",
+        "./internal/application/fleet",
+        "./internal/application/capacity",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/kms",
+        "./internal/bootstrap",
+        "./cmd/asservat",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 4.501810312271118,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 1.0009238719940186,
+      "log_sha256": "2f7fb472fa5ad912f6c1ffd47ac9a7cf1c39d0d079498891786136ecd8194a28",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 9.002565383911133,
+      "log_sha256": "e776b9fbe539a0132ad80c3d6703f74e6f733f031d154e5b66190863c5f3df50",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "boot_id": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-runtime-sustainability-4-rrrtim4m",
+  "tmp_free_before": 16748384256,
+  "mirror_changed": [],
+  "exit": 0,
+  "ended": 1791902542.891436,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": [],
+    "linked_directories": []
+  },
+  "scratch_removed": true
+}

@@ -1,0 +1,42 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/mtls",
+    "./internal/adapters/postgres",
+    "./internal/bootstrap",
+    "./test/integration"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 4.209,
+  "expectedFailure": false,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

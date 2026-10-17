@@ -1,0 +1,94 @@
+=== RUN   TestReviewedPressStyleHash
+--- PASS: TestReviewedPressStyleHash (0.00s)
+=== RUN   TestPinnedReactAriaPressStyle
+--- PASS: TestPinnedReactAriaPressStyle (0.00s)
+=== RUN   TestStaticSnapshotAndCacheBoundaries
+--- PASS: TestStaticSnapshotAndCacheBoundaries (0.00s)
+=== RUN   TestNoFallbackOrRequestAuthority
+=== RUN   TestNoFallbackOrRequestAuthority//api/v1/session
+=== RUN   TestNoFallbackOrRequestAuthority//auth/start
+=== RUN   TestNoFallbackOrRequestAuthority//content/secret
+=== RUN   TestNoFallbackOrRequestAuthority//captures/one
+=== RUN   TestNoFallbackOrRequestAuthority//index.html
+=== RUN   TestNoFallbackOrRequestAuthority//assets
+=== RUN   TestNoFallbackOrRequestAuthority//assets/
+=== RUN   TestNoFallbackOrRequestAuthority//assets/missing-01234567.js
+=== RUN   TestNoFallbackOrRequestAuthority//assets/../index.html
+=== RUN   TestNoFallbackOrRequestAuthority//assets//index-01234567.js
+=== RUN   TestNoFallbackOrRequestAuthority//%61ssets/index-01234567.js
+=== RUN   TestNoFallbackOrRequestAuthority//assets/index-01234567.js?x=1
+=== RUN   TestNoFallbackOrRequestAuthority//?
+=== RUN   TestNoFallbackOrRequestAuthority//?secret=anything
+=== RUN   TestNoFallbackOrRequestAuthority//assets/index-01234567.js.map
+=== RUN   TestNoFallbackOrRequestAuthority//\assets/index-01234567.js
+=== RUN   TestNoFallbackOrRequestAuthority/forwarded_host
+=== RUN   TestNoFallbackOrRequestAuthority/absolute_URL
+=== RUN   TestNoFallbackOrRequestAuthority/empty_authorization
+=== RUN   TestNoFallbackOrRequestAuthority/wrong_origin
+=== RUN   TestNoFallbackOrRequestAuthority/duplicate_origin
+=== RUN   TestNoFallbackOrRequestAuthority/cross-site_subresource
+=== RUN   TestNoFallbackOrRequestAuthority/unknown_fetch_site
+=== RUN   TestNoFallbackOrRequestAuthority/authorization
+=== RUN   TestNoFallbackOrRequestAuthority/same-site_subresource
+=== RUN   TestNoFallbackOrRequestAuthority/duplicate_fetch_site
+=== RUN   TestNoFallbackOrRequestAuthority/escaped_request_URI
+=== RUN   TestNoFallbackOrRequestAuthority/oversized_request_URI
+=== RUN   TestNoFallbackOrRequestAuthority/plaintext_forwarded_TLS
+--- PASS: TestNoFallbackOrRequestAuthority (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//api/v1/session (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//auth/start (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//content/secret (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//captures/one (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//index.html (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets/ (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets/missing-01234567.js (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets/../index.html (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets//index-01234567.js (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//%61ssets/index-01234567.js (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets/index-01234567.js?x=1 (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//? (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//?secret=anything (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//assets/index-01234567.js.map (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority//\assets/index-01234567.js (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/forwarded_host (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/absolute_URL (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/empty_authorization (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/wrong_origin (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/duplicate_origin (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/cross-site_subresource (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/unknown_fetch_site (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/authorization (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/same-site_subresource (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/duplicate_fetch_site (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/escaped_request_URI (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/oversized_request_URI (0.00s)
+    --- PASS: TestNoFallbackOrRequestAuthority/plaintext_forwarded_TLS (0.00s)
+=== RUN   TestRejectInvalidPackageAndOrigin
+=== RUN   TestRejectInvalidPackageAndOrigin/missing_referenced_file
+=== RUN   TestRejectInvalidPackageAndOrigin/symlink
+=== RUN   TestRejectInvalidPackageAndOrigin/unhashed_file
+=== RUN   TestRejectInvalidPackageAndOrigin/nested_directory
+=== RUN   TestRejectInvalidPackageAndOrigin/too_many_assets
+=== RUN   TestRejectInvalidPackageAndOrigin/missing_index
+=== RUN   TestRejectInvalidPackageAndOrigin/source_map
+=== RUN   TestRejectInvalidPackageAndOrigin/secret_file
+=== RUN   TestRejectInvalidPackageAndOrigin/empty
+=== RUN   TestRejectInvalidPackageAndOrigin/oversized_html
+=== RUN   TestRejectInvalidPackageAndOrigin/oversized_asset
+--- PASS: TestRejectInvalidPackageAndOrigin (0.03s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/missing_referenced_file (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/symlink (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/unhashed_file (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/nested_directory (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/too_many_assets (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/missing_index (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/source_map (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/secret_file (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/empty (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/oversized_html (0.00s)
+    --- PASS: TestRejectInvalidPackageAndOrigin/oversized_asset (0.02s)
+=== RUN   TestBuiltConsolePackage
+--- PASS: TestBuiltConsolePackage (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/console	1.043s

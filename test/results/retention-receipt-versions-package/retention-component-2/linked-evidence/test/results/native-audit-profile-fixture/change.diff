@@ -1,0 +1,38 @@
+--- before
++++ after
+@@ -4,6 +4,7 @@
+ 	"bytes"
+ 	"context"
+ 	"crypto/sha256"
++	"encoding/json"
+ 	"errors"
+ 	"io"
+ 	"net/http"
+@@ -676,6 +677,27 @@
+ 			t.Fatal(e)
+ 		}
+ 		policy := audit.OperationLifecyclePolicy{RootID: f.allocation.RootID, Lane: lane, InstallationID: f.worker.Binding.InstallationID, StoreID: f.published.Expectation.Registration.StoreID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: backing.ExpectedRevision + 1, MetadataSlots: backing.Accounts * backing.RecordsPerAccount, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
++		if lane == "normal" {
++			// This fixture's earlier processing initialization owns the same
++			// audit lane. Preserve its storage/backup/history identity while
++			// enlarging the explicitly synthetic backing through the real API.
++			// An administrator-only fixture read is not a runtime producer.
++			var count int64
++			var retained []byte
++			var original audit.OperationLifecyclePolicy
++			if e = f.admin.QueryRow(ctx, `SELECT count(*), min(policy)::jsonb FROM (
++ SELECT (intent->'Lifecycle'->'Policy')::text AS policy
++ FROM operation_audit WHERE root_id=$1 AND lane='normal'
++ AND intent->>'Name'='initialize_processing'
++ AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL LIMIT 2
++) original`, backing.RootID).Scan(&count, &retained); e != nil || count != 1 || json.Unmarshal(retained, &original) != nil || !original.CertificateVerificationBacked() || original.RootID != backing.RootID || original.Lane != lane || original.InstallationID != f.worker.Binding.InstallationID || original.BackingRevision != backing.ExpectedRevision {
++				t.Fatal("original acknowledged processing audit policy unavailable")
++			}
++			policy = original
++			policy.BackingRevision = backing.ExpectedRevision + 1
++			policy.MetadataSlots = backing.Accounts * backing.RecordsPerAccount
++			policy.ValidUntil = backing.ValidUntil
++		}
+ 		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
+ 		policy.BackupReservedBytes = bb * policy.MetadataSlots
+ 		policy.WALReservedBytes = ww * policy.MetadataSlots

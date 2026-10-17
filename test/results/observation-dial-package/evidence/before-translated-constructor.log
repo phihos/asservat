@@ -1,0 +1,14 @@
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/finite
+    owner_observation_dial_test.go:179: BEFORE-PROTECTED-DIAL-PORT: fixed external endpoint rejected invalid signed control work
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v1
+    owner_observation_dial_test.go:179: BEFORE-PROTECTED-DIAL-PORT: fixed external endpoint rejected invalid signed control work
+=== RUN   TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v2
+    owner_observation_dial_test.go:179: BEFORE-PROTECTED-DIAL-PORT: fixed external endpoint rejected invalid signed control work
+--- FAIL: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority (0.09s)
+    --- FAIL: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/finite (0.04s)
+    --- FAIL: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v1 (0.03s)
+    --- FAIL: TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority/v2 (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.127s
+FAIL

@@ -1,0 +1,36 @@
+{
+  "phase": "after",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/overlay-after.json",
+    "-race",
+    "./internal/bootstrap",
+    "-run",
+    "^TestWorkerNative",
+    "-count=1",
+    "-timeout=60s",
+    "-v"
+  ],
+  "exit": 0,
+  "seconds": 4.491,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "payloadSHA256": "8a6000f3d3c38876dbf1251a154f1a7d0547257bcd9649456a87d381ae33ef88",
+  "dependencySHA256": "cb52820069dc1e02eb52eba67d17dffcebdd64aca075b200e4f89250b6c2bd03",
+  "dependenciesCount": 1465,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/tmp"
+  }
+}

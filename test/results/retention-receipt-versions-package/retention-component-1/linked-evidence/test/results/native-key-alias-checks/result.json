@@ -1,0 +1,40 @@
+{
+  "phases": [
+    {
+      "command": [
+        "make",
+        "sql-check",
+        "ASSERVAT_BUILD_TMP=/tmp/asservat-key-alias-fbd4ahm2"
+      ],
+      "exit": 0,
+      "seconds": 0.295
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(InitialSchema|SessionCapacityReads)",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "seconds": 8.573
+    },
+    {
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 9.811
+    }
+  ],
+  "exit": 0,
+  "scratchRemoved": true
+}

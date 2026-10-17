@@ -1,0 +1,38 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-regional-proof-20261013/checkpoint-v2/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^Test(ConnectorObservationOperation|ConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority|ConnectorProcessProofBeforeReadinessAndCurrentProtection)",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "expectedExit": 0,
+  "expectedFailureOccurrences": null,
+  "seconds": 42.728,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  }
+}

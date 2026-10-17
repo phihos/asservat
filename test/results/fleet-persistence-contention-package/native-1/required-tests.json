@@ -1,0 +1,12 @@
+[
+  "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-expired-source",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-constructor-bridge-contention",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-changed",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-expired",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-unknown-commit",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-change",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-renewed",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-recovery",
+  "TestInitialInstallationWithRealServices/owner-identity-roles-observation-contention-final-expired"
+]

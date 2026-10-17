@@ -1,0 +1,10 @@
+{
+  "scope": "parenthesize CASE in PL/pgSQL IF expression; no semantic or role changes",
+  "files": [
+    {
+      "path": "migrations/00054_protected_capacity.sql",
+      "base_sha256": "5712c10fc2f4604776bbecb5e4b27de708e347d72091ad88f43d64aa7a799ea8",
+      "payload_sha256": "c7d0d5b14128903bf137907388aa8f0c9181be245aac22b6900496a33a567fb5"
+    }
+  ]
+}

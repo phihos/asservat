@@ -1,0 +1,5 @@
+--- FAIL: TestInitialSchemaShorterObservationCancelsAlreadyPassedSQLContext (0.00s)
+    initial_schema_test.go:145: shorter root deadline discarded
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.005s
+FAIL

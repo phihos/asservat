@@ -1,0 +1,33 @@
+{
+  "phase": "sqlc-version",
+  "command": [
+    "/home/phil/.cache/asservat-build/bin/sqlc",
+    "version"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 0.19,
+  "expectedFailure": false,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

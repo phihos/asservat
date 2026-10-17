@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_operation_channel.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/adapters/mtls/connector_operation_channel.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_operation_coordinator_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/adapters/mtls/connector_operation_coordinator_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_operation_hub.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/adapters/mtls/connector_operation_hub.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/owner_operation.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/adapters/mtls/owner_operation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/owner_operation_wire.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/adapters/mtls/owner_operation_wire.go",
+    "/home/phil/Projekte/asservat/internal/contracts/owner_observation_operation.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/contracts/owner_observation_operation.go",
+    "/home/phil/Projekte/asservat/internal/contracts/owner_observation_operation_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-coordinator-20261013/checkpoint-v2/files/internal/contracts/owner_observation_operation_test.go"
+  }
+}

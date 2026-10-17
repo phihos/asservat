@@ -1,0 +1,7 @@
+=== RUN   TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:255: Operation cannot be fulfilled on deployments.apps "connector": the object has been modified; please apply your changes to the latest version and try again
+    context_start_connector_test.go:65: bounded actual API classes: counts=map[GET deployments:1 GET other:2 GET validatingadmissionpolicies:2 GET validatingadmissionpolicybindings:2 POST other:1 POST selfsubjectreviews:1 PUT deployments/dry-run:1] total_roundtrip=map[GET deployments:1.014553ms GET other:5.748438ms GET validatingadmissionpolicies:2.285046ms GET validatingadmissionpolicybindings:1.703956ms POST other:919.532µs POST selfsubjectreviews:6.013198ms PUT deployments/dry-run:2.165256ms]
+--- FAIL: TestConnectorAPIProcessWithRealKubernetes (0.99s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.040s
+FAIL

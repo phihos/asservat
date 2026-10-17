@@ -1,0 +1,35 @@
+# Download worker enrollment
+
+[ADR-071](../decisions/071-download-worker-enrollment.md) refines REQ-DLD-003, REQ-DEP-003 and REQ-CAP-003. C-14 owns enrollment/renewal as part of the existing ArtifactDownload worker; C-08 owns its encrypted audit, C-21 the Kubernetes/SQL/X.509/provider adapters, and C-24 the pure values. This is private control behavior, not a new developer permission, entity, approval or public HTTP API.
+
+## Bootstrap proof and key ownership
+
+`WorkerEnrollmentBindings` returns the exact currently registered admitted worker and its original configuration observation interval, without requiring a certificate. `WorkerEnrollmentAttester` checks its installation/namespace/cluster pins, current immutable worker sources and two rounds of actual dedicated-audience token review and live object checks. It binds a separately verified CSR public-key digest. The resulting `WorkerEnrollmentProof` contains minimized identity/hash/timing facts, never a bearer token or CSR body. Its lifetime remains at most five seconds, including the preceding configuration lookup.
+
+An identity-free CSR must pass the existing bounded DER parser, permitted key algorithms, signature verification and canonical public-key digest. CSR subjects, SANs, extensions and attributes are forbidden; the server assigns the admitted worker's acquisition identity. The process private key stays in the worker. Enrollment ingress must use authenticated server TLS with pinned installation trust and confidential token delivery. The application coordinator does not itself supply that transport or its aggregate admission limits.
+
+## Persistent sequence
+
+1. Obtain current human/client download authority and a fresh worker/token/CSR proof. Lock the existing recovery, permission, session, configuration and worker state. Claim one public key and original claimed time for that worker.
+2. Write/read-verify encrypted create-only enrollment audit and acknowledge it separately. Exact retries reuse the acknowledged receipt.
+3. With fresh current authority/proof, select the original-time-derived certificate period. Persist a unique signing attempt before any remote signing. Only the successful inserting transaction receives `MaySign`; peers and retries only observe it. Unknown outcomes remain spent.
+4. The fixed OpenBao role signs the identity-free CSR with server-selected URI and absolute expiry. Independently verify the actual chain, CSR public key, strict leaf usages/identity and original permit deadline. Persist only that public certificate and bounded chain against its exact attempt.
+5. Write/read-verify encrypted certificate audit through the separate audit role. Refresh current authority and token proof, then activate the exact certificate. Only then return it to the worker.
+
+Audits may complete after a signing interval as historical records. They cannot renew a proof, activate a stale worker or extend a certificate. Certificate retrieval reuses recorded DER/chain; an audit outage after signing must not cause another signing request. Signing and activation are disjoint SQL roles; audit acknowledgement has no activation/parent-counter rights.
+
+## Renewal, revocation and limits
+
+Periods are 20 minutes from original `DownloadWorkerIntent.CreatedAt`, capped at `RunUntil`, with a one-minute preparation overlap. There are at most 24 periods, two spent attempts each, one process key and one accepted signing result per period. The period is selected from database time, never an HTTP parameter. A retry cannot lengthen `CertificateNotAfter`. The sign interval is the intersection of original current proof, current download authority, certificate deadline and five seconds. Recheck all applicable cutoffs after blocking SQL work and before commit.
+
+`ReadDownloadWorkerIdentity` additionally requires an exact activated certificate digest/peer from migration 27. A merely valid CA-signed certificate is insufficient. Different workers, alternate keys, unaudited results and expired/retired/profile-revoked workers deny. Later key grants keep their original at-most-five-second worker proofs, so revocation remains bounded rather than an instantaneous cross-process promise. Short overlap permits in-flight work during renewal without extending either certificate's original deadline.
+
+The signing budget is part of each already admitted finite worker. Installation/workload worker ceilings and provider-wide admission still apply; this component does not qualify aggregate KMS/PKI throughput. Public certificate and audit history inherit the worker/session's finite cleanup and recovery obligations. Lost process keys require retiring the worker and fresh admission; do not overwrite enrollment with a replacement key.
+
+## Implementation and qualification status
+
+The component implementation passes the scoped real-service suites recorded in [implementation progress](../implementation-progress.md). ADR-072 supplies the process-key and private transport components below. Active requester/connector routing, protected issuer bootstrap/rotation, the local static-key CA path, acquisition executable, continuous supervision and Helm installation remain unfinished. Synthetic proofs, CA roots and user credentials in fixtures cannot replace those requirements. The SQL suite uses synthetic token proofs and a test CA; the actual Kubernetes/OpenBao/TLS suite uses synthetic signing permits and registry bindings. These independently measured boundaries are not a fully composed public download.
+
+[ADR-072 process credentials and private transport](worker-credential-channel.md) now implement the bounded CSR/token channel, live control operation and worker key/renewal client. Production requester routing, protected issuer/endpoint bootstrap and executable/supervisor remain unfinished.
+
+Current acquisition identity, signing preparation, certificate activation and native certificate reads require the exact retained worker-intent, configuration, enrollment and certificate receipts to carry immutable nonempty, non-`null` audit versions. An acknowledgement flag or nonempty JSON body is insufficient; the original purpose, target key, digest and receipt shape remain binding. The shared owner locator reads the original worker receipt in its existing SQL query. The certificate path separately reads the acknowledged enrollment under the same original deadline. These checks neither recreate audit nor renew an old observation. Structural worker decoding remains available for termination and independent physical retirement.

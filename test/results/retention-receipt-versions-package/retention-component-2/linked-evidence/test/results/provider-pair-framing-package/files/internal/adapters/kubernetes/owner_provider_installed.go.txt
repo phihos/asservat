@@ -1,0 +1,44 @@
+package kubernetes
+
+import (
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/utils/ptr"
+)
+
+// BuildProviderOwnerWorkload derives only the fresh v2 original template.
+// The immutable identity projection contains the four SQL roles; renewable
+// provider authentication and rotating audit storage have separate fixed
+// projections. All existing v1 template/receipt bytes remain untouched.
+func BuildProviderOwnerWorkload(p OwnerWorkloadPlan, clusterID string, selection contracts.OwnerProviderSelection) (*OwnerWorkload, error) {
+	if !authorization.UUID(clusterID) || providerconfig.ValidateOwnerProviderSelection(p.InstallationID, selection) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	w, err := BuildInstalledOwnerWorkload(p)
+	if err != nil {
+		return nil, err
+	}
+	pod := &w.Deployment.Spec.Template.Spec
+	projection := pod.Volumes[0].Projected
+	keys := []string{contracts.OwnerIdentityRoleManifestFile, "sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json"}
+	items := make([]core.KeyToPath, 0, len(keys))
+	for _, key := range keys {
+		items = append(items, core.KeyToPath{Key: key, Path: key})
+	}
+	projection.Sources[1].Secret.Items = items
+	projection.Sources = append(projection.Sources,
+		core.VolumeProjection{Secret: &core.SecretProjection{
+			LocalObjectReference: core.LocalObjectReference{Name: selection.AuditCredentials.Name},
+			Items:                []core.KeyToPath{{Key: contracts.OwnerProviderAuditCredentialFile, Path: contracts.OwnerProviderAuditCredentialFile}},
+		}},
+		core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{
+			Path: contracts.OwnerProviderTokenFile, Audience: contracts.OwnerProviderAudience(p.InstallationID, clusterID), ExpirationSeconds: ptr.To(int64(600)),
+		}},
+	)
+	w.Role.Rules = append(w.Role.Rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{selection.AuditCredentials.Name}, Verbs: []string{"get"}})
+	return w, nil
+}

@@ -1,0 +1,27 @@
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/12 13:45:25 http: TLS handshake error from 127.0.0.1:33458: remote error: tls: unknown certificate
+2026/10/12 13:45:25 http: TLS handshake error from 127.0.0.1:33468: remote error: tls: unknown certificate
+2026/10/12 13:45:26 http: TLS handshake error from 127.0.0.1:33500: remote error: tls: unknown certificate
+    console_native_restart_test.go:169: built native-restart browser: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+        
+          assert(originalRequests >= failedState.native_ids.length)
+        
+            at file:///home/phil/.cache/asservat-build/planning/console-native-restart-20261012/work/web/tests/native-restart-journey.mjs:46:3 {
+          generatedMessage: true,
+          code: 'ERR_ASSERTION',
+          actual: false,
+          expected: true,
+          operator: '==',
+          diff: 'simple'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleNativeRestartWithBuiltPackage (1.89s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.948s
+FAIL

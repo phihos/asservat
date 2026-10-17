@@ -1,0 +1,14 @@
+{
+  "evidence/before-backing.json": "6191428c45c648c72b44b7341bace661f26c7c2dc4e4f54a75150518af9d822d",
+  "evidence/before-backing.log": "b3b873704c0bbe8be0060d872e5f8fe4b49999d435d277e4208004c9d74f74eb",
+  "evidence/compile.json": "b4fdd2e30a8f7340c313c81f7638a522c8dc6a64da6aadf0b379e56ab24fd46b",
+  "evidence/compile.log": "086fb6a4c6497ce8f14a5644f651a82e4e860be206178b2a3c55c2fe36005cef",
+  "evidence/go-architecture.json": "6fdf9588e0ead1e2c5420e9778282dbf7d67d02ea608f6778eeb66eebc36b06b",
+  "evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+  "evidence/race.json": "cb09a916c3ee19a07e5942497a9e6270f8274efbb1fa11e1cec205076cd1e57e",
+  "evidence/race.log": "96675b6b029a4d102a03bc35967064bd4f478d1e1b79190a29a44112c3709138",
+  "evidence/vet.json": "997b5be3c3d63b9860da5916be53288c74f1a8bd2645ed202c0b32c14bc50339",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "HANDOFF.md": "db3cc552047d94af11b38c5fd85591b7a540b253ac031b6066e82ece1c551ec9",
+  "RESULT.json": "a0bbecbcc8cbe31c24023aac5bc665268394765e01884ec9f400023124bcb8cf"
+}

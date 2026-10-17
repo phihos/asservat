@@ -1,0 +1,55 @@
+schemaVersion: share/v1
+id: 00000000-0000-4000-8000-000000000033
+kind: EvidenceShare
+spec:
+  caseID: 00000000-0000-4000-8000-000000000002
+  artifacts:
+  - artifactID: 00000000-0000-4000-8000-000000000003
+    digest: '3333333333333333333333333333333333333333333333333333333333333333'
+  recipients:
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: group-incident-reviewers-789
+  dataClasses:
+  - extract
+  operations:
+  - get_case
+  - list_artifacts
+  - get_backtrace
+  reason: Share the requested approved stack projection as it becomes ready.
+  notAfter: '2026-10-09T17:55:00Z'
+  includeFutureArtifacts: false
+  allowReshare: false
+  origin:
+    sharingIntentID: 00000000-0000-4000-8000-000000000030
+    captureUID: 00000000-0000-4000-8000-000000000031
+    selectionID: stack
+  createdBy:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  management:
+    mode: teams
+    teams:
+    - subject:
+        kind: Group
+        issuer: https://identity.example.invalid/realms/company
+        id: group-payments-123
+      assignmentIDs:
+      - owner-assignment-1
+    - subject:
+        kind: Group
+        issuer: https://identity.example.invalid/realms/company
+        id: group-payments-sre-456
+      assignmentIDs:
+      - owner-assignment-2
+status:
+  phase: Active
+  revision: 1
+  approvedBy:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  approvedAt: '2026-10-09T12:00:00Z'

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/console_native_restart_test.go",
+    "base_sha256": null,
+    "sha256": "d2b0272f6aec7a1d6ae5d5a25eb4addbb73ed51779b3cd464b6cd1f7e3fb79c1"
+  },
+  {
+    "path": "web/tests/native-restart-journey.mjs",
+    "base_sha256": null,
+    "sha256": "c11e0a25be7935e5f2730a492acd3a4045b7fc48896c1618a6aa05f3c653acf5"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "files": {
+    "docs/architecture/runtime-profiles.md": "5b89bdf27881c93c023fa1bf2a2e2d4e349af3a65941734a21fdb62be419f944",
+    "internal/adapters/diagnostics/go_profile.go": "3ff90e8361d59908b1eda60687895db60d432cc4f09e430e26be8e1957f3eac8",
+    "internal/adapters/diagnostics/go_profile_test.go": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "internal/application/execution/go_profile.go": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "internal/domain/execution/go_profile.go": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "internal/domain/execution/go_profile_test.go": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+  },
+  "originalManifestSHA256": "dcc9715117fc6a8d869dceaebf3ce8692345cccfdcff7e7bc41816ec217f4ea9",
+  "scope": "Original-caller duration fit failing regression"
+}

@@ -1,0 +1,55 @@
+--- a/docs/architecture/runtime-profiles.md
++++ b/docs/architecture/runtime-profiles.md
+@@ -43,8 +43,12 @@
+ The mechanism requires at least two seconds of explicitly admitted setup/finish
+ margin, permits at most ten, and does not synthesize defaults. Planning retains
+ the product's ten-second CPU, five-second trace and five-second snapshot defaults.
+-If remaining time no longer fits the requested recording plus margin, do not
+-contact the application. Recording duration, not HTTP/client timeout, sets the
++Before dialing, the fit check uses the original caller/action context deadline.
++After channel resolution it uses the earliest original caller, action and
++channel cutoff for both the socket and final pre-HTTP check. A longer admitted
++action cannot bypass a shorter caller lifetime. If the remaining effective
++interval cannot fit the requested recording plus margin, do not contact the
++application. Recording duration, not HTTP/client timeout, sets the
+ server-side upper request parameter. Cancellation or even complete HTTP EOF
+ does not independently prove the remote profiler stopped. Unknown starts remain
+ spent; the mechanism has no retry, stop-profiler request or capacity-refund path.
+--- a/internal/adapters/diagnostics/go_profile.go
++++ b/internal/adapters/diagnostics/go_profile.go
+@@ -93,7 +93,8 @@
+ 			err = value.ErrExpired
+ 		}
+ 	}()
+-	if !c.now().Add(r.Parameters.Duration + time.Second).Before(r.Deadline) {
++	effectiveDeadline, hasDeadline := ctx.Deadline()
++	if !hasDeadline || !c.now().Add(r.Parameters.Duration+time.Second).Before(effectiveDeadline) {
+ 		return out, value.ErrExpired
+ 	}
+ 	channel, dialErr := c.dialer.DialGoProfile(ctx, r)
+@@ -106,9 +107,14 @@
+ 	if !validProfileChannel(channel) || !c.now().Before(channel.ValidUntil) || channel.ValidUntil.After(r.Deadline) || ctx.Err() != nil || !watch.valid(c.now()) {
+ 		return out, value.ErrDenied
+ 	}
+-	channelDeadline = channel.ValidUntil
+ 	ctx, channelCancel = context.WithDeadline(ctx, channel.ValidUntil)
+-	if err = channel.Connection.SetDeadline(channel.ValidUntil); err != nil {
++	// Preserve the earliest original caller, action and channel cutoff. A
++	// longer channel lifetime cannot make an unfinishable recording admissible.
++	channelDeadline, hasDeadline = ctx.Deadline()
++	if !hasDeadline {
++		return out, value.ErrExpired
++	}
++	if err = channel.Connection.SetDeadline(channelDeadline); err != nil {
+ 		return out, value.ErrProfileUnavailable
+ 	}
+ 	// Interrupt a blocked Read/Write at current-observation loss too, not just
+@@ -148,7 +154,7 @@
+ 	}
+ 	// Dial/setup may have consumed the admitted margin. Do not contact the
+ 	// application unless its fixed requested duration still fits.
+-	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channel.ValidUntil) {
++	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channelDeadline) {
+ 		return out, value.ErrExpired
+ 	}
+ 	out.Outcome = value.GoProfileOutcome{Format: r.Parameters.Format(), StartedAt: c.now().UTC(), MayHaveStarted: true}

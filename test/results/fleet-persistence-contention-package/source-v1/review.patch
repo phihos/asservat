@@ -1,0 +1,989 @@
+--- a/docs/architecture/configuration-reconciliation.md
++++ b/docs/architecture/configuration-reconciliation.md
+@@ -90,3 +90,7 @@
+ refreshes, both source loops and pending hints belong in qualification. The
+ fresh command candidate stays unselected until its complete original-generated
+ Pod transition passes; active capacity/cleanup qualification remains separate.
++
++## Failed unchanged fleet persistence
++
++[ADR-155](../decisions/155-unchanged-fleet-persistence-contention.md) preserves the concrete wrapper's any-error invalidation of pending/active scheduling notices. A qualified unchanged-source persistence lock conflict remains an error and supplies no committed notice. Only the observer's additional SQL suspension may be omitted after exact current source/row/incarnation checks under the original bounds; the prior expiry and current recovery checks remain. The next cadence reads independently. The new distinction is source-staged and not yet runtime-qualified.
+--- a/docs/architecture/fleet-observation.md
++++ b/docs/architecture/fleet-observation.md
+@@ -13,3 +13,5 @@
+ [ADR-091](configuration-reconciliation.md) supplies protected fleet reading and scheduled hub-worker composition; ADR-094/095 qualify its native Pod and ordinary deletion. Installer provisioning and independent recovery promotion remain pending.
+ 
+ Fleet observation and failure timestamps are normalized to PostgreSQL microseconds. An equal stored observation time cannot extend the deadline, advance revision or undo suspension; a replay after an equal-time fence must remain unavailable.
++
++[ADR-155](../decisions/155-unchanged-fleet-persistence-contention.md) defines one narrow persistence-failure distinction. An actual aborted LockFleetTrust55P03 on an independently observed unchanged positive source may retain the previous row without adding suspension only after exact before/after row, database-incarnation and database-time checks. The error stays unavailable, scheduling notices are invalidated, and the previous original expiry never moves. This is a classification of failed persistence, not a current-source proof or success. Source failures, changes, suspension/recovery, expiry and uncertain outcomes retain fencing. Implementation and qualification of this branch are staged; the earlier native diagnostic proves only the motivating lock/fence chain.
+--- a/docs/decisions/155-unchanged-fleet-persistence-contention.md
++++ b/docs/decisions/155-unchanged-fleet-persistence-contention.md
+@@ -0,0 +1,27 @@
++# ADR-155 — Unchanged fleet observation persistence contention
++
++Status: selected for staged implementation. Requirements: REQ-FED-001 and REQ-DB-005. The exact SQL lock/failure chain is reproduced; the new classification is not yet qualified or integrated.
++
++## Problem
++
++A protected installer operation holds the fleet recovery row FOR SHARE through bounded native work. The independent source observer's unchanged freshness UPDATE needs FOR UPDATE and can encounter the original one-second lock timeout. The generic failure path then suspends a previously current unchanged source. Actual PostgreSQL qualification reproduced that sequence and subsequent owner constructor refusal; it did not identify the original full-bootstrap refusal's exact predicate.
++
++The shared recovery/suspension lock remains necessary. It must not become FOR KEY SHARE or disappear merely to improve availability. Source observation cannot approve recovery or alter the original authority deadline.
++
++## Decision
++
++Recognize only the actual SQL adapter's failed persistence of an independently read unchanged positive source. Before the lock, read the existing complete fleet row and check database time after that read. Exact installation/issuer/source UID/generation/digest, positive suspension/recovery state, original dates and the independent source's complete validity must agree. This nonlocking comparison grants no UPDATE or COMMIT authority. Preserve the original locked predicate and all normal effect checks.
++
++Only the last callback's actual LockFleetTrust error with SQLSTATE55P03 can mark this classification. That callback immediately returns before any source UPDATE or COMMIT attempt. Reset local callback state on the existing bounded serialization/deadlock retry. Pool, connection, other-statement, cancellation and unknown COMMIT errors cannot select this outcome. The generic Ledger error mapping and rollback cleanup remain unchanged.
++
++After rollback/release, read the complete actual row and database time again through the same pool. Require the entire public row, including original timestamps, to remain equal and positive/current. Pin actual postmaster start, database OID and primary state before transaction admission and recheck after blocking confirmation; an independently accepted replacement incarnation cannot reuse the old classification. Include all added reads in the original five-second SQL operation budget. Use the earliest original operation/caller/source/stored deadline, with no fresh timeout. This path writes nothing and returns an unavailable error, never success, a permit, accepted freshness or a scheduling hint.
++
++TrustObserver suppresses its extra suspension only for this typed persistence failure after a positive source read. All source-read errors, changed/new/missing/suspended/recovery state, expiry, failed confirmation and unknown outcomes retain current fencing. The same error returned by a source reader is insufficient. The bootstrap wrapper still invalidates pending and active notices for every failed SQL outcome and never emits a committed notice on this path.
++
++The previous stored observation remains usable only until its original expiry and current recovery checks. The next ordinary cadence obtains an independent source observation. It does not renew or retry the failed proof, and no selected effect changes its deadline. No migration, grant, pool, limiter, cadence, statement/lock timeout or role changes are required.
++
++## Qualification
++
++Source-only tests cover exact row/source/incarnation comparisons, unavailable error classification, source-versus-persistence ordering and pending/active notice cancellation. The staged actual SQL cases exercise unchanged bridge contention with byte-identical retained row/deadline, expiry without a refreshed observation, and unchanged fencing attempts for changed or expired sources. A test-only TLS bridge drops one successful COMMIT acknowledgement; the actual committed row must be observed before ordinary fencing. Separate cases delay delivery of the actual server lock-abort error until the original bridge releases and the actual row changes, enters recovery, or receives an independently newer observation. Final confirmation must reject all three, and the original failure CAS must preserve the newer observation. No passing result for this new behavior is claimed. The earlier diagnostic's two actual SQL cases and source hashes remain separate evidence.
++
++Installed owner execution and the original owner phase timing budget still require native qualification. This decision does not enable public services or the v2 observation backend.
+--- a/docs/decisions/README.md
++++ b/docs/decisions/README.md
+@@ -400,3 +400,5 @@
+ - **ADR-150 — Operation-owned native observation:** [Original bounded proof and direct holder routing](150-operation-owned-native-observation-proof.md), independent native boundaries, actual current SQL/TLS checks and one-use local claims. Component checks pass; complete native availability and installed selection remain pending.
+ 
+ - **ADR-153 — Operation-owned connector enrollment:** [Original native admission and signing boundaries](153-operation-owned-connector-enrollment.md), distinct complete initial/final enforcement observations and current intermediate source/token/controller reads inside one original operation. Legacy interfaces, SQL checks and unknown spend remain unchanged; component and native qualification are pending.
++
++- **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Source-staged; new behavior and installed startup remain unqualified.
+--- a/internal/adapters/postgres/fleet_observation.go
++++ b/internal/adapters/postgres/fleet_observation.go
+@@ -2,11 +2,13 @@
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"time"
+ 
+ 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+ 	port "asservat.local/asservat/internal/application/fleet"
+ 	value "asservat.local/asservat/internal/domain/fleet"
++	"github.com/jackc/pgx/v5"
+ 	"github.com/jackc/pgx/v5/pgxpool"
+ )
+ 
+@@ -26,7 +28,28 @@
+ 		return value.ErrInvalid
+ 	}
+ 	a.ObservedAt, a.FreshUntil = ownerTime(a.ObservedAt), ownerTime(a.FreshUntil)
+-	return s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
++	// Include the new nonlocking reads in the same original five-second SQL
++	// operation budget, rather than starting Ledger's window after those reads.
++	until := time.Now().Add(5 * time.Second)
++	if a.FreshUntil.Before(until) {
++		until = a.FreshUntil
++	}
++	original, cancel := context.WithDeadline(ctx, until)
++	defer cancel()
++	ctx = original
++	// This same-pool query precedes the transaction, so MaxConns1 is never
++	// acquired recursively. The incarnation is retained across every attempt.
++	incarnation, err := readFleetObservationIncarnation(ctx, s.claims.ledger.pool)
++	if err != nil || ctx.Err() != nil || !incarnation.primary || !a.Valid(incarnation.at) {
++		return value.ErrUnavailable
++	}
++	var comparison custodydb.FleetCurrentTrust
++	lockContention := false
++	err = s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
++		// Ledger may invoke this callback again only for its existing bounded
++		// serialization/deadlock retry. An earlier attempt cannot classify a later
++		// query or unknown COMMIT result.
++		comparison, lockContention = custodydb.FleetCurrentTrust{}, false
+ 		now, err := q.CurrentTime(ctx)
+ 		if err != nil {
+ 			return err
+@@ -34,6 +57,17 @@
+ 		if !a.Valid(now.Time) {
+ 			return value.ErrDenied
+ 		}
++		// This unlocked row is only a possible failure classification. It never
++		// replaces the original FOR UPDATE or authorizes UPDATE/COMMIT.
++		before, readErr := q.ReadFleetTrust(ctx, id(a.InstallationID))
++		if readErr != nil && !errors.Is(readErr, pgx.ErrNoRows) {
++			return readErr
++		}
++		now, err = q.CurrentTime(ctx)
++		if err != nil {
++			return err
++		}
++		candidate := readErr == nil && unchangedFleetObservation(a, before, now.Time)
+ 		// The restricted SQL role cannot insert suspension/recovery flags. Database
+ 		// defaults create a blocked root, including when the SQL row was absent.
+ 		if err = q.InsertBlockedFleetTrust(ctx, custodydb.InsertBlockedFleetTrustParams{InstallationID: id(a.InstallationID), IssuerEpoch: id(a.IssuerEpoch), SourceUid: a.Revision.UID, SourceGeneration: a.Revision.Generation, SourceDigest: a.Revision.Digest[:], ObservedAt: ts(a.ObservedAt), FreshUntil: ts(a.FreshUntil)}); err != nil {
+@@ -41,6 +75,10 @@
+ 		}
+ 		root, err := q.LockFleetTrust(ctx, id(a.InstallationID))
+ 		if err != nil {
++			if candidate && fleetObservationLockTimeout(err) {
++				comparison, lockContention = before, true
++			}
++			// The exact server abort returns before UPDATE or any COMMIT attempt.
+ 			return err
+ 		}
+ 		now, err = q.CurrentTime(ctx)
+@@ -74,6 +112,13 @@
+ 		}
+ 		return nil
+ 	})
++	// The generic transaction has now completed its rollback/release path.
++	// Only the last exact lock abort can enter confirmation; unknown COMMIT,
++	// connection failure and all other errors keep the original failure fence.
++	if err != nil && lockContention && s.confirmFleetObservationContention(ctx, a, comparison, incarnation) {
++		return value.ErrObservationPersistenceContended
++	}
++	return err
+ }
+ func (s *FleetObservation) FenceAdministration(ctx context.Context, started time.Time) error {
+ 	if started.Year() < 2020 || started.Year() > 9999 {
+--- a/internal/adapters/postgres/fleet_observation_contention.go
++++ b/internal/adapters/postgres/fleet_observation_contention.go
+@@ -0,0 +1,73 @@
++package postgres
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"github.com/jackc/pgx/v5/pgconn"
++	"github.com/jackc/pgx/v5/pgxpool"
++)
++
++// Public database incarnation facts only, not an activation/recovery proof.
++// The effective recovery view remains mandatory on both row observations.
++type fleetObservationIncarnation struct {
++	postmaster time.Time
++	database   uint32
++	primary    bool
++	at         time.Time
++}
++
++func readFleetObservationIncarnation(ctx context.Context, pool *pgxpool.Pool) (fleetObservationIncarnation, error) {
++	var out fleetObservationIncarnation
++	err := pool.QueryRow(ctx, `SELECT pg_postmaster_start_time(), (SELECT oid FROM pg_database WHERE datname=current_database()), NOT pg_is_in_recovery(), clock_timestamp()`).Scan(&out.postmaster, &out.database, &out.primary, &out.at)
++	return out, err
++}
++func sameFleetObservationIncarnation(a, b fleetObservationIncarnation) bool {
++	return a.primary && b.primary && a.database != 0 && a.database == b.database && !a.postmaster.IsZero() && a.postmaster.Equal(b.postmaster)
++}
++
++func fleetObservationLockTimeout(err error) bool {
++	var pe *pgconn.PgError
++	return errors.As(err, &pe) && pe.Code == "55P03"
++}
++
++// Both callers check database time after the actual potentially blocking row
++// read. This validates only a failed unchanged observation classification.
++func unchangedFleetObservation(a value.Administration, row custodydb.FleetCurrentTrust, now time.Time) bool {
++	if !a.Valid(now) || a.Suspended || row.Suspended || row.RecoveryBlocked || row.InstallationID != id(a.InstallationID) || row.IssuerEpoch != id(a.IssuerEpoch) || row.SourceUid != a.Revision.UID || row.SourceGeneration != a.Revision.Generation || !bytes.Equal(row.SourceDigest, a.Revision.Digest[:]) {
++		return false
++	}
++	if !row.ObservedAt.Valid || !row.FreshUntil.Valid || row.ObservedAt.InfinityModifier != 0 || row.FreshUntil.InfinityModifier != 0 || row.ObservedAt.Time.After(now) || !now.Before(row.FreshUntil.Time) || !row.ObservedAt.Time.Before(row.FreshUntil.Time) || row.FreshUntil.Time.Sub(row.ObservedAt.Time) > 30*time.Second {
++		return false
++	}
++	return !a.ObservedAt.Before(row.ObservedAt.Time) && (!a.ObservedAt.Equal(row.ObservedAt.Time) || !a.FreshUntil.After(row.FreshUntil.Time))
++}
++
++func sameFleetObservationRow(a, b custodydb.FleetCurrentTrust) bool {
++	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.SourceUid == b.SourceUid && a.SourceGeneration == b.SourceGeneration && bytes.Equal(a.SourceDigest, b.SourceDigest) && a.Suspended == b.Suspended && a.RecoveryBlocked == b.RecoveryBlocked && a.ObservedAt.Valid == b.ObservedAt.Valid && a.ObservedAt.InfinityModifier == b.ObservedAt.InfinityModifier && a.ObservedAt.Time.Equal(b.ObservedAt.Time) && a.FreshUntil.Valid == b.FreshUntil.Valid && a.FreshUntil.InfinityModifier == b.FreshUntil.InfinityModifier && a.FreshUntil.Time.Equal(b.FreshUntil.Time)
++}
++
++func (s *FleetObservation) confirmFleetObservationContention(ctx context.Context, a value.Administration, before custodydb.FleetCurrentTrust, original fleetObservationIncarnation) bool {
++	if ctx.Err() != nil {
++		return false
++	}
++	until := a.FreshUntil
++	if before.FreshUntil.Time.Before(until) {
++		until = before.FreshUntil.Time
++	}
++	// WithDeadline also preserves an earlier original caller cutoff. This
++	// confirmation cannot manufacture a fresh five-second observation interval.
++	call, cancel := context.WithDeadline(ctx, until)
++	defer cancel()
++	q := custodydb.New(s.claims.ledger.pool)
++	after, err := q.ReadFleetTrust(call, id(a.InstallationID))
++	if err != nil || call.Err() != nil || !sameFleetObservationRow(before, after) {
++		return false
++	}
++	current, err := readFleetObservationIncarnation(call, s.claims.ledger.pool)
++	return err == nil && call.Err() == nil && sameFleetObservationIncarnation(original, current) && unchangedFleetObservation(a, after, current.at)
++}
+--- a/internal/adapters/postgres/fleet_observation_contention_test.go
++++ b/internal/adapters/postgres/fleet_observation_contention_test.go
+@@ -0,0 +1,137 @@
++package postgres
++
++import (
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"errors"
++	"github.com/jackc/pgx/v5/pgconn"
++	"testing"
++	"time"
++)
++
++func fleetContentionValues() (value.Administration, custodydb.FleetCurrentTrust, time.Time) {
++	n := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
++	const uid = "11111111-1111-4111-8111-111111111111"
++	a := value.Administration{InstallationID: uid, IssuerEpoch: uid, Issuer: "https://issuer.example", Revision: identity.Revision{UID: uid, Generation: 1, Digest: [32]byte{1}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
++	r := custodydb.FleetCurrentTrust{InstallationID: id(uid), IssuerEpoch: id(uid), SourceUid: uid, SourceGeneration: 1, SourceDigest: append([]byte(nil), a.Revision.Digest[:]...), ObservedAt: ts(n.Add(-time.Second)), FreshUntil: ts(n.Add(4 * time.Second))}
++	return a, r, n
++}
++func TestFleetObservationContentionRequiresCurrentExactPositiveSource(t *testing.T) {
++	for _, mode := range []string{"same", "missing", "new-uid", "generation", "digest", "long-digest", "epoch", "installation", "source-suspended", "stored-suspended", "recovery", "stored-expired", "source-expired", "future", "older", "equal-time-extension", "missing-date", "infinite-date", "long-interval"} {
++		t.Run(mode, func(t *testing.T) {
++			a, r, n := fleetContentionValues()
++			switch mode {
++			case "missing":
++				r = custodydb.FleetCurrentTrust{}
++			case "new-uid":
++				r.SourceUid = "22222222-2222-4222-8222-222222222222"
++			case "generation":
++				r.SourceGeneration++
++			case "digest":
++				r.SourceDigest[0]++
++			case "long-digest":
++				r.SourceDigest = append(r.SourceDigest, 0)
++			case "epoch":
++				r.IssuerEpoch = id("22222222-2222-4222-8222-222222222222")
++			case "installation":
++				r.InstallationID = id("22222222-2222-4222-8222-222222222222")
++			case "source-suspended":
++				a.Suspended = true
++			case "stored-suspended":
++				r.Suspended = true
++			case "recovery":
++				r.RecoveryBlocked = true
++			case "stored-expired":
++				r.FreshUntil = ts(n)
++			case "source-expired":
++				n = a.FreshUntil
++			case "future":
++				n = a.ObservedAt.Add(-time.Nanosecond)
++			case "older":
++				a.ObservedAt = r.ObservedAt.Time.Add(-time.Second)
++				a.FreshUntil = n.Add(3 * time.Second)
++			case "equal-time-extension":
++				r.FreshUntil = ts(n.Add(3 * time.Second))
++				a.ObservedAt = r.ObservedAt.Time
++				a.FreshUntil = r.FreshUntil.Time.Add(time.Microsecond)
++			case "missing-date":
++				r.FreshUntil.Valid = false
++			case "infinite-date":
++				r.FreshUntil.InfinityModifier = 1
++			case "long-interval":
++				r.FreshUntil = ts(r.ObservedAt.Time.Add(31 * time.Second))
++			}
++			if unchangedFleetObservation(a, r, n) != (mode == "same") {
++				t.Fatal("classification admitted changed/unavailable source")
++			}
++		})
++	}
++}
++func TestFleetObservationContentionFinalRowCannotRefreshOrReplace(t *testing.T) {
++	_, original, _ := fleetContentionValues()
++	for _, mode := range []string{"same-instant", "observation", "expiry", "suspension", "recovery", "source", "digest", "generation", "epoch", "installation"} {
++		t.Run(mode, func(t *testing.T) {
++			current := original
++			current.SourceDigest = append([]byte(nil), original.SourceDigest...)
++			switch mode {
++			case "same-instant":
++				current.FreshUntil.Time = current.FreshUntil.Time.In(time.FixedZone("fixture", 3600))
++			case "observation":
++				current.ObservedAt.Time = current.ObservedAt.Time.Add(time.Microsecond)
++			case "expiry":
++				current.FreshUntil.Time = current.FreshUntil.Time.Add(time.Microsecond)
++			case "suspension":
++				current.Suspended = true
++			case "recovery":
++				current.RecoveryBlocked = true
++			case "source":
++				current.SourceUid = "other"
++			case "digest":
++				current.SourceDigest[0]++
++			case "generation":
++				current.SourceGeneration++
++			case "epoch":
++				current.IssuerEpoch = id("22222222-2222-4222-8222-222222222222")
++			case "installation":
++				current.InstallationID = id("22222222-2222-4222-8222-222222222222")
++			}
++			if sameFleetObservationRow(original, current) != (mode == "same-instant") {
++				t.Fatal("final row adopted changed facts")
++			}
++		})
++	}
++}
++func TestFleetObservationContentionOnlyExactServerLockAbort(t *testing.T) {
++	for _, code := range []string{"55P03", "57014", "40001", "40P01", "08006", "08007", "23505"} {
++		if fleetObservationLockTimeout(&pgconn.PgError{Code: code}) != (code == "55P03") {
++			t.Fatal("non-lock failure classified", code)
++		}
++	}
++	if fleetObservationLockTimeout(errors.New("55P03")) || fleetObservationLockTimeout(value.ErrUnavailable) || fleetObservationLockTimeout(nil) {
++		t.Fatal("message or generic error supplied server abort")
++	}
++}
++
++func TestFleetObservationContentionRejectsIndependentlyReactivatedIncarnation(t *testing.T) {
++	_, _, n := fleetContentionValues()
++	original := fleetObservationIncarnation{postmaster: n.Add(-time.Hour), database: 42, primary: true, at: n}
++	for _, mode := range []string{"same", "postmaster", "database", "standby", "zero"} {
++		current := original
++		switch mode {
++		case "postmaster":
++			current.postmaster = current.postmaster.Add(time.Second)
++		case "database":
++			current.database++
++		case "standby":
++			current.primary = false
++		case "zero":
++			current = fleetObservationIncarnation{}
++		}
++		// Even if independently accepted activation makes both public rows match
++		// with recovery=false, a changed actual incarnation cannot classify this call.
++		if sameFleetObservationIncarnation(original, current) != (mode == "same") {
++			t.Fatal("changed incarnation classified", mode)
++		}
++	}
++}
+--- a/internal/application/fleet/trust_observer.go
++++ b/internal/application/fleet/trust_observer.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"time"
+ 
+ 	value "asservat.local/asservat/internal/domain/fleet"
+@@ -34,10 +35,14 @@
+ 	if err == nil && !a.Valid(s.Now()) {
+ 		err = value.ErrDenied
+ 	}
++	unchangedContention := false
+ 	if err == nil {
+ 		err = s.Projection.ObserveAdministration(ctx, a)
++		// Only the persistence call may classify its exact aborted lock attempt.
++		// A source reader returning this error still follows the original fence.
++		unchangedContention = errors.Is(err, value.ErrObservationPersistenceContended) && ctx.Err() == nil && !a.Suspended && a.Valid(s.Now())
+ 	}
+-	if err != nil {
++	if err != nil && !unchangedContention {
+ 		// The read deadline is not reused for fencing. The parent cancellation is
+ 		// still respected; an unreachable database leaves the old expiry in force.
+ 		fenceCtx, done := context.WithTimeout(ctx, 5*time.Second)
+--- a/internal/application/fleet/trust_observer_contention_test.go
++++ b/internal/application/fleet/trust_observer_contention_test.go
+@@ -0,0 +1,65 @@
++package fleet
++
++import (
++	value "asservat.local/asservat/internal/domain/fleet"
++	"context"
++	"errors"
++	"fmt"
++	"testing"
++	"time"
++)
++
++type contentionTrustFixture struct {
++	a                   value.Administration
++	readErr, persistErr error
++	observed, fenced    bool
++	afterPersist        func()
++}
++
++func (f *contentionTrustFixture) FleetAdministration(context.Context) (value.Administration, error) {
++	return f.a, f.readErr
++}
++func (f *contentionTrustFixture) ObserveAdministration(context.Context, value.Administration) error {
++	f.observed = true
++	if f.afterPersist != nil {
++		f.afterPersist()
++	}
++	return f.persistErr
++}
++func (f *contentionTrustFixture) FenceAdministration(context.Context, time.Time) error {
++	f.fenced = true
++	return nil
++}
++
++func TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence(t *testing.T) {
++	for _, mode := range []string{"unchanged-persistence", "wrapped-persistence", "source-error", "suspended-source", "unavailable-persistence", "unknown-commit", "expired-after-persistence", "cancelled-after-persistence"} {
++		t.Run(mode, func(t *testing.T) {
++			ctx, cancel := context.WithCancel(t.Context())
++			defer cancel()
++			a := workerSchedulingAdministration()
++			now := a.ObservedAt
++			f := &contentionTrustFixture{a: a, persistErr: value.ErrObservationPersistenceContended}
++			switch mode {
++			case "wrapped-persistence":
++				f.persistErr = fmt.Errorf("fixed context: %w", f.persistErr)
++			case "suspended-source":
++				f.a.Suspended = true
++			case "source-error":
++				f.readErr = f.persistErr
++				f.persistErr = nil
++			case "unavailable-persistence", "unknown-commit":
++				f.persistErr = value.ErrUnavailable
++			case "expired-after-persistence":
++				f.afterPersist = func() { now = a.FreshUntil }
++			case "cancelled-after-persistence":
++				f.afterPersist = cancel
++			}
++			o := TrustObserver{Settings: f, Projection: f, Now: func() time.Time { return now }}
++			err := o.Reconcile(ctx)
++			skip := mode == "unchanged-persistence" || mode == "wrapped-persistence"
++			if err == nil || !errors.Is(err, value.ErrUnavailable) || f.fenced == skip || f.observed == (mode == "source-error") {
++				t.Fatal("failed persistence changed fencing classification")
++			}
++		})
++	}
++}
+--- a/internal/bootstrap/configuration_runtime_source_notice.go
++++ b/internal/bootstrap/configuration_runtime_source_notice.go
+@@ -22,7 +22,12 @@
+ 		return fleet.ErrUnavailable
+ 	}
+ 	s.admission.NoteFleetObservation(a)
+-	err := s.actual.ObserveAdministration(ctx, a)
++	return s.finishObservation(ctx, a, s.actual.ObserveAdministration(ctx, a))
++}
++
++// Keep every failed SQL outcome on the same notice-invalidating path, including
++// unchanged persistence contention. This private completion grants no authority.
++func (s *configurationRuntimeFleetProjection) finishObservation(ctx context.Context, a fleet.Administration, err error) error {
+ 	if err != nil || ctx.Err() != nil || !a.Valid(time.Now()) {
+ 		s.admission.InvalidateFleetNotice()
+ 		if err != nil {
+--- a/internal/bootstrap/configuration_runtime_source_notice_test.go
++++ b/internal/bootstrap/configuration_runtime_source_notice_test.go
+@@ -0,0 +1,62 @@
++package bootstrap
++
++import (
++	app "asservat.local/asservat/internal/application/fleet"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"context"
++	"errors"
++	"testing"
++	"time"
++)
++
++// These are scheduling notices only; neither pending nor admitted work has a
++// native/SQL/provider proof here. The actual wrapper still owns a concrete SQL
++// adapter and calls this same completion only after that adapter returns.
++func TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices(t *testing.T) {
++	for _, active := range []bool{false, true} {
++		t.Run(map[bool]string{false: "pending-notice", true: "active-notice"}[active], func(t *testing.T) {
++			gate, err := app.NewWorkerRuntimeAdmission(t.Context())
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer gate.Close()
++			ticket, err := gate.WaitWrapRefresh(t.Context())
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer ticket.Release()
++			const uid = "11111111-1111-4111-8111-111111111111"
++			n := time.Now().UTC()
++			a := value.Administration{InstallationID: uid, IssuerEpoch: uid, Issuer: "https://issuer.example", Revision: identity.Revision{UID: uid, Generation: 1, Digest: [32]byte{1}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
++			gate.NoteFleetObservation(a)
++			if active {
++				gate.NoteFleetCommitted(t.Context(), a)
++				if err = ticket.AwaitFleetObservation(); err != nil {
++					t.Fatal(err)
++				}
++			}
++			projection := &configurationRuntimeFleetProjection{admission: gate}
++			err = projection.finishObservation(t.Context(), a, value.ErrObservationPersistenceContended)
++			if !errors.Is(err, value.ErrObservationPersistenceContended) || ticket.Context().Err() == nil {
++				t.Fatal("contention became scheduling success or retained active work")
++			}
++			if !active && ticket.AwaitFleetObservation() == nil {
++				t.Fatal("failed persistence supplied a scheduling hint")
++			}
++			ticket.Release()
++			// No hint survives for the next independently admitted ticket. This wait
++			// has its own test-only caller deadline and selects no authority.
++			short, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
++			defer cancel()
++			next, err := gate.WaitWrapRefresh(short)
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer next.Release()
++			if err = next.AwaitFleetObservation(); err == nil {
++				t.Fatal("later ticket reused failed observation")
++			}
++		})
++	}
++}
+--- a/internal/domain/fleet/observation_persistence.go
++++ b/internal/domain/fleet/observation_persistence.go
+@@ -0,0 +1,13 @@
++package fleet
++
++// ErrObservationPersistenceContended is a failed unchanged-source persistence
++// attempt, not an accepted observation, authority, or retry hint. Consumers keep
++// the prior original expiry. It remains unavailable to ordinary callers.
++var ErrObservationPersistenceContended error = observationPersistenceContended{}
++
++type observationPersistenceContended struct{}
++
++func (observationPersistenceContended) Error() string {
++	return "unchanged fleet observation persistence contended"
++}
++func (observationPersistenceContended) Unwrap() error { return ErrUnavailable }
+--- a/specs/federation.md
++++ b/specs/federation.md
+@@ -9,6 +9,8 @@
+ The initial connector enrollment implementation preserves the original bootstrap/key on retries, durably audits the claim before signing, and caps provider calls at two nonrefundable attempts of at most five seconds each. Issued identities have a fixed expiry thirty minutes after the original claim. Unknown signing outcomes do not become peer authority. Signed results require an exact durable encrypted audit and a current atomic peer registration before delivery; retry cannot re-enable revoked registration or extend any deadline. See the [activation contract](../docs/architecture/enrollment-activation.md). [Protected fleet administration](../docs/architecture/fleet-administration.md) assigns enrollment separately from workload access. [Credential delivery](../docs/architecture/bootstrap-channel.md) uses a configured secret-channel profile, returns no secret in operation results and cannot activate a slot before issuance audit. These refinements do not qualify production enrollment merely by being specified.
+ 
+ For the optional fresh-install observation-bootstrap profile, the original protected owner Service UID and issuer scope derive one common TLS verification name alongside each server leaf's existing exact process name. Before dialing the installed reachable endpoint, the consumer MUST retain a finite current independently accepted owner candidate set. Standard TLS hostname/root verification, membership of the actual leaf in that set and exact current SQL activation/configuration MUST precede peer-proof exchange. Only the producer's own scoped source/guard/route facts may pass before full proof; workload metadata and effects require the complete current proof. Original deadlines are never restarted at receipt. Existing exact-owner/public/effect routes MUST reject common-SNI connections, including requests that substitute an exact-owner HTTP Host. Omitted capability preserves the legacy profile; this is not a rolling upgrade or protection against a compromised authorized cluster-local observer. See [ADR144](../docs/decisions/144-cluster-local-observations.md).
++
++[ADR-155](../docs/decisions/155-unchanged-fleet-persistence-contention.md) permits only a classified failed persistence of an independently observed unchanged positive fleet source to retain its previous original SQL expiry without an additional suspension. Classification MUST require the exact last LockFleetTrust55P03 abort before UPDATE/COMMIT and complete current source/row/database-incarnation comparison before and after blocking work. It MUST remain unavailable and MUST invalidate scheduling notices, create no write/success hint and never refresh a selected proof. Source-read errors, new/changed/suspended/recovery state, expiry, failed confirmation and uncertain commits MUST retain ordinary fencing. The next observation MUST be independently selected under normal cadence; no timeout, role, lock or retry bound changes follow.
+ 
+ ### SC-FED-001
+ 
+--- a/test/integration/fleet_observation_commit_reply_test.go
++++ b/test/integration/fleet_observation_commit_reply_test.go
+@@ -0,0 +1,154 @@
++package integration
++
++import (
++	"bytes"
++	"crypto/tls"
++	"crypto/x509"
++	"encoding/binary"
++	"github.com/jackc/pgx/v5"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptest"
++	"strconv"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++)
++
++type fleetObservationCommitLoss struct {
++	armed, lost atomic.Bool
++	holdLock    atomic.Bool
++	lockAborted chan struct{}
++	releaseLock chan struct{}
++	releaseOnce sync.Once
++}
++
++func (f *fleetObservationCommitLoss) release() { f.releaseOnce.Do(func() { close(f.releaseLock) }) }
++func fleetObservationErrorCode(body []byte, expected string) bool {
++	for len(body) > 1 {
++		field := body[0]
++		end := bytes.IndexByte(body[1:], 0)
++		if end < 0 {
++			return false
++		}
++		if field == 'C' {
++			return string(body[1:1+end]) == expected
++		}
++		body = body[2+end:]
++	}
++	return false
++}
++
++// An owned test-only TLS bridge drops exactly one successful PostgreSQL COMMIT
++// CommandComplete. Actual SQL has committed; the client receives no commit
++// acknowledgement. No protocol payload, credentials or SQL are logged.
++func fleetObservationLostCommitConfig(t *testing.T, original, backend *pgx.ConnConfig) (*pgx.ConnConfig, *fleetObservationCommitLoss) {
++	t.Helper()
++	fault := &fleetObservationCommitLoss{lockAborted: make(chan struct{}), releaseLock: make(chan struct{})}
++	cert := httptest.NewTLSServer(http.NotFoundHandler())
++	t.Cleanup(cert.Close)
++	listener, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	var work sync.WaitGroup
++	var mu sync.Mutex
++	connections := map[net.Conn]struct{}{}
++	done := make(chan struct{})
++	go func() {
++		defer close(done)
++		for {
++			raw, err := listener.Accept()
++			if err != nil {
++				return
++			}
++			mu.Lock()
++			connections[raw] = struct{}{}
++			mu.Unlock()
++			work.Add(1)
++			go func() {
++				defer work.Done()
++				defer raw.Close()
++				defer func() { mu.Lock(); delete(connections, raw); mu.Unlock() }()
++				_ = raw.SetDeadline(time.Now().Add(5 * time.Second))
++				var ssl [8]byte
++				if _, err := io.ReadFull(raw, ssl[:]); err != nil || !bytes.Equal(ssl[:], []byte{0, 0, 0, 8, 4, 210, 22, 47}) {
++					return
++				}
++				if _, err := raw.Write([]byte("S")); err != nil {
++					return
++				}
++				conn := tls.Server(raw, cert.TLS.Clone())
++				if conn.Handshake() != nil {
++					return
++				}
++				defer conn.Close()
++				up, err := net.DialTimeout("tcp", net.JoinHostPort(backend.Host, strconv.Itoa(int(backend.Port))), time.Second)
++				if err != nil {
++					return
++				}
++				defer up.Close()
++				_ = raw.SetDeadline(time.Time{})
++				sent := make(chan struct{})
++				go func() { _, _ = io.Copy(up, conn); _ = up.Close(); close(sent) }()
++				defer func() { _ = conn.Close(); _ = up.Close(); <-sent }()
++				for {
++					var head [5]byte
++					if _, err := io.ReadFull(up, head[:]); err != nil {
++						return
++					}
++					length := binary.BigEndian.Uint32(head[1:])
++					if length < 4 || length > 1<<20 {
++						return
++					}
++					body := make([]byte, length-4)
++					if _, err := io.ReadFull(up, body); err != nil {
++						return
++					}
++					if head[0] == 'E' && fleetObservationErrorCode(body, "55P03") && fault.holdLock.Swap(false) {
++						close(fault.lockAborted)
++						<-fault.releaseLock
++					}
++					if head[0] == 'C' && bytes.Equal(body, []byte("COMMIT\x00")) && fault.armed.Swap(false) {
++						fault.lost.Store(true)
++						return
++					}
++					if _, err := conn.Write(head[:]); err != nil {
++						return
++					}
++					if _, err := conn.Write(body); err != nil {
++						return
++					}
++				}
++			}()
++		}
++	}()
++	t.Cleanup(func() {
++		_ = listener.Close()
++		<-done
++		fault.release()
++		mu.Lock()
++		for connection := range connections {
++			_ = connection.Close()
++		}
++		mu.Unlock()
++		work.Wait()
++	})
++	roots := x509.NewCertPool()
++	roots.AddCert(cert.Certificate())
++	host, port, err := net.SplitHostPort(listener.Addr().String())
++	if err != nil {
++		t.Fatal(err)
++	}
++	number, err := strconv.Atoi(port)
++	if err != nil {
++		t.Fatal(err)
++	}
++	out := original.Copy()
++	out.Host, out.Port = host, uint16(number)
++	out.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS13, ServerName: "127.0.0.1", RootCAs: roots}
++	out.Fallbacks = nil
++	return out, fault
++}
+--- a/test/integration/fleet_observation_contention_test.go
++++ b/test/integration/fleet_observation_contention_test.go
+@@ -0,0 +1,231 @@
++package integration
++
++import (
++	"asservat.local/asservat/internal/adapters/postgres"
++	app "asservat.local/asservat/internal/application/fleet"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/audit"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	fleet "asservat.local/asservat/internal/domain/fleet"
++	"context"
++	"encoding/json"
++	"errors"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgxpool"
++	"strings"
++	"testing"
++	"time"
++)
++
++// One fixed independently selected synthetic source, not a reader that refreshes
++// time on access. SQL observation, original activation and bridge are actual.
++type fixedContentionAdministration struct{ value fleet.Administration }
++
++func (s fixedContentionAdministration) FleetAdministration(context.Context) (fleet.Administration, error) {
++	return s.value, nil
++}
++
++type countedContentionProjection struct {
++	actual               *postgres.FleetObservation
++	fences               int
++	lost                 *fleetObservationCommitLoss
++	admin                *pgxpool.Pool
++	expected             fleet.Administration
++	committedBeforeFence bool
++}
++
++func (p *countedContentionProjection) ObserveAdministration(ctx context.Context, a fleet.Administration) error {
++	return p.actual.ObserveAdministration(ctx, a)
++}
++func (p *countedContentionProjection) FenceAdministration(ctx context.Context, started time.Time) error {
++	p.fences++
++	if p.lost != nil && p.lost.lost.Load() {
++		// Read the committed actual row before applying the existing failure fence.
++		// This is test evidence, never accepted authority or a retry of COMMIT.
++		_ = p.admin.QueryRow(ctx, `SELECT NOT suspended AND observed_at=$2 AND fresh_until=$3 FROM public.fleet_current_trust WHERE installation_id=$1`, p.expected.InstallationID, p.expected.ObservedAt, p.expected.FreshUntil).Scan(&p.committedBeforeFence)
++	}
++	return p.actual.FenceAdministration(ctx, started)
++}
++
++func qualifyFleetObservationContention(t *testing.T, ctx context.Context, admin *pgxpool.Pool, config *pgx.ConnConfig, root *ownerIdentitySQLRoot, input contracts.OwnerIdentityRoles, observer *postgres.FleetObservation, a fleet.Administration, mode string, lostCommit *fleetObservationCommitLoss) {
++	t.Helper()
++	var recordRaw, receiptRaw []byte
++	if err := admin.QueryRow(ctx, `SELECT record_json,audit_receipt_json FROM public.fleet_initial_activation WHERE installation_id=$1`, input.InstallationID).Scan(&recordRaw, &receiptRaw); err != nil {
++		t.Fatal("original activation read", err)
++	}
++	var record audit.InitialInstallation
++	var receipt audit.Receipt
++	if json.Unmarshal(recordRaw, &record) != nil || json.Unmarshal(receiptRaw, &receipt) != nil || !record.Valid() || !receipt.ValidInitialInstallation(record.Scope.InstallationID, record.Claim.ID) {
++		t.Fatal("original activation invalid")
++	}
++	if mode == "observation-contention-final-expired" {
++		// Choose this finite original stored interval before either competing call.
++		a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
++		a.FreshUntil = a.ObservedAt.Add(2 * time.Second)
++		if e := observer.ObserveAdministration(ctx, a); e != nil {
++			t.Fatal("short original stored interval", e)
++		}
++	}
++	bridge, err := postgres.NewInitialRuntimeBridgeSQL(ctx, config, record, receipt)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer bridge.Close()
++	var before string
++	var until time.Time
++	if err = admin.QueryRow(ctx, `SELECT to_jsonb(t)::text,t.fresh_until FROM public.fleet_current_trust t WHERE installation_id=$1`, input.InstallationID).Scan(&before, &until); err != nil {
++		t.Fatal(err)
++	}
++	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
++	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
++	switch mode {
++	case "observation-contention", "observation-unknown-commit", "observation-contention-final-change", "observation-contention-final-renewed", "observation-contention-final-recovery", "observation-contention-final-expired":
++	case "observation-contention-changed":
++		a.Revision.Generation++
++	case "observation-contention-expired":
++		a.FreshUntil = a.ObservedAt.Add(750 * time.Millisecond)
++	default:
++		t.Fatal("unknown contention mode")
++	}
++	p := &countedContentionProjection{actual: observer, lost: lostCommit, admin: admin, expected: a}
++	o := app.TrustObserver{Settings: fixedContentionAdministration{a}, Projection: p, Now: time.Now}
++	var observed error
++	if strings.HasPrefix(mode, "observation-contention-final-") {
++		if lostCommit == nil {
++			t.Fatal("missing exact lock-abort reply control")
++		}
++		observationCtx, cancel := context.WithDeadline(ctx, a.FreshUntil)
++		defer cancel()
++		result := make(chan error, 1)
++		started, joined := false, false
++		defer func() {
++			lostCommit.release()
++			if started && !joined {
++				cancel()
++				<-result
++			}
++		}()
++		err = bridge.WithInitialRuntimeBridge(ctx, func(call context.Context) error {
++			lostCommit.holdLock.Store(true)
++			started = true
++			// Independent observer lifetime: ending the bridge's actual callback does
++			// not cancel this separately running original source observation.
++			go func() { result <- o.Reconcile(observationCtx) }()
++			select {
++			case <-lostCommit.lockAborted:
++				return nil
++			case observed = <-result:
++				joined = true
++				return errors.New("observer returned before actual server lock abort")
++			case <-call.Done():
++				return call.Err()
++			}
++		})
++		if err != nil {
++			t.Fatal("original bridge lock-abort ordering", err)
++		}
++		switch mode {
++		case "observation-contention-final-expired":
++			timer := time.NewTimer(time.Until(until))
++			select {
++			case <-ctx.Done():
++				timer.Stop()
++				t.Fatal("fixture cancelled before original expiry")
++			case <-timer.C:
++			}
++		case "observation-contention-final-change":
++			_, err = admin.Exec(ctx, `UPDATE public.fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1`, input.InstallationID)
++		case "observation-contention-final-recovery":
++			_, err = admin.Exec(ctx, `UPDATE public.fleet_trust SET recovery_blocked=true WHERE installation_id=$1`, input.InstallationID)
++		case "observation-contention-final-renewed":
++			// An independently newer stored observation is a fixture mutation, not a
++			// retry of the failed source. The existing failure CAS must leave it intact.
++			_, err = admin.Exec(ctx, `WITH n AS MATERIALIZED(SELECT clock_timestamp() AS at) UPDATE public.fleet_trust SET observed_at=n.at,fresh_until=n.at+interval '5 seconds' FROM n WHERE installation_id=$1`, input.InstallationID)
++		}
++		if err != nil {
++			t.Fatal("controlled post-abort row mutation", err)
++		}
++		if err = admin.QueryRow(ctx, `SELECT to_jsonb(t)::text FROM public.fleet_current_trust t WHERE installation_id=$1`, input.InstallationID).Scan(&before); err != nil {
++			t.Fatal(err)
++		}
++		lostCommit.release()
++		observed = <-result
++		joined = true
++	} else if mode == "observation-unknown-commit" {
++		if lostCommit == nil {
++			t.Fatal("missing exact commit reply fault")
++		}
++		lostCommit.armed.Store(true)
++		observed = o.Reconcile(ctx)
++	} else if err = bridge.WithInitialRuntimeBridge(ctx, func(call context.Context) error { observed = o.Reconcile(call); return nil }); err != nil {
++		t.Fatal("original bridge", err)
++	}
++	var after string
++	if err = admin.QueryRow(ctx, `SELECT to_jsonb(t)::text FROM public.fleet_current_trust t WHERE installation_id=$1`, input.InstallationID).Scan(&after); err != nil {
++		t.Fatal(err)
++	}
++	if mode == "observation-contention" {
++		if !errors.Is(observed, fleet.ErrObservationPersistenceContended) || !errors.Is(observed, fleet.ErrUnavailable) || p.fences != 0 || before != after {
++			t.Fatal("unchanged lock contention wrote/refreshed/fenced original SQL or reported success")
++		}
++		accepted, e := postgres.NewOwnerIdentitySQLRoles(ctx, config, root, input)
++		if e != nil {
++			t.Fatal("original unextended observation unavailable", e)
++		}
++		accepted.Close()
++		// Only the retained original interval remains. No retry/refresh is made.
++		timer := time.NewTimer(time.Until(until))
++		defer timer.Stop()
++		select {
++		case <-ctx.Done():
++			t.Fatal("fixture cancelled")
++		case <-timer.C:
++		}
++		denied, e := postgres.NewOwnerIdentitySQLRoles(ctx, config, root, input)
++		if denied != nil {
++			denied.Close()
++		}
++		if !errors.Is(e, cfg.ErrUnavailable) {
++			t.Fatal("old deadline was extended", e)
++		}
++	} else if strings.HasPrefix(mode, "observation-contention-final-") {
++		if observed == nil || errors.Is(observed, fleet.ErrObservationPersistenceContended) || p.fences != 1 {
++			t.Fatal("post-abort change suppressed ordinary failure fence")
++		}
++		var suspended bool
++		if err = admin.QueryRow(ctx, `SELECT suspended FROM public.fleet_current_trust WHERE installation_id=$1`, input.InstallationID).Scan(&suspended); err != nil {
++			t.Fatal(err)
++		}
++		if mode == "observation-contention-final-renewed" {
++			if suspended || before != after {
++				t.Fatal("older failure overwrote independent newer observation")
++			}
++		} else if !suspended {
++			t.Fatal("post-abort changed/recovery row was not fenced")
++		}
++	} else if mode == "observation-unknown-commit" {
++		if observed == nil || errors.Is(observed, fleet.ErrObservationPersistenceContended) || p.fences != 1 || !lostCommit.lost.Load() || !p.committedBeforeFence {
++			t.Fatal("unknown actual COMMIT suppressed fence or fixture did not commit")
++		}
++		var suspended bool
++		if err = admin.QueryRow(ctx, `SELECT suspended FROM public.fleet_current_trust WHERE installation_id=$1`, input.InstallationID).Scan(&suspended); err != nil || !suspended {
++			t.Fatal("unknown COMMIT failure fence missing", err)
++		}
++	} else {
++		if observed == nil || errors.Is(observed, fleet.ErrObservationPersistenceContended) || p.fences != 1 {
++			t.Fatal("changed/expired observation suppressed original fence")
++		}
++		// Its attempted fence competed with the same original bridge, so actual
++		// successful persistence is checked only after that operation releases.
++		if err = observer.FenceAdministration(ctx, a.ObservedAt); err != nil {
++			t.Fatal("post-operation exact failure fence", err)
++		}
++		var suspended bool
++		if err = admin.QueryRow(ctx, `SELECT suspended FROM public.fleet_current_trust WHERE installation_id=$1`, input.InstallationID).Scan(&suspended); err != nil || !suspended {
++			t.Fatal("negative source fence missing", err)
++		}
++	}
++	if root.claims != 0 || root.receipts != 0 {
++		t.Fatal("classification consumed owner role authority")
++	}
++}
+--- a/test/integration/initial_installation_test.go
++++ b/test/integration/initial_installation_test.go
+@@ -573,7 +573,7 @@
+ 			qualifyConfigurationRuntimeRoles(t, ctx, admin, address, tlsConfig, s.scope, record.Claim.ID, current, &objectstore.OwnerConfigurationAuditObjects{Store: objects.Store, Seal: objects.Seal, Open: objects.Open}, mode)
+ 		})
+ 	}
+-	for _, mode := range []string{"matrix", "runtime-administrator-denied", "unknown-claim", "lost-completion", "held-lock", "recovery-after-lock", "root-after-lock", "verification-root-after-lock", "constructor-expired-source", "constructor-bridge-contention"} {
++	for _, mode := range []string{"matrix", "runtime-administrator-denied", "unknown-claim", "lost-completion", "held-lock", "recovery-after-lock", "root-after-lock", "verification-root-after-lock", "constructor-expired-source", "constructor-bridge-contention", "observation-contention", "observation-contention-changed", "observation-contention-expired", "observation-unknown-commit", "observation-contention-final-change", "observation-contention-final-renewed", "observation-contention-final-recovery", "observation-contention-final-expired"} {
+ 		t.Run("owner-identity-roles-"+mode, func(t *testing.T) {
+ 			s := setup(t)
+ 			record, err := s.service.Activate(ctx)
+--- a/test/integration/owner_identity_roles_test.go
++++ b/test/integration/owner_identity_roles_test.go
+@@ -169,6 +169,10 @@
+ 	if mode == "constructor-bridge-contention" {
+ 		observerConfig.ConnConfig.RuntimeParams = map[string]string{"lock_timeout": "1000ms", "statement_timeout": "5000ms", "application_name": "asservat-owner-constructor-observer-fixture"}
+ 	}
++	var lostCommit *fleetObservationCommitLoss
++	if mode == "observation-unknown-commit" || strings.HasPrefix(mode, "observation-contention-final-") {
++		observerConfig.ConnConfig, lostCommit = fleetObservationLostCommitConfig(t, observerConfig.ConnConfig, admin.Config().ConnConfig)
++	}
+ 	observerConfig.MaxConns = 1
+ 	observerConfig.MinConns = 0
+ 	observerPool, e := pgxpool.NewWithConfig(ctx, observerConfig)
+@@ -225,6 +229,10 @@
+ 		qualifyOwnerIdentityConstructorCurrent(t, ctx, admin, c, root, input, observer, observerPool, a, mode)
+ 		return
+ 	}
++	if strings.HasPrefix(mode, "observation-contention") || mode == "observation-unknown-commit" {
++		qualifyFleetObservationContention(t, ctx, admin, c, root, input, observer, a, mode, lostCommit)
++		return
++	}
+ 	producer, e := postgres.NewOwnerIdentitySQLRoles(ctx, c, root, input)
+ 	if e != nil {
+ 		t.Fatal("post-activation constructor", e)

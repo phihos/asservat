@@ -1,0 +1,22 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:493: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation
+--- PASS: TestContextAdmissionWithRealServices (35.76s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast (3.15s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.65s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast (32.27s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused (15.52s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort (0.88s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation (15.87s)
+PASS
+ok  	asservat.local/asservat/test/integration	36.816s

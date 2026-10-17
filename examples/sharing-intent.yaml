@@ -1,0 +1,73 @@
+schemaVersion: sharing-intent/v1
+id: 00000000-0000-4000-8000-000000000030
+kind: SharingIntent
+spec:
+  recipients:
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: group-incident-reviewers-789
+  source:
+    kind: DebugCapture
+    clusterID: 00000000-0000-4000-8000-000000000001
+    namespaceUID: namespace-payments-uid
+    resourceUID: 00000000-0000-4000-8000-000000000031
+    generation: 1
+    planDigest: 981455ead3e88e0aff88067e6cf95d5ee95109549a48c5c983e0713b992c4fc1
+    recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
+  requestDigest: ed94a26864c96623d13fa5930ca9cbcfd5f7295a284b4e028c2b0fed827a969c
+  acceptedAt: '2026-10-09T12:00:00Z'
+  notAfter: '2026-10-09T18:00:00Z'
+  maxCaptures: 1
+  maxArtifactsPerCapture: 64
+  resolvedSelections:
+  - id: stack
+    actionID: core
+    dataClass: extract
+    operations:
+    - get_case
+    - list_artifacts
+    - get_backtrace
+    projectionDigest: '7777777777777777777777777777777777777777777777777777777777777777'
+    independentApprovalRequired: false
+  - id: core
+    actionID: core
+    dataClass: raw
+    operations:
+    - read_memory
+    independentApprovalRequired: true
+  createdBy:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  management:
+    mode: teams
+    teams:
+    - subject:
+        kind: Group
+        issuer: https://identity.example.invalid/realms/company
+        id: group-payments-123
+      assignmentIDs:
+      - owner-assignment-1
+    - subject:
+        kind: Group
+        issuer: https://identity.example.invalid/realms/company
+        id: group-payments-sre-456
+      assignmentIDs:
+      - owner-assignment-2
+status:
+  phase: Active
+  revision: 1
+  registeredCaptures: 1
+  materializedArtifacts: 1
+  selectionApprovals:
+  - selectionID: stack
+    phase: Approved
+    approvedBy:
+      issuer: https://identity.example.invalid/realms/company
+      subject: service-owner-123
+      clientID: asservat-browser
+      identityType: human
+    approvedAt: '2026-10-09T12:00:00Z'
+  - selectionID: core
+    phase: PendingApproval

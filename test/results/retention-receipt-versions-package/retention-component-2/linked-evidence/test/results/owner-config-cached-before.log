@@ -1,0 +1,6 @@
+--- FAIL: TestOwnerRouteKeepsOriginalConfigurationAndDeadline (0.00s)
+    --- FAIL: TestOwnerRouteKeepsOriginalConfigurationAndDeadline/cached-first-observation (0.00s)
+        owner_test.go:102: original routing deadline lost current signing trust unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.007s
+FAIL

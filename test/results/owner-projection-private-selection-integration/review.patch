@@ -1,0 +1,30 @@
+--- a/internal/adapters/kubernetes/owner_projection_preflight_test.go
++++ b/internal/adapters/kubernetes/owner_projection_preflight_test.go
+@@ -336,16 +336,23 @@
+ 				f.root.operationRootUID = ""
+ 			} else {
+ 				effects.before = func(context.Context, fleet.Administration) error {
+-					if private.Load() != 0 {
+-						t.Error("selected private state before split completion")
++					if effects.calls.Load() == 1 {
++						if private.Load() != 0 {
++							t.Error("selected private state before execution prefix completed")
++						}
++						projectionSplitMutate(t, f, name)
++					} else if name != "private-version" || effects.calls.Load() != 2 || private.Load() != 2 {
++						// Only the successful execution reaches its independent
++						// finalizer. Its two execution reads have completed, but
++						// no finalization read may precede this second lock.
++						t.Error("finalization selected private state before its own prefix completed")
+ 					}
+-					projectionSplitMutate(t, f, name)
+ 					return nil
+ 				}
+ 			}
+ 			out, err := f.projection.Advance(context.Background())
+ 			if name == "private-version" {
+-				if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || private.Load() != 4 || unlocked.Load() != 0 {
++				if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || effects.calls.Load() != 2 || private.Load() != 4 || unlocked.Load() != 0 {
+ 					t.Fatal("same pinned root first post-lock version was not selected", out.Status, err, private.Load())
+ 				}
+ 			} else {

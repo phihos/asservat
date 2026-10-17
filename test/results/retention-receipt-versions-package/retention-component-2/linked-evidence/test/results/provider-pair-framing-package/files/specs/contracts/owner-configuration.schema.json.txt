@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-configuration.schema.json",
+  "title": "Protected hub owner configuration v1",
+  "description": "Private owner-pool.json ConfigMap. Public CA roots and endpoint pins only; independently qualified administrator protection. X.509 validity and aggregate DER bounds require runtime validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "clusterID",
+    "issuerEpoch",
+    "revision",
+    "suspended",
+    "namespace",
+    "service",
+    "deployment",
+    "serviceAccount",
+    "port",
+    "issuerRoots"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-hub-owner-configuration/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "issuerEpoch": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "service": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/service"
+    },
+    "deployment": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "serviceAccount": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535
+    },
+    "issuerRoots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 21848,
+        "contentEncoding": "base64",
+        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+      }
+    },
+    "nativePort": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535,
+      "description": "Optional separate private native h2 listener on the same independently verified owner Pod. Must differ from port; omission disables native delivery. This field participates in accepted configuration identity."
+    },
+    "nativeBootstrap": {
+      "const": "owner-bootstrap/v1",
+      "description": "Fresh installed native observation bootstrap profile. Requires nativePort. Omission preserves the original single-SAN profile; it is not a rolling-upgrade switch."
+    },
+    "nativeCandidateLimit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024,
+      "description": "Explicit complete observation candidate population ceiling. Independent of process connection/concurrency bounds. Omission retains legacy behavior; selected fresh installed v2 derives 1024."
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*(?![\\s\\S])"
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  },
+  "dependentRequired": {
+    "nativeBootstrap": [
+      "nativePort"
+    ],
+    "nativeCandidateLimit": [
+      "nativePort",
+      "nativeBootstrap"
+    ]
+  }
+}

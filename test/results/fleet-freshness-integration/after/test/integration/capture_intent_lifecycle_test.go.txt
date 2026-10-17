@@ -1,0 +1,706 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/jose"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/privacy"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Synthetic source/identity/retention roots are explicit. SQL roles, encrypted
+// writes, independent acknowledgements and lifecycle deletion are real. This
+// fixture does not implement regional routing or an installed public workflow.
+func qualifyCaptureIntentLifecycle(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s3admin *s3.Client, bucket string, create func(*testing.T, int64) captureAdmissionScenario) {
+	t.Run("capture-intent-private-pair", func(t *testing.T) {
+		roles := map[string]*pgxpool.Pool{}
+		for _, purpose := range []string{"source", "admit", "journal", "ack", "cleanup", "verify", "retire", "read"} {
+			p := poolFor("capture_operation_"+purpose+"_runtime", "synthetic-capture-operation-"+purpose)
+			roles[purpose] = p
+			defer p.Close()
+		}
+		t.Run("deferred-retirement-role-isolation", func(t *testing.T) {
+			// Native positive H0/H2 retirement below must work through the private
+			// views, without granting reads or writes on the shared base tables.
+			for _, purpose := range []string{"cleanup", "verify", "retire"} {
+				for _, relation := range []string{"operation_audit_lifecycle", "operation_audit_history"} {
+					var readable, writable bool
+					if err := roles[purpose].QueryRow(ctx, `SELECT has_any_column_privilege(current_user,$1,'SELECT'),has_any_column_privilege(current_user,$1,'INSERT,UPDATE,REFERENCES') OR has_table_privilege(current_user,$1,'DELETE,TRUNCATE,TRIGGER')`, "public."+relation).Scan(&readable, &writable); err != nil || readable || writable {
+						t.Fatal("capture cleanup acquired shared table privileges", purpose, relation, readable, writable, err)
+					}
+				}
+				for _, function := range []string{"public.require_operation_audit_retirement()", "public.require_operation_audit_history_retirement()"} {
+					var executable bool
+					if err := roles[purpose].QueryRow(ctx, `SELECT has_function_privilege(current_user,$1,'EXECUTE')`, function).Scan(&executable); err != nil || executable {
+						t.Fatal("capture cleanup acquired direct validator execution", purpose, function, executable, err)
+					}
+				}
+			}
+		})
+		config, e := postgres.New(ctx, roles["source"])
+		if e != nil {
+			t.Fatal(e)
+		}
+		mac, e := app.NewOperationMAC("capture-input-v1", bytes.Repeat([]byte{41}, 32), "capture-accounts-v1", bytes.Repeat([]byte{42}, 32))
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer mac.Close()
+		type scenario struct {
+			s         captureAdmissionScenario
+			policy    value.OperationLifecyclePolicy
+			account   value.CaptureAuditAccount
+			admit     *postgres.ContextAdmissions
+			journal   *postgres.CaptureAuditJournal
+			ack       *postgres.CaptureAuditAcknowledgements
+			publisher app.CaptureOperationPublication
+		}
+		setup := func(t *testing.T, h int64, retention ...int64) scenario {
+			retained := int64(60)
+			if len(retention) > 0 {
+				retained = retention[0]
+			}
+			t.Helper()
+			s := create(t, 2)
+			n := time.Now().UTC().Truncate(time.Microsecond)
+			_, e = admin.Exec(ctx, `INSERT INTO capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until) VALUES($1,$2,'capture_operation_source_runtime'::regrole::oid,'capture_operation_admit_runtime'::regrole::oid,'capture_operation_journal_runtime'::regrole::oid,'capture_operation_ack_runtime'::regrole::oid,'capture_operation_cleanup_runtime'::regrole::oid,'capture_operation_verify_runtime'::regrole::oid,'capture_operation_retire_runtime'::regrole::oid,'capture_operation_read_runtime'::regrole::oid,1,false,$3)`, s.a.RootID, s.recovery.installation, n.Add(time.Hour))
+			if e != nil {
+				t.Fatal("fixture protected root", e)
+			}
+			p := value.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "capture", InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 8, MaxPurgeLeases: 8, CleanupBudgetSeconds: 15, ProofWindowSeconds: 1, BackupHorizonSeconds: h, ValidUntil: n.Add(time.Hour), OverdueTerminal: value.OperationOverdueTerminal, History: &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{3}, Layout: value.CaptureOperationHistoryLayout, MaximumRowFootprintBytes: 256 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 2}}
+			b, w := p.History.SlotBacking(p.MaxPurgeLeases)
+			p.BackupReservedBytes = b * p.MetadataSlots
+			p.WALReservedBytes = w * p.MetadataSlots
+			digest, e := mac.CaptureAccount(p.InstallationID, p.RootID, s.a.Registration.AllocationID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			a := value.CaptureAuditAccount{RootID: p.RootID, AllocationID: s.a.Registration.AllocationID, AccountVersion: mac.AccountVersion(), AccountDigest: digest, Revision: 1, Records: 4, RetainedSeconds: retained, Policy: p}
+			pool := app.OperationAuditPool{RootID: p.RootID, Lane: "capture", AccountVersion: a.AccountVersion, Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: a.RetainedSeconds, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}
+			if e = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: pool, Account: a, ValidUntil: n.Add(time.Hour)}, mac); e != nil {
+				t.Fatal("configure private backing", e)
+			}
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+			if e != nil {
+				t.Fatal(e)
+			}
+			j, e := postgres.NewCaptureAuditJournal(ctx, roles["journal"], p)
+			if e != nil {
+				t.Fatal(e)
+			}
+			ack, e := postgres.NewCaptureAuditAcknowledgements(ctx, roles["ack"], p)
+			if e != nil {
+				t.Fatal(e)
+			}
+			producer, e := objectstore.NewClosedOperationAuditObjects(store, p.StoreID, keys, keys)
+			if e != nil {
+				t.Fatal(e)
+			}
+			completed, e := postgres.NewCaptureOperationIntents(ctx, roles["read"], p.RootID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			return scenario{s, p, a, ad, j, ack, app.CaptureOperationPublication{RootID: p.RootID, Completed: completed, Journal: j, Acknowledgements: ack, Writer: producer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}}
+		}
+		fresh := func(t *testing.T, s captureAdmissionScenario) captureAdmissionScenario {
+			t.Helper()
+			n := time.Now().UTC().Truncate(time.Microsecond)
+			batch := s.batch
+			batch.Initial = nil
+			batch.ObservedAt = n
+			batch.FreshUntil = n.Add(5 * time.Second)
+			if e := s.p.RefreshPermissions(ctx, batch); e != nil {
+				t.Fatal(e)
+			}
+			in := s.a.Plan.Input
+			in.Target.ObservedAt = n
+			in.Target.FreshUntil = n.Add(5 * time.Second)
+			in.Capability.ObservedAt = n
+			in.Capability.FreshUntil = n.Add(5 * time.Second)
+			policies, e := s.retention.policies(ctx)
+			if e != nil {
+				t.Fatal(e)
+			}
+			// Evaluate real observations after their blocking reads. The synthetic
+			// caller, target and request keep the original n-derived deadlines.
+			in.Retention, e = privacy.Resolve(policies, privacy.Input{Target: in.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: in.Retention.AnchorAt, RequestedSeconds: in.Retention.RequestedSeconds}, time.Now().UTC().Truncate(time.Microsecond))
+			if e != nil {
+				t.Fatal(e)
+			}
+			in.Deadline = n.Add(8 * time.Second)
+			s.a.Registration.WriteUntil = in.Deadline
+			s.a.Plan, e = planning.CompileContext(in, time.Now().UTC().Truncate(time.Microsecond))
+			if e != nil {
+				t.Fatal(e)
+			}
+			caller := s.a.Eligibility.VerifiedIdentity
+			caller.VerifiedAt = n
+			caller.ValidUntil = n.Add(5 * time.Second)
+			projection, e := s.p.Permissions(ctx, in.Target.Target())
+			if e != nil {
+				t.Fatal(e)
+			}
+			s.a.Eligibility = authorization.ContextEligibility(caller, projection, in.Target.Target(), time.Now())
+			s.a.Recovery, e = s.recovery.reader.RecoveryState(ctx)
+			if e != nil {
+				t.Fatal(e)
+			}
+			return s
+		}
+		count := func(t *testing.T, s scenario, want int) {
+			t.Helper()
+			var c, a, b int
+			e := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_capture WHERE root_id=$1),(SELECT coalesce(sum(charged),0) FROM operation_audit_account WHERE root_id=$1 AND lane='capture'),(SELECT count(*) FROM custody_attempt WHERE allocation_id=$2)`, s.s.a.RootID, s.account.AllocationID).Scan(&c, &a, &b)
+			if e != nil || c != want || a != want || b != want {
+				t.Fatal("non-atomic capture/audit charge", c, a, b, e)
+			}
+		}
+		observed := func(t *testing.T, in value.OperationIntent, want int) {
+			t.Helper()
+			prefix := value.OperationAuditKey(in.RootID, in.ID, "")
+			versions, e := s3admin.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: &bucket, Prefix: &prefix, MaxKeys: aws.Int32(16)})
+			if e != nil || aws.ToBool(versions.IsTruncated) {
+				t.Fatal("incomplete fixture version inventory", e)
+			}
+			objects, e := s3admin.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &prefix, MaxKeys: aws.Int32(16)})
+			if e != nil || aws.ToBool(objects.IsTruncated) {
+				t.Fatal("incomplete fixture key inventory", e)
+			}
+			uploads, e := s3admin.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: &bucket, Prefix: &prefix, MaxUploads: aws.Int32(16)})
+			if e != nil || aws.ToBool(uploads.IsTruncated) || len(uploads.Uploads) != 0 {
+				t.Fatal("unexpected fixture pending writer", e)
+			}
+			count := max(len(objects.Contents), len(versions.Versions)+len(versions.DeleteMarkers))
+			var total int64
+			if len(versions.Versions) > 0 {
+				for _, o := range versions.Versions {
+					total += aws.ToInt64(o.Size)
+				}
+			} else {
+				for _, o := range objects.Contents {
+					total += aws.ToInt64(o.Size)
+				}
+			}
+			if count != want || count > 2 || total > 2*value.OperationCipherLimit {
+				t.Fatal("private pair object backing", count, total, want)
+			}
+		}
+		wait := func(at time.Time) {
+			if d := time.Until(at.Add(10 * time.Millisecond)); d > 0 {
+				timer := time.NewTimer(d)
+				defer timer.Stop()
+				<-timer.C
+			}
+		}
+		t.Run("storage-binding-lock-without-allocation-or-freshness-writes", func(t *testing.T) {
+			s := setup(t, 0)
+			p := roles["admit"]
+			var tableUpdate, lockColumn bool
+			if e := p.QueryRow(ctx, `SELECT has_table_privilege(current_user,'context_storage_binding','UPDATE'),has_column_privilege(current_user,'context_storage_binding','source_uid','UPDATE')`).Scan(&tableUpdate, &lockColumn); e != nil || tableUpdate || !lockColumn {
+				t.Fatal("storage lock requires only the existing narrow column grant", tableUpdate, lockColumn, e)
+			}
+			tx, e := p.Begin(ctx)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer tx.Rollback(ctx)
+			var source string
+			if e = tx.QueryRow(ctx, `SELECT source_uid FROM context_storage_binding WHERE root_id=$1 AND allocation_id=$2 FOR SHARE`, s.s.a.RootID, s.account.AllocationID).Scan(&source); e != nil || source != s.s.a.Storage.Revision.UID {
+				t.Fatal("exact storage binding share lock", e)
+			}
+			if e = tx.Rollback(ctx); e != nil {
+				t.Fatal(e)
+			}
+			for _, query := range []string{
+				`UPDATE context_storage_binding SET allocation_id=allocation_id WHERE root_id=$1`,
+				`UPDATE context_storage_binding SET source_generation=source_generation+1 WHERE root_id=$1`,
+				`UPDATE context_storage_binding SET source_digest=source_digest WHERE root_id=$1`,
+				`UPDATE context_storage_binding SET observed_at=clock_timestamp() WHERE root_id=$1`,
+				`UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '30 seconds' WHERE root_id=$1`,
+				`INSERT INTO context_storage_binding SELECT * FROM context_storage_binding WHERE root_id=$1 AND false`,
+				`DELETE FROM context_storage_binding WHERE root_id=$1`,
+			} {
+				_, e = p.Exec(ctx, query, s.s.a.RootID)
+				var pe *pgconn.PgError
+				if !errors.As(e, &pe) || pe.Code != "42501" {
+					t.Fatal("storage binding mutation not denied by role privileges", e)
+				}
+			}
+			count(t, s, 0)
+		})
+		t.Run("storage-lock-outage-is-unavailable-not-changed", func(t *testing.T) {
+			s := setup(t, 0)
+			// Fixture-admin removes only the lock privilege; the product identity
+			// remains SELECT-only throughout the attempted admission.
+			if _, e := admin.Exec(ctx, `REVOKE UPDATE(source_uid) ON context_storage_binding FROM capture_operation_admit_runtime`); e != nil {
+				t.Fatal(e)
+			}
+			defer func() {
+				if _, e := admin.Exec(ctx, `GRANT UPDATE(source_uid) ON context_storage_binding TO capture_operation_admit_runtime`); e != nil {
+					t.Error("restore exact fixture lock privilege", e)
+				}
+			}()
+			var canRead, canLock bool
+			if e := roles["admit"].QueryRow(ctx, `SELECT has_table_privilege(current_user,'context_storage_binding','SELECT'),has_column_privilege(current_user,'context_storage_binding','source_uid','UPDATE')`).Scan(&canRead, &canLock); e != nil || !canRead || canLock {
+				t.Fatal("expected actual SELECT-only fixture role", canRead, canLock, e)
+			}
+			s.s = fresh(t, s.s)
+			if _, e := s.admit.AdmitContext(ctx, s.s.a); !errors.Is(e, capturevalue.ErrUnavailable) {
+				t.Fatal("database lock-permission outage masqueraded as changed request", e)
+			}
+			count(t, s, 0)
+		})
+		t.Run("missing-storage-binding-remains-changed", func(t *testing.T) {
+			s := setup(t, 0)
+			if tag, e := admin.Exec(ctx, `DELETE FROM context_storage_binding WHERE root_id=$1 AND allocation_id=$2`, s.s.a.RootID, s.account.AllocationID); e != nil || tag.RowsAffected() != 1 {
+				t.Fatal("remove unadmitted fixture binding", e)
+			}
+			s.s = fresh(t, s.s)
+			if _, e := s.admit.AdmitContext(ctx, s.s.a); !errors.Is(e, capturevalue.ErrChanged) {
+				t.Fatal("missing original binding lost its changed-input classification", e)
+			}
+			count(t, s, 0)
+		})
+		t.Run("atomic-legacy-and-wrong-key-denial", func(t *testing.T) {
+			s := setup(t, 0)
+			s.s = fresh(t, s.s)
+			if _, e = s.s.s.AdmitContext(ctx, s.s.a); e == nil {
+				t.Fatal("legacy admission bypassed private pair")
+			}
+			count(t, s, 0)
+			wrong, e := app.NewOperationMAC("capture-input-v1", bytes.Repeat([]byte{41}, 32), "capture-accounts-v1", bytes.Repeat([]byte{99}, 32))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer wrong.Close()
+			ad, e := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.s.a.RootID, wrong, postgres.EffectTransactionGuards{Retention: s.s.retention.guard, Recovery: s.s.recovery.guard})
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e = ad.AdmitContext(ctx, s.s.a); e == nil {
+				t.Fatal("wrong allocation account accepted")
+			}
+			count(t, s, 0)
+		})
+		t.Run("same-live-admission-pair-replay-and-role-separation", func(t *testing.T) {
+			s := setup(t, 0, 90)
+			s.s = fresh(t, s.s)
+			original := s.s.a.Plan.Input
+			original.Deadline = s.s.a.Plan.CompiledAt.Add(40 * time.Second)
+			s.s.a.Registration.WriteUntil = original.Deadline
+			s.s.a.Plan, e = planning.CompileContext(original, s.s.a.Plan.CompiledAt)
+			if e != nil {
+				t.Fatal(e)
+			}
+			start := time.Now()
+			live, stop := context.WithDeadline(ctx, s.s.a.Eligibility.ValidUntil)
+			defer stop()
+			a, e := s.admit.AdmitContext(live, s.s.a)
+			if e != nil {
+				t.Fatal("admission", e)
+			}
+			got, e := s.publisher.AcknowledgedCaptureIntent(live, a.CaptureID)
+			if e != nil {
+				t.Fatal("same original caller publication", e)
+			}
+			if !time.Now().Before(s.s.a.Eligibility.ValidUntil) || got.CaptureID != a.CaptureID {
+				t.Fatal("original caller renewed")
+			}
+			t.Logf("SQL admission plus encrypted pair acknowledged in %s under original caller bound; collector acquisition is outside this SQL/S3 fixture", time.Since(start))
+			snap, e := s.journal.ReadCaptureOperation(ctx, a.CaptureID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			observed(t, snap.Intent, 2)
+			count(t, s, 1)
+			again, e := s.admit.AdmitContext(ctx, s.s.a)
+			if e != nil || !again.Replay || again.CaptureID != a.CaptureID {
+				t.Fatal("admission replay changed", e)
+			}
+			if _, e = s.publisher.AcknowledgedCaptureIntent(ctx, a.CaptureID); e != nil {
+				t.Fatal(e)
+			}
+			count(t, s, 1)
+			wait(snap.Intent.WriteUntil)
+			if !time.Now().Before(snap.Intent.Capture.Deadline) {
+				t.Fatal("passive test missed original capture interval")
+			}
+			passive := app.CaptureOperationPublication{RootID: s.policy.RootID, Completed: s.publisher.Completed, Now: time.Now}
+			got, e = passive.AcknowledgedCaptureIntent(ctx, a.CaptureID)
+			if e != nil || got.CaptureID != a.CaptureID {
+				t.Fatal("acknowledged read after original write cutoff", e)
+			}
+			if _, e = roles["read"].Exec(ctx, `SELECT capture_audit_journal($1,'{}','claim-intent',NULL)`, s.policy.RootID); e == nil {
+				t.Fatal("passive role acquired write claim")
+			}
+			var closures int
+			if e = admin.QueryRow(ctx, `SELECT (intent_completion IS NOT NULL)::int+(outcome_completion IS NOT NULL)::int FROM operation_audit_lifecycle WHERE operation_id=$1`, a.CaptureID).Scan(&closures); e != nil || closures != 2 {
+				t.Fatal("joined completion not retained", closures, e)
+			}
+			for purpose, p := range roles {
+				if _, e = p.Exec(ctx, `UPDATE operation_audit SET intent_started=false WHERE id=$1`, a.CaptureID); e == nil {
+					t.Fatal("private role direct authority", purpose)
+				} else {
+					var pe *pgconn.PgError
+					if !errors.As(e, &pe) || pe.Code != "42501" {
+						t.Fatal("role check failed outside privileges", purpose, e)
+					}
+				}
+			}
+			receipt, _ := json.Marshal(snap.IntentReceipt)
+			in, _ := app.EncodeCaptureOperationIntent(snap.Intent)
+			if _, e = roles["journal"].Exec(ctx, `SELECT capture_audit_acknowledge($1,$2,'intent',NULL,$3,NULL)`, got.RootID, in, receipt); e == nil {
+				t.Fatal("writer acknowledged itself")
+			}
+		})
+		t.Run("concurrent-first-claim-and-finite-reads", func(t *testing.T) {
+			s := setup(t, 0)
+			s.s = fresh(t, s.s)
+			a, e := s.admit.AdmitContext(ctx, s.s.a)
+			if e != nil {
+				t.Fatal(e)
+			}
+			snap, e := s.journal.ReadCaptureOperation(ctx, a.CaptureID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			results := make(chan value.CaptureWriteClaim, 4)
+			errs := make(chan error, 4)
+			var wg sync.WaitGroup
+			for range 4 {
+				wg.Go(func() { v, e := s.journal.ClaimCaptureWrite(ctx, snap.Intent, "intent"); results <- v; errs <- e })
+			}
+			wg.Wait()
+			close(results)
+			close(errs)
+			for e := range errs {
+				if e != nil {
+					t.Fatal(e)
+				}
+			}
+			n := 0
+			for v := range results {
+				if v.Fresh {
+					n++
+				}
+			}
+			if n != 1 {
+				t.Fatal("first claim duplicated", n)
+			}
+			for i := int64(1); i <= 2; i++ {
+				c, e := s.journal.ClaimCaptureReconciliation(ctx, snap.Intent, "intent")
+				if e != nil || c.Attempt != i {
+					t.Fatal("bounded read claim", i, e)
+				}
+			}
+			if _, e = s.journal.ClaimCaptureReconciliation(ctx, snap.Intent, "intent"); e == nil {
+				t.Fatal("third read refilled")
+			}
+			count(t, s, 1)
+		})
+		t.Run("held-audit-pool-preserves-original-admission-deadline", func(t *testing.T) {
+			s := setup(t, 0)
+			s.s = fresh(t, s.s)
+			tx, e := admin.Begin(ctx)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer tx.Rollback(ctx)
+			var blocker int32
+			if e = tx.QueryRow(ctx, `SELECT pg_backend_pid() FROM operation_audit_pool WHERE root_id=$1 AND lane='capture' FOR UPDATE`, s.s.a.RootID).Scan(&blocker); e != nil {
+				t.Fatal(e)
+			}
+			live, stop := context.WithTimeout(ctx, 400*time.Millisecond)
+			defer stop()
+			done := make(chan error, 1)
+			go func() { _, e := s.admit.AdmitContext(live, s.s.a); done <- e }()
+			blocked := false
+			deadline := time.Now().Add(350 * time.Millisecond)
+			for time.Now().Before(deadline) {
+				if e = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename='capture_operation_admit_runtime' AND wait_event_type='Lock' AND $1=ANY(pg_blocking_pids(pid)))`, blocker).Scan(&blocked); e != nil {
+					t.Fatal(e)
+				}
+				if blocked {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			if !blocked {
+				stop()
+				tx.Rollback(ctx)
+				<-done
+				t.Fatal("did not observe actual SQL blocker")
+			}
+			if e = <-done; e == nil {
+				t.Fatal("blocked admission ignored original caller deadline")
+			}
+			if e = tx.Rollback(ctx); e != nil {
+				t.Fatal(e)
+			}
+			count(t, s, 0)
+		})
+		t.Run("old-read-claim-cannot-borrow-new-cutoff-or-create-completion", func(t *testing.T) {
+			s := setup(t, 0)
+			s.s = fresh(t, s.s)
+			a, e := s.admit.AdmitContext(ctx, s.s.a)
+			if e != nil {
+				t.Fatal(e)
+			}
+			snap, e := s.journal.ReadCaptureOperation(ctx, a.CaptureID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			in := snap.Intent
+			claim, e := s.journal.ClaimCaptureWrite(ctx, in, "intent")
+			if e != nil || !claim.Fresh {
+				t.Fatal(e)
+			}
+			live, stop := context.WithDeadline(ctx, claim.Until)
+			completion, e := s.publisher.Writer.CreateClosedOperationIntent(live, in)
+			stop()
+			if e != nil {
+				t.Fatal(e)
+			}
+			bad := completion
+			bad.RecordDigest = artifact.Digest{}
+			rawIntent, e := app.EncodeCaptureOperationIntent(in)
+			if e != nil {
+				t.Fatal(e)
+			}
+			rawBad, e := json.Marshal(bad)
+			if e != nil {
+				t.Fatal(e)
+			}
+			_, e = roles["ack"].Exec(ctx, `SELECT capture_audit_acknowledge($1,$2,'intent',$3,NULL,NULL)`, in.RootID, rawIntent, rawBad)
+			var pe *pgconn.PgError
+			if !errors.As(e, &pe) || pe.Code != "23514" {
+				t.Fatal("empty direct completion digest was not rejected at the SQL boundary")
+			}
+			// Simulated loss discards the positive completion. Only the exact original
+			// producer knew it; Find below must not recreate that authority.
+			first, e := s.journal.ClaimCaptureReconciliation(ctx, in, "intent")
+			if e != nil {
+				t.Fatal(e)
+			}
+			wait(first.Until)
+			second, e := s.journal.ClaimCaptureReconciliation(ctx, in, "intent")
+			if e != nil || second.Attempt != 2 {
+				t.Fatal(e)
+			}
+			if e = s.ack.AcknowledgeReconciledCapture(ctx, in, "intent", completion.Receipt, first); e == nil {
+				t.Fatal("first expired claim borrowed second interval")
+			}
+			read, stop := context.WithDeadline(ctx, second.Until)
+			receipt, e := s.publisher.Reader.FindOperationIntent(read, in)
+			if e == nil {
+				e = s.ack.AcknowledgeReconciledCapture(read, in, "intent", receipt, second)
+			}
+			stop()
+			if e != nil {
+				t.Fatal("exact reconciliation", e)
+			}
+			var closed bool
+			if e = admin.QueryRow(ctx, `SELECT intent_completion IS NOT NULL FROM operation_audit_lifecycle WHERE operation_id=$1`, in.ID).Scan(&closed); e != nil || closed {
+				t.Fatal("GET manufactured writer completion", closed, e)
+			}
+			if _, e = s.publisher.AcknowledgedCaptureIntent(ctx, in.ID); e != nil {
+				t.Fatal("recovered intent pair", e)
+			}
+			observed(t, in, 2)
+			count(t, s, 1)
+			cleanup, e := postgres.NewCaptureOperationLifecycles(ctx, roles["cleanup"], s.policy, s.s.recovery.guard)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e = cleanup.ReadOperationLifecycle(ctx, in.ID); e == nil {
+				t.Fatal("unknown writer qualified for cleanup")
+			}
+		})
+		for _, h := range []int64{0, 2} {
+			name := "healthy-retirement-H0"
+			if h > 0 {
+				name = "healthy-retirement-H2"
+			}
+			t.Run(name, func(t *testing.T) {
+				s := setup(t, h)
+				s.s = fresh(t, s.s)
+				a, e := s.admit.AdmitContext(ctx, s.s.a)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, e = s.publisher.AcknowledgedCaptureIntent(ctx, a.CaptureID); e != nil {
+					t.Fatal(e)
+				}
+				snap, e := s.journal.ReadCaptureOperation(ctx, a.CaptureID)
+				if e != nil {
+					t.Fatal(e)
+				}
+				in := snap.Intent
+				observed(t, in, 2)
+				unknownID := ""
+				if h > 0 {
+					other := s.s
+					other.a.Plan.Input.CaptureID = custodyID()
+					other.a.CaseID = custodyID()
+					other.a.OccurrenceID = custodyID()
+					other.a.IdempotencyKey = "synthetic-distinct-unknown-capture"
+					other.a.SubmissionDigest = artifact.Digest{11}
+					other.a.Registration.Location.ArtifactID = custodyID()
+					other.a.Registration.Location.AttemptID = custodyID()
+					other = fresh(t, other)
+					admitted, e := s.admit.AdmitContext(ctx, other.a)
+					if e != nil {
+						t.Fatal("same-account unknown admission", e)
+					}
+					unknownID = admitted.CaptureID
+					unknown, e := s.journal.ReadCaptureOperation(ctx, unknownID)
+					if e != nil {
+						t.Fatal(e)
+					}
+					claim, e := s.journal.ClaimCaptureWrite(ctx, unknown.Intent, "intent")
+					if e != nil || !claim.Fresh {
+						t.Fatal("unknown writer first claim", e)
+					}
+					// Its claimed PUT outcome is deliberately never supplied. The
+					// other record's healthy cleanup cannot refund this spend.
+				}
+
+				lifecycle := func(purpose string) *postgres.OperationLifecycles {
+					x, e := postgres.NewCaptureOperationLifecycles(ctx, roles[purpose], s.policy, s.s.recovery.guard)
+					if e != nil {
+						t.Fatal(e)
+					}
+					return x
+				}
+				cleanup, ack, retire := lifecycle("cleanup"), lifecycle("verify"), lifecycle("retire")
+				pub, private, e := ed25519.GenerateKey(rand.Reader)
+				if e != nil {
+					t.Fatal(e)
+				}
+				sign, e := jose.NewOperationRetirementSignatures(in.RootID, "synthetic-capture", private, map[string]ed25519.PublicKey{"synthetic-capture": pub})
+				if e != nil {
+					t.Fatal(e)
+				}
+				verify, e := jose.NewOperationRetirementSignatures(in.RootID, "", nil, map[string]ed25519.PublicKey{"synthetic-capture": pub})
+				if e != nil {
+					t.Fatal(e)
+				}
+				objects, e := objectstore.NewOperationAuditCleanupObjects(store, s.policy.StoreID, keys, keys, sign, verify)
+				if e != nil {
+					t.Fatal(e)
+				}
+				reader, e := objectstore.NewOperationAuditCleanupVerifier(store, s.policy.StoreID, keys, verify)
+				if e != nil {
+					t.Fatal(e)
+				}
+				life := app.OperationCleanup{Journal: cleanup, Acknowledgements: ack, Finalizer: retire, Objects: objects, Verifier: reader}
+				if h > 0 {
+					life.Finalizer = captureAuditFinalizerFunc(func(call context.Context, id string) error {
+						tx, e := roles["retire"].Begin(call)
+						if e != nil {
+							t.Fatal(e)
+						}
+						defer tx.Rollback(call)
+						var changed bool
+						if e = tx.QueryRow(call, `SELECT finish_capture_operation_retirement($1,$2,$3)`, in.RootID, id, s.policy.InstallationID).Scan(&changed); e != nil || !changed {
+							t.Fatal("atomic private retirement transfer", e)
+						}
+						var operationRows, historyRecords int
+						if e = tx.QueryRow(call, `SELECT (SELECT count(*) FROM capture_operation_audit WHERE id=$1),(SELECT coalesce(sum(records),0) FROM capture_operation_history WHERE root_id=$2)`, id, in.RootID).Scan(&operationRows, &historyRecords); e != nil || operationRows != 0 || historyRecords != 1 {
+							t.Fatal("private operation to cooling transfer", operationRows, historyRecords, e)
+						}
+						if e = tx.Rollback(call); e != nil {
+							t.Fatal(e)
+						}
+						var bindingRows, lifecycleRows, charge int
+						if e = admin.QueryRow(call, `SELECT (SELECT count(*) FROM operation_audit WHERE id=$1),(SELECT count(*) FROM capture_audit_binding WHERE capture_id=$1),(SELECT count(*) FROM operation_audit_lifecycle WHERE operation_id=$1),(SELECT count(*) FROM operation_audit_history WHERE root_id=$2),(SELECT sum(charged) FROM operation_audit_account WHERE root_id=$2 AND lane='capture')`, id, in.RootID).Scan(&operationRows, &bindingRows, &lifecycleRows, &historyRecords, &charge); e != nil || operationRows != 1 || bindingRows != 1 || lifecycleRows != 1 || historyRecords != 0 || charge != 2 {
+							t.Fatal("rollback changed exact live and unknown obligations", operationRows, bindingRows, lifecycleRows, historyRecords, charge, e)
+						}
+						results := make(chan error, 2)
+						var wg sync.WaitGroup
+						for range 2 {
+							wg.Go(func() { results <- retire.RetireOperationAudit(call, id) })
+						}
+						wg.Wait()
+						close(results)
+						success := 0
+						for e := range results {
+							if e == nil {
+								success++
+							} else if e != app.ErrUnavailable {
+								t.Fatal(e)
+							}
+						}
+						if success != 1 {
+							t.Fatal("concurrent private finalizers did not retire exactly once", success)
+						}
+						return nil
+					})
+				}
+				wait(in.Lifecycle.OriginalPurgeAt)
+				refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
+				if e = life.Advance(ctx, in.ID); e != app.ErrUnavailable {
+					t.Fatal("early terminal phase", e)
+				}
+				observed(t, in, 1)
+				wait(in.Lifecycle.CertificatePurgeAt)
+				refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
+				if e = life.Advance(ctx, in.ID); e != nil {
+					t.Fatal("positive private retirement", e)
+				}
+				observed(t, in, 0)
+				passive := app.CaptureOperationPublication{RootID: s.policy.RootID, Completed: s.publisher.Completed, Now: time.Now}
+				if got, e := passive.AcknowledgedCaptureIntent(ctx, in.ID); e != nil || got.CaptureID != in.ID {
+					t.Fatal("retained provenance after pair cleanup", e)
+				}
+				var c, b, o, charge int
+				if e = admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_capture WHERE id=$1),(SELECT count(*) FROM capture_audit_binding WHERE capture_id=$1),(SELECT count(*) FROM operation_audit WHERE id=$1),(SELECT coalesce(sum(charged),0) FROM operation_audit_account WHERE root_id=$2 AND lane='capture')`, in.ID, in.RootID).Scan(&c, &b, &o, &charge); e != nil || c != 1 || b != 0 || o != 0 {
+					t.Fatal("retirement changed accepted authority or retained pair", c, b, o, e)
+				}
+				if h == 0 && charge != 0 || h > 0 && charge != 2 {
+					t.Fatal("history charge", charge, h)
+				}
+				if h > 0 {
+					var at time.Time
+					if e = admin.QueryRow(ctx, `SELECT max(release_at) FROM operation_audit_history WHERE root_id=$1 AND lane='capture'`, in.RootID).Scan(&at); e != nil {
+						t.Fatal(e)
+					}
+					wait(at)
+					refreshAuditFixtureRecovery(t, ctx, admin, s.s.recovery.observation, 30*time.Second)
+					if _, e = (app.OperationHistoryCleanup{Journal: retire, Finalizer: retire}).Sweep(ctx); e != nil {
+						t.Fatal("history drain", e)
+					}
+					var unknownRows, historyRows int
+					if e = admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM operation_audit WHERE id=$1),(SELECT count(*) FROM operation_audit_history WHERE root_id=$2),(SELECT sum(charged) FROM operation_audit_account WHERE root_id=$2 AND lane='capture')`, unknownID, in.RootID).Scan(&unknownRows, &historyRows, &charge); e != nil || unknownRows != 1 || historyRows != 0 || charge != 1 {
+						t.Fatal("history drain released unknown spend", unknownRows, historyRows, charge, e)
+					}
+				}
+			})
+		}
+	})
+}
+
+type captureAuditFinalizerFunc func(context.Context, string) error
+
+func (f captureAuditFinalizerFunc) RetireOperationAudit(ctx context.Context, id string) error {
+	return f(ctx, id)
+}

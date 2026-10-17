@@ -1,0 +1,5 @@
+=== RUN   TestRetentionWithRealKubernetes
+    retention_test.go:30: run make permission-integration
+--- SKIP: TestRetentionWithRealKubernetes (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.053s

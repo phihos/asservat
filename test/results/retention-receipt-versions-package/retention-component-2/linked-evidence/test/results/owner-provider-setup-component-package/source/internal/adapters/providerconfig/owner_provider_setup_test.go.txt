@@ -1,0 +1,276 @@
+package providerconfig
+
+import (
+	"bytes"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"github.com/google/uuid"
+)
+
+type setupFixture struct {
+	in        contracts.OwnerDeployment
+	profile   contracts.OwnerProviderAuthentication
+	pool      fleet.OwnerPool
+	reader    *SetupReader
+	roots     [][]byte
+	responses map[string]map[string]json.RawMessage
+	requests  atomic.Int32
+	intercept func(http.ResponseWriter, *http.Request) bool
+}
+
+func setupMap(t *testing.T, v any) map[string]json.RawMessage {
+	t.Helper()
+	raw, e := json.Marshal(v)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var out map[string]json.RawMessage
+	if e = json.Unmarshal(raw, &out); e != nil {
+		t.Fatal(e)
+	}
+	return out
+}
+
+func newSetupFixture(t *testing.T) *setupFixture {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	cert := &x509.Certificate{SerialNumber: big.NewInt(97551), NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
+	der, err := x509.CreateCertificate(rand.Reader, cert, cert, key.Public(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &setupFixture{roots: [][]byte{der}, responses: map[string]map[string]json.RawMessage{}}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.requests.Add(1)
+		if r.Method != http.MethodGet || r.Header.Get("X-Vault-Token") != "synthetic-inspection-only" || r.URL.RawQuery != "" {
+			t.Error("reader changed method/token/URL")
+			w.WriteHeader(403)
+			return
+		}
+		if f.intercept != nil && f.intercept(w, r) {
+			return
+		}
+		data, ok := f.responses[strings.TrimPrefix(r.URL.Path, "/v1/")]
+		if !ok {
+			t.Error("unselected provider path", r.URL.Path)
+			w.WriteHeader(404)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": data, "auth": nil, "wrap_info": nil, "lease_id": "", "lease_duration": 0, "renewable": false})
+	}))
+	server.TLS = &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}, MinVersion: tls.VersionTLS12}
+	server.StartTLS()
+	t.Cleanup(server.Close)
+	f.in = contracts.OwnerDeployment{Format: contracts.OwnerDeploymentFormat, InstallationID: uuid.NewString(), ClusterID: uuid.NewString(), Namespace: contracts.WorkerObjectReference{Name: "original-hub", UID: uuid.NewString()}, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.invalid", Roots: f.roots}, Postgres: contracts.OwnerPostgresEndpoint{Host: "postgres.invalid", Port: 5432, Database: "asservat", Roots: f.roots, MaxConnections: 1}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.invalid", Roots: f.roots, Bucket: "audit", Region: "test"}, KeyService: contracts.OwnerKeyService{Endpoint: server.URL, Roots: f.roots, AuditMount: "transit", AuditKey: "audit", PKIMount: "pki", ServerRole: "server", ClientRole: "client"}}
+	account := contracts.WorkerObjectReference{Name: "owner", UID: uuid.NewString()}
+	f.pool = fleet.OwnerPool{InstallationID: f.in.InstallationID, ClusterID: f.in.ClusterID, IssuerEpoch: uuid.NewString(), Namespace: f.in.Namespace.Name, NamespaceUID: f.in.Namespace.UID, Service: "hub", ServiceUID: uuid.NewString(), Deployment: "hub", DeploymentUID: uuid.NewString(), ServiceAccount: account.Name, AccountUID: account.UID, Port: 8443, NativePort: 9444, NativeBootstrap: fleet.OwnerBootstrapProfile}
+	recipe, err := OwnerProviderRecipeFor(f.in, "owner-auth", "auth_kubernetes_original", account, contracts.WorkerObjectReference{Name: "audit", UID: uuid.NewString()}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.profile = recipe.Profile
+	setup, err := OwnerSetupRecipeFor(f.in, f.profile, f.pool, f.roots, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.responses["sys/auth/owner-auth"] = setupMap(t, map[string]any{"type": "kubernetes", "accessor": f.profile.AuthMountAccessor, "config": map[string]any{"default_lease_ttl": 300, "max_lease_ttl": 900, "token_type": "default-service"}})
+	f.responses["auth/owner-auth/config"] = setupMap(t, setup.AuthConfiguration)
+	f.responses["auth/owner-auth/config"]["token_reviewer_jwt_set"] = json.RawMessage("true")
+	f.responses["sys/mounts/transit"] = setupMap(t, map[string]any{"type": "transit"})
+	f.responses["transit/keys/audit"] = setupMap(t, map[string]any{"name": "audit", "type": "aes256-gcm96", "derived": false, "exportable": false, "allow_plaintext_backup": false, "deletion_allowed": false, "supports_encryption": true, "supports_decryption": true, "latest_version": 1, "min_decryption_version": 1, "min_encryption_version": 0})
+	for _, r := range recipe.Roles {
+		f.responses["auth/owner-auth/role/"+r.Name] = setupMap(t, r.Role)
+		f.responses["sys/policies/acl/"+r.Name] = setupMap(t, map[string]any{"name": r.Name, "policy": string(r.Policy)})
+	}
+	f.responses["sys/mounts/pki"] = setupMap(t, map[string]any{"type": "pki"})
+	f.responses["pki/cert/ca"] = setupMap(t, map[string]any{"certificate": string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))})
+	for _, r := range setup.PKIRoles {
+		f.responses["pki/roles/"+r.Name] = setupMap(t, r.Role)
+	}
+	f.reader, err = NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: server.URL, Roots: f.roots}, []byte("synthetic-inspection-only"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if e := f.reader.Close(context.Background()); e != nil {
+			t.Error(e)
+		}
+	})
+	return f
+}
+
+func TestOwnerProviderSetupVerifiesWholePublicBinding(t *testing.T) {
+	f := newSetupFixture(t)
+	start := time.Now()
+	check, err := f.reader.VerifyOwner(context.Background(), f.in, f.profile, f.pool, f.roots)
+	if err != nil || !check.Matches(f.in, f.profile, f.pool, f.roots, time.Now()) || f.requests.Load() != 16 || check.ObservedAt().Before(start) || check.FreshUntil().After(check.ObservedAt().Add(5*time.Second)) {
+		t.Fatal("current exact setup", err, f.requests.Load())
+	}
+	changed := f.in
+	changed.ConfigurationUID = uuid.NewString()
+	if check.Matches(changed, f.profile, f.pool, f.roots, time.Now()) || check.Matches(f.in, f.profile, f.pool, f.roots, check.FreshUntil()) || (OwnerSetupCheck{}).Matches(f.in, f.profile, f.pool, f.roots, time.Now()) {
+		t.Fatal("changed input, expiry or fabricated check accepted")
+	}
+	setup, err := OwnerSetupRecipeFor(f.in, f.profile, f.pool, f.roots, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var acl ownerProviderACL
+	if json.Unmarshal(setup.InspectionPolicy, &acl) != nil || len(acl.Path) != 16 {
+		t.Fatal("finite named read scope")
+	}
+	for path, rule := range acl.Path {
+		if strings.ContainsAny(path, "*+") || len(rule.Capabilities) != 1 || rule.Capabilities[0] != "read" {
+			t.Fatal("inspection granted effect", path)
+		}
+	}
+}
+
+func TestOwnerProviderSetupRejectsChangedEffectiveProviderScope(t *testing.T) {
+	for name, change := range map[string]func(*setupFixture){
+		"auth-mount-replaced": func(f *setupFixture) { f.responses["sys/auth/owner-auth"]["accessor"] = json.RawMessage(`"replaced"`) },
+		"offline-jwt-mode":    func(f *setupFixture) { f.responses["sys/auth/owner-auth"]["type"] = json.RawMessage(`"jwt"`) },
+		"implicit-reviewer": func(f *setupFixture) {
+			f.responses["auth/owner-auth/config"]["token_reviewer_jwt_set"] = json.RawMessage("false")
+		},
+		"local-fallback": func(f *setupFixture) {
+			f.responses["auth/owner-auth/config"]["disable_local_ca_jwt"] = json.RawMessage("false")
+		},
+		"different-api": func(f *setupFixture) {
+			f.responses["auth/owner-auth/config"]["kubernetes_host"] = json.RawMessage(`"https://foreign.invalid"`)
+		},
+		"plaintext-key-backup": func(f *setupFixture) {
+			f.responses["transit/keys/audit"]["allow_plaintext_backup"] = json.RawMessage("true")
+		},
+		"lost-old-keys": func(f *setupFixture) {
+			f.responses["transit/keys/audit"]["min_decryption_version"] = json.RawMessage("2")
+		},
+		"wildcard-certificates": func(f *setupFixture) {
+			f.responses["pki/roles/server"]["allow_wildcard_certificates"] = json.RawMessage("true")
+		},
+		"different-issuer": func(f *setupFixture) { f.responses["pki/roles/server"]["issuer_ref"] = json.RawMessage(`"other"`) },
+		"arbitrary-uri":    func(f *setupFixture) { f.responses["pki/roles/client"]["allowed_uri_sans"] = json.RawMessage(`["*"]`) },
+		"expanded-usage":   func(f *setupFixture) { f.responses["pki/roles/server"]["client_flag"] = json.RawMessage("true") },
+		"future-role-field": func(f *setupFixture) {
+			f.responses["pki/roles/server"]["future_allow_anything"] = json.RawMessage("true")
+		},
+		"namespace-selector-or": func(f *setupFixture) {
+			for path, data := range f.responses {
+				if strings.Contains(path, "/role/") {
+					data["bound_service_account_namespace_selector"] = json.RawMessage(`"{}"`)
+					break
+				}
+			}
+		},
+		"extra-policy": func(f *setupFixture) {
+			for path, data := range f.responses {
+				if strings.Contains(path, "/policies/acl/") {
+					data["policy"] = json.RawMessage(`"{\"path\":{\"*\":{\"capabilities\":[\"root\"]}}}"`)
+					break
+				}
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newSetupFixture(t)
+			change(f)
+			if check, e := f.reader.VerifyOwner(context.Background(), f.in, f.profile, f.pool, f.roots); e == nil || check != (OwnerSetupCheck{}) {
+				t.Fatal("altered provider setup accepted")
+			}
+		})
+	}
+}
+
+func TestSetupReaderRejectsWireSubstitutionAndDisclosure(t *testing.T) {
+	for _, mode := range []string{"redirect", "oversize", "duplicate", "auth", "error", "expired-body"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newSetupFixture(t)
+			f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
+				switch mode {
+				case "redirect":
+					w.Header().Set("Location", "https://other.invalid/provider")
+					w.WriteHeader(307)
+				case "oversize":
+					_, _ = w.Write(bytes.Repeat([]byte(" "), (64<<10)+1))
+				case "duplicate":
+					_, _ = w.Write([]byte(`{"data":{"type":"kubernetes","type":"other"}}`))
+				case "auth":
+					_, _ = w.Write([]byte(`{"data":{"x":1},"auth":{"client_token":"secret-must-not-escape"}}`))
+				case "error":
+					w.WriteHeader(403)
+					_, _ = w.Write([]byte("secret-must-not-escape"))
+				case "expired-body":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(200)
+					w.(http.Flusher).Flush()
+					<-r.Context().Done()
+				}
+				return true
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			_, err := f.reader.VerifyOwner(ctx, f.in, f.profile, f.pool, f.roots)
+			if !errors.Is(err, ErrSetupUnavailable) || f.requests.Load() != 1 {
+				t.Fatal("wire substitution, retry or provider detail disclosure", err, f.requests.Load())
+			}
+		})
+	}
+}
+
+func TestSetupReaderClosesAndJoinsActiveInspection(t *testing.T) {
+	f := newSetupFixture(t)
+	entered := make(chan struct{})
+	f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
+		close(entered)
+		w.WriteHeader(200)
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+		return true
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, e := f.reader.VerifyOwner(context.Background(), f.in, f.profile, f.pool, f.roots)
+		done <- e
+	}()
+	<-entered
+	if _, e := f.reader.VerifyOwner(context.Background(), f.in, f.profile, f.pool, f.roots); e == nil {
+		t.Fatal("parallel unbounded inspection")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if e := f.reader.Close(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if e := <-done; e == nil {
+		t.Fatal("closed check succeeded")
+	}
+	if f.reader.active != nil || len(f.reader.token) != 0 {
+		t.Fatal("closure did not join owned work")
+	}
+	if _, e := f.reader.VerifyOwner(context.Background(), f.in, f.profile, f.pool, f.roots); e == nil {
+		t.Fatal("closed reader reused")
+	}
+}

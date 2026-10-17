@@ -1,0 +1,38 @@
+{
+  "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-audit-inventory-20261013/checks/native-component-1",
+  "manifest": "7b0ecade4073c62afd3c1a69a8a94170c264857ee55af6df4131474fb762408a",
+  "result": "2562b2a54397d70c9d702d0134499d40bda429b14137cfc7a93067d36aa16372",
+  "dependencies": "c6c64b969ef7925e51d2b178d8c8663f21ff31b519e47f93aa6af50a4e90b7b4",
+  "unchangedPayloads": [
+    "internal/adapters/objectstore/owner_audit_inventory.go",
+    "internal/adapters/objectstore/owner_audit_inventory_match_test.go",
+    "scripts/test-custody.py",
+    "scripts/test-owner-inventory-harness.py"
+  ],
+  "scope": "Prior exact symmetric-mismatch failing-before and 11-top/47-named objectstore races; not reclassified as a new-source full race run",
+  "logs": {
+    "selectors": "661091ec92473620585821c6c2e0d076e88231f574ff9e2c84ed7375efb7ed55",
+    "compile": "1d241adbb9029ccf18feee8a4594ce8ebed3d6c16a4060ee134de6c6beea28bb",
+    "integrated-before-negative": "7adbe87bd6fc704acb822cd35067abe97084ed8c43775afcd9ea3ee8fe9d3146",
+    "races": "fd4d4c70adb130a0465cfb7b378c9d3d53947f84a5c1832c6bb3c4b50914da80",
+    "native-opt-in-closed": "0338fdf0f3044c877cae7691c9cd2b999bc1356c7bd7644b27bdb08334c83039",
+    "vet": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "go-architecture": "fb0c723e14658486cc6eff1e3521388a89971fcdbb01c53a613bf9935ad9b273"
+  },
+  "dependencyDrift": {
+    "test/fixtures/observation-native/enrollment.go": {
+      "before": "8441403ca79bd42c8127b1f1d96163bd9dc5c23e2405ef9b8426f9bcd3bd0a0a",
+      "now": "95556cd018b8c523832af14ff80c316679ae688d399ee73ae13d5c9b0691ba86"
+    },
+    "test/fixtures/observation-native/enrollment_test.go": {
+      "before": null,
+      "now": "871b1c5cabbf740782ab543fc0f9a08c97bc78f1b2ac34f80f51134d034560dc"
+    },
+    "test/integration/connector_identity_test.go": {
+      "before": "78317497901f7a43896cb1d44ded67c56d9112af28bdda54640d6f244875e26f",
+      "now": "079a4795877287a79d92137d150295074a1fb9543b01dfb280adc1de6411e52f"
+    }
+  },
+  "unchangedDependencyCount": 2306,
+  "reuseDecision": "All api/internal/module/embedded inputs and objectstore tests unchanged by complete prior closure comparison; drift is limited to independently selected native enrollment fixtures. New fixture compile and vet run separately."
+}

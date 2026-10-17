@@ -1,0 +1,41 @@
+{
+  "status": "revision8: implemented; component and installed qualification pending; reviewed frozen code v4 and production v2; no runtime passing claim",
+  "adr_162_previously_absent": true,
+  "files": [
+    {
+      "path": "docs/decisions/162-owner-projection-read-only-finalization.md",
+      "new": true,
+      "base_sha256": null,
+      "sha256": "ed8b0c0d4ae5eef8718d09da8ee632b265c00224710ef59b9e1a3a020fa07bad",
+      "base_source": "current live"
+    },
+    {
+      "path": "docs/architecture/installed-owner-identity.md",
+      "new": false,
+      "base_sha256": "4f17431f272c0344dc371c204fbcc7c633d38de3eeb349c4df02fdd1fd03f28a",
+      "sha256": "da0e1dfe2091f82411afe6f80f74873a0a614cc19ddd3c1e8e63a6433a910f77",
+      "base_source": "current live"
+    },
+    {
+      "path": "specs/federation.md",
+      "new": false,
+      "base_sha256": "49d622f3b7031ac55edbacfa50a2a0d4554db135e6adb98326800ca1c5fadf62",
+      "sha256": "250518e97003ff055c11ff62dc7161363daaf4457a87e98a70c88bf8767378de",
+      "base_source": "current live"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "new": false,
+      "base_sha256": "73dcc0273012cd864ce77e63b74bbbc6d285439f43749939910ee1537066c5a3",
+      "sha256": "023e1817e82a0e3528b92aacb3b67473cb9c1889f60f9230fe58c796d7fb7bda",
+      "base_source": "current live"
+    }
+  ],
+  "patch_sha256": "a77dd926d471c9735b598b9a5f550cdb39fde94f6fdf28520aa0e03b6740ae4f",
+  "integration_order": "All three existing bases match current live. Root integrated code v4; integrate these four documents only after the active qualification source freeze ends. No live files edited.",
+  "traceability": "Existing REQ-DEP-003 / REQ-FED-001, SC-DEP-003 / SC-FED-001, TASK-03 / TASK-11. No new requirement/scenario/task ID; traceability.yaml unchanged.",
+  "evidence_docs_dependency_sha256": "18342b61aa80939f5d34f733d8b8a849ab5deb1413dd7e3f4b5e586e4bd78f7d",
+  "reviewed_production_manifest_sha256": "a0f0da7e105dd7e9933e820495a4aa577cefc5f0e39901e19ad7ab7674bc8c3c",
+  "reviewed_code_manifest_sha256": "3780b50edc9d4587dd8283ab039461ca9266a516032959d7d2ce3e78122bbb6c",
+  "reviewed_code_patch_sha256": "8a7336fca495a3487739d48e75b39bb88927a612818aaa80616340ae5af397bd"
+}

@@ -1,0 +1,4 @@
+# asservat.local/asservat/internal/bootstrap
+../../.cache/asservat-build/planning/initial-handover-native-20261012/dependency/internal/bootstrap/initial_preparer_cleanup.go:32:3: declared and not used: ctx
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

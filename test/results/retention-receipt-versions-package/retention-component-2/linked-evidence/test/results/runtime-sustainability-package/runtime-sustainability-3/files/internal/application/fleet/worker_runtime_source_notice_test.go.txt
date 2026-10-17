@@ -1,0 +1,286 @@
+package fleet
+
+import (
+	"context"
+	"reflect"
+	"testing"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+func workerSchedulingAdministration() value.Administration {
+	const id = "11111111-1111-4111-8111-111111111111"
+	now := time.Now().UTC()
+	return value.Administration{InstallationID: id, IssuerEpoch: id, Issuer: "https://issuer.example", Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{"client"}, DeliveryProfiles: []string{"context"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 2, MaxClusters: 1}
+}
+
+// This fixture supplies synthetic scheduling notifications only. It proves
+// application ordering/cancellation, never SQL commit, recovery or availability.
+// Each notification is a separate fixed observation after ticket grant; reads
+// never manufacture a refreshed observation for an already selected candidate.
+func workerAuditSchedulingFixture(t *testing.T, ctx context.Context) *WorkerRuntimeAdmission {
+	t.Helper()
+	gate, err := NewWorkerRuntimeAdmission(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	call, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var notified *workerRuntimeTicket
+		for {
+			gate.mu.Lock()
+			active, changed := gate.active, gate.changed
+			gate.mu.Unlock()
+			if active != nil && active != notified {
+				a := workerSchedulingAdministration()
+				gate.NoteFleetObservation(a)
+				gate.NoteFleetCommitted(call, a)
+				notified = active
+				continue
+			}
+			select {
+			case <-call.Done():
+				return
+			case <-changed:
+			}
+		}
+	}()
+	t.Cleanup(func() { cancel(); <-done; gate.Close() })
+	return gate
+}
+
+func TestWorkerRuntimeNoticeDoesNotSelectBeforeCommittedOriginalRead(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	// A successful older source is not a fresh scheduling opportunity for a
+	// later granted ticket, even though its original interval has not expired.
+	old := workerSchedulingAdministration()
+	gate.NoteFleetObservation(old)
+	gate.NoteFleetCommitted(t.Context(), old)
+	p, err := gate.WaitWrapRefresh(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	result := make(chan error, 1)
+	go func() { result <- p.AwaitFleetObservation() }()
+	a := workerSchedulingAdministration()
+	gate.NoteFleetObservation(a)
+	select {
+	case <-result:
+		t.Fatal("uncommitted source scheduled an effect")
+	default:
+	}
+	gate.NoteFleetCommitted(t.Context(), a)
+	if err = <-result; err != nil {
+		t.Fatal(err)
+	}
+	original, ok := p.Context().Deadline()
+	if !ok || !original.Equal(a.FreshUntil) {
+		t.Fatal("original source end not retained")
+	}
+	next := workerSchedulingAdministration()
+	gate.NoteFleetObservation(next)
+	gate.NoteFleetCommitted(t.Context(), next)
+	current, _ := p.Context().Deadline()
+	if !current.Equal(original) {
+		t.Fatal("later source extended selected work")
+	}
+	if p.AwaitFleetObservation() == nil {
+		t.Fatal("selected ticket reacquired source scheduling")
+	}
+}
+
+func TestWorkerRuntimeNoticeClosesActiveBeforeUnavailableFenceAndRetainsSlot(t *testing.T) {
+	for _, mode := range []string{"unavailable", "changed", "same-revision-mutation", "expired-commit", "unknown-commit"} {
+		t.Run(mode, func(t *testing.T) {
+			gate, err := NewWorkerRuntimeAdmission(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer gate.Close()
+			p, err := gate.WaitOwnerAudit(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer p.Release()
+			a := workerSchedulingAdministration()
+			gate.NoteFleetObservation(a)
+			gate.NoteFleetCommitted(t.Context(), a)
+			if err = p.AwaitFleetObservation(); err != nil {
+				t.Fatal(err)
+			}
+			selected := p.Context()
+			switch mode {
+			case "changed":
+				a.Revision.Generation++
+				a.Revision.Digest[0]++
+				gate.NoteFleetObservation(a)
+			case "same-revision-mutation":
+				a.Clients[0] = "other"
+				gate.NoteFleetObservation(a)
+			case "expired-commit":
+				a.ObservedAt = time.Now().Add(-6 * time.Second)
+				a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
+				gate.NoteFleetCommitted(t.Context(), a)
+			default:
+				gate.InvalidateFleetNotice()
+			}
+			select {
+			case <-selected.Done():
+			case <-time.After(time.Second):
+				t.Fatal("active work survived source failure")
+			}
+			if gate.ClaimOwnerAudit(selected) {
+				t.Fatal("failed source began owner invocation")
+			}
+			gate.mu.Lock()
+			retained := gate.active == p.ticket
+			gate.mu.Unlock()
+			if !retained {
+				t.Fatal("cancellation released unjoined actual work")
+			}
+		})
+	}
+}
+
+func TestWorkerRuntimeNoticeWaitRetainsOuterCancellationAndRejectsForeignTicket(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	outer, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	p, err := gate.WaitOwnerAudit(outer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	if err = p.AwaitFleetObservation(); err == nil || outer.Err() == nil {
+		t.Fatal("unavailable source escaped original outer end", err)
+	}
+	if gate.ClaimOwnerAudit(p.Context()) {
+		t.Fatal("expired waiter became authority")
+	}
+	p.Release()
+	q, err := gate.WaitOwnerAudit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Release()
+	a := workerSchedulingAdministration()
+	gate.NoteFleetObservation(a)
+	gate.NoteFleetCommitted(t.Context(), a)
+	if err = q.AwaitFleetObservation(); err != nil {
+		t.Fatal(err)
+	}
+	other, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	if other.ClaimOwnerAudit(q.Context()) {
+		t.Fatal("foreign concrete gate accepted ticket")
+	}
+	var copied WorkerRuntimeAdmissionLease
+	reflect.ValueOf(&copied).Elem().Set(reflect.ValueOf(q).Elem())
+	if copied.AwaitFleetObservation() == nil || gate.ClaimOwnerAudit(copied.Context()) {
+		t.Fatal("copied ticket adopted owner")
+	}
+	if !gate.ClaimOwnerAudit(q.Context()) || gate.ClaimOwnerAudit(q.Context()) {
+		t.Fatal("owner native invocation was not exactly once per ticket")
+	}
+	q.Release()
+	if gate.ClaimOwnerAudit(q.Context()) {
+		t.Fatal("released ticket reused")
+	}
+}
+
+func TestWorkerRuntimeSourceWaitHasFixedFiniteEnd(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	p, err := gate.WaitWrapRefresh(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	start := time.Now()
+	if err = p.AwaitFleetObservation(); err == nil {
+		t.Fatal("missing source scheduled maintenance")
+	}
+	elapsed := time.Since(start)
+	if elapsed < 4900*time.Millisecond || elapsed > 6*time.Second {
+		t.Fatal("original finite source wait not enforced", elapsed)
+	}
+	if p.Context().Err() == nil {
+		t.Fatal("expired scheduling attempt remained live")
+	}
+}
+
+func TestWorkerRuntimeSourceExpiryCancelsSelectedDespiteNewerNotice(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	p, err := gate.WaitWrapRefresh(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	a := workerSchedulingAdministration()
+	a.FreshUntil = a.ObservedAt.Add(60 * time.Millisecond)
+	gate.NoteFleetObservation(a)
+	gate.NoteFleetCommitted(t.Context(), a)
+	if err = p.AwaitFleetObservation(); err != nil {
+		t.Fatal(err)
+	}
+	selected := p.Context()
+	newer := workerSchedulingAdministration()
+	gate.NoteFleetObservation(newer)
+	gate.NoteFleetCommitted(t.Context(), newer)
+	select {
+	case <-selected.Done():
+	case <-time.After(time.Second):
+		t.Fatal("new source renewed selected end")
+	}
+	end, _ := selected.Deadline()
+	if !end.Equal(a.FreshUntil) {
+		t.Fatal("original expiry changed")
+	}
+	gate.mu.Lock()
+	retained := gate.active == p.ticket
+	gate.mu.Unlock()
+	if !retained {
+		t.Fatal("expiry released actual unjoined owner")
+	}
+}
+
+func TestWorkerRuntimeFenceCannotBeReopenedByDelayedCommitNotice(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	a := workerSchedulingAdministration()
+	gate.NoteFleetObservation(a)
+	gate.InvalidateFleetNotice()
+	gate.NoteFleetCommitted(t.Context(), a)
+	gate.mu.Lock()
+	present := gate.fleetNotice != nil
+	gate.mu.Unlock()
+	if present {
+		t.Fatal("delayed reply reopened fenced scheduling")
+	}
+}

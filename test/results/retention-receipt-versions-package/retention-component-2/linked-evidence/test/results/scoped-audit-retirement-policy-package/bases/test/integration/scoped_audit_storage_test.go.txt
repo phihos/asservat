@@ -1,0 +1,323 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+)
+
+// The harness owns the backend and its synthetic IAM configuration. This uses
+// the actual SDK/store/audit with separate runtime and retirement credentials,
+// but does not supply installed SQL budgets, provider keys or recovery authority.
+func TestScopedVersionedAuditStorageWithRealServices(t *testing.T) {
+	if os.Getenv("ASSERVAT_SCOPED_AUDIT_STORAGE") != "1" {
+		t.Skip("run scripts/test-custody.py --scoped-audit")
+	}
+	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CUSTODY_FIXTURES"))
+	if err != nil {
+		t.Fatal("fixture unavailable")
+	}
+	var f fixture
+	if json.Unmarshal(raw, &f) != nil || f.S3 == "" {
+		clear(raw)
+		t.Fatal("invalid fixture")
+	}
+	clear(raw)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	bridge := tlsBridge(t, f.S3)
+	const id = "a9a9b231-0d4c-4d72-89aa-1a4516be9e9c"
+	const bucket = "synthetic-scoped-audit"
+	configurationPrefix := "hub-owner-configuration/v1/" + id + "/" + id + "/" + id + "/"
+	prefixes := []string{configurationPrefix, "hub-owner-enrollment/v1/" + id + "/", "hub-owner-certificate/v1/" + id + "/"}
+	credential := func(role string) aws.CredentialsProvider {
+		if role == "administrator" {
+			return credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+		}
+		return credentials.NewStaticCredentialsProvider(role+"-synthetic", role+"-synthetic-secret", "")
+	}
+	client := func(role string) *s3.Client {
+		return s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: credential(role), HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
+	}
+	admin, configuration, owner, retirement := client("administrator"), client("configuration"), client("owner"), client("retirement")
+	if _, err = admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(bucket)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: aws.String(bucket), VersioningConfiguration: &types.VersioningConfiguration{Status: types.BucketVersioningStatusEnabled}}); err != nil {
+		t.Fatal(err)
+	}
+	// SeaweedFS's base Write action includes deletion. A separately administered
+	// explicit denial is therefore part of this qualified permission recipe.
+	policy := map[string]any{"Version": "2012-10-17", "Statement": []any{
+		map[string]any{"Sid": "DenyRuntimeDeletion", "Effect": "Deny", "Principal": map[string]any{"AWS": []string{"arn:aws:iam::000000000000:user/configuration", "arn:aws:iam::000000000000:user/owner"}}, "Action": []string{"s3:DeleteObject", "s3:DeleteObjectVersion"}, "Resource": "arn:aws:s3:::" + bucket + "/*"},
+		map[string]any{"Sid": "DenyRetirementWrites", "Effect": "Deny", "Principal": map[string]any{"AWS": "arn:aws:iam::000000000000:user/retirement"}, "Action": []string{"s3:PutObject"}, "Resource": "arn:aws:s3:::" + bucket + "/*"},
+	}}
+	policyBytes, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: aws.String(bucket), Policy: aws.String(string(policyBytes))}); err != nil {
+		t.Fatal(err)
+	}
+	denied := func(t *testing.T, err error) {
+		t.Helper()
+		var api smithy.APIError
+		if !errors.As(err, &api) || api.ErrorCode() != "AccessDenied" {
+			t.Fatal("expected actual backend AccessDenied", err)
+		}
+	}
+	store, err := objectstore.NewVersionedAudit(bridge.URL, "us-east-1", bucket, credential("configuration"), bridge.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	keyBytes := make([]byte, 32)
+	if _, err = rand.Read(keyBytes); err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(keyBytes)
+	clear(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := authorityTestKeys{a: aead}
+	writer := &objectstore.OwnerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}
+	configurationValue := value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "owner", ServiceUID: id, Deployment: "owner", DeploymentUID: id, ServiceAccount: "owner", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{bridge.Certificate().Raw}}
+	var original audit.Receipt
+	t.Run("scoped-concurrent-encrypted-audit", func(t *testing.T) {
+		type result struct {
+			receipt audit.Receipt
+			err     error
+		}
+		results := make(chan result, 8)
+		var joined sync.WaitGroup
+		for range 8 {
+			joined.Add(1)
+			go func() {
+				defer joined.Done()
+				r, e := writer.WriteOwnerConfiguration(ctx, configurationValue)
+				results <- result{r, e}
+			}()
+		}
+		joined.Wait()
+		close(results)
+		for r := range results {
+			if r.err != nil || r.receipt.Version == "" || r.receipt.Version == "null" {
+				t.Fatal("missing scoped versioned receipt", r.err)
+			}
+			if original.Key == "" {
+				original = r.receipt
+			} else if r.receipt != original {
+				t.Fatal("concurrent same-key audit accepted different receipts")
+			}
+		}
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+	pinned := objectstore.Object{Key: original.Key, VersionID: original.Version, ETag: original.ETag, Bytes: original.Bytes, SHA256: original.SHA256}
+	t.Run("runtime-latest-replacement-preserves-committed-version", func(t *testing.T) {
+		before, e := retirement.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: aws.String(bucket), Prefix: &original.Key, MaxKeys: aws.Int32(16)})
+		if e != nil || aws.ToBool(before.IsTruncated) || len(before.Versions) != 1 || len(before.DeleteMarkers) != 0 || aws.ToString(before.Versions[0].VersionId) != original.Version {
+			t.Fatal("concurrent audit did not retain one version", e)
+		}
+		newer, e := configuration.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: &original.Key, Body: bytes.NewReader([]byte("synthetic malformed later version"))})
+		if e != nil || aws.ToString(newer.VersionId) == "" || aws.ToString(newer.VersionId) == original.Version {
+			t.Fatal("runtime replacement must create a different version", e)
+		}
+		if e = store.Verify(ctx, pinned); e != nil {
+			t.Fatal("committed version inaccessible or changed", e)
+		}
+		if receipt, e := writer.WriteOwnerConfiguration(ctx, configurationValue); e == nil || receipt != (audit.Receipt{}) {
+			t.Fatal("malformed latest audit reconciled")
+		}
+	})
+	t.Run("runtime-cannot-erase-or-reconfigure", func(t *testing.T) {
+		for _, role := range []string{"configuration", "owner"} {
+			c := client(role)
+			t.Run(role, func(t *testing.T) {
+				_, e := c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: &original.Key})
+				denied(t, e)
+				_, e = c.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: &original.Key, VersionId: &original.Version})
+				denied(t, e)
+				_, e = c.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: aws.String(bucket), VersioningConfiguration: &types.VersioningConfiguration{Status: types.BucketVersioningStatusSuspended}})
+				denied(t, e)
+				_, e = c.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: aws.String(bucket), Policy: aws.String(string(policyBytes))})
+				denied(t, e)
+				_, e = c.DeleteBucketPolicy(ctx, &s3.DeleteBucketPolicyInput{Bucket: aws.String(bucket)})
+				denied(t, e)
+				_, e = c.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: aws.String(bucket), Prefix: &original.Key})
+				denied(t, e)
+			})
+		}
+	})
+	t.Run("separate-prefix-and-anonymous-denial", func(t *testing.T) {
+		for _, prefix := range prefixes[1:] {
+			key := prefix + "synthetic"
+			result, e := owner.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: &key, Body: bytes.NewReader([]byte("synthetic owner bytes")), IfNoneMatch: aws.String("*")})
+			if e != nil || aws.ToString(result.VersionId) == "" || aws.ToString(result.VersionId) == "null" {
+				t.Fatal("owner's own prefix unavailable", e)
+			}
+			response, e := owner.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: &key, VersionId: result.VersionId})
+			if e != nil {
+				t.Fatal(e)
+			}
+			body, e := io.ReadAll(io.LimitReader(response.Body, 1024))
+			response.Body.Close()
+			if e != nil || string(body) != "synthetic owner bytes" {
+				t.Fatal("own committed bytes differ", e)
+			}
+			_, e = configuration.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: &key, Body: bytes.NewReader([]byte("foreign"))})
+			denied(t, e)
+			_, e = configuration.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: &key, VersionId: result.VersionId})
+			denied(t, e)
+			_, e = owner.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: &key, VersionId: result.VersionId})
+			denied(t, e)
+		}
+		_, e := owner.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: &original.Key, VersionId: &original.Version})
+		denied(t, e)
+		_, e = owner.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: &original.Key, Body: bytes.NewReader([]byte("foreign"))})
+		denied(t, e)
+		for _, role := range []string{"configuration", "owner", "retirement"} {
+			_, e = client(role).PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String("foreign/synthetic"), Body: bytes.NewReader([]byte("foreign"))})
+			denied(t, e)
+		}
+		_, e = retirement.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(bucket), Key: &original.Key, Body: bytes.NewReader([]byte("retirement cannot write"))})
+		denied(t, e)
+		anonymous := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: aws.AnonymousCredentials{}, HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
+		_, e = anonymous.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: &original.Key, VersionId: &original.Version})
+		denied(t, e)
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+	t.Run("separate-multipart-inventory-and-abort", func(t *testing.T) {
+		key := configurationPrefix + "interrupted"
+		started, e := configuration.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: aws.String(bucket), Key: &key})
+		if e != nil || aws.ToString(started.UploadId) == "" {
+			t.Fatal("synthetic interrupted upload unavailable", e)
+		}
+		part := []byte("synthetic uncommitted part")
+		if _, e = configuration.UploadPart(ctx, &s3.UploadPartInput{Bucket: aws.String(bucket), Key: &key, UploadId: started.UploadId, PartNumber: aws.Int32(1), ContentLength: aws.Int64(int64(len(part))), Body: bytes.NewReader(part)}); e != nil {
+			t.Fatal("synthetic part unavailable", e)
+		}
+		// Object PUT denial must also prevent retirement adding upload parts.
+		_, e = retirement.UploadPart(ctx, &s3.UploadPartInput{Bucket: aws.String(bucket), Key: &key, UploadId: started.UploadId, PartNumber: aws.Int32(2), ContentLength: aws.Int64(int64(len(part))), Body: bytes.NewReader(part)})
+		denied(t, e)
+		found, e := retirement.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: aws.String(bucket), Prefix: &configurationPrefix, MaxUploads: aws.Int32(2)})
+		if e != nil || aws.ToBool(found.IsTruncated) || len(found.Uploads) != 1 || aws.ToString(found.Uploads[0].Key) != key || aws.ToString(found.Uploads[0].UploadId) != aws.ToString(started.UploadId) {
+			t.Fatal("exact incomplete-upload inventory unavailable", e)
+		}
+		if _, e = retirement.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{Bucket: aws.String(bucket), Key: &key, UploadId: started.UploadId}); e != nil {
+			t.Fatal("independent upload abort unavailable", e)
+		}
+		after, e := retirement.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: aws.String(bucket), Prefix: &configurationPrefix, MaxUploads: aws.Int32(2)})
+		if e != nil || aws.ToBool(after.IsTruncated) || len(after.Uploads) != 0 {
+			t.Fatal("upload remained after abort", e)
+		}
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+	t.Run("independent-complete-version-retirement", func(t *testing.T) {
+		// One unknown null version and one delete marker ensure that cleanup
+		// cannot mistake current-key absence for physical absence.
+		if _, e := admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: aws.String(bucket), VersioningConfiguration: &types.VersioningConfiguration{Status: types.BucketVersioningStatusSuspended}}); e != nil {
+			t.Fatal(e)
+		}
+		if receipt, e := store.PutSmall(ctx, configurationPrefix+"unknown", []byte("synthetic uncertain physical copy")); !errors.Is(e, objectstore.ErrStorage) || receipt != (objectstore.Object{}) {
+			t.Fatal("suspended write must remain unacknowledged", e)
+		}
+		if _, e := admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: aws.String(bucket), VersioningConfiguration: &types.VersioningConfiguration{Status: types.BucketVersioningStatusEnabled}}); e != nil {
+			t.Fatal(e)
+		}
+		marker, e := retirement.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: &original.Key})
+		if e != nil || !aws.ToBool(marker.DeleteMarker) || aws.ToString(marker.VersionId) == "" {
+			t.Fatal("fixture deletion did not create the intended marker", e)
+		}
+		if e = store.Verify(ctx, pinned); e != nil {
+			t.Fatal("delete marker incorrectly erased original", e)
+		}
+		var objects []types.ObjectIdentifier
+		pages, versions, markers, nulls := 0, 0, 0, 0
+		for _, prefix := range prefixes {
+			page := s3.NewListObjectVersionsPaginator(retirement, &s3.ListObjectVersionsInput{Bucket: aws.String(bucket), Prefix: &prefix, MaxKeys: aws.Int32(2)})
+			for page.HasMorePages() {
+				pages++
+				if pages > 12 {
+					t.Fatal("inventory did not terminate within original fixture bound")
+				}
+				found, e := page.NextPage(ctx)
+				if e != nil {
+					t.Fatal(e)
+				}
+				for _, v := range found.Versions {
+					if !strings.HasPrefix(aws.ToString(v.Key), prefix) || aws.ToString(v.VersionId) == "" {
+						t.Fatal("unconfined or unaddressable version inventory")
+					}
+					objects = append(objects, types.ObjectIdentifier{Key: v.Key, VersionId: v.VersionId})
+					versions++
+					if aws.ToString(v.VersionId) == "null" {
+						nulls++
+					}
+				}
+				for _, m := range found.DeleteMarkers {
+					if !strings.HasPrefix(aws.ToString(m.Key), prefix) || aws.ToString(m.VersionId) == "" {
+						t.Fatal("unconfined or unaddressable marker inventory")
+					}
+					objects = append(objects, types.ObjectIdentifier{Key: m.Key, VersionId: m.VersionId})
+					markers++
+				}
+			}
+		}
+		if versions != 5 || markers != 1 || nulls != 1 || pages < 4 || len(objects) != 6 {
+			t.Fatalf("incomplete inventory: versions=%d markers=%d nulls=%d pages=%d", versions, markers, nulls, pages)
+		}
+		for _, object := range objects {
+			if _, e = retirement.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: object.Key, VersionId: object.VersionId}); e != nil {
+				t.Fatal("independent exact retirement failed", e)
+			}
+		}
+		for _, prefix := range prefixes {
+			found, e := retirement.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: aws.String(bucket), Prefix: &prefix, MaxKeys: aws.Int32(2)})
+			if e != nil || aws.ToBool(found.IsTruncated) || len(found.Versions) != 0 || len(found.DeleteMarkers) != 0 {
+				t.Fatal("physical versions remained", e)
+			}
+		}
+		if e = store.Verify(ctx, pinned); !errors.Is(e, objectstore.ErrStorage) {
+			t.Fatal("erased original remained available", e)
+		}
+		t.Logf("retired %d versions including %d null copy and %d marker from %d bounded inventory pages", versions, nulls, markers, pages)
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+	if _, err = admin.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: aws.String(bucket)}); err != nil {
+		t.Fatal(err)
+	}
+}

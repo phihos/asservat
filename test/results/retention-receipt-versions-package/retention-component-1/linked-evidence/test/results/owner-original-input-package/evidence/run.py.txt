@@ -1,0 +1,40 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,time,signal
+C=Path(__file__).resolve().parent; L=Path('/home/phil/Projekte/asservat')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+manifest=json.loads((C/'manifest.json').read_text());deps=json.loads((C/'dependencies.json').read_text())
+def check():
+ return {'dependencies':[p for p,v in deps.items() if h(L/p)!=v], 'bases':[v['path'] for v in manifest if h(L/v['path'])!=v['base_sha256']], 'payloads':[v['path'] for v in manifest if h(C/'files'/v['path'])!=v['payload_sha256']]}
+with (C/'evidence/started').open('x'):pass
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(C/'tmp'))
+packages=['./internal/adapters/providerconfig','./internal/contracts','./internal/adapters/kubernetes','./internal/adapters/postgres','./internal/bootstrap','./test/integration']
+overlay='-overlay='+str(C/'overlay.json')
+steps=[('before',['go','test','-overlay='+str(C/'before-overlay.json'),'-count=1','-timeout=180s','-run','^TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects$','-v','./internal/adapters/kubernetes']),('compile',['go','test',overlay,'-run','^$']+packages),('race',['go','test',overlay,'-race','-count=1','-timeout=180s','-run','^Test(OwnerIdentity|InstalledOwner)','-v','./internal/adapters/kubernetes']),('vet',['go','vet',overlay]+packages)]
+result={'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'paths':len(manifest),'dependencies':len(deps),'commands':[]}; terminal=0
+for name,command in steps:
+ before=check()
+ if any(before.values()):terminal=1;result['before_failure']=before;break
+ start=time.monotonic()
+ with (C/'evidence'/f'{name}.log').open('x') as log:
+  p=subprocess.Popen(command,cwd=L,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  print(json.dumps({'phase':name,'pid':p.pid}),flush=True)
+  try:code=p.wait(timeout=300)
+  except subprocess.TimeoutExpired:
+   os.killpg(p.pid,signal.SIGTERM)
+   try:p.wait(timeout=5)
+   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+   code=124
+ after=check(); expected=(name=='before' and code==1 and 'changed original input admitted to immutable projection' in (C/'evidence'/f'{name}.log').read_text())
+ report={'phase':name,'command':command,'exit':code,'expected_before_failure':expected,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+ result['commands'].append(report)
+ with (C/'evidence'/f'{name}.json').open('x') as f:json.dump(report,f,indent=2);f.write('\n')
+ print(json.dumps(report),flush=True)
+ if any(after.values()):terminal=1;break
+ if name=='before':
+  if not expected:terminal=code or 1;break
+ elif code:
+  terminal=code
+  if name!='race':break
+result.update(terminal_exit=terminal,final_hash_check=check())
+with (C/'result.json').open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+print(json.dumps(result),flush=True);raise SystemExit(terminal)

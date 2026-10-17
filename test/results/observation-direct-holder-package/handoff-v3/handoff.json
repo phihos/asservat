@@ -1,0 +1,14 @@
+{
+  "manifest": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/manifest.json",
+  "manifestSHA256": "efd794f683905fef279f901177e09eec7fbbe86bc609d4cc5dd980cfa85a3902",
+  "dependencies": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/dependencies.json",
+  "dependenciesSHA256": "e021151a4d6482a2f888f4425ff39baada02b54a88f9b2ca2b6e158cd891124d",
+  "freezeSHA256": "7451c1e1174f0a7558f2e06cfcdd893851dd0b78b087dc69486a1b573d942fc2",
+  "result": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/evidence/RESULT.json",
+  "resultSHA256": "bb78f4c20b82cc34c26d21d7e61f63f4bb9339e32d3833d83b428d4d92ac2c8e",
+  "handoffSHA256": "321efe0fe094a1705c6f8e6344c9d1327587e4b12d18e78eb994a6437838ffe8",
+  "evidenceSHA256": "4dfd12c8ab913d7d3b7f9d754baaf5a29e38112382bdeb6fc49f57620942575e",
+  "scope": "component only; native path/installed selection pending",
+  "terminalHandle": 44423,
+  "terminal": 0
+}

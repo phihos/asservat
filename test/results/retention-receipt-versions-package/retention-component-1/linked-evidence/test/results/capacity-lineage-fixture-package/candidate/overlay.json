@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/capacity_context_test.go": "/home/phil/.cache/asservat-build/planning/capacity-native-lineage-20261013/candidate-v1/changes/test/integration/capacity_context_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_lineage_test.go": "/home/phil/.cache/asservat-build/planning/capacity-native-lineage-20261013/candidate-v1/changes/test/integration/capacity_lineage_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_session_test.go": "/home/phil/.cache/asservat-build/planning/capacity-native-lineage-20261013/candidate-v1/changes/test/integration/capacity_session_test.go",
+    "/home/phil/Projekte/asservat/test/integration/retention_effect_fixture_test.go": "/home/phil/.cache/asservat-build/planning/capacity-native-lineage-20261013/candidate-v1/changes/test/integration/retention_effect_fixture_test.go"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "started": 1791902313.9269936,
+  "source": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-3",
+  "manifest": "af5090a35acdb24c501523b2d75257ad25dab4e93ef15a9b93f606aa8262d300",
+  "dependencies": "1535516585f63bc91fff33880dd6feb8fa6fa37723711370ccb5f7e3559e2d42",
+  "runner": "f9e9112ffc8d00a1f5e696af186d8856961c55511a621e1b3ad2fa475c5cdbc0",
+  "auxiliary": "292819afc74d14a845d255e30179213dd3ad59166ca24fe16d41ced0cfbda9a1",
+  "native": false,
+  "runtime_enablement": false,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": [],
+    "linked_directories": []
+  },
+  "phases": [
+    {
+      "name": "kms-fixture-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-3/overlay.json",
+        "-count=1",
+        "-timeout=8m",
+        "-v",
+        "./internal/adapters/kms",
+        "-run=^TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 15.504406213760376,
+      "log_sha256": "d9580338f73d7bd6e495c07dcede25543c1258bb829c03a4717b047f9954ee37",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 1,
+      "named_pass": 1
+    },
+    {
+      "name": "bootstrap-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-3/overlay.json",
+        "-count=1",
+        "-timeout=8m",
+        "-v",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 25.00814986228943,
+      "log_sha256": "8095e28ec8d391263a49d96b4c263b6975b3665081b8dc25b83692e992feee58",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 135,
+      "named_pass": 581
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-3/overlay.json",
+        "./internal/application/fleet",
+        "./internal/application/capacity",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/kms",
+        "./internal/bootstrap",
+        "./cmd/asservat",
+        "./test/integration"
+      ],
+      "exit": 1,
+      "expected_exit": 0,
+      "stop_reason": null,
+      "seconds": 11.505182981491089,
+      "log_sha256": "16d4d9e0051d55fe529b85e6174c3cc5689bb3e6ea0882985e53594b90a23db8",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": [],
+        "linked_directories": []
+      },
+      "required_checks_present": true,
+      "intended_assertion": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "boot_id": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-runtime-sustainability-3-rvmk15dv",
+  "tmp_free_before": 16748408832,
+  "mirror_changed": [],
+  "exit": 1,
+  "ended": 1791902367.1890008,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": [],
+    "linked_directories": []
+  },
+  "scratch_removed": true
+}

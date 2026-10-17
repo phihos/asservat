@@ -1,0 +1,9 @@
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/web
+
+
+ Test Files  2 passed (2)
+      Tests  38 passed (38)
+   Start at  13:28:11
+   Duration  1.69s (tests 54%, environment 27%, import 13%, transform 6%)
+

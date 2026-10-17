@@ -1,0 +1,356 @@
+{
+  "name": "get_case",
+  "description": "Read a currently authorized ordinary case of verified pod-status artifacts and effective handling dates. Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes, raw or shared access.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "required": [
+      "case_id"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "case": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "case_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "const": "Ready"
+                      },
+                      "access": {
+                        "const": "ordinary"
+                      }
+                    },
+                    "required": [
+                      "case_id",
+                      "status",
+                      "access"
+                    ]
+                  },
+                  "artifacts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "artifact_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$",
+                          "description": "Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately."
+                        },
+                        "kind": {
+                          "const": "pod-status"
+                        },
+                        "data_class": {
+                          "const": "metadata"
+                        },
+                        "completeness": {
+                          "const": "complete"
+                        },
+                        "expires_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "handling_notice": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "classification": {
+                              "const": "potentialPersonalData"
+                            },
+                            "mayContain": {
+                              "const": [
+                                "personalIdentifiers",
+                                "networkAddresses",
+                                "paths"
+                              ]
+                            },
+                            "expiresAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deleteBy": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deletionState": {
+                              "const": "scheduled"
+                            },
+                            "automaticDeletion": {
+                              "const": true
+                            },
+                            "managedCopiesOnly": {
+                              "const": true
+                            },
+                            "externalCopiesRecallable": {
+                              "const": false
+                            },
+                            "handlingCodes": {
+                              "type": "array",
+                              "items": {
+                                "enum": [
+                                  "minimizeCapture",
+                                  "restrictAccess",
+                                  "preferApprovedExtracts",
+                                  "reviewBeforeSharing",
+                                  "approvedClientsOnly",
+                                  "externalCopiesNotRecalled"
+                                ]
+                              },
+                              "minItems": 6,
+                              "maxItems": 6,
+                              "uniqueItems": true
+                            },
+                            "preservationException": {
+                              "const": false
+                            },
+                            "asOf": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "classification",
+                            "mayContain",
+                            "expiresAt",
+                            "deleteBy",
+                            "deletionState",
+                            "automaticDeletion",
+                            "managedCopiesOnly",
+                            "externalCopiesRecallable",
+                            "handlingCodes",
+                            "preservationException",
+                            "asOf"
+                          ],
+                          "allOf": [
+                            {
+                              "if": {
+                                "properties": {
+                                  "classification": {
+                                    "const": "verifiedNonPersonal"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "properties": {
+                                  "mayContain": {
+                                    "maxItems": 0
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "artifact_id",
+                        "digest",
+                        "kind",
+                        "data_class",
+                        "completeness",
+                        "expires_at",
+                        "handling_notice"
+                      ]
+                    },
+                    "maxItems": 100,
+                    "minItems": 1
+                  },
+                  "timeline": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "time": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "clock_uncertainty_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 3600000
+                        }
+                      },
+                      "required": [
+                        "time",
+                        "kind",
+                        "summary"
+                      ]
+                    },
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "case",
+                  "artifacts",
+                  "timeline"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

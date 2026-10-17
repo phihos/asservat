@@ -1,0 +1,11 @@
+# Worker Advance phase component
+
+The exact128-file native-values-3 foundation is unchanged. Twelve new files implement the private original-context/phase-owned worker Advance, concrete PostgreSQL seam, original-boundary value/effect/final methods and fixed at-most-three-call automatic reconciliation. This is the next component check, not a complete installed producer or Launch replacement.
+
+The seven-package compile includes the actual PostgreSQL-to-Kubernetes opaque-handle import and integration package. Tests exercise forged/cross-root/out-of-order/closed phase denial, original deadlines, joined closure, finite disposition, and actual TLS receipt CAS/readback with committed, pending, absent, unavailable and replaced outcomes. The receipt test uses eight actual SetupReader GETs with synthetic provider bodies and explicitly synthetic prior native/SQL/final phases; it does not qualify full Advance, SQL locks or installed provider authority. Historical receipt component tests remain selected.
+
+The controlled-before variant removes the actual closed-owner admission check. Its deterministic owner-marked-closed assertion must fail; it is a deliberately weakened new-code counterexample, not a historical shipped defect. The corrected selected races, Kube+Postgres vet and real Go architecture graph run with bounded GOMAXPROCS2/-p2 and an explicit home-cache TMPDIR. No generation/native/live mutation. All payloads, bases and dependencies are checked before and after each phase.
+
+Unknown claim/CREATE permits exact inspection only. Unknown receipt permits at most one inspection and no further CAS in the same run; later explicit reconciliation is not represented as a durable receipt-attempt fence. A known spent claim with no admitted effect does not trigger a generic retry. Failed inspection preserves prior original uncertainty as historical Spent, never stale success. Full native+SQL Advance, fresh Launch and joined provider/runtime composition remain unqualified and unselected.
+
+Follow-up only: same140 payloads, same2448 dependencies. Seven-package compile previously passed worker-phase-3-compile,589.058s. No repeated compile. Parent-approved600s wrapper covers compilation/linking only; test timeout30s/3m and production5s remain unchanged. Exact owned tmpfs scratch is removed only after process join.

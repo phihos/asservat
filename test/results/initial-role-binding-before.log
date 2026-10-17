@@ -1,0 +1,54 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block
+=== RUN   TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt
+=== RUN   TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt
+=== RUN   TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark
+=== RUN   TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies
+=== RUN   TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql
+=== RUN   TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny
+=== RUN   TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies
+=== RUN   TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait
+=== RUN   TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-valid
+    initial_installation_test.go:465: installer output 
+    initial_installation_test.go:465: native initial-installer Pod 36d558a4-e371-41e9-8661-0ecae89b0e66 image docker.io/library/asservat-context-worker@sha256:39a541649ea0e13c4c663c71424f5d82cf45e2ba5767ec49362666609f39d236 exit 0
+    initial_installation_test.go:465: probe token retirement observed after 9.402214991s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-missing-guard
+    initial_installation_test.go:465: installer output service stopped: protected configuration, credentials or original deadline unavailable
+        
+    initial_installation_test.go:465: native initial-installer Pod e72594f5-0090-4ce3-9b9d-b55627e0574a image docker.io/library/asservat-context-worker@sha256:39a541649ea0e13c4c663c71424f5d82cf45e2ba5767ec49362666609f39d236 exit 1
+    initial_installation_test.go:465: probe token retirement observed after 1.719969909s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-unbound
+    initial_installation_test.go:465: installer output service stopped: protected configuration, credentials or original deadline unavailable
+        
+    initial_installation_test.go:465: native initial-installer Pod b757a7d5-6023-425e-8911-a566c968a7af image docker.io/library/asservat-context-worker@sha256:39a541649ea0e13c4c663c71424f5d82cf45e2ba5767ec49362666609f39d236 exit 1
+    initial_installation_test.go:465: probe token retirement observed after 1.619318102s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-wrong-sql-role
+    initial_installation_test.go:465: installer output 
+    initial_installation_test.go:465: invalid installer reported success
+=== RUN   TestInitialInstallationWithRealServices/native-witness-source-and-provider-composition
+    initial_installation_test.go:505: actual protected witness and fleet ConfigMaps, real API identities/admission, SQL/S3/OpenBao activation composed; credentials and installation plan are still fixture-provisioned, not an installer Pod
+=== RUN   TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement
+    initial_installation_test.go:508: non-superuser maintenance provisioned exact purpose roles with client-derived SCRAM; exact replay preserves password/expiry, wrong secrets and excess grants deny, retirement revokes existing/new sessions' authority
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:509: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- FAIL: TestInitialInstallationWithRealServices (61.30s)
+    --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block (0.36s)
+    --- PASS: TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt (0.05s)
+    --- PASS: TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt (0.10s)
+    --- PASS: TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark (0.04s)
+    --- PASS: TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies (0.06s)
+    --- PASS: TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql (0.02s)
+    --- PASS: TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny (0.01s)
+    --- PASS: TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies (0.03s)
+    --- PASS: TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write (0.00s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-valid (21.33s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-missing-guard (10.23s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-unbound (10.20s)
+    --- FAIL: TestInitialInstallationWithRealServices/installer-pod-wrong-sql-role (11.93s)
+    --- PASS: TestInitialInstallationWithRealServices/native-witness-source-and-provider-composition (6.29s)
+    --- PASS: TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement (0.49s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	61.359s
+FAIL

@@ -1,0 +1,14 @@
+=== RUN   TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer
+    reconciliation_join_test.go:73: reconciler returned while cancelled observer still owned work
+    reconciliation_join_test.go:83: joined result = current signing trust unavailable; want original cancellation
+--- FAIL: TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer (6.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	6.011s
+=== RUN   TestHubWorkerExternalCloseJoinsRunBeforeClosingResources
+I1013 04:55:15.676049 1207890 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+    hub_worker_join_test.go:81: Close returned with a leader read still active
+E1013 04:55:15.676450 1207890 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+--- FAIL: TestHubWorkerExternalCloseJoinsRunBeforeClosingResources (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.083s
+FAIL

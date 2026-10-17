@@ -1,0 +1,11 @@
+test_actual_build_ignore_sources_and_both_usages_are_required (__main__.DirectHelperRegression.test_actual_build_ignore_sources_and_both_usages_are_required) ... ok
+test_each_missing_test_rejects_even_zero_go_exit (__main__.DirectHelperRegression.test_each_missing_test_rejects_even_zero_go_exit) ... ok
+test_nonzero_exit_cannot_be_hidden_by_pass_lines (__main__.DirectHelperRegression.test_nonzero_exit_cannot_be_hidden_by_pass_lines) ... ok
+test_package_failure_cannot_be_hidden_by_named_passes (__main__.DirectHelperRegression.test_package_failure_cannot_be_hidden_by_named_passes) ... ok
+test_skipped_or_failed_test_rejects (__main__.DirectHelperRegression.test_skipped_or_failed_test_rejects) ... ok
+test_unreviewed_named_pass_rejects (__main__.DirectHelperRegression.test_unreviewed_named_pass_rejects) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.004s
+
+OK

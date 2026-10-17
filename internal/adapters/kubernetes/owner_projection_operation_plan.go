@@ -1,0 +1,210 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+)
+
+func (s *OwnerProjectionOperation) plan(ctx context.Context, launch, inspect bool) error {
+	p := s.resources.State.OwnerIdentity
+	if p != nil && (p.PublicDigest != s.digest || p.RoleRoot != s.activation.RoleRoot || p.RoleSetupID != s.activation.RoleSetupID) {
+		return cfg.ErrChanged
+	}
+	if inspect {
+		if p == nil {
+			return cfg.ErrUnavailable
+		}
+		s.step = ownerProjectionInspect
+		if launch {
+			if s.resources.State.OwnerLaunch == nil {
+				return cfg.ErrUnavailable
+			}
+			s.step = ownerProjectionInspectLaunch
+		}
+		return nil
+	}
+	if launch {
+		return s.planLaunch(ctx)
+	}
+	if p != nil && p.Receipt != nil {
+		s.step = ownerProjectionReadComplete
+		return nil
+	}
+	if s.resources.State.OwnerLaunch != nil || !s.projection.root.resources.now().Before(s.resources.State.Until) {
+		return cfg.ErrUnavailable
+	}
+	next := s.resources.State
+	if p == nil {
+		if s.projection.attemptedParent {
+			return cfg.ErrUnavailable
+		}
+		now, until, err := s.claimDates(ctx)
+		if err != nil {
+			return err
+		}
+		next.OwnerIdentity = &contracts.OwnerIdentityProjectionClaim{OperationID: uuid.NewString(), PublicDigest: s.digest, RoleRoot: s.activation.RoleRoot, RoleSetupID: s.activation.RoleSetupID, ClaimedAt: now, Until: until}
+		s.projection.attemptedParent = true
+		s.step, s.fresh = ownerProjectionParent, true
+		return s.writeResources(ctx, next, false, until)
+	}
+	if p.Credentials == nil || p.Credentials.Receipt == nil {
+		s.step = ownerProjectionAcknowledgeCredentials
+		if p.Credentials != nil {
+			return nil
+		}
+		if s.projection.attemptedCredentials {
+			return cfg.ErrUnavailable
+		}
+		now, until, err := s.claimDates(ctx)
+		if err != nil {
+			return err
+		}
+		copy := *p
+		copy.Credentials = &contracts.OwnerIdentityObjectAttempt{OperationID: uuid.NewString(), ClaimedAt: now, Until: until}
+		next.OwnerIdentity = &copy
+		s.projection.attemptedCredentials = true
+		s.step, s.fresh = ownerProjectionCreateCredentials, true
+		err = s.writeResources(ctx, next, false, until)
+		s.claimedEffect = err == nil
+		return err
+	}
+	if p.Configuration == nil || p.Configuration.Receipt == nil {
+		s.step = ownerProjectionAcknowledgeConfiguration
+		if p.Configuration != nil {
+			return nil
+		}
+		// A positively recorded and actually re-read first child precedes admission
+		// of the second. This read cannot create or replace either child.
+		if _, err := s.readChild(ctx, "credentials"); err != nil {
+			return err
+		}
+		if s.projection.attemptedConfiguration {
+			return cfg.ErrUnavailable
+		}
+		now, until, err := s.claimDates(ctx)
+		if err != nil {
+			return err
+		}
+		copy := *p
+		copy.Configuration = &contracts.OwnerIdentityObjectAttempt{OperationID: uuid.NewString(), ClaimedAt: now, Until: until}
+		next.OwnerIdentity = &copy
+		s.projection.attemptedConfiguration = true
+		s.step, s.fresh = ownerProjectionCreateConfiguration, true
+		err = s.writeResources(ctx, next, false, until)
+		s.claimedEffect = err == nil
+		return err
+	}
+	s.step = ownerProjectionAcknowledgeJoint
+	return nil
+}
+
+func (s *OwnerProjectionOperation) planLaunch(ctx context.Context) error {
+	p := s.resources.State.OwnerIdentity
+	if p == nil || p.Receipt == nil {
+		return cfg.ErrUnavailable
+	}
+	if old := s.resources.State.OwnerLaunch; old != nil {
+		s.step = ownerProjectionAcknowledgeLaunch
+		if old.Receipt != nil {
+			s.step = ownerProjectionReadLaunch
+		}
+		return nil
+	}
+	if s.projection.attemptedLaunch || !s.projection.root.resources.now().Before(s.resources.State.Until) {
+		return cfg.ErrUnavailable
+	}
+	d := s.owner.initial.source.ownerDeployment
+	if d.Spec.Replicas == nil || *d.Spec.Replicas != 0 || s.projection.root.ownerIdentityOperationDeployment(ctx, d, s.resources.State, s.projection.root.input) != nil {
+		return cfg.ErrChanged
+	}
+	inert, err := ownerIdentitySpecDigest(d)
+	if err != nil {
+		return err
+	}
+	running := d.DeepCopy()
+	*running.Spec.Replicas = 1
+	changed, err := ownerIdentitySpecDigest(*running)
+	if err != nil {
+		return err
+	}
+	now, until, err := s.claimDates(ctx)
+	if err != nil {
+		return err
+	}
+	next := s.resources.State
+	next.OwnerLaunch = &contracts.OwnerIdentityLaunchClaim{OperationID: uuid.NewString(), ProjectionOperationID: p.OperationID, InertResourceVersion: d.ResourceVersion, InertDigest: inert, RunningDigest: changed, ClaimedAt: now, Until: until}
+	s.projection.attemptedLaunch = true
+	s.step, s.fresh = ownerProjectionLaunch, true
+	err = s.writeResources(ctx, next, true, until)
+	s.claimedEffect = err == nil
+	return err
+}
+
+func (s *OwnerProjectionOperation) claimDates(ctx context.Context) (time.Time, time.Time, error) {
+	now := s.projection.root.resources.now().UTC().Truncate(time.Microsecond)
+	deadline, ok := ctx.Deadline()
+	until := identity.Earlier(deadline, identity.Earlier(s.owner.until, s.resources.State.Until)).UTC().Truncate(time.Microsecond)
+	if !ok || ctx.Err() != nil || !now.Before(until) {
+		return time.Time{}, time.Time{}, cfg.ErrUnavailable
+	}
+	return now, until, nil
+}
+
+// Each writer accepts only its closed sibling-preserving transition and exact
+// original UID/RV. A failed/unknown write cannot be repeated by this operation.
+func (s *OwnerProjectionOperation) writeResources(ctx context.Context, next contracts.InitialRuntimeResourceState, launch bool, until time.Time) error {
+	p := s.projection
+	old := s.resources
+	transition := ownerIdentityProjectionTransition(old.State, next)
+	if launch {
+		transition = ownerIdentityLaunchTransition(old.State, next)
+	}
+	if !transition || s.object == nil || string(s.object.UID) != old.UID || s.object.ResourceVersion != old.ResourceVersion || !p.root.resources.valid(next) || !p.root.resources.now().Before(old.State.Until) {
+		return cfg.ErrChanged
+	}
+	until = identity.Earlier(until, identity.Earlier(s.owner.until, old.State.Until))
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	if initialHandoverDeadline(call, p.root.resources.now, until) != nil {
+		return cfg.ErrUnavailable
+	}
+	raw, err := json.Marshal(next)
+	defer clear(raw)
+	if err != nil || len(raw) > contracts.InitialRuntimeResourcesMaxBytes {
+		return cfg.ErrInvalid
+	}
+	body := s.object.DeepCopy()
+	body.Data = map[string][]byte{"state.json": raw}
+	if s.pending != nil {
+		s.pending.step = s.step
+		s.pending.resources = old
+		s.pending.resources.State = next
+		s.pending.journalBefore = old.ResourceVersion
+		s.pending.journalUnknown = true
+	}
+	reply, err := p.root.bridge.source.client.api.Put().AbsPath(p.root.resources.path()).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(call)
+	defer clear(reply)
+	if err != nil {
+		return cfg.ErrUnavailable
+	}
+	actual, object, err := p.root.resources.decode(call, reply)
+	if err != nil || actual.UID != old.UID || actual.ResourceVersion == old.ResourceVersion || !equalJSON(actual.State, next) || initialHandoverDeadline(call, p.root.resources.now, until) != nil {
+		return cfg.ErrChanged
+	}
+	actual.ValidUntil = identity.Earlier(actual.ValidUntil, until)
+	s.resources, s.object = actual, object
+	if s.pending != nil {
+		s.pending.resources = actual
+		s.pending.journalUnknown = false
+	}
+	s.owner.mu.Lock()
+	s.owner.until = identity.Earlier(s.owner.until, actual.ValidUntil)
+	s.owner.mu.Unlock()
+	return nil
+}

@@ -1,0 +1,11 @@
+{
+  "name": "legacy-removal-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "scope": "Full Go gate after removing the ADR-171 legacy identity-question protocol",
+  "results": "55 full packages and 543 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (TestInitialRuntimeObjectRoundTripWithRealKubernetes, group 4)",
+  "sourceHashBefore": "12479a3c28a076e570290c7af9fd1e707ae55e92e7cd77630bb99fe0be1ecbc2",
+  "sourceHashAfter": "12479a3c28a076e570290c7af9fd1e707ae55e92e7cd77630bb99fe0be1ecbc2",
+  "sourceHashCovers": "cmd internal test scripts (*.go *.py *.sql *.json *.yaml, excluding test/results)",
+  "log": "go-check.log"
+}

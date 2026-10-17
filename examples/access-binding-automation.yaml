@@ -1,0 +1,33 @@
+apiVersion: asservat.io/v1alpha1
+kind: AccessBinding
+metadata:
+  name: payments-team-automation
+  namespace: asservat-system
+spec:
+  effect: Allow
+  subjects:
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: team-payments
+  roles:
+  - workload-maintainer
+  scope:
+    clusterID: 00000000-0000-4000-8000-000000000001
+    namespaceRef:
+      name: payments
+      uid: namespace-payments-uid
+  reason: Permit reviewed Payments team policies within finite capture and observation
+    budgets.
+  automation:
+    allowedActions:
+    - kubernetesSnapshot
+    - logs
+    - packetCapture
+    - syscallTrace
+    - liveCore
+    - runtimeDiagnostic
+    - command
+    maxLifetimeSeconds: 2592000
+    maxExecutions: 100
+    maxBytes: 1099511627776
+    maxObservedBytes: 1099511627776

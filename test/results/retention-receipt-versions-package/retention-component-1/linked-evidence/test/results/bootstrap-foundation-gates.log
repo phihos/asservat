@@ -1,0 +1,61 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 7 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.538s
+ok  	asservat.local/asservat/internal/adapters/kms	1.166s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	6.055s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.370s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.734s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.333s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.387s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.860s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.022s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.020s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.026s
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+?   	asservat.local/asservat/internal/application/execution	[no test files]
+ok  	asservat.local/asservat/internal/application/fleet	1.020s
+ok  	asservat.local/asservat/internal/application/identity	1.020s
+ok  	asservat.local/asservat/internal/application/planning	1.055s
+ok  	asservat.local/asservat/internal/application/privacy	1.018s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+?   	asservat.local/asservat/internal/contracts	[no test files]
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.011s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.008s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.007s
+ok  	asservat.local/asservat/internal/domain/identity	1.010s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.010s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/test/integration	1.061s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 36 packages, 115 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 6 files match sqlc v1.31.1
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 47 schemas, 48 MCP tools, 161 examples, 171 requirements, 171 scenarios, 11 tasks, 983 local links, 335 rejected invalid examples (7329 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 10, "components": 24, "interfaces": 13, "domainEntitiesMapped": 47, "requirementsMapped": 171, "positiveChecks": 869, "rejectedInvalidCases": 120}
+/tmp/asservat-openapi-validation/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 47 domain entities, 72 browser operations, 48 MCP schema pairs, 329 resolved references.
+/tmp/asservat-openapi-validation/bin/python scripts/check-openapi.py
+PASS: OpenAPI 3.1.1 specification validation with all canonical references bundled locally.

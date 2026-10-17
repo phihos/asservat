@@ -1,0 +1,11 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+    download_sessions_test.go:313: acknowledged intent repeated encrypted audit work 2
+=== RUN   TestContextAdmissionWithRealServices/download-worker-short-runtime
+    download_sessions_test.go:187: reserved worker with less than one second to run
+--- FAIL: TestContextAdmissionWithRealServices (2.29s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (1.42s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-short-runtime (0.55s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.345s
+FAIL

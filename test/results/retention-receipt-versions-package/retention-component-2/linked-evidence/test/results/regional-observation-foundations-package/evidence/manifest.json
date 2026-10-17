@@ -1,0 +1,13 @@
+{
+  "baseFile": "bases.json",
+  "basesSHA256": "25a3384ecd5b9706bf97cb6198b39a971f0fb60b534497def639db10034df8da",
+  "dependenciesSHA256": "db34e41fa52f914c6488a67fec623a10a2d7424c59f5c64e48433ca9f0348ad3",
+  "dependencyFile": "dependencies.json",
+  "liveDependencies": 1808,
+  "overlaySHA256": "d14c97e67f050826990dfca0475c9c30841c54b55aacab440dbbffc3a629ad2c",
+  "ownedPaths": 25,
+  "payloadFile": "payload.json",
+  "payloadSHA256": "dd184b44840ee33340c8b8ac7a7fa8038408e1b94271e14accbef2d21caef8c4",
+  "scope": "ADR144 conversation foundations only; no router, runtime selection or installed/native qualification",
+  "status": "UNRUN"
+}

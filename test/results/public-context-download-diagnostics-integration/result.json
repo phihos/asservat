@@ -1,0 +1,26 @@
+{
+  "status": "integrated; qualification pending",
+  "stageManifestSHA256": "c59d9fb814e7f2fc979a228ddd780e7e7adc8373c1578e1d18130c419c525ae8",
+  "files": [
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "baseSHA256": "c16f5c1a0addbf5230d8e8b5e5a71e5b23ab865eda46f417e30c2a72181de2d5",
+      "sha256": "86de509cb8ae77939ede3df758783a9ffdf594d55e223720ce21e97ddce67e3a"
+    },
+    {
+      "path": "test/integration/public_context_download_diagnostics_checks_test.go",
+      "baseSHA256": null,
+      "sha256": "d1058dc4a88883bca3e07fd691168ee4383535d2f43198f8b4b56295784110ae"
+    },
+    {
+      "path": "test/integration/public_context_download_diagnostics_test.go",
+      "baseSHA256": null,
+      "sha256": "e24877094a715f045d21fb77c3627ce74d29af220bb1485be71e79ee9e12cd55"
+    },
+    {
+      "path": "test/integration/public_context_journey_native_test.go",
+      "baseSHA256": "3415d9209e216fc1feb96660476f912b257d527b81d582af976ccfa1d3e6e276",
+      "sha256": "001420f3430669509b79b541db545fc4839f5e3f6e50d05b0df568d281f6e829"
+    }
+  ]
+}

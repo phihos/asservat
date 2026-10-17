@@ -1,0 +1,6 @@
+--- FAIL: TestWorkerCurrentBrowserRequestHasTypedLifecycleEntryPoints (0.00s)
+    worker_current_missing_test.go:26: browser CurrentIdentity has no typed dispatch entry point; only bearer-credential Ensure exists
+    worker_current_missing_test.go:31: browser CurrentIdentity has no typed enrollment entry point; only bearer-credential Enroll exists
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.006s
+FAIL

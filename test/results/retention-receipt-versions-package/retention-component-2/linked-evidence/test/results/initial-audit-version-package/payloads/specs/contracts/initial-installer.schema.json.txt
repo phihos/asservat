@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-installer.schema.json",
+  "title": "Private first-installation executable inputs v1",
+  "description": "Fixed protected projection, at most 256 KiB. Exact Pod/account/source/admission pins and public provider roots. Credentials are separate files. Runtime checks current native protection and Pod-bound writer authentication, distinct principals/roles, and all original initial-attempt deadlines. Never a restore or public activation request.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "issuerEpoch",
+    "clusterID",
+    "namespace",
+    "witness",
+    "writerAccount",
+    "probeAccount",
+    "pod",
+    "fleetSource",
+    "podSpecDigest",
+    "configuration",
+    "witnessGuard",
+    "fleetGuard",
+    "workloadGuard",
+    "kubernetes",
+    "postgres",
+    "auditStore",
+    "keyService"
+  ],
+  "properties": {
+    "format": {
+      "enum": [
+        "asservat-initial-installer/v1",
+        "asservat-initial-installer/v2"
+      ]
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "issuerEpoch": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "witness": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "writerAccount": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "probeAccount": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "pod": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "fleetSource": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "podSpecDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "configuration": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "witnessGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "fleetGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "workloadGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/postgres"
+    },
+    "auditStore": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/auditStore"
+    },
+    "keyService": {
+      "$ref": "https://asservat.io/spec/v1/hub-worker-deployment.schema.json#/properties/keyService"
+    },
+    "handover": {
+      "const": "asservat-initial-preparation-handover/v1"
+    },
+    "schemaInitialization": {
+      "const": "asservat-initial-schema/v1"
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundleDigest",
+        "head",
+        "databaseOID",
+        "postmasterAt"
+      ],
+      "properties": {
+        "bundleDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "head": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "databaseOID": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "postmasterAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "dependentRequired": {
+    "schemaInitialization": [
+      "schema",
+      "handover"
+    ],
+    "schema": [
+      "schemaInitialization",
+      "handover"
+    ]
+  }
+}

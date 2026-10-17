@@ -1,0 +1,26 @@
+=== RUN   TestConfigurationWorkerLaunchPlanPinsSoleEditAndOriginalDates
+--- PASS: TestConfigurationWorkerLaunchPlanPinsSoleEditAndOriginalDates (0.08s)
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/input_receipt
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/projection
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/existing_launch
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/changed_body
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/expired_bound
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/zero_operation
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/input_operation_collision
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/resource_operation_collision
+=== RUN   TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/parent_setup_collision
+--- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt (0.59s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/input_receipt (0.07s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/projection (0.07s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/existing_launch (0.06s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/changed_body (0.06s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/expired_bound (0.07s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/zero_operation (0.06s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/input_operation_collision (0.06s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/resource_operation_collision (0.07s)
+    --- PASS: TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt/parent_setup_collision (0.07s)
+=== RUN   TestOwnerBootstrapOriginalAllocationAndGeneratedInput
+--- PASS: TestOwnerBootstrapOriginalAllocationAndGeneratedInput (3.77s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	5.491s

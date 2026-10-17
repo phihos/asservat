@@ -1,0 +1,6 @@
+=== RUN   TestInitialBootstrapPassiveWithRealKubernetes
+    initial_bootstrap_passive_test.go:160: protected original projection invalid permission observation request
+--- FAIL: TestInitialBootstrapPassiveWithRealKubernetes (23.94s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	23.993s
+FAIL

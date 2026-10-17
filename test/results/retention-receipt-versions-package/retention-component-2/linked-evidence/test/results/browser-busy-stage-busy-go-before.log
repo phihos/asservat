@@ -1,0 +1,5 @@
+--- FAIL: TestSessionBusyIsTemporaryWithoutCookieRemovalOrRedirect (0.00s)
+    session_busy_test.go:16: busy lost typed retry contract: 503 http.Header{"Content-Type":[]string{"application/problem+json"}, "Retry-After":[]string{"1"}}
+FAIL
+FAIL	asservat.local/asservat/internal/transport/browser	0.005s
+FAIL

@@ -1,0 +1,82 @@
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/valid
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/token
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/empty
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/oversized
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/control
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/unknown-endpoint
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/duplicate
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/absent
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/escape
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/writable
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/cancelled
+--- PASS: TestWorkerNativeCredentialProjectionNoFallback (0.01s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/valid (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/token (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/empty (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/oversized (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/control (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/unknown-endpoint (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/duplicate (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/absent (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/escape (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/writable (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/cancelled (0.00s)
+=== RUN   TestWorkerNativeHTTPDoesNotUseAmbientTrustOrRedirect
+--- PASS: TestWorkerNativeHTTPDoesNotUseAmbientTrustOrRedirect (0.00s)
+=== RUN   TestWorkerNativeJoinedDoesNotSpendNextCommandBudgetOnIdleWait
+--- PASS: TestWorkerNativeJoinedDoesNotSpendNextCommandBudgetOnIdleWait (0.00s)
+=== RUN   TestWorkerNativeJoinedKeepsOriginalStopBounds
+=== RUN   TestWorkerNativeJoinedKeepsOriginalStopBounds/parent-cancelled
+=== RUN   TestWorkerNativeJoinedKeepsOriginalStopBounds/worker-expired
+=== RUN   TestWorkerNativeJoinedKeepsOriginalStopBounds/shorter-parent
+--- PASS: TestWorkerNativeJoinedKeepsOriginalStopBounds (0.00s)
+    --- PASS: TestWorkerNativeJoinedKeepsOriginalStopBounds/parent-cancelled (0.00s)
+    --- PASS: TestWorkerNativeJoinedKeepsOriginalStopBounds/worker-expired (0.00s)
+    --- PASS: TestWorkerNativeJoinedKeepsOriginalStopBounds/shorter-parent (0.00s)
+=== RUN   TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle
+=== RUN   TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle/joined
+=== RUN   TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle/idle
+--- PASS: TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle (0.38s)
+    --- PASS: TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle/joined (0.16s)
+    --- PASS: TestWorkerNativeConversationCeilingAppliesToJoinedAndIdle/idle (0.22s)
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/joined
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup-expiry
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-open
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-command
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/false-joined
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/failed-close
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/foreign-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/expired-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/extended-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/nil-stream
+--- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/joined (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup-expiry (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-open (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-command (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/false-joined (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/failed-close (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/foreign-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/expired-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/extended-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/nil-stream (0.00s)
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/credentials
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/work
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/parent
+--- PASS: TestWorkerNativeSupervisionJoinsBothChildren (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/credentials (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/work (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/parent (0.00s)
+=== RUN   TestWorkerNativeNeverStartsBeforeCredentialReadiness
+--- PASS: TestWorkerNativeNeverStartsBeforeCredentialReadiness (0.00s)
+=== RUN   TestWorkerNativeIdleKeepsOriginalWorkerDeadline
+--- PASS: TestWorkerNativeIdleKeepsOriginalWorkerDeadline (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.443s

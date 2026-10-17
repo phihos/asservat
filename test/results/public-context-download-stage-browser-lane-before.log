@@ -1,0 +1,5 @@
+--- FAIL: TestBrowserStopWithoutEvidenceScopesSurvivesNormalSaturation (0.01s)
+    download_test.go:82: invalid input used Stop lane 400 1
+FAIL
+FAIL	asservat.local/asservat/internal/transport/browser	0.020s
+FAIL

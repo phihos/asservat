@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json",
+  "title": "Protected fixed configuration-reconciler SQL role input",
+  "description": "Purpose-fixed credential bootstrap with current native fleet/owner configuration proof and original positive activation. It never supplies accepted SQL configuration or writes recovery. Separate from public/hub and capacity roles.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "initialClaimID",
+    "clusterID",
+    "namespace",
+    "layoutDigest",
+    "deployment",
+    "serviceAccount",
+    "fleetSource",
+    "ownerSource"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-configuration-runtime-roles/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "initialClaimID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "layoutDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "fleetSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "ownerSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  }
+}

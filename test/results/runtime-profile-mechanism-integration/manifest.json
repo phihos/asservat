@@ -1,0 +1,81 @@
+{
+  "status": "Frozen stage v3: channel and shorter-caller no-effect regressions; production hashes unchanged from v1. Caller regression expected to fail. No build/test run.",
+  "scope": "Bounded named-endpoint Go runtime-profile HTTP acquisition into existing encrypted framing; no public capability or authority producer.",
+  "paths": [
+    {
+      "path": "docs/architecture/runtime-profiles.md",
+      "base_sha256": null,
+      "payload_sha256": "5b89bdf27881c93c023fa1bf2a2e2d4e349af3a65941734a21fdb62be419f944"
+    },
+    {
+      "path": "internal/adapters/diagnostics/go_profile.go",
+      "base_sha256": null,
+      "payload_sha256": "3ff90e8361d59908b1eda60687895db60d432cc4f09e430e26be8e1957f3eac8"
+    },
+    {
+      "path": "internal/adapters/diagnostics/go_profile_test.go",
+      "base_sha256": null,
+      "payload_sha256": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86"
+    },
+    {
+      "path": "internal/application/execution/go_profile.go",
+      "base_sha256": null,
+      "payload_sha256": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90"
+    },
+    {
+      "path": "internal/domain/execution/go_profile.go",
+      "base_sha256": null,
+      "payload_sha256": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998"
+    },
+    {
+      "path": "internal/domain/execution/go_profile_test.go",
+      "base_sha256": null,
+      "payload_sha256": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e"
+    },
+    {
+      "path": "specs/profiles.md",
+      "base_sha256": "f4d1f026cafb0b7385ba82fbdea151d4c6de07ecfef39cf6b7d67c0d27a5515a",
+      "payload_sha256": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+    }
+  ],
+  "review_patch_sha256": "e9b734d7e07be14a278993bb2420e14dc6254bb8aec2b5dac6226d36369147e5",
+  "test_parents": [
+    "TestGoProfileBodyBoundsAndIncompleteResponses",
+    "TestGoProfileCallerCancellationRetainsUncertainStart",
+    "TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket",
+    "TestGoProfileEncryptedNativeBytesAndFixedQueries",
+    "TestGoProfileInvalidCompositionClosesPreparedAttempt",
+    "TestGoProfileObservationNeverExtendsActionDeadline",
+    "TestGoProfileObserverJoinsBeforeReturningOutput",
+    "TestGoProfileParametersUseFiniteRuntimeSemantics",
+    "TestGoProfileRealCPUProviderAndBusyClassification",
+    "TestGoProfileRedirectStatusAndErrorsNeverEscape",
+    "TestGoProfileRefusesCredentialOnClearChannel",
+    "TestGoProfileRequestRetainsExactNodeAndOriginalBounds",
+    "TestGoProfileRevocationWhileBodyBlocked",
+    "TestGoProfileShortCallerCannotStartUnfinishableRecording",
+    "TestGoProfileShortChannelCannotStartUnfinishableRecording",
+    "TestGoProfileShortOriginalChannelDeadlineCannotBeExtended",
+    "TestGoProfileSinkMustConsumeCompleteOriginalStream"
+  ],
+  "test_parent_count": 17,
+  "dependencies_changed": false,
+  "public_wire_changed": false,
+  "requirements": [
+    "REQ-PRF-001",
+    "REQ-PRF-002",
+    "REQ-PRF-003",
+    "REQ-LIF-001",
+    "REQ-EXE-002"
+  ],
+  "pending": [
+    "profile-specific durable admission/runtime-domain mutual exclusion",
+    "trusted endpoint/template/current authority producers",
+    "qualified target-node/network-namespace dialing",
+    "raw profile custody/manifest semantic verification/publication",
+    "shared UI/MCP/native-download workflow",
+    "isolated maintained pprof parser/flamegraph/comparison"
+  ],
+  "previous_manifest_sha256": "c5bab02123c2c863dbff22ce4d2d69ed8ae903a07f4b81110df7c2318f1c1287",
+  "expected_regression_failure": "TestGoProfileShortCallerCannotStartUnfinishableRecording"
+}

@@ -1,0 +1,119 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func (s *ConfigurationRoleSource) configurationRoleGuardVersions(ctx context.Context) ([3]string, error) {
+	var out [3]string
+	var e error
+	w := s.protection
+	if out[0], e = checkAdmissionGuard(ctx, s.client, w.plan.Name, w.pin, w.policy, w.binding); e != nil {
+		return out, e
+	}
+	for n, g := range []*configMapProtection{s.fleet.protection.configMapProtection, s.owner.protection.configMapProtection} {
+		if out[n+1], e = checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding); e != nil {
+			return out, e
+		}
+	}
+	return out, nil
+}
+
+// Recheck is available only through the private current operation slot. It
+// retains the first observation dates while repeating actual current RBAC,
+// admission, complete source values and live workload/account checks.
+func (s *ConfigurationRoleSource) recheckConfigurationRoleSource(ctx context.Context, original configurationRoleObserved) (configurationRoleObserved, error) {
+	var zero configurationRoleObserved
+	p := original.observation
+	if !configurationRoleSourceMatches(s.input, p, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	live, end := context.WithDeadline(ctx, p.FreshUntil)
+	defer end()
+	ns, e := s.client.namespace(live, s.client.control)
+	if e != nil || ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	before, e := s.configurationRoleGuardVersions(live)
+	if e != nil || before != original.guards {
+		return zero, cfg.ErrChanged
+	}
+	raw, e := s.client.proofPost(live, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
+	var who auth.SelfSubjectReview
+	if e != nil || strictGuardJSON(raw, &who) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	administrator := false
+	for _, a := range s.protection.plan.Administrators {
+		administrator = administrator || actorMatches(a, who.Status.UserInfo)
+	}
+	if !administrator {
+		return zero, cfg.ErrDenied
+	}
+	// No identity-only shortcut for current enforcement. These are fresh actual
+	// non-administrator identity, RBAC and exact denied dry-run requests.
+	if e = s.protection.prove(live, p.ObservedAt); e != nil {
+		return zero, e
+	}
+	if e = s.fleet.protection.prove(live); e != nil {
+		return zero, e
+	}
+	if e = s.owner.protection.prove(live); e != nil {
+		return zero, e
+	}
+	f, e := s.fleet.settings.FleetAdministration(live)
+	if e != nil || f.Suspended || !f.Valid(s.client.now()) || f.InstallationID != p.InstallationID || f.IssuerEpoch != p.IssuerEpoch || f.Revision.UID != p.Fleet.UID || f.Revision.Generation != p.Fleet.Generation || hex.EncodeToString(f.Revision.Digest[:]) != p.Fleet.Digest {
+		return zero, cfg.ErrChanged
+	}
+	o, rootsUntil, e := s.owner.snapshot(live)
+	if e != nil || o.Suspended || o.Pool.InstallationID != p.InstallationID || o.Pool.ClusterID != p.ClusterID || o.Pool.IssuerEpoch != p.IssuerEpoch || o.Pool.NamespaceUID != p.NamespaceUID || o.Revision.UID != p.Owner.UID || o.Revision.Generation != p.Owner.Generation || hex.EncodeToString(o.Revision.Digest[:]) != p.Owner.Digest {
+		return zero, cfg.ErrChanged
+	}
+	reader := &OwnerEndpoints{client: s.client, pool: o.Pool}
+	d, e := ownerResource[apps.Deployment](reader, live, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
+	if e != nil || !configurationRoleDeploymentBound(d, s.input) || d.ResourceVersion != original.deploymentVersion {
+		return zero, cfg.ErrChanged
+	}
+	encoded, e := json.Marshal(d.Spec)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	digest := sha256.Sum256(encoded)
+	if hex.EncodeToString(digest[:]) != p.WorkloadDigest {
+		return zero, cfg.ErrChanged
+	}
+	a, e := ownerResource[core.ServiceAccount](reader, live, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+	if e != nil || !ownerMetadata(a.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) || a.ResourceVersion != original.accountVersion {
+		return zero, cfg.ErrChanged
+	}
+	after, e := s.configurationRoleGuardVersions(live)
+	if e != nil || after != before {
+		return zero, cfg.ErrChanged
+	}
+	ns, e = s.client.namespace(live, s.client.control)
+	if e != nil || ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	p.FreshUntil = identity.Earlier(p.FreshUntil, identity.Earlier(f.FreshUntil, rootsUntil))
+	if d, ok := ctx.Deadline(); ok {
+		p.FreshUntil = identity.Earlier(p.FreshUntil, d)
+	}
+	if live.Err() != nil || !configurationRoleSourceMatches(s.input, p, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	// Persisted source observations compare by their original instants; Go's
+	// process-local monotonic clock payload is not part of the JSON contract.
+	p.FreshUntil = p.FreshUntil.UTC()
+	original.observation = p
+	return original, nil
+}

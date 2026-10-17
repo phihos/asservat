@@ -1,0 +1,379 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"os/exec"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	admission "k8s.io/api/admissionregistration/v1"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
+)
+
+// This resource setup is deliberately outside any measured operation. It
+// supplies synthetic installer acceptance over real original API identities;
+// it never claims an acknowledged installed v2 backend or namespace history.
+type directNativeCluster struct {
+	api         kubernetes.Interface
+	config      *rest.Config
+	kubeconfig  string
+	id          string
+	namespace   *core.Namespace
+	accounts    map[string]*core.ServiceAccount
+	deployments map[string]*apps.Deployment
+	pods        map[string]*core.Pod
+	plan        cfg.OwnerWorkloadAdministration
+	guard       kube.GuardPin
+	protection  artifact.Digest
+	probeToken  string
+	service     *core.Service
+	dial        string
+	image       artifact.Digest
+}
+
+func newDirectNativeCluster(t *testing.T, ctx context.Context, f fixture, index int, installation string) *directNativeCluster {
+	t.Helper()
+	if index < 0 || index >= len(f.Clusters) || f.WorkerImage == "" {
+		t.Fatal("fixed native fixture cluster/image missing")
+	}
+	parts := strings.Split(f.WorkerImage, "@sha256:")
+	if len(parts) != 2 {
+		t.Fatal("native helper image lacks exact digest")
+	}
+	digest, e := hex.DecodeString(parts[1])
+	if e != nil || len(digest) != 32 {
+		t.Fatal("native helper image digest invalid")
+	}
+	config, e := clientcmd.BuildConfigFromFlags("", f.Clusters[index].Config)
+	if e != nil {
+		t.Fatal("native API config unavailable")
+	}
+	api, e := kubernetes.NewForConfig(config)
+	if e != nil {
+		t.Fatal("native API client unavailable")
+	}
+	id := custodyID()
+	name := "direct-observation-" + id[len(id)-10:]
+	ns, e := api.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted", "native-team": "test"}}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("native namespace create", e)
+	}
+	x := &directNativeCluster{api: api, config: config, kubeconfig: f.Clusters[index].Config, id: custodyID(), namespace: ns, accounts: map[string]*core.ServiceAccount{}, deployments: map[string]*apps.Deployment{}, pods: map[string]*core.Pod{}}
+	copy(x.image[:], digest)
+	t.Cleanup(func() {
+		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if e := api.CoreV1().Namespaces().Delete(c, name, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+			t.Error("native namespace cleanup", e)
+		}
+	})
+	modes := []string{"owner", "hwork"}
+	guardDeployment := "owner"
+	if index == 1 {
+		modes = []string{"regional"}
+		guardDeployment = "regional"
+	}
+	for _, account := range append(append([]string{}, modes...), "probe", "setup-observer") {
+		a, e := api.CoreV1().ServiceAccounts(name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: account}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("native account create", e)
+		}
+		x.accounts[account] = a
+	}
+	for _, mode := range modes {
+		labels := map[string]string{"app": name, "fixture-role": mode}
+		var audience, tokenFile string
+		switch mode {
+		case "owner":
+			audience = kube.OwnerEnrollmentAudience(installation)
+			tokenFile = "owner.token"
+		case "hwork":
+			audience = value.ClusterObservationAudience(installation)
+			tokenFile = "caller.token"
+		case "regional":
+			audience = kube.ConnectorEnrollmentAudience(installation)
+			tokenFile = "connector.token"
+		}
+		projection := []core.VolumeProjection{{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: mode + "-inputs"}, Optional: ptr.To(true)}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "observer.token", ExpirationSeconds: ptr.To(int64(600))}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Audience: audience, Path: tokenFile, ExpirationSeconds: ptr.To(int64(600))}}}
+		spec := core.PodSpec{ServiceAccountName: mode, AutomountServiceAccountToken: ptr.To(false), EnableServiceLinks: ptr.To(false), RestartPolicy: core.RestartPolicyAlways, TerminationGracePeriodSeconds: ptr.To(int64(10)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), RunAsGroup: ptr.To(int64(65532)), FSGroup: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Volumes: []core.Volume{{Name: "fixture", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0400)), Sources: projection}}}, {Name: "state", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: ptr.To(resource.MustParse("8Mi"))}}}}, Containers: []core.Container{{Name: "fixture", Image: f.WorkerImage, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/observation-native", mode}, Env: []core.EnvVar{{Name: "POD_UID", ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}}, VolumeMounts: []core.VolumeMount{{Name: "fixture", MountPath: "/fixture", ReadOnly: true}, {Name: "state", MountPath: "/state"}}, SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}, Resources: core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m"), core.ResourceMemory: resource.MustParse("256Mi")}}}}, Tolerations: []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: core.TolerationOpExists, Effect: core.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(300))}, {Key: "node.kubernetes.io/unreachable", Operator: core.TolerationOpExists, Effect: core.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(300))}}}
+		d, e := api.AppsV1().Deployments(name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: mode}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: spec}}}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("native helper Deployment create", e)
+		}
+		x.deployments[mode] = d
+	}
+	if index == 0 {
+		ports := []core.ServicePort{{Name: "owner", Port: 9443, TargetPort: intstr.FromInt(9443), Protocol: core.ProtocolTCP}, {Name: "observation", Port: 9444, TargetPort: intstr.FromInt(9444), Protocol: core.ProtocolTCP}, {Name: "public", Port: 9445, TargetPort: intstr.FromInt(9445), Protocol: core.ProtocolTCP}}
+		selected := map[string]string{"app": name, "fixture-role": "owner"}
+		x.service, e = api.CoreV1().Services(name).Create(ctx, &core.Service{ObjectMeta: meta.ObjectMeta{Name: "owner"}, Spec: core.ServiceSpec{Selector: selected, Ports: ports}}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("original native Service create", e)
+		}
+		reachable, e := api.CoreV1().Services(name).Create(ctx, &core.Service{ObjectMeta: meta.ObjectMeta{Name: "fixture-regional-dial"}, Spec: core.ServiceSpec{Type: core.ServiceTypeNodePort, Selector: selected, Ports: []core.ServicePort{{Name: "fixture-observation", Port: 9444, TargetPort: intstr.FromInt(9444), Protocol: core.ProtocolTCP}}}}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("fixture reachability Service create", e)
+		}
+		nodes, e := api.CoreV1().Nodes().List(ctx, meta.ListOptions{})
+		if e != nil {
+			t.Fatal("owned node address", e)
+		}
+		for _, node := range nodes.Items {
+			if string(node.UID) != f.Clusters[index].NodeUID {
+				continue
+			}
+			for _, address := range node.Status.Addresses {
+				if address.Type == core.NodeInternalIP && net.ParseIP(address.Address) != nil {
+					x.dial = net.JoinHostPort(address.Address, fmt.Sprint(reachable.Spec.Ports[0].NodePort))
+				}
+			}
+		}
+		if x.dial == "" {
+			t.Fatal("original owned node address missing")
+		}
+	}
+	who, e := api.AuthenticationV1().SelfSubjectReviews().Create(ctx, &auth.SelfSubjectReview{}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("fixture administrator identity", e)
+	}
+	x.plan = cfg.OwnerWorkloadAdministration{Name: name, ControlNamespace: cfg.NamespaceRef{Name: name, UID: string(ns.UID)}, Deployment: guardDeployment, DeploymentUID: string(x.deployments[guardDeployment].UID), Administrators: []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}}
+	if index == 1 {
+		x.plan.ConfigurationProbes = []cfg.OwnerConfigurationProbe{{ServiceAccount: "probe", ConfigMap: "connector-identity"}}
+	}
+	x.installAccess(t, ctx, modes)
+	policy, binding, e := kube.OwnerWorkloadAdmission(x.plan)
+	if e != nil {
+		t.Fatal("native namespace guard plan", e)
+	}
+	x.guard = x.installGuard(t, ctx, policy, binding)
+	for _, mode := range modes {
+		x.waitPod(t, ctx, mode)
+	}
+	t.Cleanup(func() {
+		if t.Failed() {
+			for _, mode := range modes {
+				x.closedDiagnostics(t, mode)
+			}
+		}
+	})
+	observer, probe := x.clients(t)
+	guard, e := kube.NewOwnerWorkloadProtection(observer, probe, x.plan, x.guard)
+	if e != nil {
+		t.Fatal("native namespace guard reader", e)
+	}
+	// Admission propagation retry is setup only, before any credential/query.
+	for end := time.Now().Add(15 * time.Second); time.Now().Before(end); {
+		x.protection, _, e = guard.Current(ctx)
+		if e == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("native guard setup cancelled")
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	if e != nil {
+		t.Fatal("native namespace guard unavailable", e)
+	}
+	return x
+}
+
+func (x *directNativeCluster) installGuard(t *testing.T, ctx context.Context, p *admission.ValidatingAdmissionPolicy, b *admission.ValidatingAdmissionPolicyBinding) kube.GuardPin {
+	t.Helper()
+	p, e := x.api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, p, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("native policy create", e)
+	}
+	b, e = x.api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, b, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("native binding create", e)
+	}
+	t.Cleanup(func() {
+		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for _, e := range []error{x.api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(c, b.Name, meta.DeleteOptions{}), x.api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(c, p.Name, meta.DeleteOptions{})} {
+			if e != nil && !apierrors.IsNotFound(e) {
+				t.Error("native guard cleanup", e)
+			}
+		}
+	})
+	return kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
+}
+
+func (x *directNativeCluster) waitPod(t *testing.T, ctx context.Context, mode string) {
+	t.Helper()
+	for ctx.Err() == nil {
+		list, e := x.api.CoreV1().Pods(x.namespace.Name).List(ctx, meta.ListOptions{LabelSelector: "fixture-role=" + mode})
+		if e != nil {
+			t.Fatal("native helper Pod lookup", e)
+		}
+		if len(list.Items) > 1 {
+			t.Fatal("native helper original Pod ambiguous")
+		}
+		if len(list.Items) == 1 {
+			p := list.Items[0]
+			if p.DeletionTimestamp != nil {
+				t.Fatal("native helper original Pod deleting")
+			}
+			for _, s := range p.Status.ContainerStatuses {
+				if s.RestartCount != 0 || s.State.Terminated != nil {
+					t.Fatal("native helper terminated before immutable inputs")
+				}
+			}
+			if p.Status.Phase == core.PodRunning && p.Status.PodIP != "" {
+				x.pods[mode] = p.DeepCopy()
+				d, e := x.api.AppsV1().Deployments(x.namespace.Name).Get(ctx, mode, meta.GetOptions{})
+				if e != nil {
+					t.Fatal(e)
+				}
+				x.deployments[mode] = d
+				return
+			}
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	t.Fatal("native helper startup expired")
+}
+
+func (x *directNativeCluster) installInput(t *testing.T, ctx context.Context, mode string, in Input) {
+	t.Helper()
+	if in.PodUID != string(x.pods[mode].UID) || in.Mode != mode {
+		t.Fatal("native input original Pod mismatch")
+	}
+	raw, e := json.Marshal(in)
+	if e != nil || len(raw) > 512<<10 {
+		t.Fatal("native input encode")
+	}
+	defer clear(raw)
+	_, e = x.api.CoreV1().Secrets(x.namespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: mode + "-inputs"}, Immutable: ptr.To(true), Data: map[string][]byte{"input.json": raw, "probe.token": []byte(x.probeToken)}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("native immutable input create", e)
+	}
+}
+
+func (x *directNativeCluster) control(ctx context.Context, mode string, q ControlRequest) (ControlResult, error) {
+	var zero ControlResult
+	if x.pods[mode] == nil || ctx.Err() != nil {
+		return zero, fmt.Errorf("native original helper unavailable")
+	}
+	until, ok := ctx.Deadline()
+	if !ok || !time.Now().Before(until) {
+		return zero, fmt.Errorf("native control requires original deadline")
+	}
+	q.Until = until
+	raw, e := json.Marshal(q)
+	if e != nil {
+		return zero, e
+	}
+	command := exec.CommandContext(ctx, "kubectl", "--kubeconfig", x.kubeconfig, "--request-timeout=35s", "exec", "-i", "-n", x.namespace.Name, x.pods[mode].Name, "--", "/observation-native", "control")
+	command.Stdin = strings.NewReader(string(raw))
+	output, e := command.Output()
+	if e != nil {
+		return zero, fmt.Errorf("native fixed control transport unavailable")
+	}
+	if len(output) > 64<<10 || json.Unmarshal(output, &zero) != nil {
+		return ControlResult{}, fmt.Errorf("native fixed control response invalid")
+	}
+	return zero, nil
+}
+
+func (x *directNativeCluster) template(t *testing.T, mode string) artifact.Digest {
+	t.Helper()
+	digest, e := kube.ConnectorAPITemplateDigest(x.deployments[mode].Spec.Template)
+	if e != nil {
+		t.Fatal("native full template digest", e)
+	}
+	return digest
+}
+
+// Shutdown is restrictive fixture control only. A closed/unknown control reply
+// is never considered joined; the exact original Pod must expose the marker
+// written after all admitted handlers, native I/O and SQL pools have closed.
+func (x *directNativeCluster) shutdown(t *testing.T, mode string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	_, _ = x.control(call, mode, ControlRequest{Command: "shutdown"})
+	stop()
+	for ctx.Err() == nil {
+		command := exec.CommandContext(ctx, "kubectl", "--kubeconfig", x.kubeconfig, "--request-timeout=5s", "exec", "-n", x.namespace.Name, x.pods[mode].Name, "--", "/observation-native", "joined")
+		output, e := command.Output()
+		if e == nil && string(output) == "joined\n" {
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	t.Error("native original helper did not positively join", mode)
+}
+
+func (x *directNativeCluster) closedDiagnostics(t *testing.T, mode string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	original := x.pods[mode]
+	if original == nil {
+		return
+	}
+	pod, e := x.api.CoreV1().Pods(x.namespace.Name).Get(ctx, original.Name, meta.GetOptions{})
+	if e != nil || pod.UID != original.UID {
+		t.Log("native helper diagnostics unavailable", mode)
+		return
+	}
+	previous := false
+	for _, s := range pod.Status.ContainerStatuses {
+		if s.RestartCount > 0 {
+			previous = true
+		}
+	}
+	for _, prior := range []bool{false, true} {
+		if prior && !previous {
+			continue
+		}
+		stream, e := x.api.CoreV1().Pods(x.namespace.Name).GetLogs(original.Name, &core.PodLogOptions{Container: "fixture", Previous: prior, TailLines: ptr.To(int64(8)), LimitBytes: ptr.To(int64(8192))}).Stream(ctx)
+		if e != nil {
+			continue
+		}
+		raw, e := io.ReadAll(io.LimitReader(stream, 8193))
+		_ = stream.Close()
+		if e != nil || len(raw) > 8192 {
+			clear(raw)
+			continue
+		}
+		for _, line := range bytes.Split(raw, []byte{'\n'}) {
+			var v struct{ Phase, Category string }
+			if json.Unmarshal(line, &v) == nil && slices.Contains([]string{"inputs", "composition", "owner-composition", "owner-enrollment", "regional-composition", "regional-enrollment", "native-listener", "control"}, v.Phase) && slices.Contains([]string{"none", "deadline", "cancelled", "invalid", "denied", "changed", "unavailable"}, v.Category) {
+				t.Logf("native helper closed failure mode=%s phase=%s category=%s previous=%t", mode, v.Phase, v.Category, prior)
+			}
+		}
+		clear(raw)
+	}
+}

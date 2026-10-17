@@ -1,0 +1,23 @@
+{
+  "files": [
+    {
+      "path": "test/integration/helm_bootstrap_test.go",
+      "beforeSHA256": "97ffe9ac0c3d301239a95eda378d70bb1197fc59ffd6fe59b9d237a7cfbd51e9",
+      "afterSHA256": "aa3873bf842bc69d3d72a679229e82605ae3139758cfb1c6e8363cdec0c05de0"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_chain_test.go",
+      "beforeSHA256": "82779b0d5721e858d9722e66a05e022116db760987b6bf0d557f9227a715a3fb",
+      "afterSHA256": "6bbc4e634539516e071f7b2c6826ae4606ff478f8b816438678e0e5a2191cb1b"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_copy_test.go",
+      "beforeSHA256": "2091f2db8c676ea3477546215a190673804ea762532d9b09db7b5f1c49b9234d",
+      "afterSHA256": "445973259adddb3e754fc60b88b0dae8cefea2dbc23c1f5b0368e2eccd5d76cc"
+    }
+  ],
+  "scope": "Fixture-only independent probe identity correction; no production policy changes.",
+  "qualification": "review and compile/vet/canonical passed; native pending",
+  "beforeResultSHA256": "6a8d2e60810d64807503fb3378ba5c5f112b622840f2951a0090e35ce8618700",
+  "componentResultSHA256": "9088e0d8968899c54e630140977f5f3be41de6bec989554eb784e67090fb7200"
+}

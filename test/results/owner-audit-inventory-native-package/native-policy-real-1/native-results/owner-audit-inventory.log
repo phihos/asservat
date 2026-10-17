@@ -1,0 +1,6 @@
+=== RUN   TestOwnerAuditInventoryWithRealServices
+    owner_audit_inventory_test.go:139: invalid artifact storage descriptor
+--- FAIL: TestOwnerAuditInventoryWithRealServices (0.24s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.294s
+FAIL

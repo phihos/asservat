@@ -1,0 +1,356 @@
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/valid
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/token
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/empty
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/oversized
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/control
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/unknown-endpoint
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/duplicate
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/absent
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/escape
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/writable
+=== RUN   TestWorkerNativeCredentialProjectionNoFallback/cancelled
+--- PASS: TestWorkerNativeCredentialProjectionNoFallback (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/valid (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/token (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/empty (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/oversized (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/control (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/unknown-endpoint (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/duplicate (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/absent (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/escape (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/writable (0.00s)
+    --- PASS: TestWorkerNativeCredentialProjectionNoFallback/cancelled (0.00s)
+=== RUN   TestWorkerNativeHTTPDoesNotUseAmbientTrustOrRedirect
+--- PASS: TestWorkerNativeHTTPDoesNotUseAmbientTrustOrRedirect (0.00s)
+=== RUN   TestWorkerTemporaryStorageCredentialNeedsKnownExpiry
+--- PASS: TestWorkerTemporaryStorageCredentialNeedsKnownExpiry (0.00s)
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/static
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/temporary_exact_end
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/temporary_later_end
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/unknown
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/ends_during_download
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/expired
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/malformed
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/noncanonical
+=== RUN   TestWorkerStorageCredentialCoversOriginalLifetime/bounded_static
+--- PASS: TestWorkerStorageCredentialCoversOriginalLifetime (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/static (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/temporary_exact_end (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/temporary_later_end (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/unknown (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/ends_during_download (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/expired (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/malformed (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/noncanonical (0.00s)
+    --- PASS: TestWorkerStorageCredentialCoversOriginalLifetime/bounded_static (0.00s)
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/joined
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup-expiry
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-open
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-command
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/false-joined
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/failed-close
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/foreign-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/expired-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/extended-idle
+=== RUN   TestWorkerNativeOnlyReentersAfterPositiveDisposition/nil-stream
+--- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/joined (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle-after-setup-expiry (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-open (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-command (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/false-joined (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/failed-close (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/foreign-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/expired-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/extended-idle (0.00s)
+    --- PASS: TestWorkerNativeOnlyReentersAfterPositiveDisposition/nil-stream (0.00s)
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/credentials
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/work
+=== RUN   TestWorkerNativeSupervisionJoinsBothChildren/parent
+--- PASS: TestWorkerNativeSupervisionJoinsBothChildren (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/credentials (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/work (0.00s)
+    --- PASS: TestWorkerNativeSupervisionJoinsBothChildren/parent (0.00s)
+=== RUN   TestWorkerNativeNeverStartsBeforeCredentialReadiness
+--- PASS: TestWorkerNativeNeverStartsBeforeCredentialReadiness (0.00s)
+=== RUN   TestWorkerNativeIdleKeepsOriginalWorkerDeadline
+--- PASS: TestWorkerNativeIdleKeepsOriginalWorkerDeadline (0.00s)
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/missing-pod
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/duplicate
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/path
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/alternate-flag
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/positional
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/date
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/unknown
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/digest
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/digest#01
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/installation
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/cluster
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/expired-root
+=== RUN   TestWorkerStartupExactArgumentsAndConfigPin/changed-bytes
+--- PASS: TestWorkerStartupExactArgumentsAndConfigPin (0.01s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/missing-pod (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/duplicate (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/path (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/alternate-flag (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/positional (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/date (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/unknown (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/digest (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/digest#01 (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/installation (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/cluster (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/expired-root (0.00s)
+    --- PASS: TestWorkerStartupExactArgumentsAndConfigPin/changed-bytes (0.00s)
+=== RUN   TestWorkerWaitCancelled
+--- PASS: TestWorkerWaitCancelled (0.00s)
+=== RUN   TestWorkerControlRejectsUntrustedPayloads
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/unknown
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/duplicate
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/private-key
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/empty-roots
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/duplicate-roots
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/too-many-roots
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/not-a-certificate
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/callback-path
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/credentials
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/http
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/fragment
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/empty-fragment
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/query
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/empty-query
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/wrong-format
+=== RUN   TestWorkerControlRejectsUntrustedPayloads/missing
+--- PASS: TestWorkerControlRejectsUntrustedPayloads (0.02s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/unknown (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/duplicate (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/private-key (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/empty-roots (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/duplicate-roots (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/too-many-roots (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/not-a-certificate (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/callback-path (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/credentials (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/http (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/fragment (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/empty-fragment (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/query (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/empty-query (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/wrong-format (0.00s)
+    --- PASS: TestWorkerControlRejectsUntrustedPayloads/missing (0.00s)
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/valid
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-source
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/http-provider
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document
+--- PASS: TestHubWorkerProjectionPinsAndProviderIsolation (0.03s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/valid (0.01s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-source (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/http-provider (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document (0.00s)
+=== RUN   TestInitialInstallerClosedInputsAndPlan
+=== RUN   TestInitialInstallerClosedInputsAndPlan/same-principal
+=== RUN   TestInitialInstallerClosedInputsAndPlan/same-uid
+=== RUN   TestInitialInstallerClosedInputsAndPlan/shared-map
+=== RUN   TestInitialInstallerClosedInputsAndPlan/shared-guard
+=== RUN   TestInitialInstallerClosedInputsAndPlan/invalid-uid
+=== RUN   TestInitialInstallerClosedInputsAndPlan/zero-spec
+=== RUN   TestInitialInstallerClosedInputsAndPlan/upper-spec
+=== RUN   TestInitialInstallerClosedInputsAndPlan/missing-ca
+=== RUN   TestInitialInstallerClosedInputsAndPlan/http
+=== RUN   TestInitialInstallerClosedInputsAndPlan/sql-pool
+=== RUN   TestInitialInstallerClosedInputsAndPlan/unknown
+=== RUN   TestInitialInstallerClosedInputsAndPlan/duplicate
+--- PASS: TestInitialInstallerClosedInputsAndPlan (0.06s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/same-principal (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/same-uid (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/shared-map (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/shared-guard (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/invalid-uid (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/zero-spec (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/upper-spec (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/missing-ca (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/http (0.01s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/sql-pool (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/unknown (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/duplicate (0.00s)
+=== RUN   TestInitialPreparerLoadDiagnosticHidesCauseAndPreservesIdentity
+--- PASS: TestInitialPreparerLoadDiagnosticHidesCauseAndPreservesIdentity (0.00s)
+=== RUN   TestInitialPreparerRunDiagnosticHidesCauseAndPreservesIdentity
+--- PASS: TestInitialPreparerRunDiagnosticHidesCauseAndPreservesIdentity (0.00s)
+=== RUN   TestInitialPreparerRunPreservesOnlyQualifiedProviderDiagnostic
+--- PASS: TestInitialPreparerRunPreservesOnlyQualifiedProviderDiagnostic (0.00s)
+=== RUN   TestInitialHandoverObservesSQLAfterOriginalPodTermination
+--- PASS: TestInitialHandoverObservesSQLAfterOriginalPodTermination (0.00s)
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/pod
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/request
+--- PASS: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest (0.00s)
+    --- PASS: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/pod (0.00s)
+    --- PASS: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/request (0.00s)
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation/pod-expired
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation/pod-cancelled
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation/history-expired
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation/history-cancelled
+=== RUN   TestInitialHandoverRejectsExpiredOrCancelledObservation/history-shortened
+--- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation (0.00s)
+    --- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation/pod-expired (0.00s)
+    --- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation/pod-cancelled (0.00s)
+    --- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation/history-expired (0.00s)
+    --- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation/history-cancelled (0.00s)
+    --- PASS: TestInitialHandoverRejectsExpiredOrCancelledObservation/history-shortened (0.00s)
+=== RUN   TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation
+=== RUN   TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/missingObservation
+=== RUN   TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/prepared
+=== RUN   TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/audited
+--- PASS: TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation (0.00s)
+    --- PASS: TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/missingObservation (0.00s)
+    --- PASS: TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/prepared (0.00s)
+    --- PASS: TestInitialHandoverSuccessfulPodNeverSuppliesSQLActivation/audited (0.00s)
+=== RUN   TestInitialPreparerRemedyKeepsOriginalPlanAndHidesRawErrors
+--- PASS: TestInitialPreparerRemedyKeepsOriginalPlanAndHidesRawErrors (0.00s)
+=== RUN   TestInitialPreparerZeroValueCannotRun
+--- PASS: TestInitialPreparerZeroValueCannotRun (0.00s)
+=== RUN   TestOwnerMountedInputsAndSQLRotation
+--- PASS: TestOwnerMountedInputsAndSQLRotation (0.00s)
+=== RUN   TestOwnerInputRejections
+=== RUN   TestOwnerInputRejections/unknown
+=== RUN   TestOwnerInputRejections/alias
+=== RUN   TestOwnerInputRejections/provider-http
+=== RUN   TestOwnerInputRejections/provider-query
+=== RUN   TestOwnerInputRejections/postgres-socket
+=== RUN   TestOwnerInputRejections/shared-sign-role
+=== RUN   TestOwnerInputRejections/unknown-format
+=== RUN   TestOwnerInputRejections/duplicate-administrator
+=== RUN   TestOwnerInputRejections/nil-roots
+=== RUN   TestOwnerInputRejections/bad-root
+=== RUN   TestOwnerInputRejections/excess-concurrency
+=== RUN   TestOwnerInputRejections/foreign-file
+=== RUN   TestOwnerInputRejections/null-probes
+=== RUN   TestOwnerInputRejections/duplicate-probe
+=== RUN   TestOwnerInputRejections/wildcard-probe
+=== RUN   TestOwnerInputRejections/foreign-probe
+=== RUN   TestOwnerInputRejections/too-many-probes
+=== RUN   TestOwnerInputRejections/null-leases
+=== RUN   TestOwnerInputRejections/duplicate-lease
+=== RUN   TestOwnerInputRejections/wildcard-lease
+=== RUN   TestOwnerInputRejections/foreign-lease-account
+=== RUN   TestOwnerInputRejections/too-many-leases
+--- PASS: TestOwnerInputRejections (0.09s)
+    --- PASS: TestOwnerInputRejections/unknown (0.00s)
+    --- PASS: TestOwnerInputRejections/alias (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-http (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-query (0.00s)
+    --- PASS: TestOwnerInputRejections/postgres-socket (0.00s)
+    --- PASS: TestOwnerInputRejections/shared-sign-role (0.00s)
+    --- PASS: TestOwnerInputRejections/unknown-format (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-administrator (0.00s)
+    --- PASS: TestOwnerInputRejections/nil-roots (0.00s)
+    --- PASS: TestOwnerInputRejections/bad-root (0.00s)
+    --- PASS: TestOwnerInputRejections/excess-concurrency (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-file (0.00s)
+    --- PASS: TestOwnerInputRejections/null-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/null-leases (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-lease-account (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-leases (0.00s)
+=== RUN   TestOwnerStorageProjectionRotationAndLoss
+--- PASS: TestOwnerStorageProjectionRotationAndLoss (0.00s)
+=== RUN   TestOwnerProjectedKubernetesTokenAndCatalog
+--- PASS: TestOwnerProjectedKubernetesTokenAndCatalog (0.01s)
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/valid
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/absent
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/duplicate-api
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/missing-api
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/foreign-namespace
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/http-api
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/api-credentials
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/nil-roots
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/duplicate-topology
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/zero-topology-digest
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/alias-digest
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/excess-concurrency
+=== RUN   TestOwnerNativeInputsAreClosedPinnedAndOptional/unknown-field
+--- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional (0.06s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/valid (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/absent (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/duplicate-api (0.01s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/missing-api (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/foreign-namespace (0.01s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/http-api (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/api-credentials (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/nil-roots (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/duplicate-topology (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/zero-topology-digest (0.01s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/alias-digest (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/excess-concurrency (0.00s)
+    --- PASS: TestOwnerNativeInputsAreClosedPinnedAndOptional/unknown-field (0.00s)
+=== RUN   TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs
+=== RUN   TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs/port-only
+=== RUN   TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs/inputs-only
+--- PASS: TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs (0.00s)
+    --- PASS: TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs/port-only (0.00s)
+    --- PASS: TestOwnerNativeRuntimeRequiresBothProtectedPortAndInputs/inputs-only (0.00s)
+=== RUN   TestOwnerRuntimeReadinessAndShutdown
+--- PASS: TestOwnerRuntimeReadinessAndShutdown (2.01s)
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/valid
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/foreign-source
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/proof-key
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/proof-workload
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/proof-config
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/registry-config
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/closed-key
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/parent-expired
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/closed-during-client
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/expired-proof
+=== RUN   TestOwnerStartupRejectsChangedProofAndIdentity/short-parent
+--- PASS: TestOwnerStartupRejectsChangedProofAndIdentity (0.05s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/valid (0.01s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/foreign-source (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/proof-key (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/proof-workload (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/proof-config (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/registry-config (0.01s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/closed-key (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/parent-expired (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/closed-during-client (0.01s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/expired-proof (0.00s)
+    --- PASS: TestOwnerStartupRejectsChangedProofAndIdentity/short-parent (0.01s)
+=== RUN   TestOwnerRuntimeFreshEpochAndExpiredReadiness
+--- PASS: TestOwnerRuntimeFreshEpochAndExpiredReadiness (0.00s)
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/cancel-enrollment
+=== RUN   TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/closed-listener
+--- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure (0.01s)
+    --- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/cancel-enrollment (0.00s)
+    --- PASS: TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure/closed-listener (0.00s)
+=== RUN   TestWorkerProcessDisablesOwnCoreDumping
+--- PASS: TestWorkerProcessDisablesOwnCoreDumping (1.05s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	4.481s

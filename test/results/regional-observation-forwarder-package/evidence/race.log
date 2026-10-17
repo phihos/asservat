@@ -1,0 +1,335 @@
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/valid
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/expired-first-registry
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/cached-first-registry
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/retired-during-route
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/changed-config
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/changed-enrollment
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-registry-certificate
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-route-process
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-route-pool
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-pod-name
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-replica
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-missing
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-changed
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-wrong-pool
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/removed-root
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/connection-changed
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/cancelled
+=== RUN   TestOwnerAuthenticationRequiresAllCurrentBoundaries/expired-during-crypto
+--- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/valid (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/expired-first-registry (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/cached-first-registry (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/retired-during-route (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/changed-config (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/changed-enrollment (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-registry-certificate (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-route-process (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-route-pool (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-pod-name (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/wrong-replica (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-missing (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-changed (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/protection-wrong-pool (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/removed-root (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/connection-changed (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/cancelled (0.00s)
+    --- PASS: TestOwnerAuthenticationRequiresAllCurrentBoundaries/expired-during-crypto (0.00s)
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/valid
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/expired-first-registry
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/cached-first-registry
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/retired-during-route
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/changed-config
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/changed-enrollment
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/wrong-registry-certificate
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/wrong-route-process
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/wrong-route-pool
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/wrong-pod-name
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/wrong-replica
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/protection-missing
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/protection-changed
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/protection-wrong-pool
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/removed-root
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/connection-changed
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/cancelled
+=== RUN   TestOwnerServingRequiresAllCurrentBoundaries/expired-during-crypto
+--- PASS: TestOwnerServingRequiresAllCurrentBoundaries (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/valid (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/expired-first-registry (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/cached-first-registry (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/retired-during-route (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/changed-config (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/changed-enrollment (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/wrong-registry-certificate (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/wrong-route-process (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/wrong-route-pool (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/wrong-pod-name (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/wrong-replica (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/protection-missing (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/protection-changed (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/protection-wrong-pool (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/removed-root (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/connection-changed (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/cancelled (0.00s)
+    --- PASS: TestOwnerServingRequiresAllCurrentBoundaries/expired-during-crypto (0.00s)
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/valid
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/expired-first-registry
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/cached-first-registry
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/retired-during-route
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/changed-config
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/changed-enrollment
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/wrong-registry-certificate
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/wrong-route-process
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/wrong-route-pool
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/wrong-pod-name
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/wrong-replica
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/protection-missing
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/protection-changed
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/protection-wrong-pool
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/removed-root
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/connection-changed
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/cancelled
+=== RUN   TestOwnerClientRequiresAllCurrentBoundaries/expired-during-crypto
+--- PASS: TestOwnerClientRequiresAllCurrentBoundaries (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/valid (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/expired-first-registry (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/cached-first-registry (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/retired-during-route (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/changed-config (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/changed-enrollment (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/wrong-registry-certificate (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/wrong-route-process (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/wrong-route-pool (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/wrong-pod-name (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/wrong-replica (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/protection-missing (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/protection-changed (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/protection-wrong-pool (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/removed-root (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/connection-changed (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/cancelled (0.00s)
+    --- PASS: TestOwnerClientRequiresAllCurrentBoundaries/expired-during-crypto (0.00s)
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/valid
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/expired-first-registry
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/cached-first-registry
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/retired-during-route
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/changed-config
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/changed-enrollment
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-registry-certificate
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-route-process
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-route-pool
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-pod-name
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-replica
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-missing
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-changed
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-wrong-pool
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/removed-root
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/connection-changed
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/cancelled
+=== RUN   TestOwnerClientObservationRequiresAllCurrentBoundaries/expired-during-crypto
+--- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/valid (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/expired-first-registry (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/cached-first-registry (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/retired-during-route (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/changed-config (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/changed-enrollment (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-registry-certificate (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-route-process (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-route-pool (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-pod-name (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/wrong-replica (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-missing (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-changed (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/protection-wrong-pool (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/removed-root (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/connection-changed (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/cancelled (0.00s)
+    --- PASS: TestOwnerClientObservationRequiresAllCurrentBoundaries/expired-during-crypto (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.018s
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/common-locator
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/exact-claim
+--- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads (0.06s)
+    --- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/common-locator (0.03s)
+    --- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/exact-claim (0.03s)
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/revoked
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/changed-pool
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/removed-root
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/suspended
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/source-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/revision-changed
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/route-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/guard-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/template-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/namespace-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/pod-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/replicaset-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-workload
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/close-serving-key
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/cancel-during-last-native
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/blocked-until-original-end
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-sni
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-root
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-query
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/cancelled-caller
+--- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges (0.51s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/revoked (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/changed-pool (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/removed-root (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/suspended (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/source-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/revision-changed (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/route-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/guard-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/template-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/namespace-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/pod-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/replicaset-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-workload (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/close-serving-key (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/cancel-during-last-native (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/blocked-until-original-end (0.21s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-sni (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-root (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-query (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/cancelled-caller (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	1.598s
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/valid
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=24.263615ms GET=1 POST=1 registry=16 guard=16 route=10 workload=8
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/same-pod17
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=23.879983ms GET=1 POST=1 registry=16 guard=16 route=10 workload=8
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/unknown-first
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=23.558212ms GET=2 POST=1 registry=20 guard=20 route=13 workload=10
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/two-positive
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=22.328117ms GET=2 POST=1 registry=24 guard=24 route=15 workload=12
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/cancel-other-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=22.98391ms GET=2 POST=1 registry=20 guard=20 route=13 workload=10
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/all-unknown
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=33.21049ms GET=8 POST=0 registry=32 guard=32 route=24 workload=16
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/candidate-error
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=22.97µs GET=0 POST=0 registry=0 guard=0 route=0 workload=0
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/ready-error
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=36.25µs GET=0 POST=0 registry=0 guard=0 route=0 workload=0
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/empty-ready
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=41.47µs GET=0 POST=0 registry=0 guard=0 route=0 workload=0
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/mutated-candidate-input
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=55.831µs GET=0 POST=0 registry=0 guard=0 route=0 workload=0
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/excluded-leaf
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=4.614397ms GET=0 POST=0 registry=0 guard=0 route=1 workload=0
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/wrong-holder
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=10.052579ms GET=1 POST=0 registry=8 guard=8 route=5 workload=4
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revoked-after-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=8.128412ms GET=1 POST=0 registry=5 guard=4 route=3 workload=2
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/guard-loss-after-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=8.240012ms GET=1 POST=0 registry=5 guard=5 route=3 workload=2
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/route-loss-after-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=8.967205ms GET=1 POST=0 registry=5 guard=5 route=4 workload=2
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/template-loss-after-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=8.625043ms GET=1 POST=0 registry=6 guard=6 route=4 workload=3
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revision-after-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=9.844588ms GET=1 POST=0 registry=8 guard=8 route=5 workload=4
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/truncated-get
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=7.992981ms GET=1 POST=0 registry=4 guard=4 route=3 workload=2
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/unknown-claim
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=20.049099ms GET=2 POST=1 registry=20 guard=20 route=13 workload=10
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/truncated-claim
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=20.29173ms GET=1 POST=1 registry=12 guard=12 route=8 workload=6
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revoked-after-post
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=19.575076ms GET=1 POST=1 registry=13 guard=12 route=8 workload=6
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revision-after-post
+    owner_observation_forwarder_test.go:436: synthetic current ports, actual h2: elapsed=22.054626ms GET=1 POST=1 registry=16 guard=16 route=10 workload=8
+=== RUN   TestOwnerObservationForwarderActualH2SelectionAndNoReplay/already-cancelled-and-closed-never-dispatch
+--- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay (0.44s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/valid (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/same-pod17 (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/unknown-first (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/two-positive (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/cancel-other-get (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/all-unknown (0.06s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/candidate-error (0.00s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/ready-error (0.00s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/empty-ready (0.00s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/mutated-candidate-input (0.00s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/excluded-leaf (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/wrong-holder (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revoked-after-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/guard-loss-after-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/route-loss-after-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/template-loss-after-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revision-after-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/truncated-get (0.01s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/unknown-claim (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/truncated-claim (0.02s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revoked-after-post (0.02s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/revision-after-post (0.03s)
+    --- PASS: TestOwnerObservationForwarderActualH2SelectionAndNoReplay/already-cancelled-and-closed-never-dispatch (0.00s)
+=== RUN   TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose
+=== RUN   TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/blocked-headers
+=== RUN   TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/blocked-body
+=== RUN   TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/short-original-source-bounds-claim-body
+=== RUN   TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/close-joins-native-proof-and-retains-slots
+--- PASS: TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose (0.76s)
+    --- PASS: TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/blocked-headers (0.26s)
+    --- PASS: TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/blocked-body (0.26s)
+    --- PASS: TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/short-original-source-bounds-claim-body (0.21s)
+    --- PASS: TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/close-joins-native-proof-and-retains-slots (0.04s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	2.247s
+=== RUN   TestObservationRoutingActualH2LookupClaimAndJoinedTerminal
+--- PASS: TestObservationRoutingActualH2LookupClaimAndJoinedTerminal (0.04s)
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-exact-sni
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/claim-common-sni
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/no-client-cert
+2026/10/13 05:04:38 http: TLS handshake error from 127.0.0.1:42834: tls: client didn't provide a certificate
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-authority
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/authorization
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/cookie
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/origin
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/idempotency
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/extra-query
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-media
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-body
+--- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof (0.08s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-exact-sni (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/claim-common-sni (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/no-client-cert (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-authority (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/authorization (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/cookie (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/origin (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/idempotency (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/extra-query (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-media (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-body (0.01s)
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/first-denied
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/root-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/holder-process-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/sender-leaf-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/source-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/first-shortened
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/final-cancelled
+--- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline (0.22s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/first-denied (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/root-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/holder-process-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/sender-leaf-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/source-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/first-shortened (0.13s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/final-cancelled (0.01s)
+=== RUN   TestObservationRoutingCloseJoinsBlockedAuthorityAndRetainsSlot
+--- PASS: TestObservationRoutingCloseJoinsBlockedAuthorityAndRetainsSlot (0.01s)
+=== RUN   TestObservationRoutingPublicMappingsPreserveOriginalBytes
+--- PASS: TestObservationRoutingPublicMappingsPreserveOriginalBytes (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	1.384s

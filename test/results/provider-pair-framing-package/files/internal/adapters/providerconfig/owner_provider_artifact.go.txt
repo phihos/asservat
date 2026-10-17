@@ -1,0 +1,69 @@
+package providerconfig
+
+import (
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+type ownerProviderSetupRequest struct {
+	Method string          `json:"method"`
+	Path   string          `json:"path"`
+	Body   json.RawMessage `json:"body"`
+}
+
+// OwnerProviderSetupArtifact emits public instructions for the independently
+// administered provider. It applies nothing, adopts nothing and cannot replace
+// VerifyOwner's current named readback. Provider/reviewer/SQL/S3 credentials are
+// never part of this artifact. The caller must already possess original actual
+// account/source/pool identities; an empty future source UID is not generated.
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time) ([]byte, error) {
+	if !authorization.UUID(in.ConfigurationUID) {
+		return nil, ErrSetupUnavailable
+	}
+	setup, err := OwnerSetupRecipeFor(in, profile, pool, roots, now)
+	if err != nil {
+		return nil, err
+	}
+	var requests [10]ownerProviderSetupRequest
+	for i, role := range setup.Authentication.Roles {
+		body, e := ownerProviderCanonical(struct {
+			Policy string `json:"policy"`
+		}{string(role.Policy)})
+		if e != nil {
+			return nil, e
+		}
+		requests[2*i] = ownerProviderSetupRequest{Method: "POST", Path: "sys/policies/acl/" + role.Name, Body: body}
+		requests[2*i+1] = ownerProviderSetupRequest{Method: "POST", Path: "auth/" + profile.AuthMount + "/role/" + role.Name, Body: role.Role}
+	}
+	for i, role := range setup.PKIRoles {
+		requests[8+i] = ownerProviderSetupRequest{Method: "POST", Path: in.KeyService.PKIMount + "/roles/" + role.Name, Body: role.Role}
+	}
+	// These are the exact existing persisted owner audit key formats. They are
+	// installation-scoped, unlike configuration audit's source-UID prefix. Do
+	// not claim finer provider IAM isolation than the actual object format.
+	storage := struct {
+		Store                contracts.OwnerAuditStore       `json:"store"`
+		Credentials          contracts.WorkerObjectReference `json:"credentials"`
+		SecretKey            string                          `json:"secretKey"`
+		CredentialSchema     string                          `json:"credentialSchema"`
+		Prefixes             [2]string                       `json:"prefixes"`
+		Operations           [3]string                       `json:"operations"`
+		Semantics            string                          `json:"semantics"`
+		BackendQualification string                          `json:"backendQualification"`
+	}{in.AuditStore, profile.AuditCredentials, contracts.OwnerProviderAuditCredentialFile, "https://asservat.io/spec/v1/owner-credentials.schema.json",
+		[2]string{"hub-owner-enrollment/v1/" + in.InstallationID + "/", "hub-owner-certificate/v1/" + in.InstallationID + "/"},
+		[3]string{"PutObject", "GetObject", "GetObjectVersion"}, "conditional-create/immutable-non-null-version/no-runtime-delete-or-versioning-change", "required"}
+	return ownerProviderCanonical(struct {
+		Format                 string                        `json:"format"`
+		ConfigurationUID       string                        `json:"configurationUID"`
+		Setup                  OwnerSetupRecipe              `json:"setup"`
+		Apply                  [10]ownerProviderSetupRequest `json:"apply"`
+		Inspect                []string                      `json:"inspect"`
+		AuditStorage           any                           `json:"auditStorage"`
+		ExternalAdministration bool                          `json:"externalAdministration"`
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, requests, ownerSetupPaths(in, setup), storage, true})
+}

@@ -1,0 +1,4 @@
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Component test exit: 1
+{"terminalExit": 1, "testExit": 1, "passedEntries": 2, "sourceHashes": 1118, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

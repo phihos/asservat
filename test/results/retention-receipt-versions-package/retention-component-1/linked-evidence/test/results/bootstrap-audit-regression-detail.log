@@ -1,0 +1,49 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication
+    authority_test.go:277: new access bypassed unacknowledged bootstrap provenance
+=== RUN   TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry
+=== RUN   TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect
+=== RUN   TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles
+=== RUN   TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec
+=== RUN   TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version
+=== RUN   TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit
+=== RUN   TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit
+=== RUN   TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart
+=== RUN   TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock
+--- FAIL: TestPermissionAuthorityWithRealServices (1.25s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable (0.28s)
+    --- FAIL: TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart (0.12s)
+    --- PASS: TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock (0.26s)
+=== RUN   TestCustodyWithRealServices
+=== RUN   TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge
+=== RUN   TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission
+=== RUN   TestCustodyWithRealServices/protected_backing_cannot_be_overallocated
+=== RUN   TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_register
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_store
+=== RUN   TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished
+=== RUN   TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting
+    custody_test.go:528: real S3: current and noncurrent versions, delete marker and multipart parts removed; neighbor preserved; writer barrier failure kept charge
+=== RUN   TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation
+--- PASS: TestCustodyWithRealServices (8.86s)
+    --- PASS: TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge (5.04s)
+    --- PASS: TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission (0.32s)
+    --- PASS: TestCustodyWithRealServices/protected_backing_cannot_be_overallocated (0.04s)
+    --- PASS: TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks (0.01s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_register (0.50s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_store (0.49s)
+    --- PASS: TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished (0.09s)
+    --- PASS: TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting (2.11s)
+    --- PASS: TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation (0.22s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	10.172s
+FAIL

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/owner-installed-startup-20261012/checks/joined-v1/overlay.json",
+    "./internal/contracts",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/postgres",
+    "./internal/adapters/mtls",
+    "./internal/transport/native",
+    "./internal/bootstrap",
+    "./internal/application/fleet",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 2.047,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  }
+}

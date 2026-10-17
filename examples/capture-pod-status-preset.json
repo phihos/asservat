@@ -1,0 +1,21 @@
+{
+  "apiVersion": "asservat.io/v1alpha1",
+  "kind": "DebugCapture",
+  "metadata": {
+    "name": "api-pod-status-001",
+    "namespace": "payments"
+  },
+  "spec": {
+    "presetRef": {
+      "name": "pod-status",
+      "version": "v1"
+    },
+    "target": {
+      "workloadRef": {
+        "kind": "Pod",
+        "name": "api-a"
+      },
+      "maxPods": 1
+    }
+  }
+}

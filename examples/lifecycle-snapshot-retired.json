@@ -1,0 +1,16 @@
+{
+  "executionMode": "ongoing",
+  "triggerKind": "policy",
+  "triggeredAt": "2026-10-09T12:00:30Z",
+  "sourceSessionID": "00000000-0000-4000-8000-000000000151",
+  "sourceStartedAt": "2026-10-09T11:59:30Z",
+  "snapshotID": "00000000-0000-4000-8000-000000000152",
+  "requestedBefore": "30s",
+  "after": "10s",
+  "historyCoverage": "full",
+  "gapReasons": [
+    "targetGone"
+  ],
+  "windowCoverage": "partial",
+  "sourceStoppedAt": "2026-10-09T12:00:32Z"
+}

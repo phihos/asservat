@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-25",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Diagnostic run. 'permission/projection/journal-read after 3.032s, 1.115s left after 14 attempts; first claim-write after 3.381s, 27ms left (unavailable)'. One readInstalledWorkerResources (two complete bridge reads with configuration-source proofs) took about 3 s, and the claim write repeated it inside the verified role operation's five seconds. ADR-191 replaces these reads with one retained bracket and CAS writes.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,36 @@
+{
+  "phase": "compile-integration",
+  "command": [
+    "go",
+    "test",
+    "-c",
+    "-vet=off",
+    "-o",
+    "/tmp/asservat-direct-har-k3xddyq8/integration.test",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 17.855,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "namedPass": 0,
+  "skips": 0
+}

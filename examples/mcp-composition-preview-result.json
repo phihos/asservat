@@ -1,0 +1,486 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "preview_id": "00000000-0000-4000-8000-000000000080",
+    "expires_at": "2026-10-09T12:05:00Z",
+    "execution_digest": "ba6268c735150eccd8a9a519d1c056cd8efb49b191d24a2007e5115c1b75d113",
+    "pod_count": 1,
+    "max_bytes": 100663296,
+    "max_process_starts": 0,
+    "approval_required": true,
+    "capture_enabled": true,
+    "blockers": [],
+    "warnings": [],
+    "navigation_uri": "https://asservat.example.invalid/captures/preview/00000000-0000-4000-8000-000000000080",
+    "profile_composition": {
+      "authored": {
+        "components": [
+          {
+            "id": "http",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "http-headers",
+              "version": "v1"
+            },
+            "overrides": [
+              {
+                "actionID": "http",
+                "field": "packetFilter",
+                "value": "tcp port 8080"
+              }
+            ]
+          },
+          {
+            "id": "calls",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "syscall-activity",
+              "version": "v1"
+            }
+          },
+          {
+            "id": "context",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "process-context",
+              "version": "v1"
+            }
+          }
+        ],
+        "maxTotalBytes": 100663296,
+        "maxDuration": "120s"
+      },
+      "resolvedProfiles": [
+        {
+          "componentID": "http",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "http-headers",
+            "version": "v1"
+          },
+          "sourceUID": "fixture-http-headers-v1",
+          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+          "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+        },
+        {
+          "componentID": "calls",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "syscall-activity",
+            "version": "v1"
+          },
+          "sourceUID": "fixture-syscall-activity-v1",
+          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+          "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+        },
+        {
+          "componentID": "context",
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "process-context",
+            "version": "v1"
+          },
+          "sourceUID": "fixture-process-context-v1",
+          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+          "definitionDigest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e"
+        }
+      ],
+      "actionMap": [
+        {
+          "componentID": "http",
+          "localActionID": "http",
+          "actionID": "a005bdfce57635c5dabddbdd6",
+          "deduplicated": false
+        },
+        {
+          "componentID": "calls",
+          "localActionID": "syscalls",
+          "actionID": "a5b186fa2f944fc675c96fcc2",
+          "deduplicated": false
+        },
+        {
+          "componentID": "context",
+          "localActionID": "processes",
+          "actionID": "adf187502ec3e8884310b85cf",
+          "deduplicated": false
+        },
+        {
+          "componentID": "context",
+          "localActionID": "sockets",
+          "actionID": "a7e5c90417a8841bef4f7993c",
+          "deduplicated": false
+        }
+      ]
+    },
+    "lifecycle_plan": {
+      "schemaVersion": "action-lifecycle/v1",
+      "requestKind": "DebugCapture",
+      "actions": [
+        {
+          "actionID": "a005bdfce57635c5dabddbdd6",
+          "kind": "packetCapture",
+          "executionMode": "ongoing",
+          "activation": "manualSession",
+          "requestedBefore": "30s",
+          "after": "30s"
+        },
+        {
+          "actionID": "a5b186fa2f944fc675c96fcc2",
+          "kind": "syscallTrace",
+          "executionMode": "ongoing",
+          "activation": "manualSession",
+          "requestedBefore": "30s",
+          "after": "10s"
+        },
+        {
+          "actionID": "adf187502ec3e8884310b85cf",
+          "kind": "processSnapshot",
+          "executionMode": "onTrigger"
+        },
+        {
+          "actionID": "a7e5c90417a8841bef4f7993c",
+          "kind": "networkSnapshot",
+          "executionMode": "onTrigger"
+        }
+      ],
+      "ongoingPodScope": "acceptedCapturePods"
+    },
+    "capture_assessment": {
+      "schemaVersion": "capture-assessment/v1",
+      "assessmentID": "00000000-0000-4000-8000-000000000161",
+      "planDigest": "ba6268c735150eccd8a9a519d1c056cd8efb49b191d24a2007e5115c1b75d113",
+      "generatedAt": "2026-10-09T12:00:00Z",
+      "validUntil": "2026-10-09T12:05:00Z",
+      "basis": {
+        "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "metrics": {
+          "state": "unavailable"
+        }
+      },
+      "scope": {
+        "observationPods": 1,
+        "incidentPods": 1
+      },
+      "combinedImpact": {
+        "level": "low",
+        "hasUnknowns": true,
+        "effects": [
+          "collectorMemory",
+          "nodeCPU",
+          "storageIO"
+        ],
+        "explanation": "Known mechanism effects are a minimum; workload headroom, combined overhead and placement are unmeasured. Limits are not predictions."
+      },
+      "actions": [
+        {
+          "actionID": "a005bdfce57635c5dabddbdd6",
+          "executionMode": "ongoing",
+          "impact": {
+            "level": "unknown",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU",
+              "collectorMemory",
+              "storageIO"
+            ],
+            "explanation": "Recording/parser overhead depends on traffic and placement; no matching overhead measurements are available."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "networkAddresses",
+              "personalIdentifiers"
+            ],
+            "transientOnly": [
+              "userContent",
+              "credentials"
+            ],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 67108864,
+              "sourceRef": "action:a005bdfce57635c5dabddbdd6:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "whileArmed",
+              "scope": "perObservationPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 33554432,
+              "sourceRef": "declared-ring-and-parser-allocations",
+              "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 67108864,
+              "sourceRef": "declared-frozen-capacity",
+              "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+            }
+          ]
+        },
+        {
+          "actionID": "a5b186fa2f944fc675c96fcc2",
+          "executionMode": "ongoing",
+          "impact": {
+            "level": "unknown",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU",
+              "collectorMemory"
+            ],
+            "explanation": "Kernel event rate and collector cost are unmeasured; limits bound retained data, not application latency."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "personalIdentifiers"
+            ],
+            "transientOnly": [],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 16777216,
+              "sourceRef": "action:a5b186fa2f944fc675c96fcc2:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "whileArmed",
+              "scope": "perObservationPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 8388608,
+              "sourceRef": "declared-ring-and-parser-allocations",
+              "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+            },
+            {
+              "dimension": "collectorMemoryBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 16777216,
+              "sourceRef": "declared-frozen-capacity",
+              "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+            }
+          ]
+        },
+        {
+          "actionID": "adf187502ec3e8884310b85cf",
+          "executionMode": "onTrigger",
+          "impact": {
+            "level": "low",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU"
+            ],
+            "explanation": "Bounded context collection; additional workload/node cost has not been measured for this synthetic environment."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "personalIdentifiers"
+            ],
+            "transientOnly": [],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 1048576,
+              "sourceRef": "action:adf187502ec3e8884310b85cf:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            }
+          ]
+        },
+        {
+          "actionID": "a7e5c90417a8841bef4f7993c",
+          "executionMode": "onTrigger",
+          "impact": {
+            "level": "low",
+            "hasUnknowns": true,
+            "effects": [
+              "nodeCPU"
+            ],
+            "explanation": "Bounded context collection; additional workload/node cost has not been measured for this synthetic environment."
+          },
+          "data": {
+            "classification": "potentialPersonalData",
+            "basis": "conservativeMechanism",
+            "retainedPossible": [
+              "personalIdentifiers"
+            ],
+            "transientOnly": [],
+            "unknownContent": false
+          },
+          "retention": {
+            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "accessAgeSeconds": 86100,
+            "maximumAgeSeconds": 86400,
+            "deletionBudgetSeconds": 300,
+            "policyDigests": [
+              "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+            ],
+            "automaticDeletion": true,
+            "managedCopiesOnly": true,
+            "preservationException": "none",
+            "deleteAgeSeconds": 86400
+          },
+          "quantities": [
+            {
+              "dimension": "outputBytes",
+              "phase": "perIncident",
+              "scope": "perIncidentPod",
+              "basis": "configuredLimit",
+              "lower": 0,
+              "upper": 1048576,
+              "sourceRef": "action:a7e5c90417a8841bef4f7993c:maxBytes",
+              "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+            }
+          ]
+        }
+      ],
+      "combinedQuantities": [
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "whileArmed",
+          "scope": "wholePlan",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 41943040,
+          "sourceRef": "sum-of-compatible-declared-limits",
+          "coverage": "Declared memory ring and explicit parser buffers; excludes kernel/maps, worker baseline, encryption and frozen copies."
+        },
+        {
+          "dimension": "collectorMemoryBytes",
+          "phase": "perIncident",
+          "scope": "wholePlan",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 83886080,
+          "sourceRef": "sum-of-compatible-declared-limits",
+          "coverage": "Declared frozen snapshot buffers; excludes continuing rings, worker baseline, encryption and upload staging."
+        },
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "wholePlan",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 85983232,
+          "sourceRef": "sum-of-compatible-declared-limits",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        }
+      ],
+      "interactions": [
+        {
+          "actionIDs": [
+            "a005bdfce57635c5dabddbdd6",
+            "a5b186fa2f944fc675c96fcc2",
+            "adf187502ec3e8884310b85cf",
+            "a7e5c90417a8841bef4f7993c"
+          ],
+          "kind": "combinedCostUnknown",
+          "message": "Concurrent application/kernel work may interact; no matching combined benchmark or fresh pressure data is available.",
+          "blocking": false
+        }
+      ],
+      "alternatives": [
+        {
+          "actionIDs": [
+            "a005bdfce57635c5dabddbdd6",
+            "a5b186fa2f944fc675c96fcc2"
+          ],
+          "change": "futureOnly",
+          "benefit": "Avoid continuously armed recording by explicitly selecting onTrigger with zero lookback.",
+          "coverageLoss": "Traffic and syscalls before the next trigger will be unavailable."
+        }
+      ],
+      "handlingCodes": [
+        "minimizeCapture",
+        "restrictAccess",
+        "preferApprovedExtracts",
+        "reviewBeforeSharing",
+        "approvedClientsOnly",
+        "externalCopiesNotRecalled"
+      ],
+      "handlingPolicyRef": "company-debug-evidence/v1"
+    }
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

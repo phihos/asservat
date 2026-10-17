@@ -1,0 +1,13 @@
+=== RUN   TestHelmBootstrapWithRealServices
+    helm_bootstrap_test.go:214: original activation db1aa8df-f74e-427c-b1d8-3a8f2f8ae897 image 192.168.240.2:5000/asservat@sha256:5d890ed72c70b4af0859299a3916737e8e632e84bff95a46bfad9d31a5ef254b exit 0
+=== RUN   TestHelmBootstrapWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestHelmBootstrapWithRealServices/failed-hook-original-revision-resume
+=== RUN   TestHelmBootstrapWithRealServices/helm-uninstall-preserves-original-product-state
+=== NAME  TestHelmBootstrapWithRealServices
+    helm_bootstrap_test.go:362: actual Helm package, authenticated cold exact-image pulls on two owned nodes, original manager/schema/activation/audit/retirement, positive v3 copy closure, setup-free hook replay, bounded terminal CLI resume and retained public revision inputs; no public runtime/restore/backup claim
+--- PASS: TestHelmBootstrapWithRealServices (346.48s)
+    --- PASS: TestHelmBootstrapWithRealServices/all-four-commands-passive-without-setup-files (27.93s)
+    --- PASS: TestHelmBootstrapWithRealServices/failed-hook-original-revision-resume (33.09s)
+    --- PASS: TestHelmBootstrapWithRealServices/helm-uninstall-preserves-original-product-state (1.29s)
+PASS
+ok  	asservat.local/asservat/test/integration	347.577s

@@ -1,0 +1,54 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: packets-next-interval
+  namespace: payments
+spec:
+  description: Explicit raw next-interval capture without claiming pre-trigger history;
+    sensitive observation approval required.
+  actions:
+  - id: raw-packets
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: rawPackets
+        snaplen: 2048
+        protocolSnaplen:
+        - protocol: tcp
+          bytes: 4096
+      before: 0s
+      after: 30s
+      ring:
+        maxAge: 30s
+        maxBytes: 16777216
+        segmentBytes: 4194304
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - resourceRef:
+            kind: Service
+            namespace: payments
+            name: ledger-api
+            serviceMode: backends
+            readyOnly: false
+        - resourceRef:
+            kind: StatefulSet
+            namespace: payments
+            name: ledger
+        protocol: tcp
+        ports:
+        - 8080
+        resolution: follow
+        maxEndpoints: 256
+        maxStaleness: 5s
+      maxFrozenBytes: 67108864
+      maxConcurrentSnapshots: 1
+      filter: tcp and port 8080
+    required: false
+    impact: sensitiveRead
+    limits:
+      maxBytes: 67108864
+      timeout: 90s
+  maxTotalBytes: 67108864
+  maxDuration: 120s

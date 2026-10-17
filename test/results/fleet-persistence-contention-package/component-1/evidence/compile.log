@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/domain/fleet	0.003s [no tests to run]
+ok  	asservat.local/asservat/internal/application/fleet	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.010s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.013s [no tests to run]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/test/integration	0.013s [no tests to run]

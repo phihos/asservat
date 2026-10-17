@@ -1,0 +1,11 @@
+Linux asservat-lab 6.8.0-142-generic #142-Ubuntu SMP PREEMPT_DYNAMIC Wed Sep  2 14:24:27 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+GNU gdb (Ubuntu 15.1-1ubuntu1~24.04.1) 15.1
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+/run   tmpfs  rw,nosuid,nodev,noexec,relatime,size=201488k,mode=755,inode64
+|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E
+10
+36ab099f111a514125951d183b3c3438100a2437cd98359f16dc3f772bae29a2  /opt/asservat-lab/helper
+ccce62e8a26db11ea2137b4749e3e5b474b9ec475707339852c70812d88798f2  /opt/asservat-lab/receiver
+63442b110a1237a0efba343aeaf4752991b1f24cad93d5db66b5f66dc3118bf4  /opt/asservat-lab/fixture
+b1d632a35ed5d6b352b46fb974fe979661334ab4f024b12190e528e7157a5aa4  /opt/asservat-lab/fixture.c
+dfa0191d21ce12debfb892e70fa8d89b3b0b54e97cf8b568e41a916839389740  /opt/asservat-lab/run.py

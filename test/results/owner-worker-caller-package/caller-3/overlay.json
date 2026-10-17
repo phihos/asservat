@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_bootstrap_worker_caller.go": "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go": "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go": "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go": "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go"
+  }
+}

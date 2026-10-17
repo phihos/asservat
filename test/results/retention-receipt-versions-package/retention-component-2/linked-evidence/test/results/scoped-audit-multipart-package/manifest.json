@@ -1,0 +1,7 @@
+[
+  {
+    "path": "test/integration/scoped_audit_storage_test.go",
+    "baseSHA256": "e6a66a2772fd75b1b67a8c5515a8d5dc827be6ba69aab0308c4e238dbae81c80",
+    "payloadSHA256": "8b93664ea48f8782e93a0f0922e61dc33285c201a4f06083ca8666e1190c86eb"
+  }
+]

@@ -1,0 +1,16 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-original-backing-deadline-after-account-lock
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-original-deadline-after-lock
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata
+    download_control_test.go:297: download unavailable
+--- FAIL: TestContextAdmissionWithRealServices (34.37s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-bounded-accounts-resolve-and-unknown-write (0.71s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-original-backing-deadline-after-account-lock (0.80s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-original-deadline-after-lock (0.31s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (1.54s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata (30.66s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	34.425s
+FAIL

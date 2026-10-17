@@ -1,0 +1,1009 @@
+--- a/docs/architecture/owner-configuration.md
++++ b/docs/architecture/owner-configuration.md
+@@ -101,3 +101,14 @@
+ covers the inspection profile and bounded historical reader; production policy
+ provisioning, complete pagination, backing, writer closure and physical
+ retirement remain pending.
++
++## Finite audit epoch foundation
++
++[ADR-156](../decisions/156-finite-owner-audit-epochs.md) defines independently
++audited full-snapshot epochs for automatic rollover under one protected finite
++policy. The unselected typed foundation separates new admission from an exact
++original dependency, requires explicit overlap and enough charged slots, and
++retains uncertain copies. It does not change current SQL29 v1 configuration
++receipts, raw observations or runtime selection. Actual reserve provisioning,
++one-use audit effects, accepted/admitted SQL readers, complete consumer wiring
++and positive physical retirement are still required before installed use.
+--- /dev/null
++++ b/docs/decisions/156-finite-owner-audit-epochs.md
+@@ -0,0 +1,128 @@
++# ADR-156: Finite owner configuration audit epochs
++
++Status: accepted direction; standalone values and compatibility tests are staged,
++unqualified and unselected. No runtime, schema, grant or installation format is
++enabled by this record.
++
++## Decision
++
++The required versioned audit storage contract includes every physical version,
++marker and unfinished upload. A source that remains unchanged cannot depend on
++retaining one original configuration audit forever, or create fake Kubernetes
++generation changes merely to acquire another audit key. C-21 will use separately
++identified, independently audited owner configuration acceptance epochs. Each
++epoch contains the complete original semantic configuration, an immutable
++attempt and qualified reserve reference, and finite original dates.
++
++The new epoch format is separate from SQL29's existing v1 configuration receipt.
++Existing input, record, receipt, key and encryption context bytes remain exact.
++There is no optional epoch field silently ignored by a legacy observer or
++consumer, no format negotiation, and no fallback from a missing epoch to v1.
++Selecting it requires a complete installer, accepted reader, effect and cleanup
++graph in a future reviewed format. The current observer is unchanged.
++
++## Policy and backing
++
++The protected installer supplies a finite positive automatic rollover interval, admission, dependency,
++retention, deletion, metadata and residual-copy bounds. It also declares finite
++per-epoch bytes and counts, the maximum open epochs and dependent effects. The
++standalone values check arithmetic and consistency, not physical qualification.
++There are no new default durations or claimed supported capacities. Routine
++rollover and cleanup use the configured policy automatically; no personal
++approval, annotation change or manual task is required for each epoch.
++
++The admission window must exceed the rollover interval, giving explicit overlap.
++The arithmetic lower bound for open slots is the ceiling of the full original
++residual horizon divided by the interval, plus one pending claim and the explicit
++uncertain-attempt allowance. An insufficient configured limit is rejected with
++the required minimum, never silently increased. This lower bound does not prove
++cleanup latency or physical backing. An exhausted uncertainty allowance stops
++new claims with all original obligations still charged; no finite reserve can
++absorb indefinitely unresolved writers.
++
++Before any epoch effect, a purpose-fixed installer facet must positively bind a
++dedicated control-audit allocation to actual system backing, original source,
++store, root, policy and qualification identities. Existing evidence/processing
++lanes cannot implicitly supply this reserve. Later capacity adoption retains the
++same allocation without a second charge. Allocation references are public
++provenance values, never a credential or proof of a successful reservation.
++
++The maximum open-epoch count covers the current epoch, at most one pending
++attempt, and all still-charged failed or retiring epochs. Counts and ciphertext,
++marker, multipart and metadata allowances are independently finite; a zero-byte
++copy or marker is still an object obligation. Unknown multipart bytes remain
++reserved. Compromised writers can exceed an IAM prefix through additional keys
++or versions; the contract does not claim that IAM enforces a storage quota.
++
++## Original dates and current acceptance
++
++Each epoch fixes its claim anchor, last new-admission time, latest possible
++dependency end, retained-audit cutoff, deletion deadline, metadata deadline and
++residual-copy deadline before any write. Checked positive durations derive all
++dates from that anchor. Refresh, renewal, receipt reconciliation, restart and
++head rollover cannot move them. Actual provider and SQL effects remain inside
++their original independent five-second or narrower intervals.
++
++New work requires the current positively acknowledged epoch, complete unchanged
++source and current recovery. Admission records the exact original epoch and
++maximum possible dependent end and the exact purpose-owned effect/attempt ID
++before its effect. The whole new dependency must fit current retained receipt
++availability, even when a five-second source observation is still fresh. Already admitted work checks
++that original epoch's current non-revocation and retained receipt, unchanged
++source/recovery, and the original dependency/effect ends. Head rollover alone
++neither revokes valid in-flight work nor extends it. It cannot substitute a
++successor receipt for an old attempt. Actual source suspension/change or epoch
++revocation still fences work under the applicable current rules.
++
++The new accepted-epoch port is distinct from the raw configuration observation
++port. An independent admitted-effect reference retains original identity and
++dates. Domain validity only describes well-formed values: callers must not
++manufacture SQL acceptance, recovery, reservation or non-revocation from it.
++
++## One-use effects and bounded history
++
++A pending claim consumes one pre-backed attempt before a single provider effect.
++Unknown outcomes are exact lookup-only, never another CREATE/PUT, renamed epoch
++or renewed interval. A successor needs a separate admitted slot and original
++cadence. An uncertain writer stays charged and may stop installation/renewal
++until its existing recovery protocol resolves it. Positive acknowledgement and
++head selection are separate: late completion can record charged history without
++making changed, suspended or expired state current.
++
++The successor is verified from its own complete snapshot and current recovery;
++it does not require an infinite predecessor receipt chain. Retain a bounded
++current/pending/retiring set plus an installation-owned monotonic nonreuse
++watermark. Restore must independently fence and reconcile that state before
++selection; loss or rollback cannot recreate old authority or a reusable ordinal.
++
++Old certificates, uncertain signing attempts and worker/request dependencies
++remain pinned through their original possible ends and cleanup requirements.
++New signing periods use a new finite admission. Long-lived registration and
++enrollment audit remain separately charged; epoch rollover neither renews nor
++deletes those ancestry records.
++
++Removal requires positive writer quiescence, complete exact-key inventory of
++all versions, markers and uploads, deletion/abort and verified absence, plus
++separate metadata/residual-copy completion. Expiry, a historical receipt, an
++empty first page or a currently missing source is insufficient. The current
++read-only first-page inventory diagnostic is not a retirement reader or release
++facet. Historical immutable identity remains usable after source/root expiry;
++current provider inventory credentials have independent authority and bounds.
++
++## Ownership and remaining work
++
++C-21 owns protected provisioning and owner acceptance. C-15 retains managed-copy
++accounting and retirement; C-20 owns any later selected format/schema. The fleet
++domain contains identity/policy/epoch values. The audit domain, which already
++depends on fleet, owns the full record/key/receipt contract; fleet does not import
++audit. Application ports distinguish current epoch selection from exact admitted
++dependency checks. No generic callback or cached authority adapter is introduced.
++
++A separate migration/grant proposal must define producer, attempt, acknowledgement,
++current admission, historical inventory and independent retirement facets before
++SQL implementation. Qualify actual reserve provisioning, unchanged-source
++rollover, old/new concurrent dependencies, unknown outcomes, expiry/revocation,
++restore nonreuse and full physical deletion with actual services. Pure tests
++cannot qualify provider IAM, storage backing, steady runtime availability or
++retirement. Existing runtime formats remain selected until that complete graph
++passes.
+--- a/docs/decisions/README.md
++++ b/docs/decisions/README.md
+@@ -404,3 +404,5 @@
+ - **ADR-155 — Unchanged fleet persistence contention:** [Failed persistence with original expiry](155-unchanged-fleet-persistence-contention.md), exact aborted lock classification, independent before/after source/incarnation checks and unchanged negative fencing. Component races pass (119 top-level / 605 named) and all ten focused native SQL cases pass; [integration evidence](../../test/results/fleet-persistence-contention-integration.json) preserves the original failures. Broad fleet and installed owner qualification remain pending.
+ 
+ - **ADR-157 — Protected observation dial endpoint:** [External connectivity and original serving identity](157-protected-observation-dial-endpoint.md), fixed installation-owned TCP port translation with unchanged original Service/SNI/HTTP authority, current peer checks and no replay. Translated-port TLS components and the [original direct native reference](../../test/results/direct-observation-native-6/result.json) pass with unchanged five-second bounds and positive joins/cleanup. Synthetic setup/issuer roots remain explicit; no installed endpoint producer or runtime selection is enabled.
++
++- **ADR-156 — Finite owner configuration audit epochs:** [Independent full-snapshot acceptance](156-finite-owner-audit-epochs.md), explicit automatic rollover overlap, finite charged capacity and distinct current/admitted dependency values. This typed foundation remains unselected; current SQL29 v1 configuration receipts and runtime behavior are unchanged. Reserve provisioning, one-use audit effects, complete consumer composition, physical retirement and installed sustainability remain pending.
+--- /dev/null
++++ b/internal/application/fleet/owner_audit_epoch_ports.go
+@@ -0,0 +1,25 @@
++package fleet
++
++import (
++	"context"
++
++	value "asservat.local/asservat/internal/domain/fleet"
++)
++
++// AcceptedOwnerAuditEpochReader is a new, unselected purpose-fixed port. An
++// implementation must read the actual selected current epoch/full receipt,
++// reserve, recovery and unchanged source, preserving the earliest original
++// bounds after all blocking reads. Raw OwnerConfigurationReader cannot fill it.
++type AcceptedOwnerAuditEpochReader interface {
++	ReadAcceptedOwnerAuditEpoch(context.Context) (value.AcceptedOwnerAuditEpochObservation, error)
++}
++
++// AdmittedOwnerAuditEpochReader checks exact retained original admission, its
++// current non-revocation/receipt and original dependency end plus current
++// source/recovery/reserve. It must compare the full actual stored dependency;
++// accepting the supplied value alone is forbidden. Head rollover neither fails
++// a valid old dependency nor substitutes a newer receipt or end. No production
++// implementation/consumer exists yet; this is not an authority callback hook.
++type AdmittedOwnerAuditEpochReader interface {
++	ReadAdmittedOwnerAuditEpoch(context.Context, value.OwnerAuditEpochDependency) (value.AdmittedOwnerAuditEpochObservation, error)
++}
+--- /dev/null
++++ b/internal/domain/audit/owner_configuration_epoch.go
+@@ -0,0 +1,40 @@
++package audit
++
++import (
++	"strconv"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// This new unselected record cannot be decoded as v1 configuration authority.
++// Codec, current SQL and physical reserve/retirement producers are still absent.
++const OwnerConfigurationEpochFormat = "asservat-owner-configuration-epoch/v1"
++
++type OwnerConfigurationEpoch struct {
++	Format string
++	Epoch  fleet.OwnerAuditEpoch
++}
++
++func (r OwnerConfigurationEpoch) Valid() bool {
++	return r.Format == OwnerConfigurationEpochFormat && r.Epoch.WellFormed()
++}
++func (r OwnerConfigurationEpoch) Clone() OwnerConfigurationEpoch { r.Epoch = r.Epoch.Clone(); return r }
++func (r OwnerConfigurationEpoch) Equal(other OwnerConfigurationEpoch) bool {
++	return r.Format == other.Format && r.Epoch.Equal(other.Epoch)
++}
++func OwnerConfigurationEpochKey(r OwnerConfigurationEpoch) string {
++	if !r.Valid() {
++		return ""
++	}
++	e := r.Epoch
++	return "hub-owner-configuration-epoch/v1/" + e.Reserve.InstallationID + "/" + e.Reserve.ClusterID + "/" + e.Reserve.SourceUID + "/" + e.Reserve.ID + "/" + strconv.FormatInt(e.Ordinal, 10) + "/" + e.ID
++}
++
++// Receipt structure/key matching is necessary, not verification of ciphertext
++// contents or acknowledgement. The concrete codec and SQL owner must bind the
++// complete record, original stored claim and immutable actual object version.
++func (r Receipt) ValidOwnerConfigurationEpoch(record OwnerConfigurationEpoch) bool {
++	return record.Valid() && r.Key == OwnerConfigurationEpochKey(record) && r.Version != "null" && identity.Text(r.Version, 1024) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.Bytes <= record.Epoch.Reserve.Policy.PerEpoch.CiphertextBytes && r.SHA256 != (artifact.Digest{})
++}
+--- /dev/null
++++ b/internal/domain/audit/owner_configuration_epoch_test.go
+@@ -0,0 +1,96 @@
++package audit
++
++import (
++	"bytes"
++	"encoding/json"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/fleet"
++)
++
++func ownerEpochAuditFacts(t *testing.T) OwnerConfigurationEpoch {
++	t.Helper()
++	c, _, _ := ownerReceiptVersionFacts(t)
++	const id = "11111111-1111-4111-8111-111111111111"
++	anchor := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
++	p := fleet.OwnerAuditEpochPolicy{EpochInterval: 5 * time.Minute, AdmissionWindow: 10 * time.Minute, MaxDependencyLifetime: 30 * time.Minute, RetainAfterDependencies: time.Hour, DeleteBudget: time.Hour, MetadataAfterDeletion: time.Hour, ResidualAfterMetadata: time.Hour, MaxOpenEpochs: 64, MaxUncertainEpochs: 2, MaxDependenciesPerEpoch: 32, PerEpoch: fleet.OwnerAuditEpochBudget{CiphertextBytes: 1 << 20, DataVersions: 4, DeleteMarkers: 4, MultipartUploads: 2, MultipartParts: 4, MetadataBytes: 1 << 16}}
++	reserve := fleet.OwnerControlAuditReserveReference{ID: id, InstallationRootID: id, InstallationID: id, ClusterID: id, SourceUID: id, StoreID: id, CapacityID: id, PoolID: id, AllocationID: id, QualificationID: id, RootDigest: artifact.Digest{1}, QualificationDigest: artifact.Digest{2}, PolicyDigest: artifact.Digest{3}, ProvisionedAt: anchor.Add(-time.Minute), Policy: p}
++	dates, ok := fleet.OwnerAuditEpochDates(anchor, p)
++	r := OwnerConfigurationEpoch{Format: OwnerConfigurationEpochFormat, Epoch: fleet.OwnerAuditEpoch{ID: "22222222-2222-4222-8222-222222222222", AttemptID: "33333333-3333-4333-8333-333333333333", Ordinal: 1, Reserve: reserve, Configuration: c, ClaimedAt: anchor, Deadlines: dates}}
++	if !ok || !r.Valid() {
++		t.Fatal("invalid synthetic epoch record")
++	}
++	return r
++}
++
++func TestOwnerConfigurationEpochReceiptIsSeparateFromV1(t *testing.T) {
++	r := ownerEpochAuditFacts(t)
++	const id = "11111111-1111-4111-8111-111111111111"
++	oldKey := "hub-owner-configuration/v1/" + id + "/" + id + "/" + id + "/1"
++	if OwnerConfigurationAuditKey(r.Epoch.Configuration) != oldKey {
++		t.Fatal("v1 key changed")
++	}
++	key := "hub-owner-configuration-epoch/v1/" + id + "/" + id + "/" + id + "/" + id + "/1/22222222-2222-4222-8222-222222222222"
++	if OwnerConfigurationEpochKey(r) != key || strings.Contains(key, "33333333") {
++		t.Fatal("closed epoch key changed")
++	}
++	receipt := Receipt{Key: oldKey, Version: "original-version", ETag: "original", Bytes: 17, SHA256: artifact.Digest{9}}
++	// Exact legacy receipt bytes are checked directly against the unchanged v1
++	// type. This fixture is synthetic and is not an acknowledged production row.
++	expected := `{"Key":"` + oldKey + `","Version":"original-version","ETag":"original","Bytes":17,"SHA256":[9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}`
++	raw, err := json.Marshal(receipt)
++	if err != nil || string(raw) != expected || !receipt.ValidOwnerConfiguration(r.Epoch.Configuration) || receipt.ValidOwnerConfigurationEpoch(r) {
++		t.Fatal("v1 bytes or separation changed", err)
++	}
++	originalConfig, err := json.Marshal(r.Epoch.Configuration)
++	if err != nil {
++		t.Fatal(err)
++	}
++	receipt.Key = key
++	if !receipt.ValidOwnerConfigurationEpoch(r) || receipt.ValidOwnerConfiguration(r.Epoch.Configuration) {
++		t.Fatal("new/legacy receipt formats confused")
++	}
++	copied := r.Clone()
++	copied.Epoch.Configuration.IssuerRoots[0][0]++
++	again, err := json.Marshal(r.Epoch.Configuration)
++	if err != nil || !bytes.Equal(originalConfig, again) || copied.Equal(r) {
++		t.Fatal("epoch copy mutated v1 configuration", err)
++	}
++	// A new format inside the old record cannot select it. No decoder or runtime
++	// branch exists for this proposed format.
++	copied = r.Clone()
++	copied.Format = "asservat-hub-owner-configuration-audit/v1"
++	if copied.Valid() || OwnerConfigurationEpochKey(copied) != "" || receipt.ValidOwnerConfigurationEpoch(copied) {
++		t.Fatal("mixed format accepted")
++	}
++}
++
++func TestOwnerConfigurationEpochRejectsInvalidReceiptAndScope(t *testing.T) {
++	record := ownerEpochAuditFacts(t)
++	good := Receipt{Key: OwnerConfigurationEpochKey(record), Version: "original-version", ETag: "original", Bytes: 17, SHA256: artifact.Digest{1}}
++	for name, change := range map[string]func(*Receipt){
++		"missing-version": func(r *Receipt) { r.Version = "" }, "null-version": func(r *Receipt) { r.Version = "null" }, "oversized-version": func(r *Receipt) { r.Version = strings.Repeat("x", 1025) }, "invalid-etag": func(r *Receipt) { r.ETag = "\x00" }, "empty-body": func(r *Receipt) { r.Bytes = 0 }, "oversized-body": func(r *Receipt) { r.Bytes = 128<<10 + 1 }, "empty-digest": func(r *Receipt) { r.SHA256 = artifact.Digest{} }, "foreign-key": func(r *Receipt) { r.Key += "/foreign" },
++	} {
++		t.Run(name, func(t *testing.T) {
++			r := good
++			change(&r)
++			if r.ValidOwnerConfigurationEpoch(record) {
++				t.Fatal("invalid current receipt accepted")
++			}
++		})
++	}
++	for name, change := range map[string]func(*OwnerConfigurationEpoch){
++		"epoch": func(r *OwnerConfigurationEpoch) { r.Epoch.ID = "44444444-4444-4444-8444-444444444444" }, "ordinal": func(r *OwnerConfigurationEpoch) { r.Epoch.Ordinal++ }, "reserve": func(r *OwnerConfigurationEpoch) { r.Epoch.Reserve.ID = "44444444-4444-4444-8444-444444444444" }, "missing-format": func(r *OwnerConfigurationEpoch) { r.Format = "" }, "out-of-original-budget": func(r *OwnerConfigurationEpoch) { r.Epoch.Reserve.Policy.PerEpoch.CiphertextBytes = 16 },
++	} {
++		t.Run(name, func(t *testing.T) {
++			r := record.Clone()
++			change(&r)
++			if good.ValidOwnerConfigurationEpoch(r) {
++				t.Fatal("foreign/malformed scope accepted")
++			}
++		})
++	}
++}
+--- /dev/null
++++ b/internal/domain/fleet/owner_audit_epoch.go
+@@ -0,0 +1,172 @@
++package fleet
++
++import (
++	"errors"
++	"math"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/authorization"
++)
++
++// OwnerAuditEpochPolicy is an unselected installer policy value. Every bound is
++// explicit; arithmetic validity does not qualify storage, latency or capacity.
++// The fixed chain is admission -> dependencies -> retention -> deletion ->
++// metadata -> residual copies. All horizons start at the original claim anchor.
++type OwnerAuditEpochPolicy struct {
++	EpochInterval, AdmissionWindow, MaxDependencyLifetime time.Duration
++	RetainAfterDependencies, DeleteBudget                 time.Duration
++	MetadataAfterDeletion, ResidualAfterMetadata          time.Duration
++	// MaxDependenciesPerEpoch counts all unresolved dependency rows, including
++	// completed work whose original retirement obligations are still charged.
++	MaxOpenEpochs, MaxUncertainEpochs, MaxDependenciesPerEpoch int64
++	PerEpoch                                                   OwnerAuditEpochBudget
++}
++
++// Markers and unknown uploads are separate charged obligations, including when
++// measured ciphertext size is zero. CiphertextBytes is the total byte ceiling
++// across all data versions and unfinished uploads for one epoch, not a separate
++// allowance per version. MetadataBytes covers its live dependency/obligation rows;
++// backing must additionally qualify bounded provider and residual overhead.
++// These are ceilings, not measurements.
++type OwnerAuditEpochBudget struct {
++	CiphertextBytes, DataVersions, DeleteMarkers, MultipartUploads, MultipartParts, MetadataBytes int64
++}
++
++func (b OwnerAuditEpochBudget) WellFormed() bool {
++	return b.CiphertextBytes > 0 && b.DataVersions > 0 && b.DeleteMarkers > 0 && b.MultipartUploads > 0 && b.MultipartParts >= b.MultipartUploads && b.MetadataBytes > 0
++}
++
++var (
++	ErrOwnerAuditEpochPolicyInvalid     = errors.New("invalid finite owner audit epoch policy")
++	ErrOwnerAuditEpochSlotsInsufficient = errors.New("owner audit epoch schedule exceeds configured open slots")
++)
++
++// OwnerAuditEpochSchedule is only a mathematical lower bound. Positive closure,
++// cleanup latency, source availability and backing remain separate qualification.
++// No method silently increases the administrator's configured allocation.
++type OwnerAuditEpochSchedule struct {
++	EpochInterval, AdmissionOverlap time.Duration
++	MinimumOpenEpochs               int64
++}
++
++// Schedule reports the exact minimum even when the configured slot limit is too
++// small. Normal epochs remain charged through their full original residual end;
++// the lower bound adds one pending claim plus an explicit uncertain allowance.
++// Fixed automatic rollover uses EpochInterval without changing semantic source
++// generation or requiring a person to approve every routine epoch.
++func (p OwnerAuditEpochPolicy) Schedule() (OwnerAuditEpochSchedule, error) {
++	var out OwnerAuditEpochSchedule
++	if !p.PerEpoch.WellFormed() || p.MaxOpenEpochs < 1 || p.MaxUncertainEpochs < 1 || p.MaxDependenciesPerEpoch < 1 || p.EpochInterval <= 0 || p.EpochInterval%time.Microsecond != 0 || p.EpochInterval >= p.AdmissionWindow {
++		return out, ErrOwnerAuditEpochPolicyInvalid
++	}
++	total := time.Duration(0)
++	for _, d := range []time.Duration{p.AdmissionWindow, p.MaxDependencyLifetime, p.RetainAfterDependencies, p.DeleteBudget, p.MetadataAfterDeletion, p.ResidualAfterMetadata} {
++		if d <= 0 || d%time.Microsecond != 0 || d > time.Duration(math.MaxInt64)-total {
++			return out, ErrOwnerAuditEpochPolicyInvalid
++		}
++		total += d
++	}
++	normal := int64((total-1)/p.EpochInterval) + 1
++	if p.MaxUncertainEpochs > math.MaxInt64-1-normal {
++		return out, ErrOwnerAuditEpochPolicyInvalid
++	}
++	out = OwnerAuditEpochSchedule{EpochInterval: p.EpochInterval, AdmissionOverlap: p.AdmissionWindow - p.EpochInterval, MinimumOpenEpochs: normal + 1 + p.MaxUncertainEpochs}
++	if p.MaxOpenEpochs < out.MinimumOpenEpochs {
++		return out, ErrOwnerAuditEpochSlotsInsufficient
++	}
++	for _, n := range []int64{p.PerEpoch.CiphertextBytes, p.PerEpoch.DataVersions, p.PerEpoch.DeleteMarkers, p.PerEpoch.MultipartUploads, p.PerEpoch.MultipartParts, p.PerEpoch.MetadataBytes, p.MaxDependenciesPerEpoch} {
++		if n > math.MaxInt64/p.MaxOpenEpochs {
++			return out, ErrOwnerAuditEpochPolicyInvalid
++		}
++	}
++	return out, nil
++}
++func (p OwnerAuditEpochPolicy) WellFormed() bool { _, err := p.Schedule(); return err == nil }
++
++// This is provenance, not reservation authority. Concrete protected provisioning
++// and current SQL must verify the same positive allocation/qualification/policy.
++// Qualified physical accounting and future SQL facets remain unimplemented.
++type OwnerControlAuditReserveReference struct {
++	ID, InstallationRootID, InstallationID, ClusterID, SourceUID, StoreID string
++	CapacityID, PoolID, AllocationID, QualificationID                     string
++	RootDigest, QualificationDigest, PolicyDigest                         artifact.Digest
++	ProvisionedAt                                                         time.Time
++	Policy                                                                OwnerAuditEpochPolicy
++}
++
++func (r OwnerControlAuditReserveReference) WellFormed() bool {
++	for _, id := range []string{r.ID, r.InstallationRootID, r.InstallationID, r.ClusterID, r.SourceUID, r.StoreID, r.CapacityID, r.PoolID, r.AllocationID, r.QualificationID} {
++		if !authorization.UUID(id) {
++			return false
++		}
++	}
++	return r.RootDigest != (artifact.Digest{}) && r.QualificationDigest != (artifact.Digest{}) && r.PolicyDigest != (artifact.Digest{}) && ownerEpochTime(r.ProvisionedAt) && r.Policy.WellFormed()
++}
++func (r OwnerControlAuditReserveReference) Equal(other OwnerControlAuditReserveReference) bool {
++	a, b := r, other
++	a.ProvisionedAt = time.Time{}
++	b.ProvisionedAt = time.Time{}
++	return a == b && r.ProvisionedAt.Equal(other.ProvisionedAt)
++}
++
++type OwnerAuditEpochDeadlines struct {
++	AdmitUntil, DependenciesUntil, RetainUntil, DeleteBy, MetadataUntil, ResidualUntil time.Time
++}
++
++func OwnerAuditEpochDates(anchor time.Time, p OwnerAuditEpochPolicy) (OwnerAuditEpochDeadlines, bool) {
++	var out OwnerAuditEpochDeadlines
++	if !ownerEpochTime(anchor) || !p.WellFormed() {
++		return out, false
++	}
++	at := anchor
++	fields := []*time.Time{&out.AdmitUntil, &out.DependenciesUntil, &out.RetainUntil, &out.DeleteBy, &out.MetadataUntil, &out.ResidualUntil}
++	durations := []time.Duration{p.AdmissionWindow, p.MaxDependencyLifetime, p.RetainAfterDependencies, p.DeleteBudget, p.MetadataAfterDeletion, p.ResidualAfterMetadata}
++	for i, d := range durations {
++		next := at.Add(d)
++		if !ownerEpochTime(next) || !next.After(at) {
++			return OwnerAuditEpochDeadlines{}, false
++		}
++		*fields[i] = next
++		at = next
++	}
++	return out, true
++}
++func (d OwnerAuditEpochDeadlines) Equal(other OwnerAuditEpochDeadlines) bool {
++	return d.AdmitUntil.Equal(other.AdmitUntil) && d.DependenciesUntil.Equal(other.DependenciesUntil) && d.RetainUntil.Equal(other.RetainUntil) && d.DeleteBy.Equal(other.DeleteBy) && d.MetadataUntil.Equal(other.MetadataUntil) && d.ResidualUntil.Equal(other.ResidualUntil)
++}
++
++// OwnerAuditEpoch is historical immutable intent, never current acceptance.
++// Its ID/ordinal/attempt are allocated and checked for nonreuse by the future
++// protected SQL producer; a caller-created well-formed value grants no effect.
++type OwnerAuditEpoch struct {
++	ID, AttemptID string
++	Ordinal       int64
++	Reserve       OwnerControlAuditReserveReference
++	Configuration OwnerConfiguration
++	ClaimedAt     time.Time
++	Deadlines     OwnerAuditEpochDeadlines
++}
++
++func (e OwnerAuditEpoch) WellFormed() bool {
++	if !authorization.UUID(e.ID) || !authorization.UUID(e.AttemptID) || e.ID == e.AttemptID || e.Ordinal < 1 || !e.Reserve.WellFormed() || !e.Configuration.Valid() || e.Configuration.Suspended || e.ClaimedAt.Before(e.Reserve.ProvisionedAt) {
++		return false
++	}
++	c := e.Configuration
++	if c.Pool.InstallationID != e.Reserve.InstallationID || c.Pool.ClusterID != e.Reserve.ClusterID || c.Revision.UID != e.Reserve.SourceUID {
++		return false
++	}
++	dates, ok := OwnerAuditEpochDates(e.ClaimedAt, e.Reserve.Policy)
++	return ok && e.Deadlines.Equal(dates)
++}
++func (e OwnerAuditEpoch) Equal(other OwnerAuditEpoch) bool {
++	return e.ID == other.ID && e.AttemptID == other.AttemptID && e.Ordinal == other.Ordinal && e.Reserve.Equal(other.Reserve) && e.Configuration.Equal(other.Configuration) && e.ClaimedAt.Equal(other.ClaimedAt) && e.Deadlines.Equal(other.Deadlines)
++}
++func (e OwnerAuditEpoch) Clone() OwnerAuditEpoch { e.Configuration = e.Configuration.Clone(); return e }
++
++// Restrict new absolute dates to the timestamp representation shared with SQL
++// and JSON. Historical semantic configuration dates/formats are not rewritten.
++func ownerEpochTime(t time.Time) bool {
++	_, offset := t.Zone()
++	return !t.IsZero() && t.Year() >= 1 && t.Year() <= 9999 && offset == 0 && t.Nanosecond()%1000 == 0
++}
+--- /dev/null
++++ b/internal/domain/fleet/owner_audit_epoch_accounting.go
+@@ -0,0 +1,63 @@
++package fleet
++
++// OwnerAuditEpochCapacity is the declared aggregate reservation required by one
++// original policy. This is arithmetic, not measured physical backing or a grant.
++// Bytes cover all known and uncertain ciphertext copies within the fixed
++// per-epoch ceiling. Provider allocation overhead and residual backup/WAL
++// capacity must be independently qualified by the protected provisioner.
++type OwnerAuditEpochCapacity struct {
++	Epochs, Dependencies int64
++	Objects              OwnerAuditEpochBudget
++}
++
++func (p OwnerAuditEpochPolicy) RequiredCapacity() (OwnerAuditEpochCapacity, bool) {
++	if !p.WellFormed() {
++		return OwnerAuditEpochCapacity{}, false
++	}
++	n := p.MaxOpenEpochs
++	return OwnerAuditEpochCapacity{
++		Epochs:       n,
++		Dependencies: n * p.MaxDependenciesPerEpoch,
++		Objects: OwnerAuditEpochBudget{
++			CiphertextBytes:  n * p.PerEpoch.CiphertextBytes,
++			DataVersions:     n * p.PerEpoch.DataVersions,
++			DeleteMarkers:    n * p.PerEpoch.DeleteMarkers,
++			MultipartUploads: n * p.PerEpoch.MultipartUploads,
++			MultipartParts:   n * p.PerEpoch.MultipartParts,
++			MetadataBytes:    n * p.PerEpoch.MetadataBytes,
++		},
++	}, true
++}
++
++// OwnerAuditEpochSpend is a current accounting observation, never caller-supplied
++// capacity authority. Each unresolved claim reserves its complete epoch budget
++// before provider I/O and keeps that budget through uncertain outcome and
++// physical retirement. Known is the observed aggregate, which may exceed the
++// admitted bound; out-of-contract copies remain visible and stop new claims.
++// Completed dependencies do not reduce either count until their concrete owner
++// positively completes the original retained obligations.
++type OwnerAuditEpochSpend struct {
++	ChargedEpochs, PendingEpochs, UncertainEpochs, Dependencies int64
++	Known                                                       OwnerAuditEpochBudget
++}
++
++// FitsAnotherEpoch checks only arithmetic room for a new full claim. Concrete
++// SQL must separately verify current recovery/source, original reserve backing,
++// cadence, one-use attempt and complete current known/uncertain accounting. This
++// method cannot release charge, settle a writer, renew an epoch or select it.
++func (s OwnerAuditEpochSpend) FitsAnotherEpoch(p OwnerAuditEpochPolicy) bool {
++	capacity, ok := p.RequiredCapacity()
++	if !ok || s.ChargedEpochs < 0 || s.ChargedEpochs >= capacity.Epochs || s.PendingEpochs != 0 || s.UncertainEpochs < 0 || s.UncertainEpochs > s.ChargedEpochs || s.UncertainEpochs >= p.MaxUncertainEpochs || s.Dependencies < 0 || s.Dependencies > s.ChargedEpochs*p.MaxDependenciesPerEpoch {
++		return false
++	}
++	used := []int64{s.Known.CiphertextBytes, s.Known.DataVersions, s.Known.DeleteMarkers, s.Known.MultipartUploads, s.Known.MultipartParts, s.Known.MetadataBytes}
++	per := []int64{p.PerEpoch.CiphertextBytes, p.PerEpoch.DataVersions, p.PerEpoch.DeleteMarkers, p.PerEpoch.MultipartUploads, p.PerEpoch.MultipartParts, p.PerEpoch.MetadataBytes}
++	for i, n := range used {
++		// Positive policy maxima and charged count were checked before this
++		// multiplication. An empty inventory never subtracts unknown spend.
++		if n < 0 || n > s.ChargedEpochs*per[i] {
++			return false
++		}
++	}
++	return true
++}
+--- /dev/null
++++ b/internal/domain/fleet/owner_audit_epoch_accounting_test.go
+@@ -0,0 +1,173 @@
++package fleet
++
++import (
++	"errors"
++	"math"
++	"testing"
++	"time"
++)
++
++func TestOwnerAuditEpochAccountingChargesUnknownClaims(t *testing.T) {
++	p := ownerEpochFacts(t).Reserve.Policy
++	capacity, ok := p.RequiredCapacity()
++	if !ok || capacity.Epochs != 64 || capacity.Dependencies != 2048 || capacity.Objects != (OwnerAuditEpochBudget{CiphertextBytes: 64 << 20, DataVersions: 256, DeleteMarkers: 256, MultipartUploads: 128, MultipartParts: 256, MetadataBytes: 64 << 16}) {
++		t.Fatal("aggregate capacity omitted a dimension", capacity, ok)
++	}
++	// A lost writer response may leave no listed bytes. The fully charged slot
++	// still prevents a claim once the original maximum is reached.
++	unknown := OwnerAuditEpochSpend{ChargedEpochs: p.MaxOpenEpochs}
++	if unknown.FitsAnotherEpoch(p) {
++		t.Fatal("empty known inventory refunded unknown claims")
++	}
++	one := OwnerAuditEpochSpend{ChargedEpochs: 1, Dependencies: p.MaxDependenciesPerEpoch, Known: p.PerEpoch}
++	if !one.FitsAnotherEpoch(p) {
++		t.Fatal("full original charge rejected despite independent room")
++	}
++	for name, change := range map[string]func(*OwnerAuditEpochSpend){
++		"pending":               func(s *OwnerAuditEpochSpend) { s.PendingEpochs = 1 },
++		"uncertain-exhaustion":  func(s *OwnerAuditEpochSpend) { s.ChargedEpochs = 2; s.UncertainEpochs = 2 },
++		"unowned-uncertainty":   func(s *OwnerAuditEpochSpend) { s.UncertainEpochs = 2 },
++		"negative-uncertainty":  func(s *OwnerAuditEpochSpend) { s.UncertainEpochs = -1 },
++		"negative-pending":      func(s *OwnerAuditEpochSpend) { s.PendingEpochs = -1 },
++		"negative-count":        func(s *OwnerAuditEpochSpend) { s.ChargedEpochs = -1 },
++		"oversized-count":       func(s *OwnerAuditEpochSpend) { s.ChargedEpochs = math.MaxInt64 },
++		"negative-dependencies": func(s *OwnerAuditEpochSpend) { s.Dependencies = -1 },
++		"excess-dependencies":   func(s *OwnerAuditEpochSpend) { s.Dependencies++ },
++		"unowned-obligation":    func(s *OwnerAuditEpochSpend) { s.ChargedEpochs = 0 },
++		"excess-bytes":          func(s *OwnerAuditEpochSpend) { s.Known.CiphertextBytes++ },
++		"excess-versions":       func(s *OwnerAuditEpochSpend) { s.Known.DataVersions++ },
++		"excess-markers":        func(s *OwnerAuditEpochSpend) { s.Known.DeleteMarkers++ },
++		"excess-uploads":        func(s *OwnerAuditEpochSpend) { s.Known.MultipartUploads++ },
++		"excess-parts":          func(s *OwnerAuditEpochSpend) { s.Known.MultipartParts++ },
++		"excess-metadata":       func(s *OwnerAuditEpochSpend) { s.Known.MetadataBytes++ },
++		"negative-bytes":        func(s *OwnerAuditEpochSpend) { s.Known.CiphertextBytes = -1 },
++		"negative-versions":     func(s *OwnerAuditEpochSpend) { s.Known.DataVersions = -1 },
++		"negative-markers":      func(s *OwnerAuditEpochSpend) { s.Known.DeleteMarkers = -1 },
++		"negative-uploads":      func(s *OwnerAuditEpochSpend) { s.Known.MultipartUploads = -1 },
++		"negative-parts":        func(s *OwnerAuditEpochSpend) { s.Known.MultipartParts = -1 },
++		"negative-metadata":     func(s *OwnerAuditEpochSpend) { s.Known.MetadataBytes = -1 },
++	} {
++		t.Run(name, func(t *testing.T) {
++			s := one
++			change(&s)
++			if s.FitsAnotherEpoch(p) {
++				t.Fatal("new claim allowed with pending/invalid/out-of-contract spend")
++			}
++		})
++	}
++	for _, n := range []int64{0, -1, math.MaxInt64} {
++		bad := p
++		bad.PerEpoch.CiphertextBytes = n
++		if c, ok := bad.RequiredCapacity(); ok || c != (OwnerAuditEpochCapacity{}) {
++			t.Fatal("invalid/overflow arithmetic returned capacity", n, c)
++		}
++	}
++}
++
++func TestOwnerAuditEpochAdmissionRequiresWholeRetainedLifecycle(t *testing.T) {
++	e := ownerEpochFacts(t)
++	now := e.ClaimedAt.Add(time.Minute)
++	source := OwnerConfigurationObservation{Configuration: e.Configuration.Clone(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
++	o := AcceptedOwnerAuditEpochObservation{Source: source, Epoch: e.Clone(), ObservedAt: now, FreshUntil: source.FreshUntil, CurrentRetainUntil: e.Deadlines.RetainUntil}
++	d := OwnerAuditEpochDependency{ID: "44444444-4444-4444-8444-444444444444", EffectID: "77777777-7777-4777-8777-777777777777", Purpose: OwnerAuditCertificateDependency, Epoch: e.Clone(), AdmittedAt: now, EndsAt: now.Add(20 * time.Minute)}
++	if !d.MatchesAdmission(o, now) {
++		t.Fatal("valid synthetic original admission failed")
++	}
++	shortened := o.Clone()
++	shortened.CurrentRetainUntil = now.Add(time.Minute)
++	if !shortened.Valid(now) || d.MatchesAdmission(shortened, now) {
++		t.Fatal("fresh source allowed lifecycle beyond current retained receipt")
++	}
++	// An independently admitted original operation may still continue until the
++	// shortened cutoff. This is not admission of its entire lifecycle again.
++	retained := AdmittedOwnerAuditEpochObservation{Source: source, Dependency: d.Clone(), ObservedAt: now, FreshUntil: source.FreshUntil, CurrentRetainUntil: shortened.CurrentRetainUntil}
++	if !retained.Valid(now) {
++		t.Fatal("current shortening lost valid bounded continuation")
++	}
++	for name, change := range map[string]func(*OwnerAuditEpochDependency){
++		"missing-effect":     func(d *OwnerAuditEpochDependency) { d.EffectID = "" },
++		"malformed-effect":   func(d *OwnerAuditEpochDependency) { d.EffectID = "not-an-effect-UUID" },
++		"future-admission":   func(d *OwnerAuditEpochDependency) { d.AdmittedAt = now.Add(time.Microsecond) },
++		"before-observation": func(d *OwnerAuditEpochDependency) { d.AdmittedAt = now.Add(-time.Microsecond) },
++		"changed-epoch":      func(d *OwnerAuditEpochDependency) { d.Epoch.Ordinal++ },
++		"changed-source":     func(d *OwnerAuditEpochDependency) { d.Epoch.Configuration.Revision.Generation++ },
++		"changed-reserve":    func(d *OwnerAuditEpochDependency) { d.Epoch.Reserve.ID = d.ID },
++	} {
++		t.Run(name, func(t *testing.T) {
++			copy := d.Clone()
++			change(&copy)
++			if copy.MatchesAdmission(o, now) {
++				t.Fatal("invalid or cross-epoch admission accepted")
++			}
++		})
++	}
++	other := d.Clone()
++	other.EffectID = "88888888-8888-4888-8888-888888888888"
++	if !other.WellFormed() || other.Equal(d) {
++		t.Fatal("concrete effect identity lost from exact admission equality")
++	}
++	// Shape cannot verify which effect is stored; this deliberately still fits
++	// the policy. Concrete SQL must compare the actual purpose-owned attempt.
++	if !other.MatchesAdmission(o, now) {
++		t.Fatal("shape check purported to invent stored effect authority")
++	}
++}
++
++func TestOwnerAuditEpochScheduleReportsUnfundedRollover(t *testing.T) {
++	p := ownerEpochFacts(t).Reserve.Policy
++	schedule, err := p.Schedule()
++	// Synthetic, newly selected test policy: 280 minutes total residual horizon
++	// divided by a five-minute interval, plus pending one and uncertain two.
++	if err != nil || schedule.MinimumOpenEpochs != 59 || schedule.AdmissionOverlap != 5*time.Minute || schedule.EpochInterval != 5*time.Minute {
++		t.Fatal("incorrect fixed-cadence lower bound", schedule, err)
++	}
++	p.MaxOpenEpochs = 8 // The earlier unshipped fixture could not sustain rollover.
++	schedule, err = p.Schedule()
++	if !errors.Is(err, ErrOwnerAuditEpochSlotsInsufficient) || schedule.MinimumOpenEpochs != 59 || p.MaxOpenEpochs != 8 || p.WellFormed() {
++		t.Fatal("unsustainable limit silently raised or accepted", schedule, err)
++	}
++	p.MaxOpenEpochs = 59
++	p.ResidualAfterMetadata += time.Microsecond
++	schedule, err = p.Schedule()
++	if !errors.Is(err, ErrOwnerAuditEpochSlotsInsufficient) || schedule.MinimumOpenEpochs != 60 {
++		t.Fatal("partial residual interval truncated", schedule, err)
++	}
++	p.MaxOpenEpochs = 60
++	if _, err := p.Schedule(); err != nil {
++		t.Fatal("explicit sufficient lower bound rejected", err)
++	}
++	p.MaxUncertainEpochs = math.MaxInt64
++	if _, err := p.Schedule(); !errors.Is(err, ErrOwnerAuditEpochPolicyInvalid) {
++		t.Fatal("uncertain-slot arithmetic overflow accepted", err)
++	}
++}
++
++func TestOwnerAuditEpochAdmissionRejectsElapsedOriginalDependency(t *testing.T) {
++	e := ownerEpochFacts(t)
++	observed := e.ClaimedAt.Add(time.Minute)
++	source := OwnerConfigurationObservation{Configuration: e.Configuration.Clone(), ObservedAt: observed, FreshUntil: observed.Add(5 * time.Second)}
++	o := AcceptedOwnerAuditEpochObservation{Source: source, Epoch: e.Clone(), ObservedAt: observed, FreshUntil: source.FreshUntil, CurrentRetainUntil: e.Deadlines.RetainUntil}
++	d := OwnerAuditEpochDependency{ID: "44444444-4444-4444-8444-444444444444", EffectID: "77777777-7777-4777-8777-777777777777", Purpose: OwnerAuditRequestDependency, Epoch: e.Clone(), AdmittedAt: observed, EndsAt: observed.Add(time.Second)}
++	original := d.Clone()
++	for _, tc := range []struct {
++		name string
++		now  time.Time
++		want bool
++	}{
++		{name: "immediately-before", now: d.EndsAt.Add(-time.Microsecond), want: true},
++		{name: "exact-original-end", now: d.EndsAt, want: false},
++		{name: "after-original-end", now: d.EndsAt.Add(time.Microsecond), want: false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			if !o.Valid(tc.now) || !d.WellFormed() {
++				t.Fatal("regression fixture lost fresh source and well-formed original dependency")
++			}
++			if got := d.MatchesAdmission(o, tc.now); got != tc.want {
++				t.Fatalf("original dependency end was not enforced: admission=%v want=%v", got, tc.want)
++			}
++			if !d.Equal(original) || !o.Epoch.Equal(original.Epoch) {
++				t.Fatal("expiry check rewrote the original record or deadlines")
++			}
++		})
++	}
++}
+--- /dev/null
++++ b/internal/domain/fleet/owner_audit_epoch_observation.go
+@@ -0,0 +1,95 @@
++package fleet
++
++import (
++	"time"
++
++	"asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// AcceptedOwnerAuditEpochObservation is the output of the separate concrete
++// accepted-epoch reader, never the raw Kubernetes source port. Valid checks
++// shape/time only; the reader must check actual stored receipt, selected head,
++// current non-revocation, recovery and reserve. No implementation is selected.
++type AcceptedOwnerAuditEpochObservation struct {
++	Source                 OwnerConfigurationObservation
++	Epoch                  OwnerAuditEpoch
++	ObservedAt, FreshUntil time.Time
++	CurrentRetainUntil     time.Time
++}
++
++func (o AcceptedOwnerAuditEpochObservation) Valid(now time.Time) bool {
++	return o.Source.Valid(now) && o.Epoch.WellFormed() && o.Source.Configuration.Equal(o.Epoch.Configuration) && !o.ObservedAt.Before(o.Source.ObservedAt) && !o.ObservedAt.Before(o.Epoch.ClaimedAt) && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second) && !o.FreshUntil.After(o.Source.FreshUntil) && !o.FreshUntil.After(o.Epoch.Deadlines.AdmitUntil) && ownerEpochTime(o.CurrentRetainUntil) && !o.CurrentRetainUntil.After(o.Epoch.Deadlines.RetainUntil) && !o.FreshUntil.After(o.CurrentRetainUntil)
++}
++func (o AcceptedOwnerAuditEpochObservation) Clone() AcceptedOwnerAuditEpochObservation {
++	o.Source.Configuration = o.Source.Configuration.Clone()
++	o.Epoch = o.Epoch.Clone()
++	return o
++}
++
++type OwnerAuditDependencyPurpose string
++
++const (
++	OwnerAuditCertificateDependency OwnerAuditDependencyPurpose = "owner-certificate"
++	OwnerAuditWorkerDependency      OwnerAuditDependencyPurpose = "owner-worker"
++	OwnerAuditRequestDependency     OwnerAuditDependencyPurpose = "owner-request"
++	OwnerAuditInstallerDependency   OwnerAuditDependencyPurpose = "owner-installer"
++)
++
++// A dependency is allocated before effect by its concrete SQL owner, not by a
++// configuration reader. EffectID is the exact original attempt/request of that
++// purpose owner, not the epoch attempt. EndsAt includes every possible original leaf/request/
++// cleanup end. No successor epoch rewrites this exact immutable admission.
++type OwnerAuditEpochDependency struct {
++	ID, EffectID       string
++	Purpose            OwnerAuditDependencyPurpose
++	Epoch              OwnerAuditEpoch
++	AdmittedAt, EndsAt time.Time
++}
++
++func (d OwnerAuditEpochDependency) WellFormed() bool {
++	switch d.Purpose {
++	case OwnerAuditCertificateDependency, OwnerAuditWorkerDependency, OwnerAuditRequestDependency, OwnerAuditInstallerDependency:
++	default:
++		return false
++	}
++	return authorization.UUID(d.ID) && authorization.UUID(d.EffectID) && d.Epoch.WellFormed() && ownerEpochTime(d.AdmittedAt) && ownerEpochTime(d.EndsAt) && !d.AdmittedAt.Before(d.Epoch.ClaimedAt) && d.AdmittedAt.Before(d.Epoch.Deadlines.AdmitUntil) && d.EndsAt.After(d.AdmittedAt) && !d.EndsAt.After(d.AdmittedAt.Add(d.Epoch.Reserve.Policy.MaxDependencyLifetime)) && !d.EndsAt.After(d.Epoch.Deadlines.DependenciesUntil)
++}
++
++// MatchesAdmission checks an original admission value against the exact current
++// observation and the entire retained dependency lifetime. It performs no claim,
++// reservation or lookup; concrete SQL must use database time and independently
++// verify its purpose-owned EffectID before recording the dependency/effect.
++// Current retention shortening may prevent new admission while already-admitted
++// work remains usable only until its independently checked shortened cutoff.
++func (d OwnerAuditEpochDependency) MatchesAdmission(o AcceptedOwnerAuditEpochObservation, now time.Time) bool {
++	return o.Valid(now) && d.WellFormed() && now.Before(d.EndsAt) && d.Epoch.Equal(o.Epoch) && !d.AdmittedAt.Before(o.ObservedAt) && !d.AdmittedAt.After(now) && d.AdmittedAt.Before(o.FreshUntil) && !d.EndsAt.After(o.CurrentRetainUntil)
++}
++func (d OwnerAuditEpochDependency) Clone() OwnerAuditEpochDependency {
++	d.Epoch = d.Epoch.Clone()
++	return d
++}
++func (d OwnerAuditEpochDependency) Equal(other OwnerAuditEpochDependency) bool {
++	return d.ID == other.ID && d.EffectID == other.EffectID && d.Purpose == other.Purpose && d.Epoch.Equal(other.Epoch) && d.AdmittedAt.Equal(other.AdmittedAt) && d.EndsAt.Equal(other.EndsAt)
++}
++
++// This distinct observation checks the original admitted dependency's current
++// non-revocation/retained receipt, not the selected head. A concrete SQL reader
++// must compare the entire exact stored dependency and full epoch receipt plus
++// current source/recovery/reserve. No boolean or caller-created value supplies
++// those facts. The old admission cutoff is deliberately not a completion cutoff.
++type AdmittedOwnerAuditEpochObservation struct {
++	Source                 OwnerConfigurationObservation
++	Dependency             OwnerAuditEpochDependency
++	ObservedAt, FreshUntil time.Time
++	CurrentRetainUntil     time.Time
++}
++
++func (o AdmittedOwnerAuditEpochObservation) Valid(now time.Time) bool {
++	return o.Source.Valid(now) && o.Dependency.WellFormed() && o.Source.Configuration.Equal(o.Dependency.Epoch.Configuration) && !o.ObservedAt.Before(o.Source.ObservedAt) && !o.ObservedAt.Before(o.Dependency.AdmittedAt) && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second) && !o.FreshUntil.After(o.Source.FreshUntil) && !o.FreshUntil.After(o.Dependency.EndsAt) && !o.FreshUntil.After(o.Dependency.Epoch.Deadlines.RetainUntil) && ownerEpochTime(o.CurrentRetainUntil) && !o.CurrentRetainUntil.After(o.Dependency.Epoch.Deadlines.RetainUntil) && !o.FreshUntil.After(o.CurrentRetainUntil)
++}
++func (o AdmittedOwnerAuditEpochObservation) Clone() AdmittedOwnerAuditEpochObservation {
++	o.Source.Configuration = o.Source.Configuration.Clone()
++	o.Dependency = o.Dependency.Clone()
++	return o
++}
+--- /dev/null
++++ b/internal/domain/fleet/owner_audit_epoch_test.go
+@@ -0,0 +1,165 @@
++package fleet
++
++import (
++	"math"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++func ownerEpochFacts(t *testing.T) OwnerAuditEpoch {
++	t.Helper()
++	const id = "11111111-1111-4111-8111-111111111111"
++	anchor := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
++	policy := OwnerAuditEpochPolicy{EpochInterval: 5 * time.Minute, AdmissionWindow: 10 * time.Minute, MaxDependencyLifetime: 30 * time.Minute, RetainAfterDependencies: time.Hour, DeleteBudget: time.Hour, MetadataAfterDeletion: time.Hour, ResidualAfterMetadata: time.Hour, MaxOpenEpochs: 64, MaxUncertainEpochs: 2, MaxDependenciesPerEpoch: 32, PerEpoch: OwnerAuditEpochBudget{CiphertextBytes: 1 << 20, DataVersions: 4, DeleteMarkers: 4, MultipartUploads: 2, MultipartParts: 4, MetadataBytes: 1 << 16}}
++	reserve := OwnerControlAuditReserveReference{ID: id, InstallationRootID: id, InstallationID: id, ClusterID: id, SourceUID: id, StoreID: id, CapacityID: id, PoolID: id, AllocationID: id, QualificationID: id, RootDigest: artifact.Digest{1}, QualificationDigest: artifact.Digest{2}, PolicyDigest: artifact.Digest{3}, ProvisionedAt: anchor.Add(-time.Minute), Policy: policy}
++	config := OwnerConfiguration{Pool: OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "owner", ServiceUID: id, Deployment: "owner", DeploymentUID: id, ServiceAccount: "owner", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{4}}, ProtectionDigest: artifact.Digest{5}, IssuerRoots: [][]byte{{6}}}
++	dates, ok := OwnerAuditEpochDates(anchor, policy)
++	e := OwnerAuditEpoch{ID: "22222222-2222-4222-8222-222222222222", AttemptID: "33333333-3333-4333-8333-333333333333", Ordinal: 1, Reserve: reserve, Configuration: config, ClaimedAt: anchor, Deadlines: dates}
++	if !ok || !e.WellFormed() {
++		t.Fatal("invalid synthetic epoch")
++	}
++	return e
++}
++
++func TestOwnerAuditEpochRejectsInvalidBoundsAndOriginalPins(t *testing.T) {
++	for name, change := range map[string]func(*OwnerAuditEpoch){
++		"missing-policy":         func(e *OwnerAuditEpoch) { e.Reserve.Policy = OwnerAuditEpochPolicy{} },
++		"zero-cadence":           func(e *OwnerAuditEpoch) { e.Reserve.Policy.EpochInterval = 0 },
++		"cadence-past-admission": func(e *OwnerAuditEpoch) { e.Reserve.Policy.EpochInterval = e.Reserve.Policy.AdmissionWindow },
++		"negative-duration":      func(e *OwnerAuditEpoch) { e.Reserve.Policy.DeleteBudget = -time.Hour },
++		"fractional-sql-time":    func(e *OwnerAuditEpoch) { e.Reserve.Policy.DeleteBudget += time.Nanosecond },
++		"duration-sum-overflow": func(e *OwnerAuditEpoch) {
++			e.Reserve.Policy.ResidualAfterMetadata = time.Duration(math.MaxInt64 / 1000 * 1000)
++		},
++		"byte-product-overflow":         func(e *OwnerAuditEpoch) { e.Reserve.Policy.PerEpoch.CiphertextBytes = math.MaxInt64 },
++		"count-product-overflow":        func(e *OwnerAuditEpoch) { e.Reserve.Policy.MaxDependenciesPerEpoch = math.MaxInt64 },
++		"no-pending-room":               func(e *OwnerAuditEpoch) { e.Reserve.Policy.MaxOpenEpochs = 1 },
++		"missing-unknown-upload-budget": func(e *OwnerAuditEpoch) { e.Reserve.Policy.PerEpoch.MultipartUploads = 0 },
++		"missing-marker-budget":         func(e *OwnerAuditEpoch) { e.Reserve.Policy.PerEpoch.DeleteMarkers = 0 },
++		"parts-less-than-uploads":       func(e *OwnerAuditEpoch) { e.Reserve.Policy.PerEpoch.MultipartParts = 1 },
++		"later-reserve":                 func(e *OwnerAuditEpoch) { e.Reserve.ProvisionedAt = e.ClaimedAt.Add(time.Second) },
++		"missing-allocation":            func(e *OwnerAuditEpoch) { e.Reserve.AllocationID = "" },
++		"missing-qualification":         func(e *OwnerAuditEpoch) { e.Reserve.QualificationDigest = artifact.Digest{} },
++		"foreign-source":                func(e *OwnerAuditEpoch) { e.Reserve.SourceUID = e.ID },
++		"foreign-cluster":               func(e *OwnerAuditEpoch) { e.Reserve.ClusterID = e.ID },
++		"foreign-installation":          func(e *OwnerAuditEpoch) { e.Reserve.InstallationID = e.ID },
++		"zero-ordinal":                  func(e *OwnerAuditEpoch) { e.Ordinal = 0 },
++		"missing-attempt":               func(e *OwnerAuditEpoch) { e.AttemptID = "" },
++		"aliased-attempt":               func(e *OwnerAuditEpoch) { e.AttemptID = e.ID },
++		"suspended":                     func(e *OwnerAuditEpoch) { e.Configuration.Suspended = true },
++		"moved-admission":               func(e *OwnerAuditEpoch) { e.Deadlines.AdmitUntil = e.Deadlines.AdmitUntil.Add(time.Microsecond) },
++		"moved-residual":                func(e *OwnerAuditEpoch) { e.Deadlines.ResidualUntil = e.Deadlines.ResidualUntil.Add(time.Microsecond) },
++		"changed-anchor":                func(e *OwnerAuditEpoch) { e.ClaimedAt = e.ClaimedAt.Add(time.Microsecond) },
++		"non-UTC":                       func(e *OwnerAuditEpoch) { e.ClaimedAt = e.ClaimedAt.In(time.FixedZone("other", 3600)) },
++	} {
++		t.Run(name, func(t *testing.T) {
++			e := ownerEpochFacts(t)
++			change(&e)
++			if e.WellFormed() {
++				t.Fatal("invalid epoch accepted")
++			}
++		})
++	}
++	e := ownerEpochFacts(t)
++	if _, ok := OwnerAuditEpochDates(time.Date(9999, 12, 31, 23, 59, 0, 0, time.UTC), e.Reserve.Policy); ok {
++		t.Fatal("out-of-wire-range absolute date accepted")
++	}
++	if _, ok := OwnerAuditEpochDates(time.Time{}, e.Reserve.Policy); ok {
++		t.Fatal("zero anchor accepted")
++	}
++}
++
++func TestOwnerAuditEpochCloneAndInstantEquality(t *testing.T) {
++	e := ownerEpochFacts(t)
++	copy := e.Clone()
++	copy.ClaimedAt = copy.ClaimedAt.In(time.FixedZone("same-instant", 0))
++	if !copy.WellFormed() || !copy.Equal(e) {
++		t.Fatal("same UTC instant changed equality")
++	}
++	copy.Configuration.IssuerRoots[0][0]++
++	if copy.Equal(e) || e.Configuration.IssuerRoots[0][0] != 6 {
++		t.Fatal("clone changed original roots or equality lost them")
++	}
++	copy = e.Clone()
++	copy.Reserve.StoreID = e.ID
++	if copy.Equal(e) {
++		t.Fatal("store identity omitted from equality")
++	}
++	copy = e.Clone()
++	copy.Deadlines.DeleteBy = copy.Deadlines.DeleteBy.Add(time.Microsecond)
++	if copy.Equal(e) {
++		t.Fatal("original dates omitted from equality")
++	}
++}
++
++func TestOwnerAuditEpochRolloverDoesNotMoveAdmittedDependency(t *testing.T) {
++	old := ownerEpochFacts(t)
++	dependency := OwnerAuditEpochDependency{ID: "44444444-4444-4444-8444-444444444444", EffectID: "77777777-7777-4777-8777-777777777777", Purpose: OwnerAuditCertificateDependency, Epoch: old.Clone(), AdmittedAt: old.ClaimedAt.Add(time.Minute), EndsAt: old.ClaimedAt.Add(25 * time.Minute)}
++	if !dependency.WellFormed() {
++		t.Fatal("invalid synthetic admitted dependency")
++	}
++	next := old.Clone()
++	next.ID = "55555555-5555-4555-8555-555555555555"
++	next.AttemptID = "66666666-6666-4666-8666-666666666666"
++	next.Ordinal = 2
++	next.ClaimedAt = old.ClaimedAt.Add(5 * time.Minute)
++	next.Deadlines, _ = OwnerAuditEpochDates(next.ClaimedAt, next.Reserve.Policy)
++	now := old.ClaimedAt.Add(11 * time.Minute)
++	source := OwnerConfigurationObservation{Configuration: old.Configuration.Clone(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
++	current := AcceptedOwnerAuditEpochObservation{Source: source, Epoch: next, ObservedAt: now, FreshUntil: source.FreshUntil, CurrentRetainUntil: next.Deadlines.RetainUntil}
++	retained := AdmittedOwnerAuditEpochObservation{Source: source, Dependency: dependency.Clone(), ObservedAt: now, FreshUntil: source.FreshUntil, CurrentRetainUntil: old.Deadlines.RetainUntil}
++	if !current.Valid(now) || !retained.Valid(now) {
++		t.Fatal("successor or original admitted interval lost")
++	}
++	// This only checks values. Actual selected-head/non-revocation and stored
++	// receipt/dependency comparison remain mandatory concrete SQL work.
++	wrong := current.Clone()
++	wrong.Epoch = old.Clone()
++	if wrong.Valid(now) {
++		t.Fatal("old epoch admitted new work after fixed cutoff")
++	}
++	swapped := dependency.Clone()
++	swapped.Epoch = next.Clone()
++	if swapped.Equal(dependency) {
++		t.Fatal("successor substituted for original dependency")
++	}
++	changed := retained.Clone()
++	changed.Source.Configuration.Revision.Generation++
++	if changed.Valid(now) {
++		t.Fatal("semantic source change accepted")
++	}
++	shortened := retained.Clone()
++	shortened.CurrentRetainUntil = now
++	if shortened.Valid(now) {
++		t.Fatal("current retention shortening ignored")
++	}
++	extended := retained.Clone()
++	extended.CurrentRetainUntil = old.Deadlines.RetainUntil.Add(time.Microsecond)
++	if extended.Valid(now) {
++		t.Fatal("current read extended original retained epoch")
++	}
++	ended := dependency.EndsAt
++	expired := retained.Clone()
++	expired.Source.ObservedAt = ended
++	expired.Source.FreshUntil = ended.Add(time.Second)
++	expired.ObservedAt = ended
++	expired.FreshUntil = expired.Source.FreshUntil
++	if expired.Valid(ended) {
++		t.Fatal("original dependency expiry renewed")
++	}
++	moved := dependency.Clone()
++	moved.EndsAt = moved.AdmittedAt.Add(old.Reserve.Policy.MaxDependencyLifetime + time.Microsecond)
++	if moved.WellFormed() {
++		t.Fatal("dependency outlived its original policy bound")
++	}
++	if !retained.Dependency.Equal(dependency) {
++		t.Fatal("head rollover mutated original dependency")
++	}
++	retained.Dependency.Epoch.Configuration.IssuerRoots[0][0]++
++	if dependency.Epoch.Configuration.IssuerRoots[0][0] != 6 {
++		t.Fatal("observation clone aliased original dependency")
++	}
++}

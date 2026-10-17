@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+ok  	asservat.local/asservat/internal/application/fleet	1.013s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.009s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.839s
+ok  	asservat.local/asservat/test/integration	1.950s

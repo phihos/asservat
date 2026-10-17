@@ -1,0 +1,11 @@
+=== RUN   TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable
+    owner_bootstrap_worker_caller_test.go:234: unavailable final journal became changed identity 2 permission source identity changed
+    owner_identity_operation_fixture_test.go:405: private-root fixture: creates=0 object=false api="" kind="" namespace=false name=false fields=0 decoded=false valid=false
+--- FAIL: TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable (3.67s)
+=== RUN   TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable
+    owner_bootstrap_worker_caller_test.go:257: expired final return became changed identity 2 permission source identity changed
+    owner_identity_operation_fixture_test.go:405: private-root fixture: creates=0 object=false api="" kind="" namespace=false name=false fields=0 decoded=false valid=false
+--- FAIL: TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable (3.65s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	7.370s
+FAIL

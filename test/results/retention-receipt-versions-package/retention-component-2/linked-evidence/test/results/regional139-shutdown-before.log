@@ -1,0 +1,5 @@
+--- FAIL: TestOwnerRuntimeJoinsBlockedChildAfterCancellation (6.01s)
+    owner_runtime_join_test.go:55: Run returned while original child remained blocked current signing trust unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	6.171s
+FAIL

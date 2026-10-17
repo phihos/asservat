@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^api-execution-one-preparation-exact-result-historical-publication$"
+  ],
+  "exit": 0,
+  "status": "passed",
+  "result": "ADR-176 ContextKeyWraps on real PostgreSQL under its own NOINHERIT login with exactly postgres.ContextKeyWrapGrantSQL: the executor process's activated connector client leaf wraps the data and manifest keysets of its prepared attempt; denied are a repeated role, another certificate, an attempt without a prepared execution, a non-collector role and any wrap after the start object is bound. Retained earlier attempts in this session: superuser pool refused by the ledger, missing server leaf (process not serving).",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "custody.log"
+}

@@ -1,0 +1,56 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/wrong-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/zero-digest
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01
+--- PASS: TestContextAdmissionWithRealServices (9.94s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions (7.10s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null (0.29s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-null (0.28s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-empty (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-enrollment-null (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-empty (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-certificate-null (0.30s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/wrong-key (0.22s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/zero-digest (0.21s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-intent-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-outcome-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-worker-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/native-parent-enrollment-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-empty (0.12s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/historical-accounting-null (0.12s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (2.50s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01 (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01 (0.06s)
+PASS
+ok  	asservat.local/asservat/test/integration	11.000s

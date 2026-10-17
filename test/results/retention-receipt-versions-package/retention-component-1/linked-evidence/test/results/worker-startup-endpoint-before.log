@@ -1,0 +1,6 @@
+--- FAIL: TestWorkerControlRejectsUntrustedPayloads (0.00s)
+    --- FAIL: TestWorkerControlRejectsUntrustedPayloads/empty-fragment (0.00s)
+        download_worker_test.go:162: invalid control payload admitted
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.004s
+FAIL

@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-22",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Diagnostic run. The first attempt failed at 'role:configuration-fleet/root-read/source.deployment-final-bound': the worker Deployment's resource version changed between the opening proof and the post-lock recheck. Until the bridge's retained step, the initial guard denies the Deployment controller's status writes. Its backed-off write lands about 2 s later, inside the first role operation. Fix (ADR-188 decision 4): after the bridge, wait for the worker and owner Deployments to settle before the first claim.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

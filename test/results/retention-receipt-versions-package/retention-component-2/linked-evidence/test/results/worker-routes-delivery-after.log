@@ -1,0 +1,8 @@
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry
+--- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite (0.10s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel (0.00s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry (0.10s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.154s

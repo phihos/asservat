@@ -1,0 +1,108 @@
+# ADR-121: Explicit native acquisition worker startup
+
+Status: accepted; runtime composition and selected native startup qualification
+pass. Installed evidence transfer and provider provisioning remain incomplete.
+
+## Problem
+
+The acquisition executable currently obtains and renews a process certificate,
+but cannot retrieve and transfer the developer's requested evidence. The native
+exchange must run in that same admitted process without acquiring human tokens,
+database credentials or a wrapping key. Credential readiness alone must not be
+reported as a completed download.
+
+## Decision
+
+Select native work explicitly with worker control v2. Existing v1 remains the
+credential-only format. The complete immutable control digest includes separate
+exchange, storage and key-service TLS roots and exact installation-owned endpoints.
+Retain the 64 KiB document limit and one combined 32 KiB CA DER budget. All public
+pins are included in the accepted worker configuration and dispatch identity;
+none independently authorizes evidence or key access.
+
+An accepted v2 worker profile additionally pins one immutable storage-credential
+Secret by name and UID. The Restricted Job mounts its single private JSON file
+read-only at a fixed path. It has no endpoint, callback, arbitrary file path or
+identity-selector field. Kubernetes observation of a Secret UID is not atomic
+proof of its mounted incarnation: protected provisioning and deletion/replacement
+prevention must be qualified before enabling v2. No secret digest enters SQL or
+public provenance. No ambient credentials, trust roots, proxy or metadata-service
+fallback is allowed.
+
+Temporary storage credentials require a known original expiration that covers
+the whole admitted worker lifetime. The immutable file cannot renew credentials
+in place. Static keys may omit expiration; any supplied expiration is binding.
+Actual provider rejection or revocation still stops work. Rotation uses a newly
+accepted credential identity and dispatch, preserving the original worker's
+lifetime and cleanup rules.
+
+After current acquisition credentials are established, run the ADR-116 native
+conversation loop alongside certificate renewal. Use the distinct TLS 1.3/h2
+native client, never the finite storage/key HTTP client for a live exchange. Read
+the current projected Pod token and generate a fresh canonical base64url nonce
+from 32 cryptographically random bytes on every connection, matching the native
+wire contract rather than the UUID format used for database identities.
+Only an exactly checked NoCommand or positively Joined conversation permits a
+later connection within the original RunUntil and 32,768-conversation ceiling.
+Scheduling refinement: NoCommand retains at least one second of idle backoff;
+a positively Joined result and successfully joined stream close permit the next
+fresh Hello immediately. The success path must not spend an active subsequent
+operation's original short interval on idle backoff. Every connection still reads
+the current token, uses a new nonce and passes current TLS/server admission and
+capacity checks. No wire, authority lifetime, slot or retry grant changes.
+Errors, lost acknowledgements and Uncertain terminate
+automatic selection. They require the existing explicit cancellation/retirement
+and new charged admission workflow, not a hidden command replay.
+
+The original client setup budget and the server's no-command observation each
+remain at most five seconds. A server observation starts after connection setup;
+its remaining freshness is validated at receipt, not against the earlier client
+start. Receipt after the original setup budget is still rejected, and neither
+interval can extend RunUntil or confer command/evidence authority.
+
+The process retains only the verified metadata result between conversations.
+Native bytes and unwrapped keys do not persist there. Separate regional storage
+reads and the remote key service consume the exact admitted preparation or
+content-window authority. No human identity is synthesized in the worker. Native v2 requires at least
+64 MiB configured memory; legacy v1 retains its 16 MiB floor. This allows room
+for the bounded command, manifest and decoder buffers but is not a measured RSS
+guarantee. Deployed worst-case memory qualification remains required.
+
+Failure or cancellation of either renewal or transfer cancels and joins both.
+Stream/buffer closure and the regional result owner must join before dependencies
+close. A blocked advisory stdout observer cannot delay renewal or shutdown. Logs
+may report credential establishment, not evidence success.
+
+## Qualification and remaining work
+
+The startup parser, scoped Job/Secret shape and credential projection have staged
+focused race tests. The temporary-credential regression reproduced acceptance of
+an unknown expiry before the guard was added; focused tests pass afterward.
+The conversation/supervision implementation compiles against the frozen ADR-116
+v2 API snapshot. Focused vet and the complete bootstrap, contracts, authorization
+and mTLS race suites pass. Original-lifetime, typed-idle, failed-open/unknown-ACK
+and joined two-child shutdown tests pass; the Kubernetes projection/Job race
+suite also passes. The provisional memory floor has a failing-before regression.
+These are staged component checks, not deployed worker evidence or a complete
+public download workflow. The later ConnectorAdmission constructor correction
+must be included before combined native qualification.
+
+Integrated startup review found that the loop used UUID nonces, which the actual
+native encoder rejects before network I/O. The wire-contract regression fails
+against that implementation; the corrected 32-byte nonce generator and existing
+startup/supervision regressions pass. A compiled v2 Pod qualification remains
+necessary beyond injected loop callbacks. The actual v2 Pod subsequently exposed
+a second issue: the client compared server freshness with its earlier connection
+start. The failing-before regression and correction retain independent five-second
+setup/observation bounds. The selected native rerun now passes actual process-owned
+credentials, immutable Secret projection, two authenticated idle conversations
+with distinct nonces, and positive worker termination/foreground retirement.
+The fixture supplies dispatch/registry/audit roots and no dispatchable evidence
+command. It does not qualify timed renewal, full native delivery or the installer.
+
+Required native qualification includes actual protected v2 configuration, immutable
+mount identity, process-owned enrollment and renewal, the two-hop native exchange,
+exact-byte download, current-identity loss, cancellation, uncertain acknowledgements
+and positive worker retirement. Secret/issuer producers and full hub/connector
+startup composition remain mandatory. Helm runtime services remain disabled
+until the full installed slice meets its requirements.

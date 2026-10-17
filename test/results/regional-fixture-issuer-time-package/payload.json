@@ -1,0 +1,5 @@
+{
+  "test/integration/connector_identity_test.go": "079a4795877287a79d92137d150295074a1fb9543b01dfb280adc1de6411e52f",
+  "test/fixtures/observation-native/enrollment.go": "95556cd018b8c523832af14ff80c316679ae688d399ee73ae13d5c9b0691ba86",
+  "test/fixtures/observation-native/enrollment_test.go": "871b1c5cabbf740782ab543fc0f9a08c97bc78f1b2ac34f80f51134d034560dc"
+}

@@ -1,0 +1,26 @@
+{
+  "manifest": [
+    {
+      "path": "internal/application/fleet/initial_runtime_bridge.go",
+      "base_sha256": null,
+      "payload_sha256": "1209ce3a2c7a59909b8d3697098198aeb86bff0949d4812d904281831d2318a9"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_runtime_bridge.go",
+      "base_sha256": null,
+      "payload_sha256": "00645eb6ae45a5d3988a5413b29773d222d439241096bdc312b86f23daec0d6c"
+    },
+    {
+      "path": "test/integration/initial_runtime_bridge_sql_test.go",
+      "base_sha256": null,
+      "payload_sha256": "dfa55aabb0452413f4ca2bab009b08ae9ce201a7ecb1bd916cc0f8a0d9301e2d"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base_sha256": "dd9efa9bd3f76d7bddb3c256c58edda01c0fca8c3f0a09b9043fca81f0fa50d9",
+      "payload_sha256": "8a94fe240898ead8f7a55839806264f8b444dd0867f6b382a1aee57a9ba950be"
+    }
+  ],
+  "checkedDependencies": 1531,
+  "purpose": "reproduce intended administrator constructor rejection; corrected payload retained separately"
+}

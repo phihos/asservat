@@ -1,0 +1,6 @@
+{
+  "test/integration/capture_admission_test.go": "15ca662972e4a4b1bca68081ddc4b81618c278c8f318609f2b59d560c8a97ebc",
+  "test/integration/context_publication_test.go": "b77053e8183ee1ab9ec4c02f7d5bf6d7fdc2a6f3450b7a0a62c88772f3429da8",
+  "test/integration/download_sessions_test.go": "4353d6ab18089b04c4042f6015fff415e9e5dec5f58974826d079aff6077622d",
+  "test/integration/native_retention_observer_test.go": null
+}

@@ -1,0 +1,45 @@
+{
+  "manifest": "25235f6419f1133c9d6a9d4c885a29188e4208f28a6f13832e4afae42704b4c6",
+  "dependencies": "f78826bf1a1dd6671619929b469c7aae3f3ab8b370904cb9aa702f80370f4e09",
+  "runner": "1ace6c276985d2a8b51ec447173eeefd57a8635b18d7c71e404539398d729c5f",
+  "scope": "Compile/vet only of explicitly selected native child; real provider execution pending. The two unintegrated private effects files are frozen overlay dependencies.",
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-effects-native-20261013/overlay.json",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 2.165,
+      "log_sha256": "e9af10df2f3fbf6e312ef3a162c850cf301c5414c45241299adf6830c64ada10"
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-effects-native-20261013/overlay.json",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 0.415,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "exit": 0
+}

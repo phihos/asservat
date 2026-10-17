@@ -1,0 +1,159 @@
+{
+  "terminal": 1,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 11.135,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/before-overlay.json",
+        "-vet=off",
+        "-count=1",
+        "-timeout=30s",
+        "-run",
+        "^TestDirectHolderUnavailableFirstCandidateKeepsIndependentPositive$",
+        "-v",
+        "./internal/bootstrap"
+      ],
+      "exit": 1,
+      "expectedExit": 1,
+      "seconds": 3.074,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": "unavailable first candidate cancelled independent pending positive",
+      "markerOccurrences": 1
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(OwnerLocalObservation|OwnerObservation(DialCandidate|Candidate|Operation)|ClusterObservationCaller|DirectHolder|Local(Pending|Registry|Receiver|ObservationRouting)|OperationHolder|OwnerPending|OwnerOperation(Routing|Receiver)|HubObservationOperation|ObservationOperationRouting|OperationChannel|OperationCoordinator|OperationOwner|ConnectorOperation|ConnectorObservationChannel|HubConnectorObservation|OwnerBootstrap|RegionalOperationActual|RegionalObservationOperation)",
+        "-v",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation",
+        "./internal/bootstrap"
+      ],
+      "exit": 1,
+      "expectedExit": 0,
+      "seconds": 198.576,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 125,
+      "namedPass": 444,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    }
+  ],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 16780025856
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

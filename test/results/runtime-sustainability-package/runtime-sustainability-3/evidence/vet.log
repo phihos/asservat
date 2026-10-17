@@ -1,0 +1,1 @@
+../../.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-3/files/internal/adapters/kubernetes/configuration_worker_provider_operation.go:199:41: redundant and: s.worker.guard.probe != nil && s.worker.guard.probe != nil

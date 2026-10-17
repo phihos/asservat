@@ -1,0 +1,18 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 713a10ad-7262-4441-8412-86d84b53fe20 image docker.io/library/asservat-context-worker@sha256:9198786862220d31834092c2869c3c23cb70f325080bcfd5a866e751f44ae558 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:299: continuation produce 
+    installer_continuation_native_test.go:299: continuation continue installer continuation stopped at worker/documents (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (393.40s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (21.60s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (85.34s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	393.460s
+FAIL

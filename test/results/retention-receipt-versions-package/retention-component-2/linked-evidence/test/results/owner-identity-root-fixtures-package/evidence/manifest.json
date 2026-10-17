@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_producer_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "0b1c412ffecf8bd1cc09430f36e7d92b41751732c9d87e5a4efc3a757d0c5730"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_producer_test.go",
+    "base_sha256": null,
+    "payload_sha256": "9669e4cc27f0c7e8470ad39dd69225025852fdc72536e20ec94de661109dbd37"
+  },
+  {
+    "path": "test/integration/initial_installation_test.go",
+    "base_sha256": "8a94fe240898ead8f7a55839806264f8b444dd0867f6b382a1aee57a9ba950be",
+    "payload_sha256": "a6b3160bf6dac3bd7665a471610ef76bb1eb2873a1d49dace747152297c7a18b"
+  },
+  {
+    "path": "test/integration/owner_identity_roles_test.go",
+    "base_sha256": null,
+    "payload_sha256": "7dee1b45f3ee1dd891f394ec70518b6bd8e236a541ce99e9b90ab4a50a0abda3"
+  }
+]

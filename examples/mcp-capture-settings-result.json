@@ -1,0 +1,124 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "captureSettings",
+    "capture_id": "00000000-0000-4000-8000-000000000120",
+    "cluster_id": "00000000-0000-4000-8000-000000000010",
+    "namespace_uid": "namespace-payments-uid",
+    "accepted_at": "2026-10-09T12:00:00Z",
+    "expires_at": "2026-10-16T11:55:00Z",
+    "settings_digest": "d5af3b079e187819bc05e2695ef3a535e83bed8128adc806780e6952236684f4",
+    "original_execution_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "settings": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "StatefulSet",
+          "name": "ledger",
+          "uid": "workload-ledger-uid"
+        },
+        "maxPods": 1,
+        "selection": "lowestOrdinal",
+        "adoption": "pinUID",
+        "ordinals": [
+          0
+        ]
+      },
+      "recipe_spec": {
+        "description": "Synthetic bounded context used by both v1 presets; no packet ring.",
+        "actions": [
+          {
+            "id": "context",
+            "kind": "kubernetesSnapshot",
+            "parameters": {
+              "include": [
+                "pod",
+                "workload",
+                "events",
+                "endpoints",
+                "rollout"
+              ]
+            },
+            "required": true,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 1048576,
+              "timeout": "5s"
+            }
+          },
+          {
+            "id": "logs",
+            "kind": "logs",
+            "parameters": {
+              "before": "30s",
+              "after": "10s",
+              "stream": "both"
+            },
+            "required": false,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 10485760,
+              "timeout": "15s"
+            }
+          },
+          {
+            "id": "status",
+            "kind": "fileRead",
+            "parameters": {
+              "namespace": "targetProc",
+              "path": "/proc/self/status",
+              "process": "podMainProcesses"
+            },
+            "required": false,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 1048576,
+              "timeout": "2s"
+            }
+          },
+          {
+            "id": "sockets",
+            "kind": "networkSnapshot",
+            "parameters": {
+              "include": [
+                "addresses",
+                "routes",
+                "sockets",
+                "counters"
+              ]
+            },
+            "required": false,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 1048576,
+              "timeout": "5s"
+            }
+          }
+        ],
+        "maxTotalBytes": 13631488,
+        "maxDuration": "30s"
+      },
+      "dependency_pins": [
+        {
+          "role": "recipe",
+          "digest": "4cbb726069eb97268b9b29b254b57d440b8cd545b0b789110715e5e76289d21c"
+        },
+        {
+          "role": "retention",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "requested_retention": "24h"
+    },
+    "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000120"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

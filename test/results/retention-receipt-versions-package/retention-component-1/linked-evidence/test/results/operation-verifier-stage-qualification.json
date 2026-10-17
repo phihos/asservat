@@ -1,0 +1,86 @@
+{
+  "scope": "isolated staged component checks; external fixture source compiled but not run",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2"
+  },
+  "checks": [
+    {
+      "name": "sqlc-final",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate",
+        "-f",
+        "/home/phil/.cache/asservat-build/planning/operation-verification-budget-20261012/sql-work/sqlc.yaml"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 0.157
+    },
+    {
+      "name": "final-race",
+      "command": [
+        "go",
+        "test",
+        "-p",
+        "2",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/operation-verification-budget-20261012/overlay.json",
+        "-race",
+        "./internal/domain/audit",
+        "./internal/application/audit",
+        "./internal/adapters/postgres",
+        "./internal/transport/presentation"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 3.976
+    },
+    {
+      "name": "integration-final-compile",
+      "command": [
+        "go",
+        "test",
+        "-p",
+        "2",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/operation-verification-budget-20261012/overlay.json",
+        "-race",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 12.469
+    },
+    {
+      "name": "final-vet",
+      "command": [
+        "go",
+        "vet",
+        "-p",
+        "2",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/operation-verification-budget-20261012/overlay.json",
+        "./internal/domain/audit",
+        "./internal/application/audit",
+        "./internal/adapters/postgres",
+        "./internal/transport/presentation",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 3.284
+    }
+  ],
+  "before": {
+    "log": "evidence/before.log",
+    "exit": 1,
+    "claims": 0,
+    "provider_calls": 8,
+    "acknowledgements": 8
+  },
+  "historical_early_denial": {
+    "before_exit": 1,
+    "before_log": "evidence/historical-before.log",
+    "after_exit": 0,
+    "after_log": "evidence/historical-after.log"
+  }
+}

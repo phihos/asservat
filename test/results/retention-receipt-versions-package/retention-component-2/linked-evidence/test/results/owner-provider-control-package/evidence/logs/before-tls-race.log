@@ -1,0 +1,6 @@
+=== RUN   TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure
+    owner_provider_control_test.go:376: custom TLS hook disclosed JWT outside profile: error=<nil>, login requests=1
+--- FAIL: TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.053s
+FAIL

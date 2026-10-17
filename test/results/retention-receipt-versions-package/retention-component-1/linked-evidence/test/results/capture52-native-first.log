@@ -1,0 +1,28 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial
+    capture_intent_lifecycle_test.go:195: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation
+    capture_intent_lifecycle_test.go:216: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads
+    capture_intent_lifecycle_test.go:287: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline
+    capture_intent_lifecycle_test.go:332: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion
+    capture_intent_lifecycle_test.go:373: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0
+    capture_intent_lifecycle_test.go:455: complete current retention policy unavailable
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2
+    capture_intent_lifecycle_test.go:455: complete current retention policy unavailable
+--- FAIL: TestContextAdmissionWithRealServices (1.82s)
+    --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair (1.48s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial (0.56s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation (0.16s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads (0.15s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline (0.15s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion (0.15s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0 (0.16s)
+        --- FAIL: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2 (0.15s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.868s
+FAIL

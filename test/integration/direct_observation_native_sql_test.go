@@ -1,0 +1,291 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
+	"net/url"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	audit "asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Initial recovery, accepted owner source and issuer/history qualification are
+// explicit fixture authority. The independent source owner below uses the real
+// restricted observers and original five-second values; runtime reads never
+// refresh them. This is not an installed source producer or HWORK load test.
+type directNativeSQL struct {
+	lab                          *ownerConfigLab
+	pools                        map[string]*pgxpool.Pool
+	helper                       map[string]SQL
+	roles                        value.ConnectorIdentityRoles
+	backing                      app.ConnectorIdentityBacking
+	audit                        Audit
+	refreshes                    atomic.Int64
+	sourceFailure                atomic.Bool
+	ownerObserved, fleetObserved atomic.Int64
+}
+
+type directNativeAcceptedOwnerSource struct {
+	configuration value.OwnerConfiguration
+	observed      time.Time
+}
+
+func (s *directNativeAcceptedOwnerSource) ReadOwnerConfiguration(ctx context.Context) (value.OwnerConfigurationObservation, error) {
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	until := n.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok && d.Before(until) {
+		until = d.UTC().Truncate(time.Microsecond)
+	}
+	if ctx.Err() != nil {
+		return value.OwnerConfigurationObservation{}, ctx.Err()
+	}
+	s.observed = n
+	return value.OwnerConfigurationObservation{Configuration: s.configuration.Clone(), ObservedAt: n, FreshUntil: until}, nil
+}
+
+func newDirectNativeSQL(t *testing.T, ctx context.Context, f fixture, c value.OwnerConfiguration, root string) *directNativeSQL {
+	t.Helper()
+	l := &directNativeSQL{lab: ownerConfigurationLab(t, ctx, f, c), pools: map[string]*pgxpool.Pool{}, helper: map[string]SQL{}}
+	u, e := url.Parse(f.Postgres)
+	if e != nil {
+		t.Fatal("native SQL address")
+	}
+	address, tlsConfig := pgTLSBridge(t, u.Host)
+	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.NativeProviders.Root})
+	if f.NativeProviders.Postgres == "" || f.NativeProviders.S3 == "" || len(rootPEM) == 0 {
+		t.Fatal("in-Pod provider endpoints missing")
+	}
+	nativeURL, e := url.Parse("postgres://" + f.NativeProviders.Postgres)
+	if e != nil || nativeURL.Host == "" {
+		t.Fatal("native SQL endpoint invalid")
+	}
+	add := func(purpose, role, password string, hostPool bool) {
+		remote := *nativeURL
+		remote.User = url.UserPassword(role, password)
+		remote.Path = "/custody_test"
+		remote.RawQuery = "sslmode=disable"
+		l.helper[purpose] = SQL{DSN: remote.String(), Roots: rootPEM, ServerName: nativeURL.Hostname()}
+		if !hostPool {
+			return
+		}
+		local := url.URL{Scheme: "postgres", User: url.UserPassword(role, password), Host: address, Path: "/custody_test", RawQuery: "sslmode=disable"}
+		pc, e := pgxpool.ParseConfig(local.String())
+		if e != nil {
+			t.Fatal("native host role config")
+		}
+		pc.ConnConfig.TLSConfig = tlsConfig
+		pc.ConnConfig.Fallbacks = nil
+		pc.MaxConns = 1
+		pc.MinConns = 0
+		p, e := pgxpool.NewWithConfig(ctx, pc)
+		if e != nil {
+			t.Fatal("native host role pool")
+		}
+		t.Cleanup(p.Close)
+		l.pools[purpose] = p
+	}
+	// Identical minimized current-owner graph already used by installed role70.
+	// No registration, issuance, activation, capacity effect or administrator grant.
+	prefix := connectorSQLRolePrefix(custodyID())
+	ownerRead := prefix + "owner_read"
+	if _, e = l.lab.admin.Exec(ctx, "CREATE ROLE "+pgx.Identifier{ownerRead}.Sanitize()+" LOGIN PASSWORD 'synthetic-owner-read'"); e != nil {
+		t.Fatal("native owner read role", e)
+	}
+	for _, grant := range []string{"GRANT USAGE ON SCHEMA public TO ", "GRANT SELECT ON goose_db_version,fleet_current_trust,hub_owner_configuration,hub_owner_configuration_revision,hub_owner_enrollment,hub_owner_certificate TO ", "GRANT UPDATE(installation_id) ON fleet_current_trust TO ", "GRANT UPDATE(source_uid) ON hub_owner_configuration TO "} {
+		if _, e = l.lab.admin.Exec(ctx, grant+pgx.Identifier{ownerRead}.Sanitize()); e != nil {
+			t.Fatal("native owner read grant", e)
+		}
+	}
+	add("owner-read", ownerRead, "synthetic-owner-read", false)
+	add("owner-write", "owner_enrollment_runtime", "synthetic-owner-enrollment", false)
+	add("owner-ack", "owner_enrollment_audit_runtime", "synthetic-owner-enrollment-audit", false)
+	add("owner-activate", "owner_enrollment_activate_runtime", "synthetic-owner-enrollment-activate", false)
+	add("recovery-read", "peer_read_runtime", "synthetic-peer-read", false)
+	add("fleet-observe", "fleet_observe_runtime", "synthetic-fleet-observe", true)
+	add("cluster-credential", "cluster_credential_runtime", "synthetic-cluster-credential", true)
+	// ADR-193 step 3f: the fixture's bootstrap issuance logins, connected only
+	// when a test issues a bootstrap through the product BootstrapIssuer.
+	for _, r := range []string{"reserve", "record", "audit", "activate"} {
+		add("bootstrap-"+r, "bootstrap_"+r+"_runtime", "synthetic-bootstrap-"+r, true)
+	}
+	for _, duty := range []string{"source", "journal", "acknowledgement", "cleanup", "verifier", "finalizer", "read"} {
+		role := prefix + duty
+		password := "synthetic-" + duty
+		if _, e = l.lab.admin.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" LOGIN PASSWORD '"+password+"'"); e != nil {
+			t.Fatal("native connector role", e)
+		}
+		for _, grant := range []string{"GRANT USAGE ON SCHEMA public TO ", "GRANT SELECT ON goose_db_version TO "} {
+			if _, e = l.lab.admin.Exec(ctx, grant+pgx.Identifier{role}.Sanitize()); e != nil {
+				t.Fatal("native connector base grant", e)
+			}
+		}
+		purpose := "connector-" + duty
+		if duty == "acknowledgement" {
+			purpose = "connector-ack"
+		}
+		add(purpose, role, password, duty == "source")
+	}
+	l.roles = value.ConnectorIdentityRoles{Source: prefix + "source", Journal: prefix + "journal", Acknowledgement: prefix + "acknowledgement", Cleanup: prefix + "cleanup", Verifier: prefix + "verifier", Finalizer: prefix + "finalizer"}
+	grants := map[string][]string{
+		"source":          {"stage_connector_identity(uuid,jsonb,jsonb)", "fence_connector_identity(uuid,uuid,timestamptz)", "promote_connector_backing(uuid,uuid,jsonb)", "close_connector_backing_candidate(uuid,uuid)"},
+		"journal":         {"read_connector_process_admission(uuid,uuid,jsonb)", "read_connector_process_backing(uuid,jsonb)", "admit_connector_process(uuid,jsonb,jsonb,jsonb)", "store_connector_process_outcome(uuid,uuid,jsonb,jsonb)", "accept_connector_process(uuid,uuid,jsonb)", "read_connector_credential_process(uuid,jsonb)", "read_connector_credential_attempt(uuid,uuid,jsonb)", "admit_connector_credential(uuid,jsonb,jsonb,jsonb)", "claim_connector_credential(uuid,uuid,jsonb,jsonb)", "store_connector_credential(uuid,uuid,jsonb,jsonb,jsonb)", "activate_connector_credential(uuid,uuid,jsonb,jsonb)", "connector_audit_journal(uuid,jsonb,text,jsonb)", "read_connector_backing_candidate(uuid,jsonb)", "read_connector_backing_admission(uuid,uuid,jsonb)", "admit_connector_backing(uuid,jsonb,jsonb)", "store_connector_backing_outcome(uuid,uuid,jsonb,jsonb)"},
+		"acknowledgement": {"connector_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb)"},
+		"read":            {"read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)"},
+	}
+	for duty, functions := range grants {
+		for _, fn := range functions {
+			if _, e = l.lab.admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION "+fn+" TO "+pgx.Identifier{prefix + duty}.Sanitize()); e != nil {
+				t.Fatal("native connector purpose grant", e)
+			}
+		}
+	}
+	if _, e = l.lab.admin.Exec(ctx, "INSERT INTO permission_stream(id,epoch,trust_digest,lease_until) VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds')", root, custodyID(), bytes.Repeat([]byte{43}, 32)); e != nil {
+		t.Fatal("synthetic original permission root", e)
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	q := audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{23}, Layout: audit.ConnectorOperationHistoryLayout, MaximumRowFootprintBytes: 1 << 20, MaximumTransitionWALBytes: 1 << 20, BackupCopies: 1, WALCopies: 1}
+	policy := audit.OperationLifecyclePolicy{RootID: root, Lane: "identity", InstallationID: c.Pool.InstallationID, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{24}, BackupProfileDigest: artifact.Digest{25}, BackingRevision: 1, MetadataSlots: 512, MaxPurgeLeases: 2, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, ValidUntil: n.Add(40 * time.Minute), History: &q, OverdueTerminal: audit.OperationOverdueTerminal}
+	bb, ww := q.SlotBacking(policy.MaxPurgeLeases)
+	policy.BackupReservedBytes = bb * policy.MetadataSlots
+	policy.WALReservedBytes = ww * policy.MetadataSlots
+	l.backing = app.ConnectorIdentityBacking{AccountVersion: "connector-accounts-v1", AccountLimit: 2, RecordsPerAccount: 256, RetainedSeconds: 3600, ProfileLimit: 2, SourceTransitionLimit: 64, SourceBackupReservedBytes: 6 << 20, SourceWALReservedBytes: 128 << 20, Policy: policy}
+	if !l.backing.Valid() {
+		t.Fatal("native original synthetic backing invalid")
+	}
+	bridge := tlsBridge(t, f.S3)
+	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+	s3admin := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: &bridge.URL, UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client(), RetryMaxAttempts: 1})
+	bucket := "direct-observation-" + custodyID()
+	if _, e = s3admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(bucket)}); e != nil {
+		t.Fatal("native audit bucket", e)
+	}
+	if _, e = s3admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: aws.String(bucket), VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); e != nil {
+		t.Fatal("native immutable audit versions", e)
+	}
+	key := make([]byte, 32)
+	if _, e = rand.Read(key); e != nil {
+		t.Fatal("native synthetic wrapping key")
+	}
+	l.audit = Audit{Endpoint: f.NativeProviders.S3, Region: "us-east-1", Bucket: bucket, AccessKey: "synthetic-only", SecretKey: "synthetic-only-secret", Roots: rootPEM, WrapKey: key}
+	return l
+}
+
+func (l *directNativeSQL) startSources(t *testing.T, ctx context.Context, cancel context.CancelFunc, c value.OwnerConfiguration) {
+	t.Helper()
+	fleet, e := postgres.NewFleetObservation(ctx, l.pools["fleet-observe"], c.Pool.InstallationID)
+	if e != nil {
+		t.Fatal("native source observer constructor", e)
+	}
+	source := &directNativeAcceptedOwnerSource{configuration: c}
+	owner := app.OwnerConfigurationObserver{Reader: source, Ledger: l.lab.writer, Audit: l.lab.audit, Acknowledgements: l.lab.ack, Now: time.Now}
+	root, stop := context.WithCancel(ctx)
+	done := make(chan error, 1)
+	ready := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		first := true
+		for {
+			call, end := context.WithTimeout(root, 5*time.Second)
+			basis, basisErr := fleet.ReadAdministrationBasis(call)
+			n := time.Now().UTC().Truncate(time.Microsecond)
+			a := value.Administration{InstallationID: c.Pool.InstallationID, IssuerEpoch: c.Pool.IssuerEpoch, Issuer: "https://identity.invalid", Revision: identity.Revision{UID: "synthetic-owner-configuration", Generation: 1, Digest: artifact.Digest(bytes.Repeat([]byte{42}, 32))}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []string{"console"}, DeliveryProfiles: []string{"synthetic"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 16, MaxClusters: 2}
+			err := basisErr
+			if err == nil {
+				err = fleet.ObserveAdministration(call, basis, a)
+			}
+			if err == nil {
+				err = owner.Observe(call)
+			}
+			end()
+			if err != nil {
+				if root.Err() != nil {
+					done <- nil
+				} else {
+					l.sourceFailure.Store(true)
+					done <- err
+					cancel()
+				}
+				return
+			}
+			l.ownerObserved.Store(source.observed.UnixNano())
+			l.fleetObserved.Store(n.UnixNano())
+			l.refreshes.Add(1)
+			if first {
+				close(ready)
+				first = false
+			}
+			select {
+			case <-root.Done():
+				done <- nil
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	t.Cleanup(func() {
+		stop()
+		if err := <-done; err != nil {
+			t.Error("native background source owner failed")
+		}
+	})
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("native source owner unavailable")
+	}
+}
+
+func (l *directNativeSQL) stageRegional(t *testing.T, ctx context.Context, c app.ConnectorIdentityConfiguration) {
+	t.Helper()
+	p := c.Backing.Policy
+	source, e := postgres.NewConnectorIdentitySources(ctx, l.pools["connector-source"], c.Source.Observation.Profile.RootID, c.Source.Observation.Profile.Binding, app.ConnectorQualificationPin{InstallationID: p.InstallationID, StoreID: p.StoreID, BackupProfileID: p.BackupProfileID, Qualification: *p.History})
+	if e != nil {
+		t.Fatal("native source journal constructor", e)
+	}
+	call, end := context.WithDeadline(ctx, c.Source.Observation.FreshUntil)
+	defer end()
+	if e = source.StageConnectorIdentity(call, c); e != nil {
+		t.Fatal("native original connector source stage", e)
+	}
+	// This source admission is complete. Runtime uses real source observations in
+	// each ordinal, not a nonexistent SQL source-lease refresher.
+	l.pools["connector-source"].Close()
+}
+func directNativeCA(t *testing.T) CA {
+	t.Helper()
+	ca, key := connectorSQLCA(t)
+	private, e := x509.MarshalPKCS8PrivateKey(key)
+	if e != nil {
+		t.Fatal("synthetic fixture CA encode")
+	}
+	return CA{DER: ca.Raw, PKCS8: private}
+}
+func directNativeSQLSet(t *testing.T, l *directNativeSQL, purposes ...string) map[string]SQL {
+	t.Helper()
+	out := map[string]SQL{}
+	for _, p := range purposes {
+		v, ok := l.helper[p]
+		if !ok {
+			t.Fatal("native fixture purpose missing")
+		}
+		out[p] = v
+	}
+	return out
+}

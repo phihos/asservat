@@ -1,0 +1,27 @@
+[
+  {
+    "base": null,
+    "path": "internal/adapters/kubernetes/cluster_observation_metadata.go",
+    "payload": "660a90b476f65290fec0d2d9fc818a44ca386dcb76728f353cfc1f8bd8ff272c"
+  },
+  {
+    "base": null,
+    "path": "internal/adapters/kubernetes/cluster_observation_metadata_test.go",
+    "payload": "e4bc8397358a9d3ecc3e5b0b72b7836c2a12d625ac169bcdc6128f66ae6f6803"
+  },
+  {
+    "base": null,
+    "path": "internal/transport/native/owner_observation_operation_lifetime_test.go",
+    "payload": "d10b6325c4939d206fa4a8e4e722b29327f411bb91b367e1a3d7be54072b4c8b"
+  },
+  {
+    "base": null,
+    "path": "internal/transport/native/owner_observation_operation_server.go",
+    "payload": "58587153dd84dbfc16c1e1ad4a83916c7b63307d2f0bd27f8588664fa00877b6"
+  },
+  {
+    "base": null,
+    "path": "internal/transport/native/owner_observation_operation_server_test.go",
+    "payload": "4d65d04c4c4bd08207a1e4164671ca7e6d49275293f80ff624a678aa8966173a"
+  }
+]

@@ -1,0 +1,6 @@
+=== RUN   TestConfigurationWorkerOpaqueLaterPhaseCannotReextendAdmittedDeadline
+    configuration_worker_operation_test.go:123: later phase reextended an earlier admitted deadline
+--- FAIL: TestConfigurationWorkerOpaqueLaterPhaseCannotReextendAdmittedDeadline (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.044s
+FAIL

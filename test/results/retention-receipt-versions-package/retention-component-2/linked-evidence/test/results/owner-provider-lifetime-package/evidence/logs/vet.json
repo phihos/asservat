@@ -1,0 +1,21 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+    "./internal/adapters/kms"
+  ],
+  "exit": 0,
+  "seconds": 0.549,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

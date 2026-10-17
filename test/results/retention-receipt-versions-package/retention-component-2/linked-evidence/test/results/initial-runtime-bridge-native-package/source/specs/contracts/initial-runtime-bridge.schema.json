@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-runtime-bridge.schema.json",
+  "title": "Original protected runtime guard handoff",
+  "description": "Private fixed two-transition journal. Independent current native guard and activated-incarnation checks remain mandatory. Claims never renew their original five-second effect interval; exact read-only receipt reconciliation cannot repeat a policy update.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "bindingDigest",
+    "setupID",
+    "createdAt",
+    "until"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-runtime-bridge/v1"
+    },
+    "bindingDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "probe": {
+      "$ref": "https://asservat.io/spec/v1/initial-runtime-bridge.schema.json#/$defs/transition"
+    },
+    "retained": {
+      "$ref": "https://asservat.io/spec/v1/initial-runtime-bridge.schema.json#/$defs/transition"
+    }
+  },
+  "dependentRequired": {
+    "retained": [
+      "probe"
+    ]
+  },
+  "$defs": {
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "fromResourceVersion",
+        "fromGeneration",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "fromResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fromGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policyUID",
+            "resourceVersion",
+            "generation",
+            "specDigest"
+          ],
+          "properties": {
+            "policyUID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "specDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

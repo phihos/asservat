@@ -1,0 +1,52 @@
+[
+  {
+    "path": "internal/contracts/initial_preparer.go",
+    "base_sha256": "52166ca16cbc84f013ae44bcbbe1e9755b2fe3169a9a2f379e7dc016dc8ba8bf",
+    "sha256": "90804541c050143f5cf03738566eeaab2ffc84792bccd807e83bffc54169ed98"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer.go",
+    "base_sha256": "ccdd5518c267a96cdee54f075d441fd9822f6536b84aeac27400546733dc54a1",
+    "sha256": "80c370972439b62a010067f2eef679a3f18f1dbc6863c7588fe48b3c48be7447"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_contract.go",
+    "base_sha256": "5af23537d98cf61e27411f2f64f780d7aa5ad2b498e4d00bef1a2fab99c3a3d8",
+    "sha256": "ac62053363dabf7f3e881a9e9d25ef901bf751ec45f75236f1c30f70ae851465"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_launch.go",
+    "base_sha256": "322dd6a38d9797a3b1fba6c82f9b92c7fc749750c765ce02e075818bf9679f3f",
+    "sha256": "a67484bd7819d9b5d1b2c024b2d422385f28b7e4b6f6f346de7b93edc8b55007"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_staging_retirement.go",
+    "base_sha256": "4be6478b28d23d4cfa7dffa47bc2e9a7fe1ad015fd115b903981cabf4e3b71c9",
+    "sha256": "0576047b33802e80a214361316e5eb006a5b7007f79b088b9ff3b0e54f0f2aea"
+  },
+  {
+    "path": "specs/contracts/initial-preparation-root.schema.json",
+    "base_sha256": "e606ebfefaa7044480619b835ca18f368a64cfda8fb1161e48888b3bf8a62d15",
+    "sha256": "e3e9b79bef898756113276ce122d5d9851977bb3a328c864cc3797bae503c6df"
+  },
+  {
+    "path": "docs/architecture/initial-activation-handover.md",
+    "base_sha256": "7357f1453e496515b7c1e94403b31fa394a7a9927ec3f62a0e001dc30bdd9c49",
+    "sha256": "cd35ab8a03c50d45d5148a246c5346717877a428140a34af9b1e61a36fbbac3b"
+  },
+  {
+    "path": "docs/decisions/129-initial-activation-handover.md",
+    "base_sha256": "0a484e730548a95d6a96325b47f7e31f16e1196c6841aee9d72b73382f0006b2",
+    "sha256": "0c382561c7c6c757b823cb79508f99d5c5cf336fd81fae1307b204f2df8b5ef3"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_conflicts.go",
+    "base_sha256": null,
+    "sha256": "ac1cb568400e1287c34986c80861433e56146bc0ffbe55e65f758e7e17705236"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_conflicts_test.go",
+    "base_sha256": null,
+    "sha256": "628181f6021cf1f0bb9400c6c1e087dbdf7da069beeba8db54e1d58fec417e43"
+  }
+]

@@ -1,0 +1,91 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: incident-context
+  namespace: payments
+spec:
+  description: 'Synthetic example: log, proc and peer-selected packet context.'
+  actions:
+  - id: context
+    kind: kubernetesSnapshot
+    parameters:
+      include:
+      - pod
+      - workload
+      - events
+      - endpoints
+      - rollout
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: logs
+    kind: logs
+    parameters:
+      before: 30s
+      after: 10s
+      stream: both
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 10485760
+      timeout: 15s
+  - id: status
+    kind: fileRead
+    parameters:
+      namespace: targetProc
+      path: /proc/self/status
+      process: podMainProcesses
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 2s
+  - id: sockets
+    kind: networkSnapshot
+    parameters:
+      include:
+      - addresses
+      - routes
+      - sockets
+      - counters
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: packets
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: networkHeaders
+      before: 30s
+      after: 30s
+      ring:
+        maxAge: 30s
+        maxBytes: 16777216
+        segmentBytes: 4194304
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - podSelector:
+            namespace: payments
+            matchLabels:
+              app: database
+        protocol: tcp
+        ports:
+        - 5432
+        resolution: frozen
+        maxEndpoints: 256
+        maxStaleness: 5s
+      maxFrozenBytes: 67108864
+      maxConcurrentSnapshots: 1
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 67108864
+      timeout: 90s
+  maxTotalBytes: 100663296
+  maxDuration: 120s

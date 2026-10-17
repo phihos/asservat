@@ -1,0 +1,4 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-identity.py
+Owned TLS Keycloak ready; running provider qualification
+Provider test exit: 1
+make: *** [Makefile:100: identity-integration] Error 1

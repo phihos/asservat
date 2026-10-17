@@ -1,0 +1,87 @@
+package kubernetes
+
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	core "k8s.io/api/core/v1"
+)
+
+func providerWorkerPlan(t *testing.T) (HubWorkerWorkloadPlan, string, string, contracts.ConfigurationProviderSelection) {
+	t.Helper()
+	s, _ := initialRuntimeResourceFixture(t)
+	n := s.names
+	p := HubWorkerWorkloadPlan{Namespace: s.initial.Namespace.Name, Name: n.Worker, ServiceAccount: n.Worker, Configuration: n.WorkerInputs, Credentials: n.WorkerProviders,
+		Image: s.preparer.plan.Workload.Image, FleetSource: s.initial.FleetSource.Name, OwnerSource: n.OwnerSource, FleetGuard: s.initial.FleetGuard.Name, OwnerGuard: n.OwnerSourceGuard, LeaderLease: n.Lease}
+	selection := contracts.ConfigurationProviderSelection{AuthMount: "configuration-auth", AuthMountAccessor: "auth_kubernetes_original", AuditCredentials: contracts.WorkerObjectReference{Name: n.WorkerProviders, UID: ownerID(2901)}}
+	return p, s.initial.InstallationID, s.initial.ClusterID, selection
+}
+
+func TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL(t *testing.T) {
+	p, installation, cluster, selection := providerWorkerPlan(t)
+	old, err := BuildInstalledHubWorkerWorkload(p, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := json.Marshal(old)
+	w, err := BuildProviderHubWorkerWorkload(p, installation, cluster, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources
+	if len(sources) != 10 || *w.Deployment.Spec.Replicas != 0 || sources[1].Secret == nil || sources[1].Secret.Name != selection.AuditCredentials.Name ||
+		!reflect.DeepEqual(sources[1].Secret.Items, []core.KeyToPath{{Key: contracts.ConfigurationProviderAuditCredentialFile, Path: contracts.ConfigurationProviderAuditCredentialFile}}) ||
+		sources[1].Secret.Optional == nil || *sources[1].Secret.Optional {
+		t.Fatal("provider storage can substitute SQL or silently be absent")
+	}
+	jwt := sources[9].ServiceAccountToken
+	if jwt == nil || jwt.Path != contracts.ConfigurationProviderTokenFile || jwt.Audience != contracts.ConfigurationProviderAudience(installation, cluster) || jwt.ExpirationSeconds == nil || *jwt.ExpirationSeconds != 600 {
+		t.Fatal("provider JWT has wrong original native projection")
+	}
+	if sources[5].Secret == nil || sources[5].Secret.Name == selection.AuditCredentials.Name || len(sources[5].Secret.Items) != 4 {
+		t.Fatal("mutable provider material shares original SQL projection")
+	}
+	rule := w.Role.Rules[len(w.Role.Rules)-1]
+	if !reflect.DeepEqual(rule.APIGroups, []string{""}) || !reflect.DeepEqual(rule.Resources, []string{"secrets"}) || !reflect.DeepEqual(rule.ResourceNames, []string{selection.AuditCredentials.Name}) || !reflect.DeepEqual(rule.Verbs, []string{"get"}) {
+		t.Fatal("runtime can read unrelated secrets or administer provider material")
+	}
+	// Undo only the three reviewed additions, then compare the complete object
+	// graph. Security fields, optional receipts and all existing RBAC stay exact.
+	sources[1].Secret.Items = old.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources[1].Secret.Items
+	w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources = sources[:9]
+	w.Role.Rules = w.Role.Rules[:len(w.Role.Rules)-1]
+	if !reflect.DeepEqual(w, old) {
+		t.Fatal("fresh provider template changed another installed boundary")
+	}
+	oldAgain, _ := BuildInstalledHubWorkerWorkload(p, installation)
+	after, _ := json.Marshal(oldAgain)
+	if string(before) != string(after) {
+		t.Fatal("new builder changed legacy bytes")
+	}
+}
+
+func TestProviderWorkerRejectsForeignOrUnpinnedMaterial(t *testing.T) {
+	p, installation, cluster, selection := providerWorkerPlan(t)
+	for _, mode := range []string{"foreign-secret", "missing-uid", "another-plan-secret", "token-auth", "missing-cluster"} {
+		t.Run(mode, func(t *testing.T) {
+			plan, s, c := p, selection, cluster
+			switch mode {
+			case "foreign-secret":
+				s.AuditCredentials.Name = "foreign"
+			case "missing-uid":
+				s.AuditCredentials.UID = ""
+			case "another-plan-secret":
+				plan.Credentials = "foreign"
+			case "token-auth":
+				s.AuthMount = "token"
+			case "missing-cluster":
+				c = ""
+			}
+			if _, err := BuildProviderHubWorkerWorkload(plan, installation, c, s); err == nil {
+				t.Fatal("unbound provider material entered original template")
+			}
+		})
+	}
+}

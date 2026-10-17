@@ -1,0 +1,82 @@
+[
+  {
+    "path": "docs/architecture/initial-schema.md",
+    "base_sha256": "c65aedb71978bb9b04488ab08450bc58f4909bd7d2d89c425db70ba88efc9aef",
+    "sha256": "09ee8c18392cae7088d28adc5de0cf33bb062fa58657804dde08e81f45a71cb0"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_inputs.go",
+    "base_sha256": "88c49b649e57d0d983e57e7d3b800cdf37d18ac5b6b779d3342a7294c99ec054",
+    "sha256": "be2c7d38f23eea61cf5ede0518b24fd6b081933b41eedf8105f20a86f4e298f6"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_schema_inputs_test.go",
+    "base_sha256": null,
+    "sha256": "64f64a793a6c4b2266650a4c6d2729da655f7da74afc0194719caca92e3165e3"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_installation.go",
+    "base_sha256": "6d03f6754291ad82b176e07d22211c43d2b2685740c449827b71cb14334fae51",
+    "sha256": "9a3969c6b47609ad2c408ddeb1620caea3b24c81c0655860fb735252cfa02334"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_expectation.go",
+    "base_sha256": null,
+    "sha256": "db58b2084232525cfd7d6f45ad515dd6c5abbd48d9368c4f132d5e529d8c93ca"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_expectation_test.go",
+    "base_sha256": null,
+    "sha256": "27c3b0c95809853f34514030a488a15228b0b5f46e1dc907032e12b0045222b3"
+  },
+  {
+    "path": "internal/bootstrap/initial_installer.go",
+    "base_sha256": "29016ac2f5e5b458c048532ac82e1e4df7eb17393f96c835948a3b27524a95e0",
+    "sha256": "bfe0d3e276f3301788bc61b6f7c78d1b3b0713eb01e47542a9f6b0ccdcbea831"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "c338eacdd019fc06154ffc483d9ccce62abcd90879645dc97d3bb5b52eb2a9e4",
+    "sha256": "19808c668fe7db3fdf479b3df8bdb9a72f98cd3734c268bd05f4628d22dad786"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_schema.go",
+    "base_sha256": null,
+    "sha256": "b031063736928e80356d3a9b6c4ccfb40b77371b41f964e1f3b5057e53214a55"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_schema_test.go",
+    "base_sha256": null,
+    "sha256": "893c6a075066b3557f65b4e0184c1ab38716e1e8bcd7406a21c68c627ea9ab22"
+  },
+  {
+    "path": "internal/contracts/initial_installer.go",
+    "base_sha256": "d5bf07d8418231eb39a5d63a124d1897f85346f308a4f8205e33bf16a52297a3",
+    "sha256": "f00aad914af8bd15c13f4e11f08b5cabbae8bcaad9d878c3ac23e6ff7bb2ddd8"
+  },
+  {
+    "path": "specs/contracts/initial-installer.schema.json",
+    "base_sha256": "c4805600d8b9cb5dbf20f861ad9800b3f8e562d90570773c99dd9cbcf119b8bb",
+    "sha256": "2338e8447d2f531a2c3d6b55c0ed7e98cfbf056c861d8bf8175612d56c0e1f2a"
+  },
+  {
+    "path": "test/integration/initial_preparer_handover_test.go",
+    "base_sha256": "9bd88c6e048468ea3040ba2699d079399faf2404ccae6012b8d804a0f1180c10",
+    "sha256": "bdd144c0cf404fe9104a199fbdaf84aa5942d6053c743e10e9e19d9bac4696cc"
+  },
+  {
+    "path": "test/integration/initial_schema_activation_test.go",
+    "base_sha256": null,
+    "sha256": "8404ad045c43ca13f8d69de6c16d9b98ca94203feb9ff12d9b44f4909d1b1a4b"
+  },
+  {
+    "path": "test/integration/initial_schema_consumption_test.go",
+    "base_sha256": null,
+    "sha256": "4af253df716870f8fe066806fff248e1e2a3e78bc75d6e676ee636a2ae44f5ed"
+  },
+  {
+    "path": "test/integration/initial_schema_test.go",
+    "base_sha256": "5d9264dcc1d1f9a2ede12ee42d3795722636e9fff5e795a719658b1b652731d6",
+    "sha256": "adb01687d56db8fd56b7c6e69ff679986d7369d909ce35a6311803273bc23fdc"
+  }
+]

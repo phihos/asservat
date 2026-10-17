@@ -1,0 +1,4 @@
+{
+  "test/integration/fleet_freshness_native_test.go": "82af1ba6416fce87a0f9390f39885c4ed533d07dd5080ba35354ead4936b8630",
+  "migrations/00059_fleet_observation_separation.sql": "7c8deaa4bd9ab8f8a4f3100167cc6de6a66c652e593343f7e11124e20a38aa8e"
+}

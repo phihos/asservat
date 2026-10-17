@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "path": "scripts/helm_registry.py",
+      "before": "29c070386bac695acbde02e0002d68e56912be3126071cd4d1d529531b406821",
+      "after": "69faeecb70d34d1fd2d21b3dd90aefcd3b3821fc97ecdfa63961b8954070111b"
+    },
+    {
+      "path": "scripts/test-helm-bootstrap-selection.py",
+      "before": "79a3de7fbc3dcbcad2b8a09f53a2b3f1518f63e9320b931623be4cb372860fcb",
+      "after": "3fbe908871fe0928b72d2b8a45ee4fd8ed14fed1f285f977bfa900f706aba897"
+    }
+  ],
+  "scope": "fixture export retains original compressed bytes and verifies bounded rootfs identity",
+  "productChanges": false
+}

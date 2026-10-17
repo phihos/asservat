@@ -1,0 +1,30 @@
+{
+  "phase": "race-providerconfig",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=180s",
+    "-v",
+    "./internal/adapters/providerconfig"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 1.702,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-relay.schema.json",
+  "title": "Private hub worker-enrollment live relay v2",
+  "description": "TLS 1.3 mutual authentication, HTTP/1.1 POST /internal/hub-owner/v2/enroll-worker. Dedicated Pod bearer token in Authorization; closed JSON request at most 20 KiB. Chunked response content type application/vnd.asservat.owner-enrollment-stream: one four-byte big-endian length prefix and at most 49664 bytes of closed response JSON, followed by an open silent body. EOF, any additional byte or transport error cancels delivery. Until is the original owner/output deadline, never renewable. No finite-response or v1 fallback; locator and certificate provide no evidence authority.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "locator",
+        "enrollment"
+      ],
+      "properties": {
+        "format": {
+          "const": "asservat-owner-relay/v2"
+        },
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requestID",
+            "podUID",
+            "processEpoch",
+            "fence",
+            "started",
+            "until"
+          ],
+          "properties": {
+            "requestID": {
+              "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+            },
+            "podUID": {
+              "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+            },
+            "processEpoch": {
+              "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+            },
+            "fence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "started": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "enrollment": {
+          "$ref": "https://asservat.io/spec/v1/worker-enrollment.schema.json#/oneOf/0"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "until",
+        "enrollment"
+      ],
+      "properties": {
+        "format": {
+          "const": "asservat-owner-relay/v2"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "enrollment": {
+          "$ref": "https://asservat.io/spec/v1/worker-enrollment.schema.json#/oneOf/1"
+        }
+      }
+    }
+  ]
+}

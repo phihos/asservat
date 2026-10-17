@@ -1,0 +1,30 @@
+{
+  "scope": "joined configuration observer and HubWorker Run/Close ownership only; no provider2 selection",
+  "files": [
+    {
+      "path": "docs/architecture/configuration-reconciliation.md",
+      "base_sha256": "d33e20b68d40de054d1310d2a3f5ba435700055e2259135470e64f787f9d890c",
+      "payload_sha256": "be4784c01f8abb1eac9d99c7c05a3285a1727bfcdcab7aa5f5dea67f72ce2b5a"
+    },
+    {
+      "path": "internal/application/fleet/reconciliation.go",
+      "base_sha256": "117f5b4fe60d1cdfebbebe615abd98a994ffbd850c083cc281ef82f7e84515ec",
+      "payload_sha256": "1ddc216b571bb88ec2dd9dcec8fb9a595b9aa04c5d3946b2601159746577dd5d"
+    },
+    {
+      "path": "internal/application/fleet/reconciliation_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "c3b47d9b52a67b493c37ef6c814bb6b48446c41934d38cbea1ec3d928e8c28dd"
+    },
+    {
+      "path": "internal/bootstrap/hub_worker.go",
+      "base_sha256": "cac619c17ff67278937f6f85fa1f75c8ad656b9fc2a2e18ffa2752bdffafdf0f",
+      "payload_sha256": "e01407ba819e97364f1cb18028cb841dc81436fec22e3c096a5627a4fc529994"
+    },
+    {
+      "path": "internal/bootstrap/hub_worker_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8e837901c3504f7cf3ed3ffb457f8dd595505c850077a1fc860122883c63c8c9"
+    }
+  ]
+}

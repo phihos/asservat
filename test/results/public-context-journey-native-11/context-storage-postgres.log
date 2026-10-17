@@ -1,0 +1,67 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-14 05:33:26.693 UTC [133] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 05:33:26.693 UTC [133] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 05:33:26.704 UTC [139] LOG:  database system was shut down at 2026-10-14 05:33:24 UTC
+2026-10-14 05:33:26.733 UTC [133] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-14 05:33:26.879 UTC [133] LOG:  received fast shutdown request
+.2026-10-14 05:33:26.882 UTC [133] LOG:  aborting any active transactions
+2026-10-14 05:33:26.883 UTC [133] LOG:  background worker "logical replication launcher" (PID 142) exited with exit code 1
+2026-10-14 05:33:26.883 UTC [137] LOG:  shutting down
+2026-10-14 05:33:26.886 UTC [137] LOG:  checkpoint starting: shutdown immediate
+2026-10-14 05:33:27.729 UTC [137] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.023 s, sync=0.807 s, total=0.847 s; sync files=303, longest=0.009 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-14 05:33:27.743 UTC [133] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-14 05:33:27.799 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 05:33:27.799 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-14 05:33:27.799 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-14 05:33:27.802 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 05:33:27.809 UTC [197] LOG:  database system was shut down at 2026-10-14 05:33:27 UTC
+2026-10-14 05:33:27.814 UTC [1] LOG:  database system is ready to accept connections
+2026-10-14 05:33:27.954 UTC [208] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-14 05:33:27.954 UTC [208] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-14 05:34:36.377 UTC [218] ERROR:  permission denied for table permission_stream
+2026-10-14 05:34:36.377 UTC [218] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-14 05:34:36.377 UTC [218] ERROR:  permission denied for table context_storage_binding
+2026-10-14 05:34:36.377 UTC [218] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-14 05:34:36.378 UTC [218] ERROR:  permission denied for table context_capture
+2026-10-14 05:34:36.378 UTC [218] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-14 05:34:36.378 UTC [218] ERROR:  permission denied for table context_capture
+2026-10-14 05:34:36.378 UTC [218] STATEMENT:  DELETE FROM context_capture

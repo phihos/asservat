@@ -1,0 +1,10 @@
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted17
+    owner_observation_candidates_test.go:29: candidate bound 17 17
+=== NAME  TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess
+    owner_observation_candidates_test.go:35: different processes in one Pod were silently collapsed
+--- FAIL: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess (0.00s)
+    --- FAIL: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted17 (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/fleet	0.002s
+FAIL

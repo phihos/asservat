@@ -1,0 +1,97 @@
+{
+  "integratedAt": 1791862322.6315713,
+  "jointPreflight": true,
+  "session": 67079,
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_reader.go",
+      "base_sha256": "f2a0a1f42e827c24e8853f7dfababea097df3b9cd6576b7b617b9fc9949ba661",
+      "payload_sha256": "53a699ac90d3b58289d154bdf5d8cefbc1591bae5dfa28c6cf22dc7bcf6295e6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_reader_copy_test.go",
+      "base_sha256": null,
+      "payload_sha256": "d3d0111b8037abf3777de2d0016ecd43128c279ace8f8abad2762080d7e5e7fd"
+    }
+  ],
+  "qualification": {
+    "manifest": "b323ed5b418a34104ba039d63e619adc14915afbc01670beef8661fe084770d4",
+    "dependencies": "25d8908547e766d16e3007e6a13fb6b971092bbaf60b34a9b6362df0a5162219",
+    "runner": "18065a70fbc3c8947c47e7068dbb48652148426e287df859d2861f8f0280255f",
+    "started": 1791861990.1422844,
+    "before": {
+      "payload": [],
+      "base": [],
+      "dependencies": [],
+      "inventory": []
+    },
+    "phases": [
+      {
+        "name": "before",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-reader-copy-20261013/candidate-v1/before-overlay.json",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "./internal/adapters/kubernetes",
+          "-run=^TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput$"
+        ],
+        "exit": 1,
+        "timed_out": false,
+        "expected_failure": true,
+        "seconds": 9.827418565750122,
+        "log_sha256": "fd6b339eb241c321c98f7a8fd6b3569c47966936ccee2437a9c5aaf4f2301157"
+      },
+      {
+        "name": "corrected-races",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-reader-copy-20261013/candidate-v1/overlay.json",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "./internal/adapters/kubernetes",
+          "-run=^(TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput|TestCapacityProjectionCurrentReader.*)$"
+        ],
+        "exit": 0,
+        "timed_out": false,
+        "expected_failure": false,
+        "seconds": 12.93305253982544,
+        "log_sha256": "e849a5e7409408fb1d99dc5837dbb3219c819527bf63aca595f11d49d2331ffc"
+      },
+      {
+        "name": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-reader-copy-20261013/candidate-v1/overlay.json",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "timed_out": false,
+        "expected_failure": false,
+        "seconds": 1.8170051574707031,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "exit": 0,
+    "ended": 1791862014.7703748,
+    "after": {
+      "payload": [],
+      "base": [],
+      "dependencies": [],
+      "inventory": []
+    }
+  },
+  "scope": "Component prerequisite only; no backend qualification, accepted profile change, or installed runtime enablement"
+}

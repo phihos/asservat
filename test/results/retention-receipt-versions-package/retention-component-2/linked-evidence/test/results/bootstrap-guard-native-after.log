@@ -1,0 +1,25 @@
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/original-match-condition-rejected
+    initial_bootstrap_guard_test.go:140: actual API rejected original match-condition variables
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/administrator-private-create-and-cas-only
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/administrator-cannot-delete-namespace
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/administrator-cannot-change-probe-rbac
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/unrelated-names-remain-unaffected
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/observer-dry-run-only-continuity-exception
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/observer-bootstrap-probe-still-denied
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/reject-token-audience
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/reject-token-lifetime
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/reject-token-anchor-name
+--- PASS: TestInitialBootstrapGuardWithRealKubernetes (9.12s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/original-match-condition-rejected (0.07s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/administrator-private-create-and-cas-only (0.60s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/administrator-cannot-delete-namespace (0.20s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/administrator-cannot-change-probe-rbac (0.00s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/unrelated-names-remain-unaffected (0.60s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/observer-dry-run-only-continuity-exception (0.19s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/observer-bootstrap-probe-still-denied (0.00s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/reject-token-audience (0.20s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/reject-token-lifetime (0.20s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/reject-token-anchor-name (0.20s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.166s

@@ -1,0 +1,34 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "kind": "captureHistoryPage",
+    "history": [
+      {
+        "capture_id": "00000000-0000-4000-8000-000000000120",
+        "origin": "manual",
+        "accepted_at": "2026-10-09T12:00:00Z",
+        "summary_expires_at": "2026-10-16T11:55:00Z",
+        "phase": "Succeeded",
+        "action_kinds": [
+          "kubernetesSnapshot",
+          "logs",
+          "fileRead",
+          "networkSnapshot"
+        ],
+        "evidence_state": "expired",
+        "repeat_state": "available",
+        "settings_expires_at": "2026-10-16T11:55:00Z",
+        "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000120"
+      }
+    ],
+    "ordering": "acceptedAtDescCaptureIDDesc"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

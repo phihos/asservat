@@ -1,0 +1,23 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+    "./internal/contracts",
+    "./internal/adapters/kms",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "seconds": 3.982,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

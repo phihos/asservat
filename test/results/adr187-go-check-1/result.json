@@ -1,0 +1,11 @@
+{
+  "name": "adr187-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 2,
+  "status": "failed",
+  "scope": "Full Go gate after ADR-187 (replay after the guard bridge), ADR-188 (configuration role post-lock proof and the post-bridge settle wait) and the continuation stop diagnostics",
+  "results": "48 full packages passed. Kubernetes group 5/7 failed one of 554 tests: TestProviderOwnerProjectionOperationCompleteAndLaunch ('launch current acknowledgement projection.provider-observe', 22.76 s). It took 12.6-13.7 s in the previous three gates. Rerun alone under -race it passed 8 of 8 (3 at about 15 s, then 5 at 13.7-14.1 s). The changed code does not reach its launch path: the owner projection borrows the resource producer without its current check. Recorded as a load-timing failure inside the group, not reproduced. A full gate is owed after the next change set.",
+  "sourceHashBefore": "dad38b4ea2156db55034f69e0abb8645737e9eb98ff1b7e9ff4415b9a1527800",
+  "sourceHashAfter": "dad38b4ea2156db55034f69e0abb8645737e9eb98ff1b7e9ff4415b9a1527800",
+  "log": "go-check.log"
+}

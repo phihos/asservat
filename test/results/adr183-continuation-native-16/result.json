@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-16",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "The continuation completed again. The launched owner stopped with 'owner startup failed: phase=provider-prime role=none reason=other'. Priming refreshes each provider slot after the provider's native/source/recovery proof, whose identity-reader failure was collapsed to ErrKeyService. Run 17 runs that proof once in a new provider-proof phase and keeps the reader's fixed check for the diagnostic.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

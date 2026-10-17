@@ -1,0 +1,71 @@
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/empty
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version ""
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/null
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version "null"
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/oversize
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/empty
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version ""
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/null
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version "null"
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/oversize
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/empty
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version ""
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/null
+    owner_receipt_versions_test.go:63: current authority=true, want false for retained version "null"
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/oversize
+--- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/immutable (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/empty (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/oversize (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/immutable (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/empty (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/oversize (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/immutable (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/empty (0.00s)
+    --- FAIL: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/oversize (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.010s
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/new
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/acknowledged
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/missing-source
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/expired-source
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/cancelled-source
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/ledger-conflict
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/bad-old-receipt
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/empty-old-version
+    owner_configuration_test.go:116: unexpected result <nil>
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/null-old-version
+    owner_configuration_test.go:116: unexpected result <nil>
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/audit-failed
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/bad-new-receipt
+=== RUN   TestOwnerConfigurationAcceptanceOrderingAndFailures/ack-failed
+--- FAIL: TestOwnerConfigurationAcceptanceOrderingAndFailures (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/new (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/acknowledged (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/missing-source (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/expired-source (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/cancelled-source (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/ledger-conflict (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/bad-old-receipt (0.00s)
+    --- FAIL: TestOwnerConfigurationAcceptanceOrderingAndFailures/empty-old-version (0.00s)
+    --- FAIL: TestOwnerConfigurationAcceptanceOrderingAndFailures/null-old-version (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/audit-failed (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/bad-new-receipt (0.00s)
+    --- PASS: TestOwnerConfigurationAcceptanceOrderingAndFailures/ack-failed (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.006s
+FAIL

@@ -1,0 +1,40 @@
+schemaVersion: grant/v1
+id: 00000000-0000-4000-8000-000000000046
+kind: AccessGrant
+spec:
+  requester:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  grantType: adHocCapture
+  target:
+    kind: capture
+    clusterID: 00000000-0000-4000-8000-000000000001
+    workloadUID: workload-ledger-uid
+    captureUID: 00000000-0000-4000-8000-000000000047
+    executionDigest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    recipeDigest: c90f5f1e3a2a09584c184acfe4935d39ef81c7771847b4cdecce7622d9281fa2
+  operations:
+  - packetCapture
+  reason: Review this one accepted capture before its original deadline.
+  notAfter: '2026-10-09T12:05:00Z'
+  limits:
+    maxExecutions: 1
+    maxBytes: 67108864
+    maxDuration: 90s
+  issuedAt: '2026-10-09T12:00:00Z'
+  observationLimits:
+    maxSessionSeconds: 30
+    maxObservedBytes: 1073741824
+    maxBytesPerSecond: 33554432
+    maxConcurrentSessions: 1
+status:
+  phase: Pending
+  revision: 1
+  reservedBytes: 0
+  spentBytes: 0
+  executionsSpent: 0
+  executionsReserved: 0
+  observedBytesReserved: 0
+  observedBytesSpent: 0

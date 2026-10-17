@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture-cleanup-projection-claim.schema.json",
+  "title": "Original capture cleanup projection claim",
+  "description": "Public provenance only. The first positive claim permits one fixed immutable Secret create; uncertain results allow exact lookup only. Original claim and journal dates never renew. Completed provenance requires fresh protected workload and exact SQL role/root checks before runtime use.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationID",
+    "publicDigest",
+    "setup",
+    "claimedAt",
+    "until"
+  ],
+  "properties": {
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "publicDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "setup": {
+      "$ref": "https://asservat.io/spec/v1/capacity-root-setup-claim.schema.json#/$defs/receipt"
+    },
+    "claimedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secret",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "secret": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,604 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"reflect"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+	"k8s.io/client-go/rest"
+)
+
+// These tests retain the existing synthetic SQL/provider/API fixture boundary.
+// Counts describe actual requests through its original six clients, not native
+// API admission, real row contention or drained-bucket availability.
+type projectionSplitRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f projectionSplitRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type projectionSplitCounters struct{ calls [6]atomic.Int32 }
+
+func (c *projectionSplitCounters) snapshot() (out [6]int32) {
+	for i := range out {
+		out[i] = c.calls[i].Load()
+	}
+	return out
+}
+func projectionSplitClients(f *ownerProjectionOperationFixture) [6]rest.Interface {
+	p := f.resources.preparer
+	return [6]rest.Interface{p.creator.api, p.protection.observer.api, p.protection.probe.api, f.source.client.api, f.source.protection.probe.api, f.source.fleet.protection.probe.api}
+}
+func projectionSplitCount(t *testing.T, f *ownerProjectionOperationFixture) *projectionSplitCounters {
+	t.Helper()
+	out := &projectionSplitCounters{}
+	seen := map[*http.Client]bool{}
+	for i, api := range projectionSplitClients(f) {
+		client, ok := api.(*rest.RESTClient)
+		if !ok || client.Client == nil || seen[client.Client] {
+			t.Fatal("fixture did not retain six distinct HTTP clients")
+		}
+		seen[client.Client] = true
+		before, limiter := client.Client.Transport, client.GetRateLimiter()
+		client.Client.Transport = projectionSplitRoundTripper(func(r *http.Request) (*http.Response, error) { out.calls[i].Add(1); return before.RoundTrip(r) })
+		t.Cleanup(func() {
+			if client.GetRateLimiter() != limiter {
+				t.Error("original limiter replaced")
+			}
+			client.Client.Transport = before
+		})
+	}
+	return out
+}
+func projectionSplitDifference(after, before [6]int32) [6]int32 {
+	for i := range after {
+		after[i] -= before[i]
+	}
+	return after
+}
+func projectionSplitPrivateCounts(f *ownerProjectionOperationFixture, effects *ownerPreflightBridgeFixture) (*atomic.Int32, *atomic.Int32) {
+	total, unlocked := &atomic.Int32{}, &atomic.Int32{}
+	f.api.mu.Lock()
+	previous := f.api.extra
+	f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && r.URL.Path == f.root.path()+"/"+f.root.name() {
+			total.Add(1)
+			if !effects.held.Load() {
+				unlocked.Add(1)
+			}
+		}
+		return previous(w, r)
+	}
+	f.api.mu.Unlock()
+	return total, unlocked
+}
+
+func TestOwnerProjectionSplitExactGraphsAndPrivateAdmission(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+	f.bridge.effects = effects
+	counts := projectionSplitCount(t, f)
+	private, unlocked := projectionSplitPrivateCounts(f, effects)
+	var reads []bool
+	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+		reads = append(reads, effects.held.Load())
+		return f.accepted.ReadOwnerConfiguration(ctx)
+	})
+	steps := []struct {
+		name   string
+		call   func(context.Context) (OwnerProjectionAdvance, error)
+		status OwnerProjectionAdvanceStatus
+		s      int32
+	}{
+		{"parent", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 82},
+		{"credentials-create", f.projection.Advance, OwnerProjectionAdvancePending, 84},
+		{"credentials-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 84},
+		{"configuration-create", f.projection.Advance, OwnerProjectionAdvancePending, 87},
+		{"configuration-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 86},
+		{"joint", f.projection.Advance, OwnerProjectionAdvanceComplete, 86},
+		{"complete-read", f.projection.Advance, OwnerProjectionAdvanceComplete, 85},
+		{"inspect-complete", f.projection.Inspect, OwnerProjectionAdvanceComplete, 85},
+		{"launch", f.projection.Launch, OwnerProjectionAdvancePending, 87},
+		{"launch-receipt", f.projection.Launch, OwnerProjectionAdvanceComplete, 86},
+		{"launch-read", f.projection.Launch, OwnerProjectionAdvanceComplete, 85},
+		{"inspect-launch", f.projection.InspectLaunch, OwnerProjectionAdvanceComplete, 85},
+	}
+	for _, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			before, provider, secrets, bridges := counts.snapshot(), f.provider.requests.Load(), private.Load(), effects.calls.Load()
+			reads = nil
+			out, err := step.call(context.Background())
+			if err != nil || out.Status != step.status {
+				t.Fatal("original phase failed", out.Status, err)
+			}
+			got, want := projectionSplitDifference(counts.snapshot(), before), [6]int32{32, 26, 14, step.s, 8, 18}
+			if got != want || f.provider.requests.Load()-provider != 16 || private.Load()-secrets != 3 || unlocked.Load() != 0 || effects.calls.Load()-bridges != 1 || !reflect.DeepEqual(reads, []bool{false, true, true, true}) {
+				t.Fatal("split changed concrete graph or private/accepted boundary", got, want, reads, private.Load()-secrets, unlocked.Load())
+			}
+		})
+		if t.Failed() {
+			return
+		}
+	}
+	if f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 {
+		t.Fatal("finite phases repeated an external effect")
+	}
+}
+
+// Called only outside the API handler; the actual bridge callback models a
+// completed SQL wait. Mutation changes the served original object, not a DTO
+// passed to production code. The accepted projection remains separately owned.
+func projectionSplitMutate(t *testing.T, f *ownerProjectionOperationFixture, name string) {
+	t.Helper()
+	if name == "administrator" {
+		f.fault.Store(6)
+		return
+	}
+	if name == "accepted-configuration" {
+		f.fault.Store(3)
+		return
+	}
+	prefix := "/api/v1/namespaces/" + f.root.input.Namespace.Name
+	path := ""
+	switch name {
+	case "namespace":
+		path = prefix
+	case "fleet-source":
+		path = prefix + "/configmaps/" + f.source.input.FleetSource.Name
+	case "owner-source":
+		path = prefix + "/configmaps/" + f.source.input.OwnerSource.Name
+	case "workload-policy":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + f.source.protection.plan.Name
+	case "fleet-policy":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + f.source.fleet.protection.plan.Name
+	case "owner-policy":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + f.source.owner.protection.plan.Name
+	case "workload-binding":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.source.protection.plan.Name
+	case "fleet-binding":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.source.fleet.protection.plan.Name
+	case "owner-binding":
+		path = "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.source.owner.protection.plan.Name
+	case "bridge-journal":
+		path = f.bridge.path()
+	case "resource-journal":
+		path = f.resources.path()
+	case "worker-deployment", "worker-deployment-spec":
+		path = "/apis/apps/v1/namespaces/" + f.root.input.Namespace.Name + "/deployments/" + f.source.input.Deployment.Name
+	case "worker-account", "worker-account-body":
+		path = prefix + "/serviceaccounts/" + f.source.input.ServiceAccount.Name
+	case "owner-deployment":
+		path = "/apis/apps/v1/namespaces/" + f.root.input.Namespace.Name + "/deployments/" + f.root.input.Deployment.Name
+	case "owner-account":
+		path = prefix + "/serviceaccounts/" + f.root.input.ServiceAccount.Name
+	case "owner-service":
+		f.accepted.mu.Lock()
+		path = prefix + "/services/" + f.accepted.value.Configuration.Pool.Service
+		f.accepted.mu.Unlock()
+	case "private-version", "private-replaced", "private-missing":
+		path = f.root.path() + "/" + f.root.name()
+	default:
+		t.Fatal("unknown fixed mutation")
+	}
+	f.api.mu.Lock()
+	defer f.api.mu.Unlock()
+	object := f.api.objects[path]
+	if object == nil {
+		t.Fatal("original fixture object missing for fixed mutation", name)
+	}
+	metadata := object["metadata"].(map[string]any)
+	switch {
+	case name == "private-missing":
+		delete(f.api.objects, path)
+	case name == "private-replaced":
+		metadata["uid"] = ownerID(9770)
+	case name == "namespace":
+		metadata["deletionTimestamp"] = time.Now().UTC().Format(time.RFC3339)
+	case strings.HasSuffix(name, "-policy"):
+		metadata["generation"] = float64(91)
+	case name == "owner-deployment":
+		object["spec"].(map[string]any)["replicas"] = float64(2)
+	case name == "worker-deployment-spec":
+		// Both desired counts satisfy the shape bound; only the original full
+		// spec comparison catches this change while resourceVersion stays fixed.
+		spec := object["spec"].(map[string]any)
+		replicas, ok := spec["replicas"].(float64)
+		if !ok || replicas != 0 && replicas != 1 {
+			t.Fatal("fixture worker is not the bounded zero/one deployment")
+		}
+		spec["replicas"] = float64(1) - replicas
+	case name == "worker-account-body":
+		// Metadata shape and original UID/version remain valid.
+		metadata["annotations"] = map[string]any{"asservat.test/split": "changed"}
+	default:
+		metadata["resourceVersion"] = "991"
+	}
+}
+func projectionSplitNoParentEffect(t *testing.T, f *ownerProjectionOperationFixture) {
+	t.Helper()
+	p := f.projection.projection
+	if p.attemptedParent || p.attemptedCredentials || p.attemptedConfiguration || p.attemptedLaunch || f.journalWrites.Load() != 0 || f.verification.checks != 0 || f.creates[0].Load() != 0 || f.creates[1].Load() != 0 || f.launches.Load() != 0 {
+		t.Fatal("failed first admission reached attempt or effect")
+	}
+}
+func TestOwnerProjectionSplitBridgeWaitChangesDenyBeforeFirstClaim(t *testing.T) {
+	names := []string{"namespace", "fleet-source", "owner-source", "workload-policy", "fleet-policy", "owner-policy", "workload-binding", "fleet-binding", "owner-binding", "bridge-journal", "resource-journal", "worker-deployment", "worker-deployment-spec", "worker-account", "worker-account-body", "owner-deployment", "owner-account", "owner-service", "administrator", "accepted-configuration"}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+			f.bridge.effects = effects
+			private, unlocked := projectionSplitPrivateCounts(f, effects)
+			effects.before = func(context.Context, fleet.Administration) error {
+				if private.Load() != 0 {
+					t.Error("private first read preceded completed native under bridge")
+				}
+				projectionSplitNoParentEffect(t, f)
+				projectionSplitMutate(t, f, name)
+				return nil
+			}
+			out, err := f.projection.Advance(context.Background())
+			want := cfg.ErrChanged
+			if name == "administrator" {
+				want = cfg.ErrDenied
+			} else if name == "accepted-configuration" {
+				want = cfg.ErrUnavailable
+			}
+			if !errors.Is(err, want) || out.Status != "" || effects.calls.Load() != 1 || private.Load() != 0 || unlocked.Load() != 0 {
+				t.Fatal("post-wait change admitted private state or effect", err, private.Load(), effects.calls.Load())
+			}
+			projectionSplitNoParentEffect(t, f)
+		})
+	}
+}
+func TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+	f.bridge.effects = effects
+	private, _ := projectionSplitPrivateCounts(f, effects)
+	var changed atomic.Bool
+	f.api.mu.Lock()
+	previous := f.api.extra
+	f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		path := "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.source.owner.protection.plan.Name
+		if effects.held.Load() && r.Method == http.MethodGet && r.URL.Path == path && changed.CompareAndSwap(false, true) {
+			source := "/api/v1/namespaces/" + f.root.input.Namespace.Name + "/configmaps/" + f.source.input.OwnerSource.Name
+			f.api.objects[source]["metadata"].(map[string]any)["resourceVersion"] = "997"
+		}
+		return previous(w, r)
+	}
+	f.api.mu.Unlock()
+	_, err := f.projection.Advance(context.Background())
+	if !errors.Is(err, cfg.ErrChanged) || !changed.Load() || private.Load() != 0 {
+		t.Fatal("source changed during final guard was hidden", err, changed.Load(), private.Load())
+	}
+	projectionSplitNoParentEffect(t, f)
+}
+
+func TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate(t *testing.T) {
+	for _, name := range []string{"native-denial", "accepted-unavailable", "accepted-expired", "bridge-recovery"} {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+			f.bridge.effects = effects
+			private, _ := projectionSplitPrivateCounts(f, effects)
+			var accepted atomic.Int32
+			f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+				n := accepted.Add(1)
+				value, err := f.accepted.ReadOwnerConfiguration(ctx)
+				if n > 1 {
+					switch name {
+					case "accepted-unavailable":
+						return value, cfg.ErrUnavailable
+					case "accepted-expired":
+						value.FreshUntil = value.ObservedAt
+					}
+				}
+				return value, err
+			})
+			if name == "native-denial" {
+				f.fault.Store(2)
+			}
+			if name == "bridge-recovery" {
+				effects.before = func(context.Context, fleet.Administration) error { return cfg.ErrUnavailable }
+			}
+			_, err := f.projection.Advance(context.Background())
+			if err == nil || private.Load() != 0 {
+				t.Fatal("failed complete native/short SQL proof read private material", err, private.Load())
+			}
+			projectionSplitNoParentEffect(t, f)
+		})
+	}
+}
+
+func TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection(t *testing.T) {
+	for _, name := range []string{"private-version", "private-replaced", "private-missing", "unpinned"} {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+			f.bridge.effects = effects
+			private, unlocked := projectionSplitPrivateCounts(f, effects)
+			if name == "unpinned" {
+				f.root.operationRootUID = ""
+			} else {
+				effects.before = func(context.Context, fleet.Administration) error {
+					if private.Load() != 0 {
+						t.Error("selected private state before split completion")
+					}
+					projectionSplitMutate(t, f, name)
+					return nil
+				}
+			}
+			out, err := f.projection.Advance(context.Background())
+			if name == "private-version" {
+				if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || private.Load() != 3 || unlocked.Load() != 0 {
+					t.Fatal("same pinned root first post-lock version was not selected", out.Status, err, private.Load())
+				}
+			} else {
+				if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || unlocked.Load() != 0 || name == "unpinned" && private.Load() != 0 {
+					t.Fatal("missing/replaced/unpinned root became authority", err, private.Load())
+				}
+				projectionSplitNoParentEffect(t, f)
+			}
+		})
+	}
+}
+
+func TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect(t *testing.T) {
+	for _, step := range []string{"credentials", "launch", "private-version"} {
+		t.Run(step, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			call := f.projection.Advance
+			if step == "launch" {
+				ownerProjectionAdvanceTo(t, f, 6)
+				call = f.projection.Launch
+			} else {
+				ownerProjectionAdvanceTo(t, f, 1)
+			}
+			writes, creates, launches := f.journalWrites.Load(), f.creates[0].Load(), f.launches.Load()
+			f.verification.beforeCurrent = func() {
+				if step == "private-version" {
+					projectionSplitMutate(t, f, step)
+				} else {
+					f.fault.Store(6)
+				}
+			}
+			_, err := call(context.Background())
+			if err == nil || f.journalWrites.Load() != writes+1 || f.creates[0].Load() != creates || f.launches.Load() != launches {
+				t.Fatal("postclaim change reached external effect or lost spend", err)
+			}
+			if step == "launch" && !f.projection.projection.attemptedLaunch || step != "launch" && !f.projection.projection.attemptedCredentials {
+				t.Fatal("unknown original attempt became fresh")
+			}
+			f.fault.Store(0)
+			f.verification.beforeCurrent = nil
+			spent := f.journalWrites.Load()
+			_, err = call(context.Background())
+			if err == nil || f.journalWrites.Load() != spent || f.creates[0].Load() != creates || f.launches.Load() != launches {
+				t.Fatal("failed proof retried the already-spent original effect", err)
+			}
+		})
+	}
+}
+
+func TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait(t *testing.T) {
+	for _, name := range []string{"short-positive", "caller-cancelled", "source-expired"} {
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+			f.bridge.effects = effects
+			private, _ := projectionSplitPrivateCounts(f, effects)
+			end := time.Now().Add(2 * time.Second)
+			ctx, cancel := context.WithDeadline(context.Background(), end)
+			defer cancel()
+			effects.before = func(call context.Context, a fleet.Administration) error {
+				original, ok := call.Deadline()
+				if !ok || !original.Equal(end) || original.After(a.FreshUntil) {
+					t.Error("bridge replaced original caller end")
+				}
+				if name == "caller-cancelled" {
+					cancel()
+				}
+				if name == "source-expired" {
+					f.api.mu.Lock()
+					f.api.shift += 6 * time.Second
+					f.api.mu.Unlock()
+					now := f.api.clock().UTC().Truncate(time.Microsecond)
+					f.accepted.mu.Lock()
+					f.accepted.value.ObservedAt = now
+					f.accepted.value.FreshUntil = now.Add(5 * time.Second)
+					f.accepted.mu.Unlock()
+				}
+				return nil
+			}
+			out, err := f.projection.Advance(ctx)
+			if name == "short-positive" {
+				if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || out.Snapshot.ValidUntil.After(end) {
+					t.Fatal("valid shorter original parent failed or extended", err)
+				}
+			} else {
+				if err == nil || private.Load() != 0 {
+					t.Fatal("new observation rescued expired original preflight", err, private.Load())
+				}
+				projectionSplitNoParentEffect(t, f)
+			}
+		})
+	}
+}
+
+func TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches(t *testing.T) {
+	for _, phase := range []string{"prefix", "suffix"} {
+		for _, name := range []string{"root", "bridge", "resources"} {
+			t.Run(phase+"/"+name, func(t *testing.T) {
+				f := newOwnerProjectionOperationFixture(t)
+				effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+				f.bridge.effects = effects
+				client := f.source.client.api.(*rest.RESTClient)
+				previous := client.Client.Transport
+				entered, cancelled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+				var once sync.Once
+				unblock := func() { once.Do(func() { close(release) }) }
+				defer unblock()
+				var block atomic.Bool
+				client.Client.Transport = projectionSplitRoundTripper(func(r *http.Request) (*http.Response, error) {
+					desired := phase == "suffix"
+					if r.Method == http.MethodGet && effects.held.Load() == desired && block.CompareAndSwap(false, true) {
+						close(entered)
+						<-r.Context().Done()
+						close(cancelled)
+						<-release
+						return nil, r.Context().Err()
+					}
+					return previous.RoundTrip(r)
+				})
+				ctx, cancel := context.WithCancel(context.Background())
+				done, completed := make(chan error, 1), make(chan struct{})
+				var closed chan struct{}
+				go func() { defer close(completed); _, err := f.projection.Advance(ctx); done <- err }()
+				defer func() {
+					cancel()
+					unblock()
+					<-completed
+					if closed != nil {
+						<-closed
+					}
+					client.Client.Transport = previous
+				}()
+				select {
+				case <-entered:
+				case err := <-done:
+					t.Fatal("failed before original client barrier", err)
+				case <-time.After(2 * time.Second):
+					t.Fatal("original client barrier not entered")
+				}
+				closed = make(chan struct{})
+				go func() {
+					switch name {
+					case "root":
+						f.root.Close()
+					case "bridge":
+						f.bridge.Close()
+					case "resources":
+						f.resources.Close()
+					}
+					close(closed)
+				}()
+				select {
+				case <-cancelled:
+				case <-time.After(time.Second):
+					t.Fatal("close did not cancel original native request")
+				}
+				select {
+				case <-closed:
+					t.Fatal("close returned before native request joined")
+				default:
+				}
+				select {
+				case <-done:
+					t.Fatal("operation returned before original request joined")
+				default:
+				}
+				unblock()
+				select {
+				case err := <-done:
+					if err == nil {
+						t.Fatal("closed operation returned success")
+					}
+				case <-time.After(time.Second):
+					t.Fatal("operation did not join")
+				}
+				select {
+				case <-closed:
+				case <-time.After(time.Second):
+					t.Fatal("close did not join")
+				}
+				projectionSplitNoParentEffect(t, f)
+				if _, err := f.projection.Advance(context.Background()); !errors.Is(err, cfg.ErrUnavailable) {
+					t.Fatal("closed projection admitted another operation", err)
+				}
+			})
+		}
+	}
+}
+
+type projectionSplitVerifier func(context.Context, *OwnerProjectionOperation) (OwnerProjectionAdvance, error)
+
+func (f projectionSplitVerifier) AdvanceOwnerProjectionOperation(ctx context.Context, op *OwnerProjectionOperation) (OwnerProjectionAdvance, error) {
+	return f(ctx, op)
+}
+
+func TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+	f.bridge.effects = effects
+	counts := projectionSplitCount(t, f)
+	var prefix *ownerProjectionPreflight
+	effects.before = func(ctx context.Context, _ fleet.Administration) error {
+		var ok bool
+		prefix, ok = ctx.Value(ownerProjectionPreflightKey{}).(*ownerProjectionPreflight)
+		if !ok || prefix == nil || prefix.self != prefix || prefix.used == nil || prefix.used.Load() {
+			t.Fatal("bridge lacks original unused opaque prefix")
+		}
+		before := counts.snapshot()
+		copied := *prefix
+		if _, err := copied.complete(ctx, ownerIdentityProviderObservation{}); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("copied prefix admitted completion", err)
+		}
+		var zero *ownerProjectionPreflight
+		if _, err := zero.complete(ctx, ownerIdentityProviderObservation{}); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("nil prefix admitted completion", err)
+		}
+		deadline, _ := ctx.Deadline()
+		foreign, cancel := context.WithDeadline(context.Background(), deadline)
+		defer cancel()
+		if _, err := prefix.complete(foreign, ownerIdentityProviderObservation{}); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("foreign context admitted completion", err)
+		}
+		replaced := context.WithValue(ctx, ownerProjectionPreflightKey{}, &copied)
+		if _, err := prefix.complete(replaced, ownerIdentityProviderObservation{}); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("replacement marker admitted completion", err)
+		}
+		if prefix.used.Load() || counts.snapshot() != before {
+			t.Fatal("rejected prefix consumed original slot or made I/O")
+		}
+		return nil
+	}
+	var replayed bool
+	f.projection.verification = projectionSplitVerifier(func(ctx context.Context, op *OwnerProjectionOperation) (OwnerProjectionAdvance, error) {
+		before := counts.snapshot()
+		if prefix == nil || !prefix.used.Load() {
+			t.Fatal("role boundary did not complete the original prefix")
+		}
+		if _, err := prefix.complete(ctx, op.provider); !errors.Is(err, cfg.ErrUnavailable) {
+			t.Fatal("completed prefix replayed", err)
+		}
+		if counts.snapshot() != before {
+			t.Fatal("replayed prefix repeated native reads")
+		}
+		replayed = true
+		return f.verification.AdvanceOwnerProjectionOperation(ctx, op)
+	})
+	out, err := f.projection.Advance(context.Background())
+	if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || !replayed || f.journalWrites.Load() != 1 {
+		t.Fatal("invalid copies poisoned or replaced valid original operation", out.Status, err, replayed)
+	}
+}
+
+func TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+	f.bridge.effects = effects
+	private, _ := projectionSplitPrivateCounts(f, effects)
+	projectionSplitMutate(t, f, "owner-deployment")
+	_, err := f.projection.Advance(context.Background())
+	if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || effects.calls.Load() != 0 || private.Load() != 0 {
+		t.Fatal("invalid original denied-probe target reached bridge or private journal", err, effects.calls.Load(), private.Load())
+	}
+	projectionSplitNoParentEffect(t, f)
+}

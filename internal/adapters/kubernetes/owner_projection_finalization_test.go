@@ -1,0 +1,618 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"reflect"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+// These are the existing synthetic API/SQL/provider composition fixtures.
+// Actual requests and one-use effects are counted; none of these tests claims
+// real PostgreSQL locking, Kubernetes admission or 20-QPS availability.
+func projectionFinalizeThrough(t *testing.T, f *ownerProjectionOperationFixture, count int) OwnerProjectionAdvance {
+	t.Helper()
+	var out OwnerProjectionAdvance
+	for i := 0; i < count; i++ {
+		execute := f.projection.Execute
+		if i >= 6 {
+			execute = f.projection.ExecuteLaunch
+		}
+		if err := execute(context.Background()); err != nil {
+			t.Fatal("bounded execution", i, err)
+		}
+		var err error
+		out, err = f.projection.Finalize(context.Background())
+		if err != nil {
+			t.Fatal("independent finalization", i, err)
+		}
+	}
+	return out
+}
+func projectionEffectCounts(f *ownerProjectionOperationFixture) [4]int32 {
+	return [4]int32{f.journalWrites.Load(), f.creates[0].Load(), f.creates[1].Load(), f.launches.Load()}
+}
+func TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
+	f.bridge.effects = effects
+	counts := projectionSplitCount(t, f)
+	private, unlocked := projectionSplitPrivateCounts(f, effects)
+	var accepted []bool
+	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+		accepted = append(accepted, effects.held.Load())
+		return f.accepted.ReadOwnerConfiguration(ctx)
+	})
+	steps := []struct {
+		name           string
+		execute, final int32
+		status         OwnerProjectionAdvanceStatus
+	}{
+		{"parent", 53, 52, OwnerProjectionAdvanceAcknowledged},
+		{"credentials-create", 54, 54, OwnerProjectionAdvancePending},
+		{"credentials-receipt", 54, 54, OwnerProjectionAdvanceAcknowledged},
+		{"configuration-create", 56, 56, OwnerProjectionAdvancePending},
+		{"configuration-receipt", 55, 56, OwnerProjectionAdvanceAcknowledged},
+		{"joint", 55, 56, OwnerProjectionAdvanceComplete},
+		{"launch", 56, 56, OwnerProjectionAdvancePending},
+		{"launch-receipt", 55, 56, OwnerProjectionAdvanceComplete},
+	}
+	for index, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			before, provider, reads := counts.snapshot(), f.provider.requests.Load(), private.Load()
+			accepted = nil
+			execute := f.projection.Execute
+			if index >= 6 {
+				execute = f.projection.ExecuteLaunch
+			}
+			if err := execute(context.Background()); err != nil {
+				t.Fatal("execution", err)
+			}
+			want := [6]int32{20, 13, 7, step.execute, 4, 9}
+			if got := projectionSplitDifference(counts.snapshot(), before); got != want || f.provider.requests.Load()-provider != 16 || private.Load()-reads != 2 || unlocked.Load() != 0 || !reflect.DeepEqual(accepted, []bool{false, true, true}) {
+				t.Fatal("execution graph", got, want, accepted, private.Load()-reads)
+			}
+			if f.projection.pending == nil || f.projection.pending.semanticVersion != 1 {
+				t.Fatal("execution reported without pending semantic pin")
+			}
+			snapshot := f.projection.pending.resources
+			before, provider, reads = counts.snapshot(), f.provider.requests.Load(), private.Load()
+			writes := projectionEffectCounts(f)
+			accepted = nil
+			out, err := f.projection.Finalize(context.Background())
+			if err != nil || out.Status != step.status || out.Snapshot.UID != snapshot.UID || !equalJSON(out.Snapshot.State, snapshot.State) {
+				t.Fatal("original-result finalization", out.Status, err)
+			}
+			want = [6]int32{20, 13, 7, step.final, 4, 9}
+			if got := projectionSplitDifference(counts.snapshot(), before); got != want || f.provider.requests.Load()-provider != 16 || private.Load()-reads != 2 || unlocked.Load() != 0 || !reflect.DeepEqual(accepted, []bool{false, true, true}) {
+				t.Fatal("finalization graph", got, want, accepted, private.Load()-reads)
+			}
+			if projectionEffectCounts(f) != writes || f.projection.pending != nil {
+				t.Fatal("finalizer mutated or left an unresolved result")
+			}
+			out.Snapshot.State.Objects[0].OperationID = "caller-owned-copy"
+			if f.projection.lastVerified.resources.State.Objects[0].OperationID == "caller-owned-copy" {
+				t.Fatal("result aliases retained pending state")
+			}
+		})
+		if t.Failed() {
+			return
+		}
+	}
+	writes := projectionEffectCounts(f)
+	out, err := f.projection.InspectLaunch(context.Background())
+	if err != nil || out.Status != OwnerProjectionAdvanceComplete || projectionEffectCounts(f) != writes || f.verification.finalizations != 9 {
+		t.Fatal("completed current inspection", err)
+	}
+	if f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 {
+		t.Fatal("fixed effects repeated")
+	}
+}
+
+func TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName(t *testing.T) {
+	for _, purpose := range []int32{1, 2} {
+		t.Run(map[int32]string{1: "credentials", 2: "configuration"}[purpose], func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			count := 1
+			if purpose == 2 {
+				count = 3
+			}
+			projectionFinalizeThrough(t, f, count)
+			f.lose.Store(purpose)
+			if err := f.projection.Execute(context.Background()); err == nil {
+				t.Fatal("lost CREATE reply reported success")
+			}
+			p := f.projection.pending
+			if p == nil || p.children[purpose-1] != nil || p.semanticVersion != 1 {
+				t.Fatal("lost reply obtained a target UID")
+			}
+			before, provider := projectionEffectCounts(f), f.provider.requests.Load()
+			if out, err := f.projection.Finalize(context.Background()); err == nil || out.Status != "" {
+				t.Fatal("unknown original target became verified")
+			}
+			if _, err := f.projection.Inspect(context.Background()); err == nil {
+				t.Fatal("consumed finalizer was retried")
+			}
+			if err := f.projection.Execute(context.Background()); err == nil {
+				t.Fatal("pending CREATE was replayed")
+			}
+			if projectionEffectCounts(f) != before || f.provider.requests.Load() != provider {
+				t.Fatal("unknown UID caused discovery or effects")
+			}
+		})
+	}
+}
+func TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS(t *testing.T) {
+	for _, committed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "not-committed", true: "committed"}[committed], func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			projectionFinalizeThrough(t, f, 2)
+			original := *f.projection.lastVerified.resources.State.OwnerIdentity.Credentials
+			if committed {
+				f.lose.Store(4)
+			} else {
+				f.dropJournal.Store(true)
+			}
+			if err := f.projection.Execute(context.Background()); err == nil {
+				t.Fatal("uncertain receipt claimed acknowledgement")
+			}
+			p := f.projection.pending
+			if p == nil || !p.journalUnknown || p.semanticVersion != 1 {
+				t.Fatal("missing exact version/expected receipt CAS")
+			}
+			writes := projectionEffectCounts(f)
+			out, err := f.projection.Inspect(context.Background())
+			if committed {
+				if err != nil || out.Status != OwnerProjectionAdvanceAcknowledged || out.Snapshot.State.OwnerIdentity.Credentials.Receipt == nil {
+					t.Fatal("exact committed reply not independently verified", err)
+				}
+				child := out.Snapshot.State.OwnerIdentity.Credentials
+				if child.OperationID != original.OperationID || !child.Until.Equal(original.Until) {
+					t.Fatal("finalizer changed original spend")
+				}
+			} else if err == nil {
+				t.Fatal("missing CAS accepted")
+			}
+			if projectionEffectCounts(f) != writes || !f.projection.receiptAttempts[ownerProjectionAcknowledgeCredentials] {
+				t.Fatal("readback repeated/refunded original CAS")
+			}
+			if _, err := f.projection.Finalize(context.Background()); err == nil {
+				t.Fatal("same finalizer reusable")
+			}
+		})
+	}
+}
+func TestOwnerProjectionFinalizationUnknownPreSQLClaimHasNoVersion(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	f.lose.Store(4)
+	if err := f.projection.Execute(context.Background()); err == nil {
+		t.Fatal("lost parent claim reported success")
+	}
+	p := f.projection.pending
+	if p == nil || p.semanticVersion != 0 || !p.journalUnknown {
+		t.Fatal("pre-SQL uncertainty invented locked authority")
+	}
+	before := projectionEffectCounts(f)
+	if _, err := f.projection.Finalize(context.Background()); err == nil {
+		t.Fatal("pre-SQL unknown was salvaged by fresh authority")
+	}
+	if projectionEffectCounts(f) != before || f.verification.checks != 0 {
+		t.Fatal("unknown claim advanced")
+	}
+}
+func projectionReplaceChild(t *testing.T, f *ownerProjectionOperationFixture, index int, field string) {
+	t.Helper()
+	path := "/api/v1/namespaces/" + f.root.input.Namespace.Name
+	if index == 0 {
+		path += "/secrets/" + f.resources.names.OwnerProviders
+	} else {
+		path += "/configmaps/" + f.resources.names.OwnerInputs
+	}
+	f.api.mu.Lock()
+	defer f.api.mu.Unlock()
+	original := f.api.objects[path]
+	if original == nil {
+		t.Fatal("missing original child")
+	}
+	if field == "uid" {
+		original["metadata"].(map[string]any)[field] = ownerID(9831 + index)
+	} else {
+		original["metadata"].(map[string]any)[field] = "9831"
+	}
+}
+func TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect(t *testing.T) {
+	for _, index := range []int{0, 1} {
+		for _, when := range []string{"before-finalize", "before-receipt", "after-receipt"} {
+			for _, field := range []string{"uid", "resourceVersion"} {
+				t.Run([]string{"credentials", "configuration"}[index]+"/"+when+"/"+field, func(t *testing.T) {
+					f := newOwnerProjectionOperationFixture(t)
+					count := 1
+					if index == 1 {
+						count = 3
+					}
+					projectionFinalizeThrough(t, f, count)
+					if err := f.projection.Execute(context.Background()); err != nil {
+						t.Fatal(err)
+					}
+					if when != "before-finalize" {
+						if _, err := f.projection.Finalize(context.Background()); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if when == "after-receipt" {
+						if err := f.projection.Execute(context.Background()); err != nil {
+							t.Fatal(err)
+						}
+						if _, err := f.projection.Finalize(context.Background()); err != nil {
+							t.Fatal(err)
+						}
+					}
+					projectionReplaceChild(t, f, index, field)
+					before := projectionEffectCounts(f)
+					if when == "before-finalize" {
+						if _, err := f.projection.Finalize(context.Background()); err == nil {
+							t.Fatal("replacement finalized")
+						}
+					} else if err := f.projection.Execute(context.Background()); err == nil {
+						t.Fatal("replacement reached receipt/next effect")
+					}
+					if projectionEffectCounts(f) != before {
+						t.Fatal("replacement persisted a new receipt/claim/effect", before, projectionEffectCounts(f))
+					}
+				})
+			}
+		}
+	}
+}
+func TestOwnerProjectionFinalizationRejectsCurrentChanges(t *testing.T) {
+	for _, when := range []string{"before-first-read", "before-final-current"} {
+		for _, change := range []string{"administrator", "accepted-configuration", "private-replaced", "resource-journal", "workload-policy", "fleet-source"} {
+			t.Run(when+"/"+change, func(t *testing.T) {
+				f := newOwnerProjectionOperationFixture(t)
+				if err := f.projection.Execute(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				if when == "before-first-read" {
+					projectionSplitMutate(t, f, change)
+				} else {
+					f.verification.beforeFinalizeCurrent = func() { projectionSplitMutate(t, f, change) }
+				}
+				before := projectionEffectCounts(f)
+				if _, err := f.projection.Finalize(context.Background()); err == nil {
+					t.Fatal("changed current original source accepted")
+				}
+				if projectionEffectCounts(f) != before {
+					t.Fatal("read-only denial wrote state")
+				}
+				f.fault.Store(0)
+				f.verification.beforeFinalizeCurrent = nil
+				if _, err := f.projection.Inspect(context.Background()); err == nil {
+					t.Fatal("failed finalizer silently retried")
+				}
+			})
+		}
+	}
+}
+func TestOwnerProjectionFinalizationRejectsSQLSemanticABA(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	if err := f.projection.Execute(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// Same source tuple and incarnation, but a separately restrictive transition
+	// changed SQL59's version. Synthetic SQL stand-in, not a real migration test.
+	f.verification.semanticVersion = 3
+	before := projectionEffectCounts(f)
+	if _, err := f.projection.Finalize(context.Background()); err == nil {
+		t.Fatal("new semantic version rescued original pending result")
+	}
+	if f.verification.finalizations != 0 || projectionEffectCounts(f) != before {
+		t.Fatal("semantic ABA reached finalizer result/effects")
+	}
+}
+
+type projectionFinalizerDelegate struct {
+	*ownerProjectionSQLFixture
+	after func(context.Context, *OwnerProjectionFinalization, OwnerProjectionAdvance, error)
+}
+
+func (s *projectionFinalizerDelegate) FinalizeOwnerProjectionOperation(ctx context.Context, f *OwnerProjectionFinalization) (OwnerProjectionAdvance, error) {
+	out, err := s.ownerProjectionSQLFixture.FinalizeOwnerProjectionOperation(ctx, f)
+	if s.after != nil {
+		s.after(ctx, f, out, err)
+	}
+	return out, err
+}
+func TestOwnerProjectionFinalizationOriginalCallerAndCleanupCutoff(t *testing.T) {
+	for _, mode := range []string{"caller-cancelled", "caller-ended", "root-closed", "resource-closed", "publication-lock"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			caller, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := f.projection.Execute(caller); err != nil {
+				t.Fatal(err)
+			}
+			before := projectionEffectCounts(f)
+			if mode == "caller-cancelled" {
+				cancel()
+			} else if mode == "caller-ended" {
+				// Model passage beyond the retained caller bound independently of a fresh
+				// Finalize invocation. This doesn't modify a persisted claim/source date.
+				original, c := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+				defer c()
+				f.projection.pending.caller = original
+			} else if mode == "root-closed" {
+				f.root.Close()
+			} else if mode == "resource-closed" {
+				f.resources.Close()
+			}
+			if mode == "publication-lock" {
+				entered, release := make(chan struct{}), make(chan struct{})
+				var once sync.Once
+				unblock := func() { once.Do(func() { close(release) }) }
+				defer unblock()
+				f.projection.verification = &projectionFinalizerDelegate{ownerProjectionSQLFixture: f.verification, after: func(ctx context.Context, handle *OwnerProjectionFinalization, out OwnerProjectionAdvance, err error) {
+					if err != nil {
+						t.Error("positive before publication wait", err)
+						return
+					}
+					f.projection.mu.Lock()
+					go func() { close(entered); <-release; f.projection.mu.Unlock() }()
+				}}
+				finished, joined := make(chan error, 1), make(chan struct{})
+				go func() { defer close(joined); _, err := f.projection.Finalize(context.Background()); finished <- err }()
+				defer func() { cancel(); unblock(); <-joined }()
+				select {
+				case <-entered:
+				case err := <-finished:
+					t.Fatal("did not reach publication lock", err)
+				case <-time.After(5 * time.Second):
+					t.Fatal("finalizer not admitted")
+				}
+				// This is the original Execute caller, not merely the new finalizer caller.
+				cancel()
+				unblock()
+				select {
+				case err := <-finished:
+					if err == nil {
+						t.Fatal("late cancellation published success")
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal("finalizer not joined")
+				}
+			} else if _, err := f.projection.Finalize(context.Background()); err == nil {
+				t.Fatal("original lifetime resurrected")
+			}
+			if projectionEffectCounts(f) != before || f.projection.pending == nil || f.projection.lastVerified != nil {
+				t.Fatal("failed finalization published or mutated")
+			}
+		})
+	}
+}
+
+// A legacy verifier is explicit synthetic input to the public legacy factory;
+// its already-created helper must still be fenced at the shared root boundary.
+type projectionLegacyVerifier struct {
+	snapshot contracts.OwnerIdentityRoleSnapshot
+}
+
+func (s projectionLegacyVerifier) VerifyOwnerIdentityRoles(context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	return s.snapshot, nil
+}
+func TestOwnerProjectionFinalizationFencesEveryOtherRootController(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	roles, err := f.root.VerifyProviderOwnerIdentityRoles(context.Background(), f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := NewProviderOwnerIdentityProjection(f.root, projectionLegacyVerifier{roles}, f.projection.projection.input, f.provider.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := NewProviderOwnerProjection(f.root, f.verification, f.projection.projection.input, f.provider.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = f.projection.Execute(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	before := projectionEffectCounts(f)
+	for name, call := range map[string]func() error{
+		"same-legacy":           func() error { _, e := f.projection.Advance(context.Background()); return e },
+		"other-legacy":          func() error { _, e := other.Advance(context.Background()); return e },
+		"other-execute":         func() error { return other.Execute(context.Background()) },
+		"other-finalize":        func() error { _, e := other.Finalize(context.Background()); return e },
+		"earlier-helper":        func() error { _, e := legacy.Advance(context.Background()); return e },
+		"earlier-launch-helper": func() error { _, e := legacy.Launch(context.Background()); return e },
+		"role-helper":           func() error { _, e := f.root.VerifyProviderOwnerIdentityRoles(context.Background(), f.roles); return e },
+	} {
+		if e := call(); e == nil {
+			t.Fatal("pending exclusion bypass", name)
+		}
+	}
+	if projectionEffectCounts(f) != before {
+		t.Fatal("alternate controller performed effects")
+	}
+	if _, err = f.projection.Finalize(context.Background()); err != nil {
+		t.Fatal("rejected alternate poisoned owner", err)
+	}
+}
+func TestOwnerProjectionFinalizationCompatibilityEntryClaimsBeforeProviderIO(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	other, err := NewProviderOwnerProjection(f.root, f.verification, f.projection.projection.input, f.provider.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Compatibility Advance claims split ownership before its provider read.
+	// A concurrent controller cannot enter the former legacy admission window.
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	var first atomic.Bool
+	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+		if first.CompareAndSwap(false, true) {
+			close(entered)
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return fleet.OwnerConfigurationObservation{}, cfg.ErrUnavailable
+			}
+		}
+		return f.accepted.ReadOwnerConfiguration(ctx)
+	})
+	finished, joined := make(chan error, 1), make(chan struct{})
+	go func() { defer close(joined); _, e := other.Advance(context.Background()); finished <- e }()
+	defer func() { unblock(); <-joined }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("compatibility provider entry not observed")
+	}
+	before := projectionEffectCounts(f)
+	if err = f.projection.Execute(context.Background()); err == nil {
+		t.Fatal("second controller entered pending lineage")
+	}
+	if projectionEffectCounts(f) != before {
+		t.Fatal("refused second controller wrote state")
+	}
+	unblock()
+	select {
+	case e := <-finished:
+		if e != nil {
+			t.Fatal("original compatibility split failed", e)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("compatibility split not joined")
+	}
+}
+func TestOwnerProjectionFinalizationReconstructedRootCannotAdoptProgress(t *testing.T) {
+	for _, progress := range []int{0, 1, 2, 6, 8} {
+		t.Run([]string{"roles-only", "parent", "credential", "joint", "launch"}[map[int]int{0: 0, 1: 1, 2: 2, 6: 3, 8: 4}[progress]], func(t *testing.T) {
+			f := newOwnerProjectionOperationFixture(t)
+			if progress > 0 {
+				projectionFinalizeThrough(t, f, progress)
+			}
+			rebuilt, err := NewProviderOwnerIdentityRoleRoot(context.Background(), f.bridge, f.resources, f.accepted, f.root.input.LayoutDigest)
+			if err != nil {
+				t.Fatal("read-only reconstructed root", err)
+			}
+			defer rebuilt.Close()
+			if _, err = rebuilt.OpenProviderOwnerIdentityRoles(context.Background()); err != nil {
+				t.Fatal("historical role observation", err)
+			}
+			if rebuilt.createAttempted || rebuilt.operationRootUID == "" {
+				t.Fatal("reconstructed reader confused with original create lineage")
+			}
+			other, err := NewProviderOwnerProjection(rebuilt, f.verification, f.projection.projection.input, f.provider.reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := projectionEffectCounts(f)
+			if err = other.Execute(context.Background()); err == nil {
+				t.Fatal("reconstructed root adopted stored progress")
+			}
+			if _, err = other.Advance(context.Background()); err == nil {
+				t.Fatal("compatibility entry adopted progress")
+			}
+			if projectionEffectCounts(f) != before {
+				t.Fatal("reconstruction repeated effects")
+			}
+		})
+	}
+}
+
+func TestProviderOwnerInstallationUnknownReceiptConsumesSingleFinalizer(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	calls := 0
+	f.verification.beforeEffect = func() {
+		calls++
+		if calls == 3 {
+			f.lose.Store(4)
+		}
+	}
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer driver.Close()
+	out, err := driver.Run(context.Background())
+	if err != nil || !out.Complete || out.Calls != 30 || out.Finalizations != 8 || out.Inspections != 1 || f.verification.finalizations != 8 {
+		t.Fatal("unknown receipt scheduled a second finalizer or replay", out, err)
+	}
+	if f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 || f.journalWrites.Load() != 8 {
+		t.Fatal("unexpected effect inventory", projectionEffectCounts(f))
+	}
+}
+func TestProviderOwnerInstallationFailedFinalizerDoesNotInspectAgain(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	f.verification.beforeFinalizeCurrent = func() { f.fault.Store(6) }
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer driver.Close()
+	out, err := driver.Run(context.Background())
+	if err == nil || out.Complete || out.Calls != 16 || out.Finalizations != 1 || out.Inspections != 0 || f.creates[0].Load() != 0 {
+		t.Fatal("failed finalization was retried", out, err)
+	}
+}
+
+func TestOwnerProjectionFinalizationRetainsOnlyPublicPendingPins(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	if err := f.projection.Execute(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := f.projection.pending
+	if p.original.object != nil || p.original.retained.object != nil || p.original.source.proof.native != nil {
+		t.Fatal("pending retained a native authority or raw journal")
+	}
+	for _, role := range p.roles.State.Roles {
+		if role.Password != "" {
+			t.Fatal("pending retained password")
+		}
+	}
+	for _, role := range p.original.roles.State.Roles {
+		if role.Password != "" {
+			t.Fatal("original pins retained password")
+		}
+	}
+	// Check original role data still exists in its owned Secret; clearing the
+	// retained public copy must not mutate the original credential journal.
+	f.api.mu.Lock()
+	raw, _ := json.Marshal(f.api.objects[f.root.path()+"/"+f.root.name()])
+	f.api.mu.Unlock()
+	_, _, err := f.root.decode(raw, time.Now().Add(time.Second))
+	clear(raw)
+	if err != nil {
+		t.Fatal("sanitization destroyed original role journal", err)
+	}
+}
+func TestOwnerProjectionFinalizationUnknownLaunchReadbackCannotReplay(t *testing.T) {
+	f := newOwnerProjectionOperationFixture(t)
+	projectionFinalizeThrough(t, f, 6)
+	f.lose.Store(3)
+	if err := f.projection.ExecuteLaunch(context.Background()); err == nil {
+		t.Fatal("lost launch reply was success")
+	}
+	before := projectionEffectCounts(f)
+	out, err := f.projection.Finalize(context.Background())
+	if err != nil || out.Status != OwnerProjectionAdvancePending || out.Snapshot.State.OwnerLaunch == nil || out.Snapshot.State.OwnerLaunch.Receipt != nil {
+		t.Fatal("known original deployment exact replacement not verified", err)
+	}
+	if projectionEffectCounts(f) != before {
+		t.Fatal("finalizer replayed launch")
+	}
+	if err := f.projection.ExecuteLaunch(context.Background()); err != nil {
+		t.Fatal("separate receipt execution", err)
+	}
+	if _, err = f.projection.Finalize(context.Background()); err != nil || f.launches.Load() != 1 {
+		t.Fatal("receipt finalization", err)
+	}
+}

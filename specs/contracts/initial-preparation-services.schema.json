@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-preparation-services.schema.json",
+  "title": "Private public service inputs for initial installation",
+  "description": "Installation-owned public desired configuration. No credentials, private material digests, Kubernetes identity guesses or activation flags. The producer records its digest before typed effects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "fleet",
+    "kubernetes",
+    "postgres",
+    "auditStore",
+    "keyService"
+  ],
+  "properties": {
+    "format": {
+      "enum": [
+        "asservat-initial-preparation-services/v1",
+        "asservat-initial-preparation-services/v2"
+      ]
+    },
+    "fleet": {
+      "$ref": "https://asservat.io/spec/v1/fleet-settings.schema.json"
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/initial-installer.schema.json#/properties/kubernetes"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/initial-installer.schema.json#/properties/postgres"
+    },
+    "auditStore": {
+      "$ref": "https://asservat.io/spec/v1/initial-installer.schema.json#/properties/auditStore"
+    },
+    "keyService": {
+      "$ref": "https://asservat.io/spec/v1/initial-installer.schema.json#/properties/keyService"
+    }
+  }
+}

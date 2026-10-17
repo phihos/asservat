@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestFederationRegionalProductWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "seconds": 115.527,
+  "requiredPassed": [
+    "TestFederationRegionalProductWithRealKubernetes"
+  ],
+  "scope": "Product /asservat hub-federation and connector Pods: product connector role grants, real OpenBao PKI/transit, encrypted S3 audit, ADR-168 SQL store; regional Pod holds only its Secret and in-cluster reads. Fixture-created roles, PKI, owner/fleet trust and generation 1 remain synthetic setup authority; no product installer.",
+  "missing": [
+    "TestFederationRegionalProductWithRealKubernetes"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "failed"
+}

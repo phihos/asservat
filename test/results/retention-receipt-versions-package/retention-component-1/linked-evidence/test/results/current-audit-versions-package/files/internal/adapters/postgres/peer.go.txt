@@ -1,0 +1,108 @@
+package postgres
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	port "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// PeerRegistry is a SELECT-only hub facet. Enrollment, audit, rotation and root
+// recovery writers must be wired separately; constructor success activates none.
+type PeerRegistry struct {
+	pool         *pgxpool.Pool
+	installation string
+}
+
+var _ port.PeerRegistry = (*PeerRegistry)(nil)
+
+func NewPeerRegistry(ctx context.Context, pool *pgxpool.Pool, installation string) (*PeerRegistry, error) {
+	if !authorization.UUID(installation) {
+		return nil, value.ErrInvalid
+	}
+	if _, err := New(ctx, pool); err != nil {
+		return nil, value.ErrUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var version int64
+	if err := pool.QueryRow(ctx, "SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version); err != nil || version != currentSchemaVersion {
+		return nil, value.ErrUnavailable
+	}
+	return &PeerRegistry{pool: pool, installation: installation}, nil
+}
+
+func (p *PeerRegistry) PeerRegistration(ctx context.Context, b value.PeerBinding) (value.PeerRegistration, error) {
+	var out value.PeerRegistration
+	if !b.Valid() || b.InstallationID != p.installation || b.Role != value.ConnectorPeer {
+		return out, value.ErrDenied
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	// Hold one primary connection across the clock/read/clock sequence; a
+	// blocked query cannot give stale enabled state a newly minted freshness.
+	conn, err := p.pool.Acquire(ctx)
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	defer conn.Release()
+	var replica bool
+	if err = conn.QueryRow(ctx, "SELECT pg_is_in_recovery()").Scan(&replica); err != nil || replica {
+		return out, value.ErrUnavailable
+	}
+	q := custodydb.New(conn)
+	start, err := q.CurrentTime(ctx)
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	rows, err := q.ReadPeerRegistration(ctx, custodydb.ReadPeerRegistrationParams{InstallationID: id(b.InstallationID), PeerID: id(b.PeerID)})
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	now, err := q.CurrentTime(ctx)
+	if err != nil || ctx.Err() != nil {
+		return out, value.ErrUnavailable
+	}
+	if len(rows) < 1 || len(rows) > 2 || now.Time.Before(start.Time) || !now.Time.Before(start.Time.Add(5*time.Second)) {
+		return out, value.ErrDenied
+	}
+	r := rows[0]
+	rootRevision := identity.Revision{UID: r.SourceUid, Generation: r.SourceGeneration}
+	copy(rootRevision.Digest[:], r.SourceDigest)
+	if len(r.SourceDigest) != 32 || !rootRevision.Valid() {
+		return out, value.ErrDenied
+	}
+	if r.Suspended || r.RecoveryBlocked || !r.Enabled || !r.AuditID.Valid || !r.AuditObjectKey.Valid || !r.AuditObjectVersion.Valid || r.AuditObjectVersion.String == "null" || !identity.Text(r.AuditObjectVersion.String, 1024) || len(r.AuditObjectSha256) != 32 || uid(r.ClusterID) != b.ClusterID || uid(r.CurrentEpoch) != b.IssuerEpoch || uid(r.IssuerEpoch) != b.IssuerEpoch || r.Role != string(b.Role) || !identity.Fresh(r.ObservedAt.Time, r.FreshUntil.Time, now.Time, 30*time.Second) || !now.Time.Before(r.PeerNotAfter.Time) {
+		return out, value.ErrDenied
+	}
+	// Hash the entire bounded statement projection, including root revision and
+	// certificate slots. The digest records what was checked; it is not a MAC.
+	raw, err := json.Marshal(rows)
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	out = value.PeerRegistration{Binding: b, Revision: identity.Revision{UID: b.PeerID, Generation: r.Revision, Digest: sha256.Sum256(raw)}, Enabled: true, ObservedAt: start.Time.UTC(), FreshUntil: identity.Earlier(start.Time.Add(5*time.Second), identity.Earlier(r.FreshUntil.Time, r.PeerNotAfter.Time)).UTC()}
+	for _, row := range rows {
+		if len(row.CertificateSha256) != 32 {
+			return value.PeerRegistration{}, value.ErrUnavailable
+		}
+		cert := value.PeerCertificate{Binding: b, NotBefore: row.NotBefore.Time.UTC(), NotAfter: row.NotAfter.Time.UTC()}
+		copy(cert.Digest[:], row.CertificateSha256)
+		if cert.Digest == (artifact.Digest{}) {
+			return value.PeerRegistration{}, value.ErrUnavailable
+		}
+		out.Certificates = append(out.Certificates, cert)
+	}
+	if !out.Valid(now.Time) {
+		return value.PeerRegistration{}, value.ErrDenied
+	}
+	return out, nil
+}

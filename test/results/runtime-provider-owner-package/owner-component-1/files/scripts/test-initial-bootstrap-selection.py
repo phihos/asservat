@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Pure selector regression; never starts a fixture or writes live files."""
+import importlib.util
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
+fixture = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fixture)
+
+class BootstrapSelection(unittest.TestCase):
+    def test_provider_pair_requires_own_original_chain(self):
+        self.assertEqual(fixture.qualification_selection(None,False,False,True,runtime_provider_pair=True),("^TestInitialBootstrapChainWithRealServices$",1))
+        for options in ({}, {"initial_bootstrap_chain":True,"owner_provider_auth":True}, {"initial_bootstrap_chain":True,"runtime_object_roundtrip":True}):
+            with self.assertRaises(ValueError):
+                fixture.qualification_selection(None,False,False,runtime_provider_pair=True,**options)
+        flags={"ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR":"1","ASSERVAT_INITIAL_RUNTIME_INSTALLED_OWNER":"1","ASSERVAT_INITIAL_RUNTIME_BRIDGE":"1"}
+        ordinary=fixture.qualification_environment(flags,Path("fixture"),Path("work"),False,False)
+        self.assertFalse(any(k in ordinary for k in flags))
+        pair=fixture.qualification_environment(flags,Path("fixture"),Path("work"),False,False,True,runtime_provider_pair=True)
+        self.assertEqual(pair["ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR"],"1")
+        self.assertEqual(pair["ASSERVAT_INITIAL_RUNTIME_BRIDGE"],"1")
+        self.assertNotIn("ASSERVAT_INITIAL_RUNTIME_INSTALLED_OWNER",pair)
+        legacy=fixture.qualification_environment(flags,Path("fixture"),Path("work"),False,False,True)
+        self.assertEqual(legacy["ASSERVAT_INITIAL_RUNTIME_INSTALLED_OWNER"],"1")
+        self.assertNotIn("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR",legacy)
+
+    def test_provider_worker_requires_explicit_pair_and_chain(self):
+        for options in ({}, {"initial_bootstrap_chain": True}, {"runtime_provider_pair": True}):
+            with self.assertRaises(ValueError):
+                fixture.qualification_selection(None, False, False, runtime_provider_worker=True, **options)
+        self.assertEqual(fixture.qualification_selection(None, False, False, True, runtime_provider_pair=True, runtime_provider_worker=True), ("^TestInitialBootstrapChainWithRealServices$", 1))
+        with self.assertRaises(ValueError):
+            fixture.qualification_selection("TestOther", False, False, True, runtime_provider_pair=True, runtime_provider_worker=True)
+
+    def test_provider_worker_flag_cannot_leak_to_other_modes(self):
+        flag = "ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER"
+        for options in ({}, {"initial_bootstrap_chain": True}, {"initial_bootstrap_chain": True, "runtime_provider_pair": True}):
+            selected = fixture.qualification_environment({flag:"1"}, Path("fixture"), Path("work"), False, False, **options)
+            self.assertNotIn(flag, selected)
+        selected = fixture.qualification_environment({}, Path("fixture"), Path("work"), False, False, True, runtime_provider_pair=True, runtime_provider_worker=True)
+        for key in (flag, "ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR", "ASSERVAT_INITIAL_RUNTIME_BRIDGE", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE"):
+            self.assertEqual(selected[key], "1")
+
+    def test_provider_owner_requires_explicit_running_worker(self):
+        for options in ({}, {"initial_bootstrap_chain": True}, {"initial_bootstrap_chain": True, "runtime_provider_pair": True}):
+            with self.assertRaises(ValueError):
+                fixture.qualification_selection(None, False, False, runtime_provider_owner=True, **options)
+        options = dict(initial_bootstrap_chain=True, runtime_provider_pair=True, runtime_provider_worker=True, runtime_provider_owner=True)
+        self.assertEqual(fixture.qualification_selection(None, False, False, **options), ("^TestInitialBootstrapChainWithRealServices$", 1))
+        with self.assertRaises(ValueError):
+            fixture.qualification_selection("TestOther", False, False, **options)
+
+    def test_provider_owner_flag_does_not_select_another_mode(self):
+        flag = "ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER"
+        for options in ({}, {"initial_bootstrap_chain": True}, {"initial_bootstrap_chain": True, "runtime_provider_pair": True, "runtime_provider_worker": True}):
+            selected = fixture.qualification_environment({flag: "1"}, Path("fixture"), Path("work"), False, False, **options)
+            self.assertNotIn(flag, selected)
+        selected = fixture.qualification_environment({}, Path("fixture"), Path("work"), False, False, True, runtime_provider_pair=True, runtime_provider_worker=True, runtime_provider_owner=True)
+        for key in (flag, "ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER", "ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR", "ASSERVAT_INITIAL_RUNTIME_BRIDGE"):
+            self.assertEqual(selected[key], "1")
+
+    def test_owner_only_aggregate_timeout_keeps_existing_modes(self):
+        self.assertIsNone(fixture.qualification_go_timeout())
+        self.assertEqual(fixture.qualification_go_timeout(helm_bootstrap=True), "12m")
+        self.assertEqual(fixture.qualification_go_timeout(runtime_provider_owner=True), "14m")
+
+    def test_exact_empty_database_selection(self):
+        self.assertEqual(fixture.qualification_selection(None, False, False, True), ("^TestInitialBootstrapChainWithRealServices$", 1))
+        with patch.object(fixture.subprocess, "run", side_effect=AssertionError("fixture migration attempted")), patch.object(fixture, "run", side_effect=AssertionError("fixture SQL grants attempted")):
+            fixture.prepare_fixture_database(Path("unused"), Path("unused"), "unused", "unused", True)
+    def test_no_combined_or_arbitrary_selection(self):
+        for arguments in [("TestOther",False,False,True),(None,True,False,True),(None,False,True,True),(None,True,True,False)]:
+            with self.assertRaises(ValueError):fixture.qualification_selection(*arguments)
+    def test_original_selectors_and_stale_flags(self):
+        self.assertEqual(fixture.qualification_selection("TestOther",False,False), ("TestOther",2))
+        self.assertEqual(fixture.qualification_selection(None,False,True), ("^TestInitialSchemaHandoverWithRealServices$",1))
+        flags={k:"1" for k in ("ASSERVAT_INITIAL_HANDOVER_NATIVE","ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE","ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE")}
+        current=fixture.qualification_environment(flags,Path("fixture"),Path("work"),False,False,True)
+        self.assertEqual({k:current[k] for k in flags if k in current},{"ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE":"1"})
+        ordinary=fixture.qualification_environment(flags,Path("fixture"),Path("work"),False,False)
+        self.assertFalse(any(k in ordinary for k in flags))
+
+if __name__ == "__main__":unittest.main()

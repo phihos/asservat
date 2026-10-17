@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/bootstrap	4.399s
+ok  	asservat.local/asservat/internal/contracts	1.235s
+ok  	asservat.local/asservat/internal/domain/authorization	1.384s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.357s
+?   	asservat.local/asservat/internal/transport/native	[no test files]

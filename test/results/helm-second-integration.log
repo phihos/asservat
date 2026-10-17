@@ -1,0 +1,37 @@
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/tmp/asservat-openapi-validation/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 modes, 4 canonical CRDs, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06
+/tmp/asservat-openapi-validation/bin/python scripts/test-helm.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-helm.py", line 128, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/phil/Projekte/asservat/scripts/test-helm.py", line 90, in main
+    run(k + ["apply", "--server-side", "--field-manager=asservat-crd-upgrade", "-f", str(CHART / "crds")])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-helm.py", line 23, in run
+    raise RuntimeError(f"unexpected result for {args}: {result.stdout}\n{result.stderr}")
+RuntimeError: unexpected result for ['kubectl', '--kubeconfig', '/home/phil/.cache/asservat-build/tmp/helm-6y2w_383/kubeconfig', '--request-timeout=15s', 'apply', '--server-side', '--field-manager=asservat-crd-upgrade', '-f', '/home/phil/Projekte/asservat/charts/asservat/crds']: customresourcedefinition.apiextensions.k8s.io/accessbindings.asservat.io serverside-applied
+customresourcedefinition.apiextensions.k8s.io/capacityreservations.asservat.io serverside-applied
+customresourcedefinition.apiextensions.k8s.io/permissionsources.asservat.io serverside-applied
+
+error: Apply failed with 1 conflict: conflict with "helm": .spec.versions
+Please review the fields above--they currently have other managers. Here
+are the ways you can resolve this warning:
+* If you intend to manage all of these fields, please re-run the apply
+  command with the `--force-conflicts` flag.
+* If you do not intend to manage all of the fields, please edit your
+  manifest to remove references to the fields that should keep their
+  current managers.
+* You may co-own fields by updating your manifest to match the existing
+  value; in this case, you'll become the manager if the other manager(s)
+  stop managing the field (remove it from their configuration).
+See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts
+
+make: *** [Makefile:107: helm-integration] Error 1

@@ -1,0 +1,50 @@
+{
+  "name": "current-history-effects-catchup",
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^retention-(current-|catchup-pages-apply-lowering-before-raising$)"
+  ],
+  "exit": 0,
+  "seconds": 12.35,
+  "diskBeforeBytes": 424050909184,
+  "sourceSnapshotUnchanged": true,
+  "requiredPassedTests": [
+    "TestContextAdmissionWithRealServices/retention-current-history-earliest-empty",
+    "TestContextAdmissionWithRealServices/retention-current-history-earliest-null",
+    "TestContextAdmissionWithRealServices/retention-current-history-latest-empty",
+    "TestContextAdmissionWithRealServices/retention-current-history-latest-null",
+    "TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty",
+    "TestContextAdmissionWithRealServices/retention-current-admitted-effect-null",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt"
+  ],
+  "passedTests": [
+    "TestContextAdmissionWithRealServices/retention-current-history-earliest-empty",
+    "TestContextAdmissionWithRealServices/retention-current-history-earliest-null",
+    "TestContextAdmissionWithRealServices/retention-current-history-latest-empty",
+    "TestContextAdmissionWithRealServices/retention-current-history-latest-null",
+    "TestContextAdmissionWithRealServices/retention-current-admitted-effect-empty",
+    "TestContextAdmissionWithRealServices/retention-current-admitted-effect-null",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-empty",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-earlier-lifecycle-null",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-root",
+    "TestContextAdmissionWithRealServices/retention-catchup-pages-apply-lowering-before-raising/retention-current-lifecycle-foreign-attempt"
+  ],
+  "missingRequiredTests": [],
+  "validationErrors": [],
+  "harnessSourceMismatches": [],
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "testExit": 0,
+  "archiveHashes": {
+    "harness.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "custody-environment.json": "9b5ed849eb6101fae5304e2ddbe44ceef8869b9c1d4ddf78cdda1c780f1f7a5f",
+    "custody.log": "0842dfacbaf403c73127de9bbdf10da11432e929a99271afa93c8604535c0f7d"
+  }
+}

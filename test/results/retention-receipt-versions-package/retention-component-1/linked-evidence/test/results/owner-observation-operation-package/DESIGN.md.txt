@@ -1,0 +1,131 @@
+# ADR150 implementation boundary — 2026-10-13
+
+This is a source-only design. The native expected-denial counterexample is recorded in the proposed ADR; no v2 implementation or whole-route latency result exists yet. There are no live repository edits. Parent owns integration and all native labs.
+
+## Current complete graph, by real process/client
+
+Counts assume one complete EndpointSlice page and one selected remote owner, without a probe CAS conflict. More pages/candidate branches add work under the same original bound. They are not reasons to enlarge a limit or instantiate another client. The named ports below use the already configured `PermissionClient` and independent probe client in each process. Different processes naturally have different clients; composition within one process must use the same objects and limiter.
+
+| Process | Current observer/probe calls | Source path |
+|---|---:|---|
+| HWORK | 94 / 24 | `bootstrap/cluster_observation_client.go` calls selected twice; each is full authentication (23/6) plus workload (24/6) |
+| Owner B, local HWORK ingress plus selected remote lookup/claim | 451 / 108 | caller before/after 52/12 plus forwarder 399/96 |
+| Owner A, locator/claim receiver plus four own-peer replies | 656 / 168 | receiver 376/96 plus own-peer replies 280/72 |
+| Regional connector R | 312 / 72 plus selected metadata | four producer calls at 78/18 each |
+
+B and A can be the same process; that branch must compose one operation and cannot reset a guard interval or allocate another limiter. These totals must not be added as if all four processes shared one limiter, nor assessed as if their serial waits happened concurrently. Each hop consumes the caller's original five seconds.
+
+Selected capacity metadata is currently: namespaces page = 1 observer request; workloads page = 1 observer request; exact workload = 4 observer requests (namespace, workload, namespace, workload); namespace guard = 9 observer + 3 probe requests. These are mutually exclusive request purposes. Discovery supplies candidates only. `capacity_workload.go` currently does not namespace-bracket the workload LIST; the stronger exact workload read supplies the two namespace/two workload checks before use. The namespace guard has separate installation pins and cannot reuse connector workload or source protection.
+
+The lower bounds omit source-owner background work, token file reads, TLS/SQL/serialization latency, queueing, pages beyond the first, and other admitted requests. The native first pair's 94/24 is measured; the rest are source counts, not observed round-trip timings.
+
+## Proposed native boundary worksheet
+
+A boundary is a real native read, not a memoized call to an existing full authenticator. Its private implementation obtains a finite object set and runs all existing pure predicates against the actual objects. It shares a read only when the object identity, native client, purpose and original interval are literally the same. It must not share HWORK and owner Deployment/account/Pod values.
+
+For k exact owner Pods in the same accepted owner pool, one boundary reads:
+
+| Native work | Observer calls |
+|---|---:|
+| Original namespace before and after | 2 |
+| Exact policy and binding before and after the independent denied probe | 4 |
+| Actual guard-target owner Deployment used by that successful probe | 1 |
+| Exact owner ServiceAccount | 1 |
+| Exact Service before and after | 2 |
+| Complete same-RV EndpointSlice LIST | p pages, at least 1 |
+| Each exact Pod before/after plus its exact ReplicaSet | 3k |
+| Total | 10 + p + 3k |
+
+The same already-read owner Deployment is validated against the original template and each ReplicaSet, and the same Pod reads supply Ready/endpoint and installed-template predicates. This is an explicit shared observation; it is not called two independent endpoint/template checks. Pure predicate extraction must preserve deleted-object, ownership, labels, template, image, scheduling, Ready, PodIPs, port and Service-selector checks. A conflict in the existing independent probe may add bounded calls and shorten the remaining budget; no retry budget is added.
+
+One local HWORK subject adds its separate account and Deployment, Pod before/after and ReplicaSet (5 calls), plus two actual online TokenReviews (2). Its native namespace/guard is shared only when the complete original guard pin and existing native client match. The original owner guard's Deployment is never substituted for HWORK.
+
+Two independent boundaries produce this first target worksheet:
+
+| Process, successful one-holder case | Proposed observer/probe calls | Qualifications |
+|---|---:|---|
+| HWORK authenticating selected owner B | 28 / 6 | k=1, p=1, complete initial before token disclosure and final before result use |
+| B including HWORK and exact selected holder A | 48 / 6, plus original candidate discovery if not literally included | k=2, p=1 and separate HWORK +7 per boundary; existing independent Ready intersection adds 5 if retained as separate I/O |
+| A authenticating B and its own serving identity | 34 / 6 | k=2, p=1; same original proof supplies own-peer native facts for four ordinals, not four claimed independent reads |
+| R initial/final source+workload bracket plus four source values | 50 / 12 plus selected metadata | two source guard reads (6 each), two workload guards (7 each), distinct exact account/Pod/RS and two TokenReviews per boundary (6 each), four fresh namespace-bracketed source snapshots (3 each) |
+
+For additional contacted owner candidates, B must perform each branch's actual exact Pod/ReplicaSet/Ready checks before its GET; it cannot select peers based only on a list or certificate. Additional branch calls remain charged to the same client/operation. Native qualification must count them. A complete SQL limit-plus-one read and complete Ready intersection remain mandatory. The configured retained limit is an upper bound with overflow denial, not a promise that all candidates can be contacted within five seconds. No smaller implicit completeness cap or serial 1,024-TLS fallback is introduced.
+
+This worksheet is a target for implementation, not a completed optimization. The first component may preserve extra unchanged reads while establishing the invariant; the full native gate must measure the final concrete graph before runtime selection. Even these counts do not guarantee a five-second round trip after actual TLS, token, SQL, probe and limiter work.
+
+## Exact identities and source/port ownership
+
+| Boundary | Independently installed input | Actual current checks retained | Scope owner |
+|---|---|---|---|
+| HWORK→B, before reading its token | original LocalOwner source/pool/issuer roots, complete deployment/guard/journal provenance | complete SQL candidates; actual common-SNI leaf membership; current exact activated registration/configuration/root; B native Ready/template chain | bootstrap typed v2 local client; same role70 SQL pool, no nested transaction |
+| B local caller | original root, HWORK account/Deployment/template, complete original namespace guard | dedicated-audience online TokenReview, exact current account/Pod/RS/Deployment, original token expiry and native proof | concrete Kubernetes v2 operation; no forwarded HWORK token |
+| B→A GET/POST | accepted same-pool candidates and exact original observation capability | actual common-SNI locator TLS then actual exact-SNI claim TLS; current sender/holder registration/configuration; actual private-key closure/renewal; original selected holder/sequence | bootstrap forwarder and typed mtls v2 pair checker |
+| A holder | original local listener/process key, installed connector profile, original standby/sequence | current own and sender SQL/TLS; exact current holder claim; original accepted socket end | purpose-fixed receiver/holder factory; no caller-selected callback |
+| A→R four ordinals | independently installed regional source/profile/roles, issuer roots and workload pins | separate SQL49 pre/post current-leaf reads; numbered original challenge/exporter-bound questions; own current SQL/leaf/key each ordinal | mtls v2 hub coordinator and purpose-specific SQL source adapter |
+| R native source and process | original exact source UID/config guard; distinct workload guard; actual process-owned CSR/key/leaf; installed Deployment/template/account | fresh canonical full source value at every ordinal; online token/native chain at the two boundaries; current private key/leaf and pinned plus current roots each ordinal; final native proof before ordinal4 returns | concrete Kubernetes v2 regional operation plus mtls producer |
+| R selected target | request exact namespace/workload/selector keys or cursor; original installed capacity guard | existing bounded metadata/guard adapter unchanged, result dates intersect original operation | existing capacity ports, never source/guard authority from received request |
+
+General `OwnerAuthenticator`, `OwnerEndpoint`, `OwnerWorkloadProtection.Current`, `ReadConnectorIdentitySource`, `ReadConnectorProcessProof`, `ObserveConnectorProcess`, existing enrollment/retirement/capture authorities and SQL49 current queries remain unchanged. New private v2 composition may extract pure native object validators; it must not implement a caching replacement for an old general port. SQL checks must never nest inside another SQL transaction/acquisition or acquire native authority from a current row alone.
+
+## State and completion
+
+```mermaid
+sequenceDiagram
+    participant H as HWORK
+    participant B as Selected hub
+    participant A as Exact holder
+    participant R as Regional connector
+    H->>H: Actual selected-server initial native bracket and SQL/TLS
+    H->>B: One local v2 POST, then original token is not forwarded
+    B->>B: Online HWORK admission + operation initial native bracket
+    B->>A: Locator v2 GET, current SQL/new actual TLS
+    A->>A: Initial native bracket, reserve original pending record
+    A-->>B: Public routing locator only
+    B->>A: Sole claim v2 POST, current SQL/new exact-SNI TLS
+    A->>A: Consume exact record once; current SQL/key/holder
+    A->>R: Ordinal1, request/channel-bound own proof
+    R->>R: Initial native bracket + actual source value1
+    R-->>A: Value1 under original bracket
+    A->>A: Exact current SQL49 leaf check
+    A->>R: Ordinal2
+    R-->>A: Actual source value2, same original bracket
+    A->>R: One selected metadata operation
+    R-->>A: Bounded result, not yet released to HWORK
+    A->>R: Ordinal3
+    R-->>A: Actual source value3
+    A->>A: Current SQL49 check + independent final native bracket
+    A->>R: Ordinal4 with final own native proof
+    R->>R: Actual source value4 + independent final native bracket
+    R-->>A: Final source proof, original dates only
+    A->>R: Exact Receipt; join request/response EOF
+    A-->>B: Result only after terminal checks and closure
+    B->>B: Independent final native + online caller checks
+    B-->>H: Result, all original bounds retained
+    H->>H: Independent final selected-server native/SQL/TLS check
+```
+
+The initial/final brackets prove current bounded observations. They cannot prove uninterrupted historical cleanliness, instantaneous revocation under partition, or rule out an unobserved A→B→A transition. Known changes or any failed check permanently close the operation. There is no re-bracketing after failure. Early metadata is bounded private state until final checks and existing terminal EOF complete; a native mutation discovered at final validation suppresses output.
+
+A positive locator GET is not final native completion. The receiver retains a bounded pending record until the exact POST or original expiry, with its admission slot held. The record belongs to the original server process and deadline, not the returned HTTP callback's lifetime. Cancellation/failed output before a locator is sent closes it; a possibly delivered locator remains unknown and charged until claim or original expiry. Finishing GET must not manufacture a fresh root or detach an unbounded task. Claim rechecks actual new connection/SQL/key and atomically spends the original record before blocking work. Repeated GET, failed POST or missing/restarted state cannot repair/recreate/retry it. Cleanup joins actual work and uses exact record identity so stale cleanup cannot delete a replacement.
+
+## Explicit semantic version and ownership
+
+Selected semantic value: `operation-native-brackets/v2`. New private v2 local, locator/claim, own-proof and stream purposes/format identifiers reject v1 counterparts before metadata. Preserve the existing typed public metadata request/result and digest bytes inside the new envelopes, four ordinal values and twelve frame count. V2 proof replies explicitly name one original native-bracket identity/start/end plus initial/final phase. Old v1 decoders never accept the bracket semantics. No version negotiation, retry or mixed-mode downgrade.
+
+Console owns the single fresh installed worker2+owner2 carrier and original journal/producer/reader propagation. Its existing required `Observation.Format` is the single selector: the fresh pair requires the fixed `owner-observation/v2` literal; this is not an extra editable field or another layout variant. MCP's CapacityLocalOwner consumes that exact original field; `NativeCandidateLimit` cannot infer it. Workflow owns concrete native proof types, v2 private codecs/mtls source/receiver/forwarder and their loader consumer hunks. Shared contract/schema edits require a frozen coordinated field before either producer selects it. Regional receipt/pins must independently bind the same exact selection. Runtime routes remain unselected until all consumers and native availability pass.
+
+First code paths planned (new files, outside repo):
+
+- `internal/adapters/kubernetes/owner_observation_operation.go` and `_test.go`: concrete request-owned native proof and exact initial/final lifecycle.
+- Narrow pure predicate extraction only if needed from `owner_endpoint.go`, `cluster_observation_caller.go`, `owner_workload_guard.go`; public entry points retain unchanged behavior and tests.
+- Later regional counterpart `connector_observation_operation.go` and tests with four actual full-value decodes under an explicit retained source guard.
+
+No migration, new SQL role/pool, extra client limiter, authority cache, provider grant or runtime selector belongs to the first checkpoint. Closed proof state does not itself authenticate a TLS connection or authorize SQL/metadata.
+
+## Required regressions and evidence
+
+The actual native counterexample is the original failing workflow evidence. Do not replace it with a synthetic timing claim. The first new component tests must establish actual native API traffic at initial and final boundaries, exact request/pin/participant binding, unchanged original dates after waits, wrong/expired/cancelled context rejection, mutation of every relevant native object/guard, probe denial loss, Service/Pod replacement, TokenReview loss where applicable, and joined Close during admitted reads. Unknown reads and expiry are terminal, never refreshed. Existing general-reader tests remain unchanged and applicable.
+
+The regional checkpoint additionally asserts exactly four distinct source-value GETs/decodes, mutation of roles/backing/source/roots on any ordinal, fresh ordinal4 final native checks, key renewal/closure, wrong channel, duplicate ordinal and failure after spend. V2 rejects v1 or missing/wrong bracket capability/identity/phase/date, retains integer/digest byte parity, and cannot expose the metadata result before successful final proof and EOF.
+
+Receiver/forwarder tests cover abandoned locator, slot retention, missing/replaced pending record, duplicate/concurrent POST, wrong/new TLS leaf, SQL revocation/recovery at every boundary, same Pod with changed process, holder sequence replacement, near-socket-end attachment, cancellation while native/SQL/network I/O is pending, and no unknown POST replay. Complete native qualification uses actual Kubernetes + SQL + mTLS across HWORK, two owners and regional side, all four purposes and original five seconds, with body-free per-leg counters. Loopback fake-port results qualify component mechanics only.

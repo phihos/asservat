@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/connector_identity_test.go": "/home/phil/.cache/asservat-build/planning/connector-profile-cleanup-alias-20261013/files/test/integration/connector_identity_test.go",
+    "/home/phil/Projekte/asservat/test/integration/connector_profile_cleanup_guard_test.go": "/home/phil/.cache/asservat-build/planning/connector-profile-cleanup-alias-20261013/files/test/integration/connector_profile_cleanup_guard_test.go"
+  }
+}

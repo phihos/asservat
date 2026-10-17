@@ -1,0 +1,13 @@
+{
+  "scope": "Original channel deadline propagation through candidates, metadata, receipt and current-key lock checks; component only.",
+  "paths": 2,
+  "dependenciesVerified": 2081,
+  "manifestSHA256": "ec5a9c800213536c471e05dd7217fefdf02cc8009e0bc4d61483c7c8f0501470",
+  "resultSHA256": "0c0fe7a22ac704aefd066d40da5547461cf1624e53e28b9b8bc660559cbe4392",
+  "terminal": 0,
+  "topLevelPass": 44,
+  "namedPass": 184,
+  "skips": 0,
+  "nativeQualification": false,
+  "before": "Four intended failures; initial corrected compile-name failure preserved separately."
+}

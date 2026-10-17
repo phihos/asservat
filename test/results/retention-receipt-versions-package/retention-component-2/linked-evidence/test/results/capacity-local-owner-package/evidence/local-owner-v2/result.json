@@ -1,0 +1,103 @@
+{
+  "manifest": "6453e56568d962b9f11fe8f0c5e6e270f3fd8546a6060e26afc84e038c8d2e52",
+  "dependencies": "bbf7d57dbde9ab4d11027e7fc8737bf14267ef42892893561a8d60c884d21d03",
+  "runner": "a7c5fb71be7ed7a07b3590403c0429afd030314bf7f8bcf01f0c04b80846e690",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": [],
+    "retained_evidence": [],
+    "live_evidence": []
+  },
+  "phases": [
+    {
+      "name": "kubernetes-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v2/overlay.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^Test(Capacity|InstalledWorker|WorkerProjection|PublicRuntimeWorker|CaptureCleanupProjection|InstalledOwnerOriginalLayout)",
+        "-count=1",
+        "-timeout=10m",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 59.892831563949585,
+      "log_sha256": "f062253d199bc370015aee26e2a55d327a186692a985f00e7802f69331278897"
+    },
+    {
+      "name": "postgres-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v2/overlay.json",
+        "./internal/adapters/postgres",
+        "-run",
+        "^Test(CapacityRole|PublicRuntimeRolePlan|FixedRuntimeRoleFunctionAlias|CaptureCleanupPlans)",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 9.432627439498901,
+      "log_sha256": "77dda94a26e282e775326942b0c2d67cae737b6c10694af6bad63034bb58b42d"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v2/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 4.1143457889556885,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "static",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "architecture-check",
+        "spec-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "cwd": "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/checks/local-owner-v2/static-tree",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 7.1496171951293945,
+      "log_sha256": "b51e4bdb073cb46b972ad0519c738abaca259a2eef8d5811eee4554fe95dbb7f"
+    }
+  ],
+  "started_at": 1791848137.6410828,
+  "terminal_exit": 0,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": [],
+    "retained_evidence": [],
+    "live_evidence": []
+  },
+  "ended_at": 1791848221.9931445
+}

@@ -1,0 +1,357 @@
+--- test/integration/direct_observation_native_fixture_test.go
++++ staged/test/integration/direct_observation_native_fixture_test.go
+@@ -9,6 +9,7 @@
+ 	"io"
+ 	"net"
+ 	"os/exec"
++	"reflect"
+ 	"slices"
+ 	"strings"
+ 	"testing"
+@@ -44,6 +45,7 @@
+ 	accounts    map[string]*core.ServiceAccount
+ 	deployments map[string]*apps.Deployment
+ 	pods        map[string]*core.Pod
++	inputUntil  map[string]time.Time
+ 	plan        cfg.OwnerWorkloadAdministration
+ 	guard       kube.GuardPin
+ 	protection  artifact.Digest
+@@ -80,7 +82,7 @@
+ 	if e != nil {
+ 		t.Fatal("native namespace create", e)
+ 	}
+-	x := &directNativeCluster{api: api, config: config, kubeconfig: f.Clusters[index].Config, id: custodyID(), namespace: ns, accounts: map[string]*core.ServiceAccount{}, deployments: map[string]*apps.Deployment{}, pods: map[string]*core.Pod{}}
++	x := &directNativeCluster{api: api, config: config, kubeconfig: f.Clusters[index].Config, id: custodyID(), namespace: ns, accounts: map[string]*core.ServiceAccount{}, deployments: map[string]*apps.Deployment{}, pods: map[string]*core.Pod{}, inputUntil: map[string]time.Time{}}
+ 	copy(x.image[:], digest)
+ 	t.Cleanup(func() {
+ 		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+@@ -116,7 +118,7 @@
+ 			audience = kube.ConnectorEnrollmentAudience(installation)
+ 			tokenFile = "connector.token"
+ 		}
+-		projection := []core.VolumeProjection{{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: mode + "-inputs"}, Optional: ptr.To(true)}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "observer.token", ExpirationSeconds: ptr.To(int64(600))}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Audience: audience, Path: tokenFile, ExpirationSeconds: ptr.To(int64(600))}}}
++		projection := []core.VolumeProjection{{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: mode + "-inputs"}, Optional: ptr.To(false)}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "observer.token", ExpirationSeconds: ptr.To(int64(600))}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Audience: audience, Path: tokenFile, ExpirationSeconds: ptr.To(int64(600))}}}
+ 		spec := core.PodSpec{ServiceAccountName: mode, AutomountServiceAccountToken: ptr.To(false), EnableServiceLinks: ptr.To(false), RestartPolicy: core.RestartPolicyAlways, TerminationGracePeriodSeconds: ptr.To(int64(10)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), RunAsGroup: ptr.To(int64(65532)), FSGroup: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Volumes: []core.Volume{{Name: "fixture", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0400)), Sources: projection}}}, {Name: "state", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: ptr.To(resource.MustParse("8Mi"))}}}}, Containers: []core.Container{{Name: "fixture", Image: f.WorkerImage, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/observation-native", mode}, Env: []core.EnvVar{{Name: "POD_UID", ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}}, VolumeMounts: []core.VolumeMount{{Name: "fixture", MountPath: "/fixture", ReadOnly: true}, {Name: "state", MountPath: "/state"}}, SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}, Resources: core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m"), core.ResourceMemory: resource.MustParse("256Mi")}}}}, Tolerations: []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: core.TolerationOpExists, Effect: core.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(300))}, {Key: "node.kubernetes.io/unreachable", Operator: core.TolerationOpExists, Effect: core.TaintEffectNoExecute, TolerationSeconds: ptr.To(int64(300))}}}
+ 		d, e := api.AppsV1().Deployments(name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: mode}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: spec}}}, meta.CreateOptions{})
+ 		if e != nil {
+@@ -168,7 +170,7 @@
+ 	}
+ 	x.guard = x.installGuard(t, ctx, policy, binding)
+ 	for _, mode := range modes {
+-		x.waitPod(t, ctx, mode)
++		x.waitPodIdentity(t, ctx, mode)
+ 	}
+ 	t.Cleanup(func() {
+ 		if t.Failed() {
+@@ -222,7 +224,9 @@
+ 	return kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
+ }
+ 
+-func (x *directNativeCluster) waitPod(t *testing.T, ctx context.Context, mode string) {
++// Retain identity before the required Secret permits any container startup.
++// Pending is a fixture setup state, never a peer/readiness/authority proof.
++func (x *directNativeCluster) waitPodIdentity(t *testing.T, ctx context.Context, mode string) {
+ 	t.Helper()
+ 	for ctx.Err() == nil {
+ 		list, e := x.api.CoreV1().Pods(x.namespace.Name).List(ctx, meta.ListOptions{LabelSelector: "fixture-role=" + mode})
+@@ -234,34 +238,127 @@
+ 		}
+ 		if len(list.Items) == 1 {
+ 			p := list.Items[0]
+-			if p.DeletionTimestamp != nil {
+-				t.Fatal("native helper original Pod deleting")
+-			}
+-			for _, s := range p.Status.ContainerStatuses {
+-				if s.RestartCount != 0 || s.State.Terminated != nil {
+-					t.Fatal("native helper terminated before immutable inputs")
++			if p.Status.Phase == "" && p.UID != "" && p.DeletionTimestamp == nil && !directNativeContainerStarted(&p) {
++				select {
++				case <-ctx.Done():
++				case <-time.After(100 * time.Millisecond):
+ 				}
+-			}
+-			if p.Status.Phase == core.PodRunning && p.Status.PodIP != "" {
+-				x.pods[mode] = p.DeepCopy()
+-				d, e := x.api.AppsV1().Deployments(x.namespace.Name).Get(ctx, mode, meta.GetOptions{})
+-				if e != nil {
+-					t.Fatal(e)
+-				}
+-				x.deployments[mode] = d
+-				return
+-			}
++				continue
++			}
++			if p.UID == "" || p.DeletionTimestamp != nil || p.Status.Phase != core.PodPending || directNativeContainerStarted(&p) {
++				t.Fatal("native helper ran before required inputs")
++			}
++			owner, ok := directNativeController(p.OwnerReferences, "ReplicaSet")
++			if !ok {
++				t.Fatal("native original Pod controller missing")
++			}
++			rs, e := x.api.AppsV1().ReplicaSets(x.namespace.Name).Get(ctx, owner.Name, meta.GetOptions{})
++			if e != nil {
++				t.Fatal("native original ReplicaSet unavailable", e)
++			}
++			d, e := x.api.AppsV1().Deployments(x.namespace.Name).Get(ctx, mode, meta.GetOptions{})
++			if e != nil {
++				t.Fatal("native original Deployment unavailable", e)
++			}
++			original := x.deployments[mode]
++			before, eb := kube.ConnectorAPITemplateDigest(original.Spec.Template)
++			after, ea := kube.ConnectorAPITemplateDigest(d.Spec.Template)
++			if !directNativePendingChain(&p, rs, d) || original.UID != d.UID || eb != nil || ea != nil || before != after {
++				t.Fatal("native original Pending chain changed")
++			}
++			x.pods[mode] = p.DeepCopy()
++			x.deployments[mode] = d
++			return
+ 		}
+ 		select {
+ 		case <-ctx.Done():
+ 		case <-time.After(100 * time.Millisecond):
+ 		}
+ 	}
+-	t.Fatal("native helper startup expired")
++	t.Fatal("native helper identity setup expired")
++}
++
++func directNativeController(refs []meta.OwnerReference, kind string) (meta.OwnerReference, bool) {
++	if len(refs) != 1 {
++		return meta.OwnerReference{}, false
++	}
++	o := refs[0]
++	return o, o.APIVersion == "apps/v1" && o.Kind == kind && o.Name != "" && o.UID != "" && o.Controller != nil && *o.Controller
++}
++
++func directNativeContainerStarted(p *core.Pod) bool {
++	for _, s := range append(append([]core.ContainerStatus{}, p.Status.InitContainerStatuses...), p.Status.ContainerStatuses...) {
++		if s.RestartCount != 0 || s.ContainerID != "" || s.State.Running != nil || s.State.Terminated != nil || s.LastTerminationState.Terminated != nil || (s.Started != nil && *s.Started) {
++			return true
++		}
++	}
++	return false
++}
++
++func directNativePendingChain(p *core.Pod, rs *apps.ReplicaSet, d *apps.Deployment) bool {
++	if p == nil || rs == nil || d == nil || p.UID == "" || rs.UID == "" || d.UID == "" || p.Name == "" || p.Namespace == "" || rs.Name == "" || d.Name == "" || p.DeletionTimestamp != nil || rs.DeletionTimestamp != nil || d.DeletionTimestamp != nil || p.Namespace != rs.Namespace || rs.Namespace != d.Namespace || p.Status.Phase != core.PodPending || directNativeContainerStarted(p) {
++		return false
++	}
++	po, ok := directNativeController(p.OwnerReferences, "ReplicaSet")
++	ro, rok := directNativeController(rs.OwnerReferences, "Deployment")
++	return ok && rok && po.UID == rs.UID && po.Name == rs.Name && ro.UID == d.UID && ro.Name == d.Name
++}
++
++// This wait owns only the original setup deadline fixed before input creation.
++// It never reselects a replacement or restarts enrollment/authority work.
++func (x *directNativeCluster) waitPodRunning(t *testing.T, ctx context.Context, mode string) {
++	t.Helper()
++	until := x.inputUntil[mode]
++	original := x.pods[mode]
++	if original == nil || until.IsZero() || !time.Now().Before(until) {
++		t.Fatal("native original input setup expired", mode)
++	}
++	setup, stop := context.WithDeadline(ctx, until)
++	defer stop()
++	for setup.Err() == nil {
++		p, e := x.api.CoreV1().Pods(x.namespace.Name).Get(setup, original.Name, meta.GetOptions{})
++		if setup.Err() != nil || !time.Now().Before(until) {
++			break
++		}
++		if e != nil {
++			x.closedDiagnostics(t, mode)
++			t.Fatal("native original input Pod unavailable", mode)
++		}
++		if p.UID != original.UID || p.DeletionTimestamp != nil || !reflect.DeepEqual(p.OwnerReferences, original.OwnerReferences) {
++			t.Fatal("native original input Pod changed", mode)
++		}
++		for _, s := range p.Status.ContainerStatuses {
++			if s.RestartCount != 0 || s.State.Terminated != nil || s.LastTerminationState.Terminated != nil {
++				x.closedDiagnostics(t, mode)
++				t.Fatal("native helper failed original startup", mode)
++			}
++		}
++		if p.Status.Phase == core.PodRunning && p.Status.PodIP != "" {
++			x.pods[mode] = p.DeepCopy()
++			return
++		}
++		if p.Status.Phase != core.PodPending {
++			t.Fatal("native original input Pod phase changed", mode)
++		}
++		select {
++		case <-setup.Done():
++		case <-time.After(100 * time.Millisecond):
++		}
++	}
++	x.closedDiagnostics(t, mode)
++	t.Fatal("native original input materialization expired", mode)
+ }
+ 
+ func (x *directNativeCluster) installInput(t *testing.T, ctx context.Context, mode string, in Input) {
+ 	t.Helper()
++	// Start once before the API create. A slow or unknown create cannot renew
++	// this setup interval; the same deadline also bounds the subsequent wait.
++	setup, stop := context.WithTimeout(ctx, 2*time.Minute)
++	defer stop()
++	if _, exists := x.inputUntil[mode]; exists {
++		t.Fatal("native input create attempt already retained")
++	}
++	x.inputUntil[mode], _ = setup.Deadline()
+ 	if in.PodUID != string(x.pods[mode].UID) || in.Mode != mode {
+ 		t.Fatal("native input original Pod mismatch")
+ 	}
+@@ -270,7 +367,7 @@
+ 		t.Fatal("native input encode")
+ 	}
+ 	defer clear(raw)
+-	_, e = x.api.CoreV1().Secrets(x.namespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: mode + "-inputs"}, Immutable: ptr.To(true), Data: map[string][]byte{"input.json": raw, "probe.token": []byte(x.probeToken)}}, meta.CreateOptions{})
++	_, e = x.api.CoreV1().Secrets(x.namespace.Name).Create(setup, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: mode + "-inputs"}, Immutable: ptr.To(true), Data: map[string][]byte{"input.json": raw, "probe.token": []byte(x.probeToken)}}, meta.CreateOptions{})
+ 	if e != nil {
+ 		t.Fatal("native immutable input create", e)
+ 	}
+--- test/integration/direct_observation_native_test.go
++++ staged/test/integration/direct_observation_native_test.go
+@@ -4,8 +4,11 @@
+ 	"bytes"
+ 	"context"
+ 	"encoding/json"
++	"io"
++	"net/http"
+ 	"os"
+ 	"slices"
++	"strings"
+ 	"testing"
+ 	"time"
+ 
+@@ -14,8 +17,12 @@
+ 	cfg "asservat.local/asservat/internal/domain/configuration"
+ 	value "asservat.local/asservat/internal/domain/fleet"
+ 	"asservat.local/asservat/internal/domain/identity"
++	apps "k8s.io/api/apps/v1"
++	core "k8s.io/api/core/v1"
+ 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/types"
++	"k8s.io/client-go/kubernetes"
++	"k8s.io/client-go/rest"
+ )
+ 
+ func TestDirectNativeFixtureWireParity(t *testing.T) {
+@@ -73,6 +80,102 @@
+ 	}
+ }
+ 
++type directNativeSetupTransport func(*http.Request) (*http.Response, error)
++
++func (f directNativeSetupTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
++
++func TestDirectNativeInputSetupDeadline(t *testing.T) {
++	parent, stop := context.WithTimeout(context.Background(), 5*time.Second)
++	defer stop()
++	originalEnd, _ := parent.Deadline()
++	var deadlines []time.Time
++	api, err := kubernetes.NewForConfigAndClient(&rest.Config{Host: "https://fixture.invalid"}, &http.Client{Transport: directNativeSetupTransport(func(r *http.Request) (*http.Response, error) {
++		end, ok := r.Context().Deadline()
++		if !ok {
++			t.Fatal("setup API request omitted original deadline")
++		}
++		deadlines = append(deadlines, end)
++		body := ""
++		status := http.StatusOK
++		switch {
++		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/namespaces/fixture/secrets":
++			status = http.StatusCreated
++			body = `{"apiVersion":"v1","kind":"Secret","metadata":{"name":"owner-inputs","namespace":"fixture","uid":"input"}}`
++		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/namespaces/fixture/pods/original":
++			body = `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"original","namespace":"fixture","uid":"pod"},"status":{"phase":"Running","podIP":"10.0.0.7"}}`
++		default:
++			t.Fatal("unexpected setup API call")
++		}
++		return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
++	})})
++	if err != nil {
++		t.Fatal(err)
++	}
++	x := &directNativeCluster{api: api, namespace: &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "fixture"}}, pods: map[string]*core.Pod{"owner": {ObjectMeta: meta.ObjectMeta{Name: "original", Namespace: "fixture", UID: "pod"}, Status: core.PodStatus{Phase: core.PodPending}}}, inputUntil: map[string]time.Time{}}
++	x.installInput(t, parent, "owner", Input{Mode: "owner", PodUID: "pod"})
++	// A later, longer parent cannot replace the deadline retained before CREATE.
++	later, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++	defer cancel()
++	x.waitPodRunning(t, later, "owner")
++	if len(deadlines) != 2 || !x.inputUntil["owner"].Equal(originalEnd) || !deadlines[0].Equal(originalEnd) || !deadlines[1].Equal(originalEnd) {
++		t.Fatal("create or running wait renewed original setup bound")
++	}
++}
++
++func TestDirectNativePendingIdentity(t *testing.T) {
++	controller := true
++	pod := &core.Pod{ObjectMeta: meta.ObjectMeta{Name: "original", Namespace: "fixture", UID: "pod", OwnerReferences: []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "ReplicaSet", Name: "replica", UID: "rs", Controller: &controller}}}, Status: core.PodStatus{Phase: core.PodPending}}
++	rs := &apps.ReplicaSet{ObjectMeta: meta.ObjectMeta{Name: "replica", Namespace: "fixture", UID: "rs", OwnerReferences: []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: "deployment", UID: "deployment", Controller: &controller}}}}
++	d := &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "deployment", Namespace: "fixture", UID: "deployment"}}
++	if !directNativePendingChain(pod, rs, d) {
++		t.Fatal("exact Pending chain rejected")
++	}
++	for _, tc := range []struct {
++		name   string
++		mutate func(*core.Pod, *apps.ReplicaSet, *apps.Deployment)
++	}{
++		{"replacement-replicaset", func(_ *core.Pod, r *apps.ReplicaSet, _ *apps.Deployment) { r.UID = "replacement" }},
++		{"replacement-deployment", func(_ *core.Pod, _ *apps.ReplicaSet, d *apps.Deployment) { d.UID = "replacement" }},
++		{"extra-owner", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.OwnerReferences = append(p.OwnerReferences, p.OwnerReferences[0])
++		}},
++		{"missing-controller", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { p.OwnerReferences[0].Controller = nil }},
++		{"wrong-owner-kind", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { p.OwnerReferences[0].Kind = "StatefulSet" }},
++		{"wrong-namespace", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { p.Namespace = "replacement" }},
++		{"missing-pod-uid", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { p.UID = "" }},
++		{"deleting-pod", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { v := meta.Now(); p.DeletionTimestamp = &v }},
++		{"deleting-replicaset", func(_ *core.Pod, r *apps.ReplicaSet, _ *apps.Deployment) { v := meta.Now(); r.DeletionTimestamp = &v }},
++		{"deleting-deployment", func(_ *core.Pod, _ *apps.ReplicaSet, d *apps.Deployment) { v := meta.Now(); d.DeletionTimestamp = &v }},
++		{"running-before-input", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) { p.Status.Phase = core.PodRunning }},
++		{"old-container-id", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.ContainerStatuses = []core.ContainerStatus{{ContainerID: "containerd://original"}}
++		}},
++		{"known-running-state", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.ContainerStatuses = []core.ContainerStatus{{State: core.ContainerState{Running: &core.ContainerStateRunning{}}}}
++		}},
++		{"terminated-state", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.ContainerStatuses = []core.ContainerStatus{{State: core.ContainerState{Terminated: &core.ContainerStateTerminated{}}}}
++		}},
++		{"previous-termination", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.ContainerStatuses = []core.ContainerStatus{{LastTerminationState: core.ContainerState{Terminated: &core.ContainerStateTerminated{}}}}
++		}},
++		{"restart", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.ContainerStatuses = []core.ContainerStatus{{RestartCount: 1}}
++		}},
++		{"init-started", func(p *core.Pod, _ *apps.ReplicaSet, _ *apps.Deployment) {
++			p.Status.InitContainerStatuses = []core.ContainerStatus{{ContainerID: "containerd://original-init"}}
++		}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			p, r, dep := pod.DeepCopy(), rs.DeepCopy(), d.DeepCopy()
++			tc.mutate(p, r, dep)
++			if directNativePendingChain(p, r, dep) {
++				t.Fatal("changed or started original chain accepted")
++			}
++		})
++	}
++}
++
+ // This is a reference H/A/R composition with actual product v2 listener and
+ // separate original Pods in two clusters. Initial issuer/accepted owner-source,
+ // recovery and storage-qualification roots remain explicit fixture authority.
+@@ -144,12 +247,14 @@
+ 		mounted[mode] = true
+ 		x.installInput(t, ctx, mode, in)
+ 	}
+-	// Wait only for setup. Any actual process failure/restart is terminal; there
+-	// is no enrollment, operation or uncertain POST retry in this wait.
++	// Required inputs are materialized before containers start. Retain each
++	// create attempt's original setup interval, then use the unchanged control
++	// readiness wait; no enrollment, operation or uncertain POST is replayed.
+ 	for _, role := range []struct {
+ 		x    *directNativeCluster
+ 		mode string
+ 	}{{a, "owner"}, {a, "hwork"}, {r, "regional"}} {
++		role.x.waitPodRunning(t, ctx, role.mode)
+ 		role.x.waitControl(t, ctx, role.mode)
+ 	}
+ 	t.Logf("native direct setup elapsed=%s source-refreshes=%d synthetic-initial-roots=true installed-runtime=false full-HWORK-background=false", time.Since(setup), sql.refreshes.Load())

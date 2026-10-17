@@ -1,0 +1,3 @@
+ok  	asservat.local/asservat/internal/application/identity	1.009s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.009s
+ok  	asservat.local/asservat/internal/transport/browser	1.024s

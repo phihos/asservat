@@ -1,0 +1,30 @@
+--- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects (1.98s)
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/sql-port (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/sql-host (0.16s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/sql-pool (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/sql-roots (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/audit-roots (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/audit-path (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/key-mount (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/key-roots (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/invalid-root (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/pem-root (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/expired-root (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/duplicate-root (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+    --- FAIL: TestInitialPreparationRejectsStaticProviderErrorsBeforeEffects/endpoint-port (0.15s)
+        initial_preparer_inputs_test.go:272: invalid public provider input consumed preparation
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	1.992s
+FAIL

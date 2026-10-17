@@ -1,0 +1,47 @@
+package postgres
+
+import (
+	"context"
+	"testing"
+
+	"asservat.local/asservat/internal/adapters/kubernetes"
+)
+
+func TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse(t *testing.T) {
+	for _, purpose := range []string{"verify", "role", "inspect-role", "projection"} {
+		t.Run(purpose, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			// The nil pool is deliberate: a fabricated operation must fail before
+			// pool admission, SQL or native I/O, not merely fail a later query.
+			roles := &OwnerIdentitySQLRoles{ctx: ctx, cancel: cancel}
+			producer := &OwnerIdentityOperationSQL{roles: roles, root: &kubernetes.OwnerIdentityRoleRoot{}}
+			var operation kubernetes.OwnerIdentityOperation
+			if purpose == "verify" {
+				if _, err := producer.VerifyOwnerIdentityOperation(ctx, &operation); err == nil {
+					t.Fatal("caller-built zero operation reached SQL")
+				}
+			} else if purpose == "role" {
+				if _, err := producer.AdvanceOwnerIdentityRoleOperation(ctx, &operation); err == nil {
+					t.Fatal("caller-built zero operation reached role effect")
+				}
+			} else if purpose == "inspect-role" {
+				if _, err := producer.InspectOwnerIdentityRoleOperation(ctx, &operation); err == nil {
+					t.Fatal("caller-built zero operation reached SQL inspection")
+				}
+			} else {
+				var projection kubernetes.OwnerProjectionOperation
+				if _, err := producer.AdvanceOwnerProjectionOperation(ctx, &projection); err == nil {
+					t.Fatal("caller-built zero operation reached projection SQL")
+				}
+			}
+			roles.mu.Lock()
+			busy := roles.busy
+			roles.mu.Unlock()
+			if busy {
+				t.Fatal("rejected native operation leaked SQL owner")
+			}
+			roles.work.Wait()
+		})
+	}
+}

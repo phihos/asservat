@@ -1,0 +1,37 @@
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/original
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/empty
+    retention_versions_test.go:32: current receipt=true want false
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/null
+    retention_versions_test.go:32: current receipt=true want false
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/maximum
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/oversize
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-control
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-printable
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/original
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/empty
+    retention_versions_test.go:32: current receipt=true want false
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/null
+    retention_versions_test.go:32: current receipt=true want false
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/maximum
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/oversize
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-control
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-printable
+--- FAIL: TestRetentionCurrentAuditRequiresImmutableVersions (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/original (0.00s)
+    --- FAIL: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/empty (0.00s)
+    --- FAIL: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/null (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/maximum (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/oversize (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-control (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-printable (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/original (0.00s)
+    --- FAIL: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/empty (0.00s)
+    --- FAIL: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/null (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/maximum (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/oversize (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-control (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-printable (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.006s
+FAIL

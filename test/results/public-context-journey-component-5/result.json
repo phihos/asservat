@@ -1,0 +1,78 @@
+{
+  "runnerSHA256": "699dc547b6ba0a1b6b67150f6bbb1998dfe3cbea60184431fef23c22d3ecf953",
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "pid": 1113382,
+      "processGroup": 1113382,
+      "exit": 0,
+      "seconds": 8.607,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "pid": 1113604,
+      "processGroup": 1113604,
+      "exit": 0,
+      "seconds": 2.002,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    }
+  ],
+  "sourceCount": 3063,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "passed",
+  "reviewedPayloads": {
+    "scripts/test-context-storage.py": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "scripts/test-regional-context-selection.py": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "test/integration/api_execution_native_test.go": "0320e0ee88fe9af3e2cc7d3e16a5afa36f4f980de468f303641bb41a12eba7db",
+    "test/integration/capture_admission_test.go": "c16f5c1a0addbf5230d8e8b5e5a71e5b23ab865eda46f417e30c2a72181de2d5",
+    "test/integration/context_continuation_native_test.go": "93cee050d9f8954f7ec0fa35ca94c127ee66a31d38d80d307584ec3f96213383",
+    "test/integration/context_native_content_test.go": "2f93b3ce9868bd620ac8830d2ea812b9df1414cb92330badc6b541a0a9cba405",
+    "test/integration/public_context_journey_native_test.go": "3415d9209e216fc1feb96660476f912b257d527b81d582af976ccfa1d3e6e276",
+    "test/integration/public_context_journey_test.go": "1ded4db47f6418579296f7f201b155dfbb8a3fa4a0aeb8de863017ae906b4680",
+    "test/integration/worker_enrollment_helpers_test.go": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68",
+    "test/integration/retention_effect_fixture_test.go": "bba253cdfa3a5c55750eb83ff8a756be4f5912dcba223d420b70be7bab1ff021"
+  },
+  "selections": {},
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "9cfa9bf3a695d96db841d8c281a4b913140f4e87102872fdd5a2fe0b29c1452c",
+    "runner.py": "699dc547b6ba0a1b6b67150f6bbb1998dfe3cbea60184431fef23c22d3ecf953",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payloads/scripts/test-context-storage.py.txt": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "payloads/scripts/test-regional-context-selection.py.txt": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "payloads/test/integration/api_execution_native_test.go.txt": "0320e0ee88fe9af3e2cc7d3e16a5afa36f4f980de468f303641bb41a12eba7db",
+    "payloads/test/integration/capture_admission_test.go.txt": "c16f5c1a0addbf5230d8e8b5e5a71e5b23ab865eda46f417e30c2a72181de2d5",
+    "payloads/test/integration/context_continuation_native_test.go.txt": "93cee050d9f8954f7ec0fa35ca94c127ee66a31d38d80d307584ec3f96213383",
+    "payloads/test/integration/context_native_content_test.go.txt": "2f93b3ce9868bd620ac8830d2ea812b9df1414cb92330badc6b541a0a9cba405",
+    "payloads/test/integration/public_context_journey_native_test.go.txt": "3415d9209e216fc1feb96660476f912b257d527b81d582af976ccfa1d3e6e276",
+    "payloads/test/integration/public_context_journey_test.go.txt": "1ded4db47f6418579296f7f201b155dfbb8a3fa4a0aeb8de863017ae906b4680",
+    "payloads/test/integration/worker_enrollment_helpers_test.go.txt": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68",
+    "payloads/test/integration/retention_effect_fixture_test.go.txt": "bba253cdfa3a5c55750eb83ff8a756be4f5912dcba223d420b70be7bab1ff021"
+  }
+}

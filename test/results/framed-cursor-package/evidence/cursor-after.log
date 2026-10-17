@@ -1,0 +1,6 @@
+# asservat.local/asservat/internal/domain/artifact [asservat.local/asservat/internal/domain/artifact.test]
+../../.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/domain/artifact/framed_read_work_test.go:35:55: cannot use MaxFrames (constant 131072 of type int) as int64 value in struct literal
+../../.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/domain/artifact/framed_read_work_test.go:35:66: cannot use MaxPages (constant 512 of type int) as int64 value in struct literal
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	1.616s
+FAIL	asservat.local/asservat/internal/domain/artifact [build failed]
+FAIL

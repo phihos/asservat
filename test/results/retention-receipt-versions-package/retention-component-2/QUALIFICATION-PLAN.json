@@ -1,0 +1,50 @@
+{
+  "status": "source-only; unrun",
+  "schema_head": "parent supplies guarded currentSchemaVersion 56 -> 57 separately; not staged here",
+  "limits": {
+    "GOMAXPROCS": 2,
+    "go_parallelism": 2,
+    "no_native_parallelism": true,
+    "no_live_generation": true
+  },
+  "generator": "pinned sqlc v1.31.1 in isolated mirror",
+  "expected_generated_delta": [
+    "internal/adapters/postgres/custodydb/retention_sources.sql.go"
+  ],
+  "before": {
+    "overlay": [
+      "internal/domain/audit/retention_versions_test.go"
+    ],
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-p",
+      "2",
+      "./internal/domain/audit",
+      "-run",
+      "^TestRetentionCurrentAuditRequiresImmutableVersions$"
+    ],
+    "expected_failing_subtests": [
+      "checkpoint/empty",
+      "checkpoint/null",
+      "lifecycle/empty",
+      "lifecycle/null"
+    ]
+  },
+  "affected_packages": [
+    "./internal/domain/audit",
+    "./internal/application/configuration",
+    "./internal/application/privacy",
+    "./internal/adapters/postgres",
+    "./internal/adapters/objectstore",
+    "./test/integration"
+  ],
+  "native_top_level": [
+    "TestRetentionReceiptPredicatesWithRealPostgres",
+    "TestContextAdmissionWithRealServices",
+    "TestRetentionWithRealKubernetes"
+  ],
+  "component_cannot_claim": "SQL parser/planner or current native receipt qualification; no backend or installed runtime enablement"
+}

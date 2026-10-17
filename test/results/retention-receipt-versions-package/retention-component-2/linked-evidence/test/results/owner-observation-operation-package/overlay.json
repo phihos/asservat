@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_observation_operation.go": "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/files/internal/adapters/kubernetes/owner_observation_operation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_observation_operation_routes.go": "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/files/internal/adapters/kubernetes/owner_observation_operation_routes.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_observation_operation_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/files/internal/adapters/kubernetes/owner_observation_operation_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_workload_guard.go": "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/files/internal/adapters/kubernetes/owner_workload_guard.go"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "freeze": {
+    "manifest.json": "bda759933c97eac3072136e423a3f967cc214a4ff9462d545bb0c75f114960b0",
+    "dependencies.json": "0440c560a28045ab6f9bb3747a8d93eefcb5616bac62fd1ba503b7fcbff50e3d",
+    "overlay.json": "88f39f96dba3dcaf1574006f2b1f2e1dd093077ea48fc03ffe49da4fb3774b88",
+    "run.py": "1a26abe17c572a4770946b28b8553d7162274fecf27bf40db3495a20fba457df"
+  },
+  "dependencies": 1904,
+  "paths": 7,
+  "phases": [
+    {
+      "name": "regression",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/integer-before-3/overlay.json",
+        "-count=1",
+        "-v",
+        "-run=^TestOwnerProviderSetupBindsExactIntegerGeneration$",
+        "./internal/adapters/providerconfig"
+      ],
+      "exit": 1,
+      "seconds": 0.655,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "logSHA256": "fadf064b39e267f99710a8da4a61169596e1303d205d658feaf40d7abc350364"
+    }
+  ],
+  "exit": 1,
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "inventory": [],
+    "freeze": []
+  }
+}

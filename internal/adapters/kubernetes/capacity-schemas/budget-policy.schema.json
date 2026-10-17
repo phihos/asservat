@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/budget-policy.schema.json",
+  "title": "Asservat EvidenceBudgetPolicy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "EvidenceBudgetPolicy"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "poolRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clusterID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "namespaceSelector": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "matchLabels": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 16,
+                  "propertyNames": {
+                    "maxLength": 253
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  }
+                }
+              },
+              "required": [
+                "matchLabels"
+              ]
+            }
+          },
+          "required": [
+            "clusterID",
+            "namespaceSelector"
+          ]
+        },
+        "namespaceEnvelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxWorkloadAccounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxStoredBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "maxObjects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "maxWorkloadAccounts",
+            "maxStoredBytes",
+            "maxObjects"
+          ]
+        },
+        "workload": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "protected": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ]
+            },
+            "hardLimit": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ]
+            },
+            "contextReserve": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ]
+            },
+            "dump": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "burst": {
+                  "const": 1
+                },
+                "minimumIntervalSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400
+                },
+                "maxStartsPerRollingHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "maxInputBytesPerRollingHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "maxProcessesPerEpisode": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64,
+                  "default": 1
+                }
+              },
+              "required": [
+                "burst",
+                "minimumIntervalSeconds",
+                "maxStartsPerRollingHour",
+                "maxInputBytesPerRollingHour"
+              ]
+            },
+            "maxConcurrentExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueuedExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueueAgeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            },
+            "upload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bytesPerSecond": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "burstBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                }
+              },
+              "required": [
+                "bytesPerSecond",
+                "burstBytes"
+              ]
+            },
+            "maxUploadRequestsPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maxSpoolBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "onFull": {
+              "enum": [
+                "RejectNewExpensive",
+                "DeleteOldestEligibleInAccount"
+              ]
+            }
+          },
+          "required": [
+            "protected",
+            "hardLimit",
+            "contextReserve",
+            "dump",
+            "maxConcurrentExpensive",
+            "maxQueuedExpensive",
+            "maxQueueAgeSeconds",
+            "upload",
+            "maxUploadRequestsPerSecond",
+            "maxSpoolBytes",
+            "onFull"
+          ]
+        },
+        "node": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxConcurrentExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueuedExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "upload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bytesPerSecond": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "burstBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                }
+              },
+              "required": [
+                "bytesPerSecond",
+                "burstBytes"
+              ]
+            },
+            "maxSpoolBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "impactProfileRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "unhealthySamples": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "sampleIntervalSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "recoveryHealthySeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            }
+          },
+          "required": [
+            "maxConcurrentExpensive",
+            "maxQueuedExpensive",
+            "upload",
+            "maxSpoolBytes",
+            "impactProfileRef",
+            "unhealthySamples",
+            "sampleIntervalSeconds",
+            "recoveryHealthySeconds"
+          ]
+        }
+      },
+      "required": [
+        "poolRef",
+        "scope",
+        "namespaceEnvelope",
+        "workload",
+        "node"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

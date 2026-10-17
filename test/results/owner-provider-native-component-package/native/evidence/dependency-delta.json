@@ -1,0 +1,76 @@
+{
+  "changed": [
+    {
+      "path": "internal/bootstrap/initial_runtime_configuration.go",
+      "before": "4857c79b1ddede4e8b4b81ab90d5b42d3a2ea9ce7327d7025fde1aee042f632a",
+      "after": "b5f9c5732a9dc3f95e20f5be2dc5cc0816f2d09b6282e777e6d4571cc9352bde"
+    }
+  ],
+  "added": [
+    {
+      "path": "internal/adapters/kms/owner_provider_control.go",
+      "sha256": "ba947130f6bcc39b4b3896f130b8e002fc33edbb5da052a5e536fc4ed66ad30f"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_control_test.go",
+      "sha256": "3502062c7228a82c4a844b695a002e839af5825249b430acc4794828968e04b0"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_control_validation.go",
+      "sha256": "11cecdd7bfc72aa59eaf67178ee8f72673890dbc908bae9c12137e2737f1f1ac"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lease.go",
+      "sha256": "a320c8c9df1f1a3fb5dfd861063a378ad718b6058586618c4cc739bd199d817d"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lease_test.go",
+      "sha256": "8a9fb7cf4920e9fc314c11e7a06a9497e702ba598178ceb21534e6e9044ab8ee"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_hub.go",
+      "sha256": "dbe9ecc1f2b6bdd25e94db71a97de2ed4d23491c51b214ea8872f254bb423b36"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_hub_test.go",
+      "sha256": "bc3b84eec3867661d3a33e577dcb0aa216d89934e44b29a87a49d00c80f6e7d8"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_registry.go",
+      "sha256": "32769e8099a449b896cc82212c68037f494a3a5d026d23c7650dfe065cf7436a"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_registry_test.go",
+      "sha256": "24a037652167f6ed42901b51c0f7cfd735c7ebadd8e8899481b5014a44675b81"
+    },
+    {
+      "path": "internal/application/fleet/connector_observation_registry.go",
+      "sha256": "b6fc35f8faccc919e9044b37358798156c0dc05f0e72bd88f385e20f1c1b80cd"
+    },
+    {
+      "path": "internal/bootstrap/initial_runtime_configuration_probe_test.go",
+      "sha256": "85fe655fe15381afb8b9749bd1a2453fe55414e8a69c5fae3b9b4658fa232646"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_handler.go",
+      "sha256": "86563cbbf13646f3cb7b3a02e06f59d903e388f25400ecd8ae2418ec468a5d5e"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_handler_test.go",
+      "sha256": "2d723fd046959fbd50471bf1a27f16b2211ff22a4e7e9771ef044b428c60606c"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_holder.go",
+      "sha256": "9fea78d1020ec126d067bc5d18558c7c67b950d342a66fb0d7529aae88284bf2"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_holder_test.go",
+      "sha256": "18a200ccc675b24c45d90c3e79bdc186886cfc196cb10194bbae1fe72cf184cf"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_stream.go",
+      "sha256": "138ec56fabd34aaa4cb7134b89012502721be1eb25dc517bf590140bf9ddf8a7"
+    }
+  ],
+  "qualification": "Parent integrated19paths; native-auth-1 remains immutable unrun source only. Five control files verified exact control-lease-1 payloads."
+}

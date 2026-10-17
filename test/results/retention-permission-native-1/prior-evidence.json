@@ -1,0 +1,19 @@
+{
+  "scope": "first three actual terminal successful phases; wrong harness fourth phase remains failed",
+  "hashes": {
+    "bootstrap-fleet/fleet-environment.json": "e3e55469b0a8d250a66a68d96b53ceb69f2863a2f32e35d2d736dad4f0841596",
+    "bootstrap-fleet/fleet.log": "ce39279222af7dd55c9e0ae67c840ded4351fac652f80df69dcdb82d6f191291",
+    "bootstrap-fleet/harness.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+    "bootstrap-fleet/result.json": "08c4c20a44a922e1dd48c47303120826bad1f066372c2598e4a18983a58a940c",
+    "current-history-effects-catchup/custody-environment.json": "9b5ed849eb6101fae5304e2ddbe44ceef8869b9c1d4ddf78cdda1c780f1f7a5f",
+    "current-history-effects-catchup/custody.log": "0842dfacbaf403c73127de9bbdf10da11432e929a99271afa93c8604535c0f7d",
+    "current-history-effects-catchup/harness.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "current-history-effects-catchup/result.json": "e099677ec0c9f6e39445868e6ab0cfe123049e813433f5bb27a1a1301db3b609",
+    "predicates-planner-backfill/custody-environment.json": "ae16af4eca69543cbb24dae60dddf9852d28d74570e50c13889e232136be6d1e",
+    "predicates-planner-backfill/custody.log": "f88c615fab2334b6dfdea5793e682fd6cef5d68ce6bf3ca68148ff259cbf2856",
+    "predicates-planner-backfill/harness.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "predicates-planner-backfill/result.json": "30430c40d86f5e5bbf8c04955433377d9c13fc4f0572a1c2233c1a63ea3412e2",
+    "result.json": "241353788b0d6471ce95267b9dcc946955dd0b76231a3a7a275ebca90dd5ff43",
+    "sources.json": "de5620bb6b285fe09a61a68f446a9c33a6d8506d4509686c252f4ab57123becc"
+  }
+}

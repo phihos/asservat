@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-5",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "First end-to-end phase 1 in product code: the continuation published the worker2 artifact; the actual installer-provider-apply created the two exact ACL policies and auth roles plus the inspection policy and wrote the inbox; the continuation consumed it, opened the provider inspection and filled the original empty audit Secret. It then stopped at worker/roles (unavailable). Run 6 splits that step and adds a denied class.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

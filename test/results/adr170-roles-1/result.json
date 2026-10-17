@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--initial-installation"
+  ],
+  "exit": 0,
+  "seconds": 90.278,
+  "requiredPassed": [
+    "TestInitialInstallationWithRealServices",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-held-lock",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock"
+  ],
+  "passedCount": 87,
+  "missing": [],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "passed"
+}

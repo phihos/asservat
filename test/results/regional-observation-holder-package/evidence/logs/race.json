@@ -1,0 +1,36 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^Test(Hub(ConnectorObservation|Observation)|ConnectorObservation(Registry|Stream|Hello|Channel)|RegionalObservationExchange|ClusterObservationOrder)",
+    "-v",
+    "./internal/application/fleet",
+    "./internal/adapters/postgres",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation"
+  ],
+  "exit": 0,
+  "seconds": 13.681,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

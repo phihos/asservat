@@ -1,0 +1,187 @@
+{"phase": "compile", "pid": 2086959, "started": 1791876322.1080797}
+{"name": "compile", "command": ["go", "test", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json", "-run=^$", "-count=1", "./internal/adapters/kubernetes", "./internal/adapters/postgres", "./internal/bootstrap", "./test/integration"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 21.09615683555603, "log_sha256": "f7e5cf33b466aa410c3cb830761c0385f008625bcfce22a8c080d0913bd21c40", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "prior_evidence": []}, "pass_entries": 0, "missing_required_passes": []}
+{"phase": "owner-projection-race", "pid": 2087677, "started": 1791876343.595919}
+{"name": "owner-projection-race", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json", "-count=1", "-timeout=180s", "-v", "./internal/adapters/kubernetes", "-run=^(TestOwnerIdentityOperation|TestOwnerProjectionOperation|TestProviderOwnerOperation|TestProviderOwnerProjectionOperation|TestProviderOwnerInstallation|TestProviderOwnerAcceptedObservation|TestOwnerIdentityProducer|TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput)"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 132.93229866027832, "log_sha256": "c3b65772184735ab82adeedecde70d37a35239420613a82036972b15eac779e9", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "prior_evidence": []}, "pass_entries": 48, "missing_required_passes": []}
+{"phase": "owner-operation-sql-race", "pid": 2099704, "started": 1791876476.6501424}
+{"name": "owner-operation-sql-race", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json", "-count=1", "-timeout=30s", "-v", "./internal/adapters/postgres", "-run=^TestOwnerIdentityOperationSQL"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 15.317060470581055, "log_sha256": "6dce603fea5d320c0e5b1a9ae478e096648f36e368a02d58f9a7a7cac4d79f40", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "prior_evidence": []}, "pass_entries": 5, "missing_required_passes": []}
+{"phase": "vet", "pid": 2103386, "started": 1791876492.077795}
+{"name": "vet", "command": ["go", "vet", "-overlay", "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json", "./internal/adapters/kubernetes", "./internal/adapters/postgres", "./internal/bootstrap"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 3.5191972255706787, "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "prior_evidence": []}, "pass_entries": 0, "missing_required_passes": []}
+{"phase": "go-architecture", "pid": 2103617, "started": 1791876495.7042813}
+{"name": "go-architecture", "command": ["python3", "scripts/check-go-architecture.py"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 1.365513801574707, "log_sha256": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "prior_evidence": []}, "pass_entries": 0, "missing_required_passes": []}
+{
+  "manifest": "cd174c056a308586ca21e1e770cca69675e3ae00ace77bf234b9a1f4b33876b1",
+  "dependencies": "0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38",
+  "runner": "5f1527f9dee42a19a24bf6c6196eb9ea410fbf21beae8ef77fbf110eaf982cd2",
+  "started": 1791876322.0007894,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 21.09615683555603,
+      "log_sha256": "f7e5cf33b466aa410c3cb830761c0385f008625bcfce22a8c080d0913bd21c40",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "owner-projection-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^(TestOwnerIdentityOperation|TestOwnerProjectionOperation|TestProviderOwnerOperation|TestProviderOwnerProjectionOperation|TestProviderOwnerInstallation|TestProviderOwnerAcceptedObservation|TestOwnerIdentityProducer|TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 132.93229866027832,
+      "log_sha256": "c3b65772184735ab82adeedecde70d37a35239420613a82036972b15eac779e9",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 48,
+      "missing_required_passes": []
+    },
+    {
+      "name": "owner-operation-sql-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json",
+        "-count=1",
+        "-timeout=30s",
+        "-v",
+        "./internal/adapters/postgres",
+        "-run=^TestOwnerIdentityOperationSQL"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 15.317060470581055,
+      "log_sha256": "6dce603fea5d320c0e5b1a9ae478e096648f36e368a02d58f9a7a7cac4d79f40",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 5,
+      "missing_required_passes": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-2/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 3.5191972255706787,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "python3",
+        "scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.365513801574707,
+      "log_sha256": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior_evidence": []
+      },
+      "pass_entries": 0,
+      "missing_required_passes": []
+    }
+  ],
+  "native": false,
+  "prior_evidence": {
+    "scope": "Preserved original failing-before and failed fixture run; no production changes in corrected overlay. Prior meaningful before is not rerun.",
+    "files": {
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/manifest.json": "b6395b9767b9430258b039c92be8604f67b7587ead33fcbe82a3425025c8f9fa",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/dependencies.json": "215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/result.json": "8456638d1c519e7359710907581d0837e1aa6ca1bb3048182b78b64943599aa1",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/before-manifest.json": "dcb8b4a0df556c081c219a3f4d4279f14095c13ec0d8d75f8bf4a409511fba87",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/evidence/controlled-before.log": "456372a27ebe6e7dda7db35c8dbc6cb1106878b1b505ed890c7d0c4609ffaab7",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/evidence/owner-projection-race.log": "3066de1bf2d405a258804faecc473458ee871d878328232e1970387697d4f8b2",
+      "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/HANDOFF.md": "c6ff6da36587dd26f49f35ecb0f3b01f515943efa3939eab598f6e33e4fc18d7"
+    }
+  },
+  "tmpdir": "/tmp/asservat-owner-projection-2-48of4cqk",
+  "tmpdir_free_before": 8922894336,
+  "exit": 0,
+  "ended": 1791876497.1237118,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": []
+  },
+  "tmpdir_removed": true
+}

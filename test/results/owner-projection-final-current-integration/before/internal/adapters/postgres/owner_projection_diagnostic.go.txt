@@ -1,0 +1,83 @@
+package postgres
+
+// OwnerProjectionSQLCheck is a closed diagnostic for the actual deciding
+// statement or existing compound predicate. It is never authority or SQL data.
+type OwnerProjectionSQLCheck uint8
+
+const (
+	ownerProjectionSQLUnknown OwnerProjectionSQLCheck = iota
+
+	ownerProjectionSQLEntry
+	ownerProjectionSQLLifetime
+	ownerProjectionSQLAdmitted
+	ownerProjectionSQLBegin
+	ownerProjectionSQLFleetLock
+	ownerProjectionSQLInstallationLock
+	ownerProjectionSQLCurrentBeforeNative
+	ownerProjectionSQLCurrentNative
+	ownerProjectionSQLCurrentDeadline
+	ownerProjectionSQLRoleMaterial
+	ownerProjectionSQLRoleProvenance
+	ownerProjectionSQLRoleVerification
+	ownerProjectionSQLCurrentBeforeEffect
+	ownerProjectionSQLApply
+	ownerProjectionSQLFinalNative
+	ownerProjectionSQLCurrentAfterFinal
+	ownerProjectionSQLCommit
+	ownerProjectionSQLResult
+)
+
+func (c OwnerProjectionSQLCheck) String() string {
+	switch c {
+
+	case ownerProjectionSQLEntry:
+		return "entry"
+	case ownerProjectionSQLLifetime:
+		return "lifetime"
+	case ownerProjectionSQLAdmitted:
+		return "admitted"
+	case ownerProjectionSQLBegin:
+		return "begin"
+	case ownerProjectionSQLFleetLock:
+		return "fleet-lock"
+	case ownerProjectionSQLInstallationLock:
+		return "installation-lock"
+	case ownerProjectionSQLCurrentBeforeNative:
+		return "current-before-native"
+	case ownerProjectionSQLCurrentNative:
+		return "current-native"
+	case ownerProjectionSQLCurrentDeadline:
+		return "current-deadline"
+	case ownerProjectionSQLRoleMaterial:
+		return "role-material"
+	case ownerProjectionSQLRoleProvenance:
+		return "role-provenance"
+	case ownerProjectionSQLRoleVerification:
+		return "role-verification"
+	case ownerProjectionSQLCurrentBeforeEffect:
+		return "current-before-effect"
+	case ownerProjectionSQLApply:
+		return "apply"
+	case ownerProjectionSQLFinalNative:
+		return "final-native"
+	case ownerProjectionSQLCurrentAfterFinal:
+		return "current-after-final"
+	case ownerProjectionSQLCommit:
+		return "commit"
+	case ownerProjectionSQLResult:
+		return "result"
+	default:
+		return "unknown"
+	}
+}
+
+type OwnerProjectionSQLFailure struct {
+	check OwnerProjectionSQLCheck
+	cause error
+}
+
+func (e *OwnerProjectionSQLFailure) Check() OwnerProjectionSQLCheck { return e.check }
+func (e *OwnerProjectionSQLFailure) Error() string {
+	return "owner projection SQL: " + e.check.String()
+}
+func (e *OwnerProjectionSQLFailure) Unwrap() error { return e.cause }

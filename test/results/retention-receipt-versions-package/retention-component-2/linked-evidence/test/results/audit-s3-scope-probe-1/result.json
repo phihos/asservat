@@ -1,0 +1,213 @@
+{
+  "scope": "Owned synthetic S3 policy diagnostics only; private HTTP, no TLS, product runtime, durable storage or installation authority qualification",
+  "image": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "name": "asservat-audit-scope-7d09d6e497cd",
+  "prefix": "hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/",
+  "observations": [
+    {
+      "name": "create-bucket",
+      "actor": "admin",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "conditional-create-baseline",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": "*",
+      "status": 200,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "conditional-conflict-baseline",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": "*",
+      "status": 412,
+      "errorCode": "PreconditionFailed",
+      "bodySHA256": "2b7b905b2f259231aa7e9f22bd47720ba78a4ddecf4f56955d0f11330909bc20",
+      "bodyBytes": 439
+    },
+    {
+      "name": "scoped-read-baseline",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "errorCode": null,
+      "bodySHA256": "21d8d8622c5c570b6d6c8730d5c5f75df3212fa242311abcba05ecaa1049e646",
+      "bodyBytes": 45
+    },
+    {
+      "name": "foreign-write-baseline",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/foreign/new",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "7079c7ec8a161c75f4d1dfc091c14589ef2b71539c025fd6a51a121f47f5dcaf",
+      "bodyBytes": 270
+    },
+    {
+      "name": "anonymous-read",
+      "actor": "anonymous",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "e3ce806b87a8091c1569175aca1d0afb95b3dc785403efaa29e89a3b154289ff",
+      "bodyBytes": 386
+    },
+    {
+      "name": "install-conditional-policy",
+      "actor": "admin",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {
+        "policy": ""
+      },
+      "conditional": null,
+      "status": 204,
+      "errorCode": null,
+      "bodySHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodyBytes": 0
+    },
+    {
+      "name": "conditional-create-with-required-policy",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/new",
+      "query": {},
+      "conditional": "*",
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "b0003a28f4389050fe38fefbe1461d9bd0be654d6e77e8242f8544f42fa7fe36",
+      "bodyBytes": 376
+    },
+    {
+      "name": "unconditional-create-denied",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/missing",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "3cd5183ca3abebcaca261adaacea400a7ffd76180adb067c5c3c99b912978993",
+      "bodyBytes": 384
+    },
+    {
+      "name": "unconditional-overwrite-denied",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "11b745d0457872e65bd04eec203f1a1e228ce5d2720131e0a0a0669a166d66c1",
+      "bodyBytes": 386
+    },
+    {
+      "name": "conditional-overwrite-denied",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": "*",
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "7f879960962e9b0e33607ba24077864039e5043487c42063cfe03cb266236396",
+      "bodyBytes": 386
+    },
+    {
+      "name": "runtime-delete-denied",
+      "actor": "writer",
+      "method": "DELETE",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "2c67fa91df2f2eb95548446fc7d19d2b00fdbb190e8494636c5ba5fe9cdca730",
+      "bodyBytes": 386
+    },
+    {
+      "name": "foreign-read-denied",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/foreign/new",
+      "query": {},
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "de6a2126060fa126a97fd3a8edb8d266024bd859c6537b3eefd24c3e7e695200",
+      "bodyBytes": 270
+    },
+    {
+      "name": "runtime-policy-write-denied",
+      "actor": "writer",
+      "method": "PUT",
+      "path": "/synthetic-audit",
+      "query": {
+        "policy": ""
+      },
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "9e3c8847ceff3037a496ee812911bb3096c4763506bee2aea7d313674f0c93fc",
+      "bodyBytes": 236
+    },
+    {
+      "name": "runtime-policy-delete-denied",
+      "actor": "writer",
+      "method": "DELETE",
+      "path": "/synthetic-audit",
+      "query": {
+        "policy": ""
+      },
+      "conditional": null,
+      "status": 403,
+      "errorCode": "AccessDenied",
+      "bodySHA256": "f911d195e3a000e53a576ed9da13de42990723d612de6b6ceb2b5cf6838e950c",
+      "bodyBytes": 236
+    },
+    {
+      "name": "original-record-readable",
+      "actor": "writer",
+      "method": "GET",
+      "path": "/synthetic-audit/hub-owner-enrollment/v1/4234588f-c91d-4f1d-9d1a-5689bf49e7b6/original",
+      "query": {},
+      "conditional": null,
+      "status": 200,
+      "errorCode": null,
+      "bodySHA256": "21d8d8622c5c570b6d6c8730d5c5f75df3212fa242311abcba05ecaa1049e646",
+      "bodyBytes": 45
+    }
+  ],
+  "cleanupFailures": [],
+  "runnerSHA256": "e8a91964176f5721458f522165b96bd11912f781d6e43995cdf128e9eca6a40e",
+  "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "containerID": "c299898b5d25b31d9d49ee87f090006805611751d7e08281e03f28f78f2ff3ca",
+  "qualificationPassed": false,
+  "completed": true,
+  "exit": 0
+}

@@ -1,0 +1,107 @@
+[
+  {
+    "path": "cmd/asservat/main.go",
+    "checked": null,
+    "current": "4527f65c3a73efaad12b7fb7751dd2c72b4c812219ae1f144c663a6b9ab4dae2"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "checked": "5d0d3ac46766bc65689f2700b51ee007403f25e4655b5d320a8a597e175fc2de",
+    "current": "0ea446dd15a86a87395f06c6e5bd8972f36861f0c27409a32977aae2f1fb9707"
+  },
+  {
+    "path": "test/results/custody-environment.json",
+    "checked": "305baec1e5e7b922bd42bc2f494a1454a13ef5001ca824961acb901f925e2e4f",
+    "current": "ba8a735ce42002d1da0e916ae0dc92216d7728649256e57954638dee05d44e78"
+  },
+  {
+    "path": "test/results/native-fixture-source-renewal/corrected-identity-observation.json",
+    "checked": null,
+    "current": "db39ffe900186a75839e38fb0a0a01b44b423f2067d0a8e884918548ae9dc487"
+  },
+  {
+    "path": "test/results/native-fixture-source-renewal/hashes.json",
+    "checked": null,
+    "current": "81e92bea04ae89b8ed0eb64af6ffc6860a289e9973da5aee1b7f3f3ca962604f"
+  },
+  {
+    "path": "test/results/native-interrupted-renewed-source-owners-environment.json",
+    "checked": null,
+    "current": "d04fc7d0e92b9180d4430f304c8afe6926dbbce107df41dbb85475eb2c57a88d"
+  },
+  {
+    "path": "test/results/native-interrupted-supervised-original-scheduling-environment.json",
+    "checked": null,
+    "current": "ba8a735ce42002d1da0e916ae0dc92216d7728649256e57954638dee05d44e78"
+  },
+  {
+    "path": "test/results/native-interrupted-supervised-sources-environment.json",
+    "checked": null,
+    "current": "0ac1824168c0acc625a90166afe3e1f2e66d28f78bc46896128490d8bc4c5479"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-integration.json",
+    "checked": null,
+    "current": "72c4d0af39c2b433828898aca7a64b79e0fcf324bd9388fea7d791d4ae1cb40e"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/PACKAGE-HASHES.json",
+    "checked": null,
+    "current": "7d21531fbcdd084856ef9031f281578a8e90a58232cc103f53d8e73b4de8745b"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/bases.json",
+    "checked": null,
+    "current": "670db4c247b88aa12bbf7fd87a4e93f7bc8ab0081a7197bf8b3867ccdeb23193"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/dependencies.json",
+    "checked": null,
+    "current": "cb52820069dc1e02eb52eba67d17dffcebdd64aca075b200e4f89250b6c2bd03"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/evidence/after.json",
+    "checked": null,
+    "current": "b6f2afc8a1a839203b42c40b009c3f291ca63232dcc785385d73114938bd81cc"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/evidence/before.json",
+    "checked": null,
+    "current": "8a45e436c859a15e9bb3f5644d683fede1ee67c6cb098555ec714cc5f282ba48"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/evidence/fixture-compile.json",
+    "checked": null,
+    "current": "bac796ec90da82519906be895dca00b52c17605d654dd485510670322330759e"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/evidence/vet.json",
+    "checked": null,
+    "current": "aad5f5e34f3e9b08e33aacfc22db3ad815f392d6e533c6399d97a4526d5d1e03"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/manifest.json",
+    "checked": null,
+    "current": "23cf24e389537aaa2e7cdf212984c84955b9610af8ce1ac35fa16667631c44bf"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/overlay-after.json",
+    "checked": null,
+    "current": "aee7b092888a9b537f7b4fd4a9441fe1018ebc98efd653f09bb03eea065a8f38"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/overlay-before.json",
+    "checked": null,
+    "current": "4e5cab5da82025f9099582175a8753d4cb87079d5191932aa0abade0c394346c"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-package/payload-hashes.json",
+    "checked": null,
+    "current": "8a6000f3d3c38876dbf1251a154f1a7d0547257bcd9649456a87d381ae33ef88"
+  },
+  {
+    "path": "test/results/native-joined-scheduling-reversion.json",
+    "checked": null,
+    "current": "46a1ce9d74edbd0c90d0e9b8e983cb5318b80a41613894015252cefab61c4099"
+  }
+]

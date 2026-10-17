@@ -1,0 +1,45 @@
+=== RUN   TestDownloadJobsWithRealKubernetes
+    download_jobs_kube_test.go:190: actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs
+    download_jobs_kube_test.go:410: restricted real Job creation, immutable image/config pins, projected token, exact Pod binding and confirmed termination/foreground cleanup passed; compiled credential-phase executable and OpenBao-issued process credential; dispatch authority/registry and issuance audit remain fixture inputs, no native transfer
+--- PASS: TestDownloadJobsWithRealKubernetes (18.36s)
+=== RUN   TestDownloadNativeJobsWithRealKubernetes
+    download_jobs_kube_test.go:190: actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs
+    download_jobs_kube_test.go:327: native worker did not perform two current authenticated idle exchanges: accepted=1 rejected=0
+--- FAIL: TestDownloadNativeJobsWithRealKubernetes (23.97s)
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/healthy-native-request-drain
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-target_namespace
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-root
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-account
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-cluster_role
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-collection
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationPublicInputsWithRealKubernetes/retired-role-cannot-refill
+--- PASS: TestInitialPreparationPublicInputsWithRealKubernetes (57.63s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/healthy-native-request-drain (0.90s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-rolebinding-cannot-refill (0.01s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPublicInputsWithRealKubernetes/retired-role-cannot-refill (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	100.004s
+FAIL

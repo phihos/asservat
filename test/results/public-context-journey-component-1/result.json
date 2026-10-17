@@ -1,0 +1,111 @@
+{
+  "runnerSHA256": "27d2bb51a0faed1dc33c1763a9a030a7165e825cac41926c22c558ba97751bb0",
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "pid": 1029541,
+      "processGroup": 1029541,
+      "exit": 0,
+      "seconds": 9.608,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "selection",
+      "command": [
+        "python3",
+        "scripts/test-regional-context-selection.py"
+      ],
+      "pid": 1029842,
+      "processGroup": 1029842,
+      "exit": 0,
+      "seconds": 0.101,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "pid": 1029844,
+      "processGroup": 1029844,
+      "exit": 0,
+      "seconds": 2.002,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "sql-check",
+        "go-architecture-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "pid": 1029950,
+      "processGroup": 1029950,
+      "exit": 0,
+      "seconds": 10.808,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    }
+  ],
+  "sourceCount": 3063,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "passed",
+  "reviewedPayloads": {
+    "scripts/test-context-storage.py": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "scripts/test-regional-context-selection.py": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "test/integration/api_execution_native_test.go": "b3756deeddbc642ca22ca8e3647ee993414f3cd242689640f4b4c1451c0f312f",
+    "test/integration/capture_admission_test.go": "7033302839376c00e66f558ae0a9f3f59e592679ac56651fe497089178d55a7f",
+    "test/integration/context_continuation_native_test.go": "3f950a3a6e6166b964ab1f6b28277fe90674918ef87c240cfcd631a45e9488f9",
+    "test/integration/context_native_content_test.go": "3c889ecc29908abb60face938b0612ce337b5951cd3c5cdcf74055fb9c00c4a9",
+    "test/integration/public_context_journey_native_test.go": "c56b6d80feb967d3c4a06476dab3094c26155cceff5879bbc7545697af519588",
+    "test/integration/public_context_journey_test.go": "369827357cf4271384f7eb88297613d1d7cb78a0bb3ffead21a6079a8f131963",
+    "test/integration/worker_enrollment_helpers_test.go": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68"
+  },
+  "selections": {},
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "8795a607bd636b1f5b7ba9acda50954eee0b3bf4177692ac30cdff87ac10187e",
+    "runner.py": "27d2bb51a0faed1dc33c1763a9a030a7165e825cac41926c22c558ba97751bb0",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "compile.log": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+    "selection.log": "e6ec182765cd965f2837d8eeaef5a64af48a104f245cd1a0b7281559194c57c1",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "canonical.log": "53fc5ddbe83337e341c88479d7b5504a2d7c48de833d7fd3d2f1ccf7acec47ad",
+    "payloads/scripts/test-context-storage.py.txt": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "payloads/scripts/test-regional-context-selection.py.txt": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "payloads/test/integration/api_execution_native_test.go.txt": "b3756deeddbc642ca22ca8e3647ee993414f3cd242689640f4b4c1451c0f312f",
+    "payloads/test/integration/capture_admission_test.go.txt": "7033302839376c00e66f558ae0a9f3f59e592679ac56651fe497089178d55a7f",
+    "payloads/test/integration/context_continuation_native_test.go.txt": "3f950a3a6e6166b964ab1f6b28277fe90674918ef87c240cfcd631a45e9488f9",
+    "payloads/test/integration/context_native_content_test.go.txt": "3c889ecc29908abb60face938b0612ce337b5951cd3c5cdcf74055fb9c00c4a9",
+    "payloads/test/integration/public_context_journey_native_test.go.txt": "c56b6d80feb967d3c4a06476dab3094c26155cceff5879bbc7545697af519588",
+    "payloads/test/integration/public_context_journey_test.go.txt": "369827357cf4271384f7eb88297613d1d7cb78a0bb3ffead21a6079a8f131963",
+    "payloads/test/integration/worker_enrollment_helpers_test.go.txt": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68"
+  }
+}

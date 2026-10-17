@@ -1,0 +1,15 @@
+{
+  "before": {
+    "chunk": "7887e1",
+    "exit": 1,
+    "expected_failure": true
+  },
+  "after_race": {
+    "handle": 27203,
+    "exit": 0
+  },
+  "vet": {
+    "chunk": "eadad6",
+    "exit": 0
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/capacity_projection.go",
+    "base_sha256": "8bacf9175c3aa6234862792732a7edfe04aca0ee44671777de2ddc2e80d5f035",
+    "payload_sha256": "43a0482c86eab5cd64469ad5f46c5f787ee7fb7eeda52e2eac06a7e87ddba224"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+    "base_sha256": "22e9bfca2cc230462fd5fa065acb22a6edc249dae4ec5f742417629457894b72",
+    "payload_sha256": "cec7a2e94fd969d4221ab2a61e11cad822e636578dc48d7f8aa1f7fade211b6b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_material.go",
+    "base_sha256": "aee70370baaef8eeee6b8c1d5f8ff1caf74e36181d3a7b7cb7711d672f316bb6",
+    "payload_sha256": "869feff9058dfcf5c849fc2ac421d471a237c451c1314a22d6a36bba6ef7a285"
+  },
+  {
+    "path": "internal/adapters/kubernetes/projection_input_ownership_test.go",
+    "base_sha256": null,
+    "payload_sha256": "b33260ed8327e245f5cc6a1b585476d5984829501b1d92ac2ab853a52fe00d38"
+  }
+]

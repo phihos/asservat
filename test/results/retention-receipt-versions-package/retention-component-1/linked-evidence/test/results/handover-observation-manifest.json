@@ -1,0 +1,23 @@
+{
+  "files": [
+    {
+      "path": "internal/bootstrap/initial_preparer_handover.go",
+      "base_sha256": "9f07fdcf1fe59245385bb7adaca2cb205a135d4f790c2c0b219d855e432b2df0",
+      "sha256": "1351d09d19ca20cc7f72ca4bce342586c46c2ac7b472538f525cbd614beff648",
+      "bytes": 6051
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_handover_observation_test.go",
+      "base_sha256": null,
+      "sha256": "c2239330a626aeb3ecd7f144d95798d03e851275fd1ccecb0f9733c1bd606f3d",
+      "bytes": 6536
+    }
+  ],
+  "evidence": {
+    "before": 1,
+    "output-bound-before": 1,
+    "after-race": 0,
+    "vet": 0
+  },
+  "native_run": false
+}

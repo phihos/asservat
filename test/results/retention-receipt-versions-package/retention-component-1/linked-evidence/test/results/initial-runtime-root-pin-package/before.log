@@ -1,0 +1,5 @@
+--- FAIL: TestInitialRuntimeRootPinOriginalCreationInputAndReplacement (2.16s)
+    initial_runtime_root_pin_test.go:91: completed original creation input rejected permission source identity changed
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	2.205s
+FAIL

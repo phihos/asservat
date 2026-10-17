@@ -1,0 +1,89 @@
+{
+  "format": "asservat-staged-dependencies/v1",
+  "files": [
+    {
+      "path": "go.mod",
+      "sha256": "693025c52045be6507972e5bc0849812a0838371572bac62e9c77fc996119b56"
+    },
+    {
+      "path": "go.sum",
+      "sha256": "3f7f26175604f4e8bcddafaab5854257767787d7ac1915783b4c188c3a160641"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap.go",
+      "sha256": "50f3e6afb4ef8e4a47e095a80db82f38d12004106a35e61e7b40d49ee2d2c03f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_close.go",
+      "sha256": "548b6f5b3931f0b5eabdcceff5b04d4e3a35433a1962a820994762e78802fd05"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_guard.go",
+      "sha256": "83b3399f65776c461f1f991ff673de5d47b05074ac6fa4314cc786a09d66422b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_state.go",
+      "sha256": "cf48fbe24ac39f798082837237a8c50f38e12708dc2847505cd0442042b5b8c0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_observation.go",
+      "sha256": "df1a2675603567cdd17e8b197dce51790f4a392907d953da8ee0e1cf0ad90460"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_passive.go",
+      "sha256": "64c4ea78aaa57a4eeb30779726e06a9dbdae02578872390d145c58cce923dde3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_activation.go",
+      "sha256": "46495f65d7f24c0874bb511815469eae6e28be115f27073d21524d7daf11fddb"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+      "sha256": "430c8d2ceaf1703b6b2c7c5aa74820e869bc94d2cb79ecc093f29112464d39cc"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager.go",
+      "sha256": "bc18bd1058929749f365678e44404f2e817ff63487f52fb7a478b75a19eb4eca"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_schema.go",
+      "sha256": "d2e123ab21a42a298870c5fdb67f922d65e69802f583905d1b5ec243d71c8139"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_files.go",
+      "sha256": "47067525e05f76061d24e14b56a4d8a8e3df86f0aa23ecfb6184fa170b62c94e"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_retire.go",
+      "sha256": "511ed47918a4ffbde516bbc963fe737a8bacdaea803ba8d5e3dec24826cd51d9"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_schema.go",
+      "sha256": "c1e611f1cc3919291e8ba833ce276ebd3ee0439de18b47f4a5bab806207a8db2"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_scratch.go",
+      "sha256": "5219dce6a309e6e2df20d09a33f030ee2bb0eb2d2743ec7cd0fb08d9e22728cf"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_schema.go",
+      "sha256": "b031063736928e80356d3a9b6c4ccfb40b77371b41f964e1f3b5057e53214a55"
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap_copy_closure.go",
+      "sha256": "8f94c6a0bcfdb42618254f92c197d5c25a098ad2ec4433540fbc3cc221fd083b"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_chain_test.go",
+      "sha256": "297903109d3610619b41ce0ef6f08ce7f4ff269b58d9e34541b52ebaab06b424"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_copy_test.go",
+      "sha256": "53a37d82d7ac5989eb71f46068e648c0a9b5be8b98677022939518e36fe1b39d"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_guard_test.go",
+      "sha256": "8902575507d747286e9f3ddc41a900ef106dbb587552cb91c74f9e81b7b9c713"
+    }
+  ]
+}

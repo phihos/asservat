@@ -1,0 +1,147 @@
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/request
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/union
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/future
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced
+--- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/request (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/union (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/future (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced (0.00s)
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret
+--- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.015s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.025s [no tests to run]
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed
+--- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner (0.21s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh (0.06s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked (0.04s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing (0.04s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close (0.05s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed (0.03s)
+=== RUN   TestConnectorObservationChannelRequiresAllProofsAndExactReceipt
+--- PASS: TestConnectorObservationChannelRequiresAllProofsAndExactReceipt (0.08s)
+=== RUN   TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof
+--- PASS: TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof (0.04s)
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close
+--- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases (0.49s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request (0.05s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay (0.05s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay (0.06s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt (0.11s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result (0.06s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close (0.08s)
+=== RUN   TestConnectorObservationChannelCloseJoinsAdmittedMetadata
+--- PASS: TestConnectorObservationChannelCloseJoinsAdmittedMetadata (0.07s)
+=== RUN   TestConnectorObservationChannelPreservesSerializedOriginalInstants
+--- PASS: TestConnectorObservationChannelPreservesSerializedOriginalInstants (0.07s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	2.036s
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload
+--- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose (0.02s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload (0.01s)
+=== RUN   TestClusterObservationApplicationDigestPreservesEmptyAndOrderingSemantics
+--- PASS: TestClusterObservationApplicationDigestPreservesEmptyAndOrderingSemantics (0.00s)
+=== RUN   TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource
+--- PASS: TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource (0.00s)
+=== RUN   TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection
+--- PASS: TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection (0.00s)
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/exact-dns
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/wrong-sni-dns
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/ip-empty-sni
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/ip-wrong-dns-sni
+--- PASS: TestClusterObservationLocalActualSNIAndAuthority (0.05s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/exact-dns (0.02s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/wrong-sni-dns (0.01s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/ip-empty-sni (0.01s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/ip-wrong-dns-sni (0.01s)
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/valid
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-denied
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-replaced-after-read
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-first-shortened
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-target
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-purpose
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-request-digest
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-page
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/remote-unavailable
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/expiry-before-delivery
+--- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection (0.13s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/valid (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-denied (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-replaced-after-read (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-first-shortened (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-target (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-purpose (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-request-digest (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-page (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/remote-unavailable (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/expiry-before-delivery (0.01s)
+=== RUN   TestClusterObservationLocalCancellationJoinsAndRetainsSlot
+--- PASS: TestClusterObservationLocalCancellationJoinsAndRetainsSlot (0.05s)
+=== RUN   TestClusterObservationLocalUnknownPOSTIsNotRetried
+--- PASS: TestClusterObservationLocalUnknownPOSTIsNotRetried (0.01s)
+=== RUN   TestClusterObservationLocalOriginalDeadlineIncludesTokenRead
+--- PASS: TestClusterObservationLocalOriginalDeadlineIncludesTokenRead (0.03s)
+=== RUN   TestClusterObservationChildIntervalsCannotEscapeRelayCap
+--- PASS: TestClusterObservationChildIntervalsCannotEscapeRelayCap (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	1.374s

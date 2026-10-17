@@ -1,0 +1,102 @@
+{
+  "cleanup": {
+    "freeAfter": 16731344896,
+    "removed": true,
+    "scratchCreated": true
+  },
+  "failure": null,
+  "finalHashes": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "integratedComponent": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "nativeQualification": false,
+  "phases": [
+    {
+      "after": {
+        "bases": [],
+        "dependencies": [],
+        "frozen": [],
+        "integratedComponent": [],
+        "liveFileSet": [],
+        "mirror": [],
+        "mirrorFileSet": [],
+        "payloadFileSet": [],
+        "sourceFileSet": []
+      },
+      "before": {
+        "bases": [],
+        "dependencies": [],
+        "frozen": [],
+        "integratedComponent": [],
+        "liveFileSet": [],
+        "mirror": [],
+        "mirrorFileSet": [],
+        "payloadFileSet": [],
+        "sourceFileSet": []
+      },
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-buildvcs=false",
+        "-o",
+        "/tmp/asservat-connector-native-selection-thdzwa_9/observation-native",
+        "test/fixtures/observation-native/data.go",
+        "test/fixtures/observation-native/enrollment.go",
+        "test/fixtures/observation-native/inputs.go",
+        "test/fixtures/observation-native/main.go",
+        "test/fixtures/observation-native/metrics.go",
+        "test/fixtures/observation-native/runtime.go"
+      ],
+      "exit": 0,
+      "phase": "helper-build",
+      "seconds": 10.837
+    },
+    {
+      "after": {
+        "bases": [],
+        "dependencies": [],
+        "frozen": [],
+        "integratedComponent": [],
+        "liveFileSet": [],
+        "mirror": [],
+        "mirrorFileSet": [],
+        "payloadFileSet": [],
+        "sourceFileSet": []
+      },
+      "before": {
+        "bases": [],
+        "dependencies": [],
+        "frozen": [],
+        "integratedComponent": [],
+        "liveFileSet": [],
+        "mirror": [],
+        "mirrorFileSet": [],
+        "payloadFileSet": [],
+        "sourceFileSet": []
+      },
+      "command": [
+        "go",
+        "vet",
+        "test/fixtures/observation-native/data.go",
+        "test/fixtures/observation-native/enrollment.go",
+        "test/fixtures/observation-native/inputs.go",
+        "test/fixtures/observation-native/main.go",
+        "test/fixtures/observation-native/metrics.go",
+        "test/fixtures/observation-native/runtime.go"
+      ],
+      "exit": 0,
+      "phase": "helper-vet",
+      "seconds": 51.548
+    }
+  ],
+  "runtimeSelection": false,
+  "terminal": 0
+}

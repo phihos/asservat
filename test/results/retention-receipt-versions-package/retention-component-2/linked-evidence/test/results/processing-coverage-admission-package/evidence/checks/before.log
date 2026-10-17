@@ -1,0 +1,11 @@
+=== RUN   TestContextProcessingCoveragePrecedesPreviewAndAdmission
+=== RUN   TestContextProcessingCoveragePrecedesPreviewAndAdmission/preview
+    context_processing_test.go:62: known short coverage reached draft/admission <nil>
+=== RUN   TestContextProcessingCoveragePrecedesPreviewAndAdmission/new-admission
+    context_processing_test.go:62: known short coverage reached draft/admission <nil>
+--- FAIL: TestContextProcessingCoveragePrecedesPreviewAndAdmission (0.01s)
+    --- FAIL: TestContextProcessingCoveragePrecedesPreviewAndAdmission/preview (0.00s)
+    --- FAIL: TestContextProcessingCoveragePrecedesPreviewAndAdmission/new-admission (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/capture	0.014s
+FAIL

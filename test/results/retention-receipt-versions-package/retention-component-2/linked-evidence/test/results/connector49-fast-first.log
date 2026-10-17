@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:368: connector client issuance current signing trust unavailable
+--- FAIL: TestContextAdmissionWithRealServices (1.34s)
+    --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast (1.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.387s
+FAIL

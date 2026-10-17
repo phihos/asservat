@@ -1,0 +1,42 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,time
+root=Path('/home/phil/Projekte/asservat')
+stage=Path(__file__).parent
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(stage/'manifest.json')=='7565cecede19242acae26f31aad64a1c5259de72d3065b6330a60e4f54b02ce1'
+assert sha(stage/'dependencies.json')=='9e570d07c2519ea299bdec516d92b0283b16ae837d9a815069185db2194921e5'
+manifest=json.loads((stage/'manifest.json').read_text())
+deps=json.loads((stage/'dependencies.json').read_text())
+def verify():
+ errors=[]
+ for row in manifest['files']:
+  for p,h in [(root/row['path'],row['base_sha256']),(stage/'bases'/row['path'],row['base_sha256']),(stage/'changes'/row['path'],row['payload_sha256'])]:
+   if sha(p)!=h:errors.append(str(p))
+ for p,h in deps.items():
+  if sha(root/p)!=h:errors.append(p)
+ return errors
+out=stage/'check-1';out.mkdir(exist_ok=False);(out/'tmp').mkdir()
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(out/'tmp'))
+for key in list(env):
+ if key.startswith('ASSERVAT_'):env.pop(key)
+result={'started_at':time.time(),'before':verify(),'runner_sha256':sha(Path(__file__)),'phases':[]}
+def phase(name,command,expected,required):
+ started=time.time();log=out/(name+'.log')
+ with log.open('x') as f:p=subprocess.run(command,cwd=root,env=env,stdout=f,stderr=subprocess.STDOUT)
+ (out/(name+'.exit')).write_text(str(p.returncode)+'\n')
+ value={'name':name,'command':command,'exit':p.returncode,'expected':expected,'seconds':time.time()-started,'log_sha256':sha(log)}
+ result['phases'].append(value);print(json.dumps(value),flush=True)
+ if p.returncode!=expected or any(s not in log.read_text() for s in required):raise RuntimeError(name+' did not reach expected verdict')
+try:
+ if result['before']:raise RuntimeError('source drift')
+ phase('before',['go','test','-race','-vet=off','./internal/adapters/kubernetes','-run','^TestPublicRoleProjectionExcludesReconcilerCredentials$','-count=1','-timeout=2m','-v'],1,['--- FAIL: TestPublicRoleProjectionExcludesReconcilerCredentials','invalid permission observation request'])
+ phase('after',['go','test','-race','-vet=off','-overlay',str(stage/'overlay.json'),'./internal/adapters/kubernetes','-run','^TestPublic(Role|Runtime)','-count=1','-timeout=3m','-v'],0,['--- PASS: TestPublicRoleProjectionExcludesReconcilerCredentials','--- PASS: TestPublicRuntimeAllPurposeClaimCompletionKeepsOriginalWorkerProof','--- PASS: TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact','--- PASS: TestPublicRuntimeProjectionUnknownClaimCannotCreate','--- PASS: TestPublicRuntimeProjectionDoesNotUseShortenedOrIncompleteVerification'])
+ phase('vet',['go','vet','-overlay',str(stage/'overlay.json'),'./internal/adapters/kubernetes'],0,[])
+ result['terminal_exit']=0
+except Exception as e:result.update(terminal_exit=1,error=str(e))
+finally:
+ result['after']=verify();result['ended_at']=time.time()
+ if result['after']:result['terminal_exit']=2
+ with (out/'result.json').open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+ print(json.dumps(result),flush=True)
+raise SystemExit(result['terminal_exit'])

@@ -1,0 +1,64 @@
+apiVersion: asservat.io/v1alpha1
+kind: CaptureProfile
+metadata:
+  name: io-arguments-v1
+  namespace: asservat-profiles
+spec:
+  name: io-arguments
+  version: v1
+  definition:
+    displayName: Bounded I/O arguments
+    description: Explicit sensitive argument variant, subject to individual or reviewed
+      policy observation approval.
+    recipe:
+      description: Explicit sensitive argument variant, subject to individual or reviewed
+        policy observation approval.
+      actions:
+      - id: syscalls
+        kind: syscallTrace
+        parameters:
+          processes: allPodProcesses
+          mode: arguments
+          before: 0s
+          after: 10s
+          syscalls:
+            mode: include
+            names:
+            - read
+            - write
+          result: all
+          ring:
+            maxAge: 10s
+            maxBytes: 8388608
+            segmentBytes: 2097152
+            maxSegments: 4
+            medium: memory
+          maxFrozenBytes: 16777216
+          maxConcurrentSnapshots: 1
+          maxEvents: 100000
+          maxEventsPerSecond: 10000
+          maxTrackedThreads: 4096
+          arguments:
+            maxBytesPerEvent: 256
+            captureBuffers: true
+        required: true
+        impact: sensitiveRead
+        limits:
+          maxBytes: 16777216
+          timeout: 20s
+        executionMode: ongoing
+      maxTotalBytes: 16777216
+      maxDuration: 30s
+    editableFields:
+    - actionID: syscalls
+      field: syscallFilter
+      label: Syscall names
+    - actionID: syscalls
+      field: syscallArguments
+      label: Argument and buffer limits
+    - actionID: syscalls
+      field: actionExecutionMode
+      label: When recording starts
+  availability:
+    enabled: true
+    deprecated: false

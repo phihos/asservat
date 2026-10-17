@@ -1,0 +1,98 @@
+{
+  "manifest_sha256": "ce7651df05e24a5532ff8a27f02273c0399dbd4d9f94e6298298740533e3fbee",
+  "dependencies_sha256": "013fec05eaf880ff1dfa1877da0a140d839c6c6eff1891cd367c9eaa4397a99e",
+  "paths": 4,
+  "dependencies": 1906,
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-7/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/providerconfig",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_before_failure": false,
+      "seconds": 18.535,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-7/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestOwnerIdentityProducer",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expected_before_failure": false,
+      "seconds": 36.669,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-7/overlay.json",
+        "./internal/adapters/providerconfig",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_before_failure": false,
+      "seconds": 2.301,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    }
+  ],
+  "terminal_exit": 0,
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

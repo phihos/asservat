@@ -1,0 +1,20 @@
+=== RUN   TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:331: bounded phase=process-constructor elapsed=2.79668332s API_counts=map[GET configmaps:4 GET deployments:6 GET other:14 GET pods:3 GET replicasets:3 GET secrets:1 GET serviceaccounts:2 GET validatingadmissionpolicies:10 GET validatingadmissionpolicybindings:10 POST other:5 POST selfsubjectreviews:6 POST tokenreviews:2 PUT configmaps/dry-run:2 PUT deployments/dry-run:3] API_roundtrip=map[GET configmaps:5.128175ms GET deployments:10.642133ms GET other:14.811619ms GET pods:3.218282ms GET replicasets:3.069842ms GET secrets:1.272818ms GET serviceaccounts:1.920673ms GET validatingadmissionpolicies:10.179579ms GET validatingadmissionpolicybindings:10.46785ms POST other:3.416374ms POST selfsubjectreviews:8.572708ms POST tokenreviews:1.715362ms PUT configmaps/dry-run:2.531597ms PUT deployments/dry-run:6.876526ms]
+    context_start_connector_test.go:338: bounded phase=process-read elapsed=698.064178ms API_counts=map[GET configmaps:1 GET deployments:1 GET other:3 GET pods:1 GET replicasets:1 GET secrets:1 GET serviceaccounts:1 GET validatingadmissionpolicies:2 GET validatingadmissionpolicybindings:2 POST selfsubjectreviews:1] API_roundtrip=map[GET configmaps:892.746µs GET deployments:1.123128ms GET other:2.861449ms GET pods:1.173098ms GET replicasets:956.176µs GET secrets:1.042207ms GET serviceaccounts:1.007437ms GET validatingadmissionpolicies:1.904584ms GET validatingadmissionpolicybindings:1.827163ms POST selfsubjectreviews:879.346µs]
+    context_start_connector_test.go:342: actual guarded Deployment/ReplicaSet/Pod defaults, explicit projected token and independently pinned startup inputs accepted
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/actual-start-status-under-both-guards
+    context_start_connector_test.go:376: admitted capacity TokenRequest permission configuration unavailable
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/capacity-token-admission
+    context_start_connector_test.go:392: exact capacity TokenRequest denied cannot bind token for serviceaccount "capacity" to pod running with different serviceaccount name.
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/changed-input-metadata
+=== NAME  TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:70: bounded actual API classes: counts=map[GET configmaps:6 GET deployments:14 GET other:29 GET pods:7 GET replicasets:7 GET secrets:6 GET serviceaccounts:6 GET validatingadmissionpolicies:21 GET validatingadmissionpolicybindings:21 POST other:9 POST selfsubjectreviews:13 POST serviceaccounts:2 POST tokenreviews:4 PUT configmaps/dry-run:2 PUT deployments/dry-run:7] total_roundtrip=map[GET configmaps:7.022668ms GET deployments:18.281987ms GET other:37.850316ms GET pods:7.412161ms GET replicasets:7.058529ms GET secrets:9.906787ms GET serviceaccounts:5.778109ms GET validatingadmissionpolicies:20.78254ms GET validatingadmissionpolicybindings:26.712292ms POST other:6.239533ms POST selfsubjectreviews:18.275614ms POST serviceaccounts:3.458413ms POST tokenreviews:3.214372ms PUT configmaps/dry-run:2.531597ms PUT deployments/dry-run:15.05654ms]
+--- FAIL: TestConnectorAPIProcessWithRealKubernetes (7.08s)
+    --- PASS: TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial (0.01s)
+    --- FAIL: TestConnectorAPIProcessWithRealKubernetes/actual-start-status-under-both-guards (0.09s)
+    --- FAIL: TestConnectorAPIProcessWithRealKubernetes/capacity-token-admission (0.00s)
+    --- PASS: TestConnectorAPIProcessWithRealKubernetes/changed-input-metadata (0.70s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	7.132s
+FAIL

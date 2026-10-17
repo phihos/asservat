@@ -1,0 +1,12 @@
+{
+  "internal/adapters/kubernetes/connector_observation_operation.go": "602d7427c7f457ca8b3cafcb2c423d5d3aa37867db39ca8ede1dccd9df09c9ba",
+  "internal/adapters/kubernetes/observation_operation_ports.go": null,
+  "internal/adapters/kubernetes/observation_operation_ports_test.go": null,
+  "internal/adapters/kubernetes/owner_observation_operation.go": "a892cb55d909e0f3cb74d0c27201c1022bc877078178a099d23d2e235ffbc875",
+  "internal/adapters/postgres/connector_observation_operation.go": null,
+  "internal/adapters/postgres/connector_observation_operation_test.go": null,
+  "internal/adapters/postgres/connector_registry.go": "5b3e743d3ba7bf94b362e537c6feb271a8b2faa3244b6b2fe9427d80677ca119",
+  "internal/application/fleet/observation_operation.go": null,
+  "internal/domain/fleet/observation_operation.go": null,
+  "internal/domain/fleet/observation_operation_test.go": null
+}

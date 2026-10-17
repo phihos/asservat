@@ -1,0 +1,7 @@
+{
+  "interpretation": "Actual expected trigger reached, but PostgreSQL resolves a.process_id against the outer operation_audit variable first: SQLSTATE 42703, record a has no field process_id. The before runner expected42702 and therefore itself exited1; that actual result is retained, not rewritten into a passing harness. This establishes the same nested alias collision by actual SQL, without backdating process dates.",
+  "function": "guard_connector_identity_profile",
+  "branch": "cleanup UPDATE",
+  "migration51SHA256": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+  "normalization": "Corrected nested alias reverted byte-for-byte to the original full SQL51 function body."
+}

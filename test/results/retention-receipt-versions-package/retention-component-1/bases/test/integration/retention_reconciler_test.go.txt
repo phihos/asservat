@@ -1,0 +1,419 @@
+package integration
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/url"
+	"sync"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/configuration"
+	value "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/privacy"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5/pgxpool"
+	admission "k8s.io/api/admissionregistration/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+)
+
+// Retain timing evidence on failure without adding synchronous log writes to
+// the five-second observation path.
+type tracedRetentionStore struct {
+	app.RetentionCheckpointStore
+	mu    sync.Mutex
+	trace []string
+}
+
+func (s *tracedRetentionStore) record(line string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.trace) == 256 {
+		copy(s.trace, s.trace[1:])
+		s.trace = s.trace[:255]
+	}
+	s.trace = append(s.trace, line)
+}
+
+func (s *tracedRetentionStore) ObserveRetention(ctx context.Context, o app.RetentionObservation) error {
+	started := time.Now()
+	err := s.RetentionCheckpointStore.ObserveRetention(ctx, o)
+	s.record(fmt.Sprintf("observe started=%s rv=%s at=%s until=%s elapsed=%s result=%v", started.UTC().Format(time.RFC3339Nano), o.List.ResourceVersion, o.Protection.ObservedAt.UTC().Format(time.RFC3339Nano), o.Protection.FreshUntil.UTC().Format(time.RFC3339Nano), time.Since(started), err))
+	return err
+}
+
+func (s *tracedRetentionStore) AdvanceRetentionCursor(ctx context.Context, f app.RetentionFence, cursor string) error {
+	started := time.Now()
+	err := s.RetentionCheckpointStore.AdvanceRetentionCursor(ctx, f, cursor)
+	s.record(fmt.Sprintf("bookmark started=%s rv=%s elapsed=%s result=%v", started.UTC().Format(time.RFC3339Nano), cursor, time.Since(started), err))
+	return err
+}
+
+func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *rest.Config, client *kube.PermissionClient, reader *kube.RetentionClient, plan value.RetentionAdministration, writer dynamic.ResourceInterface, dsn, endpoint string) {
+	t.Helper()
+	const cluster = "11111111-1111-4111-8111-111111111111"
+	native, err := kubernetes.NewForConfig(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := rest.CopyConfig(c)
+	config.Impersonate = rest.ImpersonationConfig{UserName: "retention-guard-observer", Groups: []string{"system:authenticated"}}
+	observer, err := kube.NewPermissionClient(config, cluster, plan.ControlNamespace, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config = rest.CopyConfig(c)
+	config.Impersonate = rest.ImpersonationConfig{UserName: "retention-outsider", Groups: []string{"system:authenticated", "retention-fixture"}}
+	probe, err := kube.NewPermissionClient(config, cluster, plan.ControlNamespace, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := native.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, plan.Name, meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, plan.Name, meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := kube.NewRetentionGuard(observer, probe, plan, kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proof, err := guard.RetentionProtection(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := reader.RetentionPolicyList(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash := app.RetentionSnapshotDigest(initial.Snapshot)
+	now := time.Now().UTC()
+	cm, err := native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "retention-bootstrap"}, Data: map[string]string{"format": "asservat-retention-bootstrap/v1", "reviewer": "synthetic-installer", "policiesSHA256": hex.EncodeToString(hash[:]), "protectionSHA256": hex.EncodeToString(proof.Digest[:]), "reviewedAt": now.Format(time.RFC3339Nano), "expiresAt": now.Add(time.Hour).Format(time.RFC3339Nano)}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	role, err := native.RbacV1().Roles(plan.ControlNamespace.Name).Get(ctx, "retention-reader", meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	role.Rules = append(role.Rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{cm.Name}, Verbs: []string{"get"}})
+	if _, err = native.RbacV1().Roles(plan.ControlNamespace.Name).Update(ctx, role, meta.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, actor := range []string{"retention-delegate", "retention-status", "retention-reader"} {
+		config := rest.CopyConfig(c)
+		config.Impersonate = rest.ImpersonationConfig{UserName: actor, Groups: []string{"retention-fixture"}}
+		api, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = api.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Patch(ctx, cm.Name, types.MergePatchType, []byte(`{"data":{"reviewer":"forged"}}`), meta.PatchOptions{}); !apierrors.IsForbidden(err) {
+			t.Fatal("untrusted role altered initial review", actor, err)
+		}
+	}
+	review, err := kube.NewRetentionBootstrapReviewClient(client, cm.Name, string(cm.UID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, tls := pgTLSBridge(t, u.Host)
+	poolFor := func(user, password string) *pgxpool.Pool {
+		t.Helper()
+		pc, err := pgxpool.ParseConfig("postgres://" + user + ":" + password + "@" + address + "/custody_test?sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+		pc.ConnConfig.TLSConfig = tls
+		pc.ConnConfig.Fallbacks = nil
+		pc.MaxConns = 4
+		pool, err := pgxpool.NewWithConfig(ctx, pc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return pool
+	}
+	runtime := poolFor("retention_source_runtime", "synthetic-retention-source")
+	defer runtime.Close()
+	auditPool := poolFor("retention_source_audit_runtime", "synthetic-retention-source-audit")
+	defer auditPool.Close()
+	readPool := poolFor("retention_source_read_runtime", "synthetic-retention-source-read")
+	defer readPool.Close()
+	catchupPool := poolFor("retention_catchup_runtime", "synthetic-retention-catchup")
+	defer catchupPool.Close()
+	root := custodyID()
+	if _, err = admin.Exec(ctx, "INSERT INTO permission_stream(id,epoch,trust_digest,lease_until) VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds')", root, custodyID(), make([]byte, 32)); err != nil {
+		t.Fatal(err)
+	}
+	ledger, err := postgres.NewRetentionSources(ctx, runtime, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditLedger, err := postgres.NewRetentionSources(ctx, auditPool, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridge := tlsBridge(t, endpoint)
+	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+	s3api := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
+	bucket := "retention-source-audit"
+	if _, err = s3api.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
+		t.Fatal(err)
+	}
+	objects, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := make([]byte, 32)
+	if _, err = rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(key)
+	clear(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := authorityTestKeys{aead}
+	publisher := app.RetentionAcceptancePublisher{Journal: auditLedger, Writer: &objectstore.RetentionAcceptanceObjects{Store: objects, Seal: keys, Open: keys}}
+	traced := &tracedRetentionStore{RetentionCheckpointStore: ledger}
+	t.Cleanup(func() {
+		if t.Failed() {
+			traced.mu.Lock()
+			defer traced.mu.Unlock()
+			for _, line := range traced.trace {
+				t.Log(line)
+			}
+		}
+	})
+	r := app.RetentionReconciler{RootID: root, Source: privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: plan.ControlNamespace.UID, Hub: true, ProtectionDigest: proof.Digest}, Reader: reader, Watcher: reader, Protection: guard, Review: review, Store: traced, Now: time.Now, NewID: custodyID}
+	sourceReader, err := postgres.NewRetentionSources(ctx, readPool, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catchup, err := postgres.NewRetention(ctx, catchupPool, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := func() (context.CancelFunc, <-chan error) {
+		child, cancel := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() { done <- r.Run(child) }()
+		return cancel, done
+	}
+	stop := func(cancel context.CancelFunc, done <-chan error) {
+		t.Helper()
+		cancel()
+		select {
+		case err := <-done:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatal("reconciler stopped unexpectedly", err)
+			}
+		case <-time.After(6 * time.Second):
+			t.Fatal("reconciler did not stop")
+		}
+	}
+	wait := func(done <-chan error, sequence int64) {
+		t.Helper()
+		deadline := time.NewTimer(8 * time.Second)
+		defer deadline.Stop()
+		tick := time.NewTicker(25 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			var current int64
+			err := admin.QueryRow(ctx, "SELECT sequence FROM retention_source WHERE root_id=$1", root).Scan(&current)
+			if err == nil && current >= sequence {
+				return
+			}
+			select {
+			case err := <-done:
+				t.Fatal("reconciliation failed", err)
+			case <-deadline.C:
+				t.Fatal("checkpoint timed out")
+			case <-tick.C:
+			}
+		}
+	}
+	waitReady := func(done <-chan error) {
+		t.Helper()
+		deadline := time.NewTimer(12 * time.Second)
+		defer deadline.Stop()
+		tick := time.NewTicker(100 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			if err := publisher.Publish(ctx, 64); err != nil {
+				t.Fatal(err)
+			}
+			page, err := catchup.ReconcileRetentionPage(ctx, r.Source, 16)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.Idle {
+				if got, err := sourceReader.AcceptedRetentionSource(ctx, root, r.Source); err == nil && got.Ready && got.Valid(time.Now()) {
+					return
+				}
+			}
+			select {
+			case err := <-done:
+				t.Fatal("reconciler ended before Ready", err)
+			case <-deadline.C:
+				t.Fatal("complete source did not become Ready")
+			case <-tick.C:
+			}
+		}
+	}
+	cancel, done := start()
+	defer cancel()
+	wait(done, 1)
+	waitReady(done)
+	// Routine unrelated API activity must not make a stable qualified source
+	// oscillate between Ready and Unavailable on each complete-list refresh.
+	steadyUntil := time.Now().Add(30 * time.Second)
+	for time.Now().Before(steadyUntil) {
+		patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"annotations": map[string]string{"test.asservat.io/progress": time.Now().UTC().Format(time.RFC3339Nano)}}})
+		if _, err := native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Patch(ctx, cm.Name, types.MergePatchType, patch, meta.PatchOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := sourceReader.AcceptedRetentionSource(ctx, root, r.Source); err != nil || !got.Valid(time.Now()) {
+			var sequence int64
+			var cursor, floor string
+			var observed, until, lease *time.Time
+			var suspended bool
+			_ = admin.QueryRow(ctx, "SELECT sequence,watch_cursor,list_cursor,observed_at,fresh_until,lease_until,suspended FROM retention_source WHERE root_id=$1", root).Scan(&sequence, &cursor, &floor, &observed, &until, &lease, &suspended)
+			select {
+			case ended := <-done:
+				t.Fatal("source ended during steady observation", ended)
+			default:
+			}
+			t.Fatalf("stable source availability gap: %v; now=%s sequence=%d watch=%s list=%s observed=%v until=%v lease=%v suspended=%v", err, time.Now().UTC(), sequence, cursor, floor, observed, until, lease, suspended)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	qualifyRetentionTopology(t, ctx, native, client, plan.ControlNamespace.Name, root, r.Source)
+	stop(cancel, done)
+	if _, err = sourceReader.AcceptedRetentionSource(ctx, root, r.Source); err == nil {
+		t.Fatal("suspended source remained Ready")
+	}
+	// The review is required once, not on every controller restart.
+	if err = native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Delete(ctx, cm.Name, meta.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	baseline, err := writer.Get(ctx, "baseline", meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, maximum := range []int64{600, 3600} {
+		if err = unstructured.SetNestedField(baseline.Object, maximum, "spec", "maxima", "evidenceSeconds"); err != nil {
+			t.Fatal(err)
+		}
+		baseline, err = writer.Update(ctx, baseline, meta.UpdateOptions{FieldValidation: "Strict"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Preserve an entire temporary rule even though it is absent from both the
+	// pre-restart and post-restart complete lists.
+	spec, _, err := unstructured.NestedMap(baseline.Object, "spec")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec["scope"] = map[string]any{"clusterIDs": []any{cluster}}
+	temporary := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceRetentionPolicy", "metadata": map[string]any{"name": "temporary"}, "spec": spec}}
+	if _, err = writer.Create(ctx, temporary, meta.CreateOptions{FieldValidation: "Strict"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = writer.Delete(ctx, "temporary", meta.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	cancel, done = start()
+	defer cancel()
+	wait(done, 5)
+	waitReady(done)
+	stop(cancel, done)
+	rows, err := admin.Query(ctx, "SELECT transition_json FROM retention_checkpoint WHERE root_id=$1 ORDER BY sequence", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := []int64{}
+	for rows.Next() {
+		var raw []byte
+		var checkpoint app.RetentionTransition
+		if err = rows.Scan(&raw); err != nil || json.Unmarshal(raw, &checkpoint) != nil {
+			t.Fatal("checkpoint decode", err)
+		}
+		for _, p := range checkpoint.List.Snapshot.Policies {
+			if p.Name == "baseline" {
+				limits = append(limits, p.Policy.MaximumSeconds)
+			}
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(limits) != 5 || limits[0] != 3600 || limits[1] != 600 || limits[2] != 3600 {
+		t.Fatal("restart coalesced intermediate shortening", limits)
+	}
+	if err = publisher.Publish(ctx, 64); err != nil {
+		t.Fatal(err)
+	}
+	if pending, err := auditLedger.PendingRetentionAcceptances(ctx, 64); err != nil || len(pending) != 0 {
+		t.Fatal("source audit did not drain", err)
+	}
+	// A current guard failure terminates the source controller; a same-value
+	// restoration with a new binding version needs explicit requalification.
+	cancel, done = start()
+	defer cancel()
+	changed := binding.DeepCopy()
+	changed.Spec.ValidationActions = []admission.ValidationAction{admission.Warn}
+	changed, err = native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(ctx, changed, meta.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		binding.ResourceVersion = changed.ResourceVersion
+		if _, e := native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(context.WithoutCancel(ctx), binding, meta.UpdateOptions{}); e != nil {
+			t.Error(e)
+		}
+	}()
+	select {
+	case err = <-done:
+		if err == nil {
+			t.Fatal("lost guard returned success")
+		}
+	case <-time.After(6 * time.Second):
+		t.Fatal("lost guard kept renewing")
+	}
+}

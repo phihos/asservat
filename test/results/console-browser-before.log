@@ -1,0 +1,60 @@
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/11 17:05:43 http: TLS handshake error from 127.0.0.1:45260: remote error: tls: unknown certificate
+2026/10/11 17:05:43 http: TLS handshake error from 127.0.0.1:45292: remote error: tls: unknown certificate
+    console_test.go:89: console browser test failed: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        ExpectError: expect(locator).toBeVisible() failed
+        
+        Locator: getByText('Your session has expired. Sign in again to continue.')
+        Expected: visible
+        Timeout: 5000ms
+        Error: element(s) not found
+        
+        Call log:
+          - Expect "toBeVisible" getByText('Your session has expired. Sign in again to continue.') with timeout 5000ms
+          - waiting for getByText('Your session has expired. Sign in again to continue.')
+        
+            at captureRawStack (/home/phil/Projekte/asservat/web/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+            at callMatcherAsStep (/home/phil/Projekte/asservat/web/node_modules/playwright/lib/matchers/expect.js:13316:57)
+            at Object.toBeVisible (/home/phil/Projekte/asservat/web/node_modules/playwright/lib/matchers/expect.js:13308:23)
+            at /home/phil/Projekte/asservat/web/scripts/browser-test.mjs:82:88 {
+          matcherResult: {
+            message: 'expect(locator).toBeVisible() failed\n' +
+              '\n' +
+              "Locator: getByText('Your session has expired. Sign in again to continue.')\n" +
+              'Expected: visible\n' +
+              'Timeout: 5000ms\n' +
+              'Error: element(s) not found\n' +
+              '\n' +
+              'Call log:\n' +
+              `  - Expect "toBeVisible" getByText('Your session has expired. Sign in again to continue.') with timeout 5000ms\n` +
+              "  - waiting for getByText('Your session has expired. Sign in again to continue.')\n",
+            pass: false,
+            actual: undefined,
+            name: 'toBeVisible',
+            expected: 'visible',
+            log: [
+              `  - Expect "toBeVisible" getByText('Your session has expired. Sign in again to continue.') with timeout 5000ms`,
+              "  - waiting for getByText('Your session has expired. Sign in again to continue.')"
+            ],
+            timeout: 5000,
+            ariaSnapshot: '- link "Skip to content":\n' +
+              '  - /url: "#main"\n' +
+              '- banner:\n' +
+              '  - link "Asservat":\n' +
+              '    - /url: /\n' +
+              '  - button "Sign out"\n' +
+              '- main:\n' +
+              '  - heading "Workspace unavailable" [level=1]\n' +
+              '  - paragraph: Your sign-in succeeded. The investigation service is not available in this build.'
+          }
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleBrowserWithBuiltPackage (6.31s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.321s
+FAIL

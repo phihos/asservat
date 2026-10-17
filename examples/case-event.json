@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-000000000008",
+  "source": "https://hub.example.invalid/clusters/00000000-0000-4000-8000-000000000001",
+  "type": "io.asservat.case.analysis.completed.v1",
+  "subject": "00000000-0000-4000-8000-000000000002",
+  "time": "2026-10-09T12:00:03Z",
+  "datacontenttype": "application/json",
+  "dataref": "asservat://case/00000000-0000-4000-8000-000000000002",
+  "data": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "caseID": "00000000-0000-4000-8000-000000000002",
+    "occurrenceID": "00000000-0000-4000-8000-000000000005",
+    "artifactIDs": [
+      "00000000-0000-4000-8000-000000000003"
+    ],
+    "occurrenceCount": 1,
+    "dataClasses": [
+      "extract"
+    ]
+  }
+}

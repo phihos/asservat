@@ -1,0 +1,5 @@
+=== RUN   TestRegionalInstallerWithRealKubernetes
+    regional_installer_native_test.go:113: installer-cluster: objects created, both guards proven with the connector token, ungated, rerun unchanged, source write denied
+--- PASS: TestRegionalInstallerWithRealKubernetes (1.87s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.924s

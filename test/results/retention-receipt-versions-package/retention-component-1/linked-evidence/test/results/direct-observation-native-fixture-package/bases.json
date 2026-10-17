@@ -1,0 +1,15 @@
+{
+  "scripts/test-context-storage.py": "bd5bee6927bda363287e8cbcd636dba4cf88b16654f00932b4497c91162659ae",
+  "test/fixtures/observation-native/data.go": null,
+  "test/fixtures/observation-native/enrollment.go": null,
+  "test/fixtures/observation-native/inputs.go": null,
+  "test/fixtures/observation-native/main.go": null,
+  "test/fixtures/observation-native/metrics.go": null,
+  "test/fixtures/observation-native/runtime.go": null,
+  "test/integration/direct_observation_native_access_test.go": null,
+  "test/integration/direct_observation_native_data_test.go": null,
+  "test/integration/direct_observation_native_fixture_test.go": null,
+  "test/integration/direct_observation_native_source_test.go": null,
+  "test/integration/direct_observation_native_sql_test.go": null,
+  "test/integration/direct_observation_native_test.go": null
+}

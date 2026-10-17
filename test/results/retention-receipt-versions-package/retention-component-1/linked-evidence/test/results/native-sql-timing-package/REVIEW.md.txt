@@ -1,0 +1,15 @@
+# Temporary native SQL timing diagnostic
+
+The two-file overlay adds an opt-in observer to the existing role-specific fixture pools. It does not instrument the administrator pool, change pool limits, issue queries, alter SQL, or perform network I/O. It neither changes authority contexts/deadlines nor records SQL bodies, arguments, credentials, identifiers, or error strings.
+
+Query labels are a closed list of 26 names confirmed against the current generated SQLC source. Role labels are a closed list of fixed roles used by the selected fixture; unknown names, including otherwise valid alphanumeric tokens and dynamic role names, become `other`. No generated diagnostic registry or runtime configuration is introduced. Transaction labels are only exact `begin`, `commit`, and `rollback`.
+
+The observer records total query/acquire/failure counts and the longest 32 combined events, using a mutex and a fixed array. It performs a bounded 32-element selection scan after the array fills. Clock/context/mutex overhead exists and is not independently measured. This is a temporary diagnostic, not a production performance qualification. Records are emitted only during joined fixture cleanup, after the subsequently registered role pools close.
+
+In pinned pgx v5.11.0, QueryEnd for rows is invoked by rows.Close, so query durations include row consumption/scanning. Pool Acquire spans pool acquisition and may include connection creation/replacement and ping. Neither duration separately establishes server lock time. Long query time can guide a later focused investigation; it does not justify removing locks or current authority checks.
+
+Focused tests exercise unknown SQL comment labels (including alphanumeric tokens), unknown/dynamic role names, argument/error exclusion, original context deadline and cancellation, fixed retention of longest events, and concurrent bounded recording. They use no external services. The existing pool factory refuses to replace a non-nil tracer.
+
+`run-check.py` runs integration compile, only `TestNativeSQLTiming` under race, and integration vet sequentially. Each process has a 240-second wall bound; tests have a 60-second timeout. Environment is GOMAXPROCS=2, GOFLAGS=-p=2, and this stage's TMPDIR. It stops at the first failing exit or changed base/payload/dependency. The evidence directory contains actual exits and before/after hashes; no native result is claimed by these checks.
+
+The pre-existing seven-file checked-constructor package remains unchanged. This timing overlay qualifies no product behavior and must be combined with current integrated source before the parent-owned selected native run. That run remains necessary to distinguish query and pool costs on the real preparation failure.

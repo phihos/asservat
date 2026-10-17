@@ -1,0 +1,10 @@
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes
+=== RUN   TestInitialBootstrapGuardWithRealKubernetes/original-match-condition-rejected
+    initial_bootstrap_guard_test.go:140: actual API rejected original match-condition variables
+=== NAME  TestInitialBootstrapGuardWithRealKubernetes
+    initial_bootstrap_guard_test.go:181: corrected product policy rejected ValidatingAdmissionPolicy.admissionregistration.k8s.io "bootstrap-guard-10000000-install-bootstrap" is invalid: spec.variables[2].name: Invalid value: "namespace": must be a valid CEL identifier
+--- FAIL: TestInitialBootstrapGuardWithRealKubernetes (5.32s)
+    --- PASS: TestInitialBootstrapGuardWithRealKubernetes/original-match-condition-rejected (0.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.373s
+FAIL

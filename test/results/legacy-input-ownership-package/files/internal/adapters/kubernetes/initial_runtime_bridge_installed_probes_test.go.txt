@@ -1,0 +1,122 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+// Only original native resource provenance and SQL activation are synthetic.
+// This uses the actual completed initial input and installed inventory to
+// exercise the bridge constructor. It does not qualify real API enforcement.
+func TestInitialRuntimeBridgeInstalledOriginalSourceProbes(t *testing.T) {
+	_, preparer, original := handoverConflictFixture(t)
+	effects := rootPinEffects(t, preparer, original)
+	resources, err := NewInstalledOwnerRuntimeResources(context.Background(), preparer, effects, [][]byte{ownerConfigurationTestRoot(t, time.Now())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resources.Close()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	state := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: resources.binding, SetupID: ownerID(7800), WorkerLayout: contracts.HubWorkerInstalledLayout, OwnerLayout: contracts.OwnerInstalledLayout, CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
+	for i, item := range initialRuntimeResourceItems {
+		object, e := resources.object(state, i)
+		if e != nil {
+			t.Fatal(e)
+		}
+		state.Objects = append(state.Objects, contracts.InitialRuntimeResourceClaim{Item: item, OperationID: ownerID(7810 + i), TemplateDigest: preparationDigest(object.object), ClaimedAt: now, Until: now.Add(5 * time.Second), Receipt: &contracts.InitialRuntimeResourceReceipt{UID: ownerID(7850 + i), ResourceVersion: "1", Generation: 1}})
+	}
+	inventory, err := resources.inventory(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	administration := inventory.BridgeAdministration
+	if administration.Owner.CapacityProbe == nil || len(administration.SourceProbes) != 3 || !administration.Valid() {
+		t.Fatal("fixture did not retain complete installed guard")
+	}
+	source := &ConfigurationRoleSource{
+		client:     &PermissionClient{control: administration.Initial.ControlNamespace, now: time.Now},
+		protection: &OwnerWorkloadProtection{plan: administration.Owner},
+		fleet:      &ProtectedFleetSettings{settings: &FleetSettingsClient{}, protection: &FleetConfigurationProtection{configMapProtection: &configMapProtection{}}},
+		owner:      &OwnerConfigurationSource{protection: &OwnerConfigurationProtection{configMapProtection: &configMapProtection{}}},
+		input:      contracts.ConfigurationRuntimeRoles{InstallationID: resources.initial.InstallationID, InitialClaimID: effects.record.Claim.ID, ClusterID: resources.initial.ClusterID, Namespace: inventory.Namespace, Deployment: inventory.WorkerDeployment, ServiceAccount: inventory.WorkerAccount, FleetSource: inventory.FleetSource, OwnerSource: inventory.OwnerSource},
+	}
+	before := preparationDigest(administration)
+	bridge, err := NewInitialRuntimeBridge(context.Background(), preparer, source, effects, administration)
+	if err != nil {
+		t.Fatal("complete installed original source probes rejected", err)
+	}
+	bridge.Close()
+	if effects.effects != 0 || preparationDigest(administration) != before {
+		t.Fatal("constructor mutated source or entered SQL effects")
+	}
+	for name, change := range map[string]func(*cfg.InitialRuntimeBridgeAdministration){
+		"third arbitrary name": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.SourceProbes[2].ConfigMap = "other-source"
+			a.Owner.ConfigurationProbes[2].ConfigMap = "other-source"
+		},
+		"third account": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.SourceProbes[2].ServiceAccount = "other-worker"
+			a.Owner.ConfigurationProbes[2].ServiceAccount = "other-worker"
+		},
+		"third account UID": func(a *cfg.InitialRuntimeBridgeAdministration) { a.SourceProbes[2].ServiceAccountUID = ownerID(7990) },
+		"capacity account":  func(a *cfg.InitialRuntimeBridgeAdministration) { a.Owner.CapacityProbe.ServiceAccount = "other-worker" },
+		"capacity account UID": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.Owner.CapacityProbe.ServiceAccountUID = ownerID(7990)
+		},
+		"fleet original account": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.SourceProbes[0].ServiceAccount = "other-worker"
+			a.Owner.ConfigurationProbes[0].ServiceAccount = "other-worker"
+		},
+		"owner original account UID": func(a *cfg.InitialRuntimeBridgeAdministration) { a.SourceProbes[1].ServiceAccountUID = ownerID(7990) },
+		"missing third": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.SourceProbes = a.SourceProbes[:2]
+			a.Owner.ConfigurationProbes = a.Owner.ConfigurationProbes[:2]
+		},
+		"third without capacity": func(a *cfg.InitialRuntimeBridgeAdministration) { a.Owner.CapacityProbe = nil },
+		"fourth source": func(a *cfg.InitialRuntimeBridgeAdministration) {
+			a.SourceProbes = append(a.SourceProbes, cfg.InitialRuntimeSourceProbe{ConfigMap: "fourth", ServiceAccount: inventory.WorkerAccount.Name, ServiceAccountUID: inventory.WorkerAccount.UID})
+			a.Owner.ConfigurationProbes = append(a.Owner.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: "fourth", ServiceAccount: inventory.WorkerAccount.Name})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, _ := json.Marshal(administration)
+			var next cfg.InitialRuntimeBridgeAdministration
+			if json.Unmarshal(raw, &next) != nil {
+				t.Fatal("fixture copy")
+			}
+			change(&next)
+			if !next.Valid() {
+				t.Fatal("negative must reach original binding checks")
+			}
+			candidate := *source
+			protection := *source.protection
+			protection.plan = next.Owner
+			candidate.protection = &protection
+			if value, e := NewInitialRuntimeBridge(context.Background(), preparer, &candidate, effects, next); !errors.Is(e, cfg.ErrChanged) {
+				if value != nil {
+					value.Close()
+				}
+				t.Fatal("changed installed probe binding accepted", e)
+			}
+			if effects.effects != 0 {
+				t.Fatal("changed constructor reached SQL effects")
+			}
+		})
+	}
+	t.Run("caller input ownership", func(t *testing.T) {
+		want := preparationDigest(bridge.administration)
+		administration.Owner.CapacityProbe.ServiceAccountUID = ownerID(7989)
+		administration.SourceProbes[0].ConfigMap = "replaced-source"
+		administration.Initial.Administrators[0].Name = "replaced-administrator"
+		if preparationDigest(bridge.administration) != want {
+			t.Fatal("caller changed retained bridge administration")
+		}
+	})
+
+}

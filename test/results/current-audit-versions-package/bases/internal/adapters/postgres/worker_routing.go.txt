@@ -1,0 +1,132 @@
+package postgres
+
+import (
+	"context"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// WorkerRouting is a read facet for a hub installation and permission root. It
+// resolves the cluster/profile from immutable admitted SQL state. It exposes no
+// dispatch, enrollment, locator claim, configuration acceptance or audit writes.
+type WorkerRouting struct {
+	ledger             *Ledger
+	root, installation string
+}
+
+var _ evidence.WorkerEnrollmentBindings = (*WorkerRouting)(nil)
+var _ evidence.WorkerOwnerLookup = (*WorkerRouting)(nil)
+
+func NewWorkerRouting(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*WorkerRouting, error) {
+	if ctx == nil || ctx.Err() != nil || !value.UUID(root) || !value.UUID(installation) {
+		return nil, artifact.ErrInvalid
+	}
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	return &WorkerRouting{l, root, installation}, nil
+}
+
+func (s *WorkerRouting) ReadDownloadWorkerEnrollment(ctx context.Context, session, worker string) (value.DownloadWorkerIdentity, error) {
+	if s == nil || !value.UUID(worker) {
+		return value.DownloadWorkerIdentity{}, artifact.ErrInvalid
+	}
+	o, err := readWorkerIdentity(ctx, s.ledger, s.root, s.installation, nil, session)
+	if err != nil {
+		return value.DownloadWorkerIdentity{}, err
+	}
+	if o.Worker.Intent.ID != worker {
+		return value.DownloadWorkerIdentity{}, artifact.ErrInvalid
+	}
+	return o, nil
+}
+
+func (s *WorkerRouting) ReadWorkerOwner(ctx context.Context, session, worker string) (value.WorkerOwnerLease, error) {
+	if s == nil {
+		return value.WorkerOwnerLease{}, artifact.ErrInvalid
+	}
+	return readWorkerOwner(ctx, s.ledger, s.root, s.installation, session, worker)
+}
+
+func readWorkerOwner(ctx context.Context, l *Ledger, root, installation, session, worker string) (value.WorkerOwnerLease, error) {
+	var out value.WorkerOwnerLease
+	if ctx == nil || ctx.Err() != nil || !value.UUID(session) || !value.UUID(worker) {
+		return out, artifact.ErrInvalid
+	}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	r, err := custodydb.New(l.pool).ReadWorkerOwner(ctx, custodydb.ReadWorkerOwnerParams{ID: id(worker), SessionID: id(session), RootID: id(root), InstallationID: id(installation)})
+	if err != nil {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	out = workerOwnerLease(r, installation, session)
+	if !out.Valid(time.Now()) || ctx.Err() != nil {
+		return value.WorkerOwnerLease{}, artifact.ErrDownloadExpired
+	}
+	return out, nil
+}
+
+// expected is set only for the original profile-scoped effect adapter. The hub
+// reader instead uses the exact stored profile and independently fixed installation.
+func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation string, expected *value.DownloadWorkerProfile, session string) (value.DownloadWorkerIdentity, error) {
+	var out value.DownloadWorkerIdentity
+	if ctx == nil || ctx.Err() != nil || !value.UUID(session) {
+		return out, artifact.ErrInvalid
+	}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	q := custodydb.New(l.pool)
+	start, err := q.CurrentTime(ctx)
+	if err != nil {
+		return out, err
+	}
+	r, err := q.LatestDownloadWorker(ctx, custodydb.LatestDownloadWorkerParams{SessionID: id(session), RootID: id(root)})
+	if err != nil {
+		return out, err
+	}
+	w, err := decodeWorker(r)
+	if err != nil {
+		return out, err
+	}
+	p := w.Intent.Profile
+	if p.InstallationID != installation || expected != nil && p != *expected || r.AuditReceiptJson == nil || !r.ClaimedAt.Valid || r.TerminationJson != nil || r.RetiredProofJson != nil {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	configuration := &WorkerConfigurations{l, installation, p.ClusterID, p.NamespaceUID, p.Configuration.UID}
+	until, err := configuration.CurrentWorkerConfiguration(ctx, p)
+	if err != nil {
+		return out, err
+	}
+	// Configuration/recovery checks can wait on locks. Recheck the original
+	// worker and parent after that wait, without refreshing the original start.
+	current, err := q.LatestDownloadWorker(ctx, custodydb.LatestDownloadWorkerParams{SessionID: r.SessionID, RootID: r.RootID})
+	if err != nil {
+		return out, err
+	}
+	parent, err := q.ReadDownloadSession(ctx, custodydb.ReadDownloadSessionParams{ID: r.SessionID, RootID: r.RootID})
+	if err != nil {
+		return out, err
+	}
+	now, err := q.CurrentTime(ctx)
+	if err != nil {
+		return out, err
+	}
+	if current.ID != r.ID || current.TerminationJson != nil || current.RetiredProofJson != nil || !now.Time.Before(w.Intent.RunUntil) || !now.Time.Before(parent.Deadline.Time) || artifact.DownloadState(parent.State).Terminal() || !identity.Fresh(start.Time, start.Time.Add(5*time.Second), now.Time, 5*time.Second) {
+		return out, artifact.ErrDownloadExpired
+	}
+	deadline, _ := ctx.Deadline()
+	until = identity.Earlier(until, identity.Earlier(start.Time.Add(5*time.Second), w.Intent.RunUntil))
+	until = identity.Earlier(until, identity.Earlier(parent.Deadline.Time, deadline))
+	out = value.DownloadWorkerIdentity{Worker: w, ObservedAt: start.Time, FreshUntil: until}
+	if ctx.Err() != nil || !out.Valid(time.Now()) {
+		return value.DownloadWorkerIdentity{}, artifact.ErrDownloadExpired
+	}
+	return out, nil
+}

@@ -1,0 +1,37 @@
+from pathlib import Path
+import subprocess,json,time,uuid
+out=Path(__file__).parent;name='asservat-setup-shape-'+uuid.uuid4().hex[:12]
+image='quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf'
+report={'container':name,'image':image,'observations':[],'cleanupFailures':[]};created=False
+def bao(args,token='synthetic-root',stdin=None):
+ return subprocess.run(['docker','exec','-i','--env','BAO_ADDR=http://127.0.0.1:8200','--env','BAO_TOKEN='+token,name,'bao',*args],input=stdin,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+try:
+ p=subprocess.run(['docker','run','--detach','--rm','--network','none','--name',name,'--env','BAO_DEV_ROOT_TOKEN_ID=synthetic-root',image,'server','-dev','-dev-listen-address=127.0.0.1:8200'],capture_output=True,text=True,timeout=30)
+ if p.returncode:raise RuntimeError('owned provider creation failed')
+ created=True
+ for attempt in range(30):
+  r=bao(['status','-format=json'])
+  if r.returncode==0:break
+  time.sleep(.2)
+ else:raise RuntimeError('owned provider readiness failed')
+ for args in [['auth','enable','-path=owner-auth','kubernetes'],['secrets','enable','-path=transit','transit'],['write','transit/keys/audit','type=aes256-gcm96']]:
+  r=bao(args);assert r.returncode==0,r.stderr
+ paths=['sys/auth/owner-auth','sys/mounts/auth/owner-auth','sys/mounts/auth/owner-auth/tune','sys/mounts/transit','transit/keys/audit']
+ policy='\n'.join('path "'+p+'" { capabilities = ["read"] }' for p in paths)
+ r=bao(['policy','write','inspection','-'],stdin=policy);assert r.returncode==0,r.stderr
+ r=bao(['write','-format=json','auth/token/create','policies=inspection','no_default_policy=true','ttl=60s','renewable=false']);assert r.returncode==0,r.stderr
+ token=json.loads(r.stdout)['auth']['client_token']
+ for path in paths:
+  for label,credential in [('root','synthetic-root'),('named-read-only',token)]:
+   r=bao(['read','-format=json',path],credential)
+   row={'path':path,'credentialScope':label,'exit':r.returncode,'stderr':r.stderr}
+   if r.returncode==0:row['publicData']=json.loads(r.stdout)['data']
+   report['observations'].append(row)
+ r=bao(['token','revoke',token]);assert r.returncode==0,r.stderr
+ report['exit']=0
+finally:
+ if created:
+  r=subprocess.run(['docker','rm','--force',name],capture_output=True,text=True,timeout=30)
+  if r.returncode:report['cleanupFailures'].append('owned provider removal failed')
+ with (out/'result.json').open('x') as f:json.dump(report,f,indent=2);f.write('\n')
+ print(json.dumps(report),flush=True)

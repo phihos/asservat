@@ -1,0 +1,6 @@
+=== RUN   TestContextStorageWithRealServices
+    context_storage_test.go:116: fixture transit/keys/evidence status 200, want 204
+--- FAIL: TestContextStorageWithRealServices (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.075s
+FAIL

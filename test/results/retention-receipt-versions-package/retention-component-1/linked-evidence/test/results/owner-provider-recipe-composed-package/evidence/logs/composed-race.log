@@ -1,0 +1,4 @@
+=== RUN   TestOwnerIdentityComposedUnknownObjectsAndLaunchAreLookupOnly
+--- PASS: TestOwnerIdentityComposedUnknownObjectsAndLaunchAreLookupOnly (32.21s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	33.309s

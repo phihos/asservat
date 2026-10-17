@@ -1,0 +1,38 @@
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-target_namespace
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-root
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-account
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-cluster_role
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-collection
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-role-cannot-refill
+=== NAME  TestInitialPreparationSupervisorWithRealKubernetes
+    initial_preparer_test.go:168: clusterrolebindings.rbac.authorization.k8s.io "asservat.initial-resume-target.installer" is forbidden: ValidatingAdmissionPolicy 'initial-resume-continuity' with binding 'initial-resume-continuity' denied request: Asservat preparation identities must remain occupied and may only lose setup authority.
+    initial_preparer_test.go:175: clusterroles.rbac.authorization.k8s.io "asservat.initial-resume-target.installer" is forbidden: ValidatingAdmissionPolicy 'initial-resume-continuity' with binding 'initial-resume-continuity' denied request: Asservat preparation identities must remain occupied and may only lose setup authority.
+    initial_preparer_test.go:190: namespaces "initial-resume-target" is forbidden: ValidatingAdmissionPolicy 'initial-resume-continuity' with binding 'initial-resume-continuity' denied request: Asservat preparation identities must remain occupied and may only lose setup authority.
+    initial_preparer_test.go:190: namespaces "initial-bootstrap-resume" is forbidden: ValidatingAdmissionPolicy 'initial-resume-continuity' with binding 'initial-resume-continuity' denied request: Asservat preparation identities must remain occupied and may only lose setup authority.
+--- FAIL: TestInitialPreparationSupervisorWithRealKubernetes (24.39s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-role-cannot-refill (0.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	24.438s
+FAIL

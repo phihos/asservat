@@ -1,0 +1,185 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	captureapp "asservat.local/asservat/internal/application/capture"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/capture"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// This only retains the actual runner result for the existing independent
+// publication assertions. It supplies no authorization or synthetic execution.
+type nativeContinuationStart struct {
+	runner   *executionapp.APIContextRunner
+	regional captureapp.ContextAcceptedStart
+	result   executionapp.ContextResult
+	calls    int
+}
+
+func (s *nativeContinuationStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
+	s.calls++
+	if s.regional != nil {
+		return s.regional.StartContext(ctx, current, id)
+	}
+	if s.runner == nil {
+		return value.ErrUnavailable
+	}
+	r, err := s.runner.Execute(ctx, current, id)
+	if err == nil && r.State == "StoredPendingVerification" {
+		s.result = r
+	}
+	return err
+}
+
+func nativeContinuationSubmission(t *testing.T, ctx context.Context, n *nativeAPIEnvironment, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, start *nativeContinuationStart) captureapp.ContextSubmission {
+	t.Helper()
+	investigation, publication := nativeContinuationApplicationServices(t, ctx, n, s, admin, poolFor, store, keys)
+	admissions := investigation.Admission.(*postgres.ContextAdmissions)
+	investigation.Replay = nativeContinuationAdmissions{t, admissions}
+	investigation.Admission = nativeContinuationAdmissions{t, admissions}
+	return captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: nativeContinuationPublication{t, publication}, Start: start}
+}
+
+// Reuse the original real admission/audit services in the shared operation
+// assembly without reconstructing or replacing their accepted root or receipts.
+func nativeContinuationApplicationServices(t *testing.T, ctx context.Context, n *nativeAPIEnvironment, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys) (captureapp.ContextInvestigation, auditapp.CaptureOperationPublication) {
+	t.Helper()
+	pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
+	previews, err := postgres.NewContextPreviews(ctx, pool("context_preview_runtime", "synthetic-context-preview"), s.a.RootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storage, err := postgres.NewContextStorageReader(ctx, pool("context_storage_read_runtime", "synthetic-context-storage-read"), s.a.RootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Protected root pins, backing qualification and MAC keys are explicitly
+	// synthetic fixture inputs. The admission, pair writes, acknowledgements and
+	// completion read use their actual separate current52 SQL/S3 components.
+	roles := map[string]*pgxpool.Pool{}
+	for _, purpose := range []string{"source", "admit", "journal", "ack", "read"} {
+		roles[purpose] = pool("capture_operation_"+purpose+"_runtime", "synthetic-capture-operation-"+purpose)
+	}
+	config, err := postgres.New(ctx, roles["source"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac, err := auditapp.NewOperationMAC("capture-input-v1", bytes.Repeat([]byte{41}, 32), "capture-accounts-v1", bytes.Repeat([]byte{42}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	_, err = admin.Exec(ctx, `INSERT INTO capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until) VALUES($1,$2,'capture_operation_source_runtime'::regrole::oid,'capture_operation_admit_runtime'::regrole::oid,'capture_operation_journal_runtime'::regrole::oid,'capture_operation_ack_runtime'::regrole::oid,'capture_operation_cleanup_runtime'::regrole::oid,'capture_operation_verify_runtime'::regrole::oid,'capture_operation_retire_runtime'::regrole::oid,'capture_operation_read_runtime'::regrole::oid,1,false,$3)`, s.a.RootID, s.recovery.installation, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal("synthetic protected capture root", err)
+	}
+	account := nativeContinuationAuditAccount(t, s.a.RootID, s.recovery.installation, s.a.Registration.AllocationID, now, mac)
+	policy := account.Policy
+	backing := auditapp.OperationAuditPool{RootID: policy.RootID, Lane: "capture", AccountVersion: account.AccountVersion, Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: account.RetainedSeconds, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}
+	if err = config.ConfigureCaptureAuditBacking(ctx, postgres.CaptureAuditBacking{Pool: backing, Account: account, ValidUntil: now.Add(time.Hour)}, mac); err != nil {
+		t.Fatal("native capture audit backing", err)
+	}
+	admissions, err := postgres.NewAuditedContextAdmissions(ctx, roles["admit"], s.a.RootID, mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	journal, err := postgres.NewCaptureAuditJournal(ctx, roles["journal"], policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ack, err := postgres.NewCaptureAuditAcknowledgements(ctx, roles["ack"], policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := postgres.NewCaptureOperationIntents(ctx, roles["read"], s.a.RootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	processing, err := postgres.NewProcessingReads(ctx, pool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.guard)
+	if err != nil {
+		t.Fatal("current pre-collection processing reader", err)
+	}
+	publisher := auditapp.CaptureOperationPublication{RootID: s.a.RootID, Completed: completed, Journal: journal, Acknowledgements: ack, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}
+
+	return captureapp.ContextInvestigation{RootID: s.a.RootID, InstallationID: s.recovery.installation, Previews: previews, Replay: admissions, Admission: admissions, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Storage: storage, Processing: processing, Recovery: s.recovery.reader, Lifetime: 30 * time.Second, Now: time.Now, NewID: custodyID}, publisher
+}
+
+// Test-only boundary diagnostics report no identity, source, receipt or evidence
+// fields, and never replay an operation to infer its outcome.
+type nativeContinuationAdmissions struct {
+	t     *testing.T
+	inner *postgres.ContextAdmissions
+}
+
+func (s nativeContinuationAdmissions) LookupContextAdmission(ctx context.Context, in value.ReplayQuery) (value.Accepted, bool, error) {
+	started := time.Now()
+	a, found, err := s.inner.LookupContextAdmission(ctx, in)
+	s.t.Logf("native continuation stage=lookup elapsed=%s found=%t accepted=%t error=%v", time.Since(started), found, a.CaptureID != "", err)
+	return a, found, err
+}
+func (s nativeContinuationAdmissions) AdmitReviewedContext(ctx context.Context, preview string, in value.Admission) (value.Accepted, error) {
+	started := time.Now()
+	a, err := s.inner.AdmitReviewedContext(ctx, preview, in)
+	s.t.Logf("native continuation stage=reviewed-admission elapsed=%s accepted=%t error=%v", time.Since(started), a.CaptureID != "", err)
+	return a, err
+}
+
+type nativeContinuationPublication struct {
+	t     *testing.T
+	inner auditapp.CaptureOperationPublication
+}
+
+func (s nativeContinuationPublication) AcknowledgedCaptureIntent(ctx context.Context, id string) (auditvalue.CaptureIntent, error) {
+	started := time.Now()
+	intent, err := s.inner.AcknowledgedCaptureIntent(ctx, id)
+	s.t.Logf("native continuation stage=intent-publication elapsed=%s acknowledged=%t error=%v", time.Since(started), intent.Valid(), err)
+	return intent, err
+}
+func diagnoseNativeContinuation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root, preview string) {
+	t.Helper()
+	read, end := context.WithTimeout(ctx, 2*time.Second)
+	defer end()
+	var previews, closed, captures, pending, audited, pairs, bindings int64
+	err := admin.QueryRow(read, `SELECT
+  (SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=$2),
+  (SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=$2 AND closed_at IS NOT NULL),
+  (SELECT count(*) FROM context_capture WHERE root_id=$1 AND preview_id=$2),
+  (SELECT count(*) FROM context_capture WHERE root_id=$1 AND preview_id=$2 AND state='accepted_pending_audit'),
+  (SELECT count(*) FROM context_capture WHERE root_id=$1 AND preview_id=$2 AND state='intent_audited'),
+  (SELECT count(*) FROM operation_audit a JOIN context_capture c ON c.id=a.id AND c.root_id=a.root_id WHERE c.root_id=$1 AND c.preview_id=$2 AND a.lane='capture'),
+  (SELECT count(*) FROM capture_audit_binding b JOIN context_capture c ON c.id=b.capture_id AND c.root_id=b.root_id WHERE c.root_id=$1 AND c.preview_id=$2)`, root, preview).Scan(&previews, &closed, &captures, &pending, &audited, &pairs, &bindings)
+	t.Logf("native continuation retained-state previews=%d closed=%d captures=%d pending=%d audited=%d pairs=%d bindings=%d diagnostic-error=%v", previews, closed, captures, pending, audited, pairs, bindings, err)
+}
+
+// The fixture funds the unchanged capture/write interval plus the complete
+// original proof, cleanup and history intervals before actual SQL admission.
+func nativeContinuationAuditAccount(t *testing.T, root, installation, allocation string, now time.Time, mac *auditapp.OperationMAC) auditvalue.CaptureAuditAccount {
+	t.Helper()
+	policy := auditvalue.OperationLifecyclePolicy{RootID: root, Lane: "capture", InstallationID: installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 8, MaxPurgeLeases: 8, CleanupBudgetSeconds: 15, ProofWindowSeconds: 1, BackupHorizonSeconds: 0, ValidUntil: now.Add(time.Hour), OverdueTerminal: auditvalue.OperationOverdueTerminal, History: &auditvalue.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{3}, Layout: auditvalue.CaptureOperationHistoryLayout, MaximumRowFootprintBytes: 256 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 2}}
+	bytes, wal := policy.History.SlotBacking(policy.MaxPurgeLeases)
+	policy.BackupReservedBytes = bytes * policy.MetadataSlots
+	policy.WALReservedBytes = wal * policy.MetadataSlots
+	accountDigest, err := mac.CaptureAccount(policy.InstallationID, policy.RootID, allocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := auditvalue.CaptureAuditAccount{RootID: policy.RootID, AllocationID: allocation, AccountVersion: mac.AccountVersion(), AccountDigest: accountDigest, Revision: 1, Records: 4, RetainedSeconds: 120, Policy: policy}
+	return account
+}

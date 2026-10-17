@@ -1,0 +1,8 @@
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/11 19:26:21 http: TLS handshake error from 127.0.0.1:44918: remote error: tls: unknown certificate
+2026/10/11 19:26:21 http: TLS handshake error from 127.0.0.1:44930: remote error: tls: unknown certificate
+    console_test.go:119: Synthetic current identity; actual Go TLS/static/session handlers and built React console:
+        Console browser checks passed: 11 journeys, 9 accessibility scans, no external requests or CSP/runtime errors.
+--- PASS: TestConsoleBrowserWithBuiltPackage (9.13s)
+PASS
+ok  	asservat.local/asservat/test/integration	9.146s

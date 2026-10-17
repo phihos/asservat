@@ -1,0 +1,49 @@
+package postgres
+
+import (
+	"slices"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+)
+
+func TestConfigurationRuntimeRolePlanCannotCreatePublicAuthority(t *testing.T) {
+	installation := "00000000-0000-4000-8000-000000000001"
+	names := map[string]bool{}
+	for _, p := range contracts.ConfigurationRuntimeRolePurposes() {
+		name, ok := ConfigurationRuntimeRoleName(installation, p)
+		if !ok || names[name] {
+			t.Fatal("nonunique fixed role")
+		}
+		names[name] = true
+		if _, ok = PublicRuntimeRoleName(installation, p); ok {
+			t.Fatal("reconciler purpose selectable as public role")
+		}
+		grants, ok := configurationRuntimeRoleGrants(p)
+		if !ok {
+			t.Fatal("missing fixed grants")
+		}
+		if !slices.Contains(grants, publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"}) || !slices.Contains(grants, publicRuntimeGrant{"table", "fleet_current_trust", "installation_id", "UPDATE"}) {
+			t.Fatal("actual recovery read/lock missing")
+		}
+		for _, g := range grants {
+			if g.privilege == "UPDATE" && (g.column == "recovery_blocked" || g.column == "activated_postmaster_at" || g.column == "activated_database_oid" || g.column == "issuer_epoch") {
+				t.Fatal("credential role can activate recovery")
+			}
+			if g.object == "hub_owner_configuration_revision" && g.column == "audit_receipt_json" && p != "configuration-audit" {
+				t.Fatal("source role can acknowledge itself")
+			}
+			if p == "configuration-audit" && (g.privilege == "INSERT" || g.object == "fleet_trust") {
+				t.Fatal("audit role can observe or create fleet authority")
+			}
+		}
+	}
+	for _, p := range []string{"identity-read", "capacity", "capacity-capture", "configuration-admin", ""} {
+		if _, ok := ConfigurationRuntimeRoleName(installation, p); ok {
+			t.Fatal("unlisted role accepted")
+		}
+	}
+	if ConfigurationRuntimeRoleLayoutDigest() == PublicRuntimeRoleLayoutDigest() {
+		t.Fatal("purpose layouts alias")
+	}
+}

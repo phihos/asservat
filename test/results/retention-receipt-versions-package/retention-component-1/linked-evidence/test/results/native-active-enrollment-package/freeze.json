@@ -1,0 +1,19 @@
+{
+  "manifest.json": "083078c26ce2c701a86ac3a4b81e1e7a06a428fafa316b74dc5138603efc6f95",
+  "base.json": "b6060c8aa40e879d41c86b1517f462b05f0f0f097267271d7654d1fdf3b34148",
+  "dependencies.json": "2c2d7df1ad7c54f2fd282e52b9ff56f8b9fdd5c17076d7f2f4d8204c88dbb3b5",
+  "payload-hashes.json": "1c1fbf57294fb65d2c43b8a423e3447efbdaaab210ed7265dacb6d2a46030a96",
+  "check-inputs.json": "f179af19e525a7d3126a5be44cb8f4efc38ac9968de278b6e3f8368cd859304d",
+  "overlay-before.json": "981598de7fdfc13c2d0353352dbb74f88f3764ba68a90b77673d7ea365f9dc4e",
+  "overlay-after.json": "4ef1af3d0a4ee7209e97892bbc40679ff6af8adb3722ad875e1692b66dd98ac3",
+  "run_checks.py": "405ec6e4afb5080ba0d319ee54264f80e671c1528540e2133626b1cefcf3c701",
+  "PROPOSAL.md": "1f65a2ce2479146872cf1266d4bf15ba39d1df9fcbd0bc6095c1e7c4d4dc5abc",
+  "HANDOFF.md": "9640f8af10c334f3abcc76c786be3bc1f120efa89ce6beed35e2775c09103ccf",
+  "evidence/after.json": "15e5b3ef61d0553bd7f43401cd08cfa64abc179039f6138496c3e744cd46dc97",
+  "evidence/after.log": "badc914fba95a2aa346fd2c0c479781918cfee45a7e12c47808cc350bdf24c91",
+  "evidence/before.json": "d9aee644e7b246bb00920f9cdb6266606687f682418ee865c75192cecccd70c3",
+  "evidence/before.log": "a8981fa449021da07b59a656357e61a146f894189624397354c6fbff76d0ae79",
+  "evidence/runner.log": "a778de028ef8a7744a62bb273b586bf2994c36e08b793e918c4cca08c44ffd14",
+  "evidence/vet.json": "f893260ef33be9172d0e505441155a3f83023314f8f14114eec3a4e1ab083857",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,9 @@
+{"Time":"2026-10-13T19:05:25.14456883+02:00","Action":"start","Package":"asservat.local/asservat/test/integration"}
+{"Time":"2026-10-13T19:05:25.157086661+02:00","Action":"run","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryWithRealServices"}
+{"Time":"2026-10-13T19:05:25.157120341+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryWithRealServices","Output":"=== RUN   TestOwnerAuditInventoryWithRealServices\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:25.157137381+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryWithRealServices","Output":"    owner_audit_inventory_test.go:33: run scripts/test-custody.py --owner-audit-inventory\n"}
+{"Time":"2026-10-13T19:05:25.157146262+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryWithRealServices","Output":"--- SKIP: TestOwnerAuditInventoryWithRealServices (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:25.157152072+02:00","Action":"skip","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryWithRealServices","Elapsed":0}
+{"Time":"2026-10-13T19:05:25.157162262+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:25.157996495+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"ok  \tasservat.local/asservat/test/integration\t0.013s\n"}
+{"Time":"2026-10-13T19:05:25.158015695+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Elapsed":0.013}

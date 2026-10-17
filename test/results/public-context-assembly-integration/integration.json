@@ -1,0 +1,142 @@
+{
+  "at": "2026-10-14T00:41:39.604168+00:00",
+  "files": [
+    {
+      "path": "docs/architecture/README.md",
+      "base_sha256": "c4d3f39e235b4f980239b73ca21ac92a8ff1585101565cdcce67a48aea1cbfb9",
+      "payload_sha256": "c494e060ae56d5f02acf04b6d9801f2928aabba8bab773c4322bb6e30f3651b0",
+      "payload_bytes": 28630
+    },
+    {
+      "path": "docs/architecture/public-context-composition.md",
+      "base_sha256": "dd81c7bd9fda59881bfc4c8714607f5752b6359c4b951d55aa75de19a434b9cc",
+      "payload_sha256": "7d681654fb2bc65c37702fb79c9f3911c047d5de31650eebd391d1ff0494e7ea",
+      "payload_bytes": 6808
+    },
+    {
+      "path": "docs/decisions/160-public-context-service-assembly.md",
+      "base_sha256": null,
+      "payload_sha256": "1704b7d459cc37d81a41b933eeef04e0f1ced02b08c1cf580ebcf1377974cbbe",
+      "payload_bytes": 4056
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base_sha256": "d9f0dc78c1b066729c43d8f9356c7c9eb2a988545ed11c750cc5b4b38560a113",
+      "payload_sha256": "d1be104e4554a60c7b6011535289f53a29b67ec9297e4ef3e46ad68a3fad20fe",
+      "payload_bytes": 61254
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_roles_test.go",
+      "base_sha256": "088213e0f5a22e620cc118588753bdfe10fa5f461899e454084f11e52697488d",
+      "payload_sha256": "96bc78538de01bd14c2d05f4836ecb9f761fb7724b1026368d3acd17609d09b2",
+      "payload_bytes": 24441
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+      "base_sha256": "e4ba4fadc1c968e2854075ec7e31d6770ccd7931e252419d25bc5f51e85edc98",
+      "payload_sha256": "188809ecda8a9f26c2930301871468cebdc4a0040e76c918fa8b5c52bdde0ddd",
+      "payload_bytes": 15653
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_role_plan_test.go",
+      "base_sha256": "d891f3470d64bc08c9b5b37392d198775d23b9b007d6cfff29334cc94957a408",
+      "payload_sha256": "7a8e212587f068f3882373bf28d4bdd490838fb2daccfe099b846c7f487cff1a",
+      "payload_bytes": 5924
+    },
+    {
+      "path": "internal/bootstrap/public_context_operations.go",
+      "base_sha256": null,
+      "payload_sha256": "c5a3615c5a278bc1a211fd71646807581b97725ffacdc2c13bfcd3d7bcbf2e9c",
+      "payload_bytes": 5390
+    },
+    {
+      "path": "internal/bootstrap/public_context_operations_test.go",
+      "base_sha256": null,
+      "payload_sha256": "a8a8a845f27fd756b46ae13f59812bdba1945fc8e01b6f34a0b09974d7cdd7c2",
+      "payload_bytes": 13371
+    },
+    {
+      "path": "internal/contracts/public_runtime_roles.go",
+      "base_sha256": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+      "payload_sha256": "29d84cc707914d459fd0519b374b6cdbd3d2d41be95b362cd04e880ba6cc20e8",
+      "payload_bytes": 9253
+    },
+    {
+      "path": "internal/contracts/public_runtime_roles_test.go",
+      "base_sha256": "243939ff28d57ac62aa5a74ffe963da4b69967539b2e789bd190cb44381417e3",
+      "payload_sha256": "e75b14e9277cb873e403d89c75f178a8b20d260fc000405fa833a47e9f118cf4",
+      "payload_bytes": 1996
+    },
+    {
+      "path": "specs/contracts/public-runtime-credentials.schema.json",
+      "base_sha256": "af4be74467779f19c63b0791232f44211d805688b4907c13d9b1f9b1189e1071",
+      "payload_sha256": "433250cff71d906c3a71ddbea6ca2ceb18c36cf086f50deac9dc78da35d00a1b",
+      "payload_bytes": 2691
+    },
+    {
+      "path": "specs/contracts/public-runtime-role-state.schema.json",
+      "base_sha256": "bbd90e94a68ab72fc214038e8ca5fc6dfdb50863a02468d0aabc8dd598d655b9",
+      "payload_sha256": "481a66d1b802b6d86614bc62373617fa4e9fca1d36bfeb6140cf1400b4c12dec",
+      "payload_bytes": 5436
+    },
+    {
+      "path": "specs/contracts/public-runtime-roles.schema.json",
+      "base_sha256": "1716800b1aa9ec318ff9e496920d049f266338a841b3a5bea21e951ee298eb2d",
+      "payload_sha256": "982d4e793901de0246900387d8e1cd6da2097fb0753f1fdeaeee9c2b67c183b7",
+      "payload_bytes": 5745
+    },
+    {
+      "path": "specs/interfaces.md",
+      "base_sha256": "0eed6638945ffe04f0f75b9c1b6de0de7b3abf5dedc91d72a59b6b6c30a9a79c",
+      "payload_sha256": "b43304befc8d901eb350b8d718965c858b9fa4c22cd49b7958e64150b720cd3e",
+      "payload_bytes": 5160
+    },
+    {
+      "path": "test/integration/public_context_preview_roles_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7ca3f1e2b481b69fc3a194a74676a4af03fb737517bc562cbb96c8ef3aca0f1d",
+      "payload_bytes": 8486
+    },
+    {
+      "path": "test/integration/public_runtime_roles_test.go",
+      "base_sha256": "9c206444ba9d9b35a2a75fa3f1421f71f7d7cf2d06a3a1890a880c279bcc2061",
+      "payload_sha256": "74b9155a1fac7b68a56261ff479a401ef7ea865570057a82b11cea6eae779ca6",
+      "payload_bytes": 21042
+    }
+  ],
+  "manifestSHA256": "25da027af8329b8325fe42a16dcde764b6dc24718081a15b601a1e196ccaee39",
+  "patchSHA256": "9a0fb5079dd289d0494a387d91b9e9bb45aae2c1981fd276fd08e16d92b62fc7",
+  "verification": "pending",
+  "archiveHashes": {
+    "payloads/specs/interfaces.md.txt": "b43304befc8d901eb350b8d718965c858b9fa4c22cd49b7958e64150b720cd3e",
+    "payloads/test/integration/public_context_preview_roles_test.go.txt": "7ca3f1e2b481b69fc3a194a74676a4af03fb737517bc562cbb96c8ef3aca0f1d",
+    "payloads/test/integration/public_runtime_roles_test.go.txt": "74b9155a1fac7b68a56261ff479a401ef7ea865570057a82b11cea6eae779ca6",
+    "payloads/specs/contracts/public-runtime-credentials.schema.json.txt": "433250cff71d906c3a71ddbea6ca2ceb18c36cf086f50deac9dc78da35d00a1b",
+    "payloads/specs/contracts/public-runtime-role-state.schema.json.txt": "481a66d1b802b6d86614bc62373617fa4e9fca1d36bfeb6140cf1400b4c12dec",
+    "payloads/specs/contracts/public-runtime-roles.schema.json.txt": "982d4e793901de0246900387d8e1cd6da2097fb0753f1fdeaeee9c2b67c183b7",
+    "payloads/internal/bootstrap/public_context_operations.go.txt": "c5a3615c5a278bc1a211fd71646807581b97725ffacdc2c13bfcd3d7bcbf2e9c",
+    "payloads/internal/bootstrap/public_context_operations_test.go.txt": "a8a8a845f27fd756b46ae13f59812bdba1945fc8e01b6f34a0b09974d7cdd7c2",
+    "payloads/internal/contracts/public_runtime_roles.go.txt": "29d84cc707914d459fd0519b374b6cdbd3d2d41be95b362cd04e880ba6cc20e8",
+    "payloads/internal/contracts/public_runtime_roles_test.go.txt": "e75b14e9277cb873e403d89c75f178a8b20d260fc000405fa833a47e9f118cf4",
+    "payloads/internal/adapters/kubernetes/public_runtime_roles_test.go.txt": "96bc78538de01bd14c2d05f4836ecb9f761fb7724b1026368d3acd17609d09b2",
+    "payloads/internal/adapters/postgres/public_runtime_role_plan.go.txt": "188809ecda8a9f26c2930301871468cebdc4a0040e76c918fa8b5c52bdde0ddd",
+    "payloads/internal/adapters/postgres/public_runtime_role_plan_test.go.txt": "7a8e212587f068f3882373bf28d4bdd490838fb2daccfe099b846c7f487cff1a",
+    "payloads/docs/architecture/README.md.txt": "c494e060ae56d5f02acf04b6d9801f2928aabba8bab773c4322bb6e30f3651b0",
+    "payloads/docs/architecture/public-context-composition.md.txt": "7d681654fb2bc65c37702fb79c9f3911c047d5de31650eebd391d1ff0494e7ea",
+    "payloads/docs/decisions/160-public-context-service-assembly.md.txt": "1704b7d459cc37d81a41b933eeef04e0f1ced02b08c1cf580ebcf1377974cbbe",
+    "payloads/docs/decisions/README.md.txt": "d1be104e4554a60c7b6011535289f53a29b67ec9297e4ef3e46ad68a3fad20fe",
+    "before/specs/interfaces.md.txt": "0eed6638945ffe04f0f75b9c1b6de0de7b3abf5dedc91d72a59b6b6c30a9a79c",
+    "before/test/integration/public_runtime_roles_test.go.txt": "9c206444ba9d9b35a2a75fa3f1421f71f7d7cf2d06a3a1890a880c279bcc2061",
+    "before/specs/contracts/public-runtime-credentials.schema.json.txt": "af4be74467779f19c63b0791232f44211d805688b4907c13d9b1f9b1189e1071",
+    "before/specs/contracts/public-runtime-role-state.schema.json.txt": "bbd90e94a68ab72fc214038e8ca5fc6dfdb50863a02468d0aabc8dd598d655b9",
+    "before/specs/contracts/public-runtime-roles.schema.json.txt": "1716800b1aa9ec318ff9e496920d049f266338a841b3a5bea21e951ee298eb2d",
+    "before/internal/contracts/public_runtime_roles.go.txt": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+    "before/internal/contracts/public_runtime_roles_test.go.txt": "243939ff28d57ac62aa5a74ffe963da4b69967539b2e789bd190cb44381417e3",
+    "before/internal/adapters/kubernetes/public_runtime_roles_test.go.txt": "088213e0f5a22e620cc118588753bdfe10fa5f461899e454084f11e52697488d",
+    "before/internal/adapters/postgres/public_runtime_role_plan.go.txt": "e4ba4fadc1c968e2854075ec7e31d6770ccd7931e252419d25bc5f51e85edc98",
+    "before/internal/adapters/postgres/public_runtime_role_plan_test.go.txt": "d891f3470d64bc08c9b5b37392d198775d23b9b007d6cfff29334cc94957a408",
+    "before/docs/architecture/README.md.txt": "c4d3f39e235b4f980239b73ca21ac92a8ff1585101565cdcce67a48aea1cbfb9",
+    "before/docs/architecture/public-context-composition.md.txt": "dd81c7bd9fda59881bfc4c8714607f5752b6359c4b951d55aa75de19a434b9cc",
+    "before/docs/decisions/README.md.txt": "d9f0dc78c1b066729c43d8f9356c7c9eb2a988545ed11c750cc5b4b38560a113"
+  }
+}

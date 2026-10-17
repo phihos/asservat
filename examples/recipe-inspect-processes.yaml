@@ -1,0 +1,35 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: inspect-processes
+  namespace: payments
+spec:
+  description: Synthetic bounded discovery diagnostic; identity and protocol adapters
+    require qualification.
+  actions:
+  - id: processes
+    kind: processSnapshot
+    parameters:
+      include:
+      - identity
+      - status
+      - cgroups
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: sockets
+    kind: networkSnapshot
+    parameters:
+      include:
+      - sockets
+      - counters
+      - socketOwners
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  maxTotalBytes: 2097152
+  maxDuration: 10s

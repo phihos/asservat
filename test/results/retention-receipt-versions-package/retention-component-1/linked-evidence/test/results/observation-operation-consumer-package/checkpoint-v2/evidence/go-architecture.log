@@ -1,0 +1,14 @@
+internal/adapters/jose/download_stop_retirement.go:12:2: no required module provides package asservat.local/asservat/internal/application/evidence; to add it:
+	go get asservat.local/asservat/internal/application/evidence
+Traceback (most recent call last):
+  File "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v2/architecture-mirror/scripts/check-go-architecture.py", line 13, in <module>
+    output = subprocess.check_output(["go", "list", "-json", "./..."], cwd=ROOT, text=True)
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['go', 'list', '-json', './...']' returned non-zero exit status 1.

@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:263: invalid or stale context plan
+--- FAIL: TestContextAdmissionWithRealServices (2.79s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-api-runner (2.74s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.842s
+FAIL

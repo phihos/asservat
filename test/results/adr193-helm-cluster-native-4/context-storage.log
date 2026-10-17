@@ -1,0 +1,5 @@
+=== RUN   TestHelmClusterInstallWithRealServices
+    helm_cluster_test.go:156: helm mode=cluster: hook ran installer-cluster from the registry; installer account administers both guards; ungated; upgrade rerun unchanged; cluster-admin token request and source write denied
+--- PASS: TestHelmClusterInstallWithRealServices (12.66s)
+PASS
+ok  	asservat.local/asservat/test/integration	13.741s

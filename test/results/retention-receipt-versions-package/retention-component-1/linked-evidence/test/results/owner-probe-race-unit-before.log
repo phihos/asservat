@@ -1,0 +1,8 @@
+--- FAIL: TestOwnerWorkloadProtectionRequiresActualCurrentDenial (1.64s)
+    --- FAIL: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-once (0.08s)
+        owner_workload_guard_test.go:194: bounded conflict retry: permission configuration unavailable, writes=1, until=0001-01-01 00:00:00 +0000 UTC
+    --- FAIL: TestOwnerWorkloadProtectionRequiresActualCurrentDenial/conflict-always (0.08s)
+        owner_workload_guard_test.go:200: conflict retries not bounded: 1
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	1.680s
+FAIL

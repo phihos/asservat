@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-12T15:27:17.130873+00:00",
+  "manifestSHA256": "32fa89261ef02b3e08894dd09d6d9fd0fbd18dbd67a4579b6563a2789c90dc77",
+  "verifiedDependencies": 1372,
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source.go",
+      "base_sha256": "3d6e5c961b5d097a14ec9d5869199afc4017ce0ff4b9ca9936689d08ef13c914",
+      "payload_sha256": "6d150969c227f70fdee2a9df39431af5ad5757f32b917dca322ded641b78e24b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+      "base_sha256": "f016f927096932a183a4165825cb0c446cb2c833e6cf2e47515105843a0adf3d",
+      "payload_sha256": "f68904df666f016fc63c3af471bf58bdebc172f6226ab28ab9bd87f689b89873"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_inert_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b4ac187e8e499ce92e7409a341ea538bad02b5102bedc77997ed94adb468b037"
+    },
+    {
+      "path": "docs/architecture/configuration-credential-provisioning.md",
+      "base_sha256": "35b51e5d62b8df697b7ba0d0702c41136eefaf4c27d1990fcdf2f9de8f74f93b",
+      "payload_sha256": "9d1d8ba5924e1341f81c8be1ccae5418761fd288050a207b25d0e9e17794f7bc"
+    }
+  ],
+  "scope": "Inert deployment credential observation only; no launch/replay or command switch. Staged tests passed; integrated qualification pending."
+}

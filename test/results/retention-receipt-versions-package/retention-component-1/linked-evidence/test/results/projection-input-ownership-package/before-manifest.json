@@ -1,0 +1,5 @@
+{
+  "internal/adapters/kubernetes/owner_identity_projection.go": "22e9bfca2cc230462fd5fa065acb22a6edc249dae4ec5f742417629457894b72",
+  "internal/adapters/kubernetes/owner_identity_projection_material.go": "aee70370baaef8eeee6b8c1d5f8ff1caf74e36181d3a7b7cb7711d672f316bb6",
+  "internal/adapters/kubernetes/capacity_projection.go": "8bacf9175c3aa6234862792732a7edfe04aca0ee44671777de2ddc2e80d5f035"
+}

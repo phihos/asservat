@@ -1,0 +1,26 @@
+# Inventory amendment component and native failure
+
+Five source payloads remain frozen at `native-source-checkpoint-1`, manifest `7b0ecade4073c62afd3c1a69a8a94170c264857ee55af6df4131474fb762408a`. No live source integration by this agent.
+
+Component `55106` terminal 0:
+- selectors: actual exit 0, 0.464s, log `661091ec92473620585821c6c2e0d076e88231f574ff9e2c84ed7375efb7ed55`.
+- compile: actual exit 0, 17.139s, log `1d241adbb9029ccf18feee8a4594ce8ebed3d6c16a4060ee134de6c6beea28bb`.
+- integrated-before-negative: actual exit 1, 1.516s, log `7adbe87bd6fc704acb822cd35067abe97084ed8c43775afcd9ea3ee8fe9d3146`.
+- races: actual exit 0, 21.494s, log `fd4d4c70adb130a0465cfb7b378c9d3d53947f84a5c1832c6bb3c4b50914da80`.
+- native-opt-in-closed: actual exit 0, 2.718s, log `0338fdf0f3044c877cae7691c9cd2b999bc1356c7bd7644b27bdb08334c83039`.
+- vet: actual exit 0, 2.217s, log `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- go-architecture: actual exit 0, 0.815s, log `fb0c723e14658486cc6eff1e3521388a89971fcdbb01c53a613bf9935ad9b273`.
+
+Corrected races: 11 top-level / 47 named passes. The original integrated body failed the intended missing-current child. Native opt-in absent produced SKIP and no PASS. All five payload/base hashes and 2,308 dependency hashes stayed exact; mirror source changes empty; subprocesses joined and scratch removed.
+
+Native `41351` terminal 1: exact mode `--owner-audit-inventory`, total 41.174s. Only forbidden-operation child passed; inventory read failed with `ErrStorage`. All 2,248 native source hashes unchanged, cleanup failures empty, 2,308 component dependencies unchanged, mirror source changes empty, scratch removed after harness terminal and clean cleanup.
+
+Independent administrator setup reached and verified actual null zero-byte version, all seven data/marker entries, exact version bytes and one unfinished upload/part before product Read. These partial observations do not qualify the missing reader/list capability or complete retirement. Exact failing source and assertions are preserved. No broadened Read/admin role or weakened null assertion.
+
+Reports:
+- component result `2562b2a54397d70c9d702d0134499d40bda429b14137cfc7a93067d36aa16372`
+- native result `c0baf548089c3c41e2a50bf1eda244a90691ec253f5447a07ee989057d848291`
+- native environment `7fac6bea8b224a5f02d2032822832349e56916395727a1f9f741b73ba921de21`
+- native test log `ec522ac17c69fc285eac85e8276df0e09e4ca6519c7a077bf25cef74d8496cc8`
+
+Next: separate test-only original-call trace identifies the rejected LIST; source review of pinned named multipart-list policy requires actual qualification. `native-diagnostic-source-1` is uncompiled/unrun. No extra lab until parent slot allocation.

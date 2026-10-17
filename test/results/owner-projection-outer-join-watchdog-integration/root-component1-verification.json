@@ -1,0 +1,9 @@
+{
+  "resultSHA256": "43cb7698129fc49899412710858a12f993b152baec250b8241a9b419be47c770",
+  "sourceCount": 3082,
+  "archiveCount": 29,
+  "sourceUnchanged": true,
+  "processGroupsAbsent": true,
+  "scratchAbsent": true,
+  "qualification": "failed; original package timeout and three watchdog failures preserved"
+}

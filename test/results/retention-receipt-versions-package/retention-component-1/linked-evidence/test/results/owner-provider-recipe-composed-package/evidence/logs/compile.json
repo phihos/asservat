@@ -1,0 +1,25 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+    "-run",
+    "^$",
+    "./internal/contracts",
+    "./internal/adapters/kms",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "seconds": 7.537,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

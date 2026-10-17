@@ -1,0 +1,125 @@
+package kubernetes
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	core "k8s.io/api/core/v1"
+)
+
+func capacityLocalOwnerBindingFixture(t *testing.T) (contracts.CapacityDeployment, contracts.CapacityCredentialManifest) {
+	t.Helper()
+	s, state, o, a := ownerIdentityActivationFixture(t)
+	source, err := s.object(state, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pool contracts.OwnerConfiguration
+	if json.Unmarshal([]byte(source.object.(*core.ConfigMap).Data["owner-pool.json"]), &pool) != nil {
+		t.Fatal("original source wire")
+	}
+	o.PermissionRootID = ownerID(3900)
+	worker := contracts.WorkerObjectReference{Name: s.names.Worker, UID: state.Objects[1].Receipt.UID}
+	o.CapacityProbe = &contracts.OwnerDeploymentCapacityProbe{ServiceAccount: worker}
+	o.Observation = &contracts.OwnerObservationBootstrap{Format: contracts.OwnerObservationFormat, Activation: &a, TemplateDigest: strings.Repeat("1", 64), ImageDigest: strings.Repeat("2", 64), ProtectionDigest: strings.Repeat("3", 64)}
+	c := contracts.CapacityDeployment{Format: contracts.CapacityDeploymentFormat, InstallationID: o.InstallationID, PermissionRootID: o.PermissionRootID, RoleRootUID: ownerID(3901), RoleSetupID: ownerID(3902), Control: contracts.CapacityControlDeployment{ClusterID: o.ClusterID, Namespace: o.Namespace}, LocalOwner: &contracts.CapacityLocalOwner{Source: contracts.WorkerObjectReference{Name: s.names.OwnerSource, UID: o.ConfigurationUID}, Pool: pool, Deployment: o}}
+	m := contracts.CapacityCredentialManifest{Format: contracts.CapacityCredentialManifestFormat, RootUID: c.RoleRootUID, SetupID: c.RoleSetupID, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, InitialClaimID: a.Input.InitialClaimID, ClusterID: o.ClusterID, Namespace: o.Namespace, OwnerConfigurationUID: o.ConfigurationUID, Worker: contracts.PublicRuntimeWorkerBinding{Resources: a.Input.Resources, ResourceSetupID: a.Input.ResourceSetupID, ResourceBinding: a.Input.ResourceBinding, WorkerLayout: contracts.HubWorkerInstalledLayout, Account: contracts.PublicRuntimeWorkerObject{Reference: worker}}}, Capacity: contracts.CapacityRootSetupReceipt{PermissionRootID: c.PermissionRootID}}
+	return c, m
+}
+
+func TestCapacityLocalOwnerOriginalBinding(t *testing.T) {
+	c, m := capacityLocalOwnerBindingFixture(t)
+	if _, err := CapacityLocalOwnerBinding(c, m); err != nil {
+		t.Fatal("original typed binding", err)
+	}
+	for _, mode := range []string{"missing", "source-uid", "source-name", "setup", "resources", "binding", "worker-layout", "permission-root", "namespace", "account", "deployment", "missing-activation", "native-conflict", "original-revision", "bootstrap-port", "bootstrap-profile", "zero-image", "missing-capacity-probe", "capacity-probe-account"} {
+		t.Run(mode, func(t *testing.T) {
+			b, _ := json.Marshal(c)
+			var v contracts.CapacityDeployment
+			if json.Unmarshal(b, &v) != nil {
+				t.Fatal("fixture clone")
+			}
+			switch mode {
+			case "missing":
+				v.LocalOwner = nil
+			case "source-uid":
+				v.LocalOwner.Source.UID = ownerID(3950)
+			case "source-name":
+				v.LocalOwner.Source.Name = "other"
+			case "setup":
+				v.LocalOwner.Deployment.Observation.Activation.Input.ResourceSetupID = ownerID(3951)
+			case "resources":
+				v.LocalOwner.Deployment.Observation.Activation.Input.Resources.UID = ownerID(3952)
+			case "binding":
+				changed := strings.Repeat("b", 64)
+				if changed == v.LocalOwner.Deployment.Observation.Activation.Input.ResourceBinding {
+					t.Fatal("negative fixture did not change the original binding")
+				}
+				v.LocalOwner.Deployment.Observation.Activation.Input.ResourceBinding = changed
+			case "worker-layout":
+				m.Input.Worker.WorkerLayout = ""
+				defer func() { m.Input.Worker.WorkerLayout = contracts.HubWorkerInstalledLayout }()
+			case "permission-root":
+				v.LocalOwner.Deployment.PermissionRootID = ownerID(3953)
+			case "namespace":
+				v.LocalOwner.Pool.Namespace.UID = ownerID(3954)
+			case "account":
+				v.LocalOwner.Pool.ServiceAccount.UID = ownerID(3955)
+			case "deployment":
+				v.LocalOwner.Pool.Deployment.UID = ownerID(3956)
+			case "missing-activation":
+				v.LocalOwner.Deployment.Observation.Activation = nil
+			case "native-conflict":
+				v.LocalOwner.Deployment.Native = &contracts.OwnerNativeDeployment{}
+			case "original-revision":
+				v.LocalOwner.Pool.Revision++
+			case "bootstrap-port":
+				v.LocalOwner.Pool.NativePort++
+			case "bootstrap-profile":
+				v.LocalOwner.Pool.NativeBootstrap = ""
+			case "missing-capacity-probe":
+				v.LocalOwner.Deployment.CapacityProbe = nil
+			case "capacity-probe-account":
+				v.LocalOwner.Deployment.CapacityProbe.ServiceAccount.UID = ownerID(3957)
+			case "zero-image":
+				v.LocalOwner.Deployment.Observation.ImageDigest = strings.Repeat("0", 64)
+			}
+			if _, err := CapacityLocalOwnerBinding(v, m); err == nil {
+				t.Fatal("changed original binding accepted")
+			}
+		})
+	}
+}
+
+func TestCapacityLocalOwnerPublicDigestCoversWholeCarrier(t *testing.T) {
+	c, m := capacityLocalOwnerBindingFixture(t)
+	original := CapacityRuntimePublicDigest(c, m)
+	for _, mode := range []string{"roots", "guard", "probe", "lease", "history", "image", "source-body"} {
+		t.Run(mode, func(t *testing.T) {
+			b, _ := json.Marshal(c)
+			var v contracts.CapacityDeployment
+			_ = json.Unmarshal(b, &v)
+			switch mode {
+			case "roots":
+				v.LocalOwner.Pool.IssuerRoots = append(v.LocalOwner.Pool.IssuerRoots, []byte("different"))
+			case "guard":
+				v.LocalOwner.Deployment.WorkloadGuard.BindingResourceVersion += "0"
+			case "probe":
+				v.LocalOwner.Deployment.ConfigurationProbes = append(v.LocalOwner.Deployment.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: "other", ServiceAccount: "other"})
+			case "lease":
+				v.LocalOwner.Deployment.SchedulingLeases = append(v.LocalOwner.Deployment.SchedulingLeases, contracts.OwnerSchedulingLease{Lease: "other", ServiceAccount: "other"})
+			case "history":
+				v.LocalOwner.Deployment.InitialHistoryProbe = &contracts.OwnerInitialHistoryProbe{Configuration: "other"}
+			case "image":
+				v.LocalOwner.Deployment.Observation.ImageDigest = strings.Repeat("4", 64)
+			case "source-body":
+				v.LocalOwner.Pool.Revision++
+			}
+			if CapacityRuntimePublicDigest(v, m) == original {
+				t.Fatal("carrier change escaped original public receipt")
+			}
+		})
+	}
+}

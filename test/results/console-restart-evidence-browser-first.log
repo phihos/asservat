@@ -1,0 +1,27 @@
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/12 13:42:19 http: TLS handshake error from 127.0.0.1:44448: remote error: tls: unknown certificate
+2026/10/12 13:42:19 http: TLS handshake error from 127.0.0.1:44460: remote error: tls: unknown certificate
+2026/10/12 13:42:21 http: TLS handshake error from 127.0.0.1:44486: remote error: tls: unknown certificate
+    console_native_restart_test.go:169: built native-restart browser: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+        
+        2 !== 1
+        
+            at file:///home/phil/.cache/asservat-build/planning/console-native-restart-20261012/work/web/tests/native-restart-journey.mjs:40:74 {
+          generatedMessage: true,
+          code: 'ERR_ASSERTION',
+          actual: 2,
+          expected: 1,
+          operator: 'strictEqual',
+          diff: 'simple'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleNativeRestartWithBuiltPackage (2.08s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.139s
+FAIL

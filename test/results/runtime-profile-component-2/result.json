@@ -1,0 +1,378 @@
+{
+  "runnerSHA256": "19288796bfb73bf5875a7517b05cac20e5c33d63fd0434710ace9e186cc6e20f",
+  "manifestSHA256": "bc6347b13576e7bbc1e300a3829255bcadf117e02b019227484590f539590066",
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "sourceCount": 3095,
+  "reviewedPayloads": {
+    "docs/architecture/runtime-profiles.md": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+    "internal/adapters/diagnostics/go_profile.go": "7f639d8f3961cfc75c04045cb96daac11fb498fd529089987d0f89ec76d8f0b5",
+    "internal/adapters/diagnostics/go_profile_test.go": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "internal/application/execution/go_profile.go": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "internal/domain/execution/go_profile.go": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "internal/domain/execution/go_profile_test.go": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+  },
+  "steps": [
+    {
+      "name": "race-application",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys|TestAPIContextOriginalPreparationIntervalExpiresBeforeKeys|TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire|TestAPIContextRunnerFailureIsImmutableSpentOutcome|TestAPIContextRunnerOneEffectAndClosedKeys|TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry|TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend|TestContextExecutionHasOneEffectUnderConcurrentDelivery|TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect|TestContextExecutionRejectsReplacedCollectorOrMismatchedReference)$",
+        "./internal/application/execution"
+      ],
+      "pid": 1745702,
+      "processGroup": 1745702,
+      "exit": 0,
+      "seconds": 1.402,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextOriginalPreparationIntervalExpiresBeforeKeys"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextRunnerFailureIsImmutableSpentOutcome"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextRunnerOneEffectAndClosedKeys"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestContextExecutionHasOneEffectUnderConcurrentDelivery"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect"
+        ],
+        [
+          "asservat.local/asservat/internal/application/execution",
+          "TestContextExecutionRejectsReplacedCollectorOrMismatchedReference"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/application/execution/TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextOriginalPreparationIntervalExpiresBeforeKeys",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-after-keys",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-start-record-reply",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/legacy-writer-protocol",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-create-reply",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-preparation-reply",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-record-reply",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-reply",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/replacement-pod",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/restarted-process",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/revoked-after-keys",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerFailureIsImmutableSpentOutcome",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerFailureIsImmutableSpentOutcome/capture",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerFailureIsImmutableSpentOutcome/oversize",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerFailureIsImmutableSpentOutcome/write",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextRunnerOneEffectAndClosedKeys",
+        "asservat.local/asservat/internal/application/execution/TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/authority",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/changed-audience",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/expiry-after-start",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/key-revoked",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/keys",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/lookup",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/replacement-reservation",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/revoked-after-keys",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/signature",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionHasOneEffectUnderConcurrentDelivery",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/capture",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/lost-start-reply",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/oversize",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/write",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/audit",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/budget",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/capability",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/collector",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/epoch",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/raw",
+        "asservat.local/asservat/internal/application/execution/TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/scope"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-diagnostics",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestGoProfileBodyBoundsAndIncompleteResponses|TestGoProfileCallerCancellationRetainsUncertainStart|TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket|TestGoProfileEncryptedNativeBytesAndFixedQueries|TestGoProfileInvalidCompositionClosesPreparedAttempt|TestGoProfileObserverJoinsBeforeReturningOutput|TestGoProfileRealCPUProviderAndBusyClassification|TestGoProfileRedirectStatusAndErrorsNeverEscape|TestGoProfileRefusesCredentialOnClearChannel|TestGoProfileRevocationWhileBodyBlocked|TestGoProfileShortCallerCannotStartUnfinishableRecording|TestGoProfileShortChannelCannotStartUnfinishableRecording|TestGoProfileShortOriginalChannelDeadlineCannotBeExtended|TestGoProfileSinkMustConsumeCompleteOriginalStream)$",
+        "./internal/adapters/diagnostics"
+      ],
+      "pid": 1745754,
+      "processGroup": 1745754,
+      "exit": 0,
+      "seconds": 6.305,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileBodyBoundsAndIncompleteResponses"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileCallerCancellationRetainsUncertainStart"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileEncryptedNativeBytesAndFixedQueries"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileInvalidCompositionClosesPreparedAttempt"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileObserverJoinsBeforeReturningOutput"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileRealCPUProviderAndBusyClassification"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileRedirectStatusAndErrorsNeverEscape"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileRefusesCredentialOnClearChannel"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileRevocationWhileBodyBlocked"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileShortCallerCannotStartUnfinishableRecording"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileShortChannelCannotStartUnfinishableRecording"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileShortOriginalChannelDeadlineCannotBeExtended"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileSinkMustConsumeCompleteOriginalStream"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses/empty",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses/oversized-chunked",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses/oversized-known",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses/truncated",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileBodyBoundsAndIncompleteResponses/wrong-media",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileCallerCancellationRetainsUncertainStart",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket/blocked",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket/denied",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries/cpu",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries/delta",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries/heap",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries/heap-gc",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileEncryptedNativeBytesAndFixedQueries/trace",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt/denied",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt/invalid-request",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt/nil-collector",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt/nil-parent",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileInvalidCompositionClosesPreparedAttempt/zero-collector",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileObserverJoinsBeforeReturningOutput",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRealCPUProviderAndBusyClassification",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRealCPUProviderAndBusyClassification/application-owned-profiler",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRealCPUProviderAndBusyClassification/native-provider",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Forbidden",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Found",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Internal_Server_Error",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Moved_Permanently",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Not_Found",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Permanent_Redirect",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Temporary_Redirect",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRedirectStatusAndErrorsNeverEscape/Unauthorized",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRefusesCredentialOnClearChannel",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRefusesCredentialOnClearChannel/clear-denied",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRefusesCredentialOnClearChannel/verified-tls",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileRevocationWhileBodyBlocked",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileShortCallerCannotStartUnfinishableRecording",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileShortChannelCannotStartUnfinishableRecording",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileShortOriginalChannelDeadlineCannotBeExtended",
+        "asservat.local/asservat/internal/adapters/diagnostics/TestGoProfileSinkMustConsumeCompleteOriginalStream"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-domain",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestAPIStartNeverAcceptsNodeIdentityOrLargerBudget|TestGoProfileObservationNeverExtendsActionDeadline|TestGoProfileParametersUseFiniteRuntimeSemantics|TestGoProfileRequestRetainsExactNodeAndOriginalBounds)$",
+        "./internal/domain/execution"
+      ],
+      "pid": 1745969,
+      "processGroup": 1745969,
+      "exit": 0,
+      "seconds": 1.301,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/domain/execution",
+          "TestAPIStartNeverAcceptsNodeIdentityOrLargerBudget"
+        ],
+        [
+          "asservat.local/asservat/internal/domain/execution",
+          "TestGoProfileObservationNeverExtendsActionDeadline"
+        ],
+        [
+          "asservat.local/asservat/internal/domain/execution",
+          "TestGoProfileParametersUseFiniteRuntimeSemantics"
+        ],
+        [
+          "asservat.local/asservat/internal/domain/execution",
+          "TestGoProfileRequestRetainsExactNodeAndOriginalBounds"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/domain/execution/TestAPIStartNeverAcceptsNodeIdentityOrLargerBudget",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileObservationNeverExtendsActionDeadline",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileParametersUseFiniteRuntimeSemantics",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/missing-boot",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/missing-margin",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/oversized",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/unbound-source",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/unbounded-finish",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/wrong-native-type",
+        "asservat.local/asservat/internal/domain/execution/TestGoProfileRequestRetainsExactNodeAndOriginalBounds/zero-bytes"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "pid": 1746037,
+      "processGroup": 1746037,
+      "exit": 0,
+      "seconds": 1.301,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check",
+        "design-check"
+      ],
+      "pid": 1746121,
+      "processGroup": 1746121,
+      "exit": 0,
+      "seconds": 10.708,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "generatedMirrorRestored": true
+    }
+  ],
+  "status": "passed",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "payloadsUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "2fefdb2f11b0b4311d28294f25370a35a97728cd5e84e94ab56bb8c7d3616ca7",
+    "runner.py": "19288796bfb73bf5875a7517b05cac20e5c33d63fd0434710ace9e186cc6e20f",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "manifest.json": "bc6347b13576e7bbc1e300a3829255bcadf117e02b019227484590f539590066",
+    "review.patch": "1f73925085ff40d3ab35a7c715d9d1b22fb5d1fd381541b69d0a55d67955fa9d",
+    "race-application.log": "3083ca80bd756cae4c0b60030ad15d94461424f6271b64e5f203561f0a74a4e5",
+    "race-diagnostics.log": "22178f2556f8bda3c17f7ec7edaebb36d589442f64773a12c1f5652ea9c3f8cf",
+    "race-domain.log": "d1946736d5aecd9fab473b4513ab0ee0895011d706623a814cfa496a75832d26",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "canonical.log": "b13bb4212f31c162f27d33a91acd90cbf7b61d35f49f38a5b8105daf75c4de44",
+    "architecture-validation-after.json": "b2534c84a6662866b7cf9f1c537c05d178f64787282c90240647778996675d0e",
+    "payloads/specs/profiles.md.txt": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56",
+    "payloads/internal/domain/execution/go_profile.go.txt": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "payloads/internal/domain/execution/go_profile_test.go.txt": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "payloads/internal/application/execution/go_profile.go.txt": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "payloads/internal/adapters/diagnostics/go_profile.go.txt": "7f639d8f3961cfc75c04045cb96daac11fb498fd529089987d0f89ec76d8f0b5",
+    "payloads/internal/adapters/diagnostics/go_profile_test.go.txt": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "payloads/docs/architecture/runtime-profiles.md.txt": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79"
+  }
+}

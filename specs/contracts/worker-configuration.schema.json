@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/worker-configuration.schema.json",
+  "title": "Protected download worker configuration",
+  "description": "Private worker-profile.json ConfigMap payload; independently pinned installation source with qualified administrator admission. No public request or evidence authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "clusterID",
+    "recoveryEpoch",
+    "revision",
+    "suspended",
+    "namespace",
+    "serviceAccount",
+    "priorityClass",
+    "controlConfig",
+    "image",
+    "imagePullSecrets",
+    "cpuMillis",
+    "memoryBytes",
+    "maxRuntimeSeconds"
+  ],
+  "properties": {
+    "format": {
+      "enum": [
+        "asservat-worker-configuration/v1",
+        "asservat-worker-configuration/v2"
+      ]
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+    },
+    "recoveryEpoch": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/namespace"
+    },
+    "serviceAccount": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/reference"
+    },
+    "priorityClass": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/reference"
+    },
+    "controlConfig": {
+      "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/digestReference"
+    },
+    "image": {
+      "type": "string",
+      "maxLength": 456,
+      "pattern": "^[^\\s]{1,384}@sha256:[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/name"
+      }
+    },
+    "cpuMillis": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 4000
+    },
+    "memoryBytes": {
+      "type": "integer",
+      "minimum": 16777216,
+      "maximum": 8589934592
+    },
+    "maxRuntimeSeconds": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 28800
+    },
+    "storeCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "uid": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[^\\x00-\\x1f\\x7f]+(?![\\s\\S])"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*(?![\\s\\S])"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uid"
+        }
+      }
+    },
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uid"
+        }
+      }
+    },
+    "digestReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/uid"
+        },
+        "sha256": {
+          "$ref": "https://asservat.io/spec/v1/worker-configuration.schema.json#/$defs/digest"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "format": {
+          "const": "asservat-worker-configuration/v1"
+        }
+      },
+      "not": {
+        "required": [
+          "storeCredentials"
+        ]
+      }
+    },
+    {
+      "properties": {
+        "format": {
+          "const": "asservat-worker-configuration/v2"
+        },
+        "memoryBytes": {
+          "minimum": 67108864
+        }
+      },
+      "required": [
+        "storeCredentials"
+      ]
+    }
+  ]
+}

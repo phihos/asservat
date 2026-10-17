@@ -1,0 +1,135 @@
+{
+  "handle": 45706,
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 6.272,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(OwnerObservationOperation|OwnerWorkloadProtectionRequiresActualCurrentDenial|OwnerEndpointBoundedDiscovery|ClusterObservationCallerExactNativeReadBoundary)",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 26.484,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 1.512,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "env",
+        "GOFLAGS=-p=2 -overlay=/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+        "python3",
+        "scripts/check-go-architecture.py"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 1.312,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "payloadSet": [],
+        "freeze": []
+      }
+    }
+  ],
+  "topLevelPasses": 12,
+  "namedPasses": 148,
+  "nativeRun": false,
+  "componentAuthority": "actual TLS fake Kubernetes API with explicit synthetic native objects and guard responses"
+}

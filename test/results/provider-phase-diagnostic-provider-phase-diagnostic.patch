@@ -1,0 +1,281 @@
+--- a/internal/bootstrap/initial_preparer.go
++++ b/internal/bootstrap/initial_preparer.go
+@@ -185,7 +185,11 @@
+ 	if errors.As(e.cause, &inner) {
+ 		phase += "/" + inner.phase
+ 	}
+-	return "initial preparation run " + phase + ": unavailable"
++	out := "initial preparation run " + phase + ": unavailable"
++	if provider := kube.InitialPreparationProviderDiagnostic(e.cause); provider != "" {
++		out += " (" + provider + ")"
++	}
++	return out
+ }
+ func (e initialPreparerRunFailure) Unwrap() error { return e.cause }
+ 
+--- a/internal/bootstrap/initial_preparer_diagnostic_test.go
++++ b/internal/bootstrap/initial_preparer_diagnostic_test.go
+@@ -1,6 +1,7 @@
+ package bootstrap
+ 
+ import (
++	kube "asservat.local/asservat/internal/adapters/kubernetes"
+ 	"asservat.local/asservat/internal/adapters/mounts"
+ 	"context"
+ 	"errors"
+@@ -42,3 +43,12 @@
+ 		t.Fatal("SQL phase or cause missing", err)
+ 	}
+ }
++
++func TestInitialPreparerRunPreservesOnlyQualifiedProviderDiagnostic(t *testing.T) {
++	var binder *kube.InitialPreparationCredentialBinder
++	_, _, cause := binder.PrepareProvider(context.Background(), "wrap", nil)
++	err := initialPreparerRunFailure{phase: "sql-and-providers", cause: initialPreparerRunFailure{phase: "provider-wrap", cause: cause}}
++	if !errors.Is(err, cause) || !strings.Contains(err.Error(), "sql-and-providers/provider-wrap: unavailable (phase=inputs elapsed_ms=") || !strings.Contains(err.Error(), "parent_remaining_ms=-1 original_operation_remaining_ms=-1)") {
++		t.Fatal("provider detail lost", err)
++	}
++}
+--- a/internal/adapters/kubernetes/initial_preparer_provider.go
++++ b/internal/adapters/kubernetes/initial_preparer_provider.go
+@@ -71,26 +71,41 @@
+ // issue claim. Unknown claim/POST replies never issue again. A positive response
+ // retained by this joined process may finish persistence after a lost CAS reply;
+ // another process needs the already persisted original response.
+-func (b *InitialPreparationCredentialBinder) PrepareProvider(ctx context.Context, purpose string, issuer InitialProviderIssuer) (contracts.InitialProviderResponse, time.Time, error) {
++func (b *InitialPreparationCredentialBinder) PrepareProvider(ctx context.Context, purpose string, issuer InitialProviderIssuer) (_ contracts.InitialProviderResponse, _ time.Time, err error) {
++	phase := "inputs"
++	started := time.Now()
++	var parentUntil, activeUntil time.Time
++	if ctx != nil {
++		parentUntil, _ = ctx.Deadline()
++	}
++	defer func() {
++		if err != nil {
++			err = initialPreparationProviderFailure{phase: phase, cause: err, started: started, parentUntil: parentUntil, activeUntil: activeUntil, finished: time.Now()}
++		}
++	}()
+ 	var zero contracts.InitialProviderResponse
+ 	if b == nil || ctx == nil || issuer == nil || !b.preparer.ProviderInputsEnabled() || purpose != "wrap" && purpose != "unwrap" {
+ 		return zero, time.Time{}, cfg.ErrInvalid
+ 	}
+ 	s := b.preparer
++	phase = "request-owner"
+ 	ctx, joined, e := s.ownPodRequest(ctx)
+ 	if e != nil {
+ 		return zero, time.Time{}, e
+ 	}
+ 	defer joined()
++	phase = "binding"
+ 	_, binding, until, e := b.Bind(ctx)
+ 	if e != nil {
+ 		return zero, time.Time{}, e
+ 	}
++	activeUntil = until
+ 	if !s.protection.observer.now().Before(binding.NotAfter) {
+ 		return zero, time.Time{}, cfg.ErrUnavailable
+ 	}
+ 	ctx, end := context.WithDeadline(ctx, until)
+ 	defer end()
++	phase = "material"
+ 	material, e := s.readProviderMaterial(ctx)
+ 	if e != nil {
+ 		return zero, time.Time{}, e
+@@ -98,22 +113,27 @@
+ 	if material.StorageUseUntil.Before(binding.NotAfter) {
+ 		return zero, time.Time{}, cfg.ErrChanged
+ 	}
++	phase = "original-private-scope"
+ 	root, _, e := s.originalPrivateScope(ctx)
+ 	if e != nil {
+ 		return zero, time.Time{}, e
+ 	}
++	phase = "private-state"
+ 	private, state, e := s.readPrivate(ctx)
+ 	if e != nil || state.RootUID != root.RootUID || state.SQL == nil || state.SQL.Secret == nil {
+ 		return zero, time.Time{}, cfg.ErrChanged
+ 	}
++	phase = "provider-preflight"
+ 	parent, providerUntil, e := issuer.Check(ctx, binding.NotAfter)
+ 	until = identity.Earlier(until, providerUntil)
++	activeUntil = until
+ 	if e != nil {
+ 		return zero, time.Time{}, cfg.ErrUnavailable
+ 	}
+ 	ctx, done := context.WithDeadline(ctx, until)
+ 	defer done()
+ 	if state.Providers == nil {
++		phase = "parent-persist"
+ 		next := state
+ 		next.Providers = &contracts.InitialPreparationProviders{ProfileDigest: preparationDigest(*s.providers), Parent: parent}
+ 		if !s.providerStateFits(next) {
+@@ -127,6 +147,7 @@
+ 			return zero, time.Time{}, e
+ 		}
+ 	}
++	phase = "original-parent"
+ 	if !sameProviderParent(state.Providers.Parent, parent) || state.Providers.ProfileDigest != preparationDigest(*s.providers) {
+ 		return zero, time.Time{}, cfg.ErrChanged
+ 	}
+@@ -139,6 +160,7 @@
+ 	}
+ 	fresh := false
+ 	if issue == nil {
++		phase = "issue-claim"
+ 		id, e := prepUUID()
+ 		if e != nil {
+ 			return zero, time.Time{}, e
+@@ -170,9 +192,11 @@
+ 	if response == nil {
+ 		value, ok := s.providerResponse(issue.ID)
+ 		if !ok && fresh {
++			phase = "before-issue"
+ 			if e = s.finish(ctx, until); e != nil {
+ 				return zero, time.Time{}, e
+ 			}
++			phase = "provider-issue"
+ 			value, e = issuer.Issue(ctx, purpose, *issue, parent)
+ 			if e != nil {
+ 				return zero, time.Time{}, cfg.ErrUnavailable
+@@ -181,11 +205,14 @@
+ 			ok = true
+ 		}
+ 		if !ok {
+-			return zero, time.Time{}, cfg.ErrUnavailable
+-		}
++			phase = "original-response-unresolved"
++			return zero, time.Time{}, cfg.ErrUnavailable
++		}
++		phase = "response-verify"
+ 		if e = issuer.Verify(ctx, purpose, *issue, parent, value); e != nil {
+ 			return zero, time.Time{}, cfg.ErrUnavailable
+ 		}
++		phase = "response-persist"
+ 		next := state
+ 		p := *state.Providers
+ 		next.Providers = &p
+@@ -200,14 +227,20 @@
+ 			return zero, time.Time{}, e
+ 		}
+ 		response = &value
+-	} else if e = issuer.Verify(ctx, purpose, *issue, parent, *response); e != nil {
+-		return zero, time.Time{}, cfg.ErrUnavailable
+-	}
++	} else {
++		phase = "retained-response-verify"
++		if e = issuer.Verify(ctx, purpose, *issue, parent, *response); e != nil {
++			return zero, time.Time{}, cfg.ErrUnavailable
++		}
++	}
++	phase = "final-workload"
+ 	final, e := b.current.current(ctx, true)
+ 	until = identity.Earlier(until, final)
+-	if e != nil {
+-		return zero, time.Time{}, e
+-	}
++	activeUntil = until
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	phase = "final-protection"
+ 	if e = s.finish(ctx, until); e != nil {
+ 		return zero, time.Time{}, e
+ 	}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider_diagnostic.go
+@@ -0,0 +1,50 @@
++package kubernetes
++
++import (
++	"errors"
++	"fmt"
++	"time"
++)
++
++// Durations are local diagnostic observations, never renewed authority. Only
++// static phase names and clamped integer milliseconds may cross this boundary.
++type initialPreparationProviderFailure struct {
++	phase                                       string
++	cause                                       error
++	started, finished, parentUntil, activeUntil time.Time
++}
++
++func (e initialPreparationProviderFailure) Error() string {
++	return "initial provider preparation " + InitialPreparationProviderDiagnostic(e) + ": unavailable"
++}
++func (e initialPreparationProviderFailure) Unwrap() error { return e.cause }
++func initialProviderDiagnosticMS(d time.Duration) int64 {
++	if d <= 0 {
++		return 0
++	}
++	if d >= time.Minute {
++		return 60000
++	}
++	return d.Milliseconds()
++}
++func InitialPreparationProviderDiagnostic(err error) string {
++	var e initialPreparationProviderFailure
++	if !errors.As(err, &e) {
++		return ""
++	}
++	switch e.phase {
++	case "inputs", "request-owner", "binding", "material", "original-private-scope", "private-state", "provider-preflight", "parent-persist", "original-parent", "issue-claim", "before-issue", "provider-issue", "original-response-unresolved", "response-verify", "response-persist", "retained-response-verify", "final-workload", "final-protection":
++	default:
++		return ""
++	}
++	// No date, source identifier, cause string or provider response is rendered.
++	parentStart, parentEnd, activeEnd := int64(-1), int64(-1), int64(-1)
++	if !e.parentUntil.IsZero() {
++		parentStart = initialProviderDiagnosticMS(e.parentUntil.Sub(e.started))
++		parentEnd = initialProviderDiagnosticMS(e.parentUntil.Sub(e.finished))
++	}
++	if !e.activeUntil.IsZero() {
++		activeEnd = initialProviderDiagnosticMS(e.activeUntil.Sub(e.finished))
++	}
++	return fmt.Sprintf("phase=%s elapsed_ms=%d parent_start_ms=%d parent_remaining_ms=%d original_operation_remaining_ms=%d", e.phase, initialProviderDiagnosticMS(e.finished.Sub(e.started)), parentStart, parentEnd, activeEnd)
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider_diagnostic_test.go
+@@ -0,0 +1,42 @@
++package kubernetes
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"testing"
++	"time"
++
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++func TestInitialProviderPreparationDiagnosticSeparatesOriginalDeadlines(t *testing.T) {
++	n := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
++	secret := errors.New("DO-NOT-LEAK-token-provider-response")
++	for _, test := range []struct {
++		name           string
++		parent, active time.Time
++		elapsed        time.Duration
++		want           string
++	}{
++		{"operation-expired", n.Add(40 * time.Second), n.Add(5 * time.Second), 6 * time.Second, "elapsed_ms=6000 parent_start_ms=40000 parent_remaining_ms=34000 original_operation_remaining_ms=0"},
++		{"process-expired", n.Add(3 * time.Second), n.Add(3 * time.Second), 4 * time.Second, "elapsed_ms=4000 parent_start_ms=3000 parent_remaining_ms=0 original_operation_remaining_ms=0"},
++		{"bounded-unknown", time.Time{}, time.Time{}, 2 * time.Hour, "elapsed_ms=60000 parent_start_ms=-1 parent_remaining_ms=-1 original_operation_remaining_ms=-1"},
++	} {
++		t.Run(test.name, func(t *testing.T) {
++			e := initialPreparationProviderFailure{phase: "provider-issue", cause: secret, started: n, finished: n.Add(test.elapsed), parentUntil: test.parent, activeUntil: test.active}
++			got := InitialPreparationProviderDiagnostic(e)
++			if !errors.Is(e, secret) || strings.Contains(e.Error(), secret.Error()) || got != "phase=provider-issue "+test.want {
++				t.Fatal("unsafe or unbounded original deadline diagnostic", got)
++			}
++		})
++	}
++	if InitialPreparationProviderDiagnostic(initialPreparationProviderFailure{phase: secret.Error(), cause: secret}) != "" {
++		t.Fatal("unqualified phase rendered")
++	}
++	var b *InitialPreparationCredentialBinder
++	_, _, e := b.PrepareProvider(context.Background(), "wrap", nil)
++	if !errors.Is(e, cfg.ErrInvalid) || !strings.Contains(InitialPreparationProviderDiagnostic(e), "phase=inputs ") {
++		t.Fatal("entry phase missing", e)
++	}
++}

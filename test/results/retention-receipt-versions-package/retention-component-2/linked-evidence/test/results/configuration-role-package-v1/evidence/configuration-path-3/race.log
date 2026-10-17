@@ -1,0 +1,75 @@
+=== RUN   TestConfigurationRoleRootCompleteOriginalOperation
+    configuration_role_operation_test.go:63: purpose=configuration-fleet elapsed=4.999557525s requests=127 negative_probes=9
+    configuration_role_operation_test.go:65: original five-second role operation complete: permission configuration unavailable
+--- FAIL: TestConfigurationRoleRootCompleteOriginalOperation (7.17s)
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/rbac
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/admission
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/fleet
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/owner
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/workload
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/guard
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/account
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/administrator
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/probe-became-administrator
+--- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources (51.55s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/rbac (5.52s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/admission (5.57s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/fleet (5.82s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/owner (5.97s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/workload (6.02s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/guard (5.47s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/account (6.07s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/administrator (5.52s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/probe-became-administrator (5.59s)
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=true
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=false
+--- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes (3.36s)
+    --- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=true (0.09s)
+    --- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=false (3.27s)
+=== RUN   TestConfigurationRoleOperationDoesNotEscapeOrRenew
+--- PASS: TestConfigurationRoleOperationDoesNotEscapeOrRenew (4.97s)
+=== RUN   TestConfigurationRoleOperationCloseCancelsAndJoins
+--- PASS: TestConfigurationRoleOperationCloseCancelsAndJoins (0.07s)
+=== RUN   TestConfigurationRoleSourceOriginalFiveSecondPath
+    configuration_role_source_path_test.go:266: complete source observation: elapsed=1.951037327s requests=68 negative_probes=3
+--- PASS: TestConfigurationRoleSourceOriginalFiveSecondPath (2.02s)
+=== RUN   TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement
+=== RUN   TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement/rbac
+=== RUN   TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement/admission
+--- PASS: TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement (5.00s)
+    --- PASS: TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement/rbac (2.47s)
+    --- PASS: TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement/admission (2.52s)
+=== RUN   TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath
+    configuration_role_source_path_test.go:299: complete source plus initial root: elapsed=2.102894378s requests=71 negative_probes=3
+--- PASS: TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath (2.18s)
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-fleet
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/installation
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/cluster
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/deployment
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/account
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/owner-source
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/future
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-owner
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/missing-guard
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/namespace
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/fleet-source
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/expired
+--- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-fleet (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/installation (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/cluster (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/deployment (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/account (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/owner-source (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/future (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-owner (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/missing-guard (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/namespace (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/fleet-source (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/expired (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	76.371s
+FAIL

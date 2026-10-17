@@ -1,0 +1,8 @@
+=== RUN   TestConnectorLifecycleEnrollmentWithinOriginalBound
+    connector_lifecycle_nested_regression_test.go:175: legacy-native ordinal=1 elapsed=1.836915897s remaining=3.163054715s observer=54 probe=12 failed=false
+    connector_lifecycle_nested_regression_test.go:175: legacy-native ordinal=2 elapsed=2.699917398s remaining=463.028886ms observer=54 probe=12 failed=false
+    connector_lifecycle_nested_regression_test.go:175: legacy-native ordinal=3 elapsed=451.999001ms remaining=10.619873ms observer=9 probe=3 failed=true
+    connector_lifecycle_nested_regression_test.go:177: legacy-effects prepared=1 intent=1 stored=1 outcome=1 accepted=0 elapsed=4.989495648s
+    connector_lifecycle_nested_regression_test.go:185: BEFORE-NESTED-NATIVE-BOUND: valid original admission cannot finish repeated full native proof inside its original five seconds; admitted spend remains retained
+--- FAIL: TestConnectorLifecycleEnrollmentWithinOriginalBound (5.14s)
+FAIL

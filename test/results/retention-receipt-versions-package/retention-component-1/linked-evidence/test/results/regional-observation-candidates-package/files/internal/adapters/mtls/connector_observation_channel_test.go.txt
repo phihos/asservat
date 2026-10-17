@@ -1,0 +1,378 @@
+package mtls
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+type observationCandidatesFunc func(context.Context) (value.APIContextOwnerCandidates, error)
+
+func (f observationCandidatesFunc) ReadContextStartOwners(ctx context.Context) (value.APIContextOwnerCandidates, error) {
+	return f(ctx)
+}
+func (f observationCandidatesFunc) ReadOwnerObservationCandidates(ctx context.Context) (value.APIContextOwnerCandidates, error) {
+	return f(ctx)
+}
+
+type observationMetadataFunc func(context.Context, value.ClusterObservationRequest) (value.ClusterObservationResult, error)
+
+func (f observationMetadataFunc) ObserveCluster(ctx context.Context, r value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+	return f(ctx, r)
+}
+
+// Real TLS 1.3, mutual certificate verification and exporter on a retained
+// connection. The local source/Pod/SQL observations remain synthetic; this
+// fixture does not qualify native routing or multi-cluster availability.
+type observationChannelFixture struct {
+	f                                            *connectorPairFixture
+	ownerPin                                     value.OwnerObservationPin
+	ownerCA                                      ownerTestCA
+	owner                                        value.OwnerCertificate
+	leaf                                         value.ConnectorCredentialCertificate
+	channel                                      *ConnectorObservationChannel
+	server                                       tls.ConnectionState
+	ctx                                          context.Context
+	candidateCalls, registryCalls, metadataCalls int
+	revoked, missing                             bool
+}
+
+func newObservationChannelFixture(t *testing.T, selectedLimit ...int) *observationChannelFixture {
+	t.Helper()
+	f := newConnectorPairFixture(t)
+	c := f.owner()
+	if err := c.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	pin := value.ConnectorObservationPin{Profile: f.profile.Clone(), Roles: f.roles, TemplateDigest: artifact.Digest{11}, ImageDigest: artifact.Digest{12}, ProtectionDigest: artifact.Digest{17}}
+	op := value.OwnerObservationPin{RootID: f.profile.RootID, SourceUID: ownerTestID, Pool: ownerBootstrapPool(), TemplateDigest: artifact.Digest{13}, ImageDigest: artifact.Digest{14}, ProtectionDigest: artifact.Digest{15}}
+	if len(selectedLimit) == 1 {
+		op.Pool.NativeCandidateLimit = selectedLimit[0]
+	}
+	ca := newOwnerTestCA(t, f.clock())
+	name, _ := OwnerBootstrapServerName(op.Pool)
+	cert := ca.leaf(t, f.clock(), ownerBootstrapBinding(ownerTestID), true, func(v *x509.Certificate) { v.DNSNames = append(v.DNSNames, name) })
+	a, b := net.Pipe()
+	t.Cleanup(func() { _ = a.Close(); _ = b.Close() })
+	server := tls.Server(a, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: f.clientCA.roots, SessionTicketsDisabled: true})
+	client := tls.Client(b, &tls.Config{ServerName: name, RootCAs: ca.roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, GetClientCertificate: c.GetClientCertificate, SessionTicketsDisabled: true})
+	ctx, cancel := context.WithDeadline(context.Background(), f.clock().Add(30*time.Second))
+	t.Cleanup(cancel)
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- server.HandshakeContext(ctx) }()
+	clientErr := client.HandshakeContext(ctx)
+	if clientErr != nil {
+		_ = a.Close()
+		_ = b.Close()
+	}
+	serverErr := <-serverDone
+	if clientErr != nil || serverErr != nil {
+		t.Fatal("mutual TLS", clientErr, serverErr)
+	}
+	cs, ss := client.ConnectionState(), server.ConnectionState()
+	x := &observationChannelFixture{f: f, ownerPin: op, ownerCA: ca, leaf: c.active.installed[0], server: ss, ctx: ctx}
+	candidates := observationCandidatesFunc(func(context.Context) (value.APIContextOwnerCandidates, error) {
+		x.candidateCalls++
+		v := value.APIContextOwnerCandidates{Pool: op.Pool, Owners: []value.OwnerBinding{ownerBootstrapBinding(ownerTestID)}, ObservedAt: f.clock(), ValidUntil: f.clock().Add(5 * time.Second)}
+		if x.missing {
+			v.Owners = nil
+		}
+		return v, nil
+	})
+	before, _ := candidates.ReadContextStartOwners(ctx)
+	v, err := NewOwnerPeerVerifierForPool(ca.roots, op.Pool, f.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.owner, err = v.VerifyBootstrapServer(&cs, before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := forwardRegistry(func(context.Context, value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
+		x.registryCalls++
+		if x.revoked {
+			return value.OwnerRegistrationObservation{}, value.ErrUnavailable
+		}
+		config := ownerBootstrapConfiguration(op.Pool, ca, f.clock())
+		_, until, _ := value.OwnerCertificateWindow(f.now)
+		enrollment := value.OwnerEnrollment{ID: ownerTestID, Binding: x.owner.Binding, Usage: "server", Pool: op.Pool, SourceUID: op.SourceUID, Pod: "owner-1", ReplicaSet: "owner-rs", ReplicaSetUID: ownerTestID, PublicKeyDigest: sha256.Sum256(cs.PeerCertificates[0].RawSubjectPublicKeyInfo), InitialTokenDigest: artifact.Digest{1}, InitialWorkloadDigest: artifact.Digest{2}, InitialProtectionDigest: op.ProtectionDigest, ClaimedAt: f.now, InitialHoldUntil: until.Add(value.OwnerRegistrationGrace)}
+		return value.OwnerRegistrationObservation{Enrollment: enrollment, Certificate: x.owner, Configuration: config, ObservedAt: f.clock(), FreshUntil: f.clock().Add(5 * time.Second)}, nil
+	})
+	attester := connectorObservationAttesterFunc(func(ctx context.Context, r value.ConnectorProcessRequest) (value.ConnectorObservationAttestation, error) {
+		return connectorObservationSyntheticAttestation(f, pin, ctx, r)
+	})
+	work := connectorObservationWorkloadFunc(func(ctx context.Context, p value.ConnectorProcessIdentity, pod string) (value.ConnectorObservationWorkload, error) {
+		return value.ConnectorObservationWorkload{Process: p, Pod: pod, ReplicaSetUID: ownerTestID, TemplateDigest: pin.TemplateDigest, ImageDigest: pin.ImageDigest, ProtectionDigest: pin.ProtectionDigest, WorkloadDigest: artifact.Digest{16}, ObservedAt: f.clock(), FreshUntil: f.clock().Add(5 * time.Second)}, nil
+	})
+	producer, err := NewConnectorObservationProducer(pin, c, attester, work, f.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := observationMetadataFunc(func(ctx context.Context, r value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+		x.metadataCalls++
+		digest, err := app.ClusterObservationRequestDigest(r)
+		if err != nil {
+			return value.ClusterObservationResult{}, err
+		}
+		return value.ClusterObservationResult{RequestID: r.ID, Challenge: r.Challenge, RootID: r.RootID, ClusterID: r.ClusterID, Purpose: r.Purpose, RequestDigest: digest, Interval: value.ClusterObservationInterval{ObservedAt: f.clock(), FreshUntil: r.NotAfter}, Namespaces: &value.ClusterNamespaceCandidatePage{ResourceVersion: "10", Items: []cfg.NamespaceRef{}}}, nil
+	})
+	selected, err := app.NewOwnerObservationCandidateSelection(op.Pool, candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.channel, err = NewConnectorObservationChannel(ctx, ownerOtherID, op, ca.roots, before, &cs, x.leaf, producer, selected, registry, metadata, f.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(x.channel.Close)
+	return x
+}
+
+func (x *observationChannelFixture) request() value.ClusterObservationRequest {
+	return value.ClusterObservationRequest{RootID: x.ownerPin.RootID, ID: ownerTestID, Challenge: ownerOtherID, ClusterID: x.leaf.Binding.ClusterID, Purpose: value.ObserveCapacityNamespaces, RequestedAt: x.f.clock(), NotAfter: x.f.clock().Add(5 * time.Second)}
+}
+func (x *observationChannelFixture) probe(t *testing.T, r value.ClusterObservationRequest, n int) contracts.ClusterObservationProbe {
+	t.Helper()
+	request := value.OwnerObservationRequest{RootID: r.RootID, ID: r.ID, Challenge: r.Challenge, RequestedAt: r.RequestedAt, NotAfter: r.NotAfter}
+	channel, err := ownerObservationConnection(&x.server, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := x.f.clock()
+	config := ownerBootstrapConfiguration(x.ownerPin.Pool, x.ownerCA, now)
+	peer := value.PeerCertificate{Binding: x.leaf.Binding, Digest: x.leaf.Digest, NotBefore: x.leaf.NotBefore, NotAfter: x.leaf.NotAfter}
+	proof := value.OwnerObservation{Request: request, ConnectionBinding: channel, Connector: peer, Owner: value.AuthenticatedOwner{Certificate: x.owner, EnrollmentID: ownerTestID, Pool: x.ownerPin.Pool, Pod: "owner-1", ReplicaSetUID: ownerTestID, ConfigurationRevision: config.Configuration.Revision, ProtectionDigest: x.ownerPin.ProtectionDigest, VerifiedAt: now, ValidUntil: r.NotAfter}, Workload: value.OwnerObservationWorkload{Pin: x.ownerPin, Binding: x.owner.Binding, Pod: "owner-1", ReplicaSetUID: ownerTestID, WorkloadDigest: artifact.Digest{18}, ObservedAt: now, FreshUntil: r.NotAfter}, ObservedAt: now, FreshUntil: r.NotAfter}
+	wire, err := ownerObservationReplyWire(proof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contracts.ClusterObservationProbe{Format: contracts.ClusterObservationExchangeFormat, ExchangeID: ownerOtherID, Ordinal: n, Owner: wire}
+}
+
+func TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner(t *testing.T) {
+	for _, mode := range []string{"fresh", "revoked", "missing", "near-close", "closed"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			x.f.advance.Store(int64(6 * time.Second)) // original handshake candidates expired
+			if mode == "near-close" {
+				x.f.advance.Store(int64(29 * time.Second))
+			}
+			if mode == "closed" {
+				x.f.advance.Store(int64(30 * time.Second))
+			}
+			x.revoked = mode == "revoked"
+			x.missing = mode == "missing"
+			r := x.request()
+			reply, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 1))
+			if mode == "fresh" || mode == "near-close" {
+				if err != nil || x.candidateCalls != 2 || x.registryCalls != 1 || x.metadataCalls != 0 {
+					t.Fatal("late attachment used stale candidate or read metadata", err, x.candidateCalls, x.registryCalls, x.metadataCalls)
+				}
+				until := ownerObservationTime(reply.FreshUntil)
+				if until.After(r.NotAfter) || until.After(x.f.now.Add(30*time.Second)) {
+					t.Fatal("original request/socket extended")
+				}
+				if mode == "near-close" && !until.Equal(x.f.now.Add(30*time.Second)) {
+					t.Fatal("near-hard-close bound lost")
+				}
+			} else if err == nil || reply.Format != "" || x.metadataCalls != 0 {
+				t.Fatal("revoked/expired standby acquired metadata authority", err)
+			}
+		})
+	}
+}
+
+func TestConnectorObservationChannelRequiresAllProofsAndExactReceipt(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	r := x.request()
+	for _, n := range []int{1, 2} {
+		if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := x.channel.ObserveCluster(x.ctx, r)
+	if err != nil || x.metadataCalls != 1 {
+		t.Fatal("metadata phase", err, x.metadataCalls)
+	}
+	for _, n := range []int{3, 4} {
+		if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	receipt := contracts.ClusterObservationReceipt{Format: contracts.ClusterObservationExchangeFormat, ExchangeID: ownerOtherID, RequestID: r.ID, Challenge: r.Challenge, RequestDigest: ownerObservationHex(result.RequestDigest)}
+	if err = x.channel.AcceptObservationReceipt(x.ctx, receipt); err != nil {
+		t.Fatal(err)
+	}
+	if err = x.channel.AcceptObservationReceipt(x.ctx, receipt); err == nil {
+		t.Fatal("receipt replay")
+	}
+	if x.candidateCalls != 5 || x.registryCalls != 4 {
+		t.Fatal("fresh proof checks skipped", x.candidateCalls, x.registryCalls)
+	}
+}
+
+func TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	r := x.request()
+	if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := x.channel.ObserveCluster(x.ctx, r); err == nil || x.metadataCalls != 0 {
+		t.Fatal("metadata before second independent source proof", err)
+	}
+	if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 2)); err == nil {
+		t.Fatal("failed conversation resumed")
+	}
+}
+
+func TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases(t *testing.T) {
+	for _, mode := range []string{"wrong-channel", "wrong-owner", "changed-request", "proof-replay", "metadata-replay", "changed-receipt", "registry-revoked-after-result", "known-local-close"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newObservationChannelFixture(t)
+			r := x.request()
+			probe := x.probe(t, r, 1)
+			if mode == "wrong-channel" {
+				probe.Owner.ConnectionBinding = ownerObservationHex(artifact.Digest{99})
+			}
+			if mode == "wrong-owner" {
+				probe.Owner.OwnerLeaf = ownerObservationHex(artifact.Digest{99})
+			}
+			_, err := x.channel.AnswerConnectorObservation(x.ctx, probe)
+			if mode == "wrong-channel" || mode == "wrong-owner" {
+				if err == nil || x.metadataCalls != 0 {
+					t.Fatal("copied peer proof accepted", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "proof-replay" {
+				if _, err = x.channel.AnswerConnectorObservation(x.ctx, probe); err == nil {
+					t.Fatal("proof replayed")
+				}
+				return
+			}
+			second := x.probe(t, r, 2)
+			if mode == "changed-request" {
+				changed := r.Clone()
+				changed.Challenge = ownerTestID
+				second = x.probe(t, changed, 2)
+			}
+			_, err = x.channel.AnswerConnectorObservation(x.ctx, second)
+			if mode == "changed-request" {
+				if err == nil || x.metadataCalls != 0 {
+					t.Fatal("request replaced after first proof", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := x.channel.ObserveCluster(x.ctx, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "metadata-replay" {
+				if _, err = x.channel.ObserveCluster(x.ctx, r); err == nil || x.metadataCalls != 1 {
+					t.Fatal("metadata retried", err, x.metadataCalls)
+				}
+				return
+			}
+			if mode == "registry-revoked-after-result" {
+				x.revoked = true
+			}
+			_, err = x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 3))
+			if mode == "registry-revoked-after-result" {
+				if err == nil {
+					t.Fatal("post-result owner revocation ignored")
+				}
+				if _, err = x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 4)); err == nil {
+					t.Fatal("failed post-result proof resumed")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, 4)); err != nil {
+				t.Fatal(err)
+			}
+			receipt := contracts.ClusterObservationReceipt{Format: contracts.ClusterObservationExchangeFormat, ExchangeID: ownerOtherID, RequestID: r.ID, Challenge: r.Challenge, RequestDigest: ownerObservationHex(result.RequestDigest)}
+			if mode == "changed-receipt" {
+				receipt.RequestDigest = ownerObservationHex(artifact.Digest{99})
+			}
+			if mode == "known-local-close" {
+				x.channel.producer.credentials.Close()
+			}
+			if err = x.channel.AcceptObservationReceipt(x.ctx, receipt); err == nil {
+				t.Fatal("changed or closed terminal phase accepted")
+			}
+		})
+	}
+}
+
+func TestConnectorObservationChannelCloseJoinsAdmittedMetadata(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	r := x.request()
+	for _, n := range []int{1, 2} {
+		if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entered, cancelled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() { releaseOnce.Do(func() { close(release) }); x.channel.Close() })
+	x.channel.metadata = observationMetadataFunc(func(ctx context.Context, r value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+		close(entered)
+		<-ctx.Done()
+		close(cancelled)
+		<-release
+		return value.ClusterObservationResult{}, ctx.Err()
+	})
+	finished := make(chan error, 1)
+	go func() { _, err := x.channel.ObserveCluster(x.ctx, r); finished <- err }()
+	<-entered
+	closed := make(chan struct{})
+	go func() { x.channel.Close(); close(closed) }()
+	<-cancelled
+	select {
+	case <-closed:
+		t.Fatal("Close reported joined while admitted metadata still running")
+	default:
+	}
+	releaseOnce.Do(func() { close(release) })
+	if err := <-finished; err == nil {
+		t.Fatal("cancelled metadata returned success")
+	}
+	<-closed
+}
+
+func TestConnectorObservationChannelPreservesSerializedOriginalInstants(t *testing.T) {
+	x := newObservationChannelFixture(t)
+	r := x.request()
+	// Source request dates may have a caller's location before the wire parser
+	// returns canonical UTC. Equality is by original instant, never a new date.
+	r.RequestedAt = r.RequestedAt.In(time.FixedZone("caller", 3600))
+	r.NotAfter = r.NotAfter.In(time.FixedZone("caller", 3600))
+	for _, n := range []int{1, 2} {
+		if _, err := x.channel.AnswerConnectorObservation(x.ctx, x.probe(t, r, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := x.channel.ObserveCluster(x.ctx, r)
+	if err != nil || !result.Interval.FreshUntil.Equal(r.NotAfter) || x.metadataCalls != 1 {
+		t.Fatal("serialization changed original request identity or interval", err)
+	}
+}

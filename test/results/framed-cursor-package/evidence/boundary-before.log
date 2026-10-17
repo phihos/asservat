@@ -1,0 +1,5 @@
+--- FAIL: TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame (0.05s)
+    reader_boundary_test.go:22: read ahead of denied frame-boundary delivery: data=2 index=1 output=7340032
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/objectstore/framed	0.058s
+FAIL

@@ -1,0 +1,122 @@
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-roots
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-mount
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-region
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-key
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-generation
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe-account
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-epoch
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-endpoint
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/connection-bound
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start-uid
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/protection-digest
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/image-zero
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/duplicate-peer
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/concurrency-bound
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-database
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/pki-role
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history-uid
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/missing-peer
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-endpoint
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-host
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-port
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding-version
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe-uid
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-installation
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-pool
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-endpoint
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-policy
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-roots
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-roots
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/administrator
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/lease
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/template-zero
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-roots
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-bucket
+    owner_identity_projection_input_test.go:125: changed original input admitted to immutable projection
+--- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects (0.01s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-roots (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-mount (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-region (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-key (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-generation (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe-account (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-epoch (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-endpoint (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/connection-bound (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start-uid (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/protection-digest (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/image-zero (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/duplicate-peer (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/concurrency-bound (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-database (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/pki-role (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history-uid (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/missing-peer (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-endpoint (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-host (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-port (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding-version (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe-uid (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-installation (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-pool (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-endpoint (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-policy (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-roots (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-roots (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/administrator (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/lease (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/template-zero (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-roots (0.00s)
+    --- FAIL: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-bucket (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.020s
+FAIL

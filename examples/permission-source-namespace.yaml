@@ -1,0 +1,26 @@
+apiVersion: asservat.io/v1alpha1
+kind: PermissionSource
+metadata:
+  name: namespace-maintainers
+  namespace: asservat-system
+spec:
+  enabled: true
+  clusterID: 00000000-0000-4000-8000-000000000001
+  type: namespaceMetadata
+  namespaceSelector:
+    matchLabels:
+      platform.example.invalid/managed: 'true'
+  excludedNamespaces:
+  - kube-system
+  - asservat-system
+  role: workload-maintainer
+  maxDecisionAgeSeconds: 30
+  maxNamespaces: 200
+  protection:
+    mode: administratorManaged
+    reviewRef: platform-review/namespace-writers-2026-10
+  metadataMapping:
+    field: annotation
+    key: platform.example.invalid/owner-group-id
+    mode: groupID
+    issuer: https://identity.example.invalid/realms/company

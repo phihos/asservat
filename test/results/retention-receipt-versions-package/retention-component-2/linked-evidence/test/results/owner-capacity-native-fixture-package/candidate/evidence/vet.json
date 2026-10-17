@@ -1,0 +1,21 @@
+{
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/owner-capacity-native-fixture-20261013/candidate-1/overlay.json",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 1.445,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  }
+}

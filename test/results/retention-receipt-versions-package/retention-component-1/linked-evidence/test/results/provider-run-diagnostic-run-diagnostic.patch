@@ -1,0 +1,207 @@
+--- a/internal/bootstrap/initial_preparer.go
++++ b/internal/bootstrap/initial_preparer.go
+@@ -170,7 +170,32 @@
+ 	complete = true
+ 	return d, nil
+ }
+-func (d *InitialPreparationDeployment) Run() (contracts.InitialPreparationRoot, error) {
++
++// initialPreparerRunFailure carries only compiler-selected phase labels. The
++// underlying cause remains available for errors.Is without rendering provider,
++// Kubernetes, SQL, token or mounted content.
++type initialPreparerRunFailure struct {
++	phase string
++	cause error
++}
++
++func (e initialPreparerRunFailure) Error() string {
++	phase := e.phase
++	var inner initialPreparerRunFailure
++	if errors.As(e.cause, &inner) {
++		phase += "/" + inner.phase
++	}
++	return "initial preparation run " + phase + ": unavailable"
++}
++func (e initialPreparerRunFailure) Unwrap() error { return e.cause }
++
++func (d *InitialPreparationDeployment) Run() (_ contracts.InitialPreparationRoot, err error) {
++	phase := "run-inputs"
++	defer func() {
++		if err != nil {
++			err = initialPreparerRunFailure{phase, err}
++		}
++	}()
+ 	if d == nil || d.root == nil || d.cancel == nil || d.inputs == nil || d.preparer == nil || !d.running.CompareAndSwap(false, true) {
+ 		return contracts.InitialPreparationRoot{}, mounts.ErrUnavailable
+ 	}
+@@ -179,10 +204,13 @@
+ 	// the same plan and journal; it never renews an issued credential or effect.
+ 	ctx, cancel := context.WithTimeout(d.root, time.Minute)
+ 	defer cancel()
++	phase = "declare"
+ 	out, e := d.preparer.Declare(ctx)
+ 	if e == nil && d.preparer.ActivationPreparationEnabled() {
++		phase = "gated-pod"
+ 		out, e = d.preparer.PrepareGatedPod(ctx)
+ 		if e == nil && d.preparer.FinalInputsEnabled() {
++			phase = "final-inputs"
+ 			for {
+ 				out, e = d.preparer.PrepareFinalInputs(ctx)
+ 				if !errors.Is(e, kube.ErrInitialPreparationPolicyPending) {
+@@ -198,18 +226,22 @@
+ 			}
+ 		}
+ 		if e == nil && d.preparer.PrivateInputsEnabled() && d.sqlMaterial == nil {
++			phase = "probe"
+ 			probe, err := d.preparer.PrepareProbe(ctx)
+ 			clear(probe.Token)
+ 			e = err
+ 		}
+ 		if e == nil && d.sqlMaterial != nil {
++			phase = "sql-and-providers"
+ 			e = d.prepareSQL(ctx)
+ 		}
+ 		if e == nil {
++			phase = "request-drain"
+ 			e = d.preparer.DrainPodCreateRequests(ctx)
+ 		}
+ 	}
+ 	if e == nil && ctx.Err() != nil {
++		phase = "final-cancellation"
+ 		return contracts.InitialPreparationRoot{}, mounts.ErrUnavailable
+ 	}
+ 	return out, e
+--- a/internal/bootstrap/initial_preparer_sql.go
++++ b/internal/bootstrap/initial_preparer_sql.go
+@@ -17,14 +17,22 @@
+ // prepareSQL composes the original private material and current native guards
+ // with the existing scoped SQL provisioner and optional bounded provider phase.
+ // It does not change the activation witness, staging protection or Pod gate.
+-func (d *InitialPreparationDeployment) prepareSQL(ctx context.Context) error {
++func (d *InitialPreparationDeployment) prepareSQL(ctx context.Context) (err error) {
++	phase := "sql-inputs"
++	defer func() {
++		if err != nil {
++			err = initialPreparerRunFailure{phase, err}
++		}
++	}()
+ 	if d == nil || d.sqlMaterial == nil || d.sqlRoles == nil {
+ 		return mounts.ErrUnavailable
+ 	}
++	phase = "read-prepared-inputs"
+ 	observed, e := d.preparer.ReadPreparedInputs(ctx)
+ 	if e != nil {
+ 		return e
+ 	}
++	phase = "prepare-probe"
+ 	probe, e := d.preparer.PrepareProbe(ctx)
+ 	if e != nil {
+ 		return e
+@@ -37,6 +45,7 @@
+ 	defer end()
+ 	ns := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+ 	adminConfig := d.inputs.kubernetes("administrator-token")
++	phase = "sql-administrator-client"
+ 	admin, e := kube.NewPermissionClient(adminConfig, c.ClusterID, ns, time.Now)
+ 	if e != nil {
+ 		return e
+@@ -49,33 +58,40 @@
+ 		d.inputs.mu.Unlock()
+ 		return t
+ 	}}
++	phase = "sql-probe-client"
+ 	targetProbe, e := kube.NewPermissionClient(probeConfig, c.ClusterID, ns, time.Now)
+ 	if e != nil {
+ 		return e
+ 	}
++	phase = "sql-binder"
+ 	binder, e := kube.NewInitialPreparationCredentialBinder(d.preparer, admin, targetProbe, c, observed.Input.UID, *d.sqlMaterial)
+ 	if e != nil {
+ 		return e
+ 	}
++	phase = "sql-bind"
+ 	material, binding, _, e := binder.Bind(ctx)
+ 	if e != nil {
+ 		return e
+ 	}
++	phase = "sql-credential-bind"
+ 	credentials, e := postgres.BindInitialSQLMaterial(material, c.InstallationID, material.RequestID, binding.NotBefore, binding.NotAfter)
+ 	if e != nil {
+ 		return e
+ 	}
++	phase = "sql-startup-digest"
+ 	raw, e := hex.DecodeString(binding.StartupDigest)
+ 	if e != nil || len(raw) != 32 {
+ 		return mounts.ErrUnavailable
+ 	}
+ 	var digest artifact.Digest
+ 	copy(digest[:], raw)
++	phase = "sql-credential-encoding"
+ 	payload, e := postgres.EncodeInitialSQLCredentials(credentials, digest)
+ 	if e != nil {
+ 		return e
+ 	}
+ 	defer clear(payload)
++	phase = "sql-state-persist"
+ 	stored, e := binder.PersistSQLState(ctx, payload)
+ 	if e != nil {
+ 		return e
+@@ -84,21 +100,29 @@
+ 	// the fresh credential authentication checks. A lost/late reply stays uncertain.
+ 	effect, done := context.WithDeadline(ctx, stored.ValidUntil)
+ 	defer done()
++	phase = "sql-provision"
+ 	if e = d.sqlRoles.Provision(effect, credentials); e != nil {
+ 		return e
+ 	}
++	phase = "sql-final-binding"
+ 	if _, _, _, e = binder.Bind(effect); e != nil {
+ 		return e
+ 	}
++	phase = "sql-final-deadline"
+ 	if effect.Err() != nil || !time.Now().Before(stored.ValidUntil) {
+ 		return mounts.ErrUnavailable
+ 	}
+ 	if d.providerIssuer != nil {
+ 		for _, purpose := range []string{"wrap", "unwrap"} {
++			phase = "provider-wrap"
++			if purpose == "unwrap" {
++				phase = "provider-unwrap"
++			}
+ 			if _, _, e = binder.PrepareProvider(ctx, purpose, d.providerIssuer); e != nil {
+ 				return e
+ 			}
+ 		}
++		phase = "provider-projection"
+ 		if _, e = binder.PersistProviderProjection(ctx, d.providerIssuer); e != nil {
+ 			return e
+ 		}
+--- a/internal/bootstrap/initial_preparer_diagnostic_test.go
++++ b/internal/bootstrap/initial_preparer_diagnostic_test.go
+@@ -19,3 +19,26 @@
+ 		t.Fatal("constructor phase or cause missing", e)
+ 	}
+ }
++
++func TestInitialPreparerRunDiagnosticHidesCauseAndPreservesIdentity(t *testing.T) {
++	secret := errors.New("DO-NOT-LEAK-provider-token-sql-password")
++	for _, phase := range []string{"declare", "gated-pod", "final-inputs", "probe", "request-drain", "final-cancellation"} {
++		err := initialPreparerRunFailure{phase: phase, cause: secret}
++		if !errors.Is(err, secret) || strings.Contains(err.Error(), secret.Error()) || err.Error() != "initial preparation run "+phase+": unavailable" {
++			t.Fatal("unsafe run diagnostic")
++		}
++	}
++	for _, phase := range []string{"sql-bind", "sql-state-persist", "sql-provision", "provider-wrap", "provider-unwrap", "provider-projection"} {
++		err := initialPreparerRunFailure{phase: "sql-and-providers", cause: initialPreparerRunFailure{phase: phase, cause: secret}}
++		if !errors.Is(err, secret) || strings.Contains(err.Error(), secret.Error()) || err.Error() != "initial preparation run sql-and-providers/"+phase+": unavailable" {
++			t.Fatal("unsafe nested run diagnostic")
++		}
++	}
++	var d *InitialPreparationDeployment
++	if _, err := d.Run(); !errors.Is(err, mounts.ErrUnavailable) || err.Error() != "initial preparation run run-inputs: unavailable" {
++		t.Fatal("run phase or cause missing", err)
++	}
++	if err := d.prepareSQL(context.Background()); !errors.Is(err, mounts.ErrUnavailable) || err.Error() != "initial preparation run sql-inputs: unavailable" {
++		t.Fatal("SQL phase or cause missing", err)
++	}
++}

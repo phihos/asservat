@@ -1,0 +1,18 @@
+# Direct HWORK holder source checkpoint v2
+
+Source-only review handoff; all validation except gofmt parsing is unrun.
+
+The payload implements HWORK → exact regional holder → existing regional stream. It removes the unnecessary delegated owner hop, preserves complete current candidates, original authority/socket/token/source intervals, two real native brackets, four actual regional source ordinals, exact SQL/TLS/key checks and conservative one-use uncertain spend. No runtime selector, backend receipt, producer input, credential/grant, library or rate/deadline change is included.
+
+Read CALL-GRAPH.md and the three canonical documentation patches for the complete contract and remaining native gate. Console's independently produced caller pin is used unchanged; no fabricated Pod/ReplicaSet pins.
+
+- manifest.json: 20 payloads with exact original bases; six existing paths and fourteen additions.
+- payload.json / bases.json: exact payload/base digest maps.
+- dependencies.json: 2,161 live dependency paths, repinned after root20 audit integration. dependency-delta.json records 20 changed/added paths against source checkpoint-v1; all 20 payloads and their bases are unchanged.
+- overlay.json: 17 Go paths; no live edits.
+- before-overlay.json plus before/cluster_observation_operation_client.go.txt: original first-error candidate behavior, not yet executed. The intended marker is 'unavailable first candidate cancelled independent pending positive'.
+- SOURCE-STATUS.json: explicit unrun status and 23 staged top-level tests.
+
+The original source bases matched at capture. The existing current owner-mTLS and standalone full proof routes remain available unchanged but are not selected by this direct component. Counts are structural targets, not availability or actual SQL timing.
+
+Next: parent review; one explicitly allocated sequential compile/before/race/vet/architecture job. Any failure remains immutable and receives a separately versioned correction. Full actual native path and acknowledged installed backend/listener selection remain pending.

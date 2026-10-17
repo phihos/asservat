@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/connector-api-context.schema.json",
+  "title": "Protected connector API execution profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "connector-api-context/v1"
+    },
+    "rootId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "installationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "clusterId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "issuerEpoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "connectorRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "digest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uid",
+        "generation",
+        "digest"
+      ]
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+    },
+    "namespaceUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "account": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$"
+    },
+    "accountUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "deployment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$"
+    },
+    "deploymentUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "imageDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "templateDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "projectionDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "workloadProtectionDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "capacityAccount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$"
+    },
+    "capacityAccountUID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "inputs": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "ConfigMap",
+              "Secret"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$"
+          },
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "format": "uuid"
+          },
+          "resourceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "dedicatedToAPI": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "uid",
+          "resourceVersion"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "Secret"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "dedicatedToAPI"
+              ],
+              "properties": {
+                "dedicatedToAPI": {
+                  "const": true
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "dedicatedToAPI": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "startGuard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$"
+        },
+        "policyUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "policyGeneration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bindingUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "bindingResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "name",
+        "policyUID",
+        "policyGeneration",
+        "bindingUID",
+        "bindingResourceVersion"
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "rootId",
+    "installationId",
+    "clusterId",
+    "issuerEpoch",
+    "connectorRevision",
+    "namespace",
+    "namespaceUID",
+    "account",
+    "accountUID",
+    "deployment",
+    "deploymentUID",
+    "imageDigest",
+    "templateDigest",
+    "projectionDigest",
+    "workloadProtectionDigest",
+    "capacityAccount",
+    "capacityAccountUID",
+    "inputs",
+    "startGuard"
+  ],
+  "description": "Immutable installer-owned profile; dedicatedToAPI approves whole-object Secret GET for dedicated role-owned objects, not a user-facing setting. Exact mount syntax, UID/RV, source guard and live process are checked separately."
+}

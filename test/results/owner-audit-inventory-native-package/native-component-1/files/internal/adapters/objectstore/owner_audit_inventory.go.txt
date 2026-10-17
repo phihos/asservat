@@ -1,0 +1,237 @@
+package objectstore
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
+// OwnerConfigurationAuditInventory is a read-only diagnostic over one historical
+// revision. The configured provider credential authorizes LIST; copied original
+// configuration identifies bytes, never supplies current source/SQL authority.
+// Its owner retains and closes the Store after joining admitted readers.
+type OwnerConfigurationAuditInventory struct {
+	store         *Store
+	storeID       string
+	configuration fleet.OwnerConfiguration
+	key           string
+}
+
+type OwnerAuditPhysicalKind string
+
+const (
+	OwnerAuditVersion      OwnerAuditPhysicalKind = "version"
+	OwnerAuditDeleteMarker OwnerAuditPhysicalKind = "deleteMarker"
+)
+
+// Marker CiphertextBytes is zero because a marker has no ciphertext body. It is
+// not a zero storage charge: provider metadata overhead remains unqualified.
+type OwnerAuditPhysicalVersion struct {
+	VersionID       string
+	Kind            OwnerAuditPhysicalKind
+	CiphertextBytes int64
+	Latest          bool
+}
+
+// An upload ID is not an object version. This bounded diagnostic does not LIST
+// parts and makes no assertion about the uploaded bytes or reserved maximum.
+type OwnerAuditPendingUpload struct{ UploadID string }
+
+type OwnerAuditCurrentKey struct {
+	Bytes int64
+	ETag  string
+}
+
+// These three listings are sequential observations, not an atomic snapshot or
+// writer-quiescence/absence certificate. Complete flags describe each bounded
+// LIST only. Truncation remains explicit even if a page contains only neighboring
+// generation keys. There is no purge, release or current-authority operation.
+type OwnerAuditInventoryPage struct {
+	StoreID       string
+	Configuration fleet.OwnerConfiguration
+	Key           string
+	ReadStartedAt time.Time
+	ReadUntil     time.Time
+	Versions      []OwnerAuditPhysicalVersion
+	Uploads       []OwnerAuditPendingUpload
+	Current       *OwnerAuditCurrentKey
+
+	VersionsComplete bool
+	UploadsComplete  bool
+	CurrentComplete  bool
+	// A present current key without a matching listed latest data version, or
+	// two complete listings disagreeing about latest data presence, may be a
+	// concurrent change or incompatible inventory. Never invent a null version.
+	CurrentUnmatched bool
+}
+
+func NewOwnerConfigurationAuditInventory(store *Store, storeID string, original fleet.OwnerConfiguration) (*OwnerConfigurationAuditInventory, error) {
+	if store == nil || store.client == nil || !authorization.UUID(storeID) || !original.Valid() {
+		return nil, artifact.ErrInvalid
+	}
+	original = original.Clone()
+	key := audit.OwnerConfigurationAuditKey(original)
+	if !safeKey.MatchString(key) {
+		return nil, artifact.ErrInvalid
+	}
+	return &OwnerConfigurationAuditInventory{store: store, storeID: storeID, configuration: original, key: key}, nil
+}
+
+// Read returns the first bounded page from each actual provider inventory. It
+// makes at most three LIST requests and cannot resume cursors or mint an effect.
+// Later complete-inventory composition must supply bounded continuation; this
+// page limit is not an allowed lifetime/history ceiling or a complete scan claim.
+// On a failed LIST or row, Read returns the validated earlier facts with the error.
+// The failed/unissued LIST remains incomplete; callers must not discard known
+// physical obligations because a later observation could not finish.
+func (s *OwnerConfigurationAuditInventory) Read(ctx context.Context) (OwnerAuditInventoryPage, error) {
+	var zero OwnerAuditInventoryPage
+	if s == nil || s.store == nil || s.store.client == nil || ctx == nil {
+		return zero, artifact.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	started := time.Now()
+	live, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer cancel()
+	until, _ := live.Deadline()
+	page := OwnerAuditInventoryPage{StoreID: s.storeID, Configuration: s.configuration.Clone(), Key: s.key, ReadStartedAt: started, ReadUntil: until}
+	check := func(err error) error {
+		if live.Err() != nil {
+			return live.Err()
+		}
+		if !time.Now().Before(until) {
+			return context.DeadlineExceeded
+		}
+		if err != nil {
+			return ErrStorage
+		}
+		return nil
+	}
+	// Every returned row must belong to the requested prefix, but only the exact
+	// original key is part of this revision. Generation 1 never adopts 10 or 11.
+	keyScope := func(key *string) (bool, error) {
+		if key == nil || !safeKey.MatchString(*key) || !strings.HasPrefix(*key, s.key) {
+			return false, artifact.ErrIntegrity
+		}
+		return *key == s.key, nil
+	}
+	versions, err := s.store.client.ListObjectVersions(live, &s3.ListObjectVersionsInput{Bucket: &s.store.bucket, Prefix: &s.key, MaxKeys: aws.Int32(inventoryBatch)})
+	if err = check(err); err != nil {
+		return page, err
+	}
+	if versions == nil || versions.IsTruncated == nil || len(versions.Versions)+len(versions.DeleteMarkers) > inventoryBatch {
+		return page, artifact.ErrIntegrity
+	}
+	seen := map[string]bool{}
+	latest := 0
+	var latestBytes int64
+	var latestETag string
+	for _, v := range versions.Versions {
+		exact, err := keyScope(v.Key)
+		if err != nil || v.VersionId == nil || !identity.Text(*v.VersionId, 1024) || v.Size == nil || *v.Size < 0 || v.IsLatest == nil || v.ETag == nil || !identity.Text(*v.ETag, 1024) {
+			return page, artifact.ErrIntegrity
+		}
+		if !exact {
+			continue
+		}
+		if seen[*v.VersionId] {
+			return page, artifact.ErrIntegrity
+		}
+		seen[*v.VersionId] = true
+		if *v.IsLatest {
+			latest++
+			latestBytes, latestETag = *v.Size, *v.ETag
+		}
+		page.Versions = append(page.Versions, OwnerAuditPhysicalVersion{*v.VersionId, OwnerAuditVersion, *v.Size, *v.IsLatest})
+	}
+	for _, v := range versions.DeleteMarkers {
+		exact, err := keyScope(v.Key)
+		if err != nil || v.VersionId == nil || !identity.Text(*v.VersionId, 1024) || v.IsLatest == nil {
+			return page, artifact.ErrIntegrity
+		}
+		if !exact {
+			continue
+		}
+		if seen[*v.VersionId] {
+			return page, artifact.ErrIntegrity
+		}
+		seen[*v.VersionId] = true
+		if *v.IsLatest {
+			latest++
+			latestBytes, latestETag = 0, ""
+		}
+		page.Versions = append(page.Versions, OwnerAuditPhysicalVersion{*v.VersionId, OwnerAuditDeleteMarker, 0, *v.IsLatest})
+	}
+	if latest > 1 {
+		return page, artifact.ErrIntegrity
+	}
+	if err := check(nil); err != nil {
+		return page, err
+	}
+	page.VersionsComplete = !*versions.IsTruncated
+	uploads, err := s.store.client.ListMultipartUploads(live, &s3.ListMultipartUploadsInput{Bucket: &s.store.bucket, Prefix: &s.key, MaxUploads: aws.Int32(inventoryBatch)})
+	if err = check(err); err != nil {
+		return page, err
+	}
+	if uploads == nil || uploads.IsTruncated == nil || len(uploads.Uploads) > inventoryBatch {
+		return page, artifact.ErrIntegrity
+	}
+	seenUploads := map[string]bool{}
+	for _, v := range uploads.Uploads {
+		exact, err := keyScope(v.Key)
+		if err != nil || v.UploadId == nil || !identity.Text(*v.UploadId, 1024) {
+			return page, artifact.ErrIntegrity
+		}
+		if !exact {
+			continue
+		}
+		if seenUploads[*v.UploadId] {
+			return page, artifact.ErrIntegrity
+		}
+		seenUploads[*v.UploadId] = true
+		page.Uploads = append(page.Uploads, OwnerAuditPendingUpload{*v.UploadId})
+	}
+	if err := check(nil); err != nil {
+		return page, err
+	}
+	page.UploadsComplete = !*uploads.IsTruncated
+	current, err := s.store.client.ListObjectsV2(live, &s3.ListObjectsV2Input{Bucket: &s.store.bucket, Prefix: &s.key, MaxKeys: aws.Int32(inventoryBatch)})
+	if err = check(err); err != nil {
+		return page, err
+	}
+	if current == nil || current.IsTruncated == nil || len(current.Contents) > inventoryBatch {
+		return page, artifact.ErrIntegrity
+	}
+	for _, v := range current.Contents {
+		exact, err := keyScope(v.Key)
+		if err != nil || v.Size == nil || *v.Size < 0 || v.ETag == nil || !identity.Text(*v.ETag, 1024) {
+			return page, artifact.ErrIntegrity
+		}
+		if !exact {
+			continue
+		}
+		if page.Current != nil {
+			return page, artifact.ErrIntegrity
+		}
+		page.Current = &OwnerAuditCurrentKey{*v.Size, *v.ETag}
+		page.CurrentUnmatched = latest != 1 || latestETag == "" || latestBytes != *v.Size || latestETag != *v.ETag
+	}
+	if err := check(nil); err != nil {
+		return page, err
+	}
+	page.CurrentComplete = !*current.IsTruncated
+	if page.Current == nil && page.VersionsComplete && page.CurrentComplete && latest == 1 && latestETag != "" {
+		page.CurrentUnmatched = true
+	}
+	return page, nil
+}

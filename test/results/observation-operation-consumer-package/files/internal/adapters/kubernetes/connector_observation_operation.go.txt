@@ -1,0 +1,208 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// ConnectorObservationOperationReader is the concrete ADR150 v2 native source.
+// It implements no existing full-attestation/source interface. SQL activation,
+// actual TLS/channel and process-owned key checks remain separate requirements.
+type ConnectorObservationOperationReader struct {
+	client *PermissionClient
+	source *ConnectorIdentitySource
+	guard  *OwnerWorkloadProtection
+	tokens app.ConnectorPodToken
+	pin    value.ConnectorObservationPin
+}
+
+// ConnectorObservationNativeValue distinguishes an actual source-value read
+// from the two operation-owned native brackets. Dates never renew a bracket.
+// This local value contains no token, CSR, token digest or private key.
+type ConnectorObservationNativeValue = value.ConnectorObservationNativeValue
+
+type ConnectorObservationOperation struct {
+	reader       *ConnectorObservationOperationReader
+	root         context.Context
+	cancel       context.CancelFunc
+	mu           sync.Mutex
+	joined       sync.WaitGroup
+	busy, closed bool
+	ordinal      int
+	request      value.OwnerObservationRequest
+	process      value.ConnectorProcessIdentity
+	workload     value.ConnectorObservationWorkload
+	first        *value.ConnectorIdentitySource
+	start, until time.Time
+}
+
+func NewConnectorObservationOperationReader(c *PermissionClient, source *ConnectorIdentitySource, guard *OwnerWorkloadProtection, tokens app.ConnectorPodToken, pin value.ConnectorObservationPin) (*ConnectorObservationOperationReader, error) {
+	p := pin.Profile
+	d := p.Deployment
+	if c == nil || source == nil || source.protection == nil || source.protection.configMapProtection == nil || guard == nil || tokens == nil || !pin.Valid() || source.client != c || source.protection.observer != c || guard.observer != c || source.root != p.RootID || source.binding != p.Binding || source.uid != p.Revision.UID || source.protection.digest != p.ProtectionDigest || guard.digest != pin.ProtectionDigest || c.clusterID != p.Binding.ClusterID || c.control != (cfg.NamespaceRef{Name: d.Namespace, UID: d.NamespaceUID}) || guard.plan.ControlNamespace != c.control || guard.plan.Deployment != d.Deployment || guard.plan.DeploymentUID != d.DeploymentUID {
+		return nil, cfg.ErrInvalid
+	}
+	// Reconstruct both concrete guards from fresh zero decoded plans. Caller
+	// aliases can neither change this reader nor create another authority root.
+	var workPlan cfg.OwnerWorkloadAdministration
+	raw, err := json.Marshal(guard.plan)
+	if err != nil || json.Unmarshal(raw, &workPlan) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	workGuard, err := NewOwnerWorkloadProtection(c, guard.probe, workPlan, guard.pin)
+	if err != nil || workGuard.digest != pin.ProtectionDigest {
+		return nil, cfg.ErrInvalid
+	}
+	var sourcePlan cfg.ConfigMapAdministration
+	raw, err = json.Marshal(source.protection.plan)
+	if err != nil || json.Unmarshal(raw, &sourcePlan) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	sourceGuard, err := NewConnectorIdentityProtection(c, source.protection.probe, sourcePlan, source.protection.pin)
+	if err != nil || sourceGuard.digest != p.ProtectionDigest {
+		return nil, cfg.ErrInvalid
+	}
+	owned, err := NewConnectorIdentitySource(c, sourceGuard, source.name, source.uid, source.root, source.binding)
+	if err != nil {
+		return nil, err
+	}
+	return &ConnectorObservationOperationReader{c, owned, workGuard, tokens, pin.Clone()}, nil
+}
+
+// Begin admits one exact original operation and takes its first independent
+// native bracket. A later Read call is never a replacement for a failed Begin.
+func (s *ConnectorObservationOperationReader) Begin(ctx context.Context, request value.OwnerObservationRequest, process value.ConnectorProcessIdentity) (*ConnectorObservationOperation, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !request.Valid(s.client.now()) || request.RootID != s.pin.Profile.RootID || !process.Valid() || process.Binding != s.pin.Profile.Binding {
+		return nil, value.ErrInvalid
+	}
+	deadline, finite := ctx.Deadline()
+	if !finite || !s.client.now().Before(deadline) {
+		return nil, value.ErrInvalid
+	}
+	until := identity.Earlier(deadline, request.NotAfter)
+	root, cancel := context.WithDeadline(ctx, until)
+	start := s.client.now()
+	w, err := s.nativeBoundary(root, process, start, until)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	until = identity.Earlier(until, w.FreshUntil)
+	return &ConnectorObservationOperation{reader: s, root: root, cancel: cancel, request: request, process: process, workload: w, start: start, until: until}, nil
+}
+
+func (o *ConnectorObservationOperation) validLocked(ctx context.Context) bool {
+	return !o.closed && ctx != nil && ctx.Err() == nil && o.root.Err() == nil && o.reader.client.now().Before(o.until)
+}
+
+// Read spends each ordinal before native I/O. Every successful call performs a
+// new complete source-value decode, never a cached full source observation. The
+// fourth also performs a new independent native bracket before returning.
+func (o *ConnectorObservationOperation) Read(ctx context.Context, ordinal int) (ConnectorObservationNativeValue, error) {
+	var zero ConnectorObservationNativeValue
+	if o == nil {
+		return zero, value.ErrInvalid
+	}
+	o.mu.Lock()
+	deadline, finite := time.Time{}, false
+	if ctx != nil {
+		deadline, finite = ctx.Deadline()
+	}
+	if !o.validLocked(ctx) || !finite || o.busy || ordinal != o.ordinal+1 || ordinal > value.ConnectorObservationMaximumChecks {
+		o.closed = true
+		o.cancel()
+		o.mu.Unlock()
+		return zero, value.ErrUnavailable
+	}
+	o.ordinal = ordinal
+	o.busy = true
+	o.joined.Add(1)
+	until := identity.Earlier(o.until, deadline)
+	o.mu.Unlock()
+	defer o.joined.Done()
+	call, cancel := context.WithDeadline(o.root, until)
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { cancel(); close(done) })
+	defer func() {
+		cancel()
+		if !stop() {
+			<-done
+		}
+	}()
+	// At ordinal four the final independent bracket precedes the last full
+	// value read. The guard probe itself GETs source bytes; reading the value
+	// afterward detects any source change during that proof, rather than
+	// silently treating its ignored probe body as a new source observation.
+	workload := o.workload
+	var err error
+	if ordinal == value.ConnectorObservationMaximumChecks {
+		var current value.ConnectorObservationWorkload
+		current, err = o.reader.nativeBoundary(call, o.process, o.start, until)
+		if err == nil && !sameConnectorNativeWorkload(workload, current) {
+			err = cfg.ErrChanged
+		}
+		until = identity.Earlier(until, current.FreshUntil)
+	}
+	valueCall, stopValue := context.WithDeadline(call, until)
+	defer stopValue()
+	observed := o.reader.client.now()
+	var configuration app.ConnectorIdentityConfiguration
+	var rootsUntil time.Time
+	// This unchanged decoder performs one full-value, namespace-bracketed
+	// exact UID read. It cannot renew the original or final native interval.
+	if err == nil {
+		configuration, rootsUntil, err = o.reader.source.snapshotConfiguration(valueCall)
+	}
+	until = identity.Earlier(until, identity.Earlier(rootsUntil, configuration.Backing.Policy.ValidUntil))
+	source := configuration.Source
+	source.Observation.Profile.ProtectionDigest = o.reader.pin.Profile.ProtectionDigest
+	source.Observation.ObservedAt = observed
+	source.Observation.FreshUntil = until
+	configuration.Source = source
+	if err == nil && (!configuration.Valid(o.reader.client.now()) || !o.reader.pin.Compatible(source)) {
+		err = value.ErrUnavailable
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.busy = false
+	if err != nil || !o.validLocked(ctx) || valueCall.Err() != nil || !o.reader.client.now().Before(until) || o.first != nil && (o.first.Roles != source.Roles || !o.first.Observation.SameSource(source.Observation)) {
+		o.closed = true
+		o.cancel()
+		if err != nil {
+			return zero, err
+		}
+		return zero, value.ErrUnavailable
+	}
+	o.until = until
+	workload.FreshUntil = until
+	source.Observation.FreshUntil = until
+	if o.first == nil {
+		copy := source
+		copy.Observation.Profile = source.Observation.Profile.Clone()
+		o.first = &copy
+	}
+	return ConnectorObservationNativeValue{Request: o.request, Ordinal: ordinal, Source: source, Workload: workload, NativeStartedAt: o.start, NativeUntil: until, ValueObservedAt: observed, Final: ordinal == value.ConnectorObservationMaximumChecks}, nil
+}
+
+func sameConnectorNativeWorkload(a, b value.ConnectorObservationWorkload) bool {
+	return a.Process == b.Process && a.Pod == b.Pod && a.ReplicaSetUID == b.ReplicaSetUID && a.TemplateDigest == b.TemplateDigest && a.ImageDigest == b.ImageDigest && a.ProtectionDigest == b.ProtectionDigest && a.WorkloadDigest == b.WorkloadDigest
+}
+
+// Close never refunds a spent ordinal or certifies remote terminal completion.
+func (o *ConnectorObservationOperation) Close() {
+	if o == nil {
+		return
+	}
+	o.mu.Lock()
+	o.closed = true
+	o.cancel()
+	o.mu.Unlock()
+	o.joined.Wait()
+}

@@ -1,0 +1,40 @@
+{
+  "phase": "after-second",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-terminal-handoff-20261012/overlay-after.json",
+    "-race",
+    "./internal/transport/native",
+    "./internal/application/evidence",
+    "./internal/adapters/postgres",
+    "-run",
+    "^Test(Native|FirstContext)",
+    "-count=1",
+    "-timeout=90s",
+    "-v"
+  ],
+  "exit": 0,
+  "seconds": 18.182,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": [],
+    "before_helper": false
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": [],
+    "before_helper": false
+  },
+  "payloadSHA256": "86449eb4b54b56394cd3d831314645a013908463074930bd8d5fa92f102c5d0a",
+  "dependencySHA256": "474c6954be03c82bc0e702caa53ec433b9aa64cd3fb039362d9c2d51fd1b4d21",
+  "dependenciesCount": 1497,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-terminal-handoff-20261012/tmp"
+  }
+}

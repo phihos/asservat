@@ -1,0 +1,12 @@
+{
+  "internal/adapters/kubernetes/connector_observation_operation.go": "d4b66656768369e9e55d72027b8a9b029af645789c9efe1836210ab27e3cd59e",
+  "internal/adapters/kubernetes/observation_operation_ports.go": "398849b457833f5c8b5bf5e98f2d13b7836c0d2f1a9dda2affc851ddc2601f8b",
+  "internal/adapters/kubernetes/observation_operation_ports_test.go": "be954bddd9b505a66ff960acafb651967342fa48ef2c0f1d6b43d1fcc7814938",
+  "internal/adapters/kubernetes/owner_observation_operation.go": "1127c7d83749ca77dab8be1d7e8795d5c031baa9e885cab3eaf53b0e37ce2eb5",
+  "internal/adapters/postgres/connector_observation_operation.go": "6fa72e7c23604c235744f7bc66d525c1372abefeaaf3158af9c6e5fb3babfa95",
+  "internal/adapters/postgres/connector_observation_operation_test.go": "32c59b0741d10e07fae7572ee8c62d2d500e6e29a5a180289d53fd98aba2d71d",
+  "internal/adapters/postgres/connector_registry.go": "570dc43845b8b32821c1094998f8837d0048a333663f611ae89dbe56676b4785",
+  "internal/application/fleet/observation_operation.go": "9ac6dea1662dbdb7f63ef33518683301953a0093ed53dc10c556d431cd721bbe",
+  "internal/domain/fleet/observation_operation.go": "ea520188b89f3d263eb0f6202fb4df90c71267e622f30ca5f3222690969a4480",
+  "internal/domain/fleet/observation_operation_test.go": "70b77fbbd8909073c1fc1248729ee1b59fea78a4cefe01a13495aa206cbf306c"
+}

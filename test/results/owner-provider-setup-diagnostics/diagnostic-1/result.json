@@ -1,0 +1,224 @@
+{
+  "container": "asservat-setup-shape-4337ca683db4",
+  "image": "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf",
+  "observations": [
+    {
+      "path": "sys/auth/owner-auth",
+      "credentialScope": "root",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "auth_kubernetes_2fd2a1c4",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0,
+          "token_type": "default-service"
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "kubernetes",
+        "uuid": "e72c3d7a-89c9-a4ea-c82c-14cdec56bf00"
+      }
+    },
+    {
+      "path": "sys/auth/owner-auth",
+      "credentialScope": "named-read-only",
+      "exit": 2,
+      "stderr": "Error reading sys/auth/owner-auth: Error making API request.\n\nURL: GET http://127.0.0.1:8200/v1/sys/auth/owner-auth\nCode: 403. Errors:\n\n* 1 error occurred:\n\t* permission denied\n\n\n"
+    },
+    {
+      "path": "sys/mounts/auth/owner-auth",
+      "credentialScope": "root",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "auth_kubernetes_2fd2a1c4",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0,
+          "token_type": "default-service"
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "kubernetes",
+        "uuid": "e72c3d7a-89c9-a4ea-c82c-14cdec56bf00"
+      }
+    },
+    {
+      "path": "sys/mounts/auth/owner-auth",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "auth_kubernetes_2fd2a1c4",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0,
+          "token_type": "default-service"
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "kubernetes",
+        "uuid": "e72c3d7a-89c9-a4ea-c82c-14cdec56bf00"
+      }
+    },
+    {
+      "path": "sys/mounts/auth/owner-auth/tune",
+      "credentialScope": "root",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "default_lease_ttl": 2764800,
+        "description": "",
+        "force_no_cache": false,
+        "max_lease_ttl": 2764800,
+        "token_type": "default-service"
+      }
+    },
+    {
+      "path": "sys/mounts/auth/owner-auth/tune",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "default_lease_ttl": 2764800,
+        "description": "",
+        "force_no_cache": false,
+        "max_lease_ttl": 2764800,
+        "token_type": "default-service"
+      }
+    },
+    {
+      "path": "sys/mounts/transit",
+      "credentialScope": "root",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "transit_a1260b78",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "transit",
+        "uuid": "167910e0-b4d0-e72c-1335-0db5e730145c"
+      }
+    },
+    {
+      "path": "sys/mounts/transit",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "accessor": "transit_a1260b78",
+        "config": {
+          "default_lease_ttl": 0,
+          "force_no_cache": false,
+          "max_lease_ttl": 0
+        },
+        "deprecation_status": "supported",
+        "description": "",
+        "external_entropy_access": false,
+        "local": false,
+        "options": null,
+        "plugin_version": "",
+        "running_plugin_version": "v2.7.1+builtin.bao",
+        "running_sha256": "",
+        "seal_wrap": false,
+        "type": "transit",
+        "uuid": "167910e0-b4d0-e72c-1335-0db5e730145c"
+      }
+    },
+    {
+      "path": "transit/keys/audit",
+      "credentialScope": "root",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_plaintext_backup": false,
+        "auto_rotate_period": 0,
+        "deletion_allowed": false,
+        "derived": false,
+        "exportable": false,
+        "imported_key": false,
+        "keys": {
+          "1": 1791858062
+        },
+        "latest_version": 1,
+        "min_available_version": 0,
+        "min_decryption_version": 1,
+        "min_encryption_version": 0,
+        "name": "audit",
+        "soft_deleted": false,
+        "supports_decryption": true,
+        "supports_derivation": true,
+        "supports_encryption": true,
+        "supports_signing": false,
+        "type": "aes256-gcm96"
+      }
+    },
+    {
+      "path": "transit/keys/audit",
+      "credentialScope": "named-read-only",
+      "exit": 0,
+      "stderr": "",
+      "publicData": {
+        "allow_plaintext_backup": false,
+        "auto_rotate_period": 0,
+        "deletion_allowed": false,
+        "derived": false,
+        "exportable": false,
+        "imported_key": false,
+        "keys": {
+          "1": 1791858062
+        },
+        "latest_version": 1,
+        "min_available_version": 0,
+        "min_decryption_version": 1,
+        "min_encryption_version": 0,
+        "name": "audit",
+        "soft_deleted": false,
+        "supports_decryption": true,
+        "supports_derivation": true,
+        "supports_encryption": true,
+        "supports_signing": false,
+        "type": "aes256-gcm96"
+      }
+    }
+  ],
+  "cleanupFailures": [],
+  "exit": 0
+}

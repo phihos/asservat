@@ -1,0 +1,76 @@
+{
+  "runnerSHA256": "13bdaff9d22856bab32e84ea059c6c3372eddc29d8aedb73462895f9d58a4fcc",
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "pid": 1031760,
+      "processGroup": 1031760,
+      "exit": 0,
+      "seconds": 8.507,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "pid": 1032023,
+      "processGroup": 1032023,
+      "exit": 0,
+      "seconds": 1.902,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    }
+  ],
+  "sourceCount": 3063,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "passed",
+  "reviewedPayloads": {
+    "scripts/test-context-storage.py": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "scripts/test-regional-context-selection.py": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "test/integration/api_execution_native_test.go": "b3756deeddbc642ca22ca8e3647ee993414f3cd242689640f4b4c1451c0f312f",
+    "test/integration/capture_admission_test.go": "7033302839376c00e66f558ae0a9f3f59e592679ac56651fe497089178d55a7f",
+    "test/integration/context_continuation_native_test.go": "3f950a3a6e6166b964ab1f6b28277fe90674918ef87c240cfcd631a45e9488f9",
+    "test/integration/context_native_content_test.go": "3c889ecc29908abb60face938b0612ce337b5951cd3c5cdcf74055fb9c00c4a9",
+    "test/integration/public_context_journey_native_test.go": "c56b6d80feb967d3c4a06476dab3094c26155cceff5879bbc7545697af519588",
+    "test/integration/public_context_journey_test.go": "047e024915c028373a6eb7c40ad14b4b9ed2add5bb4279485ba7b1434902318a",
+    "test/integration/worker_enrollment_helpers_test.go": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68"
+  },
+  "selections": {},
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "49ff97fabbbb6d215ab4fd5072652e9a39ebaadfb39bdea1437df16dc7cfdf45",
+    "runner.py": "13bdaff9d22856bab32e84ea059c6c3372eddc29d8aedb73462895f9d58a4fcc",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "compile.log": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "payloads/scripts/test-context-storage.py.txt": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "payloads/scripts/test-regional-context-selection.py.txt": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "payloads/test/integration/api_execution_native_test.go.txt": "b3756deeddbc642ca22ca8e3647ee993414f3cd242689640f4b4c1451c0f312f",
+    "payloads/test/integration/capture_admission_test.go.txt": "7033302839376c00e66f558ae0a9f3f59e592679ac56651fe497089178d55a7f",
+    "payloads/test/integration/context_continuation_native_test.go.txt": "3f950a3a6e6166b964ab1f6b28277fe90674918ef87c240cfcd631a45e9488f9",
+    "payloads/test/integration/context_native_content_test.go.txt": "3c889ecc29908abb60face938b0612ce337b5951cd3c5cdcf74055fb9c00c4a9",
+    "payloads/test/integration/public_context_journey_native_test.go.txt": "c56b6d80feb967d3c4a06476dab3094c26155cceff5879bbc7545697af519588",
+    "payloads/test/integration/public_context_journey_test.go.txt": "047e024915c028373a6eb7c40ad14b4b9ed2add5bb4279485ba7b1434902318a",
+    "payloads/test/integration/worker_enrollment_helpers_test.go.txt": "f1a092c6ebce895578224e0549475d7b7ec0900721b494a725b3e9f715007f68"
+  }
+}

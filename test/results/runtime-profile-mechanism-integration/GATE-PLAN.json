@@ -1,0 +1,64 @@
+{
+  "run_only_after_parent_exclusive_build_allocation": true,
+  "commands": [
+    [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-timeout=5m",
+      "-json",
+      "-run",
+      "^TestGoProfile",
+      "./internal/domain/execution",
+      "./internal/application/execution",
+      "./internal/adapters/diagnostics"
+    ],
+    [
+      "go",
+      "vet",
+      "./internal/domain/execution",
+      "./internal/application/execution",
+      "./internal/adapters/diagnostics"
+    ],
+    [
+      "make",
+      "go-architecture-check"
+    ],
+    [
+      "make",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+    ]
+  ],
+  "expected_parents": [
+    "TestGoProfileBodyBoundsAndIncompleteResponses",
+    "TestGoProfileCallerCancellationRetainsUncertainStart",
+    "TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket",
+    "TestGoProfileEncryptedNativeBytesAndFixedQueries",
+    "TestGoProfileInvalidCompositionClosesPreparedAttempt",
+    "TestGoProfileObservationNeverExtendsActionDeadline",
+    "TestGoProfileObserverJoinsBeforeReturningOutput",
+    "TestGoProfileParametersUseFiniteRuntimeSemantics",
+    "TestGoProfileRealCPUProviderAndBusyClassification",
+    "TestGoProfileRedirectStatusAndErrorsNeverEscape",
+    "TestGoProfileRefusesCredentialOnClearChannel",
+    "TestGoProfileRequestRetainsExactNodeAndOriginalBounds",
+    "TestGoProfileRevocationWhileBodyBlocked",
+    "TestGoProfileShortCallerCannotStartUnfinishableRecording",
+    "TestGoProfileShortChannelCannotStartUnfinishableRecording",
+    "TestGoProfileShortOriginalChannelDeadlineCannotBeExtended",
+    "TestGoProfileSinkMustConsumeCompleteOriginalStream"
+  ],
+  "expected_parent_count": 17,
+  "notes": [
+    "All native sockets are owned loopback test servers; real standard-library CPU handler runs for one second with synthetic workload.",
+    "Application package intentionally has no separate new parent; HTTP tests compose the actual GoProfileEncodingSink with real framed encoder and decoder.",
+    "No Docker, privileged host collection, external identity/storage or paid services.",
+    "Capture exact source hashes, test RUN/PASS inventory and all terminal exit codes; no component result confers production node/authority qualification.",
+    "GOFLAGS=-p=2, GOMAXPROCS=2 and task-owned TMPDIR on cache filesystem under parent runner."
+  ],
+  "expected_initial_failure": "TestGoProfileShortCallerCannotStartUnfinishableRecording"
+}

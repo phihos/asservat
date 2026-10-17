@@ -1,0 +1,1316 @@
+{
+  "integrated_at": "2026-10-12T21:21:21.455648+00:00",
+  "source_manifest": {
+    "status": "source-only SQL54 native candidate; NOT compiled or integrated; pending projection runtime excluded",
+    "sources": {
+      "source_v1": "751919a2e9eee85ca0ce118fbc3d13095e12d6d50a3e244af4f1bad872b8eb58",
+      "console_v2": "92fc220e95e8b28668883510bfecc9907ce39e39071a52983779b6442770e77d"
+    },
+    "files": [
+      {
+        "path": "api/v1alpha1/capacity.go",
+        "source_sha256": "0f69e16fdb0bf5de61feedb2c95891494bb61c8dd710e36dd715e98248e24b43",
+        "payload_sha256": "0f69e16fdb0bf5de61feedb2c95891494bb61c8dd710e36dd715e98248e24b43",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "docs/architecture/capacity-production.md",
+        "source_sha256": "b6dffec22c5ce9e5c59a868f5ca55e3fde8e89459526213a88cd3f4745a4d178",
+        "payload_sha256": "b6dffec22c5ce9e5c59a868f5ca55e3fde8e89459526213a88cd3f4745a4d178",
+        "base_sha256": null,
+        "owner": "ADR141 canonical contract source"
+      },
+      {
+        "path": "docs/architecture/catalog.yaml",
+        "source_sha256": "d57efe41081d927846cc4645279080d92b955a264055c84c640a7c109f36c130",
+        "payload_sha256": "d57efe41081d927846cc4645279080d92b955a264055c84c640a7c109f36c130",
+        "base_sha256": "af406561b29dc7312139578a21d82e53cf4bf80f82669f788860aa6d75107b3b",
+        "owner": "ADR141 canonical contract source"
+      },
+      {
+        "path": "docs/decisions/141-protected-capacity-production.md",
+        "source_sha256": "c3fab4cbbd705584327863a47fbf98e65d1116d7f1f8d2edf6ec51b46209455b",
+        "payload_sha256": "c3fab4cbbd705584327863a47fbf98e65d1116d7f1f8d2edf6ec51b46209455b",
+        "base_sha256": null,
+        "owner": "ADR141 canonical contract source"
+      },
+      {
+        "path": "docs/decisions/README.md",
+        "source_sha256": "140b0518237f892c1127f37fa6bf2624f865eb240beab5b49989b26850ffd190",
+        "payload_sha256": "4f824de82799ad22fb591ab49b17a0f2f6348621a11085d79c4a8bc8a5bbf199",
+        "base_sha256": "9f8bdbddc9d092566dceabfb69a3242dd83701d030484bd3d3aea560e3c41c2e",
+        "owner": "ADR141 canonical contract source"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity-schemas/budget-policy.schema.json",
+        "source_sha256": "f7b60a145236fd70efe6fed49358d43cc7077edfd356bb8a28a5e0eff483a23f",
+        "payload_sha256": "f7b60a145236fd70efe6fed49358d43cc7077edfd356bb8a28a5e0eff483a23f",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity-schemas/common.schema.json",
+        "source_sha256": "c91fd4c8d651c2e0c82eddacba0af34ccb744d00c44cf88b5e6edc6bca8fb49b",
+        "payload_sha256": "c91fd4c8d651c2e0c82eddacba0af34ccb744d00c44cf88b5e6edc6bca8fb49b",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity-schemas/storage-pool.schema.json",
+        "source_sha256": "b114b4eb12528ceb155484346567129237c2ad27ba6e9ab6c479536b592028f9",
+        "payload_sha256": "b114b4eb12528ceb155484346567129237c2ad27ba6e9ab6c479536b592028f9",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_admission.go",
+        "source_sha256": "4804be48eb54859f6aa7ecd915465044b4d39a5c11a9c443fba1331c4ee49ea5",
+        "payload_sha256": "4804be48eb54859f6aa7ecd915465044b4d39a5c11a9c443fba1331c4ee49ea5",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_decode.go",
+        "source_sha256": "4b9e1af429dc32e45c044ff0e288052fde2be363af8be271f07357d9d183f9dc",
+        "payload_sha256": "4b9e1af429dc32e45c044ff0e288052fde2be363af8be271f07357d9d183f9dc",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_guard.go",
+        "source_sha256": "ba80fb33fa261985046b3b785bca02b67a2e4087cd8a6e2d5fa9da12cc164952",
+        "payload_sha256": "ba80fb33fa261985046b3b785bca02b67a2e4087cd8a6e2d5fa9da12cc164952",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_guard_test.go",
+        "source_sha256": "983c52837cc7ef10e9c5f934a4b8dfaa53b6dfe49ddd4511c218b0d73e2f5e8a",
+        "payload_sha256": "983c52837cc7ef10e9c5f934a4b8dfaa53b6dfe49ddd4511c218b0d73e2f5e8a",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_leader_join_test.go",
+        "source_sha256": "0ba56e151619522c297a8f6378d82a25695fcf8db96ae5fe4e53b449aced7b0e",
+        "payload_sha256": "0ba56e151619522c297a8f6378d82a25695fcf8db96ae5fe4e53b449aced7b0e",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_probe.go",
+        "source_sha256": "fd292dabe3c3974089e247ab69896fe8eab3275e09c4485229418134fabca1ac",
+        "payload_sha256": "fd292dabe3c3974089e247ab69896fe8eab3275e09c4485229418134fabca1ac",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_setup.go",
+        "source_sha256": "02dd953075fcaa83e34c8c21bbf327def7dc77863f1f8679673fdcc78b94085d",
+        "payload_sha256": "02dd953075fcaa83e34c8c21bbf327def7dc77863f1f8679673fdcc78b94085d",
+        "base_sha256": null,
+        "owner": "dependency:dependency-capacity-v6; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_setup_test.go",
+        "source_sha256": "6749b98a9170aa62a19e72389b1efb740ef092c1c02b5f36c30dd8f4d5b99c16",
+        "payload_sha256": "6749b98a9170aa62a19e72389b1efb740ef092c1c02b5f36c30dd8f4d5b99c16",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_source.go",
+        "source_sha256": "5c7b325e55b8c76c816ea15b26333a916beb410a63b4c748c6e6c5eeb7c5ab60",
+        "payload_sha256": "5c7b325e55b8c76c816ea15b26333a916beb410a63b4c748c6e6c5eeb7c5ab60",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_source_test.go",
+        "source_sha256": "b3388f719dad7ce62f26a69c1ce15ef9ed4cafb6a74bf8e1671931b2ff63e7e5",
+        "payload_sha256": "b3388f719dad7ce62f26a69c1ce15ef9ed4cafb6a74bf8e1671931b2ff63e7e5",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_workload.go",
+        "source_sha256": "8f3269a7e66032cb0d54c2c5e233cda1ef9cc82389196dcd847748e4a0115755",
+        "payload_sha256": "8f3269a7e66032cb0d54c2c5e233cda1ef9cc82389196dcd847748e4a0115755",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_workload_test.go",
+        "source_sha256": "dd9577314bef80f01ba920e30df8d0495c63d08dcc364f7a4225f3b7044013c9",
+        "payload_sha256": "dd9577314bef80f01ba920e30df8d0495c63d08dcc364f7a4225f3b7044013c9",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/kubernetes/configuration_runtime_launch.go",
+        "source_sha256": "97057a77b9c4d135268744907528ffe174744c363c1edd09ae10531709a99179",
+        "payload_sha256": "97057a77b9c4d135268744907528ffe174744c363c1edd09ae10531709a99179",
+        "base_sha256": "cfc25660ca4cbbeeb19111abb0cbe8fdd5e4bb4d0a9683281d98026b2ee6b75c",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/hub_worker_activation.go",
+        "source_sha256": "7e692219d9d9baef17756f870c0ef7b405eca6f69ff243fcfc968d3cf6650676",
+        "payload_sha256": "7e692219d9d9baef17756f870c0ef7b405eca6f69ff243fcfc968d3cf6650676",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/hub_worker_installed.go",
+        "source_sha256": "7e0efbc98e8b1895de3f7b343ae688e7d087572ae05486ae452c576ab18c5300",
+        "payload_sha256": "7e0efbc98e8b1895de3f7b343ae688e7d087572ae05486ae452c576ab18c5300",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/hub_worker_installed_test.go",
+        "source_sha256": "42a03efb2eb32cf66b5042317676f7162b3b8b1161e6f97dd9c428cce79b9df0",
+        "payload_sha256": "42a03efb2eb32cf66b5042317676f7162b3b8b1161e6f97dd9c428cce79b9df0",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/initial_runtime_resource_objects.go",
+        "source_sha256": "eba49db1eca70f1205be36314a8c90639e43b315618d0a818ce1843db88ae5e6",
+        "payload_sha256": "eba49db1eca70f1205be36314a8c90639e43b315618d0a818ce1843db88ae5e6",
+        "base_sha256": "724006f6b1e49379c54fae5c65b91e3501eab9ca5d6d5c8ab9f90b6ca7a7b64b",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+        "source_sha256": "34afd60b63226c23800fe1e155f45c9c53a106e340b319fa4955d46de80512e1",
+        "payload_sha256": "34afd60b63226c23800fe1e155f45c9c53a106e340b319fa4955d46de80512e1",
+        "base_sha256": "37320f753a49d35cc0f96bef9a99b698831a2f729d48e609f07da43f074039af",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/public_runtime_roles.go",
+        "source_sha256": "5ad3a7b72a72a1027a39d2f9d815571f14bd5b8247f744f3a4561925ad82dd27",
+        "payload_sha256": "5ad3a7b72a72a1027a39d2f9d815571f14bd5b8247f744f3a4561925ad82dd27",
+        "base_sha256": "47f782d0014628572a7ca826906fe83d506a436f5767d57b885fd4f5cfbcd075",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/public_runtime_roles_test.go",
+        "source_sha256": "088213e0f5a22e620cc118588753bdfe10fa5f461899e454084f11e52697488d",
+        "payload_sha256": "088213e0f5a22e620cc118588753bdfe10fa5f461899e454084f11e52697488d",
+        "base_sha256": "8e2fec43abb2082e758097f620f05da5bdf2536c3f5c08051ab3e92fdd52b88d",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/public_runtime_worker.go",
+        "source_sha256": "4d2194f146618d25c03adec5936fc2001332e5577c9233499211f564c4f21e2b",
+        "payload_sha256": "4d2194f146618d25c03adec5936fc2001332e5577c9233499211f564c4f21e2b",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/public_runtime_worker_test.go",
+        "source_sha256": "bb2be7fe31e231cf918bed04a3ebcd34a35d40579d198294988218b26df1bd70",
+        "payload_sha256": "bb2be7fe31e231cf918bed04a3ebcd34a35d40579d198294988218b26df1bd70",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/reconciliation_leader.go",
+        "source_sha256": "7fe70462476d04360ea6491b36261d87aae5a3e3931761c852d80b9bce372a56",
+        "payload_sha256": "7fe70462476d04360ea6491b36261d87aae5a3e3931761c852d80b9bce372a56",
+        "base_sha256": "d8bbb1826ef6ee7961a9610ca8384995eb364d74ca0ce2f6a30825fa54b54dd8",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_audit_profiles.go",
+        "source_sha256": "0efff27e2d46970d7855ad7d7cc971e9247760d4b7cd56f2aefe4e24d28d070c",
+        "payload_sha256": "0efff27e2d46970d7855ad7d7cc971e9247760d4b7cd56f2aefe4e24d28d070c",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_audit_profiles_test.go",
+        "source_sha256": "29eaef20d0ad62fddf0ff044c534ec8c3e0f3e4668200886e90c28e854a6f227",
+        "payload_sha256": "29eaef20d0ad62fddf0ff044c534ec8c3e0f3e4668200886e90c28e854a6f227",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_enrollment.go",
+        "source_sha256": "0720771124feb840f5e076388a75aa2d6fd02429635e5503df18333571c9d9e3",
+        "payload_sha256": "0720771124feb840f5e076388a75aa2d6fd02429635e5503df18333571c9d9e3",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_enrollment_decode.go",
+        "source_sha256": "8f7f369d42a9993a20c7e0dc037be6a0225069ec7e5e88c787e166d26f7c829b",
+        "payload_sha256": "8f7f369d42a9993a20c7e0dc037be6a0225069ec7e5e88c787e166d26f7c829b",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_enrollment_decode_test.go",
+        "source_sha256": "c2ab01992067266dbd273b181b6edaceb4950770268d1cc22353dedb13c90c77",
+        "payload_sha256": "c2ab01992067266dbd273b181b6edaceb4950770268d1cc22353dedb13c90c77",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_enrollment_effect.go",
+        "source_sha256": "772390c3a15bf865c2a2dac83652d871aa591695fbf86720dd398c4bdf7d79a5",
+        "payload_sha256": "772390c3a15bf865c2a2dac83652d871aa591695fbf86720dd398c4bdf7d79a5",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_permissions.go",
+        "source_sha256": "c31dd9b73353e00846b70c090505de1932ba72e54c9672b7e1554d339a90053a",
+        "payload_sha256": "c31dd9b73353e00846b70c090505de1932ba72e54c9672b7e1554d339a90053a",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_recovery.go",
+        "source_sha256": "b2f1a2f099a3ae4b079011cc0240a91ef67476e096a7a7da97b6052c7b8ed73f",
+        "payload_sha256": "b2f1a2f099a3ae4b079011cc0240a91ef67476e096a7a7da97b6052c7b8ed73f",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_recovery_test.go",
+        "source_sha256": "646438242d40d52365a89c8ca26cd27d4c1bcc889d590f1e0d31829578df4dbd",
+        "payload_sha256": "646438242d40d52365a89c8ca26cd27d4c1bcc889d590f1e0d31829578df4dbd",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_root.go",
+        "source_sha256": "76eed1fa3aaca333e304cfdf2823928e701c6aa6360c2741d37a781a35aed4ef",
+        "payload_sha256": "76eed1fa3aaca333e304cfdf2823928e701c6aa6360c2741d37a781a35aed4ef",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_runtime_credential.go",
+        "source_sha256": "fc564d219ccf37b871a4099ffdf3eaf13f661ca14977a17cb1f472f2729e8ada",
+        "payload_sha256": "fc564d219ccf37b871a4099ffdf3eaf13f661ca14977a17cb1f472f2729e8ada",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_runtime_credential_test.go",
+        "source_sha256": "7c6e89acac0fdeb2d20ffd691d44c9dd0acbd042ebb2c6cee154ea2bf7f026ab",
+        "payload_sha256": "7c6e89acac0fdeb2d20ffd691d44c9dd0acbd042ebb2c6cee154ea2bf7f026ab",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_session_decode.go",
+        "source_sha256": "4d4c043a24c20da37d49924b7aa05ae68b978d8b05987d4b873ec8f885979d14",
+        "payload_sha256": "4d4c043a24c20da37d49924b7aa05ae68b978d8b05987d4b873ec8f885979d14",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_session_decode_test.go",
+        "source_sha256": "f07a1a5cab5af903f2cc24bfebd7f549e10ea2f441f7abf0f840897d2612240f",
+        "payload_sha256": "f07a1a5cab5af903f2cc24bfebd7f549e10ea2f441f7abf0f840897d2612240f",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_session_integration_decode_test.go",
+        "source_sha256": "adeead10ca3beef6f5495bb98702eaac41dba1c5b1812e818a38c3429482f6da",
+        "payload_sha256": "adeead10ca3beef6f5495bb98702eaac41dba1c5b1812e818a38c3429482f6da",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_setup.go",
+        "source_sha256": "bb293b04dca69f1728961cf3ea475e7cb20b9849b61e756d328428b121163e2e",
+        "payload_sha256": "bb293b04dca69f1728961cf3ea475e7cb20b9849b61e756d328428b121163e2e",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_setup_input.go",
+        "source_sha256": "9753205bc95cbe91a28a6525d81e763801ff9d61ea96311eca9113c1f3df0f66",
+        "payload_sha256": "9753205bc95cbe91a28a6525d81e763801ff9d61ea96311eca9113c1f3df0f66",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_setup_input_test.go",
+        "source_sha256": "6ef0d3c0b8d3d97ac93ed17f704196d7b0eb8804d2da24380028512511738c48",
+        "payload_sha256": "6ef0d3c0b8d3d97ac93ed17f704196d7b0eb8804d2da24380028512511738c48",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_setup_pair.go",
+        "source_sha256": "43762776601d86303641ff31749732a2dea00f141fe1c98f799b696a65b04f30",
+        "payload_sha256": "43762776601d86303641ff31749732a2dea00f141fe1c98f799b696a65b04f30",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_source.go",
+        "source_sha256": "1ec4b33f811caec9c1e70e5a3b3321a2b18cd565ef34eac63890d946921a3c48",
+        "payload_sha256": "1ec4b33f811caec9c1e70e5a3b3321a2b18cd565ef34eac63890d946921a3c48",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capacity_source_test.go",
+        "source_sha256": "82054ad529d65bb09bcef627907359c76182d50134a92862e8b5313ebe0d32e0",
+        "payload_sha256": "82054ad529d65bb09bcef627907359c76182d50134a92862e8b5313ebe0d32e0",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/capture.go",
+        "source_sha256": "9cfa6f1f7e459376fd7ccd82345042e4be1babc35635b456055a0edc76b0100d",
+        "payload_sha256": "9cfa6f1f7e459376fd7ccd82345042e4be1babc35635b456055a0edc76b0100d",
+        "base_sha256": "1e4325f1b28b433b833b637f3469e511e6030e80b4efc49d30cfb750ef902837",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/context_native_control.go",
+        "source_sha256": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+        "payload_sha256": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+        "base_sha256": "e668ad770f7a1ddaa00f5a14481e3d7867a9f2d153b152702d68a3398cc0ec88",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/context_storage_read.go",
+        "source_sha256": "b5c8861e1ca94498d0430a6ca99d550d02c6e59883f85811141aeeeb8a342ad3",
+        "payload_sha256": "b5c8861e1ca94498d0430a6ca99d550d02c6e59883f85811141aeeeb8a342ad3",
+        "base_sha256": "3f204f13fa03a185d48e52da1bf12b6aa46f82c377e5e15258a258d38c4142e5",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/context_storage_read_test.go",
+        "source_sha256": "252ef5168ee72d470e2fe8cdef17c5f2d952b8ee22333c1028973e7dced547a5",
+        "payload_sha256": "252ef5168ee72d470e2fe8cdef17c5f2d952b8ee22333c1028973e7dced547a5",
+        "base_sha256": "346a50348c565d4680fa3780909b52fa60ac268fe83151adf315ed772287c012",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/download.go",
+        "source_sha256": "e45d1bc41b8e6fe4e8470212a7d93c5937e0bcae173c66ac8859525d17151c9d",
+        "payload_sha256": "e45d1bc41b8e6fe4e8470212a7d93c5937e0bcae173c66ac8859525d17151c9d",
+        "base_sha256": "543a8e2e0f0b0f62794e0e45d25438b493b999eeb3879cc7fed56380c159918a",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/download_response_window.go",
+        "source_sha256": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+        "payload_sha256": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+        "base_sha256": "5bf613f1e57d414c194348f1834a7339b182e86beafe60bd66e8a773a1f0db9b",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_capacity_role_plan.go",
+        "source_sha256": "30f63d049d06987b44e1acf0d1a4e2b6130e25a867df88bb402ac7623af48ba3",
+        "payload_sha256": "30f63d049d06987b44e1acf0d1a4e2b6130e25a867df88bb402ac7623af48ba3",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_capacity_role_plan_test.go",
+        "source_sha256": "0f0d83c48e2ac1850c89f6e5607ff157f853d30931a062face220ad647fd081d",
+        "payload_sha256": "0f0d83c48e2ac1850c89f6e5607ff157f853d30931a062face220ad647fd081d",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_cleanup_role_plan.go",
+        "source_sha256": "e7c913891d2c9ef83fa0813243731a1a10b634ee353470fbe2fcb042681976f7",
+        "payload_sha256": "e7c913891d2c9ef83fa0813243731a1a10b634ee353470fbe2fcb042681976f7",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_cleanup_role_plan_test.go",
+        "source_sha256": "c384659219ba1b6c9171a2f5eb8d21b463014290cef78747d8dbb3366c331a48",
+        "payload_sha256": "c384659219ba1b6c9171a2f5eb8d21b463014290cef78747d8dbb3366c331a48",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+        "source_sha256": "701772474c7bf42efda8de0d85987ce7731f1bd293463253af3d9ce1de7c6bc0",
+        "payload_sha256": "701772474c7bf42efda8de0d85987ce7731f1bd293463253af3d9ce1de7c6bc0",
+        "base_sha256": "815788ef05b7fa734e7bab8b2da978780b037df0423622bde623c0308f5a430e",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_role_plan_test.go",
+        "source_sha256": "d891f3470d64bc08c9b5b37392d198775d23b9b007d6cfff29334cc94957a408",
+        "payload_sha256": "d891f3470d64bc08c9b5b37392d198775d23b9b007d6cfff29334cc94957a408",
+        "base_sha256": "0cf8d676159d2649ee8bdbbaf930b420d3f138ce6ab8549fcaa570e8c14136bd",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/adapters/postgres/public_runtime_roles.go",
+        "source_sha256": "097ec59e77398298cb097ae47f09dcb2b4038e7222c3df64d4749615f63ec3a3",
+        "payload_sha256": "097ec59e77398298cb097ae47f09dcb2b4038e7222c3df64d4749615f63ec3a3",
+        "base_sha256": "2aaed5b2d0e52f2ff71ce8206c8f7e8c913da57ff8eea3da18f67828753a3003",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/application/audit/capacity_profiles.go",
+        "source_sha256": "7ed0ad07218c96a19286eda9134c29f2be4f25614a72dbc1a7a2c808674c0975",
+        "payload_sha256": "7ed0ad07218c96a19286eda9134c29f2be4f25614a72dbc1a7a2c808674c0975",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/audit/capture_account_mac.go",
+        "source_sha256": "19fadaff5404d7081225025681fa4929c14875e75533481328a8721148d03192",
+        "payload_sha256": "19fadaff5404d7081225025681fa4929c14875e75533481328a8721148d03192",
+        "base_sha256": null,
+        "owner": "console dependency checked in V6"
+      },
+      {
+        "path": "internal/application/audit/capture_account_mac_test.go",
+        "source_sha256": "83f60995ddfbb87f574581d79b6ac3dfb11106366f87ef2f106c5bfceeae4141",
+        "payload_sha256": "83f60995ddfbb87f574581d79b6ac3dfb11106366f87ef2f106c5bfceeae4141",
+        "base_sha256": null,
+        "owner": "console dependency checked in V6"
+      },
+      {
+        "path": "internal/application/capacity/backend_qualification.go",
+        "source_sha256": "88a93e00996e985fb08ced3988762153fd6c56ffe4e81a2d5cb677805d636c11",
+        "payload_sha256": "88a93e00996e985fb08ced3988762153fd6c56ffe4e81a2d5cb677805d636c11",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/backend_qualification_test.go",
+        "source_sha256": "d303211b880a29b40edf2b1fe9ab58481411aa888442c35265f9f075a78c0beb",
+        "payload_sha256": "d303211b880a29b40edf2b1fe9ab58481411aa888442c35265f9f075a78c0beb",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/context_backing.go",
+        "source_sha256": "0583c3d5ff0560222e64324aa57db8266267bb24bee01c3c38c77f4e447fcfc4",
+        "payload_sha256": "0583c3d5ff0560222e64324aa57db8266267bb24bee01c3c38c77f4e447fcfc4",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/context_backing_test.go",
+        "source_sha256": "ba08dfe6b5e3b4fd7a4b57e178065e9a50cf443c30bbd8d14c883d135b16aa70",
+        "payload_sha256": "ba08dfe6b5e3b4fd7a4b57e178065e9a50cf443c30bbd8d14c883d135b16aa70",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment.go",
+        "source_sha256": "57a37563dd1526463a6697b3f3bc67b183485697524d1133ccd4a6c240da4a41",
+        "payload_sha256": "57a37563dd1526463a6697b3f3bc67b183485697524d1133ccd4a6c240da4a41",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment_observation.go",
+        "source_sha256": "4d054dd5810c5b8036d94db50e79ca9bcd998448ab25211f66c8c663c4daab7c",
+        "payload_sha256": "4d054dd5810c5b8036d94db50e79ca9bcd998448ab25211f66c8c663c4daab7c",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment_permissions.go",
+        "source_sha256": "4d5db6b079203de19d87c68ce38504d2ce64df15b3b8d103a76e8252175b7820",
+        "payload_sha256": "4d5db6b079203de19d87c68ce38504d2ce64df15b3b8d103a76e8252175b7820",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment_plan.go",
+        "source_sha256": "73ef6d43d9468ca1dd184ba412af5ea0aba16236bd417c4a32d7b32179931d48",
+        "payload_sha256": "73ef6d43d9468ca1dd184ba412af5ea0aba16236bd417c4a32d7b32179931d48",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment_plan_test.go",
+        "source_sha256": "af58554ed6a8ba48eacdfe3597c891da44fd3c05f05a0c5e3c27f90661080797",
+        "payload_sha256": "af58554ed6a8ba48eacdfe3597c891da44fd3c05f05a0c5e3c27f90661080797",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/enrollment_test.go",
+        "source_sha256": "49c35bbf215b74e0de7dc42e8a7fde615c88e9e63b958ed7e4f0c1f84caab397",
+        "payload_sha256": "49c35bbf215b74e0de7dc42e8a7fde615c88e9e63b958ed7e4f0c1f84caab397",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/pool_plan.go",
+        "source_sha256": "6b9c0d2c5c45418ad2d17d3c69626ecc758d53764bfc55e35a55b96ec7819109",
+        "payload_sha256": "6b9c0d2c5c45418ad2d17d3c69626ecc758d53764bfc55e35a55b96ec7819109",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/pool_plan_test.go",
+        "source_sha256": "6f80163a701052a6cbe6f48750a3ef8bff585f18a16bdace266f1475dc73a8ea",
+        "payload_sha256": "6f80163a701052a6cbe6f48750a3ef8bff585f18a16bdace266f1475dc73a8ea",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/protected_budget.go",
+        "source_sha256": "ff3ffdccb50066a89d16df6bd9a7cf33f2dd47115866f00370a3c0667087bfb5",
+        "payload_sha256": "ff3ffdccb50066a89d16df6bd9a7cf33f2dd47115866f00370a3c0667087bfb5",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/protected_budget_test.go",
+        "source_sha256": "1be5b42774fd47a8b03e87534a2fb0a14efe1d802a153e2caf6f80680b6a8daa",
+        "payload_sha256": "1be5b42774fd47a8b03e87534a2fb0a14efe1d802a153e2caf6f80680b6a8daa",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/protected_guard.go",
+        "source_sha256": "439bf2ae56187abe2beabe2b0cf70b805001f4340061512e8026ccb6af29e540",
+        "payload_sha256": "439bf2ae56187abe2beabe2b0cf70b805001f4340061512e8026ccb6af29e540",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/protected_source.go",
+        "source_sha256": "1eeee3cece3d83675679b0f2cfee1bafcadcb07ddf861f3321b7214f9db6ddce",
+        "payload_sha256": "1eeee3cece3d83675679b0f2cfee1bafcadcb07ddf861f3321b7214f9db6ddce",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/protected_source_test.go",
+        "source_sha256": "853211f0168195ac4c7a99ded74ef86b035148d500a7d4bb6459da9e428232db",
+        "payload_sha256": "853211f0168195ac4c7a99ded74ef86b035148d500a7d4bb6459da9e428232db",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/reconciliation.go",
+        "source_sha256": "ee11d5627a707f6da47496da01358e00d8d32f1dc84240ebc472fb458ca0eb37",
+        "payload_sha256": "ee11d5627a707f6da47496da01358e00d8d32f1dc84240ebc472fb458ca0eb37",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/reconciliation_discovery.go",
+        "source_sha256": "ee152da320d030e5856b21c1d21fa79ace351ed5f30b32e8ea80c8ab10f52db2",
+        "payload_sha256": "ee152da320d030e5856b21c1d21fa79ace351ed5f30b32e8ea80c8ab10f52db2",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/reconciliation_test.go",
+        "source_sha256": "f21d8daa3f2aba7085897d9dc12ef38702222032c5521817ffe39e531ce81d8d",
+        "payload_sha256": "f21d8daa3f2aba7085897d9dc12ef38702222032c5521817ffe39e531ce81d8d",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/reconciliation_work.go",
+        "source_sha256": "a0955c082779c68f80c36b54e48b559fcf48397c3b94b7fe68ebec57fd708d30",
+        "payload_sha256": "a0955c082779c68f80c36b54e48b559fcf48397c3b94b7fe68ebec57fd708d30",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/reconciliation_work_test.go",
+        "source_sha256": "63f1bbf1b39196d0b51291ed9293085e010525f809d0a04e8b6320bd540e7e97",
+        "payload_sha256": "63f1bbf1b39196d0b51291ed9293085e010525f809d0a04e8b6320bd540e7e97",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_backing.go",
+        "source_sha256": "eddd31316c55dc72a25bc1b5378b72cddf0480ba2585518262a726af74ce72f8",
+        "payload_sha256": "eddd31316c55dc72a25bc1b5378b72cddf0480ba2585518262a726af74ce72f8",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_backing_test.go",
+        "source_sha256": "d1067680014dc3eaa6b4aeba6caf2f62cb35cce1be4093eb99c3c9f56a2dd87e",
+        "payload_sha256": "d1067680014dc3eaa6b4aeba6caf2f62cb35cce1be4093eb99c3c9f56a2dd87e",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_observation.go",
+        "source_sha256": "f3554c1b97bd681d8cca84fd51cd495958d48c513b443440054079139ca66c1a",
+        "payload_sha256": "f3554c1b97bd681d8cca84fd51cd495958d48c513b443440054079139ca66c1a",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_provisioning.go",
+        "source_sha256": "b980c2c44c86a881777999d7185b3e49e491a2eacdaf8b2415c43f4e8bbbd8bc",
+        "payload_sha256": "b980c2c44c86a881777999d7185b3e49e491a2eacdaf8b2415c43f4e8bbbd8bc",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_provisioning_test.go",
+        "source_sha256": "3873b44a5c4a43c097bc26e57839a8cb867dfa535f6495c756ea773b4a4affac",
+        "payload_sha256": "3873b44a5c4a43c097bc26e57839a8cb867dfa535f6495c756ea773b4a4affac",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_renewal_test.go",
+        "source_sha256": "c9580b07a3bf5d2a335c27cef5110db162543780864f2e593dad039de08fc27e",
+        "payload_sha256": "c9580b07a3bf5d2a335c27cef5110db162543780864f2e593dad039de08fc27e",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_state.go",
+        "source_sha256": "78c394c47655ddae82d2113918487a6d5fe2601b6b41e39a852d1abbe3f2de2a",
+        "payload_sha256": "78c394c47655ddae82d2113918487a6d5fe2601b6b41e39a852d1abbe3f2de2a",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/root_state_test.go",
+        "source_sha256": "aec8a485897a18dd7ade2f57e46ec6b4114297a3d7cfcb1c9d98c337634079b4",
+        "payload_sha256": "aec8a485897a18dd7ade2f57e46ec6b4114297a3d7cfcb1c9d98c337634079b4",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/source_acceptance.go",
+        "source_sha256": "899c65520d2d0978dd4bfb8d45fc9a7c263f5b72b371a8a396c1a68650269d8c",
+        "payload_sha256": "899c65520d2d0978dd4bfb8d45fc9a7c263f5b72b371a8a396c1a68650269d8c",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/source_acceptance_test.go",
+        "source_sha256": "756aed023a8514fc37147cb43ca66aadf51f276ebd95b50738855b242e83b689",
+        "payload_sha256": "756aed023a8514fc37147cb43ca66aadf51f276ebd95b50738855b242e83b689",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/source_observer.go",
+        "source_sha256": "c5527bc5bd7542a920eb0a1568d62b3d6a346438d0110c22fb9b48724ba1a765",
+        "payload_sha256": "c5527bc5bd7542a920eb0a1568d62b3d6a346438d0110c22fb9b48724ba1a765",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/source_observer_test.go",
+        "source_sha256": "767998c243c336a896c3b7cb078150403af08f34894b0590693dc1bbc21b2aaa",
+        "payload_sha256": "767998c243c336a896c3b7cb078150403af08f34894b0590693dc1bbc21b2aaa",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/application/capacity/workload_discovery.go",
+        "source_sha256": "1720bfb88898bc2e6535650855b6c94e3d22c5d2a9ec1a0b8b63dabac0c3ec87",
+        "payload_sha256": "1720bfb88898bc2e6535650855b6c94e3d22c5d2a9ec1a0b8b63dabac0c3ec87",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/capacity_hub_worker.go",
+        "source_sha256": "099e10c3b349d66d5a7bd93801e9d5c9b339746c8f86e31041938f6a721c99e8",
+        "payload_sha256": "099e10c3b349d66d5a7bd93801e9d5c9b339746c8f86e31041938f6a721c99e8",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/capacity_hub_worker_test.go",
+        "source_sha256": "d1b53cbae91127acefd3fc363f3165d574a13a35f1e18285497340a0925f182f",
+        "payload_sha256": "d1b53cbae91127acefd3fc363f3165d574a13a35f1e18285497340a0925f182f",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/capacity_worker.go",
+        "source_sha256": "35e9b59ad99b7e5c64b1853488d5ae00c2760f7769a134eeae1a52b6974a2800",
+        "payload_sha256": "35e9b59ad99b7e5c64b1853488d5ae00c2760f7769a134eeae1a52b6974a2800",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/capacity_worker_inputs.go",
+        "source_sha256": "69b8957dea3a57e716d02f5ae04f44129f187b7148975518dd85f3803406ec7f",
+        "payload_sha256": "69b8957dea3a57e716d02f5ae04f44129f187b7148975518dd85f3803406ec7f",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/capacity_worker_test.go",
+        "source_sha256": "67da3542a35a4724b74d2d44b852131a3ce85b6bc5456066cd444fe5672e4b68",
+        "payload_sha256": "67da3542a35a4724b74d2d44b852131a3ce85b6bc5456066cd444fe5672e4b68",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/bootstrap/hub_worker.go",
+        "source_sha256": "a99c588fe0882b441b3d1eb9a5f82f60e83e609c3924bf323819f36604a59209",
+        "payload_sha256": "cac619c17ff67278937f6f85fa1f75c8ad656b9fc2a2e18ffa2752bdffafdf0f",
+        "base_sha256": "b9869ec069bc0aae790a53fbcbf59aab0a3eda1e8c789da76620ea826df52a99",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/bootstrap/initial_runtime_configuration.go",
+        "source_sha256": "4857c79b1ddede4e8b4b81ab90d5b42d3a2ea9ce7327d7025fde1aee042f632a",
+        "payload_sha256": "4857c79b1ddede4e8b4b81ab90d5b42d3a2ea9ce7327d7025fde1aee042f632a",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/bootstrap/public_context_mac.go",
+        "source_sha256": "8c4670a197cc1984d8835537ff164cae1ccbbfe1ae1a0771aff7e4473c4db1b0",
+        "payload_sha256": "8c4670a197cc1984d8835537ff164cae1ccbbfe1ae1a0771aff7e4473c4db1b0",
+        "base_sha256": null,
+        "owner": "console dependency checked in V6"
+      },
+      {
+        "path": "internal/bootstrap/public_context_mac_test.go",
+        "source_sha256": "a57c189dbd830b3ba9ae41826c870ddb8a735100e1278cd29224bfcd37e46edd",
+        "payload_sha256": "a57c189dbd830b3ba9ae41826c870ddb8a735100e1278cd29224bfcd37e46edd",
+        "base_sha256": null,
+        "owner": "console dependency checked in V6"
+      },
+      {
+        "path": "internal/contracts/capacity_projection.go",
+        "source_sha256": "8abe82b90f5e6b85d71ba8f0b77621f04c800432a7fc6217d22455110ef40d17",
+        "payload_sha256": "8abe82b90f5e6b85d71ba8f0b77621f04c800432a7fc6217d22455110ef40d17",
+        "base_sha256": null,
+        "owner": "dependency:dependency-capacity-source-v1; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/capacity_runtime.go",
+        "source_sha256": "dca62b221c88b790ae2709d9bb4e24c37362a9a82d76cda5cb41147ba863fea8",
+        "payload_sha256": "dca62b221c88b790ae2709d9bb4e24c37362a9a82d76cda5cb41147ba863fea8",
+        "base_sha256": null,
+        "owner": "dependency:dependency-capacity-source-v1; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/capacity_setup.go",
+        "source_sha256": "d06b09ecfd43117b4137fe5ef16ce5006bddbb233987bab62bbe749672a3f019",
+        "payload_sha256": "d06b09ecfd43117b4137fe5ef16ce5006bddbb233987bab62bbe749672a3f019",
+        "base_sha256": null,
+        "owner": "dependency:dependency-capacity-v6; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/capture_cleanup_runtime.go",
+        "source_sha256": "0bdd9f0f450fc7898b5d5f948af99df73b777e6426ead205079d1de614bd07b2",
+        "payload_sha256": "0bdd9f0f450fc7898b5d5f948af99df73b777e6426ead205079d1de614bd07b2",
+        "base_sha256": null,
+        "owner": "payload:capture-cleanup-runtime-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/cluster_observation_projection.go",
+        "source_sha256": "972d87dc5f35216112d50d969ee3568a55341fdee5159485b10e6bd86898d2c1",
+        "payload_sha256": "972d87dc5f35216112d50d969ee3568a55341fdee5159485b10e6bd86898d2c1",
+        "base_sha256": null,
+        "owner": "dependency:dependency-observation-v3; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/hub_worker.go",
+        "source_sha256": "f16ab0574baf4dbce0d97d06462045998e963d687884d36664171d9c7de51fcd",
+        "payload_sha256": "f16ab0574baf4dbce0d97d06462045998e963d687884d36664171d9c7de51fcd",
+        "base_sha256": "ec9e77ab937177c8c77e5e9f85656b3b70bef6ce5ff00923bf2bf18a4c10d459",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/hub_worker_activation.go",
+        "source_sha256": "ccc6a63598fba2949e8afeae14d7ea60810afefb341e7f5044210fd7c438bf10",
+        "payload_sha256": "ccc6a63598fba2949e8afeae14d7ea60810afefb341e7f5044210fd7c438bf10",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/hub_worker_activation_test.go",
+        "source_sha256": "8612ace4f99d0cdb43d4cf55f843d42522d69082df1af5494f444ac10bd7a389",
+        "payload_sha256": "8612ace4f99d0cdb43d4cf55f843d42522d69082df1af5494f444ac10bd7a389",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/initial_runtime_resources.go",
+        "source_sha256": "fbc9f3bc277243e8a2d8c3da07d385775aad89660d8fb1d7c9601d6c3b095cd0",
+        "payload_sha256": "fbc9f3bc277243e8a2d8c3da07d385775aad89660d8fb1d7c9601d6c3b095cd0",
+        "base_sha256": "5315812a8c3d40c87aace4b1d78e68716e8be4438dcc24bc0ff74a60269f2750",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/public_runtime_compartments.go",
+        "source_sha256": "4f951b930ce9ac5812a3c5398cb4e6669bd75462a085a94361dc057f70886d58",
+        "payload_sha256": "4f951b930ce9ac5812a3c5398cb4e6669bd75462a085a94361dc057f70886d58",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/public_runtime_roles.go",
+        "source_sha256": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+        "payload_sha256": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+        "base_sha256": "0c19a81d252a5e8b7872022ae20910e2747c673e0a95c89571d58eee052912fa",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/public_runtime_roles_test.go",
+        "source_sha256": "243939ff28d57ac62aa5a74ffe963da4b69967539b2e789bd190cb44381417e3",
+        "payload_sha256": "243939ff28d57ac62aa5a74ffe963da4b69967539b2e789bd190cb44381417e3",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/public_runtime_worker.go",
+        "source_sha256": "83b84a7812d4fd9e999c95a579b2cdcd6953312cfb273ede38ae9f870718e13b",
+        "payload_sha256": "83b84a7812d4fd9e999c95a579b2cdcd6953312cfb273ede38ae9f870718e13b",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/contracts/public_runtime_worker_test.go",
+        "source_sha256": "12f57213f6be5efcc392dddb08fb31beb523a7095027611ed67d3ada7847417a",
+        "payload_sha256": "12f57213f6be5efcc392dddb08fb31beb523a7095027611ed67d3ada7847417a",
+        "base_sha256": null,
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "internal/domain/audit/capacity_profiles.go",
+        "source_sha256": "74e3150c89f5f3f7802df08c819ea99d301d4db9ad413987434e64dcab0d66c6",
+        "payload_sha256": "74e3150c89f5f3f7802df08c819ea99d301d4db9ad413987434e64dcab0d66c6",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/domain/audit/capacity_profiles_test.go",
+        "source_sha256": "1cbc3debcc73dc2237f48aaa1350aa2b53af4865ef1b6462ab80f314cbf8ce86",
+        "payload_sha256": "1cbc3debcc73dc2237f48aaa1350aa2b53af4865ef1b6462ab80f314cbf8ce86",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/domain/authorization/capacity_backing.go",
+        "source_sha256": "2405a30b02e0e88cf7f52cbca109f18af542ebbc4a2577e14033bfbddb03f601",
+        "payload_sha256": "2405a30b02e0e88cf7f52cbca109f18af542ebbc4a2577e14033bfbddb03f601",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "internal/domain/configuration/capacity_administration.go",
+        "source_sha256": "fdeffc39a52b8ac47ebc1db9843957413145de26671f6e1c90d180495160b92e",
+        "payload_sha256": "fdeffc39a52b8ac47ebc1db9843957413145de26671f6e1c90d180495160b92e",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "migrations/00054_protected_capacity.sql",
+        "source_sha256": "5712c10fc2f4604776bbecb5e4b27de708e347d72091ad88f43d64aa7a799ea8",
+        "payload_sha256": "5712c10fc2f4604776bbecb5e4b27de708e347d72091ad88f43d64aa7a799ea8",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "migrations/queries/capacity_producer.sql",
+        "source_sha256": "a97ad304756476e7b98a7ce0df94379c7ea56fdba1598b4d2adc749b0169fcea",
+        "payload_sha256": "a97ad304756476e7b98a7ce0df94379c7ea56fdba1598b4d2adc749b0169fcea",
+        "base_sha256": null,
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "migrations/queries/context_storage_read.sql",
+        "source_sha256": "cf8182c36ae749711143528b3e5713ef6496825b216c19eabca34ee85965642d",
+        "payload_sha256": "cf8182c36ae749711143528b3e5713ef6496825b216c19eabca34ee85965642d",
+        "base_sha256": "fbfe76cbdffe14d15afd1fca32a8f9ee5692591ec1cf1829c6e1ee681edaa776",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "migrations/queries/download_response.sql",
+        "source_sha256": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+        "payload_sha256": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+        "base_sha256": "53d49288e92259a0b1f684ac50c070055ed0f8e05d18f642520b702d659236d3",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "migrations/queries/native_exchange.sql",
+        "source_sha256": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+        "payload_sha256": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+        "base_sha256": "68dccdf31ed04f461a886648ffdbf77a7f247bd4c658ecbafb114905fd184422",
+        "owner": "ADR141 immutable V6"
+      },
+      {
+        "path": "specs/capacity.md",
+        "source_sha256": "7253ded8a694c2bb45361aaa0d7be24c3ef19d62133b2936524f495bc9aa4895",
+        "payload_sha256": "7253ded8a694c2bb45361aaa0d7be24c3ef19d62133b2936524f495bc9aa4895",
+        "base_sha256": "bb80398bfb5d16495dff73f03a75c7b407c1461158019dabe65e2dcbce3bc1f8",
+        "owner": "ADR141 canonical contract source"
+      },
+      {
+        "path": "specs/contracts/capacity-root-setup-claim.schema.json",
+        "source_sha256": "6a779f2a522f9c57f133e4e75249d5948d0f4c08bff65c8d273c2de48e5b4f86",
+        "payload_sha256": "6a779f2a522f9c57f133e4e75249d5948d0f4c08bff65c8d273c2de48e5b4f86",
+        "base_sha256": null,
+        "owner": "dependency:dependency-capacity-v6; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/hub-worker-activation.schema.json",
+        "source_sha256": "7094d1062aedd5739b05345718707f755e39a3ba699fd3859356f032855b5be1",
+        "payload_sha256": "7094d1062aedd5739b05345718707f755e39a3ba699fd3859356f032855b5be1",
+        "base_sha256": null,
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/hub-worker-deployment.schema.json",
+        "source_sha256": "bbb2685866ab0b6ff90e15c8e08907f78e0fa4d573c6c4f76868dc2b425dea48",
+        "payload_sha256": "bbb2685866ab0b6ff90e15c8e08907f78e0fa4d573c6c4f76868dc2b425dea48",
+        "base_sha256": "4bd244c100b28bd2109a1357a42e44a9ed6c9748329208058a6c7e9e69810718",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/initial-runtime-resources.schema.json",
+        "source_sha256": "512dfbdc1a7f820920d0ef93f0f50f606f9ad0e2fcb1655de4069914e8141fe4",
+        "payload_sha256": "512dfbdc1a7f820920d0ef93f0f50f606f9ad0e2fcb1655de4069914e8141fe4",
+        "base_sha256": "c30538e08f9fd6fefed821f0e6811d294a299697e761b4c9e5c5326c8896f1d5",
+        "owner": "payload:worker-projection-startup-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/public-runtime-credentials.schema.json",
+        "source_sha256": "af4be74467779f19c63b0791232f44211d805688b4907c13d9b1f9b1189e1071",
+        "payload_sha256": "af4be74467779f19c63b0791232f44211d805688b4907c13d9b1f9b1189e1071",
+        "base_sha256": "846a603546d7bec1948d36b8f5c0169aee2d0d3c1b319e0af62e573afeae345b",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/public-runtime-role-state.schema.json",
+        "source_sha256": "bbd90e94a68ab72fc214038e8ca5fc6dfdb50863a02468d0aabc8dd598d655b9",
+        "payload_sha256": "bbd90e94a68ab72fc214038e8ca5fc6dfdb50863a02468d0aabc8dd598d655b9",
+        "base_sha256": "4ca1a06066bec74742f397998faa3f61f031eccf43c452803bb23fda93525953",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "specs/contracts/public-runtime-roles.schema.json",
+        "source_sha256": "bb03c2ad80c90096bb9cad39945fa52a8848517d7a04d3a5d10b08cf2f69e0d7",
+        "payload_sha256": "bb03c2ad80c90096bb9cad39945fa52a8848517d7a04d3a5d10b08cf2f69e0d7",
+        "base_sha256": "757409cfc1c6c820b98258d4ea90fbbaabe5e64b4e7a337d67f5486de6139366",
+        "owner": "payload:public-runtime-role-inventory-20261012; compiled console dependency-only"
+      },
+      {
+        "path": "test/integration/capacity_context_test.go",
+        "source_sha256": "3dbd4d05d11c5409e7920e967b421f231023d9383e8e213389c307f98fadbf90",
+        "payload_sha256": "3dbd4d05d11c5409e7920e967b421f231023d9383e8e213389c307f98fadbf90",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_native_inputs_test.go",
+        "source_sha256": "77bb1da6ab7183fd68f95c900dca85d97d15302f5f24bc04e9d6f19194ccf84a",
+        "payload_sha256": "77bb1da6ab7183fd68f95c900dca85d97d15302f5f24bc04e9d6f19194ccf84a",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_processing_test.go",
+        "source_sha256": "124db9cf79a0cf386a36b0ea65659da45898bf71ef457bb1801760154e84da26",
+        "payload_sha256": "124db9cf79a0cf386a36b0ea65659da45898bf71ef457bb1801760154e84da26",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_producer_test.go",
+        "source_sha256": "660cd6d57371542bd6f6ff0ea2ad5473df3164209da80f79d4efc3dfbdb46a55",
+        "payload_sha256": "660cd6d57371542bd6f6ff0ea2ad5473df3164209da80f79d4efc3dfbdb46a55",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_session_test.go",
+        "source_sha256": "8589cb6339917c691b0a7c68624f9e0d4b78040278a58d934483d5b2c3e1dfd0",
+        "payload_sha256": "8589cb6339917c691b0a7c68624f9e0d4b78040278a58d934483d5b2c3e1dfd0",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_setup_root_test.go",
+        "source_sha256": "51e957c7c58897c80745cd7d247a6ca928fc2b722c8b7a009db194d93dee5fcb",
+        "payload_sha256": "51e957c7c58897c80745cd7d247a6ca928fc2b722c8b7a009db194d93dee5fcb",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_sql_fixture_test.go",
+        "source_sha256": "42ee813802159491adc89e0aa5e4b6cf3a668cce6973d0394c482efab7780733",
+        "payload_sha256": "42ee813802159491adc89e0aa5e4b6cf3a668cce6973d0394c482efab7780733",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_sql_matrix_test.go",
+        "source_sha256": "2c4ffe50961c6de9460af5b1b74a116cb15061d6403b332fa7c279fee62094bb",
+        "payload_sha256": "2c4ffe50961c6de9460af5b1b74a116cb15061d6403b332fa7c279fee62094bb",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_sql_renewal_test.go",
+        "source_sha256": "1751f9c20fd639fcd505cc8ecc2134df59239162cfa5bdc45d477abfafc02fc6",
+        "payload_sha256": "1751f9c20fd639fcd505cc8ecc2134df59239162cfa5bdc45d477abfafc02fc6",
+        "base_sha256": null,
+        "owner": "ADR141 new native source"
+      },
+      {
+        "path": "test/integration/capacity_worker_scope_test.go",
+        "source_sha256": "634ac6aee8ea0c9c1878ff7b64902ad521dba407ab6517c9c085f49e7ea5f2c9",
+        "payload_sha256": "634ac6aee8ea0c9c1878ff7b64902ad521dba407ab6517c9c085f49e7ea5f2c9",
+        "base_sha256": null,
+        "owner": "ADR141 synthetic original Kubernetes worker provenance; actual SQL roles remain real"
+      }
+    ],
+    "qualification_only": [
+      {
+        "path": "internal/adapters/postgres/custody.go",
+        "base_sha256": "881180330abcac4f926db93237144255e157eb11d02e9ffbc4f5b5f1bdea2c85",
+        "payload_sha256": "d323c07339530fcbe31aacf8ba31868457f851c3a17139d3ce6a62ea2869c9d6",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/source-checkpoint-v6/qualification/internal/adapters/postgres/custody.go",
+        "owner": "parent schema-head/inventory, qualification only"
+      },
+      {
+        "path": "internal/adapters/postgres/initial_installation_tables.go",
+        "base_sha256": "cc7a51f028cbdead614ee2b9dbe3ece7bec37174416d139f55165a295a31bf65",
+        "payload_sha256": "f98981559094fdad2ef67ed7b7aed885282e1cb42d4754dcd89da08f8f2fd082",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/source-checkpoint-v6/qualification/internal/adapters/postgres/initial_installation_tables.go",
+        "owner": "parent schema-head/inventory, qualification only"
+      }
+    ],
+    "generated_reference": [
+      {
+        "path": "internal/adapters/postgres/custodydb/capacity_producer.sql.go",
+        "base_sha256": null,
+        "payload_sha256": "f15f80a24c94bfbd5ff6b55642af6d172ba19b1cf0b52aac7a5be7817445fdfc",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/capacity_producer.sql.go"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/context_storage_read.sql.go",
+        "base_sha256": "06cda18fdba03efffdaf7a04edab6b7eb38d0e25ccb4bd9e766cf99e52474cbd",
+        "payload_sha256": "6a2f06f30033fc4c40a206bb81e4aa8aa2158cc18f5e4d813e8b69e9a564fc0b",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/context_storage_read.sql.go"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/download.sql.go",
+        "base_sha256": "2cd9092d5aca7269d59b3bf547757bc03c961a90ac28e2e19c1b23697a72e890",
+        "payload_sha256": "c7a73bfa6b182cc6e0d74f74c3a5b2ce3189063d2b32453b6d038541a9f2b5e8",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/download.sql.go"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/download_response.sql.go",
+        "base_sha256": "bb77345d5c7669cc364c1e4d769325ffd6f1566df847a616e020b5c880769679",
+        "payload_sha256": "1618f1f7a02f275ad6aba7d7ae8d302d4bdd32cc2942de399e08a183bc76e807",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/download_response.sql.go"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/models.go",
+        "base_sha256": "84cbc8b5273593b29ccf61cd13605cfc54547f080c483b98b605281f1d2bdf32",
+        "payload_sha256": "ccf9d91fef27bb6eab5b852f21cce3bdc126d5fcc4ccbfa4d312248152a36820",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/models.go"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/native_exchange.sql.go",
+        "base_sha256": "536f562dcb177523a343803e6d9aa06a9cb61767b51c77cd823fc5d62cac2ab3",
+        "payload_sha256": "2f2c89b9d1129797bcf76b928f2dbd934b9e7caafe2c74d30841931b1bc216e6",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/checks/v6-first/generation/internal/adapters/postgres/custodydb/native_exchange.sql.go"
+      }
+    ]
+  },
+  "source_manifest_sha256": "81e8b1a83d4d900a17b1792cc4ff1b695c9c4d1c876b860e4e195d5a6a6f7bc8",
+  "dependency_sha256": "8a1d1b081a72a14e2bce21208858e5f39ee0112e529700ee983526fa3fef40ef",
+  "dependency_count": 1880,
+  "correction": {
+    "scope": "one-line fixture compile correction only; original failure and source-v2 immutable",
+    "parent_manifest_sha256": "81e8b1a83d4d900a17b1792cc4ff1b695c9c4d1c876b860e4e195d5a6a6f7bc8",
+    "dependencies_sha256": "8a1d1b081a72a14e2bce21208858e5f39ee0112e529700ee983526fa3fef40ef",
+    "files": [
+      {
+        "path": "test/integration/capacity_sql_fixture_test.go",
+        "base_sha256": "42ee813802159491adc89e0aa5e4b6cf3a668cce6973d0394c482efab7780733",
+        "payload_sha256": "8e99a4654b75c537be2219f40673f5c21166cf599f3799490b09f621f8044374"
+      }
+    ]
+  },
+  "final_payloads": {
+    "api/v1alpha1/capacity.go": "0f69e16fdb0bf5de61feedb2c95891494bb61c8dd710e36dd715e98248e24b43",
+    "docs/architecture/capacity-production.md": "b6dffec22c5ce9e5c59a868f5ca55e3fde8e89459526213a88cd3f4745a4d178",
+    "docs/architecture/catalog.yaml": "d57efe41081d927846cc4645279080d92b955a264055c84c640a7c109f36c130",
+    "docs/decisions/141-protected-capacity-production.md": "c3fab4cbbd705584327863a47fbf98e65d1116d7f1f8d2edf6ec51b46209455b",
+    "docs/decisions/README.md": "4f824de82799ad22fb591ab49b17a0f2f6348621a11085d79c4a8bc8a5bbf199",
+    "internal/adapters/kubernetes/capacity-schemas/budget-policy.schema.json": "f7b60a145236fd70efe6fed49358d43cc7077edfd356bb8a28a5e0eff483a23f",
+    "internal/adapters/kubernetes/capacity-schemas/common.schema.json": "c91fd4c8d651c2e0c82eddacba0af34ccb744d00c44cf88b5e6edc6bca8fb49b",
+    "internal/adapters/kubernetes/capacity-schemas/storage-pool.schema.json": "b114b4eb12528ceb155484346567129237c2ad27ba6e9ab6c479536b592028f9",
+    "internal/adapters/kubernetes/capacity_admission.go": "4804be48eb54859f6aa7ecd915465044b4d39a5c11a9c443fba1331c4ee49ea5",
+    "internal/adapters/kubernetes/capacity_decode.go": "4b9e1af429dc32e45c044ff0e288052fde2be363af8be271f07357d9d183f9dc",
+    "internal/adapters/kubernetes/capacity_guard.go": "ba80fb33fa261985046b3b785bca02b67a2e4087cd8a6e2d5fa9da12cc164952",
+    "internal/adapters/kubernetes/capacity_guard_test.go": "983c52837cc7ef10e9c5f934a4b8dfaa53b6dfe49ddd4511c218b0d73e2f5e8a",
+    "internal/adapters/kubernetes/capacity_leader_join_test.go": "0ba56e151619522c297a8f6378d82a25695fcf8db96ae5fe4e53b449aced7b0e",
+    "internal/adapters/kubernetes/capacity_probe.go": "fd292dabe3c3974089e247ab69896fe8eab3275e09c4485229418134fabca1ac",
+    "internal/adapters/kubernetes/capacity_setup.go": "02dd953075fcaa83e34c8c21bbf327def7dc77863f1f8679673fdcc78b94085d",
+    "internal/adapters/kubernetes/capacity_setup_test.go": "6749b98a9170aa62a19e72389b1efb740ef092c1c02b5f36c30dd8f4d5b99c16",
+    "internal/adapters/kubernetes/capacity_source.go": "5c7b325e55b8c76c816ea15b26333a916beb410a63b4c748c6e6c5eeb7c5ab60",
+    "internal/adapters/kubernetes/capacity_source_test.go": "b3388f719dad7ce62f26a69c1ce15ef9ed4cafb6a74bf8e1671931b2ff63e7e5",
+    "internal/adapters/kubernetes/capacity_workload.go": "8f3269a7e66032cb0d54c2c5e233cda1ef9cc82389196dcd847748e4a0115755",
+    "internal/adapters/kubernetes/capacity_workload_test.go": "dd9577314bef80f01ba920e30df8d0495c63d08dcc364f7a4225f3b7044013c9",
+    "internal/adapters/kubernetes/configuration_runtime_launch.go": "97057a77b9c4d135268744907528ffe174744c363c1edd09ae10531709a99179",
+    "internal/adapters/kubernetes/hub_worker_activation.go": "7e692219d9d9baef17756f870c0ef7b405eca6f69ff243fcfc968d3cf6650676",
+    "internal/adapters/kubernetes/hub_worker_installed.go": "7e0efbc98e8b1895de3f7b343ae688e7d087572ae05486ae452c576ab18c5300",
+    "internal/adapters/kubernetes/hub_worker_installed_test.go": "42a03efb2eb32cf66b5042317676f7162b3b8b1161e6f97dd9c428cce79b9df0",
+    "internal/adapters/kubernetes/initial_runtime_resource_objects.go": "eba49db1eca70f1205be36314a8c90639e43b315618d0a818ce1843db88ae5e6",
+    "internal/adapters/kubernetes/initial_runtime_resources.go": "34afd60b63226c23800fe1e155f45c9c53a106e340b319fa4955d46de80512e1",
+    "internal/adapters/kubernetes/public_runtime_roles.go": "5ad3a7b72a72a1027a39d2f9d815571f14bd5b8247f744f3a4561925ad82dd27",
+    "internal/adapters/kubernetes/public_runtime_roles_test.go": "088213e0f5a22e620cc118588753bdfe10fa5f461899e454084f11e52697488d",
+    "internal/adapters/kubernetes/public_runtime_worker.go": "4d2194f146618d25c03adec5936fc2001332e5577c9233499211f564c4f21e2b",
+    "internal/adapters/kubernetes/public_runtime_worker_test.go": "bb2be7fe31e231cf918bed04a3ebcd34a35d40579d198294988218b26df1bd70",
+    "internal/adapters/kubernetes/reconciliation_leader.go": "7fe70462476d04360ea6491b36261d87aae5a3e3931761c852d80b9bce372a56",
+    "internal/adapters/postgres/capacity_audit_profiles.go": "0efff27e2d46970d7855ad7d7cc971e9247760d4b7cd56f2aefe4e24d28d070c",
+    "internal/adapters/postgres/capacity_audit_profiles_test.go": "29eaef20d0ad62fddf0ff044c534ec8c3e0f3e4668200886e90c28e854a6f227",
+    "internal/adapters/postgres/capacity_enrollment.go": "0720771124feb840f5e076388a75aa2d6fd02429635e5503df18333571c9d9e3",
+    "internal/adapters/postgres/capacity_enrollment_decode.go": "8f7f369d42a9993a20c7e0dc037be6a0225069ec7e5e88c787e166d26f7c829b",
+    "internal/adapters/postgres/capacity_enrollment_decode_test.go": "c2ab01992067266dbd273b181b6edaceb4950770268d1cc22353dedb13c90c77",
+    "internal/adapters/postgres/capacity_enrollment_effect.go": "772390c3a15bf865c2a2dac83652d871aa591695fbf86720dd398c4bdf7d79a5",
+    "internal/adapters/postgres/capacity_permissions.go": "c31dd9b73353e00846b70c090505de1932ba72e54c9672b7e1554d339a90053a",
+    "internal/adapters/postgres/capacity_recovery.go": "b2f1a2f099a3ae4b079011cc0240a91ef67476e096a7a7da97b6052c7b8ed73f",
+    "internal/adapters/postgres/capacity_recovery_test.go": "646438242d40d52365a89c8ca26cd27d4c1bcc889d590f1e0d31829578df4dbd",
+    "internal/adapters/postgres/capacity_root.go": "76eed1fa3aaca333e304cfdf2823928e701c6aa6360c2741d37a781a35aed4ef",
+    "internal/adapters/postgres/capacity_runtime_credential.go": "fc564d219ccf37b871a4099ffdf3eaf13f661ca14977a17cb1f472f2729e8ada",
+    "internal/adapters/postgres/capacity_runtime_credential_test.go": "7c6e89acac0fdeb2d20ffd691d44c9dd0acbd042ebb2c6cee154ea2bf7f026ab",
+    "internal/adapters/postgres/capacity_session_decode.go": "4d4c043a24c20da37d49924b7aa05ae68b978d8b05987d4b873ec8f885979d14",
+    "internal/adapters/postgres/capacity_session_decode_test.go": "f07a1a5cab5af903f2cc24bfebd7f549e10ea2f441f7abf0f840897d2612240f",
+    "internal/adapters/postgres/capacity_session_integration_decode_test.go": "adeead10ca3beef6f5495bb98702eaac41dba1c5b1812e818a38c3429482f6da",
+    "internal/adapters/postgres/capacity_setup.go": "bb293b04dca69f1728961cf3ea475e7cb20b9849b61e756d328428b121163e2e",
+    "internal/adapters/postgres/capacity_setup_input.go": "9753205bc95cbe91a28a6525d81e763801ff9d61ea96311eca9113c1f3df0f66",
+    "internal/adapters/postgres/capacity_setup_input_test.go": "6ef0d3c0b8d3d97ac93ed17f704196d7b0eb8804d2da24380028512511738c48",
+    "internal/adapters/postgres/capacity_setup_pair.go": "43762776601d86303641ff31749732a2dea00f141fe1c98f799b696a65b04f30",
+    "internal/adapters/postgres/capacity_source.go": "1ec4b33f811caec9c1e70e5a3b3321a2b18cd565ef34eac63890d946921a3c48",
+    "internal/adapters/postgres/capacity_source_test.go": "82054ad529d65bb09bcef627907359c76182d50134a92862e8b5313ebe0d32e0",
+    "internal/adapters/postgres/capture.go": "9cfa6f1f7e459376fd7ccd82345042e4be1babc35635b456055a0edc76b0100d",
+    "internal/adapters/postgres/context_native_control.go": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+    "internal/adapters/postgres/context_storage_read.go": "b5c8861e1ca94498d0430a6ca99d550d02c6e59883f85811141aeeeb8a342ad3",
+    "internal/adapters/postgres/context_storage_read_test.go": "252ef5168ee72d470e2fe8cdef17c5f2d952b8ee22333c1028973e7dced547a5",
+    "internal/adapters/postgres/download.go": "e45d1bc41b8e6fe4e8470212a7d93c5937e0bcae173c66ac8859525d17151c9d",
+    "internal/adapters/postgres/download_response_window.go": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+    "internal/adapters/postgres/public_runtime_capacity_role_plan.go": "30f63d049d06987b44e1acf0d1a4e2b6130e25a867df88bb402ac7623af48ba3",
+    "internal/adapters/postgres/public_runtime_capacity_role_plan_test.go": "0f0d83c48e2ac1850c89f6e5607ff157f853d30931a062face220ad647fd081d",
+    "internal/adapters/postgres/public_runtime_cleanup_role_plan.go": "e7c913891d2c9ef83fa0813243731a1a10b634ee353470fbe2fcb042681976f7",
+    "internal/adapters/postgres/public_runtime_cleanup_role_plan_test.go": "c384659219ba1b6c9171a2f5eb8d21b463014290cef78747d8dbb3366c331a48",
+    "internal/adapters/postgres/public_runtime_role_plan.go": "701772474c7bf42efda8de0d85987ce7731f1bd293463253af3d9ce1de7c6bc0",
+    "internal/adapters/postgres/public_runtime_role_plan_test.go": "d891f3470d64bc08c9b5b37392d198775d23b9b007d6cfff29334cc94957a408",
+    "internal/adapters/postgres/public_runtime_roles.go": "097ec59e77398298cb097ae47f09dcb2b4038e7222c3df64d4749615f63ec3a3",
+    "internal/application/audit/capacity_profiles.go": "7ed0ad07218c96a19286eda9134c29f2be4f25614a72dbc1a7a2c808674c0975",
+    "internal/application/audit/capture_account_mac.go": "19fadaff5404d7081225025681fa4929c14875e75533481328a8721148d03192",
+    "internal/application/audit/capture_account_mac_test.go": "83f60995ddfbb87f574581d79b6ac3dfb11106366f87ef2f106c5bfceeae4141",
+    "internal/application/capacity/backend_qualification.go": "88a93e00996e985fb08ced3988762153fd6c56ffe4e81a2d5cb677805d636c11",
+    "internal/application/capacity/backend_qualification_test.go": "d303211b880a29b40edf2b1fe9ab58481411aa888442c35265f9f075a78c0beb",
+    "internal/application/capacity/context_backing.go": "0583c3d5ff0560222e64324aa57db8266267bb24bee01c3c38c77f4e447fcfc4",
+    "internal/application/capacity/context_backing_test.go": "ba08dfe6b5e3b4fd7a4b57e178065e9a50cf443c30bbd8d14c883d135b16aa70",
+    "internal/application/capacity/enrollment.go": "57a37563dd1526463a6697b3f3bc67b183485697524d1133ccd4a6c240da4a41",
+    "internal/application/capacity/enrollment_observation.go": "4d054dd5810c5b8036d94db50e79ca9bcd998448ab25211f66c8c663c4daab7c",
+    "internal/application/capacity/enrollment_permissions.go": "4d5db6b079203de19d87c68ce38504d2ce64df15b3b8d103a76e8252175b7820",
+    "internal/application/capacity/enrollment_plan.go": "73ef6d43d9468ca1dd184ba412af5ea0aba16236bd417c4a32d7b32179931d48",
+    "internal/application/capacity/enrollment_plan_test.go": "af58554ed6a8ba48eacdfe3597c891da44fd3c05f05a0c5e3c27f90661080797",
+    "internal/application/capacity/enrollment_test.go": "49c35bbf215b74e0de7dc42e8a7fde615c88e9e63b958ed7e4f0c1f84caab397",
+    "internal/application/capacity/pool_plan.go": "6b9c0d2c5c45418ad2d17d3c69626ecc758d53764bfc55e35a55b96ec7819109",
+    "internal/application/capacity/pool_plan_test.go": "6f80163a701052a6cbe6f48750a3ef8bff585f18a16bdace266f1475dc73a8ea",
+    "internal/application/capacity/protected_budget.go": "ff3ffdccb50066a89d16df6bd9a7cf33f2dd47115866f00370a3c0667087bfb5",
+    "internal/application/capacity/protected_budget_test.go": "1be5b42774fd47a8b03e87534a2fb0a14efe1d802a153e2caf6f80680b6a8daa",
+    "internal/application/capacity/protected_guard.go": "439bf2ae56187abe2beabe2b0cf70b805001f4340061512e8026ccb6af29e540",
+    "internal/application/capacity/protected_source.go": "1eeee3cece3d83675679b0f2cfee1bafcadcb07ddf861f3321b7214f9db6ddce",
+    "internal/application/capacity/protected_source_test.go": "853211f0168195ac4c7a99ded74ef86b035148d500a7d4bb6459da9e428232db",
+    "internal/application/capacity/reconciliation.go": "ee11d5627a707f6da47496da01358e00d8d32f1dc84240ebc472fb458ca0eb37",
+    "internal/application/capacity/reconciliation_discovery.go": "ee152da320d030e5856b21c1d21fa79ace351ed5f30b32e8ea80c8ab10f52db2",
+    "internal/application/capacity/reconciliation_test.go": "f21d8daa3f2aba7085897d9dc12ef38702222032c5521817ffe39e531ce81d8d",
+    "internal/application/capacity/reconciliation_work.go": "a0955c082779c68f80c36b54e48b559fcf48397c3b94b7fe68ebec57fd708d30",
+    "internal/application/capacity/reconciliation_work_test.go": "63f1bbf1b39196d0b51291ed9293085e010525f809d0a04e8b6320bd540e7e97",
+    "internal/application/capacity/root_backing.go": "eddd31316c55dc72a25bc1b5378b72cddf0480ba2585518262a726af74ce72f8",
+    "internal/application/capacity/root_backing_test.go": "d1067680014dc3eaa6b4aeba6caf2f62cb35cce1be4093eb99c3c9f56a2dd87e",
+    "internal/application/capacity/root_observation.go": "f3554c1b97bd681d8cca84fd51cd495958d48c513b443440054079139ca66c1a",
+    "internal/application/capacity/root_provisioning.go": "b980c2c44c86a881777999d7185b3e49e491a2eacdaf8b2415c43f4e8bbbd8bc",
+    "internal/application/capacity/root_provisioning_test.go": "3873b44a5c4a43c097bc26e57839a8cb867dfa535f6495c756ea773b4a4affac",
+    "internal/application/capacity/root_renewal_test.go": "c9580b07a3bf5d2a335c27cef5110db162543780864f2e593dad039de08fc27e",
+    "internal/application/capacity/root_state.go": "78c394c47655ddae82d2113918487a6d5fe2601b6b41e39a852d1abbe3f2de2a",
+    "internal/application/capacity/root_state_test.go": "aec8a485897a18dd7ade2f57e46ec6b4114297a3d7cfcb1c9d98c337634079b4",
+    "internal/application/capacity/source_acceptance.go": "899c65520d2d0978dd4bfb8d45fc9a7c263f5b72b371a8a396c1a68650269d8c",
+    "internal/application/capacity/source_acceptance_test.go": "756aed023a8514fc37147cb43ca66aadf51f276ebd95b50738855b242e83b689",
+    "internal/application/capacity/source_observer.go": "c5527bc5bd7542a920eb0a1568d62b3d6a346438d0110c22fb9b48724ba1a765",
+    "internal/application/capacity/source_observer_test.go": "767998c243c336a896c3b7cb078150403af08f34894b0590693dc1bbc21b2aaa",
+    "internal/application/capacity/workload_discovery.go": "1720bfb88898bc2e6535650855b6c94e3d22c5d2a9ec1a0b8b63dabac0c3ec87",
+    "internal/bootstrap/capacity_hub_worker.go": "099e10c3b349d66d5a7bd93801e9d5c9b339746c8f86e31041938f6a721c99e8",
+    "internal/bootstrap/capacity_hub_worker_test.go": "d1b53cbae91127acefd3fc363f3165d574a13a35f1e18285497340a0925f182f",
+    "internal/bootstrap/capacity_worker.go": "35e9b59ad99b7e5c64b1853488d5ae00c2760f7769a134eeae1a52b6974a2800",
+    "internal/bootstrap/capacity_worker_inputs.go": "69b8957dea3a57e716d02f5ae04f44129f187b7148975518dd85f3803406ec7f",
+    "internal/bootstrap/capacity_worker_test.go": "67da3542a35a4724b74d2d44b852131a3ce85b6bc5456066cd444fe5672e4b68",
+    "internal/bootstrap/hub_worker.go": "cac619c17ff67278937f6f85fa1f75c8ad656b9fc2a2e18ffa2752bdffafdf0f",
+    "internal/bootstrap/initial_runtime_configuration.go": "4857c79b1ddede4e8b4b81ab90d5b42d3a2ea9ce7327d7025fde1aee042f632a",
+    "internal/bootstrap/public_context_mac.go": "8c4670a197cc1984d8835537ff164cae1ccbbfe1ae1a0771aff7e4473c4db1b0",
+    "internal/bootstrap/public_context_mac_test.go": "a57c189dbd830b3ba9ae41826c870ddb8a735100e1278cd29224bfcd37e46edd",
+    "internal/contracts/capacity_projection.go": "8abe82b90f5e6b85d71ba8f0b77621f04c800432a7fc6217d22455110ef40d17",
+    "internal/contracts/capacity_runtime.go": "dca62b221c88b790ae2709d9bb4e24c37362a9a82d76cda5cb41147ba863fea8",
+    "internal/contracts/capacity_setup.go": "d06b09ecfd43117b4137fe5ef16ce5006bddbb233987bab62bbe749672a3f019",
+    "internal/contracts/capture_cleanup_runtime.go": "0bdd9f0f450fc7898b5d5f948af99df73b777e6426ead205079d1de614bd07b2",
+    "internal/contracts/cluster_observation_projection.go": "972d87dc5f35216112d50d969ee3568a55341fdee5159485b10e6bd86898d2c1",
+    "internal/contracts/hub_worker.go": "f16ab0574baf4dbce0d97d06462045998e963d687884d36664171d9c7de51fcd",
+    "internal/contracts/hub_worker_activation.go": "ccc6a63598fba2949e8afeae14d7ea60810afefb341e7f5044210fd7c438bf10",
+    "internal/contracts/hub_worker_activation_test.go": "8612ace4f99d0cdb43d4cf55f843d42522d69082df1af5494f444ac10bd7a389",
+    "internal/contracts/initial_runtime_resources.go": "fbc9f3bc277243e8a2d8c3da07d385775aad89660d8fb1d7c9601d6c3b095cd0",
+    "internal/contracts/public_runtime_compartments.go": "4f951b930ce9ac5812a3c5398cb4e6669bd75462a085a94361dc057f70886d58",
+    "internal/contracts/public_runtime_roles.go": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+    "internal/contracts/public_runtime_roles_test.go": "243939ff28d57ac62aa5a74ffe963da4b69967539b2e789bd190cb44381417e3",
+    "internal/contracts/public_runtime_worker.go": "83b84a7812d4fd9e999c95a579b2cdcd6953312cfb273ede38ae9f870718e13b",
+    "internal/contracts/public_runtime_worker_test.go": "12f57213f6be5efcc392dddb08fb31beb523a7095027611ed67d3ada7847417a",
+    "internal/domain/audit/capacity_profiles.go": "74e3150c89f5f3f7802df08c819ea99d301d4db9ad413987434e64dcab0d66c6",
+    "internal/domain/audit/capacity_profiles_test.go": "1cbc3debcc73dc2237f48aaa1350aa2b53af4865ef1b6462ab80f314cbf8ce86",
+    "internal/domain/authorization/capacity_backing.go": "2405a30b02e0e88cf7f52cbca109f18af542ebbc4a2577e14033bfbddb03f601",
+    "internal/domain/configuration/capacity_administration.go": "fdeffc39a52b8ac47ebc1db9843957413145de26671f6e1c90d180495160b92e",
+    "migrations/00054_protected_capacity.sql": "5712c10fc2f4604776bbecb5e4b27de708e347d72091ad88f43d64aa7a799ea8",
+    "migrations/queries/capacity_producer.sql": "a97ad304756476e7b98a7ce0df94379c7ea56fdba1598b4d2adc749b0169fcea",
+    "migrations/queries/context_storage_read.sql": "cf8182c36ae749711143528b3e5713ef6496825b216c19eabca34ee85965642d",
+    "migrations/queries/download_response.sql": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+    "migrations/queries/native_exchange.sql": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+    "specs/capacity.md": "7253ded8a694c2bb45361aaa0d7be24c3ef19d62133b2936524f495bc9aa4895",
+    "specs/contracts/capacity-root-setup-claim.schema.json": "6a779f2a522f9c57f133e4e75249d5948d0f4c08bff65c8d273c2de48e5b4f86",
+    "specs/contracts/hub-worker-activation.schema.json": "7094d1062aedd5739b05345718707f755e39a3ba699fd3859356f032855b5be1",
+    "specs/contracts/hub-worker-deployment.schema.json": "bbb2685866ab0b6ff90e15c8e08907f78e0fa4d573c6c4f76868dc2b425dea48",
+    "specs/contracts/initial-runtime-resources.schema.json": "512dfbdc1a7f820920d0ef93f0f50f606f9ad0e2fcb1655de4069914e8141fe4",
+    "specs/contracts/public-runtime-credentials.schema.json": "af4be74467779f19c63b0791232f44211d805688b4907c13d9b1f9b1189e1071",
+    "specs/contracts/public-runtime-role-state.schema.json": "bbd90e94a68ab72fc214038e8ca5fc6dfdb50863a02468d0aabc8dd598d655b9",
+    "specs/contracts/public-runtime-roles.schema.json": "bb03c2ad80c90096bb9cad39945fa52a8848517d7a04d3a5d10b08cf2f69e0d7",
+    "test/integration/capacity_context_test.go": "3dbd4d05d11c5409e7920e967b421f231023d9383e8e213389c307f98fadbf90",
+    "test/integration/capacity_native_inputs_test.go": "77bb1da6ab7183fd68f95c900dca85d97d15302f5f24bc04e9d6f19194ccf84a",
+    "test/integration/capacity_processing_test.go": "124db9cf79a0cf386a36b0ea65659da45898bf71ef457bb1801760154e84da26",
+    "test/integration/capacity_producer_test.go": "660cd6d57371542bd6f6ff0ea2ad5473df3164209da80f79d4efc3dfbdb46a55",
+    "test/integration/capacity_session_test.go": "8589cb6339917c691b0a7c68624f9e0d4b78040278a58d934483d5b2c3e1dfd0",
+    "test/integration/capacity_setup_root_test.go": "51e957c7c58897c80745cd7d247a6ca928fc2b722c8b7a009db194d93dee5fcb",
+    "test/integration/capacity_sql_fixture_test.go": "8e99a4654b75c537be2219f40673f5c21166cf599f3799490b09f621f8044374",
+    "test/integration/capacity_sql_matrix_test.go": "2c4ffe50961c6de9460af5b1b74a116cb15061d6403b332fa7c279fee62094bb",
+    "test/integration/capacity_sql_renewal_test.go": "1751f9c20fd639fcd505cc8ecc2134df59239162cfa5bdc45d477abfafc02fc6",
+    "test/integration/capacity_worker_scope_test.go": "634ac6aee8ea0c9c1878ff7b64902ad521dba407ab6517c9c085f49e7ea5f2c9",
+    "internal/adapters/postgres/custody.go": "d323c07339530fcbe31aacf8ba31868457f851c3a17139d3ce6a62ea2869c9d6",
+    "internal/adapters/postgres/initial_installation_tables.go": "f98981559094fdad2ef67ed7b7aed885282e1cb42d4754dcd89da08f8f2fd082",
+    "internal/adapters/postgres/custodydb/capacity_producer.sql.go": "f15f80a24c94bfbd5ff6b55642af6d172ba19b1cf0b52aac7a5be7817445fdfc",
+    "internal/adapters/postgres/custodydb/context_storage_read.sql.go": "6a2f06f30033fc4c40a206bb81e4aa8aa2158cc18f5e4d813e8b69e9a564fc0b",
+    "internal/adapters/postgres/custodydb/download.sql.go": "c7a73bfa6b182cc6e0d74f74c3a5b2ce3189063d2b32453b6d038541a9f2b5e8",
+    "internal/adapters/postgres/custodydb/download_response.sql.go": "1618f1f7a02f275ad6aba7d7ae8d302d4bdd32cc2942de399e08a183bc76e807",
+    "internal/adapters/postgres/custodydb/models.go": "ccf9d91fef27bb6eab5b852f21cce3bdc126d5fcc4ccbfa4d312248152a36820",
+    "internal/adapters/postgres/custodydb/native_exchange.sql.go": "2f2c89b9d1129797bcf76b928f2dbd934b9e7caafe2c74d30841931b1bc216e6"
+  },
+  "status": "compiled source integration; actual SQL54 qualification pending; runtime disabled"
+}

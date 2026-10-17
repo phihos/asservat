@@ -1,0 +1,10 @@
+--- FAIL: TestFailedBrowserCallbackDiscardsOnlyItsNewSession (0.00s)
+    --- FAIL: TestFailedBrowserCallbackDiscardsOnlyItsNewSession/expired (0.00s)
+        browser_handoff_test.go:196: failed callback kept its unreachable session or revoked another session
+    --- FAIL: TestFailedBrowserCallbackDiscardsOnlyItsNewSession/cancelled (0.00s)
+        browser_handoff_test.go:196: failed callback kept its unreachable session or revoked another session
+    --- FAIL: TestFailedBrowserCallbackDiscardsOnlyItsNewSession/unknown-commit (0.00s)
+        browser_handoff_test.go:196: failed callback kept its unreachable session or revoked another session
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.002s
+FAIL

@@ -1,0 +1,26 @@
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/web
+
+ ❯ src/evidence/EvidenceWorkspace.test.tsx (18 tests | 1 failed | 17 skipped) 188ms
+   × offers an explicit new download after the native link was requested while status is still Ready 187ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers an explicit new download after the native link was requested while status is still Ready
+AssertionError: expected null not to be null
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:148:23
+    146|   expect(client.calls.map(c => c.name)).toEqual(['get_case', 'prepare_…
+    147|   const restart = screen.queryByRole('button', { name: 'Start a new do…
+    148|   expect(restart).not.toBeNull();
+       |                       ^
+    149|   client.responder = name => name === 'cancel_artifact_download' ? dow…
+    150|   fireEvent.click(restart!);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  13:27:47
+   Duration  1.54s (environment 41%, import 36%, tests 13%, transform 9%)
+

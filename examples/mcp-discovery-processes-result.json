@@ -1,0 +1,87 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "discoveryPage",
+    "capture_id": "00000000-0000-4000-8000-000000000090",
+    "source_artifact_ids": [
+      "00000000-0000-4000-8000-000000000091"
+    ],
+    "expires_at": "2026-10-09T12:15:00Z",
+    "section": "processes",
+    "summary": {
+      "started_at": "2026-10-09T12:00:00Z",
+      "ended_at": "2026-10-09T12:00:10Z",
+      "observed_wire_bytes": 20971520,
+      "retained_bytes": 7340032,
+      "coverage": {
+        "requested_pods": 1,
+        "covered_pods": 1,
+        "process_inventory_complete": true,
+        "traffic_complete": true,
+        "dropped_packets": 0,
+        "stop_reason": "duration"
+      },
+      "classifier_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capture_mode": "rawPackets"
+    },
+    "gaps": [
+      "Only one pod was sampled; other replicas may differ."
+    ],
+    "processes": [
+      {
+        "process_ref": "process-worker-7",
+        "pod_uid": "checkout-pod-uid",
+        "display_pid": 7,
+        "executable_name": "worker",
+        "executable_path": "/app/worker",
+        "runtime": "native",
+        "identity_basis": {
+          "confidence": "observed",
+          "reason": "Qualified executable and process start identity at snapshot time."
+        },
+        "rss_bytes": 134217728,
+        "selector_candidate": {
+          "match": {
+            "executablePath": "/app/worker"
+          },
+          "includeDescendants": true,
+          "maxDepth": 2,
+          "resolve": "atDispatch"
+        },
+        "observed_at": "2026-10-09T12:00:00Z"
+      },
+      {
+        "process_ref": "process-worker-8",
+        "pod_uid": "checkout-pod-uid",
+        "display_pid": 8,
+        "executable_name": "worker",
+        "executable_path": "/app/worker",
+        "runtime": "native",
+        "identity_basis": {
+          "confidence": "observed",
+          "reason": "Qualified executable and process start identity at snapshot time."
+        },
+        "rss_bytes": 134217728,
+        "selector_candidate": {
+          "match": {
+            "executablePath": "/app/worker"
+          },
+          "includeDescendants": true,
+          "maxDepth": 2,
+          "resolve": "atDispatch"
+        },
+        "observed_at": "2026-10-09T12:00:00Z"
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": []
+}

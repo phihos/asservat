@@ -1,0 +1,42 @@
+{
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "phases": [
+    {
+      "name": "fleet",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--fleet"
+      ],
+      "exit": 1,
+      "seconds": 69.496,
+      "diskBeforeBytes": 424657117184,
+      "diskAfterBytes": 424593510400,
+      "requiredPassedTests": [
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-literal-null",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-literal-null",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-literal-null",
+        "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-empty",
+        "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-literal-null"
+      ],
+      "missingRequiredPasses": [
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-literal-null",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-literal-null",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-empty",
+        "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-literal-null",
+        "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-empty",
+        "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-literal-null"
+      ],
+      "archiveHashes": {
+        "harness.log": "e8afb77e20348951d8625589299199388a83b936c68064e90339ae1d97d495ff"
+      }
+    }
+  ],
+  "scope": "Bootstrap/claim/signing exact immutable receipts and real provider enrollment; actual SQL/S3/OpenBao, original authority deadlines and exact historical restoration; synthetic protected roots, no public runtime",
+  "exit": 1
+}

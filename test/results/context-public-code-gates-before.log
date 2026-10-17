@@ -1,0 +1,7 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle drift: run python3 scripts/manifest-schemas.py --bundle policies --write and review
+make: *** [Makefile:102: policy-schema-check] Error 1

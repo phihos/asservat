@@ -1,0 +1,6 @@
+=== RUN   TestDownloadNativeJobsWithRealKubernetes
+    download_jobs_kube_test.go:190: actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs
+    download_jobs_kube_test.go:407: actual v2 product Pod: immutable credential projection, current TLS/Pod-token proof, two distinct native nonces and idle backoff, original lifetime and positive foreground retirement; synthetic dispatch/registry/audit and no evidence transfer
+--- PASS: TestDownloadNativeJobsWithRealKubernetes (23.94s)
+PASS
+ok  	asservat.local/asservat/test/integration	24.996s

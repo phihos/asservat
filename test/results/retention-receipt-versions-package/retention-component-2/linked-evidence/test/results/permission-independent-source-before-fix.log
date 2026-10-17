@@ -1,0 +1,5 @@
+--- FAIL: TestUnavailableAllowSourcesDoNotDiscardCompleteBindings (0.01s)
+    permissions_test.go:125: unavailable allow-only sources discarded complete explicit bindings
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.016s
+FAIL

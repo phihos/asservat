@@ -1,0 +1,6 @@
+=== RUN   TestHubConfigurationWorkerWithRealKubernetes
+    hub_worker_test.go:225: scoped scheduling update blocked by private namespace guard leases.coordination.k8s.io "reconcile" is forbidden: ValidatingAdmissionPolicy 'configuration-worker-namespace' with binding 'configuration-worker-namespace' denied request: Asservat private hub namespace requires an installation administrator or a qualified Kubernetes controller operation.
+--- FAIL: TestHubConfigurationWorkerWithRealKubernetes (0.73s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.784s
+FAIL

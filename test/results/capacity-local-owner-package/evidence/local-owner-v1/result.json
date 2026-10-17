@@ -1,0 +1,135 @@
+{
+  "manifest": "b81ba6b65da87e78de5362774055a29b4b0b2d0c9b7a8cd7725b1f60c1c07d1f",
+  "dependencies": "bbf7d57dbde9ab4d11027e7fc8737bf14267ef42892893561a8d60c884d21d03",
+  "runner": "675dcdb2bfc6c6f9346836fee82f09a111ce4f724da0e61fb1d21fe5591a1e58",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": [],
+    "retained_evidence": [],
+    "live_evidence": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v1/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration",
+        "-run",
+        "^$",
+        "-count=1"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 17.43508529663086,
+      "log_sha256": "37e8b24872500144b94c6cefbe4fe6feb22ed12aeaecfe55415d3cbb48ceb2aa"
+    },
+    {
+      "name": "before-role",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v1/before-role-overlay.json",
+        "./internal/adapters/postgres",
+        "-run",
+        "^TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects$",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "expected": 1,
+      "seconds": 6.585248947143555,
+      "log_sha256": "c099362187f799a0532bcddedf9365b8092af435e5344c8e6e504167df98a937"
+    },
+    {
+      "name": "before-workload",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v1/before-workload-overlay.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^TestInstalledWorkerOriginalRoleReceiptsCoverCapacityGraph$",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "expected": 1,
+      "seconds": 9.966968536376953,
+      "log_sha256": "989455ce958cd3ca1d25dbc3b6acb8860ffc1c108842fddecc06a80097625a7f"
+    },
+    {
+      "name": "contracts-bootstrap-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v1/overlay.json",
+        "./internal/contracts",
+        "./internal/bootstrap",
+        "-count=1",
+        "-timeout=10m",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "expected": 0,
+      "seconds": 23.199101209640503,
+      "log_sha256": "f49794a270a37f5a0cf799d2febe4e59f9f29d56606ad422a1db9b86d0edb5b5"
+    },
+    {
+      "name": "kubernetes-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-local-owner-20261012/candidate-v1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^Test(Capacity|InstalledWorker|WorkerProjection|PublicRuntimeWorker|CaptureCleanupProjection|InstalledOwnerOriginalLayout)",
+        "-count=1",
+        "-timeout=10m",
+        "-v"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "expected": 0,
+      "seconds": 34.18450355529785,
+      "log_sha256": "7f32657941b151b52716c75660e99112d991d5b56f4d96e085517e3c9abb6b08"
+    }
+  ],
+  "started_at": 1791847919.6066253,
+  "terminal_exit": 1,
+  "error": "kubernetes-race unexpected exit",
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": [],
+    "retained_evidence": [],
+    "live_evidence": []
+  },
+  "ended_at": 1791848011.490255
+}

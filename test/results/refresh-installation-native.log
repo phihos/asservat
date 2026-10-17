@@ -1,0 +1,93 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-reader-role-is-select-only
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-denial-before-sql
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-final-check-keeps-original-bound
+=== RUN   TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-blocked-sql-keeps-original-bound
+=== RUN   TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt
+=== RUN   TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt
+=== RUN   TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark
+=== RUN   TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies
+=== RUN   TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql
+=== RUN   TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny
+=== RUN   TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies
+=== RUN   TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait
+=== RUN   TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-valid
+    initial_installation_test.go:471: installer output 
+    initial_installation_test.go:471: native initial-installer Pod 3615ebbf-7fab-4fcb-ac3e-d77c072dd040 image docker.io/library/asservat-context-worker@sha256:06a1ff01757cf86256d6d0ea856fd324fe3a34903b2d4bf9283fc6e29a2d85d5 exit 0
+    initial_installation_test.go:471: probe token retirement observed after 7.40268608s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-missing-guard
+    initial_installation_test.go:471: installer output service stopped: protected configuration, credentials or original deadline unavailable
+        
+    initial_installation_test.go:471: native initial-installer Pod 4136bdac-593b-4c94-9a4a-02c6da738511 image docker.io/library/asservat-context-worker@sha256:06a1ff01757cf86256d6d0ea856fd324fe3a34903b2d4bf9283fc6e29a2d85d5 exit 1
+    initial_installation_test.go:471: probe token retirement observed after 2.002669507s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-unbound
+    initial_installation_test.go:471: installer output service stopped: protected configuration, credentials or original deadline unavailable
+        
+    initial_installation_test.go:471: native initial-installer Pod 69e46be5-5e3f-4a19-9c8c-1c330c19aee8 image docker.io/library/asservat-context-worker@sha256:06a1ff01757cf86256d6d0ea856fd324fe3a34903b2d4bf9283fc6e29a2d85d5 exit 1
+    initial_installation_test.go:471: probe token retirement observed after 1.82142107s
+=== RUN   TestInitialInstallationWithRealServices/installer-pod-wrong-sql-role
+    initial_installation_test.go:471: installer output service stopped: protected configuration, credentials or original deadline unavailable
+        
+    initial_installation_test.go:471: native initial-installer Pod 9647c2da-18df-412f-b509-22ef15a3837e image docker.io/library/asservat-context-worker@sha256:06a1ff01757cf86256d6d0ea856fd324fe3a34903b2d4bf9283fc6e29a2d85d5 exit 1
+    initial_installation_test.go:471: probe token retirement observed after 2.002235436s
+=== RUN   TestInitialInstallationWithRealServices/native-witness-source-and-provider-composition
+    initial_installation_test.go:511: actual protected witness and fleet ConfigMaps, real API identities/admission, SQL/S3/OpenBao activation composed; credentials and installation plan are still fixture-provisioned, not an installer Pod
+=== RUN   TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement
+    initial_installation_test.go:514: non-superuser maintenance provisioned exact purpose roles with client-derived SCRAM; exact replay preserves password/expiry, wrong secrets and excess grants deny, retirement revokes existing/new sessions' authority
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:515: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (61.30s)
+    --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block (0.93s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-reader-role-is-select-only (0.00s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-denial-before-sql (0.00s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-final-check-keeps-original-bound (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/audit-witness-and-later-recovery-block/historical-blocked-sql-keeps-original-bound (0.25s)
+    --- PASS: TestInitialInstallationWithRealServices/interrupted-audit-resumes-same-attempt (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/concurrent-preparations-retain-one-attempt (0.13s)
+    --- PASS: TestInitialInstallationWithRealServices/older-observation-cannot-replace-preparation-watermark (0.04s)
+    --- PASS: TestInitialInstallationWithRealServices/existing-state-before-or-after-preparation-denies (0.05s)
+    --- PASS: TestInitialInstallationWithRealServices/consumed-witness-cannot-recreate-lost-sql (0.02s)
+    --- PASS: TestInitialInstallationWithRealServices/schema-inventory-and-row-security-deny (0.01s)
+    --- PASS: TestInitialInstallationWithRealServices/source-or-incarnation-substitution-denies (0.03s)
+    --- PASS: TestInitialInstallationWithRealServices/original-deadline-survives-lock-wait (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/purpose-roles-cannot-cross-write (0.00s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-valid (21.82s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-missing-guard (10.34s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-unbound (10.21s)
+    --- PASS: TestInitialInstallationWithRealServices/installer-pod-wrong-sql-role (10.20s)
+    --- PASS: TestInitialInstallationWithRealServices/native-witness-source-and-provider-composition (6.69s)
+    --- PASS: TestInitialInstallationWithRealServices/production-sql-role-provisioning-and-retirement (0.54s)
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-target_namespace
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-root
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-account
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-cluster_role
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-collection
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationSupervisorWithRealKubernetes/retired-role-cannot-refill
+--- PASS: TestInitialPreparationSupervisorWithRealKubernetes (36.47s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSupervisorWithRealKubernetes/retired-role-cannot-refill (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	98.826s

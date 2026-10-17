@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "internal-work/v1",
+  "kind": "workReceipt",
+  "workId": "00000000-0000-4000-8000-000000000001",
+  "operationId": "00000000-0000-4000-8000-000000000002",
+  "clusterId": "00000000-0000-4000-8000-000000000003",
+  "issuerEpoch": "00000000-0000-4000-8000-000000000004",
+  "deliveryFence": 1,
+  "sequence": 1,
+  "executionDisposition": "Indeterminate",
+  "observedAt": "2026-10-09T12:00:30Z",
+  "reason": "UnknownStart"
+}

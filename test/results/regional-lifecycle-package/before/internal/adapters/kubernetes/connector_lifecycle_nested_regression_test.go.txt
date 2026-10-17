@@ -1,0 +1,190 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"testing"
+	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// BEFORE-only regression: actual TLS/API readers and their retained 20-QPS,
+// burst-20 clients, with explicitly synthetic SQL/audit/recovery authority.
+// No native Kubernetes or installation qualification is claimed. The positive
+// assertion deliberately fails against the original nested composition.
+type connectorLifecycleNestedFixture struct {
+	api                                         *connectorOperationFixture
+	attester                                    *ConnectorProcessAttester
+	request                                     value.ConnectorProcessRequest
+	start, until                                time.Time
+	row                                         *app.ConnectorProcessAdmission
+	proofs                                      []connectorLifecycleNestedPhase
+	prepares, stores, accepts, begins, finishes int
+}
+
+type connectorLifecycleNestedPhase struct {
+	ordinal            int
+	elapsed, remaining time.Duration
+	observer, probe    int32
+	failed             bool
+}
+
+func newConnectorLifecycleNestedFixture(t *testing.T) *connectorLifecycleNestedFixture {
+	t.Helper()
+	f := &connectorLifecycleNestedFixture{api: newConnectorOperationFixture(t)}
+	// Fixture setup already used these clients. Retain both actual limiters;
+	// only switch their injected observation clock to the real clock. No new
+	// client, token bucket, interval renewal or simulated sleep is introduced.
+	f.api.reader.client.now = time.Now
+	f.api.reader.guard.probe.now = time.Now
+	f.api.reader.source.protection.probe.now = time.Now
+	makeCSR := func() []byte {
+		_, key, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return csr
+	}
+	f.request = value.ConnectorProcessRequest{Process: f.api.process, ClientCSRDER: makeCSR(), ServerCSRDER: makeCSR()}
+	var err error
+	f.attester, err = NewConnectorProcessAttester(f.api.reader.client, f.api.reader.source, f.api.reader.guard, connectorTokenFunc(func(context.Context) ([]byte, error) { return bytes.Clone(f.api.token), nil }))
+	if err != nil {
+		t.Fatal("concrete legacy attester setup", err)
+	}
+	f.start = time.Now().UTC().Truncate(time.Microsecond)
+	f.until = f.start.Add(5 * time.Second)
+	return f
+}
+
+func (f *connectorLifecycleNestedFixture) ReadConnectorProcessProof(ctx context.Context, request value.ConnectorProcessRequest) (value.ConnectorProcessProof, error) {
+	start := time.Now()
+	observer, probe := f.api.base.observer.Load(), f.api.base.probe.Load()
+	proof, err := f.attester.ReadConnectorProcessProof(ctx, request)
+	end, _ := ctx.Deadline()
+	f.proofs = append(f.proofs, connectorLifecycleNestedPhase{ordinal: len(f.proofs) + 1, elapsed: time.Since(start), remaining: time.Until(end), observer: f.api.base.observer.Load() - observer, probe: f.api.base.probe.Load() - probe, failed: err != nil})
+	return proof, err
+}
+
+func (f *connectorLifecycleNestedFixture) RecoveryState(ctx context.Context) (value.RecoveryState, error) {
+	if ctx.Err() != nil {
+		return value.RecoveryState{}, value.ErrUnavailable
+	}
+	return value.RecoveryState{InstallationID: f.request.Process.Binding.InstallationID, IssuerEpoch: f.request.Process.Binding.IssuerEpoch, Revision: identity.Revision{UID: ownerID(80), Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: f.start, FreshUntil: f.until}, nil
+}
+
+func (f *connectorLifecycleNestedFixture) PrepareConnectorProcess(ctx context.Context, id string, c app.ConnectorProcessCurrent) (app.ConnectorProcessAdmission, error) {
+	if ctx.Err() != nil || !c.Valid(time.Now()) || f.row != nil {
+		return app.ConnectorProcessAdmission{}, value.ErrUnavailable
+	}
+	p := c.Proof
+	actor := audit.OperationConnectorProcessActor{Process: p.Process, Deployment: p.Configuration.Profile.Deployment, ClientKeyDigest: p.ClientKeyDigest, ServerKeyDigest: p.ServerKeyDigest}
+	in := audit.OperationIntent{ID: id, RootID: p.Configuration.Profile.RootID, TraceID: id, Name: "connector_process_enrollment", InputFormat: "connector-process/v1", MACVersion: "mac-v1", AccountVersion: "account-v1", Process: &actor, PrincipalDigest: artifact.Digest{5}, InputDigest: artifact.Digest{6}, CreatedAt: c.ObservedAt, RequestUntil: c.Until, WriteUntil: c.ObservedAt.Add(30 * time.Second), RetainUntil: c.ObservedAt.Add(3 * time.Hour)}
+	q := audit.OperationHistoryQualification{ID: id, Digest: artifact.Digest{7}, Layout: audit.ConnectorOperationHistoryLayout, MaximumRowFootprintBytes: 1 << 20, MaximumTransitionWALBytes: 1 << 20, BackupCopies: 1, WALCopies: 1}
+	policy := audit.OperationLifecyclePolicy{RootID: in.RootID, Lane: "identity", InstallationID: p.Process.Binding.InstallationID, StoreID: id, PolicyID: id, BackupProfileID: id, PolicyDigest: artifact.Digest{8}, BackupProfileDigest: artifact.Digest{9}, BackingRevision: 1, MetadataSlots: 1, MaxPurgeLeases: 2, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, ValidUntil: c.ObservedAt.Add(time.Hour), History: &q}
+	policy.BackupReservedBytes, policy.WALReservedBytes = q.SlotBacking(policy.MaxPurgeLeases)
+	var err error
+	in, err = auditapp.BindOperationLifecycle(in, policy)
+	if err != nil {
+		return app.ConnectorProcessAdmission{}, err
+	}
+	process := p.Process
+	a := app.ConnectorProcessAdmission{Process: value.ConnectorCredentialProcess{Attested: &process, Binding: process.Binding, ClientKeyDigest: p.ClientKeyDigest, ServerKeyDigest: p.ServerKeyDigest, ClaimedAt: c.ObservedAt, InitialCertificateNotAfter: c.ObservedAt.Add(value.ConnectorCertificatePeriod).Truncate(time.Second), RunUntil: c.ObservedAt.Add(2 * time.Hour)}, Intent: in}
+	if !a.Process.Valid() || !in.Valid() {
+		return app.ConnectorProcessAdmission{}, value.ErrInvalid
+	}
+	f.prepares++
+	f.row = &a
+	return a, nil
+}
+
+func (f *connectorLifecycleNestedFixture) StoreConnectorProcessOutcome(ctx context.Context, _ app.ConnectorProcessAdmission, out audit.OperationOutcome) error {
+	if ctx.Err() != nil || f.row == nil || !out.Valid() || f.begins != 1 {
+		return value.ErrUnavailable
+	}
+	f.stores++
+	f.row.Outcome = &out
+	return nil
+}
+
+func (f *connectorLifecycleNestedFixture) AcceptConnectorProcess(ctx context.Context, a app.ConnectorProcessAdmission, c app.ConnectorProcessCurrent) (value.ConnectorCredentialProcess, error) {
+	if ctx.Err() != nil || !c.Valid(time.Now()) || f.row == nil || f.row.Outcome == nil || f.finishes != 1 {
+		return value.ConnectorCredentialProcess{}, value.ErrUnavailable
+	}
+	f.accepts++
+	f.row.Activated = true
+	return a.Process, nil
+}
+
+func (f *connectorLifecycleNestedFixture) Begin(ctx context.Context, in audit.OperationIntent) error {
+	if ctx.Err() != nil || !in.Valid() || f.row == nil {
+		return value.ErrUnavailable
+	}
+	f.begins++
+	return nil
+}
+
+func (f *connectorLifecycleNestedFixture) Finish(ctx context.Context, out audit.OperationOutcome) error {
+	if ctx.Err() != nil || !out.Valid() || f.row == nil || f.row.Outcome == nil {
+		return value.ErrUnavailable
+	}
+	f.finishes++
+	return nil
+}
+
+func TestConnectorLifecycleLegacyStandaloneNativeCounts(t *testing.T) {
+	f := newConnectorLifecycleNestedFixture(t)
+	ctx, cancel := context.WithDeadline(context.Background(), f.until)
+	defer cancel()
+	proof, err := f.ReadConnectorProcessProof(ctx, f.request)
+	for _, phase := range f.proofs {
+		t.Logf("legacy-native ordinal=%d elapsed=%s remaining=%s observer=%d probe=%d failed=%t", phase.ordinal, phase.elapsed, phase.remaining, phase.observer, phase.probe, phase.failed)
+	}
+	if err != nil || !proof.Valid(time.Now()) {
+		t.Fatal("standalone concrete proof did not complete; nested-cost regression not reached")
+	}
+	if len(f.proofs) != 1 || f.proofs[0].observer != 54 || f.proofs[0].probe != 12 || f.api.reviews.Load() != 2 {
+		t.Fatal("standalone actual native read count differs from source graph")
+	}
+}
+
+func TestConnectorLifecycleEnrollmentWithinOriginalBound(t *testing.T) {
+	f := newConnectorLifecycleNestedFixture(t)
+	mac, err := auditapp.NewOperationMAC("mac-v1", make([]byte, 32), "account-v1", append([]byte{1}, make([]byte, 31)...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	enroll := app.ConnectorProcessEnrollment{Proof: f, Recovery: f, Journal: f, Audit: f, MAC: mac, Now: time.Now}
+	ctx, cancel := context.WithDeadline(context.Background(), f.until)
+	defer cancel()
+	process, err := enroll.Enroll(ctx, ownerID(81), f.request)
+	for _, phase := range f.proofs {
+		t.Logf("legacy-native ordinal=%d elapsed=%s remaining=%s observer=%d probe=%d failed=%t", phase.ordinal, phase.elapsed, phase.remaining, phase.observer, phase.probe, phase.failed)
+	}
+	t.Logf("legacy-effects prepared=%d intent=%d stored=%d outcome=%d accepted=%d elapsed=%s", f.prepares, f.begins, f.stores, f.finishes, f.accepts, time.Since(f.start))
+	if len(f.proofs) < 2 || f.proofs[0].failed || f.proofs[0].observer != 54 || f.proofs[0].probe != 12 || f.prepares != 1 || f.begins != 1 || f.row == nil {
+		t.Fatal("invalid fixture failed before the intended repeated native boundary")
+	}
+	if err != nil {
+		if !f.proofs[len(f.proofs)-1].failed || f.accepts != 0 {
+			t.Fatal("failure was not the intended repeated native proof exhaustion")
+		}
+		t.Fatal("BEFORE-NESTED-NATIVE-BOUND: valid original admission cannot finish repeated full native proof inside its original five seconds; admitted spend remains retained")
+	}
+	if !process.Valid() || f.accepts != 1 || ctx.Err() != nil {
+		t.Fatal("enrollment result lacks original bounded completion")
+	}
+}

@@ -1,0 +1,33 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: worker-pool-cores
+  namespace: payments
+spec:
+  description: Resolve current worker executable and descendants within the pod; two
+    serial dumps with one shared byte/stop budget.
+  actions:
+  - id: core
+    kind: liveCore
+    parameters:
+      profileRef: native-small
+      process: matchedProcesses
+      processSelector:
+        match:
+          executablePath: /app/bin/worker
+        includeDescendants: true
+        maxDepth: 2
+        resolve: atDispatch
+      batch:
+        maxProcesses: 2
+        maxBytesPerProcess: 268435456
+        maxStopPerProcess: 10s
+        maxTotalStop: 20s
+        consistency: sequential
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 536870912
+      timeout: 30s
+  maxTotalBytes: 536870912
+  maxDuration: 40s

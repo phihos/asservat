@@ -1,0 +1,21 @@
+package contracts
+
+// Optional only in a fresh installed layout selected before original claims.
+// It is incompatible with native backend inputs and does not select a public
+// route. The complete owner-deployment aggregate byte bound still applies.
+type OwnerObservationBootstrap struct {
+	Activation       *OwnerIdentityActivation `json:"activation"`
+	Format           string                   `json:"format"`
+	TemplateDigest   string                   `json:"templateDigest"`
+	ImageDigest      string                   `json:"imageDigest"`
+	ProtectionDigest string                   `json:"protectionDigest"`
+	Peers            []OwnerObservationPeer   `json:"peers"`
+}
+
+type OwnerObservationPeer struct {
+	InstallationID string   `json:"installationID"`
+	ClusterID      string   `json:"clusterID"`
+	IssuerEpoch    string   `json:"issuerEpoch"`
+	PeerID         string   `json:"peerID"`
+	Roots          [][]byte `json:"roots"`
+}

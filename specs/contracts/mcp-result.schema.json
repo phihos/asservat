@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/mcp-result.schema.json",
+  "title": "Asservat mcp-result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "mcp-result/v1"
+    },
+    "request_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "data_class": {
+      "type": "string",
+      "enum": [
+        "metadata",
+        "extract",
+        "raw"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "pending",
+        "error"
+      ]
+    },
+    "data": {
+      "type": "object"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "next_cursor": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "narrowing_hint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "maxItems": 32,
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
+      },
+      "maxItems": 64,
+      "minItems": 0,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "data_class",
+    "status",
+    "data",
+    "truncated",
+    "next_cursor",
+    "narrowing_hint",
+    "warnings",
+    "provenance"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "truncated": {
+            "const": true
+          }
+        },
+        "required": [
+          "truncated"
+        ]
+      },
+      "then": {
+        "properties": {
+          "narrowing_hint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    }
+  ]
+}

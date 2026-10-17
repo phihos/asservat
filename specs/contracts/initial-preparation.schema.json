@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-preparation.schema.json",
+  "title": "Private initial preparation creation journal v1",
+  "description": "Public provenance only, at most 48 KiB and 64 ordered create intents. Runtime requires unique operation IDs and kind/name targets, only the last intent may lack a receipt, exact original root/pins, native staging protection and UID/resource-version CAS. Never credentials, secret-payload hashes, evidence, execution permission, clean-history proof or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "requestID",
+    "planDigest",
+    "namespace",
+    "guard",
+    "creates"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-preparation/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "planDigest": {
+      "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "guard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "creates": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationID",
+          "kind",
+          "name",
+          "specDigest"
+        ],
+        "properties": {
+          "operationID": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+          },
+          "kind": {
+            "enum": [
+              "ServiceAccount",
+              "Role",
+              "RoleBinding",
+              "ClusterRole",
+              "ClusterRoleBinding",
+              "ConfigMap",
+              "Secret",
+              "Pod",
+              "ValidatingAdmissionPolicy",
+              "ValidatingAdmissionPolicyBinding"
+            ]
+          },
+          "name": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+          },
+          "specDigest": {
+            "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "resourceVersion"
+            ],
+            "properties": {
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "resourceVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

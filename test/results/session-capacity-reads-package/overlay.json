@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/capacity_session_test.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/test/integration/capacity_session_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/context_native_control.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/context_native_control.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/download_response_window.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/download_response_window.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/capacity_session_reads.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/capacity_session_reads.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/capacity_session_reads_test.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/capacity_session_reads_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/custodydb/download_response.sql.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/custodydb/download_response.sql.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/custodydb/native_exchange.sql.go": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/files/internal/adapters/postgres/custodydb/native_exchange.sql.go"
+  }
+}

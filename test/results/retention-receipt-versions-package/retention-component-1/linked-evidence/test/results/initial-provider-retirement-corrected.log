@@ -1,0 +1,25 @@
+=== RUN   TestInitialProviderIssuerWithRealOpenBao
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup
+    initial_provider_issuer_test.go:98: role_only_explicit_max_ttl_zero=true; nonrenewable=true; finite_actual_expiry=true
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/wrap
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-revoke status=204 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=400 exact_invalid_accessor=false single_error=true exact_wrapped_invalid_accessor=true
+    initial_provider_issuer_test.go:157: self-lookup status=403 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/unwrap
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-revoke status=204 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=400 exact_invalid_accessor=false single_error=true exact_wrapped_invalid_accessor=true
+    initial_provider_issuer_test.go:157: self-lookup status=403 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+--- PASS: TestInitialProviderIssuerWithRealOpenBao (0.13s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup (0.00s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/wrap (0.05s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/unwrap (0.05s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.177s

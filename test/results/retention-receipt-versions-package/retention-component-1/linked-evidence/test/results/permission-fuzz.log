@@ -1,0 +1,10 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/5 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 5/5 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 7331 (2443/sec), new interesting: 56 (total: 61)
+fuzz: elapsed: 6s, execs: 19290 (3987/sec), new interesting: 79 (total: 84)
+fuzz: elapsed: 9s, execs: 31666 (4124/sec), new interesting: 114 (total: 119)
+fuzz: elapsed: 12s, execs: 43778 (4037/sec), new interesting: 124 (total: 129)
+fuzz: elapsed: 15s, execs: 51250 (2491/sec), new interesting: 127 (total: 132)
+fuzz: elapsed: 16s, execs: 51250 (0/sec), new interesting: 127 (total: 132)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	16.020s

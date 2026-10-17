@@ -1,0 +1,64 @@
+# Staged owner selection diagnostics
+
+Source-only, gofmt completed outside the workspace. NOT compiled or qualified.
+No live edit or build. Current custody native gate has terminal exit1 and its
+separate result/cleanup was reported to root; no native retry is implied.
+
+## Payload
+
+Exactly three production files and two focused test files, under payload/:
+owner_bootstrap_selection.go, owner_identity_operation_native.go,
+owner_identity_operation_root.go, owner_bootstrap_selection_diagnostics_test.go,
+and owner_identity_operation_diagnostics_test.go in internal/adapters/kubernetes.
+Manifest pins each existing base and staged hash; null base means new file.
+review.patch is the exact diff. Root owns status/architecture documentation.
+
+The original Complete loop and one Inspect remain unchanged in operations and
+return precedence. A failure now carries its original phase ordinal and fixed
+selection/native/check names. The outer before/after callback labels deliberately
+do not claim SQL caused the result. Pure original-comparison groups preserve the
+exact prior conjunction, including source ResourceVersions, content and original
+journal dates. Independent observation dates remain excluded as before.
+
+Error formatting uses a private integer enum and closed switch; an arbitrary
+provider/API/SQL error is never rendered. Passthrough errors still unwrap their
+original cause. Where the previous implementation deliberately normalized a
+failure to cfg.ErrUnavailable, that exact classification remains; only fixed
+inner diagnostic detail is retained. The accepted reader's raw failure was
+previously discarded and still is. No additional read, retry, clock sample,
+source refresh, deadline, pool, lock, authority, admission or callback is added.
+
+The existing native selection t.Fatal already prints this error. No native test
+change or diagnostic read is needed. Native2 cannot identify the current first
+failed predicate; a diagnostic-only rerun may fail and should drive the actual
+correction rather than a guessed timing adjustment.
+
+## Qualification to allocate
+
+1. Snapshot the launch-time complete dependency closure in a scratch mirror; do
+   not overwrite the workspace. Add ONLY
+   owner_bootstrap_selection_diagnostics_test.go to original production sources.
+   Run -race -count=1 with exact selection
+   ^TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect$.
+   Require exit1 and exact marker
+   "missing original accepted-read diagnostic: permission configuration unavailable".
+   A compilation/setup failure does not count. No new production identifier is
+   referenced by that file, so the old implementation compiles with it.
+2. Install all five staged payloads into that mirror. Compile package/test files,
+   run the full affected OwnerBootstrap/OwnerIdentity operation race tests and
+   all new diagnostics, vet affected package, then Go architecture and canonical
+   spec/architecture/design gates. Preserve validation.json mirror output.
+3. Ensure all original source/dependency and staged hashes unchanged, required
+   named PASS entries present and actual terminal process groups joined before
+   removing only the owned scratch. No implicit native run follows.
+4. After root integration and a new explicit native slot, rerun the identical
+   installed owner full original command. Preserve the previous failure and
+   report first actual fixed code; do not change authority/timing from inference.
+
+The focused tests retain one Inspect and zero effects on initial failure; one
+original claim and no retry on a final native failure; exact original normalized
+and passthrough errors.Is; no arbitrary driver strings; both outer callback
+failure points; accepted-read short-circuit clock counts 0/1/1/2 and positive3;
+19 independent original field changes, first-group precedence and unchanged
+independent observation-date semantics. Existing positive and unknown-result
+owner suites remain required, not replaced by these diagnostic tests.

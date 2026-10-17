@@ -1,0 +1,212 @@
+[
+  {
+    "path": "internal/domain/audit/download_worker.go",
+    "base_sha256": "fd8c661f3823ae268b76742fc5f226afbd1618542dea3a9ab7f14cb2e10864ee",
+    "payload_sha256": "e8d22fb29427325e97d7173893d78ab31041bad81bee61a65701418c3d2dde56"
+  },
+  {
+    "path": "internal/domain/audit/worker_configuration.go",
+    "base_sha256": "a9290061d67de6b643927a80737464862ef3121c7cb435bc8eb7144f73f051b0",
+    "payload_sha256": "7d6bd4fde584df9ebec02847ece9e5e769c5e11442889d42aded501ca54ca833"
+  },
+  {
+    "path": "internal/domain/audit/worker_enrollment.go",
+    "base_sha256": "7b3d987e6c0f3c99d58c27352e04f2973b136974274681dd404aa07710a052bd",
+    "payload_sha256": "ad7e7601b420fb6d93b9169e97c8a5e87cb77e8b3301ae770867f5e45f6e5c25"
+  },
+  {
+    "path": "internal/domain/audit/download.go",
+    "base_sha256": "115796e88b86120925ee0f7d9759623db282b3dbaa8d8e9784709f332d93e135",
+    "payload_sha256": "9f22d4322aed8ab7aa8ced8fb31941e0f25be3e0fa621c7658a9c8bfb41b1940"
+  },
+  {
+    "path": "internal/domain/audit/download_window.go",
+    "base_sha256": "1e4a168656b60eb41cddb158c7ccf198ea2ca1a0ebae9e2a53c088f4f435b87b",
+    "payload_sha256": "129eadc19fc7c06b44676bebd07ec5891273d360848cc5e1dc4200d45b5a9069"
+  },
+  {
+    "path": "internal/domain/audit/enrollment.go",
+    "base_sha256": "9c4746e00ef5c734e4330c0a53c3b5069fab0338c0a05253a59bd753bb7853cd",
+    "payload_sha256": "87d91e1670291b21046c10c9d0e957919dc60a36e15633bff491426aebf5e56c"
+  },
+  {
+    "path": "internal/adapters/postgres/worker_routing.go",
+    "base_sha256": "6ab89598e9d12a2c77a17b6809af033226698090cdefe9980314247b74c6aaca",
+    "payload_sha256": "f8c5847e42cb13b66469c0bc81df3835eaa5469243816bbacab13b9c63668ae5"
+  },
+  {
+    "path": "internal/adapters/postgres/worker_owners.go",
+    "base_sha256": "f81a638eb028a86a70e66831ecc92d7c1538668f9d3a37cadf886a804e6604dd",
+    "payload_sha256": "56cc4ea8f6a9c9b3ef5e8812bdf36551a6cfc040c8d953f75eff447153cfd680"
+  },
+  {
+    "path": "internal/adapters/postgres/native_exchange.go",
+    "base_sha256": "a13e6509dbd7a61dd852d78694b769784c91976077e2990d361776ecf9426bc6",
+    "payload_sha256": "c4154af480fd4a81b7e807d5af46183867efb2bd418b5e62c6fcad47801c3e14"
+  },
+  {
+    "path": "internal/adapters/postgres/worker_enrollment.go",
+    "base_sha256": "213a8eac516c1a30cab7edf4b5ca4d6c48bb5bf23ee2d88f25f4c1cf01829100",
+    "payload_sha256": "c629cbd4217657339189afe7168f79f5aacd6c1416d74f4ce6cb55e09713bed3"
+  },
+  {
+    "path": "internal/adapters/postgres/download_response.go",
+    "base_sha256": "cb8ce302e4df32978cfb648c4f888c0a2bc7c7d44fc2a212cbe4861fc5f21ad0",
+    "payload_sha256": "46dd5cef71d55a2185e7df7a36bd512a47c6644451b4481e57cc30e643f09eff"
+  },
+  {
+    "path": "internal/adapters/postgres/download.go",
+    "base_sha256": "e45d1bc41b8e6fe4e8470212a7d93c5937e0bcae173c66ac8859525d17151c9d",
+    "payload_sha256": "4ccf1fff6c3d1d9baa22b8339eac21bca73a89cae3b824da12ad96202a2a9d76"
+  },
+  {
+    "path": "internal/adapters/postgres/download_response_window.go",
+    "base_sha256": "63c37d20916a79c0d25bfe70a638fc8d0774ff8ca3567a35a037d5dd788d9498",
+    "payload_sha256": "6966f0edfe8f5c4ae1928ee44c17e6190786c89b6abe6366363af286de07f599"
+  },
+  {
+    "path": "internal/adapters/postgres/peer.go",
+    "base_sha256": "3ca10b6ce6b0a8aacfcda75601b0e2d6eff73b7e588a6be6d7a67aa1338be0a8",
+    "payload_sha256": "ce4bc3cbcbcbbf7ea5a2e471d970bb53ff187a57674ae4a3184758110798a003"
+  },
+  {
+    "path": "internal/adapters/postgres/enrollment_activation.go",
+    "base_sha256": "667cb81a5b73a4c2541ebe1d63e736918228e8b2b7b302c1b860bbbefba74235",
+    "payload_sha256": "502771753e4229a1d1b85584a09d14859af603d653e558e3d0ef889c79ee42ee"
+  },
+  {
+    "path": "internal/adapters/postgres/enrollment_signing.go",
+    "base_sha256": "7a1841c48cc3a6a81bfed6667630d07e7b6c75635c44ab82c5ff22b8fa4eee69",
+    "payload_sha256": "a5e6baa8a1e710b87026401b941b321e565790bd3187fcfb9a03635341450113"
+  },
+  {
+    "path": "migrations/queries/worker_owners.sql",
+    "base_sha256": "b7c213dd0a26c2ea2f605985e05e4c65579b328d5a05acc54d42319bd430498a",
+    "payload_sha256": "c0daf7075c220b42588dd3c51a3308a87a9b200d3873e98dd4c40495a670052d"
+  },
+  {
+    "path": "internal/adapters/postgres/download_workers.go",
+    "base_sha256": "c19bef21fd58d6703a719756c54f3965b9b5a140f15bac67388c54219f11227d",
+    "payload_sha256": "50af36debb7c19e3b3608d40dc4ef29509473bb14c27bd735d9f5e8f7e3b155f"
+  },
+  {
+    "path": "internal/application/evidence/context_download_test.go",
+    "base_sha256": "d793d20826ff5b899ff4b720fa5c124d3bf347fa071621dd09601cfcb3028abe",
+    "payload_sha256": "ebd58c5a3024ab2edd6599869ff58682fe93154a80b5997905b702bb7c3a93c2"
+  },
+  {
+    "path": "internal/application/evidence/download_response_test.go",
+    "base_sha256": "d6019dd8a9fe61d8d3c706edf43803f956ef71f48d27a579f689be291121120d",
+    "payload_sha256": "731bab216757cbe1bbf912a0d7bd01c5febb6204ffa1f3fae871171b047b52c8"
+  },
+  {
+    "path": "internal/application/evidence/worker_current_test.go",
+    "base_sha256": "bd30082778b31fda618831dd8698428dbf2397e8ce536e778a659dd7af95bc12",
+    "payload_sha256": "fbd7f8320b2e765da7ab7e060e8b2e81802861fee0e27d566c793d375e158b41"
+  },
+  {
+    "path": "internal/domain/audit/download_window_test.go",
+    "base_sha256": "65e2c15f811831ee101fe2b315ac5824bab6bf470d029612f284309deebd0177",
+    "payload_sha256": "f403b7def56bea2e543a2c5ab39cf2c51a25a119244246ebea63e144917bcf94"
+  },
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "base_sha256": "dbf8aa11ab675737e07410c4fa6318b67fbb3d8af06bec1c19ec9cb2cabe2043",
+    "payload_sha256": "de630b5cb91bb3cc84bb965bbccc17e98bc751526338bc0c54c965db67d17501"
+  },
+  {
+    "path": "test/integration/worker_configuration_kube_test.go",
+    "base_sha256": "a3b1856812d9df196e054c88b6cb6df3a4d86f56587dd14d74f9904872fa7c12",
+    "payload_sha256": "050589e1adc64d2f6677d3afe8328f5ab10ae662bf2493b366042e5d213531d5"
+  },
+  {
+    "path": "test/integration/enrollment_test.go",
+    "base_sha256": "5a358dc54c4ac34898d8a4e868da9d147f5a439d4a200df09d4f3f16b2b34d02",
+    "payload_sha256": "72c82da71e2afa6e8b49fd97d7ee58fa945ba14cb67e24322e273e290f025bdc"
+  },
+  {
+    "path": "test/integration/enrollment_provider_test.go",
+    "base_sha256": "d31df36d5d95ca0b75f630c739bfabe4332a8ed689dbf5ce5d01a3555fa81196",
+    "payload_sha256": "79371674a77927be23e719d5d2cce0bdb74732d39b676fcbf53b926c43d87931"
+  },
+  {
+    "path": "test/integration/peer_registry_test.go",
+    "base_sha256": "9e7520d942282f595db8c0e0d839271343d1456c33413220c5358e8436580323",
+    "payload_sha256": "044bd33ee2199292ff09af29acc106b6f2c99bfe6d773865a65e131f9b8c126d"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "base_sha256": "5cbb4608f7fd90f5fbb40c9cc2e03be68e9bbd22b65054f07d317a2b92e67418",
+    "payload_sha256": "80065b13279dfe38dba9cdbba8e95ceafd8a5b748a5c49536c948c333c7f62bd"
+  },
+  {
+    "path": "test/integration/download_response_test.go",
+    "base_sha256": "e024381b2d480cf97744f3e99b0efd949eac1e63004a28568db8859c2bb3078f",
+    "payload_sha256": "55010c0a4393478aea07f79146b65c8b71d3cc4b37f98d33d320f0fcbd849794"
+  },
+  {
+    "path": "test/integration/worker_audit_history_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "53a5529e2acf4ba9ba86155a4c41510fba51ecefc7dd7411b563eca32fdcb66c"
+  },
+  {
+    "path": "test/integration/native_audit_history_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "56d5c6154dce68f059ccc8b88ab7ba91094fe189d8b0f5ed93ab07e18b822448"
+  },
+  {
+    "path": "test/integration/enrollment_audit_history_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "19c78ad14ff9eb41f0ed2528a4f46a35783c32c8c5bdda1438e267e0a876b759"
+  },
+  {
+    "path": "internal/adapters/postgres/worker_current_audit.go",
+    "base_sha256": null,
+    "payload_sha256": "b01148ffc2300d4241f16fba58ba2d48c6300c91f45ab1273f1fd3e622105e9f"
+  },
+  {
+    "path": "internal/adapters/postgres/worker_current_audit_test.go",
+    "base_sha256": null,
+    "payload_sha256": "f833987bda7679f674f8796957d7a57b4dc147bc1cf65b9776a7d6d9ceaf4502"
+  },
+  {
+    "path": "internal/adapters/postgres/download_current_audit_test.go",
+    "base_sha256": null,
+    "payload_sha256": "625d5c95b32203660df00c2df0c615ee3a243ac59b2de64dca25b0ab0f4233bb"
+  },
+  {
+    "path": "internal/domain/audit/current_receipt_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "0baa2e5b348a0d061508f96301e28f46bd13ceaf56a7e9e9dedebd3d4530966e"
+  },
+  {
+    "path": "internal/domain/audit/historical_download_receipts_test.go",
+    "base_sha256": null,
+    "payload_sha256": "398368ede721926d396ce2665ef5de6c5596cbbbf9669bea4e499272f08ac2e4"
+  },
+  {
+    "path": "test/integration/enrollment_signing_test.go",
+    "base_sha256": "2dc4581945f5fce92e1ea58aba524fa6e61627ba4fb7182d07b31cc5b7f6b8ec",
+    "payload_sha256": "882eb1ebe81d3bda03586ba7aff89c45a04d1d8f7c1f9535ab25ca4284f7f206"
+  },
+  {
+    "path": "docs/architecture/worker-enrollment.md",
+    "base_sha256": "0c1b98bb8aef033c6fc02b1edcad69e4436a3deb05611ce71ca672adf1e9834a",
+    "payload_sha256": "7b09dcde3c6dd463ddc1b32f21b4f5bef02af6b252f887b6bffde3c06e3a318e"
+  },
+  {
+    "path": "docs/architecture/download-sessions.md",
+    "base_sha256": "755ccd586ff290c4eb4c10c29835070c42679aed53d79c1c45a327b45a91bb72",
+    "payload_sha256": "2a520b35e36dd8b02efafc45539fd22b4da802fcfcce44d85f30d092f2f346d2"
+  },
+  {
+    "path": "docs/architecture/peer-identity.md",
+    "base_sha256": "00d18c56dab399ebfe3b9dbcac4c16b369e239de743fc988e9ae38704c01222a",
+    "payload_sha256": "d732e775830ec704e60fb76e11da117c60b3f0a0de8ed2801f32089ac258fdab"
+  },
+  {
+    "path": "specs/artifact-downloads.md",
+    "base_sha256": "b257d6969a8f71937a7bac2d0ce80a76c5165cf76d8876bb791fa9e4c3f39765",
+    "payload_sha256": "57826f0bbf7e96e2b8542bb06fe671d944e51b89dffc0d555ce9c365c0ccc080"
+  }
+]

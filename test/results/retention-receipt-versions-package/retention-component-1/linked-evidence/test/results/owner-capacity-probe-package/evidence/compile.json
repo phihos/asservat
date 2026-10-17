@@ -1,0 +1,29 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/overlay.json",
+    "-vet=off",
+    "-run",
+    "^$",
+    "-count=1",
+    "./internal/contracts",
+    "./internal/domain/configuration",
+    "./internal/adapters/kubernetes",
+    "./internal/bootstrap",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 18.706,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  }
+}

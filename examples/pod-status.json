@@ -1,0 +1,16 @@
+{
+  "format": "asservat-pod-status/v1",
+  "namespaceUID": "namespace-synthetic",
+  "podUID": "pod-synthetic",
+  "resourceVersion": "opaque-rv",
+  "observedAt": "2026-10-09T12:00:00Z",
+  "phase": "Running",
+  "ready": "True",
+  "initialized": "True",
+  "scheduled": "True",
+  "runtimeInstances": 1,
+  "running": 1,
+  "waiting": 0,
+  "terminated": 0,
+  "restarts": 0
+}

@@ -1,0 +1,32 @@
+{
+  "command": [
+    "python",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair"
+  ],
+  "exit": 1,
+  "seconds": 183.223,
+  "scope": "Original fresh bootstrap, real provider/SQL and finite worker input component; no runtime launch/public workflow",
+  "sourceCount": 2116,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "passedTests": [],
+  "productBinary": {
+    "binarySHA256": "5267e92b981462255c906e4e76c83fa6ec0c22b3394b00bf4f66f9e14074c5db",
+    "dockerImageID": "sha256:7f59815031ec24dddbcf919725882a217e7713493707d1f056fd52e8b64c31a5",
+    "tag": "asservat-context-worker:context-g9qopody"
+  },
+  "postgresFixtureStartup": {
+    "limitSeconds": 90,
+    "elapsedSeconds": 15.266,
+    "ready": true
+  },
+  "buildScratchRemoved": true,
+  "archiveHashes": {
+    "harness.log": "2ee7517a2960b9ccf81e227012b9d8818f61a0a512aa92552d41f4fe79c0a501",
+    "context-storage-environment.json": "82e80b0c0098c06be8d7a052e8eabeea4a8909087d1ac94a531390fbecbf5960",
+    "context-storage-postgres.log": "4090697f56f84f7f8e672d434470689a0a562a20084b40af7e16697fca893421",
+    "context-storage-fixture-error.log": "06d23801b04808faacb150768b586de5c726a57098bb38f66de7c1c2ff6c3d18"
+  }
+}

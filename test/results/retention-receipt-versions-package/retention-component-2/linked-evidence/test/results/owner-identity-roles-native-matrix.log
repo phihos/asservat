@@ -1,0 +1,23 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-matrix
+    initial_installation_test.go:552: actual four-purpose owner SQL role creation/SCRAM/privilege matrix passed; inert resource journal, Secret root CAS, accepted owner source and native guard remain explicitly synthetic inputs
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-runtime-administrator-denied
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-lost-completion
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-root-after-lock
+=== RUN   TestInitialInstallationWithRealServices/owner-identity-roles-verification-root-after-lock
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:575: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (3.63s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-matrix (1.53s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-runtime-administrator-denied (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-unknown-claim (0.18s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-lost-completion (0.79s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-held-lock (0.22s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-recovery-after-lock (0.12s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-root-after-lock (0.11s)
+    --- PASS: TestInitialInstallationWithRealServices/owner-identity-roles-verification-root-after-lock (0.41s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.684s

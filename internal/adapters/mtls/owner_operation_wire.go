@@ -1,0 +1,95 @@
+package mtls
+
+import (
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"context"
+	"crypto/tls"
+	"time"
+)
+
+func observationOperationRequest(w contracts.ObservationOperationRequest, now time.Time) (value.OwnerObservationRequest, error) {
+	r := value.OwnerObservationRequest{RootID: w.RootID, ID: w.ID, Challenge: w.Challenge, RequestedAt: ownerObservationTime(w.RequestedAt), NotAfter: ownerObservationTime(w.NotAfter)}
+	if w.Format != contracts.OwnerObservationOperationFormat || !r.Valid(now) {
+		return value.OwnerObservationRequest{}, value.ErrDenied
+	}
+	return r, nil
+}
+func ownerOperationReplyWire(pin value.OwnerObservationPin, request value.OwnerObservationRequest, id string, ordinal int, channel artifact.Digest, peer value.PeerCertificate, leaf value.OwnerCertificate, facts value.OwnerObservationNativeFacts, r value.OwnerRegistrationObservation, end time.Time, now time.Time) (contracts.OwnerObservationOperationReply, error) {
+	var z contracts.OwnerObservationOperationReply
+	digest, err := ownerObservationPinDigest(pin)
+	if err != nil || !authorization.UUID(id) || channel == (artifact.Digest{}) || ordinal < 1 || ordinal > 4 || facts.Final != (ordinal == 4) || !facts.Valid(now) || facts.Pin != pin || !value.SameOwnerObservationRequest(request, facts.Request) || !r.Valid(now) || r.Certificate != leaf || !ownerOperationPeerMatches(facts, r) || !peer.Valid(now) {
+		return z, value.ErrDenied
+	}
+	until := identity.Earlier(end, identity.Earlier(facts.FreshUntil, identity.Earlier(r.FreshUntil, peer.NotAfter)))
+	if !now.Before(until) {
+		return z, value.ErrUnavailable
+	}
+	var work artifact.Digest
+	for _, p := range facts.Peers {
+		if p.Binding == leaf.Binding {
+			work = p.WorkloadDigest
+		}
+	}
+	f := func(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+	rev := r.Configuration.Configuration.Revision
+	return contracts.OwnerObservationOperationReply{Format: contracts.OwnerObservationOperationFormat, Request: observationOperationRequestWire(request), Ordinal: ordinal, BracketID: id, ConnectionBinding: ownerObservationHex(channel), ConnectorLeaf: ownerObservationHex(peer.Digest), OwnerLeaf: ownerObservationHex(leaf.Digest), PinDigest: ownerObservationHex(digest), EnrollmentID: r.Enrollment.ID, Pod: r.Enrollment.Pod, ReplicaSetUID: r.Enrollment.ReplicaSetUID, Configuration: contracts.APIContextRevision{UID: rev.UID, Generation: rev.Generation, Digest: ownerObservationHex(rev.Digest)}, WorkloadDigest: ownerObservationHex(work), NativeStartedAt: f(facts.ObservedAt), NativeUntil: f(until), RegistrationObservedAt: f(r.ObservedAt), RegistrationUntil: f(identity.Earlier(r.FreshUntil, until)), Final: facts.Final}, nil
+}
+
+// This is a v2 delegated correlation, not AuthenticatedOwner or a v1 full native
+// observation. It is accepted only on the actual TLS connection with independent
+// current SQL/issuer validation. The initial native dates remain unchanged.
+type ownerOperationObservation struct {
+	wire           contracts.OwnerObservationOperationReply
+	owner          value.OwnerCertificate
+	revision       identity.Revision
+	configuration  value.OwnerConfiguration
+	started, until time.Time
+}
+
+func (v ownerOperationObservation) continues(a ownerOperationObservation) bool {
+	x, y := a.wire, v.wire
+	return v.configuration.Equal(a.configuration) && x.BracketID == y.BracketID && x.ConnectionBinding == y.ConnectionBinding && x.ConnectorLeaf == y.ConnectorLeaf && x.OwnerLeaf == y.OwnerLeaf && x.PinDigest == y.PinDigest && x.Request == y.Request && x.EnrollmentID == y.EnrollmentID && x.Pod == y.Pod && x.ReplicaSetUID == y.ReplicaSetUID && x.Configuration == y.Configuration && x.WorkloadDigest == y.WorkloadDigest && a.started.Equal(v.started) && !v.until.After(a.until)
+}
+func checkOwnerOperation(ctx context.Context, state *tls.ConnectionState, verifier *OwnerPeerVerifier, registry app.OwnerCertificateRegistry, candidates value.APIContextOwnerCandidates, pin value.OwnerObservationPin, request value.OwnerObservationRequest, peer value.PeerCertificate, w contracts.OwnerObservationOperationReply, ordinal int, now func() time.Time) (ownerOperationObservation, error) {
+	var z ownerOperationObservation
+	if ctx == nil || ctx.Err() != nil || now == nil || verifier == nil || registry == nil || !pin.Valid() || !request.Valid(now()) || !peer.Valid(now()) || candidates.Pool != pin.Pool || !candidates.Valid(now()) {
+		return z, value.ErrUnavailable
+	}
+	owner, err := verifier.VerifyBootstrapServer(state, candidates)
+	if err != nil {
+		return z, err
+	}
+	channel, err := observationOperationConnection(state, request)
+	if err != nil {
+		return z, err
+	}
+	pd, err := ownerObservationPinDigest(pin)
+	start, end := ownerObservationTime(w.NativeStartedAt), ownerObservationTime(w.NativeUntil)
+	observed, registeredUntil := ownerObservationTime(w.RegistrationObservedAt), ownerObservationTime(w.RegistrationUntil)
+	rev := identity.Revision{UID: w.Configuration.UID, Generation: w.Configuration.Generation, Digest: contextStartDigest(w.Configuration.Digest)}
+	if err != nil || w.Format != contracts.OwnerObservationOperationFormat || w.Request != observationOperationRequestWire(request) || ordinal < 1 || ordinal > 4 || w.Ordinal != ordinal || w.Final != (ordinal == 4) || !authorization.UUID(w.BracketID) || w.ConnectionBinding != ownerObservationHex(channel) || w.PinDigest != ownerObservationHex(pd) || w.OwnerLeaf != ownerObservationHex(owner.Digest) || w.ConnectorLeaf != ownerObservationHex(peer.Digest) || !authorization.UUID(w.EnrollmentID) || !authorization.UUID(w.ReplicaSetUID) || !identity.Text(w.Pod, 253) || !rev.Valid() || rev.UID != pin.SourceUID || contextStartDigest(w.WorkloadDigest) == (artifact.Digest{}) || !identity.Fresh(start, end, now(), 5*time.Second) || start.Before(request.RequestedAt) || end.After(request.NotAfter) || end.After(owner.NotAfter) || end.After(peer.NotAfter) || !identity.Fresh(observed, registeredUntil, now(), 5*time.Second) || registeredUntil.After(end) {
+		return z, value.ErrDenied
+	}
+	until := identity.Earlier(end, identity.Earlier(registeredUntil, candidates.ValidUntil))
+	call, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	r, err := registry.ReadOwnerRegistration(call, owner)
+	if err != nil || call.Err() != nil || !r.Valid(now()) || r.Certificate != owner || r.Enrollment.ID != w.EnrollmentID || r.Enrollment.Pool != pin.Pool || r.Enrollment.SourceUID != pin.SourceUID || r.Enrollment.Pod != w.Pod || r.Enrollment.ReplicaSetUID != w.ReplicaSetUID || r.Configuration.Configuration.Revision != rev {
+		return z, value.ErrUnavailable
+	}
+	current, err := verifier.currentVerifier(r.Configuration)
+	if err != nil {
+		return z, err
+	}
+	leaf, err := current.VerifyBootstrapServer(state, candidates)
+	until = identity.Earlier(until, r.FreshUntil)
+	if err != nil || leaf != owner || call.Err() != nil || !now().Before(until) || !candidates.Valid(now()) || !r.Valid(now()) {
+		return z, value.ErrUnavailable
+	}
+	return ownerOperationObservation{wire: w, owner: owner, revision: rev, configuration: r.Configuration.Configuration.Clone(), started: start, until: until}, nil
+}

@@ -1,0 +1,29 @@
+# Standalone owner configuration epoch codec
+
+Staged only; no tests or builds have run. Depends on the separate ADR156
+checkpoint3 value and audit types. No runtime or storage writer selects this format.
+
+Two new framed package files reuse the existing Tink control-audit primitive.
+The fixed new encryption context is
+`asservat-owner-configuration-epoch-audit/v1`; installation identity, exact epoch
+object key and complete original serialized snapshot participate in the existing
+associated-data construction. Old v1 configuration files are unchanged.
+
+The wrapper bounds plaintext to 64 KiB and serialized envelope to 128 KiB and the
+original per-epoch ciphertext allowance. Only a bounded keyset reaches the wrap
+port. It checks cancellation before and after the key operation. It does not
+assert memory erasure, reserve capacity, allow a provider PUT, validate an object
+version, accept a SQL epoch or infer current authority from historical validity.
+The caller supplies independently accepted original expected facts.
+
+Meaningful tests use the actual Tink cipher and ephemeral synthetic wrapping key:
+valid snapshot substitutions, old/new purpose separation (including rewriting the
+public envelope format), malformed JSON before key use, ciphertext corruption,
+output budget, maximum valid source size, and cancellation before/during wrap/open.
+Provider and SQL integration remain separate. No old-product failing reproduction
+is claimed for an entirely new unselected codec.
+
+Qualification after the exclusive native slot is released: exact staged payloads
+plus integrated epoch types; focused framed tests and existing legacy audit tests
+under race, affected compilation/vet and source/hash/cleanup verification. Full
+repository regression remains a separate gate.

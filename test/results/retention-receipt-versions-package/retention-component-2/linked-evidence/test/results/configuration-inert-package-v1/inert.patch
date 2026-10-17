@@ -1,0 +1,259 @@
+--- a/internal/adapters/kubernetes/configuration_role_source.go
++++ b/internal/adapters/kubernetes/configuration_role_source.go
+@@ -180,10 +180,15 @@
+ 	return configurationRoleObserved{observation: out, deploymentVersion: d.ResourceVersion, accountVersion: account.ResourceVersion, guards: versions}, nil
+ }
+ 
+-// Two separately retained reconciler processes, not the public hub allowance.
++// Credential provisioning also accepts the exact inert installation phase at
++// zero desired replicas. It conveys neither readiness nor permission to launch.
++// The full spec/resourceVersion is retained by the surrounding observation, so
++// zero -> one during an operation invalidates its original proof. The rollout
++// bound is calculated at future desired=1 even while inert; a later launch
++// cannot reveal a previously hidden unbacked surge allowance.
+ // A stale/closing process still consumes the role-wide SQL connection limit.
+ func configurationRoleDeploymentBound(d apps.Deployment, in contracts.ConfigurationRuntimeRoles) bool {
+-	if !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Spec.Template.Spec.ServiceAccountName != in.ServiceAccount.Name || d.Spec.Replicas == nil || *d.Spec.Replicas != 1 {
++	if !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Spec.Template.Spec.ServiceAccountName != in.ServiceAccount.Name || d.Spec.Replicas == nil || *d.Spec.Replicas < 0 || *d.Spec.Replicas > 1 {
+ 		return false
+ 	}
+ 	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+--- a/internal/adapters/kubernetes/configuration_role_source_path_test.go
++++ b/internal/adapters/kubernetes/configuration_role_source_path_test.go
+@@ -28,17 +28,19 @@
+ )
+ 
+ type configurationSourcePathFixture struct {
+-	source        *ConfigurationRoleSource
+-	requests      atomic.Int32
+-	probes        atomic.Int32
+-	purposeProbes [3]atomic.Int32
+-	secretWrites  atomic.Int32
+-	guardVersion  atomic.Int32
+-	flipGuard     atomic.Bool
+-	fault         atomic.Int32 // 1: changed RBAC; 2: changed admission with identical objects
+-	mu            sync.Mutex
+-	secret        *core.Secret
+-	projection    *core.Secret
++	source          *ConfigurationRoleSource
++	requests        atomic.Int32
++	probes          atomic.Int32
++	purposeProbes   [3]atomic.Int32
++	secretWrites    atomic.Int32
++	guardVersion    atomic.Int32
++	flipGuard       atomic.Bool
++	fault           atomic.Int32 // 1: changed RBAC; 2: changed admission with identical objects
++	replicas        atomic.Int32
++	workloadVersion atomic.Int32
++	mu              sync.Mutex
++	secret          *core.Secret
++	projection      *core.Secret
+ }
+ 
+ // This loopback server simulates Kubernetes enforcement only. Production
+@@ -49,6 +51,8 @@
+ 	in, _ := configurationRoleProofExample(time.Now())
+ 	f := &configurationSourcePathFixture{}
+ 	f.guardVersion.Store(1)
++	f.replicas.Store(1)
++	f.workloadVersion.Store(1)
+ 	ns := cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}
+ 	administrator := []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}
+ 	workload := cfg.OwnerWorkloadAdministration{Name: "cfg-workload", ControlNamespace: ns, Deployment: "hub", DeploymentUID: ownerID(20), Administrators: administrator, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: in.FleetSource.Name, ServiceAccount: "probe"}, {ConfigMap: in.OwnerSource.Name, ServiceAccount: "probe"}}, SchedulingLeases: []cfg.OwnerSchedulingLease{}}
+@@ -90,10 +94,12 @@
+ 	}
+ 	deployment := func(name string) apps.Deployment {
+ 		uid, account := workload.DeploymentUID, "hub"
++		replicas, version := int32(1), "1"
+ 		if name == in.Deployment.Name {
+ 			uid, account = in.Deployment.UID, in.ServiceAccount.Name
+-		}
+-		return apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: "1"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: account}}, Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: ptr.To(intstr.FromInt(1))}}}}
++			replicas, version = f.replicas.Load(), strconv.Itoa(int(f.workloadVersion.Load()))
++		}
++		return apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: version}, Spec: apps.DeploymentSpec{Replicas: ptr.To(replicas), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: account}}, Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: ptr.To(intstr.FromInt(1))}}}}
+ 	}
+ 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		f.requests.Add(1)
+--- /dev/null
++++ b/internal/adapters/kubernetes/configuration_role_inert_test.go
+@@ -0,0 +1,135 @@
++package kubernetes
++
++import (
++	"context"
++	"fmt"
++	"reflect"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	apps "k8s.io/api/apps/v1"
++	core "k8s.io/api/core/v1"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/types"
++	"k8s.io/apimachinery/pkg/util/intstr"
++	"k8s.io/utils/ptr"
++)
++
++func TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound(t *testing.T) {
++	in, _ := configurationRoleProofExample(time.Now())
++	d := apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: in.Deployment.Name, Namespace: in.Namespace.Name, UID: types.UID(in.Deployment.UID), ResourceVersion: "1"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(0)), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: in.ServiceAccount.Name}}, Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}}}
++	if !configurationRoleDeploymentBound(d, in) {
++		t.Fatal("inert Restricted-workload provisioning phase denied")
++	}
++	for _, c := range []struct {
++		name    string
++		surge   intstr.IntOrString
++		allowed bool
++	}{
++		{"no-overlap", intstr.FromInt(0), true},
++		{"one-overlap", intstr.FromInt(1), true},
++		{"default-quarter", intstr.FromString("25%"), true},
++		{"one-full-overlap", intstr.FromString("100%"), true},
++		{"too-many", intstr.FromInt(2), false},
++		{"hidden-at-zero", intstr.FromString("200%"), false},
++	} {
++		t.Run(c.name, func(t *testing.T) {
++			x := d.DeepCopy()
++			x.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: &c.surge}}
++			if got := configurationRoleDeploymentBound(*x, in); got != c.allowed {
++				t.Fatalf("inert rollout bound=%v, want %v", got, c.allowed)
++			}
++		})
++	}
++	for _, edit := range []func(*apps.Deployment){
++		func(x *apps.Deployment) { x.Spec.Replicas = nil },
++		func(x *apps.Deployment) { x.Spec.Replicas = ptr.To(int32(-1)) },
++		func(x *apps.Deployment) { x.Spec.Replicas = ptr.To(int32(2)) },
++		func(x *apps.Deployment) { x.UID = types.UID(ownerID(99)) },
++		func(x *apps.Deployment) { x.Spec.Template.Spec.ServiceAccountName = "replacement" },
++	} {
++		x := d.DeepCopy()
++		edit(x)
++		if configurationRoleDeploymentBound(*x, in) {
++			t.Fatal("inert phase weakened exact identity or process bound")
++		}
++	}
++}
++
++// Kubernetes enforcement and the SQL receipt are explicitly synthetic here.
++// Actual original-rate source/claim/current checks and Secret CAS run through
++// production adapters. The SQL14-case matrix qualifies SQL effects separately.
++func TestConfigurationRoleInertClaimCanCompleteWithoutLaunchingPod(t *testing.T) {
++	f := newConfigurationSourcePathFixture(t)
++	f.replicas.Store(0)
++	root := configurationPathRoot(t, f)
++	opened, err := root.OpenConfigurationRuntimeRoles(context.Background())
++	if err != nil {
++		t.Fatal("inert root", err)
++	}
++	start := time.Now()
++	call, cancel := context.WithDeadline(context.Background(), start.Add(5*time.Second))
++	defer cancel()
++	err = root.WithConfigurationRoleOperation(call, func(ctx context.Context) error {
++		claimed, fresh, e := root.ClaimConfigurationRuntimeRole(ctx, "configuration-fleet", 42, start.Add(-time.Minute))
++		if e != nil || !fresh {
++			return fmt.Errorf("inert first claim: %w", e)
++		}
++		if claimed.UID != opened.UID || !claimed.State.Until.Equal(opened.State.Until) || claimed.ValidUntil.After(start.Add(5*time.Second)) {
++			return fmt.Errorf("inert claim changed original identity or interval")
++		}
++		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.source.input.InstallationID, "-", "") + "_cfg_00", RoleOID: 100, LayoutDigest: f.source.input.LayoutDigest}
++		return root.CompleteConfigurationRuntimeRole(ctx, claimed, "configuration-fleet", receipt)
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if f.replicas.Load() != 0 || f.workloadVersion.Load() != 1 {
++		t.Fatal("credential provisioning launched or rewrote workload")
++	}
++}
++
++func TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation(t *testing.T) {
++	f := newConfigurationSourcePathFixture(t)
++	f.replicas.Store(0)
++	root := configurationPathRoot(t, f)
++	if _, err := root.OpenConfigurationRuntimeRoles(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	err := root.WithConfigurationRoleOperation(context.Background(), func(ctx context.Context) error {
++		claimed, fresh, e := root.ClaimConfigurationRuntimeRole(ctx, "configuration-fleet", 42, time.Now().Add(-time.Minute))
++		if e != nil || !fresh {
++			return fmt.Errorf("first inert claim: %w", e)
++		}
++		writes := f.secretWrites.Load()
++		f.replicas.Store(1)
++		f.workloadVersion.Add(1)
++		if _, e = root.ReadConfigurationRuntimeRoles(ctx); e == nil {
++			t.Fatal("post-lock current read accepted changed launch phase")
++		}
++		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.source.input.InstallationID, "-", "") + "_cfg_00", RoleOID: 100, LayoutDigest: f.source.input.LayoutDigest}
++		if e = root.CompleteConfigurationRuntimeRole(ctx, claimed, "configuration-fleet", receipt); e == nil {
++			t.Fatal("changed launch phase completed original claim")
++		}
++		f.replicas.Store(0)
++		f.workloadVersion.Add(1)
++		if _, e = root.ReadConfigurationRuntimeRoles(ctx); e == nil {
++			t.Fatal("zero-one-zero revived invalidated original operation")
++		}
++		if f.secretWrites.Load() != writes {
++			t.Fatal("changed phase wrote or refunded root state")
++		}
++		f.mu.Lock()
++		defer f.mu.Unlock()
++		state, e := contracts.DecodeConfigurationRuntimeRoleState(strings.NewReader(string(f.secret.Data["state.json"])))
++		if e != nil || !reflect.DeepEqual(state.Roles[0].Claim, claimed.State.Roles[0].Claim) || state.Roles[0].Receipt != nil {
++			t.Fatal("uncertain original claim was replaced or completed", e)
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++}
+--- a/docs/architecture/configuration-credential-provisioning.md
++++ b/docs/architecture/configuration-credential-provisioning.md
+@@ -19,8 +19,11 @@
+ 
+ The first source proof brackets three actual negative enforcement proofs with
+ exact namespace/guard checks and canonical fleet/owner/live Deployment/account
+-reads before and after. The Deployment supports one desired reconciler plus
+-one retained rollout process. Rechecks repeat the actual negative checks,
++reads before and after. Credential bootstrap accepts an exact inert Deployment
++at zero desired replicas, or one desired reconciler plus one retained rollout
++process. At zero replicas, the surge limit is still checked against the later
++one-replica deployment; scaling cannot expose an unbacked allowance. This is
++an installation phase, not readiness or permission to launch. Rechecks repeat the actual negative checks,
+ administrator identity, exact canonical sources/workload and before/after guard
+ versions. Matching object identities alone never proves unchanged enforcement.
+ 
+@@ -79,6 +82,16 @@
+ is a required subsequent integration hunk once projections are actually
+ produced; it is not a permanent fallback for installed public serving.
+ 
++Installed ordering is exact inert Deployment, protected inputs and immutable
++SQL projection, then an independently checked UID/resource-version CAS launch.
++The source proof retains the complete original spec digest and resourceVersion,
++so zero-to-one during an original claim is a source change and rejects that
++operation. Claims and SQL role provenance keep their original inert spec digest.
++A successful later launch therefore needs its own exact retained disposition
++for read-only installer replay; it cannot reinterpret the running spec as the
++original role claim or authorize another CREATE. The narrow inert predicate
++change does not implement that launch receipt or the complete installed handoff.
++
+ ## Actual qualification boundary
+ 
+ The isolated path4 source passed six-package compile and five-package vet.
+@@ -120,3 +133,10 @@
+ Its reduced CLI/test-helper extraction requires integrated rechecking. These
+ checks did not run a protected installer Pod or actual generated projection
+ handoff; the installed command switch remains pending that qualification.
++
++The inert-phase correction has a failing-before regression against desired=1.
++The fixed predicate, original-rate inert claim/completion and mid-claim zero-to-one
++rejection pass the focused race selection (43.075s package result); affected
++compile and Kubernetes vet pass. Run87334 verified three payload/base files
++and 1,372 dependency hashes unchanged. These checks use synthetic Kubernetes
++enforcement and SQL receipts; they do not qualify the actual launch or replay.

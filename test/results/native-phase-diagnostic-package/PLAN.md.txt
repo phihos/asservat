@@ -1,0 +1,33 @@
+# Temporary native fixture diagnostics
+
+Motivation: native-active-enrollment-qualified ended exit 1 with 1,509 unchanged
+source hashes and complete teardown. Ordinary content and intentional ranges
+passed. Interruption failed in the initial HTTP request, before client abort;
+both control cases failed preparation; exchange failed the publication permission
+gate before native setup. Concurrent host load is recorded, not an exclusive
+cause. No production change or freshness extension follows from that observation.
+
+Four test-only paths instrument existing calls. Preparation and metadata trace
+current C03 and its original permission/catalog/retention/environment ports,
+attachment/preparation/audit SQL ports, and native registration/claim/current
+origin/key binding/wait/result/positive completion. HTTP traces original identity,
+encrypted operation audit reserve/create/receipt/outcome, session lookup, C03,
+response/window admission and the same runtime callbacks. Actual interrupted
+Client.Do gets one outer timing. Publication gets timings of its existing
+permission/retention/recovery reads and original permission projection expiry.
+
+Each fixed stage retains its last sixteen completions, first error, and fixed
+port count/duration totals. Recording is disabled during all forty unchanged
+warm status polls. The original contexts, inputs, return values/errors, first
+context markers and concrete healthy auditor constructor remain unchanged.
+There are no SQL tracers, pool changes, additional reads, retries, background
+tasks or synchronous hot-path log calls. Neither durations nor remaining dates
+establish SQL lock time. No query strings, arguments, IDs, credentials, evidence,
+metadata, raw errors or absolute timestamps are logged. Unknown labels/errors
+map to fixed categories. Output occurs during owning fixture cleanup.
+
+The recorder tests check exact original calls/returns/cancellation, concurrent
+bounded retention, independent stage/first-error capture, excluded warm polls
+and rejection of dynamic labels/errors. Focused race also compiles the integration
+package; integration vet follows. Neither command runs external services or
+qualifies native workflow behavior. Parent owns the eventual native selection.

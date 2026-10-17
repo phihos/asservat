@@ -1,0 +1,9 @@
+{
+  "commands": [
+    "make spec-check architecture-check design-check go-architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 0,
+  "terminalSession": 32390,
+  "logHash": "3fd388c467bbdecb2cd5cebc74fbee11fd141febd560b5cf0a9a2f9cac6a832f",
+  "scope": "canonical documentation and architecture checks; no runtime qualification"
+}

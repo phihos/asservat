@@ -1,0 +1,8 @@
+{
+  "path": "test/integration/configuration_launch_kube_test.go",
+  "before": "afe6f23838dc4cff71bb3aad68658eceace3195401d28f5eeb1b2090e992cad6",
+  "after": "f4408e4eb96a0b0c43172544f02d513d2014755752d9484454a7f70aeb27a886",
+  "beforeEvidence": "configuration-launch-kubernetes-retry.log",
+  "reason": "Fixed prefix truncation reused the same namespace before prior namespace deletion completed; full53-character generated names retain per-case unique identity.",
+  "at": "2026-10-12T18:18:44.203428+00:00"
+}

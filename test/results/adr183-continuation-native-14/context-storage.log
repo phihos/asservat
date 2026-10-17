@@ -1,0 +1,55 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation f04ad6f4-13fb-4fa2-b6a9-bb73193e3021 image docker.io/library/asservat-context-worker@sha256:d2fcf9cf4cf3f53cc5bf3f67c09d77a3000186e78eab4cbc3c65a3a9d45e6f3e exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-ymrvhz---0", namespace "bootstrap-chain-10000000", installation "5910984d-865c-496c-b8dd-8007ff01a196": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-426cc525026cd27b2ff12899ec862837b70a3e0b4f6b988e20406c5dccc0903a-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-426cc525026cd27b2ff12899ec862837b70a3e0b4f6b988e20406c5dccc0903a-audit-wrap
+        created: sys/policies/acl/asservat-configuration-426cc525026cd27b2ff12899ec862837b70a3e0b4f6b988e20406c5dccc0903a-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-426cc525026cd27b2ff12899ec862837b70a3e0b4f6b988e20406c5dccc0903a-audit-unwrap
+        created: sys/policies/acl/asservat-5910984d865c496cb8dd8007ff01a196-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:312: continuation produce 
+    installer_continuation_native_test.go:312: continuation continue installer continuation: resources/audit-secrets done in 4ms
+        installer continuation: resources/producer done in 639ms
+        installer continuation: resources/journal done in 1.95s
+        installer continuation: resources/advance done in 1m1.753s
+        installer continuation: resources/inventory done in 653ms
+        installer continuation: bridge/observer done in 18ms
+        installer continuation: bridge/protection done in 0s
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.231s
+        installer continuation: bridge/probe done in 3.452s
+        installer continuation: bridge/retained done in 4.899s
+        installer continuation: worker/configuration-documents done in 0s
+        installer continuation: worker/outbox done in 2ms
+        installer continuation: worker/inbox done in 2.003s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 2ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 7ms
+        installer continuation: worker/roles-provision done in 22.032s
+        installer continuation: worker/roles-projection done in 4.621s
+        installer continuation: worker/inputs done in 1ms
+        installer continuation: worker/inputs-complete done in 7.659s
+        installer continuation: worker/launch done in 7.752s
+        installer continuation: public/sources done in 6ms
+        installer continuation: owner/accepted-source done in 3.034s
+        installer continuation: public/roles-binding done in 30ms
+        installer continuation: public/roles-root done in 0s
+        installer continuation: public/roles-sql done in 8ms
+        installer continuation: public/roles-provision done in 2m49.132s
+        installer continuation stopped at public/roles-projection (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (612.45s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (21.80s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (304.39s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.80s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	612.509s
+FAIL

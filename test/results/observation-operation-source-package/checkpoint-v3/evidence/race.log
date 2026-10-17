@@ -1,0 +1,184 @@
+=== RUN   TestObservationOperationClosedWireExactIntegers
+=== RUN   TestObservationOperationClosedWireExactIntegers/unknown
+=== RUN   TestObservationOperationClosedWireExactIntegers/duplicate
+=== RUN   TestObservationOperationClosedWireExactIntegers/overflow
+=== RUN   TestObservationOperationClosedWireExactIntegers/fraction
+=== RUN   TestObservationOperationClosedWireExactIntegers/too-large
+=== RUN   TestObservationOperationClosedWireExactIntegers/trailing
+--- PASS: TestObservationOperationClosedWireExactIntegers (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/unknown (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/duplicate (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/overflow (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/fraction (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/too-large (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/trailing (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.027s
+=== RUN   TestConnectorObservationProducerUsesPrivateKeysAndFreshNativeProof
+--- PASS: TestConnectorObservationProducerUsesPrivateKeysAndFreshNativeProof (0.05s)
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/roles
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/suspended
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/backing
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-client-key
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-server-key
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/guard
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/template
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/replacement
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/renewal
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/key-replaced
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/cancelled
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/closed
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/expired
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/issuer-revoked
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/proof-unavailable
+--- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority (0.35s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/roles (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/suspended (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/backing (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-client-key (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-server-key (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/guard (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/template (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/replacement (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/renewal (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/key-replaced (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/cancelled (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/closed (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/expired (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/issuer-revoked (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/proof-unavailable (0.02s)
+=== RUN   TestConnectorObservationProducerKeepsCallerDeadlineAndJoinsRootCancellation
+--- PASS: TestConnectorObservationProducerKeepsCallerDeadlineAndJoinsRootCancellation (0.02s)
+=== RUN   TestRemoteConnectorSourceReadsFreshEveryTimeAndPreservesFirstDeadline
+--- PASS: TestRemoteConnectorSourceReadsFreshEveryTimeAndPreservesFirstDeadline (0.04s)
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/unknown
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/ordinal
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/challenge
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/channel
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/process
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/backing
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/workload
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/revision
+--- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable (0.25s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/unknown (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/ordinal (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/challenge (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/channel (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/process (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/backing (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/workload (0.03s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/revision (0.03s)
+=== RUN   TestRemoteConnectorSourceCloseJoinsAdmittedProofAndDeniesConcurrentRead
+--- PASS: TestRemoteConnectorSourceCloseJoinsAdmittedProofAndDeniesConcurrentRead (0.02s)
+=== RUN   TestConnectorOperationOneNativeInstanceAcrossBothPairs
+--- PASS: TestConnectorOperationOneNativeInstanceAcrossBothPairs (0.05s)
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/new-operation
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/backing
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/roles
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/native-start
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/channel
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/leaf
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/early-final
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/missing-final
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/out-of-order
+=== RUN   TestConnectorOperationCrossPairSubstitutionIsTerminal/missing-first-registration
+--- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal (0.42s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/new-operation (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/backing (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/roles (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/native-start (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/channel (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/leaf (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/early-final (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/missing-final (0.05s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/out-of-order (0.04s)
+    --- PASS: TestConnectorOperationCrossPairSubstitutionIsTerminal/missing-first-registration (0.04s)
+=== RUN   TestConnectorOperationCancellationDuringAdmissionCannotTransfer
+--- PASS: TestConnectorOperationCancellationDuringAdmissionCannotTransfer (0.02s)
+=== RUN   TestConnectorOperationCloseJoinsNativeAndRemoteReads
+=== RUN   TestConnectorOperationCloseJoinsNativeAndRemoteReads/native
+=== RUN   TestConnectorOperationCloseJoinsNativeAndRemoteReads/remote
+--- PASS: TestConnectorOperationCloseJoinsNativeAndRemoteReads (0.05s)
+    --- PASS: TestConnectorOperationCloseJoinsNativeAndRemoteReads/native (0.03s)
+    --- PASS: TestConnectorOperationCloseJoinsNativeAndRemoteReads/remote (0.03s)
+=== RUN   TestConnectorOperationShortenedCallAndSocketNeverRenew
+=== RUN   TestConnectorOperationShortenedCallAndSocketNeverRenew/admission
+=== RUN   TestConnectorOperationShortenedCallAndSocketNeverRenew/ordinal2
+=== RUN   TestConnectorOperationShortenedCallAndSocketNeverRenew/late-attachment
+--- PASS: TestConnectorOperationShortenedCallAndSocketNeverRenew (0.97s)
+    --- PASS: TestConnectorOperationShortenedCallAndSocketNeverRenew/admission (0.32s)
+    --- PASS: TestConnectorOperationShortenedCallAndSocketNeverRenew/ordinal2 (0.32s)
+    --- PASS: TestConnectorOperationShortenedCallAndSocketNeverRenew/late-attachment (0.32s)
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/replacement-before
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/replacement-after
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/renewal-after
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/root-cancel
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/final-source
+=== RUN   TestConnectorOperationCurrentKeysAndFinalMutationDeny/issuer-change
+--- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny (0.20s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/replacement-before (0.03s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/replacement-after (0.03s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/renewal-after (0.03s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/root-cancel (0.03s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/final-source (0.03s)
+    --- PASS: TestConnectorOperationCurrentKeysAndFinalMutationDeny/issuer-change (0.03s)
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/different-bracket
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/different-leaf
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/different-observed-date
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/different-backing
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-process
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-revision
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-end
+=== RUN   TestConnectorOperationRegistrationMustMatchActualStoredPair/final-pair-is-first
+--- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair (0.29s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/different-bracket (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/different-leaf (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/different-observed-date (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/different-backing (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-process (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-revision (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/registration-end (0.04s)
+    --- PASS: TestConnectorOperationRegistrationMustMatchActualStoredPair/final-pair-is-first (0.04s)
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-purpose
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-request
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-exporter
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/bracket
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/ordinal
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/early-final
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/native-start
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/native-end
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/value-before-native
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/value-after-now
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/source-after-native
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/workload-after-native
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/leaf
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/pin
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/role-pins
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/request
+=== RUN   TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/noncanonical-time
+--- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates (0.03s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-purpose (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-request (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/v1-exporter (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/bracket (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/ordinal (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/early-final (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/native-start (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/native-end (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/value-before-native (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/value-after-now (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/source-after-native (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/workload-after-native (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/leaf (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/pin (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/role-pins (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/request (0.00s)
+    --- PASS: TestConnectorOperationWireBindsActualV2ExporterAndOriginalDates/noncanonical-time (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	3.793s

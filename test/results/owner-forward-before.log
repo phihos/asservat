@@ -1,0 +1,8 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/owner_credentials_test.go:151:17: c.ClientCertificate undefined (type *OwnerCredentials has no field or method ClientCertificate)
+internal/adapters/mtls/owner_credentials_test.go:153:17: c.ClientCertificate undefined (type *OwnerCredentials has no field or method ClientCertificate)
+internal/adapters/mtls/owner_credentials_test.go:155:19: c.VerifyClientCertificate undefined (type *OwnerCredentials has no field or method VerifyClientCertificate)
+internal/adapters/mtls/owner_credentials_test.go:157:17: c.VerifyClientCertificate undefined (type *OwnerCredentials has no field or method VerifyClientCertificate)
+internal/adapters/mtls/owner_credentials_test.go:159:17: c.ClientCertificate undefined (type *OwnerCredentials has no field or method ClientCertificate)
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL

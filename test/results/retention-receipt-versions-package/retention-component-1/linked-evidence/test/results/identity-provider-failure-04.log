@@ -1,0 +1,8 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:249: provider part 0 fields [alg kid typ] type "JWT"
+    identity_provider_test.go:249: provider part 1 fields [asservat_groups aud azp exp iat iss jti scope sid typ] type "Bearer"
+    identity_provider_test.go:249: actual provider access token rejected: invalid identity input
+--- FAIL: TestKeycloakProvider (1.55s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.594s
+FAIL

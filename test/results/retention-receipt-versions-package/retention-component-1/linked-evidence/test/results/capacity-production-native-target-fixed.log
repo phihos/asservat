@@ -1,0 +1,103 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-zero-phase-sentinels
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/capture-backed-still-unreconciled
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ready-still-unreconciled
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-original-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewed-positive-predecessor-zero-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/maximum-valid-predecessor-bytes
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-cannot-have-predecessor
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewal-requires-predecessor
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/time-cannot-manufacture-disposition
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/digest-cannot-manufacture-reconciled-time
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-missing
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-object
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-short
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-long
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-boolean-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-negative-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-oversize-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-fractional-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-missing
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-object
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-short
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-long
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-boolean-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-negative-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-oversize-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-fractional-byte
+=== RUN   TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-digest-parser-still-rejects-zero
+=== RUN   TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:129: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: fixed_role_production_ms=1845
+=== RUN   TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt
+=== RUN   TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker
+=== RUN   TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early
+    capacity_sql_matrix_test.go:121: root_three_phases_ms=245 original_remaining_ms=4701
+=== RUN   TestCapacityProducerWithRealPostgres/first-workload-unknown-capture-completion
+    capacity_sql_matrix_test.go:156: workload_three_phases_with_lookup_ms=434 original_remaining_ms=4826
+=== RUN   TestCapacityProducerWithRealPostgres/second-workload-concurrent-reserve-and-expired-phase
+=== RUN   TestCapacityProducerWithRealPostgres/current-binding-refresh-does-not-recharge
+=== RUN   TestCapacityProducerWithRealPostgres/held-source-original-caller-expiry
+=== RUN   TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session
+    capacity_sql_matrix_test.go:256: actual managed SQL52 admission context admission unavailable
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:150: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- FAIL: TestCapacityProducerWithRealPostgres (10.94s)
+    --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state (0.03s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-zero-phase-sentinels (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/capture-backed-still-unreconciled (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ready-still-unreconciled (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-original-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewed-positive-predecessor-zero-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/maximum-valid-predecessor-bytes (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/initial-cannot-have-predecessor (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/renewal-requires-predecessor (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/time-cannot-manufacture-disposition (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/digest-cannot-manufacture-reconciled-time (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-missing (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-object (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-short (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-long (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-string-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-null-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-boolean-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-negative-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-oversize-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/PreviousDigest-fractional-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-missing (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-object (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-short (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-long (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-string-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-null-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-boolean-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-negative-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-oversize-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/ReconciledDigest-fractional-byte (0.00s)
+        --- PASS: TestCapacityProducerWithRealPostgres/root-configuration-digest-state/positive-digest-parser-still-rejects-zero (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt (0.47s)
+    --- PASS: TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker (0.28s)
+    --- PASS: TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early (0.30s)
+    --- PASS: TestCapacityProducerWithRealPostgres/first-workload-unknown-capture-completion (0.47s)
+    --- PASS: TestCapacityProducerWithRealPostgres/second-workload-concurrent-reserve-and-expired-phase (5.23s)
+    --- PASS: TestCapacityProducerWithRealPostgres/current-binding-refresh-does-not-recharge (0.11s)
+    --- PASS: TestCapacityProducerWithRealPostgres/held-source-original-caller-expiry (0.86s)
+    --- FAIL: TestCapacityProducerWithRealPostgres/actual-managed-context-publication-and-original-session (0.74s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	11.002s
+FAIL

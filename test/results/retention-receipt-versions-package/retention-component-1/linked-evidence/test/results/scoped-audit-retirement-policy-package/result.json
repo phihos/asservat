@@ -1,0 +1,30 @@
+{
+  "scope": "narrow exact-prefix retirement policy and negative matrix, compile/vet; native pending",
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-3/overlay.json",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 11.882
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/multipart-3/overlay.json",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 2.095
+    }
+  ],
+  "dependencies": 1934
+}

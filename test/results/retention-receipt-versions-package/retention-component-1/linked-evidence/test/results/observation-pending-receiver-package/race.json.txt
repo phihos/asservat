@@ -1,0 +1,45 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-v2-pending-20261013/checkpoint-v1/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^Test(OwnerPending|OwnerOperationRouting|OwnerOperationReceiver|HubObservationOperation|ObservationOperationRouting|OperationChannel|OperationCoordinator|OperationOwner|ConnectorOperation|ConnectorObservationChannel|HubConnectorObservation|OwnerBootstrap|RegionalOperationActual|RegionalObservationOperation)",
+    "-v",
+    "./internal/contracts",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation",
+    "./internal/bootstrap"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "expectedExit": 0,
+  "expectedFailureOccurrences": null,
+  "seconds": 27.693,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  }
+}

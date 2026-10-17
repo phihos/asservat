@@ -1,0 +1,9 @@
+=== RUN   TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies
+    owner_deployment_join_test.go:85: legacy Close returned before the admitted Runtime joined
+--- FAIL: TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies (0.03s)
+=== RUN   TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission
+    owner_deployment_join_test.go:177: closed legacy deployment entered Runtime or repeated resource close
+--- FAIL: TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.090s
+FAIL

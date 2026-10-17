@@ -1,0 +1,8 @@
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed
+    configuration_worker_operation_test.go:64: unowned or out-of-order native/SQL phase accepted
+--- FAIL: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder (0.00s)
+    --- FAIL: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.049s
+FAIL

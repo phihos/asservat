@@ -1,0 +1,29 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-native-timing-20261013/checkpoint-v2/overlay.json",
+    "./test/integration"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 2.273,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  }
+}

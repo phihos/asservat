@@ -1,0 +1,12 @@
+{
+  "test/integration/native_preparation_trace_test.go": {
+    "before": "ba6ec87bbc29702c0f614fec04e3d9c4972b2c2aecd22a695626c035f4cd3394",
+    "afterBeforeGofmt": "6150f29b83b1e18d46d50dbd97f1c893b22f29f8ab19ba8a05725da281199ba5",
+    "after": "6cd001b3c3dfadd551becb5e83b0f6814be2e2bdcb7b73f9511eeecc26ac9630"
+  },
+  "test/integration/context_native_content_test.go": {
+    "before": "dc0bb5c24e247297f5654d574acb794062d4074d53e747a6105e684dfd980e49",
+    "afterBeforeGofmt": "a0d394a4f21c0add04efd29e26334f317bafc3777402998e6bb389ca54a78243",
+    "after": "a0d394a4f21c0add04efd29e26334f317bafc3777402998e6bb389ca54a78243"
+  }
+}

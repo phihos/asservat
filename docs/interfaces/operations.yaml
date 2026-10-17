@@ -1,0 +1,514 @@
+version: 1
+status: design-only
+operations:
+- operation: list_cases
+  path: /api/v1/operations/list_cases
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_case
+  path: /api/v1/operations/get_case
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: find_similar_cases
+  path: /api/v1/operations/find_similar_cases
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_artifacts
+  path: /api/v1/operations/list_artifacts
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_timeline
+  path: /api/v1/operations/get_timeline
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_backtrace
+  path: /api/v1/operations/get_backtrace
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_runtime_summary
+  path: /api/v1/operations/get_runtime_summary
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_profile_summary
+  path: /api/v1/operations/get_profile_summary
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: compare_profiles
+  path: /api/v1/operations/compare_profiles
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_pcap_summary
+  path: /api/v1/operations/get_pcap_summary
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_http_headers
+  path: /api/v1/operations/get_http_headers
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_zeek_log
+  path: /api/v1/operations/get_zeek_log
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_file_excerpt
+  path: /api/v1/operations/get_file_excerpt
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_logs
+  path: /api/v1/operations/get_logs
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: request_raw_access
+  path: /api/v1/operations/request_raw_access
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: get_grant
+  path: /api/v1/operations/get_grant
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: read_memory
+  path: /api/v1/operations/read_memory
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: debugger_command
+  path: /api/v1/operations/debugger_command
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: pcap_query
+  path: /api/v1/operations/pcap_query
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_query_result
+  path: /api/v1/operations/get_query_result
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_shares
+  path: /api/v1/operations/list_shares
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: create_share
+  path: /api/v1/operations/create_share
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: revoke_share
+  path: /api/v1/operations/revoke_share
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: request_capture
+  path: /api/v1/operations/request_capture
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: list_targets
+  path: /api/v1/operations/list_targets
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_diagnostics
+  path: /api/v1/operations/list_diagnostics
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: preview_capture
+  path: /api/v1/operations/preview_capture
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_capture
+  path: /api/v1/operations/get_capture
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: cancel_capture
+  path: /api/v1/operations/cancel_capture
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: get_target_discovery
+  path: /api/v1/operations/get_target_discovery
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: recommend_diagnostics
+  path: /api/v1/operations/recommend_diagnostics
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_capture_history
+  path: /api/v1/operations/list_capture_history
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_capture_settings
+  path: /api/v1/operations/get_capture_settings
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_capture_profiles
+  path: /api/v1/operations/list_capture_profiles
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_capture_profile
+  path: /api/v1/operations/get_capture_profile
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_syscall_summary
+  path: /api/v1/operations/get_syscall_summary
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: get_syscall_events
+  path: /api/v1/operations/get_syscall_events
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: syscall_query
+  path: /api/v1/operations/syscall_query
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: list_recordings
+  path: /api/v1/operations/list_recordings
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: preview_recording_save
+  path: /api/v1/operations/preview_recording_save
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: stage_editor_draft
+  path: /api/v1/console/stage_editor_draft
+  transport:
+  - browser
+  effect: command
+  role: scoped-config-author
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: get_session
+  path: /api/v1/session
+  transport:
+  - browser
+  effect: read
+  role: signed-in
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: explain_access
+  path: /api/v1/console/explain_access
+  transport:
+  - browser
+  effect: read
+  role: signed-in
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_reviews
+  path: /api/v1/console/list_reviews
+  transport:
+  - browser
+  effect: read
+  role: requester-or-reviewer
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: get_review
+  path: /api/v1/console/get_review
+  transport:
+  - browser
+  effect: read
+  role: requester-or-reviewer
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: decide_review
+  path: /api/v1/console/decide_review
+  transport:
+  - browser
+  effect: command
+  role: independent-reviewer
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: revoke_grant
+  path: /api/v1/console/revoke_grant
+  transport:
+  - browser
+  effect: command
+  role: authorized-grant-revoker
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: stop_future_sharing
+  path: /api/v1/console/stop_future_sharing
+  transport:
+  - browser
+  effect: command
+  role: current-sharing-manager
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: replace_share_managers
+  path: /api/v1/console/replace_share_managers
+  transport:
+  - browser
+  effect: command
+  role: current-authorized-owner
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: apply_privacy_action
+  path: /api/v1/console/apply_privacy_action
+  transport:
+  - browser
+  effect: command
+  role: privacy-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: preview_configuration
+  path: /api/v1/console/preview_configuration
+  transport:
+  - browser
+  effect: read
+  role: scoped-config-reader
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: submit_maintainer_configuration
+  path: /api/v1/console/submit_maintainer_configuration
+  transport:
+  - browser
+  effect: command
+  role: current-kubernetes-maintainer
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_clusters
+  path: /api/v1/console/list_clusters
+  transport:
+  - browser
+  effect: read
+  role: fleet-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: get_cluster
+  path: /api/v1/console/get_cluster
+  transport:
+  - browser
+  effect: read
+  role: fleet-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: enroll_cluster
+  path: /api/v1/console/enroll_cluster
+  transport:
+  - browser
+  effect: command
+  role: fleet-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: revoke_cluster
+  path: /api/v1/console/revoke_cluster
+  transport:
+  - browser
+  effect: command
+  role: fleet-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_capabilities
+  path: /api/v1/console/list_capabilities
+  transport:
+  - browser
+  effect: read
+  role: scoped-maintainer-or-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: get_readiness
+  path: /api/v1/console/get_readiness
+  transport:
+  - browser
+  effect: read
+  role: fleet-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_capacity
+  path: /api/v1/console/list_capacity
+  transport:
+  - browser
+  effect: read
+  role: capacity-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_deletion_work
+  path: /api/v1/console/list_deletion_work
+  transport:
+  - browser
+  effect: read
+  role: privacy-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: retry_deletion
+  path: /api/v1/console/retry_deletion
+  transport:
+  - browser
+  effect: command
+  role: privacy-operator
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_audit
+  path: /api/v1/console/list_audit
+  transport:
+  - browser
+  effect: read
+  role: scoped-audit-reader
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: get_operation
+  path: /api/v1/console/get_operation
+  transport:
+  - browser
+  effect: read
+  role: operation-authorized-reader
+  contract: docs/interfaces/browser-openapi.yaml
+- operation: list_live_sources
+  path: /api/v1/operations/list_live_sources
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: open_live_watch
+  path: /api/v1/operations/open_live_watch
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: read_live_watch
+  path: /api/v1/operations/read_live_watch
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: update_live_watch
+  path: /api/v1/operations/update_live_watch
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: close_live_watch
+  path: /api/v1/operations/close_live_watch
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: prepare_artifact_download
+  path: /api/v1/operations/prepare_artifact_download
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: get_artifact_download
+  path: /api/v1/operations/get_artifact_download
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: cancel_artifact_download
+  path: /api/v1/operations/cancel_artifact_download
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: download_artifact_content
+  path: /api/v1/downloads/{download_id}/content
+  transport:
+  - browser
+  - http-client
+  effect: read
+  contract: specs/artifact-downloads.md
+- operation: resolve_capture_request
+  path: /api/v1/operations/resolve_capture_request
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json

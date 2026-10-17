@@ -1,0 +1,6 @@
+# asservat.local/asservat/internal/adapters/postgres [asservat.local/asservat/internal/adapters/postgres.test]
+../../.cache/asservat-build/planning/download-stop-lifecycle-20261012/work/internal/adapters/postgres/download_stop_lifecycle.go:526:20: r.Records undefined (type interface{} has no field or method Records)
+../../.cache/asservat-build/planning/download-stop-lifecycle-20261012/work/internal/adapters/postgres/download_stop_lifecycle.go:529:50: r.Records undefined (type interface{} has no field or method Records)
+../../.cache/asservat-build/planning/download-stop-lifecycle-20261012/work/internal/adapters/postgres/download_stop_lifecycle.go:529:70: r.Overdue undefined (type interface{} has no field or method Overdue)
+FAIL	asservat.local/asservat/internal/adapters/postgres [build failed]
+FAIL

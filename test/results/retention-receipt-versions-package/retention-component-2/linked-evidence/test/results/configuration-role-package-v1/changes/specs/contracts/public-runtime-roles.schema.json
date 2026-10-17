@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/public-runtime-roles.schema.json",
+  "title": "Protected post-activation public SQL role input",
+  "description": "Generated installation input. The current source-stage inventory covers eighteen identity/session and retained-read purposes only; full installed graph qualification remains pending. No retired initial manager reuse or runtime DDL. Layout digest must equal compiled grants, not a caller-selected qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "initialClaimID",
+    "clusterID",
+    "namespace",
+    "layoutDigest",
+    "ownerConfigurationUID"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-public-runtime-roles/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "initialClaimID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "layoutDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ownerConfigurationUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    }
+  }
+}

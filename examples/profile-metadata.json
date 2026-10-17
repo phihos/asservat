@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "profile/v1",
+  "format": "pprof",
+  "runtime": "go",
+  "profileType": "cpu",
+  "mode": "interval",
+  "sampleTypes": [
+    {
+      "type": "samples",
+      "unit": "count"
+    },
+    {
+      "type": "cpu",
+      "unit": "nanoseconds"
+    }
+  ],
+  "durationNanoseconds": 10000000000,
+  "samplePeriod": {
+    "type": "cpu",
+    "unit": "nanoseconds",
+    "value": 10000000
+  },
+  "lostSamples": null,
+  "symbolCoverage": {
+    "resolvedLocations": 40,
+    "totalLocations": 42
+  },
+  "acquisition": {
+    "sourceRef": "api-local-pprof",
+    "forceGC": false,
+    "settingsKnown": true
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/share.schema.json",
+  "title": "Asservat share v1 \u2014 hub runtime DTO, not a Kubernetes resource",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "EvidenceShare"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "caseID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dataClasses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "includeFutureArtifacts": {
+          "const": false
+        },
+        "allowReshare": {
+          "const": false
+        },
+        "origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sharingIntentID": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "captureUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "selectionID": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,62}$"
+            }
+          },
+          "required": [
+            "sharingIntentID",
+            "captureUID",
+            "selectionID"
+          ]
+        },
+        "createdBy": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "management": {
+          "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/resolved"
+        }
+      },
+      "required": [
+        "caseID",
+        "artifacts",
+        "recipients",
+        "dataClasses",
+        "operations",
+        "createdBy",
+        "reason",
+        "notAfter",
+        "includeFutureArtifacts",
+        "allowReshare",
+        "management"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operations": {
+                "contains": {
+                  "const": "download_artifact"
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "dataClasses": {
+                "contains": {
+                  "const": "raw"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "PendingApproval",
+            "Active",
+            "Denied",
+            "Revoked",
+            "Expired",
+            "Suspended"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "approvedBy": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "phase",
+        "revision"
+      ]
+    },
+    "schemaVersion": {
+      "const": "share/v1"
+    },
+    "id": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+    }
+  },
+  "required": [
+    "kind",
+    "spec",
+    "schemaVersion",
+    "id",
+    "status"
+  ]
+}

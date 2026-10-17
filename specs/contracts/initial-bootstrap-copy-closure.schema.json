@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-copy-closure.schema.json",
+  "title": "Original positive managed setup-copy closure claim",
+  "description": "At most 4096 bytes. Fixed public original identities only, selected after independently observed manager retirement and complete activation handover. Exactly one original 15-minute interval; relational code enforces times, unique identities and original retained pins. No secret payload/hash, credential, effect/read/recovery authority, arbitrary operation list or renewed cleanup interval. Receipts remain historical after expiry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "operationID",
+    "installationID",
+    "requestID",
+    "managerCloseID",
+    "activatedClaimID",
+    "policyOperationID",
+    "bindingOperationID",
+    "namespace",
+    "seed",
+    "projection",
+    "history",
+    "root",
+    "sql",
+    "provider",
+    "managerRetiredAt",
+    "startedAt",
+    "until"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bootstrap-copy-closure/v1"
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "managerCloseID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "activatedClaimID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "policyOperationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "bindingOperationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "seed": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "projection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "history": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "root": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "sql": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "provider": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "managerRetiredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "managerRetirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "manager",
+        "startedAt",
+        "until",
+        "retiredAt"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "manager": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "oid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "oid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295,
+              "not": {
+                "const": 10
+              }
+            }
+          }
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "retiredAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

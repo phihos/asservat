@@ -1,0 +1,184 @@
+package evidence
+
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"context"
+	"sync"
+	"time"
+)
+
+// These ports receive framework-verified actual peers. No endpoint accepts a
+// caller-selected authority, process or source path. SQL effects require the
+// independently configured current transaction guards as usual.
+type NativeOperationReader interface {
+	ObserveNativeOperation(context.Context, value.NativeReference, value.KeyPeer) (value.NativeLease, error)
+}
+type NativeOperations interface {
+	NativeOperationReader
+	ClaimNativeOperation(context.Context, value.WorkerEnrollment, artifact.DownloadAuthority, value.NativeOperation) (value.NativeOperation, error)
+	ReleaseNativeOperation(context.Context, value.NativeOperation) error
+	// Complete requires an acknowledged exact open-to-closed transition under
+	// the original current lease. Cleanup nil/absence/expiry is insufficient.
+	CompleteNativeOperation(context.Context, value.NativeLease) error
+}
+
+// NativeCurrentCheck belongs to the live original hub request. It is never
+// encoded or reconstructed from a certificate or NativeLease.
+type NativeCurrentCheck func(context.Context) (value.NativeLease, error)
+
+// NativeCompletion belongs to the original request and its exact owner. A nil
+// result proves its restrictive SQL close, not new work or disclosed metadata.
+type NativeCompletion func(context.Context, value.NativeLease) error
+
+// NativeFrameGate owns a stream's current observation and known cancellation.
+// Refreshing a *response* lease is an explicit higher-level current check, not
+// this gate's job. Out-of-order callbacks may only shorten its original bound.
+type NativeFrameGate struct {
+	mu                 sync.Mutex
+	ctx                context.Context
+	cancel             context.CancelFunc
+	check              NativeCurrentCheck
+	now                func() time.Time
+	lease              value.NativeLease
+	until              time.Time
+	timer              *time.Timer
+	active             int
+	closed, doneClosed bool
+	done               chan struct{}
+}
+
+func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now func() time.Time) (*NativeFrameGate, error) {
+	if parent == nil || parent.Err() != nil || check == nil || now == nil {
+		return nil, artifact.ErrInvalid
+	}
+	started := now()
+	bounded, stop := context.WithDeadline(parent, started.Add(artifact.DownloadLease))
+	defer stop()
+	l, err := check(bounded)
+	if err != nil || bounded.Err() != nil || (!l.Valid(now()) || !l.Operation.CurrentValid(now())) {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	until := identity.Earlier(started.Add(artifact.DownloadLease), l.Until)
+	if d, ok := parent.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	if !now().Before(until) {
+		return nil, artifact.ErrDownloadExpired
+	}
+	ctx, cancel := context.WithDeadline(parent, until)
+	g := &NativeFrameGate{ctx: ctx, cancel: cancel, check: check, now: now, lease: l, until: until, done: make(chan struct{})}
+	context.AfterFunc(ctx, g.Close)
+	return g, nil
+}
+func (g *NativeFrameGate) Context() context.Context {
+	if g == nil {
+		c, cancel := context.WithCancel(context.Background())
+		cancel()
+		return c
+	}
+	return g.ctx
+}
+func sameNativeOperation(a, b value.NativeOperation) bool { return a.Equal(b) }
+
+func (g *NativeFrameGate) finishLocked() {
+	if g.closed && g.active == 0 && !g.doneClosed {
+		g.doneClosed = true
+		g.check = nil
+		close(g.done)
+	}
+}
+func (g *NativeFrameGate) Close() {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !g.closed {
+		g.closed = true
+		g.cancel()
+		if g.timer != nil {
+			g.timer.Stop()
+		}
+	}
+	g.finishLocked()
+}
+func (g *NativeFrameGate) Wait(ctx context.Context) error {
+	if g == nil || ctx == nil {
+		return artifact.ErrInvalid
+	}
+	select {
+	case <-g.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) {
+	if g == nil || ctx == nil || ctx.Err() != nil {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	g.mu.Lock()
+	if g.closed || g.ctx.Err() != nil || !g.now().Before(g.until) {
+		g.mu.Unlock()
+		g.Close()
+		return value.NativeLease{}, artifact.ErrDownloadExpired
+	}
+	g.active++
+	check, until := g.check, g.until
+	g.mu.Unlock()
+	defer func() { g.mu.Lock(); g.active--; g.finishLocked(); g.mu.Unlock() }()
+	call, stop := context.WithDeadline(ctx, until)
+	join := context.AfterFunc(g.ctx, stop)
+	l, err := check(call)
+	callErr := call.Err()
+	join()
+	stop()
+	g.mu.Lock()
+	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && l.Sequence == g.lease.Sequence
+	if valid {
+		end := identity.Earlier(g.until, l.Until)
+		if end.Before(g.until) {
+			g.until = end
+			if g.timer != nil {
+				g.timer.Stop()
+			}
+			g.timer = time.AfterFunc(time.Until(end), g.Close)
+		}
+		l.Until = g.until
+		valid = l.Valid(g.now()) && g.now().Before(g.until)
+	}
+	g.mu.Unlock()
+	if !valid {
+		g.Close()
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	return l, nil
+}
+
+// TerminalLease snapshots the gate's last successful complete check. It never
+// consults or renews authority. Consumers may only use this for bounded inbound
+// prefetch or the final zero-byte closure marker of the already checked exact
+// conversation, never data, metadata, commands or new effects. Successful local
+// retirement can close SQL before a remote relay forwards that final marker.
+// A native-package synchronous constructor/attachment may also use this snapshot
+// solely to veto or shorten its own just-completed Check, never to mint/renew a
+// checked value or authorize a frame/effect. That private value cannot cross I/O.
+// Known cancellation, revocation and monotonic shortening still stop it.
+func (g *NativeFrameGate) TerminalLease(ctx context.Context) (value.NativeLease, error) {
+	if g == nil || ctx == nil || ctx.Err() != nil {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed || g.ctx == nil || g.ctx.Err() != nil || g.now == nil || !g.now().Before(g.until) {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	l := g.lease
+	l.Until = g.until
+	if !l.Valid(g.now()) {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	return l, nil
+}

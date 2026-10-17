@@ -1,0 +1,1179 @@
+version: 1
+status: design-only; implementation scenarios not yet executed
+requirements:
+- requirement: REQ-DEP-001
+  spec: specs/deployment-profiles.md
+  scenarios:
+  - SC-DEP-001
+  tasks:
+  - TASK-11
+- requirement: REQ-DEP-002
+  spec: specs/deployment-profiles.md
+  scenarios:
+  - SC-DEP-002
+  tasks:
+  - TASK-07
+  - TASK-11
+- requirement: REQ-DEP-003
+  spec: specs/deployment-profiles.md
+  scenarios:
+  - SC-DEP-003
+  tasks:
+  - TASK-03
+  - TASK-07
+  - TASK-11
+- requirement: REQ-DEP-004
+  spec: specs/deployment-profiles.md
+  scenarios:
+  - SC-DEP-004
+  tasks:
+  - TASK-02
+  - TASK-03
+  - TASK-11
+- requirement: REQ-DEP-005
+  spec: specs/deployment-profiles.md
+  scenarios:
+  - SC-DEP-005
+  tasks:
+  - TASK-07
+  - TASK-11
+- requirement: REQ-ACT-001
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-001
+  tasks:
+  - TASK-05
+- requirement: REQ-ACT-002
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-002
+  tasks:
+  - TASK-05
+- requirement: REQ-ACT-003
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-003
+  tasks:
+  - TASK-05
+- requirement: REQ-ACT-004
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-004
+  tasks:
+  - TASK-06
+- requirement: REQ-ACT-005
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-005
+  tasks:
+  - TASK-09
+- requirement: REQ-ACT-006
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-006
+  tasks:
+  - TASK-10
+- requirement: REQ-API-001
+  spec: specs/apis.md
+  scenarios:
+  - SC-API-001
+  tasks:
+  - TASK-02
+- requirement: REQ-API-002
+  spec: specs/apis.md
+  scenarios:
+  - SC-API-002
+  tasks:
+  - TASK-02
+- requirement: REQ-AUT-001
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-001
+  tasks:
+  - TASK-07
+- requirement: REQ-AUT-002
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-002
+  tasks:
+  - TASK-07
+- requirement: REQ-AUT-003
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-003
+  tasks:
+  - TASK-07
+- requirement: REQ-AUT-004
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-004
+  tasks:
+  - TASK-07
+- requirement: REQ-SHR-001
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-001
+  tasks:
+  - TASK-07
+- requirement: REQ-SHR-002
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-002
+  tasks:
+  - TASK-07
+- requirement: REQ-SHR-003
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-003
+  tasks:
+  - TASK-07
+- requirement: REQ-SHR-004
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-004
+  tasks:
+  - TASK-02
+  - TASK-07
+- requirement: REQ-SHR-005
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-005
+  tasks:
+  - TASK-04
+  - TASK-07
+- requirement: REQ-SHR-006
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-006
+  tasks:
+  - TASK-03
+  - TASK-07
+  - TASK-08
+- requirement: REQ-SHR-007
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-007
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-AUT-005
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-005
+  tasks:
+  - TASK-07
+- requirement: REQ-EVD-001
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-001
+  tasks:
+  - TASK-03
+- requirement: REQ-EVD-002
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-002
+  tasks:
+  - TASK-03
+- requirement: REQ-EVD-003
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-003
+  tasks:
+  - TASK-03
+- requirement: REQ-EVD-004
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-004
+  tasks:
+  - TASK-03
+- requirement: REQ-EVD-005
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-005
+  tasks:
+  - TASK-08
+- requirement: REQ-EVD-006
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-006
+  tasks:
+  - TASK-03
+  - TASK-11
+- requirement: REQ-FED-001
+  spec: specs/federation.md
+  scenarios:
+  - SC-FED-001
+  tasks:
+  - TASK-02
+- requirement: REQ-FED-002
+  spec: specs/federation.md
+  scenarios:
+  - SC-FED-002
+  tasks:
+  - TASK-02
+- requirement: REQ-FED-003
+  spec: specs/federation.md
+  scenarios:
+  - SC-FED-003
+  tasks:
+  - TASK-02
+- requirement: REQ-EVT-001
+  spec: specs/federation.md
+  scenarios:
+  - SC-EVT-001
+  tasks:
+  - TASK-08
+- requirement: REQ-EVT-002
+  spec: specs/federation.md
+  scenarios:
+  - SC-EVT-002
+  tasks:
+  - TASK-08
+- requirement: REQ-MCP-001
+  spec: specs/mcp.md
+  scenarios:
+  - SC-MCP-001
+  tasks:
+  - TASK-08
+- requirement: REQ-MCP-002
+  spec: specs/mcp.md
+  scenarios:
+  - SC-MCP-002
+  tasks:
+  - TASK-08
+- requirement: REQ-MCP-003
+  spec: specs/mcp.md
+  scenarios:
+  - SC-MCP-003
+  tasks:
+  - TASK-10
+- requirement: REQ-MCP-004
+  spec: specs/mcp.md
+  scenarios:
+  - SC-MCP-004
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-TGT-001
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-001
+  tasks:
+  - TASK-04
+- requirement: REQ-TGT-002
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-002
+  tasks:
+  - TASK-04
+- requirement: REQ-TGT-003
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-003
+  tasks:
+  - TASK-04
+- requirement: REQ-TGT-004
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-004
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-001
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-001
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-002
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-002
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-003
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-003
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-004
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-004
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-005
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-005
+  tasks:
+  - TASK-04
+- requirement: REQ-TRG-006
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-006
+  tasks:
+  - TASK-04
+- requirement: REQ-PRF-001
+  spec: specs/profiles.md
+  scenarios:
+  - SC-PRF-001
+  tasks:
+  - TASK-05
+- requirement: REQ-PRF-002
+  spec: specs/profiles.md
+  scenarios:
+  - SC-PRF-002
+  tasks:
+  - TASK-05
+- requirement: REQ-PRF-003
+  spec: specs/profiles.md
+  scenarios:
+  - SC-PRF-003
+  tasks:
+  - TASK-08
+- requirement: REQ-PRF-004
+  spec: specs/profiles.md
+  scenarios:
+  - SC-PRF-004
+  tasks:
+  - TASK-05
+- requirement: REQ-PRF-005
+  spec: specs/profiles.md
+  scenarios:
+  - SC-PRF-005
+  tasks:
+  - TASK-08
+- requirement: REQ-PER-001
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-001
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-002
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-002
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-003
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-003
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-004
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-004
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-005
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-005
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-006
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-006
+  tasks:
+  - TASK-07
+- requirement: REQ-PER-007
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-007
+  tasks:
+  - TASK-07
+  - TASK-02
+- requirement: REQ-PER-008
+  spec: specs/permissions.md
+  scenarios:
+  - SC-PER-008
+  tasks:
+  - TASK-07
+- requirement: REQ-UX-001
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-001
+  tasks:
+  - TASK-02
+  - TASK-11
+- requirement: REQ-UX-002
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-002
+  tasks:
+  - TASK-04
+  - TASK-05
+- requirement: REQ-UX-003
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-003
+  tasks:
+  - TASK-07
+- requirement: REQ-UX-004
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-004
+  tasks:
+  - TASK-04
+  - TASK-08
+- requirement: REQ-UX-005
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-005
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-UX-006
+  spec: specs/ergonomics.md
+  scenarios:
+  - SC-UX-006
+  tasks:
+  - TASK-11
+- requirement: REQ-PRV-001
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-001
+  tasks:
+  - TASK-03
+  - TASK-07
+- requirement: REQ-PRV-002
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-002
+  tasks:
+  - TASK-02
+  - TASK-03
+- requirement: REQ-PRV-003
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-003
+  tasks:
+  - TASK-03
+- requirement: REQ-PRV-004
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-004
+  tasks:
+  - TASK-03
+  - TASK-11
+- requirement: REQ-PRV-005
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-005
+  tasks:
+  - TASK-03
+  - TASK-07
+- requirement: REQ-PRV-006
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-006
+  tasks:
+  - TASK-07
+  - TASK-11
+- requirement: REQ-PRV-007
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-007
+  tasks:
+  - TASK-08
+  - TASK-11
+- requirement: REQ-CAP-001
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-001
+  tasks:
+  - TASK-04
+- requirement: REQ-CAP-002
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-002
+  tasks:
+  - TASK-03
+  - TASK-05
+  - TASK-09
+- requirement: REQ-CAP-003
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-003
+  tasks:
+  - TASK-05
+  - TASK-08
+  - TASK-11
+- requirement: REQ-CAP-004
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-004
+  tasks:
+  - TASK-02
+  - TASK-03
+- requirement: REQ-CAP-005
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-005
+  tasks:
+  - TASK-02
+  - TASK-03
+- requirement: REQ-CAP-006
+  spec: specs/capacity.md
+  scenarios:
+  - SC-CAP-006
+  tasks:
+  - TASK-03
+  - TASK-11
+- requirement: REQ-DB-001
+  spec: specs/persistence.md
+  scenarios:
+  - SC-DB-001
+  tasks: &id001
+  - TASK-02
+  - TASK-03
+  - TASK-07
+  - TASK-11
+- requirement: REQ-DB-002
+  spec: specs/persistence.md
+  scenarios:
+  - SC-DB-002
+  tasks: *id001
+- requirement: REQ-DB-003
+  spec: specs/persistence.md
+  scenarios:
+  - SC-DB-003
+  tasks: *id001
+- requirement: REQ-DB-004
+  spec: specs/persistence.md
+  scenarios:
+  - SC-DB-004
+  tasks: *id001
+- requirement: REQ-DB-005
+  spec: specs/persistence.md
+  scenarios:
+  - SC-DB-005
+  tasks: *id001
+- requirement: REQ-NET-001
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-001
+  tasks: &id002
+  - TASK-06
+  - TASK-08
+  - TASK-11
+- requirement: REQ-NET-002
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-002
+  tasks: *id002
+- requirement: REQ-NET-003
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-003
+  tasks: *id002
+- requirement: REQ-NET-004
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-004
+  tasks: *id002
+- requirement: REQ-NET-005
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-005
+  tasks: *id002
+- requirement: REQ-SHR-008
+  spec: specs/authorization.md
+  scenarios:
+  - SC-SHR-008
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-TGT-005
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-005
+  tasks: &id003
+  - TASK-04
+  - TASK-07
+- requirement: REQ-TGT-006
+  spec: specs/targets.md
+  scenarios:
+  - SC-TGT-006
+  tasks: *id003
+- requirement: REQ-TRG-007
+  spec: specs/triggers.md
+  scenarios:
+  - SC-TRG-007
+  tasks:
+  - TASK-04
+- requirement: REQ-ACT-007
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-007
+  tasks:
+  - TASK-05
+  - TASK-09
+- requirement: REQ-EVD-007
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-007
+  tasks:
+  - TASK-03
+  - TASK-08
+- requirement: REQ-AUT-006
+  spec: specs/authorization.md
+  scenarios:
+  - SC-AUT-006
+  tasks:
+  - TASK-06
+  - TASK-07
+- requirement: REQ-MCP-005
+  spec: specs/mcp.md
+  scenarios:
+  - SC-MCP-005
+  tasks:
+  - TASK-08
+- requirement: REQ-PRV-008
+  spec: specs/privacy.md
+  scenarios:
+  - SC-PRV-008
+  tasks:
+  - TASK-03
+  - TASK-11
+- requirement: REQ-NET-006
+  spec: specs/packets.md
+  scenarios:
+  - SC-NET-006
+  tasks:
+  - TASK-06
+- requirement: REQ-EXE-001
+  spec: specs/execution.md
+  scenarios:
+  - SC-EXE-001
+  tasks: &id004
+  - TASK-02
+  - TASK-07
+- requirement: REQ-EXE-002
+  spec: specs/execution.md
+  scenarios:
+  - SC-EXE-002
+  tasks: *id004
+- requirement: REQ-ACT-008
+  spec: specs/actions.md
+  scenarios:
+  - SC-ACT-008
+  tasks:
+  - TASK-05
+  - TASK-07
+  - TASK-09
+- requirement: REQ-GDE-001
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-001
+  tasks:
+  - TASK-05
+  - TASK-07
+  - TASK-08
+- requirement: REQ-GDE-002
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-002
+  tasks:
+  - TASK-05
+  - TASK-09
+- requirement: REQ-GDE-003
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-003
+  tasks:
+  - TASK-05
+  - TASK-06
+  - TASK-07
+- requirement: REQ-GDE-004
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-004
+  tasks:
+  - TASK-06
+  - TASK-08
+- requirement: REQ-GDE-005
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-005
+  tasks:
+  - TASK-06
+  - TASK-08
+- requirement: REQ-GDE-006
+  spec: specs/guidance.md
+  scenarios:
+  - SC-GDE-006
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-HIS-001
+  spec: specs/capture-history.md
+  scenarios:
+  - SC-HIS-001
+  tasks:
+  - TASK-02
+  - TASK-07
+- requirement: REQ-HIS-002
+  spec: specs/capture-history.md
+  scenarios:
+  - SC-HIS-002
+  tasks:
+  - TASK-05
+  - TASK-07
+  - TASK-08
+- requirement: REQ-HIS-003
+  spec: specs/capture-history.md
+  scenarios:
+  - SC-HIS-003
+  tasks:
+  - TASK-02
+  - TASK-03
+  - TASK-07
+- requirement: REQ-HIS-004
+  spec: specs/capture-history.md
+  scenarios:
+  - SC-HIS-004
+  tasks:
+  - TASK-07
+  - TASK-08
+- requirement: REQ-CPR-001
+  spec: specs/capture-profiles.md
+  scenarios:
+  - SC-CPR-001
+  tasks: &id005
+  - TASK-02
+  - TASK-05
+  - TASK-07
+  - TASK-08
+- requirement: REQ-CPR-002
+  spec: specs/capture-profiles.md
+  scenarios:
+  - SC-CPR-002
+  tasks: *id005
+- requirement: REQ-CPR-003
+  spec: specs/capture-profiles.md
+  scenarios:
+  - SC-CPR-003
+  tasks: *id005
+- requirement: REQ-CPR-004
+  spec: specs/capture-profiles.md
+  scenarios:
+  - SC-CPR-004
+  tasks: *id005
+- requirement: REQ-CPR-005
+  spec: specs/capture-profiles.md
+  scenarios:
+  - SC-CPR-005
+  tasks: *id005
+- requirement: REQ-SYS-001
+  spec: specs/syscalls.md
+  scenarios:
+  - SC-SYS-001
+  tasks: &id006
+  - TASK-05
+  - TASK-07
+  - TASK-08
+- requirement: REQ-SYS-002
+  spec: specs/syscalls.md
+  scenarios:
+  - SC-SYS-002
+  tasks: *id006
+- requirement: REQ-SYS-003
+  spec: specs/syscalls.md
+  scenarios:
+  - SC-SYS-003
+  tasks: *id006
+- requirement: REQ-LIF-001
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-001
+  tasks:
+  - TASK-05
+  - TASK-09
+- requirement: REQ-LIF-002
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-002
+  tasks:
+  - TASK-04
+  - TASK-05
+  - TASK-06
+- requirement: REQ-LIF-003
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-003
+  tasks:
+  - TASK-05
+  - TASK-06
+- requirement: REQ-LIF-004
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-004
+  tasks:
+  - TASK-06
+  - TASK-07
+- requirement: REQ-LIF-005
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-005
+  tasks:
+  - TASK-05
+  - TASK-08
+- requirement: REQ-ASM-001
+  spec: specs/capture-assessment.md
+  scenarios:
+  - SC-ASM-001
+  tasks:
+  - TASK-05
+  - TASK-08
+- requirement: REQ-ASM-002
+  spec: specs/capture-assessment.md
+  scenarios:
+  - SC-ASM-002
+  tasks:
+  - TASK-05
+  - TASK-06
+  - TASK-08
+- requirement: REQ-ASM-003
+  spec: specs/capture-assessment.md
+  scenarios:
+  - SC-ASM-003
+  tasks:
+  - TASK-03
+  - TASK-07
+  - TASK-08
+- requirement: REQ-ASM-004
+  spec: specs/capture-assessment.md
+  scenarios:
+  - SC-ASM-004
+  tasks:
+  - TASK-03
+  - TASK-07
+  - TASK-08
+- requirement: REQ-ASM-005
+  spec: specs/capture-assessment.md
+  scenarios:
+  - SC-ASM-005
+  tasks:
+  - TASK-02
+  - TASK-07
+  - TASK-08
+- requirement: REQ-LIF-006
+  spec: specs/action-lifecycle.md
+  scenarios:
+  - SC-LIF-006
+  tasks:
+  - TASK-04
+  - TASK-05
+  - TASK-06
+- requirement: REQ-EVD-008
+  spec: specs/evidence.md
+  scenarios:
+  - SC-EVD-008
+  tasks:
+  - TASK-03
+  - TASK-05
+  - TASK-08
+  - TASK-11
+- requirement: REQ-SAV-001
+  spec: specs/recording-saves.md
+  scenarios:
+  - SC-SAV-001
+  tasks:
+  - TASK-02
+  - TASK-04
+  - TASK-07
+- requirement: REQ-SAV-002
+  spec: specs/recording-saves.md
+  scenarios:
+  - SC-SAV-002
+  tasks:
+  - TASK-02
+  - TASK-05
+  - TASK-06
+- requirement: REQ-SAV-003
+  spec: specs/recording-saves.md
+  scenarios:
+  - SC-SAV-003
+  tasks:
+  - TASK-03
+  - TASK-06
+  - TASK-07
+- requirement: REQ-SAV-004
+  spec: specs/recording-saves.md
+  scenarios:
+  - SC-SAV-004
+  tasks:
+  - TASK-02
+  - TASK-08
+- requirement: REQ-UI-001
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-001
+  tasks: &id007
+  - TASK-07
+  - TASK-08
+- requirement: REQ-UI-002
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-002
+  tasks: *id007
+- requirement: REQ-UI-003
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-003
+  tasks: *id007
+- requirement: REQ-UI-004
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-004
+  tasks: *id007
+- requirement: REQ-UI-005
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-005
+  tasks: *id007
+- requirement: REQ-UI-006
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-006
+  tasks: *id007
+- requirement: REQ-UI-007
+  spec: specs/user-experience.md
+  scenarios:
+  - SC-UI-007
+  tasks:
+  - TASK-08
+  - TASK-11
+- requirement: REQ-DOM-001
+  spec: specs/domain-model.md
+  scenarios:
+  - SC-DOM-001
+  tasks: &id008
+  - TASK-02
+  - TASK-03
+  - TASK-07
+- requirement: REQ-DOM-002
+  spec: specs/domain-model.md
+  scenarios:
+  - SC-DOM-002
+  tasks: *id008
+- requirement: REQ-DOM-003
+  spec: specs/domain-model.md
+  scenarios:
+  - SC-DOM-003
+  tasks: *id008
+- requirement: REQ-DOM-004
+  spec: specs/domain-model.md
+  scenarios:
+  - SC-DOM-004
+  tasks: *id008
+- requirement: REQ-DOM-005
+  spec: specs/domain-model.md
+  scenarios:
+  - SC-DOM-005
+  tasks: *id008
+- requirement: REQ-INT-001
+  spec: specs/interfaces.md
+  scenarios:
+  - SC-INT-001
+  tasks: &id009
+  - TASK-02
+  - TASK-07
+  - TASK-08
+- requirement: REQ-INT-002
+  spec: specs/interfaces.md
+  scenarios:
+  - SC-INT-002
+  tasks: *id009
+- requirement: REQ-INT-003
+  spec: specs/interfaces.md
+  scenarios:
+  - SC-INT-003
+  tasks: *id009
+- requirement: REQ-INT-004
+  spec: specs/interfaces.md
+  scenarios:
+  - SC-INT-004
+  tasks: *id009
+- requirement: REQ-INT-005
+  spec: specs/interfaces.md
+  scenarios:
+  - SC-INT-005
+  tasks: *id009
+- requirement: REQ-LIV-001
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-001
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-LIV-002
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-002
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-LIV-003
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-003
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-LIV-004
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-004
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-LIV-005
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-005
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-LIV-006
+  spec: specs/live-watch.md
+  scenarios:
+  - SC-LIV-006
+  tasks:
+  - TASK-02
+  - TASK-06
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-ARC-001
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-001
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-002
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-002
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-003
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-003
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-004
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-004
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-005
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-005
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-006
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-006
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-ARC-007
+  spec: specs/implementation-architecture.md
+  scenarios:
+  - SC-ARC-007
+  tasks:
+  - TASK-01
+  - TASK-02
+  - TASK-11
+- requirement: REQ-DLD-001
+  spec: specs/artifact-downloads.md
+  scenarios:
+  - SC-DLD-001
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-DLD-002
+  spec: specs/artifact-downloads.md
+  scenarios:
+  - SC-DLD-002
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-DLD-003
+  spec: specs/artifact-downloads.md
+  scenarios:
+  - SC-DLD-003
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-DLD-004
+  spec: specs/artifact-downloads.md
+  scenarios:
+  - SC-DLD-004
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-INV-001
+  spec: specs/investigation-approval.md
+  scenarios:
+  - SC-INV-001
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-INV-002
+  spec: specs/investigation-approval.md
+  scenarios:
+  - SC-INV-002
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11
+- requirement: REQ-INV-003
+  spec: specs/investigation-approval.md
+  scenarios:
+  - SC-INV-003
+  tasks:
+  - TASK-07
+  - TASK-08
+  - TASK-11

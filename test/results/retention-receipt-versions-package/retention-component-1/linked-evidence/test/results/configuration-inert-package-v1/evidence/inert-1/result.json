@@ -1,0 +1,69 @@
+{
+  "manifest_sha256": "cbd8bd73cda0f64897025d00e90cffdfe9dbc32d270fac5bb088d71ea974a8f4",
+  "dependencies_sha256": "c94190bd63772bd22a28b526f6764b5860f99176a742af461a839af39fa7e92e",
+  "commands": [
+    {
+      "phase": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/before-overlay.json",
+        "-count=1",
+        "-run",
+        "^TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "seconds": 4.621820747997845
+    },
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/overlay.json",
+        "-run",
+        "^$",
+        "-vet=off",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "seconds": 6.410624555996037
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-v",
+        "-timeout=120s",
+        "-run",
+        "^TestConfigurationRole(Inert|ZeroToOne|SourceKeeps|DeploymentUses|OperationRechecks|OperationChecksGuard|OperationDoesNotEscape|OperationClose)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 51.14246524100599
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-inert-deployment-20261012/checks/inert-1/overlay.json",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 0.6860261830006493
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 3,
+  "checked_dependencies": 1372
+}

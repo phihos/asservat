@@ -1,0 +1,88 @@
+=== RUN   TestProviderOwnerInstallationRunsFiniteOriginalSequence
+--- PASS: TestProviderOwnerInstallationRunsFiniteOriginalSequence (9.42s)
+=== RUN   TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling
+--- PASS: TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling (3.66s)
+=== RUN   TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection
+--- PASS: TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection (6.54s)
+=== RUN   TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork
+--- PASS: TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork (3.64s)
+=== RUN   TestProviderOwnerProjectionOperationCompleteAndLaunch
+--- PASS: TestProviderOwnerProjectionOperationCompleteAndLaunch (9.66s)
+=== RUN   TestProviderOwnerProjectionOperationLostCreateIsInspectOnly
+--- PASS: TestProviderOwnerProjectionOperationLostCreateIsInspectOnly (6.94s)
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/not-committed
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/committed
+--- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS (13.75s)
+    --- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/not-committed (6.83s)
+    --- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/committed (6.92s)
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/post-lock
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/final
+--- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof (12.79s)
+    --- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/post-lock (6.28s)
+    --- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/final (6.51s)
+=== RUN   TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent
+--- PASS: TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent (5.19s)
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/valid
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/rotated-current
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/stale-mount
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/replaced-secret
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-secret-kind
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-secret-version
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/extra-key
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/placeholder
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/missing-receipt
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/guard-lost
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/allowing-probe
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-token-pod
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/token-revoked
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/late-secret
+=== RUN   TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/cancelled
+--- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial (20.13s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/valid (1.70s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/rotated-current (6.30s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/stale-mount (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/replaced-secret (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-secret-kind (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-secret-version (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/extra-key (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/placeholder (1.20s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/missing-receipt (0.18s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/guard-lost (1.30s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/allowing-probe (1.61s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/wrong-token-pod (0.18s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/token-revoked (0.28s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/late-secret (1.24s)
+    --- PASS: TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial/cancelled (0.15s)
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/valid
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-worker
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-owner
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-selection
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-provider-uid
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-original-alias
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-owner-root-alias
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-child-alias
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/extra-legacy-secret-key
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-sql-key
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-audience
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-lifetime
+=== RUN   TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-audit-secret
+--- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout (2.18s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/valid (0.17s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-worker (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-owner (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-selection (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-provider-uid (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-original-alias (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-owner-root-alias (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-child-alias (0.16s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/extra-legacy-secret-key (0.20s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-sql-key (0.21s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-audience (0.17s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-lifetime (0.17s)
+    --- PASS: TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-audit-secret (0.17s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	94.950s

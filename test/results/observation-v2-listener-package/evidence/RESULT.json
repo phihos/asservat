@@ -1,0 +1,227 @@
+{
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/transport/native",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 7.197,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "race-native",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(OwnerObservationOperationListener|OwnerObservationOperationFirstRequestCloseRace|OwnerObservationOnlyListenerActualTLS|OwnerObservationListenerCloseJoinsOriginalCall|NativePurpose)",
+        "-v",
+        "./internal/transport/native"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 10.185,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 11,
+      "namedPass": 40,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "race-metadata",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestClusterObservationMetadata",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 14.692,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 5,
+      "namedPass": 32,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+        "./internal/transport/native",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.272,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "python3",
+        "/tmp/asservat-direct-native-3lri4vcg/mirror/scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.019,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    }
+  ],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 16771493888
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

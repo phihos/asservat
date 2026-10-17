@@ -1,0 +1,34 @@
+# Priority 1: current audit authority requires immutable versions
+
+Status: source-only, 42 payload paths, gofmt succeeds. No compile, race, sqlc, native, or contract result exists yet. Original optional-version inventory is ../REVIEW.md. This implements the accepted storage requirement; it changes no wire format, source deadline, SQL role grant, pool budget, migration, or runtime selector.
+
+## Scope and actual consumers
+
+- Six domain files require nonempty/non-null versions for download-worker intent/configuration, acquisition enrollment/certificate, connector claim/certificate, and batch/window intent/outcome. The shared generic `workerReceipt` and other operation/evidence families stay structurally unchanged.
+- `currentAuditedWorker` decodes the entire original worker receipt and matches its purpose/key/shape; a JSON presence check is insufficient. Current dispatch read, identity routing, owner claim, first-context response admission and native owner admission use it. Structural `decodeWorker` remains for termination/audit/retirement.
+- `readWorkerIdentity` repeats exact worker and receipt-byte comparison after current configuration can block. The owner locator's existing SELECT now embeds its already-joined worker row, so validation adds no query or grant. Actual pinned sqlc generation is pending, expected to change only custodydb/worker_owners.sql.go.
+- Current acquisition certificate activation/registry also read and validate the exact retained enrollment receipt and original enrollment identity. This adds one actual bounded enrollment SELECT to those certificate paths, within their original operation context; no freshness is reset.
+- Current batch/window decoders, metadata permission and native-parent checks require strict receipts. Native preparation explicitly requires its acknowledged flag as well as its body. Historical decoders are called only from CancelDownload, FinishDownloadBatch and FinishDownloadWindow; they cannot grant a lease, key or new I/O.
+- Current connector signing/activation verify retained version columns; PeerRegistry verifies its own retained certificate version. Historical certificate decoding/audit preservation are unchanged.
+
+## Regression design
+
+`TestReachableAuditReceiptsRequireImmutableVersions` contains ten receipt purposes, each with original/empty/null/maximum/oversize cases. Overlaying this new test alone on the original domain implementation gives the intended old-behavior before: the twenty empty/null cases must fail for the explicit version predicate reason. No fabricated old production variant is needed.
+
+Pure PostgreSQL decoder tests compare exact original row/receipt bytes and distinguish strict current reads from historical accounting. A wrong-key/zero-digest worker remains unavailable even with a nonempty version. The generic worker receipt omission behavior remains covered by the existing owner-version separation regression.
+
+The selected native `download-worker-enrollment-audit-versions` continuation uses actual existing SQL/S3 worker configuration, dispatch and certificate acknowledgements, with its existing explicitly synthetic native proof/issuer. Only the fixture administrator models old retained empty/null receipts through a transaction-local trigger bypass, registered for exact restoration before write. Runtime trigger bypass is denied. Every negative retains its original authority deadline and follows positive original reads; neither expiration nor missing grants may pass for the intended reason. Tests cover current configuration, identity, locator/claim, signing/activation, native certificate and actual native parent admission. Native denials do not advance the original fence.
+
+The same continuation verifies that recording already performed synthetic bytes and cancellation still work with historical receipt versions, without refunding prepaid charges. The existing window accounting test similarly denies old-version leases but records the already permitted synthetic physical outcome. Connector provider and registry fixtures exercise retained version-column denials and exact original restoration.
+
+Five actual fixture buckets enable versioning before first relevant audit write. Generic mixed evidence stores remain generic. capture_admission_test.go was based after the root's pool fix and retains `qualifyContextPublications(..., create, authorityPool.Reset)` exactly.
+
+## Qualification plan, not results
+
+One allocated sequential component job: verify all payload/bases/dependencies; regular owned mirror on /tmp after >=4GiB free; pinned sqlc v1.31.1 generation only in mirror and archive the sole expected generated delta; compile audit/evidence/fleet/Postgres/objectstore/bootstrap/integration; run old-domain before, full affected component races, vet, sql-check and canonical Go/spec/architecture/design gates. Native environment variables are cleared. GOMAXPROCS=2/-p=2, original test/effect bounds, finite 600-second infrastructure ceiling per step. No automatic rerun after failure.
+
+After review/integration, parent owns selected custody worker/window/peer and real provider enrollment tests. Those native hooks are only compiled in the component job. Runtime enablement, complete installed worker availability and other audit-family priorities remain separate.
+
+## Exclusions and remaining uncertainty
+
+No custody.go, connector_identity_test.go, SQL51/55 migration, shared runtime/command, generic evidence, retention or permission acceptance change. Native history cleanup/version inventory remains unchanged. Priority 2 permission/retention and Priority 3 public operation/capture/publication families remain follow-up; this patch is not a claim that every product audit family is covered.

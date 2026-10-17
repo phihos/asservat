@@ -1,0 +1,4 @@
+=== RUN   TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead
+--- PASS: TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.009s

@@ -1,0 +1,40 @@
+deployment.apps/sink restarted
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+deployment "sink" successfully rolled out
+{
+  "attachments": 1,
+  "generations": [
+    {
+      "Generation": 1,
+      "Peer": "10.42.0.7",
+      "Packets": 360,
+      "StartMS": 101,
+      "EndMS": 18092
+    },
+    {
+      "Generation": 2,
+      "Peer": "10.42.0.8",
+      "Packets": 594,
+      "StartMS": 5443,
+      "EndMS": 18092
+    },
+    {
+      "Generation": 3,
+      "Peer": "",
+      "Packets": 0,
+      "StartMS": 14144,
+      "EndMS": 18092
+    },
+    {
+      "Generation": 4,
+      "Peer": "10.42.0.8",
+      "Packets": 220,
+      "StartMS": 15014,
+      "EndMS": 18092
+    }
+  ],
+  "limitation": "Kubernetes relist + standalone TCX observer; NOT integrated Gadget emission or production watch/freshness authorization",
+  "programID": 210,
+  "transmitErrors": 6
+}

@@ -1,0 +1,53 @@
+npm notice run @asservat/console@0.0.0 npx
+npm notice run 'vitest' run src/auth/session.test.ts
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+ ❯ src/auth/session.test.ts (27 tests | 2 failed) 241ms
+   ❯ browser session lifecycle (23)
+     × one click retries logout rejected before revocation by a concurrent CSRF rotation 5ms
+     × shares the original logout budget between CSRF lookup and pre-revocation retry 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > one click retries logout rejected before revocation by a concurrent CSRF rotation
+AssertionError: expected 'unavailable' to be 'signedOut' // Object.is equality
+
+Expected: "signedOut"
+Received: "unavailable"
+
+ ❯ src/auth/session.test.ts:174:41
+    172|     const pending = controller.logout();
+    173|     await vi.advanceTimersByTimeAsync(1_000); await pending;
+    174|     expect(controller.snapshot().phase).toBe('signedOut');
+       |                                         ^
+    175|     expect(fetcher.mock.calls.filter(([path]) => path === '/auth/logou…
+    176|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > shares the original logout budget between CSRF lookup and pre-revocation retry
+AssertionError: expected [ [ '/auth/logout', …(1) ] ] to have a length of 5 but got 1
+
+- Expected
++ Received
+
+- 5
++ 1
+
+ ❯ src/auth/session.test.ts:184:76
+    182|     await vi.advanceTimersByTimeAsync(10_000); await pending;
+    183|     expect(controller.snapshot()).toEqual({ phase: 'unavailable', reas…
+    184|     expect(fetcher.mock.calls.filter(([path]) => path === '/auth/logou…
+       |                                                                            ^
+    185|     const calls = fetcher.mock.calls.length;
+    186|     await vi.advanceTimersByTimeAsync(60_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 25 passed (27)
+   Start at  23:32:30
+   Duration  721ms (environment 54%, tests 37%, transform 6%, import 2%)
+

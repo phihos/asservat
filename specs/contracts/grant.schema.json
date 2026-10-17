@@ -1,0 +1,631 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/grant.schema.json",
+  "title": "Asservat grant v1 \u2014 hub runtime DTO, not a Kubernetes resource",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "AccessGrant"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requester": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "grantType": {
+          "type": "string",
+          "enum": [
+            "rawQuery",
+            "adHocCapture",
+            "policy"
+          ]
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "artifact"
+                },
+                "caseID": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "artifacts": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
+                  },
+                  "maxItems": 64,
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "kind",
+                "caseID",
+                "artifacts"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "policy"
+                },
+                "clusterID": {
+                  "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+                },
+                "workloadUID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "executionDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "recipeDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "policyUID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "kind",
+                "clusterID",
+                "workloadUID",
+                "executionDigest",
+                "recipeDigest",
+                "policyUID"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "capture"
+                },
+                "clusterID": {
+                  "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+                },
+                "workloadUID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "executionDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "recipeDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "captureUID": {
+                  "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+                }
+              },
+              "required": [
+                "kind",
+                "clusterID",
+                "workloadUID",
+                "executionDigest",
+                "recipeDigest",
+                "captureUID"
+              ]
+            }
+          ]
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "maxExecutions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxDuration": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "maxLength": 16
+            }
+          },
+          "required": [
+            "maxBytes",
+            "maxExecutions",
+            "maxDuration"
+          ]
+        },
+        "approver": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approvalPolicyRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "maxAgeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31536000
+            }
+          },
+          "required": [
+            "name",
+            "digest",
+            "maxAgeSeconds"
+          ]
+        },
+        "observationLimits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxSessionSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "maxObservedBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "maxBytesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            },
+            "maxConcurrentSessions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "maxObservedEvents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "maxSessionSeconds",
+            "maxObservedBytes",
+            "maxBytesPerSecond",
+            "maxConcurrentSessions"
+          ]
+        },
+        "resultAccess": {
+          "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/resolved"
+        },
+        "resultOrigin": {
+          "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/origin"
+        },
+        "policyExecutor": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "policyAuthority": {
+          "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/accepted"
+        }
+      },
+      "required": [
+        "requester",
+        "grantType",
+        "target",
+        "operations",
+        "reason",
+        "notAfter",
+        "limits",
+        "issuedAt"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "rawQuery"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "properties": {
+                  "kind": {
+                    "const": "artifact"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "policy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "properties": {
+                  "kind": {
+                    "const": "policy"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "adHocCapture"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "properties": {
+                  "kind": {
+                    "const": "capture"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "policy"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "approvalPolicyRef"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "rawQuery"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "operations": {
+                "items": {
+                  "enum": [
+                    "read_memory",
+                    "debugger_command",
+                    "pcap_query",
+                    "syscall_query",
+                    "download_artifact"
+                  ]
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "operations": {
+                "items": {
+                  "enum": [
+                    "kubernetesSnapshot",
+                    "logs",
+                    "processSnapshot",
+                    "fileRead",
+                    "packetCapture",
+                    "networkSnapshot",
+                    "runtimeDiagnostic",
+                    "kernelCore",
+                    "liveCore",
+                    "command",
+                    "httpDiagnostic",
+                    "artifactCollect",
+                    "profile",
+                    "syscallTrace"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "resultAccess"
+            ]
+          },
+          "then": {
+            "properties": {
+              "grantType": {
+                "const": "adHocCapture"
+              },
+              "requester": {
+                "properties": {
+                  "identityType": {
+                    "const": "human"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "resultOrigin"
+            ]
+          },
+          "then": {
+            "properties": {
+              "grantType": {
+                "const": "rawQuery"
+              },
+              "requester": {
+                "properties": {
+                  "identityType": {
+                    "const": "human"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "policy"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "policyExecutor",
+              "policyAuthority"
+            ],
+            "properties": {
+              "policyExecutor": {
+                "properties": {
+                  "identityType": {
+                    "const": "workload"
+                  },
+                  "clientID": {
+                    "const": "policy-executor"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "policyExecutor"
+                  ]
+                },
+                {
+                  "required": [
+                    "policyAuthority"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Approved",
+            "Denied",
+            "Revoked",
+            "Expired",
+            "Exhausted"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "reservedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "spentBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "executionsSpent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "executionsReserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "observedBytesReserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "observedBytesSpent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "observedEventsReserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "observedEventsSpent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "resultAccessCounters": {
+          "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/counters"
+        }
+      },
+      "required": [
+        "phase",
+        "revision",
+        "reservedBytes",
+        "spentBytes",
+        "executionsSpent",
+        "executionsReserved"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "observedBytesReserved"
+                ]
+              },
+              {
+                "required": [
+                  "observedBytesSpent"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "observedBytesReserved",
+              "observedBytesSpent"
+            ]
+          }
+        }
+      ],
+      "dependentRequired": {
+        "observedEventsReserved": [
+          "observedEventsSpent"
+        ],
+        "observedEventsSpent": [
+          "observedEventsReserved"
+        ]
+      }
+    },
+    "schemaVersion": {
+      "const": "grant/v1"
+    },
+    "id": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+    }
+  },
+  "required": [
+    "kind",
+    "spec",
+    "schemaVersion",
+    "id",
+    "status"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "spec": {
+            "required": [
+              "resultAccess"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "required": [
+              "resultAccessCounters"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "status": {
+            "not": {
+              "required": [
+                "resultAccessCounters"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

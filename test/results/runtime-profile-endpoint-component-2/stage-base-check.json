@@ -1,0 +1,35 @@
+{
+  "status": "read-only observed live hashes at runner staging; runtime requires final overlay exactly",
+  "observedLive": {
+    "internal/domain/planning/go_profile_endpoint.go": "04f2c4e1b236e61d4afc5e82f9ca9b999fc6489ebf352892a0d1e8d266ba8b77",
+    "internal/domain/planning/go_profile_endpoint_test.go": "fb9de82a478050624a9abda9da71159130a046e42d98234548f13e773dbf694c",
+    "internal/domain/targets/profile_network.go": "c0361f267c3c245b1269ea887315b8181d81abd18987886e5c57849625b2e2a9",
+    "internal/domain/targets/profile_network_test.go": "94b53c3687e584f6f234cfa3b3ac3525ee9e324f508fff2c05183fa0767ab1fd",
+    "internal/application/planning/go_profile_endpoint.go": "c5ed08a53ba98c76d9054e8826207348ceb2e3992d04c664bd75ce06ca7a5061",
+    "internal/application/planning/go_profile_endpoint_test.go": "9baee9f277f349832745fee0525bfdfe4c6aed9771c7b75a95f38f739c2575b7",
+    "internal/application/targets/profile_network.go": "f40d84028d1248c670a1474980c0fe4abf09c60f3b180cfb6f81f43e7602e1a6",
+    "internal/adapters/kubernetes/profile_network.go": "02ef9dc624ddbaa7dcd4c5b640f88a677a98183294ee7f6b4d6ae3ce0066e004",
+    "internal/adapters/kubernetes/profile_network_test.go": "61720a001706e41391fd6d9036a549e55e261efefc86df7f7dc28ffbdb9f7336",
+    "docs/architecture/runtime-profiles.md": "fe281d8810b3b14808b7880843e379450ab117ef930b3f390ca7ecb73f51d3ed",
+    "specs/profiles.md": "6757175460b7cff42d81e3027d27fdd7de80f3edb2624059069967f6ade6fda1",
+    "scripts/test-context-storage.py": "db90d1a7123f79b8e74547f0a1b664d0f1b27b593866b6a2fc0d139ba9aac82d",
+    "scripts/test-regional-context-selection.py": "c9483b1b88f04798acb872549683483f88d027b4bfaaa9a15d0f8ee5efab74e9",
+    "test/integration/capture_admission_test.go": "3833db17490c92ab795590fc3600bf4e93295cdd4f3f401c66188d265a0d6174",
+    "test/integration/public_context_download_diagnostics_checks_test.go": "fa340a7566f7ad65e9ca1d3a24439eb16cbf4477b4f453b7aed17504f041bda2",
+    "test/integration/public_context_download_diagnostics_test.go": "2ffa4691fd938e8f0ad1acc37cb6d5cf1263ae6fe02fbb1b845ea785d9a375ae"
+  },
+  "layers": [
+    {
+      "name": "endpoint-v2",
+      "manifestSHA256": "777fcdd9e0a6b6f3fb7cbc76bb71f18a96abe8adfae0a617909e2f5bae1ef4c4"
+    },
+    {
+      "name": "domain-syntax",
+      "manifestSHA256": "4dbe8ef064451ab6c8bb2cb11581421b626ce82674d9dbd8d4e1cb4646341ec1"
+    },
+    {
+      "name": "download-log-prefix",
+      "manifestSHA256": "e7f3bb76884c26fa0b4f1eb0d3dfaa7ccf5c6b9d2f57a18baa0e80417ec3b020"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/12 13:55:52 http: TLS handshake error from 127.0.0.1:60274: remote error: tls: unknown certificate
+2026/10/12 13:55:52 http: TLS handshake error from 127.0.0.1:60292: remote error: tls: unknown certificate
+2026/10/12 13:55:53 http: TLS handshake error from 127.0.0.1:60306: remote error: tls: unknown certificate
+2026/10/12 13:55:54 http: TLS handshake error from 127.0.0.1:60316: remote error: tls: unknown certificate
+2026/10/12 13:55:54 http: TLS handshake error from 127.0.0.1:60330: remote error: tls: unknown certificate
+2026/10/12 13:55:54 http: TLS handshake error from 127.0.0.1:60360: remote error: tls: unknown certificate
+    console_native_restart_test.go:169: built native-restart browser: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        ExpectError: expect(locator).toBeEnabled() failed
+        
+        Locator: getByRole('button', { name: 'Retry same download request', exact: true })
+        Expected: enabled
+        Timeout: 5000ms
+        Error: element(s) not found
+        
+        Call log:
+          - Expect "toBeEnabled" getByRole('button', { name: 'Retry same download request', exact: true }) with timeout 5000ms
+          - waiting for getByRole('button', { name: 'Retry same download request', exact: true })
+            - locator resolved to <button disabled data-rac="" type="button" class="button" data-disabled="true" id="react-aria1646701877-_r_k_" data-react-aria-pressable="true">Retry same download request</button>
+            - unexpected value "disabled"
+        
+            at captureRawStack (/home/phil/Projekte/asservat/web/node_modules/playwright-core/lib/coreBundle.js:9282:17)
+            at callMatcherAsStep (/home/phil/Projekte/asservat/web/node_modules/playwright/lib/matchers/expect.js:13316:57)
+            at Object.toBeEnabled (/home/phil/Projekte/asservat/web/node_modules/playwright/lib/matchers/expect.js:13308:23)
+            at /home/phil/.cache/asservat-build/planning/console-native-restart-20261012/work/web/tests/native-restart-journey.mjs:76:96 {
+          matcherResult: {
+            message: 'expect(locator).toBeEnabled() failed\n' +
+              '\n' +
+              "Locator: getByRole('button', { name: 'Retry same download request', exact: true })\n" +
+              'Expected: enabled\n' +
+              'Timeout: 5000ms\n' +
+              'Error: element(s) not found\n' +
+              '\n' +
+              'Call log:\n' +
+              `  - Expect "toBeEnabled" getByRole('button', { name: 'Retry same download request', exact: true }) with timeout 5000ms\n` +
+              "  - waiting for getByRole('button', { name: 'Retry same download request', exact: true })\n" +
+              '    - locator resolved to <button disabled data-rac="" type="button" class="button" data-disabled="true" id="react-aria1646701877-_r_k_" data-react-aria-pressable="true">Retry same download request</button>\n' +
+              '    - unexpected value "disabled"\n',
+            pass: false,
+            actual: undefined,
+            name: 'toBeEnabled',
+            expected: 'enabled',
+            log: [
+              `  - Expect "toBeEnabled" getByRole('button', { name: 'Retry same download request', exact: true }) with timeout 5000ms`,
+              "  - waiting for getByRole('button', { name: 'Retry same download request', exact: true })",
+              '    - locator resolved to <button disabled data-rac="" type="button" class="button" data-disabled="true" id="react-aria1646701877-_r_k_" data-react-aria-pressable="true">Retry same download request</button>',
+              '    - unexpected value "disabled"'
+            ],
+            timeout: 5000,
+            ariaSnapshot: '- link "Skip to content":\n' +
+              '  - /url: "#main"\n' +
+              '- banner:\n' +
+              '  - link "Asservat":\n' +
+              '    - /url: /\n' +
+              '  - button "Sign out"\n' +
+              '- main:\n' +
+              '  - heading "Evidence" [level=1]\n' +
+              '  - paragraph: Inspect the saved details, or download the native file for your preferred compatible local tools.\n' +
+              '  - region "Pod status":\n' +
+              '    - heading "Pod status" [level=2]\n' +
+              '    - paragraph: Approved metadata · complete\n' +
+              '    - paragraph: "May contain user data: personal identifiers, network addresses, paths."\n' +
+              '    - term: Access until\n' +
+              '    - definition: 10/12/2026, 2:55:50 PM\n' +
+              '    - term: Managed deletion\n' +
+              '    - definition: By 10/12/2026, 3:00:50 PM\n' +
+              '    - button "Download" [disabled]\n' +
+              "  - paragraph: Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.\n" +
+              '  - region "Native download":\n' +
+              '    - heading "Ready to download" [level=2]\n' +
+              '    - term: Native file\n' +
+              '    - definition: synthetic-pod-status.json\n' +
+              '    - term: Format\n' +
+              '    - definition: application/json\n' +
+              '    - term: Size\n' +
+              '    - definition: 45 bytes\n' +
+              '    - term: SHA-256\n' +
+              '    - definition: 02e2c31513225543f6cfcd2a4999fbc4db9a7ed1ad8bf8ad312c21de554adcbb\n' +
+              '    - term: Coverage\n' +
+              '    - definition: Synthetic browser fixture only.\n' +
+              '    - paragraph: Download access ends 10/12/2026, 1:56:50 PM. Managed evidence access ends 10/12/2026, 2:55:50 PM.\n' +
+              '    - link "Download native file":\n' +
+              '      - /url: /api/v1/downloads/00000000-0000-4000-8000-000000000091/content\n' +
+              '    - button "Check download status"\n' +
+              '    - button "Cancel download"\n' +
+              '  - button "Refresh evidence details"'
+          }
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleNativeRestartWithBuiltPackage (10.28s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	10.473s
+FAIL

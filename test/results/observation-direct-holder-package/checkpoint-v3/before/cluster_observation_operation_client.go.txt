@@ -1,0 +1,618 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"net/netip"
+	"slices"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	wire "asservat.local/asservat/internal/transport/clusterobservation"
+)
+
+// DirectHolderObservationClient is the purpose-fixed HWORK -> holder -> region
+// composition. It never acquires owner client credentials, forwards the HWORK
+// token to a region, or accepts a caller-selected peer/address/locator. Installed
+// selection and caller-pin publication remain separate, mandatory producers.
+type DirectHolderObservationClient struct {
+	root            context.Context
+	cancel          context.CancelFunc
+	pin             value.OwnerObservationPin
+	podUID          string
+	roots           *x509.CertPool
+	verifier        *mtls.OwnerPeerVerifier
+	candidates      *app.OwnerObservationCandidateSelection
+	ready           ownerLocalDialReader
+	registry        app.OwnerCertificateRegistry
+	native          app.OwnerNativeObservationOperations
+	tokens          app.ClusterObservationTokenReader
+	now             func() time.Time
+	dial            func(context.Context, string, string) (net.Conn, error)
+	mu              sync.Mutex
+	closed          bool
+	active, maximum int
+	joined          sync.WaitGroup
+	sockets         chan struct{}
+}
+type ownerLocalDialReader interface {
+	ReadOwnerObservationDialCandidates(context.Context, value.APIContextOwnerCandidates) (kube.OwnerObservationDialCandidates, error)
+}
+
+var _ app.ClusterObservationExchange = (*DirectHolderObservationClient)(nil)
+
+func NewDirectHolderObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID string, roots *x509.CertPool, registry *postgres.OwnerEnrollments, endpoints *kube.OwnerEndpoints, native *kube.OwnerObservationOperationReader, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*DirectHolderObservationClient, error) {
+	if registry == nil || endpoints == nil || native == nil {
+		return nil, value.ErrInvalid
+	}
+	return newDirectHolderObservationClient(ctx, pin, podUID, roots, registry, registry, endpoints, ownerRoutingNativeReader{native}, tokens, maximum, now)
+}
+
+// Private ports/dial remapping support deterministic tests only. Production
+// supplies the same existing role70 SQL pool and native clients, with no grants,
+// rate limiters or purpose-selected URL callback added here.
+func newDirectHolderObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID string, roots *x509.CertPool, candidates app.OwnerObservationCandidateSource, registry app.OwnerCertificateRegistry, ready ownerLocalDialReader, native app.OwnerNativeObservationOperations, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*DirectHolderObservationClient, error) {
+	if ctx == nil || ctx.Err() != nil || !pin.Valid() || pin.Pool.NativeCandidateLimit == 0 || !authorization.UUID(podUID) || roots == nil || len(roots.Subjects()) == 0 || registry == nil || ready == nil || native == nil || tokens == nil || maximum < 1 || maximum > 2 || now == nil {
+		return nil, value.ErrInvalid
+	}
+	selected, err := app.NewOwnerObservationCandidateSelection(pin.Pool, candidates)
+	if err != nil {
+		return nil, err
+	}
+	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pin.Pool, now)
+	if err != nil {
+		return nil, err
+	}
+	root, cancel := context.WithCancel(ctx)
+	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}
+	return &DirectHolderObservationClient{root: root, cancel: cancel, pin: pin, podUID: podUID, roots: roots.Clone(), verifier: verifier, candidates: selected, registry: registry, ready: ready, native: native, tokens: tokens, maximum: maximum, now: now, dial: dialer.DialContext, sockets: make(chan struct{}, 2)}, nil
+}
+func (c *DirectHolderObservationClient) enter() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.root.Err() != nil || c.active >= c.maximum {
+		return false
+	}
+	c.active++
+	c.joined.Add(1)
+	return true
+}
+func (c *DirectHolderObservationClient) leave() {
+	c.mu.Lock()
+	c.active--
+	c.mu.Unlock()
+	c.joined.Done()
+}
+func (c *DirectHolderObservationClient) Close() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.closed = true
+	c.cancel()
+	c.mu.Unlock()
+	c.joined.Wait()
+}
+
+func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, request value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+	var zero value.ClusterObservationResult
+	if c == nil || ctx == nil || ctx.Err() != nil || !request.Valid(c.now()) || request.RootID != c.pin.RootID || !c.enter() {
+		return zero, value.ErrUnavailable
+	}
+	defer c.leave()
+	request = request.Clone()
+	end := request.NotAfter
+	if d, ok := ctx.Deadline(); ok {
+		end = identity.Earlier(end, d)
+	}
+	call, cancel := context.WithDeadline(ctx, end)
+	defer cancel()
+	done := make(chan struct{})
+	stop := context.AfterFunc(c.root, func() { cancel(); close(done) })
+	defer func() {
+		if !stop() {
+			<-done
+		}
+	}()
+	candidates, err := c.candidates.ReadOwnerObservationCandidates(call)
+	if err != nil || !candidates.Valid(c.now()) || candidates.Pool != c.pin.Pool || len(candidates.Owners) == 0 {
+		return zero, value.ErrUnavailable
+	}
+	candidates.Owners = slices.Clone(candidates.Owners)
+	end = identity.Earlier(end, candidates.ValidUntil)
+	sqlCall, stopSQL := context.WithDeadline(call, end)
+	defer stopSQL()
+	nativeCandidates := candidates
+	nativeCandidates.Owners = slices.Clone(candidates.Owners)
+	routes, err := c.ready.ReadOwnerObservationDialCandidates(sqlCall, nativeCandidates)
+	if err != nil || !routes.Groups.Valid(c.now()) || !sameForwardCandidates(candidates, routes.Groups.Candidates) {
+		return zero, value.ErrUnavailable
+	}
+	routes.Groups = routes.Groups.Clone()
+	addresses := make(map[string][]string, len(routes.Addresses))
+	for _, g := range routes.Groups.Groups {
+		ips := routes.Addresses[g.PodUID]
+		if len(ips) == 0 || len(ips) > 2 {
+			return zero, value.ErrUnavailable
+		}
+		for _, address := range ips {
+			ip, e := netip.ParseAddr(address)
+			if e != nil || ip.IsUnspecified() || ip.IsMulticast() || ip.IsLoopback() {
+				return zero, value.ErrUnavailable
+			}
+		}
+		addresses[g.PodUID] = slices.Clone(ips)
+	}
+	routes.Addresses = addresses
+	end = identity.Earlier(end, routes.Groups.ValidUntil)
+	bounded, stopBounded := context.WithDeadline(sqlCall, end)
+	defer stopBounded()
+	selected, err := c.locate(bounded, request.LocatorQuery(), routes)
+	if err != nil || selected == nil {
+		return zero, value.ErrUnavailable
+	}
+	defer selected.Close()
+	if bounded.Err() != nil || !routes.Groups.Valid(c.now()) || !selected.locator.Matches(request.LocatorQuery(), selected.leaf.Binding, c.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return c.claim(bounded, request, selected)
+}
+
+type ownerLocalLocated struct {
+	native  app.OwnerNativeObservationOperation
+	cancel  context.CancelFunc
+	until   time.Time
+	initial value.OwnerObservationNativeFacts
+	first   value.OwnerRegistrationObservation
+	leaf    value.OwnerCertificate
+	address string
+	token   []byte
+	locator value.ClusterObservationLocator
+	once    sync.Once
+}
+
+func (s *ownerLocalLocated) Close() {
+	if s == nil {
+		return
+	}
+	s.once.Do(func() {
+		s.cancel()
+		if s.native != nil {
+			s.native.Close()
+		}
+		clear(s.token)
+		s.token = nil
+	})
+}
+
+type ownerLocalLookupResult struct {
+	selected *ownerLocalLocated
+	err      error
+}
+
+// Discovery starts at most two workers and uses a shared process-wide two
+// socket budget. Only an authenticated, explicitly absent reply permits that
+// worker to inspect another original Pod. Unknown outcomes are not absence.
+func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.ClusterObservationLocatorQuery, routes kube.OwnerObservationDialCandidates) (*ownerLocalLocated, error) {
+	search, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var next atomic.Int32
+	var joined sync.WaitGroup
+	results := make(chan ownerLocalLookupResult, 2)
+	for range min(2, len(routes.Groups.Groups)) {
+		joined.Add(1)
+		go func() {
+			defer joined.Done()
+			for search.Err() == nil {
+				i := int(next.Add(1)) - 1
+				if i >= len(routes.Groups.Groups) {
+					return
+				}
+				g := routes.Groups.Groups[i]
+				selected, absent, err := c.lookup(ctx, search, q, routes.Groups.Candidates, g, routes.Addresses[g.PodUID][0])
+				if absent && err == nil {
+					continue
+				}
+				select {
+				case results <- ownerLocalLookupResult{selected, err}:
+				case <-search.Done():
+					if selected != nil {
+						selected.Close()
+					}
+				}
+				return
+			}
+		}()
+	}
+	done := make(chan struct{})
+	go func() { joined.Wait(); close(done) }()
+	var result ownerLocalLookupResult
+	select {
+	case result = <-results:
+	case <-done:
+		select {
+		case result = <-results:
+		default:
+			result.err = value.ErrUnavailable
+		}
+	case <-ctx.Done():
+		result.err = value.ErrUnavailable
+	}
+	cancel()
+	<-done
+	for {
+		select {
+		case other := <-results:
+			if other.selected != nil {
+				other.selected.Close()
+			}
+		default:
+			if result.err != nil || result.selected == nil || ctx.Err() != nil {
+				if result.selected != nil {
+					result.selected.Close()
+				}
+				return nil, value.ErrUnavailable
+			}
+			return result.selected, nil
+		}
+	}
+}
+func ownerLocalNativePeer(f value.OwnerObservationNativeFacts, r value.OwnerRegistrationObservation, address string) bool {
+	if len(f.Peers) != 1 {
+		return false
+	}
+	p := f.Peers[0]
+	return p.Binding == r.Certificate.Binding && p.Pod == r.Enrollment.Pod && p.ReplicaSetUID == r.Enrollment.ReplicaSetUID && slices.Contains(p.Addresses, address)
+}
+func ownerLocalSameFacts(a, b value.OwnerObservationNativeFacts) bool {
+	if a.Pin != b.Pin || !value.SameOwnerObservationRequest(a.Request, b.Request) || !a.ObservedAt.Equal(b.ObservedAt) || b.FreshUntil.After(a.FreshUntil) || len(a.Peers) != len(b.Peers) {
+		return false
+	}
+	for i, p := range a.Peers {
+		q := b.Peers[i]
+		if p.Binding != q.Binding || p.Pod != q.Pod || p.ReplicaSetUID != q.ReplicaSetUID || p.WorkloadDigest != q.WorkloadDigest || !slices.Equal(p.Addresses, q.Addresses) {
+			return false
+		}
+	}
+	return true
+}
+func (c *DirectHolderObservationClient) current(ctx context.Context, connection app.OwnerPeerConnection, first *value.OwnerRegistrationObservation) (value.OwnerRegistrationObservation, error) {
+	var zero value.OwnerRegistrationObservation
+	if ctx == nil || ctx.Err() != nil || c.root.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	leaf, err := connection.OwnerCertificate()
+	if err != nil {
+		return zero, value.ErrDenied
+	}
+	r, err := c.registry.ReadOwnerRegistration(ctx, leaf)
+	if err != nil || ctx.Err() != nil || c.root.Err() != nil || !r.Valid(c.now()) || r.Certificate != leaf || r.Enrollment.Pool != c.pin.Pool || r.Enrollment.SourceUID != c.pin.SourceUID || r.Configuration.Configuration.Pool != c.pin.Pool || r.Configuration.Configuration.Revision.UID != c.pin.SourceUID {
+		return zero, value.ErrUnavailable
+	}
+	verified, err := connection.VerifyCurrentOwner(r.Configuration)
+	if err != nil || verified != leaf || ctx.Err() != nil || !r.Valid(c.now()) || first != nil && (r.Certificate != first.Certificate || r.Enrollment != first.Enrollment || !r.Configuration.Configuration.Equal(first.Configuration.Configuration)) {
+		return zero, value.ErrUnavailable
+	}
+	r.Configuration.Configuration = r.Configuration.Configuration.Clone()
+	return r, nil
+}
+func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string) (*ownerLocalLocated, bool, error) {
+	name, err := mtls.OwnerBootstrapServerName(c.pin.Pool)
+	if err != nil {
+		return nil, false, err
+	}
+	socket, err := c.open(search, address, name)
+	if err != nil {
+		return nil, false, err
+	}
+	defer socket.Close()
+	state := socket.socket.ConnectionState()
+	connection, err := mtls.NewOwnerBootstrapConnection(c.verifier, &state, candidates)
+	if err != nil {
+		return nil, false, value.ErrDenied
+	}
+	leaf, err := connection.OwnerCertificate()
+	if err != nil || leaf.Binding.PodUID != g.PodUID || !slices.Contains(g.Owners, leaf.Binding) {
+		return nil, false, value.ErrDenied
+	}
+	first, err := c.current(search, connection, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	end, _ := search.Deadline()
+	end = identity.Earlier(end, identity.Earlier(q.NotAfter, first.FreshUntil))
+	nativeRoot, cancelNative := context.WithDeadline(root, end)
+	cancelled := make(chan struct{})
+	stopSearch := context.AfterFunc(search, func() { cancelNative(); close(cancelled) })
+	detach := sync.OnceFunc(func() {
+		if !stopSearch() {
+			<-cancelled
+		}
+	})
+	defer detach()
+	selected := &ownerLocalLocated{cancel: cancelNative, until: end, first: first, leaf: leaf, address: address}
+	retained := false
+	defer func() {
+		if !retained {
+			selected.Close()
+		}
+	}()
+	request := value.OwnerObservationRequest{RootID: q.RootID, ID: q.RequestID, Challenge: q.Challenge, RequestedAt: q.RequestedAt, NotAfter: q.NotAfter}
+	selected.native, err = c.native.OpenOwnerObservationOperation(nativeRoot, request, []value.OwnerBinding{leaf.Binding})
+	if err != nil || selected.native == nil {
+		return nil, false, value.ErrUnavailable
+	}
+	facts, err := selected.native.Original(nativeRoot)
+	if err != nil || !facts.Valid(c.now()) || facts.Final || facts.Pin != c.pin || !value.SameOwnerObservationRequest(facts.Request, request) || !ownerLocalNativePeer(facts, first, address) {
+		return nil, false, value.ErrUnavailable
+	}
+	selected.initial = facts.Clone()
+	end = identity.Earlier(end, facts.FreshUntil)
+	currentCall, stopCurrent := context.WithDeadline(search, end)
+	defer stopCurrent()
+	current, err := c.current(currentCall, connection, &first)
+	if err != nil {
+		return nil, false, err
+	}
+	end = identity.Earlier(end, current.FreshUntil)
+	tokenCall, stopToken := context.WithDeadline(currentCall, end)
+	defer stopToken()
+	token, err := c.tokens.ReadClusterObservationToken(tokenCall)
+	if err != nil || len(token) == 0 || len(token) > 16<<10 || bytes.ContainsAny(token, " \t\r\n") || tokenCall.Err() != nil {
+		clear(token)
+		return nil, false, value.ErrUnavailable
+	}
+	selected.token = bytes.Clone(token)
+	clear(token)
+	target, err := contracts.EncodeClusterObservationLocalLocatorTarget(contracts.ClusterObservationLocalLocatorQuery{PodUID: c.podUID, Query: ownerLocalQueryWire(q)})
+	if err != nil {
+		return nil, false, err
+	}
+	data, err := socket.request(tokenCall, http.MethodGet, target, contracts.ClusterObservationLocalLocatorMedia, nil, selected.token)
+	if err != nil {
+		return nil, false, err
+	}
+	defer clear(data)
+	last, err := c.current(tokenCall, connection, &first)
+	if err != nil {
+		return nil, false, err
+	}
+	end = identity.Earlier(end, last.FreshUntil)
+	reply, err := contracts.DecodeClusterObservationLocalLocator(data)
+	if err != nil || reply.PodUID != c.podUID || reply.Query != ownerLocalQueryWire(q) || tokenCall.Err() != nil || !c.now().Before(end) {
+		return nil, false, value.ErrUnavailable
+	}
+	if reply.Locator == nil {
+		return nil, true, nil
+	}
+	locator := ownerOperationLocator(*reply.Locator)
+	if !locator.Matches(q, leaf.Binding, c.now()) {
+		return nil, false, value.ErrUnavailable
+	}
+	selected.locator = locator
+	selected.until = identity.Earlier(end, locator.Interval.FreshUntil)
+	// The original operation context survives joined locator transport cleanup.
+	// Losing search cancellation is detached only for a complete positive reply.
+	detach()
+	if search.Err() != nil || nativeRoot.Err() != nil || !c.now().Before(selected.until) {
+		return nil, false, value.ErrUnavailable
+	}
+	retained = true
+	return selected, false, nil
+}
+func (c *DirectHolderObservationClient) claim(ctx context.Context, request value.ClusterObservationRequest, s *ownerLocalLocated) (value.ClusterObservationResult, error) {
+	var zero value.ClusterObservationResult
+	call, stop := context.WithDeadline(ctx, s.until)
+	defer stop()
+	name, err := mtls.OwnerServerName(s.leaf.Binding)
+	if err != nil {
+		return zero, err
+	}
+	socket, err := c.open(call, s.address, name)
+	if err != nil {
+		return zero, err
+	}
+	defer socket.Close()
+	state := socket.socket.ConnectionState()
+	connection, err := mtls.NewOwnerServerConnection(c.verifier, &state, s.leaf.Binding)
+	if err != nil {
+		return zero, value.ErrDenied
+	}
+	leaf, err := connection.OwnerCertificate()
+	if err != nil || leaf != s.leaf {
+		return zero, value.ErrDenied
+	}
+	before, err := c.current(call, connection, &s.first)
+	if err != nil {
+		return zero, err
+	}
+	end := identity.Earlier(s.until, before.FreshUntil)
+	bounded, stopBounded := context.WithDeadline(call, end)
+	defer stopBounded()
+	body, err := contracts.EncodeClusterObservationLocalClaim(contracts.ClusterObservationLocalClaim{Format: contracts.ClusterObservationLocalClaimFormat, PodUID: c.podUID, Request: wire.RequestWire(request), Locator: ownerOperationLocatorWire(s.locator)})
+	if err != nil {
+		return zero, err
+	}
+	defer clear(body)
+	data, err := socket.request(bounded, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, body, s.token)
+	if err != nil {
+		return zero, err
+	}
+	defer clear(data)
+	after, err := c.current(bounded, connection, &s.first)
+	if err != nil {
+		return zero, err
+	}
+	end = identity.Earlier(end, after.FreshUntil)
+	nativeCall, stopNative := context.WithDeadline(bounded, end)
+	defer stopNative()
+	final, err := s.native.Final(nativeCall)
+	if err != nil || !final.Valid(c.now()) || !final.Final || !ownerLocalSameFacts(s.initial, final) || !ownerLocalNativePeer(final, after, s.address) {
+		return zero, value.ErrUnavailable
+	}
+	end = identity.Earlier(end, final.FreshUntil)
+	finalCall, stopFinal := context.WithDeadline(nativeCall, end)
+	defer stopFinal()
+	current, err := c.current(finalCall, connection, &s.first)
+	if err != nil {
+		return zero, err
+	}
+	end = identity.Earlier(end, current.FreshUntil)
+	decoded, err := contracts.DecodeClusterObservationResult(data)
+	if err != nil {
+		return zero, err
+	}
+	digest, err := wire.RequestDigest(request)
+	if err != nil {
+		return zero, err
+	}
+	result, err := wire.ParseResult(decoded, request, digest, c.now())
+	if err != nil {
+		return zero, err
+	}
+	result = result.Restrict(request.RequestedAt, end)
+	if finalCall.Err() != nil || c.root.Err() != nil || !result.Matches(request, digest, c.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return result, nil
+}
+
+// A socket slot is held through actual body work, cancellation callback join
+// and Close. The budget is shared across both admitted operations and all
+// losing candidates, not multiplied per request or per retained registration.
+type ownerLocalSocket struct {
+	client          *DirectHolderObservationClient
+	socket          *tls.Conn
+	call            context.Context
+	cancel          context.CancelFunc
+	stop            func() bool
+	done            chan struct{}
+	name, authority string
+	once            sync.Once
+}
+
+func (c *DirectHolderObservationClient) open(ctx context.Context, address, name string) (*ownerLocalSocket, error) {
+	select {
+	case c.sockets <- struct{}{}:
+	case <-ctx.Done():
+		return nil, value.ErrUnavailable
+	case <-c.root.Done():
+		return nil, value.ErrUnavailable
+	}
+	admitted := true
+	defer func() {
+		if admitted {
+			<-c.sockets
+		}
+	}()
+	end, finite := ctx.Deadline()
+	if !finite || ctx.Err() != nil || !c.now().Before(end) {
+		return nil, value.ErrUnavailable
+	}
+	call, cancel := context.WithDeadline(ctx, end)
+	raw, err := c.dial(call, "tcp", net.JoinHostPort(address, strconv.Itoa(c.pin.Pool.NativePort)))
+	if err != nil || raw == nil {
+		cancel()
+		if raw != nil {
+			raw.Close()
+		}
+		return nil, value.ErrUnavailable
+	}
+	s := &ownerLocalSocket{client: c, call: call, cancel: cancel, done: make(chan struct{}), name: name, authority: net.JoinHostPort(name, strconv.Itoa(c.pin.Pool.NativePort))}
+	s.socket = tls.Client(raw, &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: c.roots.Clone(), ServerName: name, NextProtos: []string{"h2"}, SessionTicketsDisabled: true, Time: c.now})
+	s.stop = context.AfterFunc(call, func() { s.socket.Close(); close(s.done) })
+	admitted = false
+	if raw.SetDeadline(end) != nil || s.socket.HandshakeContext(call) != nil {
+		s.Close()
+		return nil, value.ErrDenied
+	}
+	return s, nil
+}
+func (s *ownerLocalSocket) Close() {
+	if s == nil {
+		return
+	}
+	s.once.Do(func() {
+		s.cancel()
+		s.socket.Close()
+		if !s.stop() {
+			<-s.done
+		}
+		<-s.client.sockets
+	})
+}
+func (s *ownerLocalSocket) request(ctx context.Context, method, target, media string, body, token []byte) ([]byte, error) {
+	end, finite := ctx.Deadline()
+	if !finite || ctx.Err() != nil || s.call.Err() != nil || !s.client.now().Before(end) || s.socket.SetDeadline(end) != nil {
+		return nil, value.ErrUnavailable
+	}
+	done := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { s.socket.Close(); close(done) })
+	defer func() {
+		if !stop() {
+			<-done
+		}
+	}()
+	var supplied atomic.Bool
+	tr := &http.Transport{ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, MaxResponseHeaderBytes: 4096, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: s.client.roots.Clone(), ServerName: s.name}, DialContext: func(context.Context, string, string) (net.Conn, error) { return nil, value.ErrDenied }, DialTLSContext: func(call context.Context, network, address string) (net.Conn, error) {
+		if network != "tcp" || address != s.authority || call.Err() != nil || ctx.Err() != nil || s.call.Err() != nil || !supplied.CompareAndSwap(false, true) {
+			return nil, value.ErrDenied
+		}
+		return s.socket, nil
+	}}
+	defer tr.CloseIdleConnections()
+	var input io.Reader
+	if method == http.MethodPost {
+		input = io.NopCloser(bytes.NewReader(body))
+	}
+	request, err := http.NewRequestWithContext(ctx, method, "https://"+s.authority+target, input)
+	if err != nil {
+		return nil, value.ErrInvalid
+	}
+	request.ContentLength = int64(len(body))
+	request.Header.Set("Accept", media)
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	if method == http.MethodPost {
+		request.Header.Set("Content-Type", media)
+	}
+	response, err := tr.RoundTrip(request)
+	if response != nil && response.Body != nil {
+		defer response.Body.Close()
+	}
+	maximum := int64(contracts.ClusterObservationBytes)
+	if method == http.MethodGet {
+		maximum = contracts.ClusterObservationLocatorBytes
+	}
+	if err != nil || response == nil || response.Body == nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || response.TLS == nil || response.TLS.ServerName != s.name || response.ContentLength < 1 || response.ContentLength > maximum || len(response.TransferEncoding) != 0 || len(response.Trailer) != 0 {
+		return nil, value.ErrUnavailable
+	}
+	for _, forbidden := range []string{"Content-Encoding", "Set-Cookie", "Location"} {
+		if len(response.Header.Values(forbidden)) != 0 {
+			return nil, value.ErrUnavailable
+		}
+	}
+	if len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != media || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
+		return nil, value.ErrUnavailable
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maximum+1))
+	if err != nil || int64(len(data)) != response.ContentLength || int64(len(data)) > maximum || ctx.Err() != nil || s.call.Err() != nil || len(response.Trailer) != 0 {
+		clear(data)
+		return nil, value.ErrUnavailable
+	}
+	return data, nil
+}

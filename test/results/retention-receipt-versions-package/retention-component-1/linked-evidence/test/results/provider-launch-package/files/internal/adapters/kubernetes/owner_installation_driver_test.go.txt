@@ -1,0 +1,102 @@
+package kubernetes
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestProviderOwnerInstallationRunsFiniteOriginalSequence(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err != nil || !out.Complete || out.Stop != "" || out.Phase != "launch-receipt" || out.Calls != 18 || out.Inspections != 0 || out.RoleRootUID == "" || out.ResourceRootUID == "" || out.OperationID == "" {
+		t.Fatal("finite original installation", out, err)
+	}
+	if f.roles.creates != 4 || f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 {
+		t.Fatal("fixed effect inventory changed")
+	}
+	before := f.journalWrites.Load()
+	if again, err := driver.Run(context.Background()); err == nil || again.Stop != OwnerInstallationClosed || f.journalWrites.Load() != before {
+		t.Fatal("same invocation restarted", again, err)
+	}
+}
+
+func TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	f.roles.beforeCurrent = func() { f.fault.Store(6) }
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err == nil || out.Complete || out.Stop != OwnerInstallationSpent || out.Calls != 2 || out.Inspections != 0 || out.OperationID == "" {
+		t.Fatal("spent-before-effect disposition", out, err)
+	}
+	if f.roles.creates != 0 || f.journalWrites.Load() != 0 {
+		t.Fatal("stopped driver continued")
+	}
+}
+
+func TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	f.roles.loseEffect = true
+	// Later credential CREATE also loses its reply. The already consumed global
+	// inspection allowance must stop immediately instead of polling that object.
+	f.lose.Store(1)
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err == nil || out.Complete || out.Stop != OwnerInstallationUnverified || out.Inspections != 1 || out.Phase != "projection" || out.Calls != 13 {
+		t.Fatal("global inspection cap", out, err)
+	}
+	if f.roles.creates != 4 || f.creates[0].Load() != 1 || f.creates[1].Load() != 0 || f.launches.Load() != 0 {
+		t.Fatal("unknown result repeated or continued creation")
+	}
+}
+
+func TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	f.roles.beforeCurrent = func() { close(entered); <-release }
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan struct{})
+	go func() { defer close(finished); _, _ = driver.Run(context.Background()) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("driver never admitted SQL/native phase")
+	}
+	closed := make(chan struct{})
+	go func() { driver.Close(); close(closed) }()
+	select {
+	case <-closed:
+		t.Fatal("Close returned before admitted native work joined")
+	case <-time.After(20 * time.Millisecond):
+	}
+	unblock()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close failed to join")
+	}
+	<-finished
+	if f.roles.creates != 0 {
+		t.Fatal("cancelled phase reached CREATE")
+	}
+}

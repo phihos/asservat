@@ -1,0 +1,6 @@
+=== RUN   TestConnectorOperationStreamCanonicalUTCEmission
+    connector_operation_connection_test.go:328: v2 request retained non-UTC wire text
+--- FAIL: TestConnectorOperationStreamCanonicalUTCEmission (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.081s
+FAIL

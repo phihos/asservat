@@ -1,0 +1,12 @@
+[
+  {
+    "path": "internal/application/fleet/reconciliation.go",
+    "before": "117f5b4fe60d1cdfebbebe615abd98a994ffbd850c083cc281ef82f7e84515ec",
+    "after": "1ddc216b571bb88ec2dd9dcec8fb9a595b9aa04c5d3946b2601159746577dd5d"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "before": "cac619c17ff67278937f6f85fa1f75c8ad656b9fc2a2e18ffa2752bdffafdf0f",
+    "after": "e01407ba819e97364f1cb18028cb841dc81436fec22e3c096a5627a4fc529994"
+  }
+]

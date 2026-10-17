@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "action-lifecycle/v1",
+  "requestKind": "DebugCapture",
+  "actions": [
+    {
+      "actionID": "traffic",
+      "kind": "packetCapture",
+      "executionMode": "ongoing",
+      "activation": "manualSession",
+      "requestedBefore": "30s",
+      "after": "10s"
+    },
+    {
+      "actionID": "syscalls",
+      "kind": "syscallTrace",
+      "executionMode": "ongoing",
+      "activation": "manualSession",
+      "requestedBefore": "30s",
+      "after": "10s"
+    },
+    {
+      "actionID": "core",
+      "kind": "liveCore",
+      "executionMode": "onTrigger"
+    }
+  ],
+  "ongoingPodScope": "acceptedCapturePods"
+}

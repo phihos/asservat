@@ -1,0 +1,479 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
+	"errors"
+	"math/big"
+	"net/url"
+	"os"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// This test issuer uses a disposable synthetic CA. It exercises the product
+// verifier and SQL/S3 coordinator, not provider qualification (the separate
+// TestConnectorPKIWithRealOpenBao covers the actual provider).
+type enrollmentTestSigner struct {
+	ca       *x509.Certificate
+	key      ed25519.PrivateKey
+	verifier *mtls.PeerVerifier
+	calls    atomic.Int64
+	fail     bool
+}
+
+func (s *enrollmentTestSigner) SignConnector(ctx context.Context, p value.CertificateIssuePermit, csr []byte) (value.IssuedCertificate, error) {
+	s.calls.Add(1)
+	if s.fail {
+		return value.IssuedCertificate{}, value.ErrUnavailable
+	}
+	request, err := x509.ParseCertificateRequest(csr)
+	if err != nil {
+		return value.IssuedCertificate{}, err
+	}
+	u, err := mtls.PeerURI(p.Enrollment.Binding)
+	if err != nil {
+		return value.IssuedCertificate{}, err
+	}
+	leaf := &x509.Certificate{SerialNumber: big.NewInt(s.calls.Load()), NotBefore: p.Enrollment.ClaimedAt.Add(-30 * time.Second).Truncate(time.Second), NotAfter: p.CertificateNotAfter(), URIs: []*url.URL{u}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, BasicConstraintsValid: true}
+	der, err := x509.CreateCertificate(rand.Reader, leaf, s.ca, request.PublicKey, s.key)
+	if err != nil {
+		return value.IssuedCertificate{}, err
+	}
+	return s.verifier.CheckIssued(p, der, [][]byte{s.ca.Raw})
+}
+
+type failedCertificateAudit struct{}
+
+func (failedCertificateAudit) WriteEnrollmentCertificate(context.Context, audit.EnrollmentCertificate) (audit.Receipt, error) {
+	return audit.Receipt{}, artifact.ErrIntegrity
+}
+
+func TestEnrollmentSigningWithRealServices(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if path == "" {
+		t.Skip("run make custody-integration")
+	}
+	var f struct{ Postgres, S3 string }
+	raw, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(raw, &f) != nil {
+		t.Fatal("fixture unavailable")
+	}
+	ctx := context.Background()
+	admin, err := pgxpool.New(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	u, err := url.Parse(f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, tlsConfig := pgTLSBridge(t, u.Host)
+	poolFor := func(user, password string) *pgxpool.Pool {
+		t.Helper()
+		c, err := pgxpool.ParseConfig("postgres://" + user + ":" + password + "@" + address + "/custody_test?sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.ConnConfig.TLSConfig = tlsConfig
+		c.ConnConfig.Fallbacks = nil
+		c.MaxConns = 8
+		p, err := pgxpool.NewWithConfig(ctx, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(p.Close)
+		return p
+	}
+	claimPool := poolFor("enrollment_claim_runtime", "synthetic-enrollment-claim")
+	auditPool := poolFor("enrollment_audit_runtime", "synthetic-enrollment-audit")
+	signPool := poolFor("enrollment_sign_runtime", "synthetic-enrollment-sign")
+	activationPool := poolFor("enrollment_activate_runtime", "synthetic-enrollment-activate")
+	readPool := poolFor("peer_read_runtime", "synthetic-peer-read")
+	bridge := tlsBridge(t, f.S3)
+	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+	bucket := "certificate-audit"
+	client := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
+	if _, err = client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyBytes := make([]byte, 32)
+	if _, err = rand.Read(keyBytes); err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(keyBytes)
+	clear(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := authorityTestKeys{aead}
+	claimObjects := &objectstore.EnrollmentClaimObjects{Store: store, Seal: keys, Open: keys}
+	certificateObjects := &objectstore.EnrollmentCertificateObjects{Store: store, Seal: keys, Open: keys}
+	type scenario struct {
+		claim   value.EnrollmentClaim
+		csr     []byte
+		service fleetapp.ConnectorEnrollment
+		signer  *enrollmentTestSigner
+	}
+	setup := func(ttl time.Duration) scenario {
+		t.Helper()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		_, private, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, private)
+		if err != nil {
+			t.Fatal(err)
+		}
+		publicKey, err := mtls.EnrollmentKey(csr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		claim := value.EnrollmentClaim{InstallationID: uuid.NewString(), BootstrapID: uuid.NewString(), SecretDigest: artifact.Digest{1}, PublicKeyDigest: publicKey}
+		epoch := uuid.NewString()
+		_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,false,$4,$5)`, claim.InstallationID, epoch, claim.SecretDigest[:], now, now.Add(30*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = admin.Exec(ctx, `INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'synthetic-issue-audit','v1',$6)`, claim.InstallationID, claim.BootstrapID, uuid.NewString(), uuid.NewString(), epoch, claim.SecretDigest[:], now, now.Add(ttl), uuid.NewString())
+		if err != nil {
+			t.Fatal(err)
+		}
+		claims, err := postgres.NewEnrollmentClaims(ctx, claimPool, claim.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		audits, err := postgres.NewEnrollmentClaimAudits(ctx, auditPool, claim.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signing, err := postgres.NewEnrollmentSigning(ctx, signPool, claim.InstallationID, uuid.NewString)
+		if err != nil {
+			t.Fatal(err)
+		}
+		certAudits, err := postgres.NewEnrollmentCertificateAudits(ctx, auditPool, claim.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		activation, err := postgres.NewEnrollmentActivation(ctx, activationPool, claim.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		caPub, caKey, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		caTemplate := &x509.Certificate{SerialNumber: big.NewInt(999), NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+		caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, caPub, caKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ca, err := x509.ParseCertificate(caDER)
+		if err != nil {
+			t.Fatal(err)
+		}
+		roots := x509.NewCertPool()
+		roots.AddCert(ca)
+		verifier, err := mtls.NewPeerVerifier(roots, claim.InstallationID, value.ConnectorPeer, time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer := &enrollmentTestSigner{ca: ca, key: caKey, verifier: verifier}
+		return scenario{claim: claim, csr: csr, signer: signer, service: fleetapp.ConnectorEnrollment{Proof: mtls.EnrollmentProof{}, Claims: claims, ClaimAudits: audits, ClaimObjects: claimObjects, Signing: signing, Issuer: signer, CertificateAudits: certAudits, CertificateObjects: certificateObjects, Activation: activation, Now: time.Now}}
+	}
+	prepare := func(s scenario) value.EnrollmentProgress {
+		t.Helper()
+		if _, err := s.service.Claims.ClaimConnector(ctx, s.claim); err != nil {
+			t.Fatal(err)
+		}
+		if err := (auditapp.EnrollmentClaimPublisher{Ledger: s.service.ClaimAudits, Objects: claimObjects}).PublishEnrollmentClaims(ctx); err != nil {
+			t.Fatal(err)
+		}
+		p, err := s.service.Signing.PrepareConnector(ctx, s.claim)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	signed := func(s scenario) value.EnrollmentProgress {
+		t.Helper()
+		p := prepare(s)
+		cert, err := s.signer.SignConnector(ctx, p.Attempt.Permit, s.csr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = s.service.Signing.StoreConnectorCertificate(ctx, p.Attempt, cert); err != nil {
+			t.Fatal(err)
+		}
+		p.Signed = &cert
+		return p
+	}
+	noPeer := func(s scenario) {
+		t.Helper()
+		var n int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_peer WHERE installation_id=$1", s.claim.InstallationID).Scan(&n); err != nil || n != 0 {
+			t.Fatal("premature peer activation", n, err)
+		}
+	}
+	t.Run("claim-audit-required", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		if _, err := s.service.Claims.ClaimConnector(ctx, s.claim); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.service.Signing.PrepareConnector(ctx, s.claim); err == nil {
+			t.Fatal("unaudited signing allowed")
+		}
+		noPeer(s)
+	})
+	t.Run("complete-and-recover-without-resigning", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		cert, err := s.service.Enroll(ctx, s.claim, s.csr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := s.service.Enroll(ctx, s.claim, s.csr)
+		if err != nil || !bytes.Equal(cert.DER, again.DER) || s.signer.calls.Load() != 1 {
+			t.Fatal("replay changed certificate or spent another call", err)
+		}
+		registry, err := postgres.NewPeerRegistry(ctx, readPool, s.claim.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reg, err := registry.PeerRegistration(ctx, cert.Certificate.Binding)
+		if err != nil || len(reg.Certificates) != 1 || reg.Certificates[0].Digest != cert.Certificate.Digest {
+			t.Fatal("committed certificate not in current registry", err)
+		}
+		if _, err = admin.Exec(ctx, "UPDATE fleet_peer SET enabled=false WHERE installation_id=$1", s.claim.InstallationID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = s.service.Enroll(ctx, s.claim, s.csr); err == nil {
+			t.Fatal("replay re-enabled revoked peer")
+		}
+		if s.signer.calls.Load() != 1 {
+			t.Fatal("revocation retried signing")
+		}
+	})
+	t.Run("invalid-proof-cannot-consume", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		if _, err := s.service.Enroll(ctx, s.claim, []byte("bad")); err == nil {
+			t.Fatal("invalid proof accepted")
+		}
+		var claimed bool
+		if err := admin.QueryRow(ctx, "SELECT claimed_at IS NOT NULL FROM fleet_bootstrap WHERE installation_id=$1", s.claim.InstallationID).Scan(&claimed); err != nil || claimed {
+			t.Fatal("invalid proof consumed token", err)
+		}
+	})
+	t.Run("audit-failure-preserves-signed-result", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		s.service.CertificateObjects = failedCertificateAudit{}
+		if _, err := s.service.Enroll(ctx, s.claim, s.csr); err == nil {
+			t.Fatal("failed audit activated")
+		}
+		noPeer(s)
+		pending, err := s.service.CertificateAudits.PendingEnrollmentCertificates(ctx)
+		if err != nil || len(pending) != 1 {
+			t.Fatal(pending, err)
+		}
+		s.service.CertificateObjects = certificateObjects
+		if _, err = s.service.Enroll(ctx, s.claim, s.csr); err != nil {
+			t.Fatal(err)
+		}
+		if s.signer.calls.Load() != 1 {
+			t.Fatal("audit retry called provider again")
+		}
+		receipt, err := certificateObjects.WriteEnrollmentCertificate(ctx, pending[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		receipt.SHA256[0]++
+		if err = s.service.CertificateAudits.AcknowledgeEnrollmentCertificate(ctx, pending[0], receipt); err == nil {
+			t.Fatal("rewrote certificate audit")
+		}
+	})
+	t.Run("parallel-prepare-spends-once-and-restart-cannot-resign", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		if _, err := s.service.Claims.ClaimConnector(ctx, s.claim); err != nil {
+			t.Fatal(err)
+		}
+		if err := (auditapp.EnrollmentClaimPublisher{Ledger: s.service.ClaimAudits, Objects: claimObjects}).PublishEnrollmentClaims(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var count atomic.Int64
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				p, err := s.service.Signing.PrepareConnector(ctx, s.claim)
+				if err != nil {
+					t.Error(err)
+				}
+				if p.MaySign {
+					count.Add(1)
+				}
+			})
+		}
+		wg.Wait()
+		if count.Load() != 1 {
+			t.Fatal("signing race", count.Load())
+		}
+		restarted, err := postgres.NewEnrollmentSigning(ctx, signPool, s.claim.InstallationID, uuid.NewString)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := restarted.PrepareConnector(ctx, s.claim)
+		if err != nil || p.MaySign || p.Attempt.Ordinal != 1 {
+			t.Fatal("restart permitted duplicate call", err)
+		}
+		noPeer(s)
+	})
+	t.Run("uncertain-provider-budget-never-refunds", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		s.signer.fail = true
+		if _, err := s.service.Enroll(ctx, s.claim, s.csr); err == nil {
+			t.Fatal("uncertain provider activated")
+		}
+		if _, err := s.service.Enroll(ctx, s.claim, s.csr); !errors.Is(err, value.ErrPending) {
+			t.Fatal("live duplicate not pending", err)
+		}
+		if s.signer.calls.Load() != 1 {
+			t.Fatal("live duplicate re-signed")
+		}
+		p, err := s.service.Signing.PrepareConnector(ctx, s.claim)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Until(p.Attempt.Permit.ValidUntil) + 5*time.Millisecond)
+		if _, err = s.service.Enroll(ctx, s.claim, s.csr); err == nil {
+			t.Fatal("second uncertain provider activated")
+		}
+		p, err = s.service.Signing.PrepareConnector(ctx, s.claim)
+		if err != nil || p.Attempt.Ordinal != 2 {
+			t.Fatal(p, err)
+		}
+		time.Sleep(time.Until(p.Attempt.Permit.ValidUntil) + 5*time.Millisecond)
+		if _, err = s.service.Enroll(ctx, s.claim, s.csr); err == nil {
+			t.Fatal("third provider attempt accepted")
+		}
+		if s.signer.calls.Load() != 2 {
+			t.Fatal("unbounded provider retries", s.signer.calls.Load())
+		}
+		noPeer(s)
+	})
+	for _, mode := range []string{"missing-certificate-audit", "revoked-bootstrap", "changed-trust", "new-epoch", "recovery"} {
+		t.Run(mode, func(t *testing.T) {
+			s := setup(5 * time.Minute)
+			p := signed(s)
+			if mode != "missing-certificate-audit" {
+				if err := (auditapp.EnrollmentCertificatePublisher{Ledger: s.service.CertificateAudits, Objects: certificateObjects}).PublishEnrollmentCertificates(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			sql := ""
+			switch mode {
+			case "revoked-bootstrap":
+				sql = "UPDATE fleet_bootstrap SET revoked=true WHERE installation_id=$1"
+			case "changed-trust":
+				sql = "UPDATE fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1"
+			case "new-epoch":
+				sql = "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"
+			case "recovery":
+				sql = "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"
+			}
+			if sql != "" {
+				if _, err := admin.Exec(ctx, sql, s.claim.InstallationID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := s.service.Activation.ActivateConnector(ctx, s.claim, p.Attempt.ID); err == nil {
+				t.Fatal("unsafe activation", mode)
+			}
+			noPeer(s)
+		})
+	}
+	t.Run("expiry-while-activation-waits", func(t *testing.T) {
+		s := setup(time.Second)
+		p := signed(s)
+		if err := (auditapp.EnrollmentCertificatePublisher{Ledger: s.service.CertificateAudits, Objects: certificateObjects}).PublishEnrollmentCertificates(ctx); err != nil {
+			t.Fatal(err)
+		}
+		tx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", s.claim.InstallationID); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { _, err := s.service.Activation.ActivateConnector(ctx, s.claim, p.Attempt.ID); done <- err }()
+		time.Sleep(time.Until(p.Attempt.Permit.Enrollment.NotAfter) + 5*time.Millisecond)
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-done; err == nil {
+			t.Fatal("expired blocked activation accepted")
+		}
+		noPeer(s)
+	})
+	t.Run("roles-and-write-once-signing-history", func(t *testing.T) {
+		s := setup(5 * time.Minute)
+		p := signed(s)
+		if err := (auditapp.EnrollmentCertificatePublisher{Ledger: s.service.CertificateAudits, Objects: certificateObjects}).PublishEnrollmentCertificates(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.service.Activation.ActivateConnector(ctx, s.claim, p.Attempt.ID); err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range []struct {
+			pool *pgxpool.Pool
+			sql  string
+		}{
+			{signPool, "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"},
+			{signPool, "UPDATE fleet_certificate_issue SET signed_at=NULL,certificate_json=NULL,certificate_sha256=NULL,certificate_not_before=NULL,certificate_not_after=NULL WHERE installation_id=$1"},
+			{signPool, "DELETE FROM fleet_certificate_issue WHERE installation_id=$1"},
+			{auditPool, "UPDATE fleet_certificate_issue SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1"},
+			{activationPool, "UPDATE fleet_certificate_issue SET activated_at=NULL WHERE installation_id=$1"},
+			{activationPool, "UPDATE fleet_certificate_issue SET certificate_json='replacement' WHERE installation_id=$1"},
+			{activationPool, "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"},
+		} {
+			if _, err := item.pool.Exec(ctx, item.sql, s.claim.InstallationID); err == nil {
+				t.Fatal("role/history expanded authority", item.sql)
+			}
+		}
+	})
+}

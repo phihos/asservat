@@ -1,0 +1,238 @@
+--- a/internal/domain/planning/go_profile_endpoint.go
++++ b/internal/domain/planning/go_profile_endpoint.go
+@@ -2,9 +2,7 @@
+ 
+ import (
+ 	"errors"
+-	"net"
+ 	"net/netip"
+-	"regexp"
+ 	"strconv"
+ 	"strings"
+ 	"time"
+@@ -192,8 +190,6 @@
+ 
+ func endpointAddressMode(s string) bool { return s == "targetLoopback" || s == "podIP" }
+ 
+-var endpointDNS = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+-
+ func validEndpointServerName(s string) bool {
+ 	if len(s) == 0 || len(s) > 253 {
+ 		return false
+@@ -202,25 +198,60 @@
+ 		return ip.Zone() == "" && !ip.Is4In6() && !ip.IsUnspecified() && !ip.IsMulticast()
+ 	}
+ 	for _, label := range strings.Split(s, ".") {
+-		if len(label) > 63 || !endpointDNS.MatchString(label) {
+-			return false
++		if len(label) == 0 || len(label) > 63 {
++			return false
++		}
++		for i := 0; i < len(label); i++ {
++			c := label[i]
++			if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
++				continue
++			}
++			if c != '-' || i == 0 || i == len(label)-1 {
++				return false
++			}
+ 		}
+ 	}
+ 	return true
+ }
+ 
++// Parse only the fixed HTTP Host syntax. This pure value check neither resolves
++// DNS nor opens sockets; bare IPv6 is deliberately unavailable without brackets.
+ func validEndpointHost(s string) bool {
+-	if len(s) > 253 || strings.ContainsAny(s, "/\\?#@%\r\n\t ") {
+-		return false
+-	}
+-	if validEndpointServerName(s) && !strings.Contains(s, ":") {
+-		return true
+-	}
+-	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+-		ip, err := netip.ParseAddr(s[1 : len(s)-1])
+-		return err == nil && ip.Is6() && validEndpointServerName(ip.String())
+-	}
+-	host, port, err := net.SplitHostPort(s)
+-	n, portErr := strconv.ParseUint(port, 10, 16)
+-	return err == nil && portErr == nil && n > 0 && strconv.FormatUint(n, 10) == port && validEndpointServerName(host)
+-}
++	if len(s) == 0 || len(s) > 253 || strings.ContainsAny(s, "/\\?#@%\r\n\t ") {
++		return false
++	}
++	var port string
++	if s[0] == '[' {
++		end := strings.IndexByte(s, ']')
++		if end < 0 {
++			return false
++		}
++		host := s[1:end]
++		ip, err := netip.ParseAddr(host)
++		if err != nil || !ip.Is6() || !validEndpointServerName(host) {
++			return false
++		}
++		tail := s[end+1:]
++		if tail == "" {
++			return true
++		}
++		if tail[0] != ':' {
++			return false
++		}
++		port = tail[1:]
++	} else {
++		if strings.ContainsAny(s, "[]") {
++			return false
++		}
++		host, value, hasPort := strings.Cut(s, ":")
++		if !validEndpointServerName(host) {
++			return false
++		}
++		if !hasPort {
++			return true
++		}
++		port = value
++	}
++	n, err := strconv.ParseUint(port, 10, 16)
++	return err == nil && n > 0 && strconv.FormatUint(n, 10) == port
++}
+--- a/internal/domain/planning/go_profile_endpoint_test.go
++++ b/internal/domain/planning/go_profile_endpoint_test.go
+@@ -100,3 +100,69 @@
+ 		}
+ 	}
+ }
++
++func TestGoEndpointHostSyntax(t *testing.T) {
++	for _, tc := range []struct {
++		name, host string
++		valid      bool
++	}{
++		{"DNS", "pprof.example.invalid", true},
++		{"DNS-port", "pprof.example.invalid:6060", true},
++		{"single-label", "a", true},
++		{"digit-label", "3-pprof", true},
++		{"maximum-label", strings.Repeat("a", 63) + ".invalid", true},
++		{"IPv4", "127.0.0.1", true},
++		{"IPv4-port", "127.0.0.1:6060", true},
++		{"minimum-port", "pprof:1", true},
++		{"maximum-port", "pprof:65535", true},
++		{"IPv6", "[::1]", true},
++		{"IPv6-port", "[::1]:6060", true},
++		{"expanded-IPv6", "[2001:0DB8:0000:0000:0000:0000:0000:0001]:6060", true},
++		{"empty", "", false},
++		{"empty-host", ":6060", false},
++		{"empty-port", "pprof:", false},
++		{"zero-port", "pprof:0", false},
++		{"leading-zero-port", "pprof:06060", false},
++		{"positive-sign-port", "pprof:+6060", false},
++		{"negative-port", "pprof:-1", false},
++		{"overflow-port", "pprof:65536", false},
++		{"huge-port", "pprof:18446744073709551616", false},
++		{"named-port", "pprof:http", false},
++		{"extra-port", "pprof:6060:6061", false},
++		{"bare-IPv6", "::1", false},
++		{"bare-IPv6-port-ambiguity", "2001:db8::1:6060", false},
++		{"missing-close-bracket", "[::1:6060", false},
++		{"missing-open-bracket", "::1]:6060", false},
++		{"extra-open-bracket", "[[::1]:6060", false},
++		{"extra-close-bracket", "[::1]]:6060", false},
++		{"missing-port-separator", "[::1]6060", false},
++		{"bracketed-empty-port", "[::1]:", false},
++		{"bracketed-zero-port", "[::1]:0", false},
++		{"bracketed-leading-zero-port", "[::1]:06060", false},
++		{"bracketed-overflow-port", "[::1]:65536", false},
++		{"bracketed-empty-host", "[]:6060", false},
++		{"bracketed-DNS", "[pprof]:6060", false},
++		{"bracketed-IPv4", "[127.0.0.1]:6060", false},
++		{"zone", "[fe80::1%eth0]:6060", false},
++		{"mapped-IPv4", "[::ffff:127.0.0.1]:6060", false},
++		{"unspecified-IPv6", "[::]:6060", false},
++		{"multicast-IPv6", "[ff02::1]:6060", false},
++		{"uppercase-DNS", "Pprof.example.invalid", false},
++		{"non-ASCII-DNS", "profíle.example.invalid", false},
++		{"leading-hyphen", "-pprof.invalid", false},
++		{"trailing-hyphen", "pprof-.invalid", false},
++		{"empty-label", "pprof..invalid", false},
++		{"trailing-dot", "pprof.invalid.", false},
++		{"long-label", strings.Repeat("a", 64) + ".invalid", false},
++		{"long-host", strings.Repeat("a", 253) + ":1", false},
++		{"header-injection", "pprof\r\nX-Secret: value", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			d := endpointDefinitionFixture()
++			d.Host = tc.host
++			if d.Valid() != tc.valid {
++				t.Fatalf("Host syntax %q accepted=%t want=%t", tc.host, d.Valid(), tc.valid)
++			}
++		})
++	}
++}
+--- a/internal/domain/targets/profile_network.go
++++ b/internal/domain/targets/profile_network.go
+@@ -2,7 +2,6 @@
+ 
+ import (
+ 	"net/netip"
+-	"regexp"
+ 	"time"
+ 
+ 	"asservat.local/asservat/internal/domain/artifact"
+@@ -11,12 +10,22 @@
+ 
+ const MaxProfilePodPorts = 256
+ 
+-var profilePortName = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
+-
+ // ProfilePortName matches EvidenceRecipe.spec.endpointBindings.portName. A
+ // declaration is a routing hint for the whole Pod, never process attribution.
+ func ProfilePortName(s string) bool {
+-	return len(s) > 0 && len(s) <= 15 && profilePortName.MatchString(s)
++	if len(s) == 0 || len(s) > 15 || s[0] < 'a' || s[0] > 'z' {
++		return false
++	}
++	for i := 1; i < len(s); i++ {
++		c := s[i]
++		if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
++			continue
++		}
++		if c != '-' || i == len(s)-1 {
++			return false
++		}
++	}
++	return true
+ }
+ 
+ type ProfilePodPort struct {
+--- a/internal/domain/targets/profile_network_test.go
++++ b/internal/domain/targets/profile_network_test.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"net/netip"
++	"strings"
+ 	"testing"
+ 	"time"
+ 
+@@ -63,3 +64,21 @@
+ 		t.Fatal("observer must retain host-network fact for explicit unavailable reason")
+ 	}
+ }
++
++func TestProfilePortNameMatchesPublicSyntax(t *testing.T) {
++	for _, tc := range []struct {
++		name  string
++		valid bool
++	}{
++		{"a", true}, {"a0", true}, {"a-0", true}, {"a--b", true},
++		{strings.Repeat("a", 15), true},
++		{"", false}, {"0", false}, {"9-metrics", false}, {"Diagnostics", false},
++		{"a-", false}, {"-a", false}, {"a_b", false}, {"a/b", false},
++		{"a b", false}, {"a\n", false}, {"é", false},
++		{strings.Repeat("a", 16), false},
++	} {
++		if ProfilePortName(tc.name) != tc.valid {
++			t.Fatalf("public port name %q accepted=%t want=%t", tc.name, ProfilePortName(tc.name), tc.valid)
++		}
++	}
++}

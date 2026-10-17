@@ -1,0 +1,6 @@
+{
+  "file": "test/integration/native_exchange_test.go",
+  "restoredSHA256": "428e42a0bfd62662d1fcfbc3912e8b2db186946edd12120f99ab8372be3667cc",
+  "terminalRun": "native-retry-preparation-phases-check.log",
+  "scope": "Only test phase instrumentation; exact original restored after terminal cleanup."
+}

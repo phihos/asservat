@@ -1,0 +1,15 @@
+{
+  "CGO_ENABLED": "0",
+  "bytes": 55503993,
+  "files": {
+    "test/fixtures/observation-native/data.go": "30f4c2c852a9094895113b02a43058de61499305dd3aa791f0222eb7efefc0fe",
+    "test/fixtures/observation-native/enrollment.go": "8441403ca79bd42c8127b1f1d96163bd9dc5c23e2405ef9b8426f9bcd3bd0a0a",
+    "test/fixtures/observation-native/inputs.go": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82",
+    "test/fixtures/observation-native/main.go": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82",
+    "test/fixtures/observation-native/metrics.go": "363acac5d1729376f75ddf68a648b799c8b99d9ff8b4984b46e7f787826d71f5",
+    "test/fixtures/observation-native/runtime.go": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427"
+  },
+  "harness": "a0d83fe73a95a373299371280d034c323c9019bea1daaa0d38318beb689fd511",
+  "runtimeExecuted": false,
+  "sha256": "87cc9186e707c8a347a6ddb17a1d15721cd1219fbb2416db317ad53eb327b949"
+}

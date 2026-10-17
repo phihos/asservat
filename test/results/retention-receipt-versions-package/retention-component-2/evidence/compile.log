@@ -1,0 +1,8 @@
+ok  	asservat.local/asservat/internal/domain/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/configuration	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/application/privacy	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.010s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/objectstore	0.012s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	0.005s [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.013s [no tests to run]

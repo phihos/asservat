@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-13T15:33:23.345254+00:00",
+  "changes": [
+    {
+      "path": "test/integration/enrollment_test.go",
+      "base": "f3b4f128f946a6b25ba838c78c58e33ea545e6ebe634e185473fc1a59fe499b7",
+      "payload": "c204cc74cca1100a61a9b73ca8538fff94996039d8c0aef1ce531a09e0fd62c2"
+    },
+    {
+      "path": "test/integration/enrollment_signing_test.go",
+      "base": "8e1766228b3fd40c32d881b128e962ad7a0b33361040a91caadc005b78741964",
+      "payload": "e7b79811ea5ebc3a5581a64c32bf4c83d58def7c703ee66fc635b75447cc3893"
+    }
+  ],
+  "scope": "test-only explicit UUID parameter casts; no product or authority change",
+  "qualification": "actual failing PostgreSQL before evidence preserved; rerun pending"
+}

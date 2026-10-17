@@ -1,0 +1,7 @@
+--- FAIL: TestBrowserIdentityCannotOutliveSession (0.00s)
+    browser_handoff_test.go:54: returned identity outlives its browser session
+--- FAIL: TestBrowserCallbackRechecksIdentityAfterSessionCreation (0.00s)
+    browser_handoff_test.go:62: callback returned identity that expired during session creation
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.002s
+FAIL

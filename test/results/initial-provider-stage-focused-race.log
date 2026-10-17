@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/adapters/kms	1.378s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	19.931s
+?   	asservat.local/asservat/internal/adapters/providerconfig	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	1.052s [no tests to run]
+ok  	asservat.local/asservat/internal/contracts	1.029s [no tests to run]
+ok  	asservat.local/asservat/test/integration	1.054s

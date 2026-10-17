@@ -1,0 +1,12 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/owner_observation_routing.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/adapters/mtls/owner_observation_routing.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/owner_observation_routing_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/adapters/mtls/owner_observation_routing_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/cluster_observation_routing_peers.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/domain/fleet/cluster_observation_routing_peers.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/cluster_observation_routing_peers_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/domain/fleet/cluster_observation_routing_peers_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/owner.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/domain/fleet/owner.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/routing_handler.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/transport/clusterobservation/routing_handler.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/routing_handler_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/transport/clusterobservation/routing_handler_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/routing_wire.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/files/internal/transport/clusterobservation/routing_wire.go"
+  }
+}

@@ -1,0 +1,102 @@
+--- test/integration/native_exchange_test.go
++++ test/integration/native_exchange_test.go
+@@ -49,7 +49,6 @@
+ 	gate                   authapp.ContextDownloadAuthority
+ 	guards                 postgres.DownloadTransactionGuards
+ 	authority              func() artifact.DownloadAuthority
+-	refresh                func(context.Context) error
+ 	store                  *objectstore.Store
+ 	keys                   authorityTestKeys
+ 	keyScope               value.KeyScope
+@@ -89,43 +88,6 @@
+ 	}
+ 	ctx, stop := context.WithTimeout(ctx, fixtureDuration)
+ 	defer stop()
+-	if err := f.refresh(ctx); err != nil {
+-		t.Fatal("current protected fixture observations", err)
+-	}
+-	// These are new observations of the explicitly synthetic protected fixture
+-	// inputs. They do not renew any request, operation or byte lease.
+-	observations, stopObservations := context.WithCancel(ctx)
+-	observed := make(chan error, 1)
+-	go func() {
+-		ticker := time.NewTicker(time.Second)
+-		defer ticker.Stop()
+-		for {
+-			select {
+-			case <-observations.Done():
+-				observed <- nil
+-				return
+-			case <-ticker.C:
+-				call, cancel := context.WithTimeout(observations, 5*time.Second)
+-				err := f.refresh(call)
+-				cancel()
+-				if err != nil {
+-					if observations.Err() != nil {
+-						observed <- nil
+-					} else {
+-						observed <- err
+-						stop()
+-					}
+-					return
+-				}
+-			}
+-		}
+-	}()
+-	defer func() {
+-		stopObservations()
+-		if err := <-observed; err != nil {
+-			t.Error("protected fixture observation stopped", err)
+-		}
+-	}()
+ 	if f.content == nil || f.content.retry == nil || !f.content.retry.second {
+ 		nativeSQLRoles(t, ctx, f.admin)
+ 	}
+@@ -412,6 +374,47 @@
+ 		}
+ 	}
+ 	t.Logf("actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=%d; synthetic identity/issuer/Pod/bootstrap facts", len(body))
++}
++
++// One observation owner spans fixture setup, dispatch and every subsequent
++// native phase, including a second independently admitted download. It supplies
++// current observations of explicit synthetic sources, never a renewed request,
++// operation or byte lease. Loss cancels and joins before fixture pools close.
++func startNativeFixtureObservations(t *testing.T, parent context.Context, refresh func(context.Context) error) (context.Context, func()) {
++	t.Helper()
++	ctx, cancel := context.WithCancel(parent)
++	initial, end := context.WithTimeout(ctx, 5*time.Second)
++	err := refresh(initial)
++	end()
++	if err != nil {
++		cancel()
++		t.Fatal("initial protected native fixture observations", err)
++	}
++	done := make(chan error, 1)
++	go func() {
++		ticker := time.NewTicker(time.Second)
++		defer ticker.Stop()
++		for {
++			select {
++			case <-ctx.Done():
++				done <- nil
++				return
++			case <-ticker.C:
++				call, finish := context.WithTimeout(ctx, 5*time.Second)
++				err := refresh(call)
++				finish()
++				if err != nil {
++					if ctx.Err() != nil { done <- nil } else { done <- err }
++					cancel()
++					return
++				}
++			}
++		}
++	}()
++	return ctx, func() {
++		cancel()
++		if err := <-done; err != nil { t.Error("protected native fixture observation stopped", err) }
++	}
+ }
+ 
+ type nativeSQLAdmission struct {

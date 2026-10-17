@@ -1,0 +1,15 @@
+# Fresh paired provider schema join
+
+Session 80963 ended with exit 0 in 8.873 seconds. The actual repository `make spec-check architecture-check design-check` targets ran in an isolated copied tree using the existing requirements-spec virtual environment. No Go build, runtime, browser or native service ran.
+
+Manifest `65ab99a3f23adbd58eb6a98c61be05c03a37c885ff64daed7ef4c13ebcc25db6`; 2,813 authored dependencies `0f810d576162129a4c55b8a61292eeefd559d8e32c5afac63e57fab203ccc7e6`; runner `fee2a944778c45a5fe5b54fdf1542a2ded434f11ae2267cdfd241854add87ad8`. Fourteen payloads comprise five console schemas, eight exact MCP dependency-worker-schemas-v1 schema files, and one additive check-specs.py hunk. The copied source tree additionally includes the exact 69-path owner-versioned-1 foundation; its incomplete worker reader/builder prerequisites remain explicit. Every payload/base, foundation byte and authored dependency matched before/after. Only the architecture gate's expected report was regenerated in the isolated tree. Native reports and existing compiled console output were linked only for documentation target-existence checks; their contents were not execution inputs.
+
+Actual results:
+
+- Specification: 120 schemas, 10,482 assertions, 713 rejected invalid examples, 173 examples, 49 MCP tools.
+- Architecture: 1,218 positive checks and 120 rejected invalid cases.
+- Design: 63 screens, nine journeys, 49 domain entities, 73 browser operations, 49 MCP schema pairs and 337 resolved references.
+
+The additional structural cases cover all four original supported layout pairs, rejected mixed/partial selections, provider authentication requiring the v2 owner branch, exact candidate-limit boundaries, closed generated provider selections, and pending/completed worker input claims. Credentials, private payload hashes and a separate editable audit-version flag are rejected. Cross-object identity, current authority, original intervals, receipt order and backend capability remain runtime checks; schema success cannot establish them.
+
+This is a canonical-contract component, not a complete predecessor or installed-v2 handoff. MCP still owns the concrete configuration-worker publisher/launch/runtime. ADR150's future explicit observation-composition selector must be integrated into this same fresh pair once its typed contract and complete native qualification exist; NativeCandidateLimit alone must not infer the protocol. Existing v1 omissions and receipts remain unchanged. No runtime selector or command is enabled by this result.

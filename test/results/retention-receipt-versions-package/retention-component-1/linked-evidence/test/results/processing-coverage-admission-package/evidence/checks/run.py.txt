@@ -1,0 +1,50 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,time,shutil
+root=Path('/home/phil/Projekte/asservat');s=Path('/home/phil/.cache/asservat-build/planning/processing-admission-20261013');c=s/'candidate-v2';out=Path(__file__).parent
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(c/'manifest.json')=='3329d2defaa7a7c7f682d370f36c4cc69383ff982f818123a0ed8860a054d970'
+assert sha(c/'dependencies.json')=='1e14056e474ca0dc0fa5214ba743df4194d9c7b29f6e6ac63a75d4b2820f450d'
+m=json.loads((c/'manifest.json').read_text());deps=json.loads((c/'dependencies.json').read_text())
+def verify():
+ v={'payloads':[],'bases':[],'dependencies':[],'retained_bases':[]}
+ for f in m['files']:
+  p=f['path']
+  if sha(c/'changes'/p)!=f['payload_sha256']:v['payloads'].append(p)
+  if sha(root/p)!=f['base_sha256']:v['bases'].append(p)
+  if sha(c/'bases'/p)!=f['base_sha256']:v['retained_bases'].append(p)
+ for p,h in deps.items():
+  if sha(root/p)!=h:v['dependencies'].append(p)
+ return v
+r={'manifest':sha(c/'manifest.json'),'dependencies':sha(c/'dependencies.json'),'runner':sha(Path(__file__)),'before':verify(),'phases':[],'started_at':time.time()}
+assert not any(r['before'].values()),r['before']
+env=os.environ.copy();env.update({'GOMAXPROCS':'2','GOFLAGS':'-p=2','TMPDIR':str(out/'tmp')})
+for k in list(env):
+ if k.startswith('ASSERVAT_'):env.pop(k)
+def phase(name,cmd,cwd=root,expected=0):
+ started=time.time()
+ with (out/(name+'.log')).open('x') as f:p=subprocess.run(cmd,cwd=cwd,env=env,stdout=f,stderr=subprocess.STDOUT)
+ (out/(name+'.exit')).write_text(str(p.returncode)+'\n')
+ a={'name':name,'command':cmd,'cwd':str(cwd),'exit':p.returncode,'expected':expected,'seconds':time.time()-started,'log_sha256':sha(out/(name+'.log'))};r['phases'].append(a);print(json.dumps(a),flush=True)
+ if p.returncode!=expected:raise RuntimeError(name+' unexpected exit')
+ if name=='before':
+  log=(out/'before.log').read_text();assert 'known short coverage reached draft/admission' in log and '[build failed]' not in log,'before must reach intended assertion'
+try:
+ phase('before',['go','test','-race','-vet=off','-overlay',str(c/'before-overlay.json'),'./internal/application/capture','-run','^TestContextProcessingCoveragePrecedesPreviewAndAdmission$','-count=1','-v'],expected=1)
+ phase('capture-presentation-bootstrap',['go','test','-race','-vet=off','-overlay',str(c/'overlay.json'),'./internal/application/capture','./internal/transport/presentation','./internal/bootstrap','-count=1','-timeout=10m','-v'])
+ phase('processing-roles-domain',['go','test','-race','-vet=off','-overlay',str(c/'overlay.json'),'./internal/adapters/postgres','./internal/domain/capture','-run','Test(ProcessingCapture|PublicRuntimeRolePlan|PublicDownloadSourceRole|CapacityRolePlans|FixedRuntimeRoleFunctionAlias|CaptureCleanupPlans)|^TestContext','-count=1','-v'])
+ phase('integration-compile',['go','test','-vet=off','-overlay',str(c/'overlay.json'),'./test/integration','-run','^$','-count=1'])
+ phase('vet',['go','vet','-overlay',str(c/'overlay.json'),'./internal/domain/capture','./internal/application/capture','./internal/transport/presentation','./internal/adapters/postgres','./internal/bootstrap','./test/integration'])
+ tree=out/'architecture-tree';tree.mkdir()
+ for p,h in deps.items():
+  dst=tree/p;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/p,dst);assert sha(dst)==h,p
+ for f in m['files']:
+  dst=tree/f['path'];dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(c/'changes'/f['path'],dst);assert sha(dst)==f['payload_sha256']
+ phase('architecture-spec',['make','go-architecture-check','architecture-check','spec-check','PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python'],cwd=tree)
+ r['terminal_exit']=0
+except Exception as e:r['terminal_exit']=1;r['error']=str(e)
+finally:
+ r['after']=verify();r['ended_at']=time.time()
+ if any(r['after'].values()):r['terminal_exit']=2
+ with (out/'result.json').open('x') as f:json.dump(r,f,indent=2);f.write('\n')
+ print(json.dumps(r,indent=2),flush=True)
+raise SystemExit(r['terminal_exit'])

@@ -1,0 +1,217 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
+)
+
+func bootstrapPublicDigest(c contracts.InitialPreparer) string {
+	b, _ := json.Marshal(c)
+	v := sha256.Sum256(b)
+	return hex.EncodeToString(v[:])
+}
+
+func bootstrapObservationValue(d contracts.InitialBootstrap, s contracts.InitialBootstrapState, c contracts.InitialPreparer) (contracts.InitialBootstrapObservation, error) {
+	var zero contracts.InitialBootstrapObservation
+	if s.Projection == nil || len(s.Creates) != len(bootstrapSteps) || s.Creates[7].Receipt == nil || s.Projection.UID != s.Creates[7].Receipt.UID {
+		return zero, cfg.ErrInvalid
+	}
+	return contracts.InitialBootstrapObservation{Format: contracts.InitialBootstrapObservationFormat, Desired: d, Prelude: s.Prelude, InstallationID: s.InstallationID, RequestID: s.RequestID, ClusterID: s.ClusterID, Projection: *s.Projection, ResourceVersion: s.Creates[7].Receipt.ResourceVersion, OperationID: s.Creates[7].OperationID, PlanDigest: preparationPlanDigest(c.Plan), ProjectionDigest: bootstrapPublicDigest(c)}, nil
+}
+
+// ObservationProjection reads the private seed only in the trusted producer.
+// Consumers receive its fixed public projection and never read the seed.
+func (s *InitialBootstrap) ObservationProjection(ctx context.Context) (contracts.InitialBootstrapObservation, error) {
+	var zero contracts.InitialBootstrapObservation
+	bounded, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	if err = s.current(bounded); err != nil {
+		return zero, err
+	}
+	_, state, err := s.readSeed(bounded)
+	if err != nil {
+		return zero, err
+	}
+	c, ready, err := s.readProjection(bounded, state)
+	if err != nil || !ready {
+		return zero, cfg.ErrUnavailable
+	}
+	return bootstrapObservationValue(s.desired, state, c)
+}
+
+// InitialBootstrapObserver owns only original public observations and a
+// bounded observation-only credential. No method creates identities, reads a
+// private seed, touches SQL/providers or refreshes a target one-use token.
+type InitialBootstrapObserver struct {
+	bootstrap      *InitialBootstrap
+	projection     contracts.InitialBootstrapObservation
+	configuration  contracts.InitialPreparer
+	mu             sync.Mutex
+	closed, active bool
+	joined         sync.WaitGroup
+	token          string
+	expires        time.Time
+	issues         int
+	now            func() time.Time
+}
+
+func NewInitialBootstrapObserver(ctx context.Context, config *rest.Config, projection contracts.InitialBootstrapObservation, c contracts.InitialPreparer) (*InitialBootstrapObserver, error) {
+	if ctx == nil || ctx.Err() != nil || !bootstrapObservationMatches(projection, c) {
+		return nil, cfg.ErrInvalid
+	}
+	// Decode into empty destinations: decoding back into a shallow argument
+	// reuses the caller's pointers and slice storage.
+	b, err := json.Marshal(projection)
+	var ownProjection contracts.InitialBootstrapObservation
+	if err != nil || json.Unmarshal(b, &ownProjection) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	b, err = json.Marshal(c)
+	var ownConfiguration contracts.InitialPreparer
+	if err != nil || json.Unmarshal(b, &ownConfiguration) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	// Every dedicated phase has one original finite process budget. The
+	// factory also caps a caller without one; no subsequent read renews it.
+	bounded, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	s, err := NewInitialBootstrap(bounded, config, ownProjection.Desired)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	stop := s.cancel
+	s.cancel = func() { stop(); cancel() }
+	return &InitialBootstrapObserver{bootstrap: s, projection: ownProjection, configuration: ownConfiguration, now: time.Now}, nil
+}
+
+func bootstrapObservationMatches(v contracts.InitialBootstrapObservation, c contracts.InitialPreparer) bool {
+	return v.Format == contracts.InitialBootstrapObservationFormat && bootstrapPreludeValid(v.Desired, v.Prelude) && authorization.UUID(v.InstallationID) && authorization.UUID(v.RequestID) && authorization.UUID(v.ClusterID) && authorization.UUID(v.Projection.UID) && authorization.UUID(v.OperationID) && identity.Text(v.ResourceVersion, 128) && v.Projection.Name == bootstrapNames(v.Desired).projection && v.InstallationID == c.Plan.InstallationID && v.RequestID == c.Plan.RequestID && v.ClusterID == c.Plan.ClusterID && v.Prelude.Namespace == c.Plan.BootstrapNamespace && c.Plan.HistoryProbe != nil && *c.Plan.HistoryProbe == v.Prelude.Account && c.Plan.ProbeName == v.Prelude.ContinuityMarker.Name && c.Plan.ProbeAudience == v.Desired.ProbeAudience && equalJSON(c.Kubernetes, v.Desired.Kubernetes) && equalJSON(c.Plan.Administrators, v.Desired.Administrators) && v.PlanDigest == preparationPlanDigest(c.Plan) && v.ProjectionDigest == bootstrapPublicDigest(c)
+}
+
+func (s *InitialBootstrapObserver) currentPublic(ctx context.Context) error {
+	b := s.bootstrap
+	v := s.projection
+	if err := b.administrator(ctx); err != nil {
+		return err
+	}
+	if err := b.checkPrelude(ctx, v.Prelude); err != nil {
+		return err
+	}
+	observer, err := NewPermissionClient(b.config, v.ClusterID, cfg.NamespaceRef{Name: v.Prelude.Namespace.Name, UID: v.Prelude.Namespace.UID}, time.Now)
+	if err != nil {
+		return err
+	}
+	policy, binding, err := InitialBootstrapAdmission(v.Desired)
+	if err != nil {
+		return err
+	}
+	normalizePermissionPolicy(&policy.Spec)
+	pin := GuardPin{PolicyUID: v.Prelude.Guard.PolicyUID, PolicyGeneration: v.Prelude.Guard.PolicyGeneration, BindingUID: v.Prelude.Guard.BindingUID, BindingResourceVersion: v.Prelude.Guard.BindingResourceVersion}
+	if _, err = checkAdmissionGuard(ctx, observer, v.Prelude.Guard.Name, pin, policy.Spec, binding.Spec); err != nil {
+		return err
+	}
+	raw, err := b.get(ctx, "/api/v1/namespaces/"+v.Prelude.Namespace.Name+"/configmaps/"+v.Projection.Name)
+	var actual core.ConfigMap
+	if err != nil || strictGuardJSON(raw, &actual) != nil || string(actual.UID) != v.Projection.UID || actual.ResourceVersion != v.ResourceVersion {
+		return cfg.ErrChanged
+	}
+	body, err := json.Marshal(s.configuration)
+	if err != nil {
+		return cfg.ErrInvalid
+	}
+	m := bootstrapMeta(v.Desired, v.Projection.Name)
+	m.Annotations["asservat.io/bootstrap-operation-id"] = v.OperationID
+	want := &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: m, Immutable: ptr.To(true), Data: map[string]string{"deployment.json": string(body)}}
+	if !bootstrapObjectMatches(want, &actual) || ctx.Err() != nil {
+		return cfg.ErrChanged
+	}
+	return nil
+}
+
+func (s *InitialBootstrapObserver) ReadToken(ctx context.Context) ([]byte, error) {
+	if s == nil || ctx == nil {
+		return nil, cfg.ErrInvalid
+	}
+	s.mu.Lock()
+	if s.closed || ctx.Err() != nil || s.bootstrap.root.Err() != nil {
+		s.mu.Unlock()
+		return nil, cfg.ErrUnavailable
+	}
+	if s.now().Add(30*time.Second).Before(s.expires) && s.token != "" {
+		token := []byte(s.token)
+		s.mu.Unlock()
+		return token, nil
+	}
+	if s.active || s.issues >= 4 {
+		s.mu.Unlock()
+		return nil, cfg.ErrUnavailable
+	}
+	s.active = true
+	s.issues++
+	s.joined.Add(1)
+	s.mu.Unlock()
+	defer func() { s.mu.Lock(); s.active = false; s.mu.Unlock(); s.joined.Done() }()
+	bounded, end, err := s.bootstrap.enter(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer end()
+	if err = s.currentPublic(bounded); err != nil {
+		return nil, err
+	}
+	// After expiry, a newly authenticated observation probe must precede its
+	// independent denial check. The request is itself fixed by the current
+	// guard. Nothing consuming this credential runs until that proof succeeds.
+	s.bootstrap.probeToken = ""
+	s.bootstrap.probeUntil = time.Time{}
+	if err = s.bootstrap.qualify(bounded, s.projection.Prelude, s.projection.ClusterID); err != nil {
+		return nil, err
+	}
+	if err = s.currentPublic(bounded); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || bounded.Err() != nil || s.bootstrap.root.Err() != nil || !s.now().Before(s.bootstrap.probeUntil) {
+		return nil, cfg.ErrUnavailable
+	}
+	s.token, s.expires = s.bootstrap.probeToken, s.bootstrap.probeUntil
+	return []byte(s.token), nil
+}
+
+func (s *InitialBootstrapObserver) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.bootstrap.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+	s.bootstrap.Close()
+	s.mu.Lock()
+	s.token = ""
+	s.mu.Unlock()
+}
+
+// MatchesInitialPreparer is only an immutable public scope comparison. It is
+// not an observation, authentication result or effect permit.
+func (s *InitialBootstrapObserver) MatchesInitialPreparer(c contracts.InitialPreparer) bool {
+	return s != nil && bootstrapObservationMatches(s.projection, c)
+}

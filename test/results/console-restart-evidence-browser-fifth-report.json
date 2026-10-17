@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "checks": [
+    "actual native anchor failure with 2 counted old-path browser request(s); Ready remains without an operation error and explicit full restart is available",
+    "lost actual Stop reply retains the old key and starts no new preparation or content request",
+    "positive exact minimal Stop receipt precedes the one fresh key; lost new-prepare reply creates no extra session or implicit GET",
+    "same new-prepare key reconciles lost reply; only a second explicit anchor click starts the new whole-file browser download; no web storage"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "authority": "Synthetic session/C14/file bytes; actual packaged React, canonical Go browser transport, TLS, failed attachment and explicit restart. No SQL, encrypted audit, regional worker, IdP or installed authority qualification."
+}

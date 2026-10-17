@@ -1,0 +1,30 @@
+{
+  "scope": "ADR134 precise audited admission bound and funded fixture lifecycle",
+  "files": [
+    {
+      "path": "docs/architecture/capture-intent-lifecycle.md",
+      "base_sha256": "5cf158f31d67a9bbcbfa63d14b6cf20a9f9217371d29271c6c9dafc7fbe3ca16",
+      "sha256": "2b539c3718c1944b21c394f295301f316fedd23967b97b9e85027b18c01b01b9"
+    },
+    {
+      "path": "internal/application/audit/capture_operation.go",
+      "base_sha256": "7f19fc20db2758d9a0ade3d3f99e6827f0352e437feeffa746f713400e45db6d",
+      "sha256": "840c68fcd6dc291ea241a72dd1fc70772f2bd29706a4772daefdc93e58e657a8"
+    },
+    {
+      "path": "internal/application/audit/capture_operation_admission_test.go",
+      "base_sha256": null,
+      "sha256": "4285eec46461ec89b0b53c2791621837b7c12a68aa5efcaad0f66d9a7c40e039"
+    },
+    {
+      "path": "test/integration/context_continuation_backing_test.go",
+      "base_sha256": null,
+      "sha256": "66a20e1bbc3e473dd020138a11e5389625495261fa20606e38d107283218908d"
+    },
+    {
+      "path": "test/integration/context_continuation_native_test.go",
+      "base_sha256": "8e36ef5f0ffa61e02abb6b73ab8828bc34703679dd389aa9e8afc4150623cf25",
+      "sha256": "b5ddd1f53a4d528e11a03345b730e87b74b90331ae420bb36bdb5b9bfb6823ea"
+    }
+  ]
+}

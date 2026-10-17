@@ -1,0 +1,425 @@
+=== RUN   TestConnectorAuditUsesOriginalAdmittedPolicyWithoutRevisionCache
+--- PASS: TestConnectorAuditUsesOriginalAdmittedPolicyWithoutRevisionCache (0.00s)
+=== RUN   TestConnectorBackingAcceptanceRequiresBothAcknowledgements
+=== RUN   TestConnectorBackingAcceptanceRequiresBothAcknowledgements/intent
+=== RUN   TestConnectorBackingAcceptanceRequiresBothAcknowledgements/outcome
+--- PASS: TestConnectorBackingAcceptanceRequiresBothAcknowledgements (0.00s)
+    --- PASS: TestConnectorBackingAcceptanceRequiresBothAcknowledgements/intent (0.00s)
+    --- PASS: TestConnectorBackingAcceptanceRequiresBothAcknowledgements/outcome (0.00s)
+=== RUN   TestConnectorBackingAcceptanceRejectsCompleteSourceChangeWithSameBehavior
+--- PASS: TestConnectorBackingAcceptanceRejectsCompleteSourceChangeWithSameBehavior (0.00s)
+=== RUN   TestConnectorBackingAcceptanceKeepsShortenedSourceDeadlineThroughOutcome
+--- PASS: TestConnectorBackingAcceptanceKeepsShortenedSourceDeadlineThroughOutcome (0.00s)
+=== RUN   TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion
+=== RUN   TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion/original_deadline
+=== RUN   TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion/caller_cancellation
+--- PASS: TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion (0.00s)
+    --- PASS: TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion/original_deadline (0.00s)
+    --- PASS: TestConnectorBackingAcceptanceRechecksAfterBlockingPromotion/caller_cancellation (0.00s)
+=== RUN   TestConnectorBackingAcceptanceReplaysOriginalWithoutRepeatingAudit
+--- PASS: TestConnectorBackingAcceptanceReplaysOriginalWithoutRepeatingAudit (0.00s)
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/same_revision
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/skipped_revision
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/zero_revision
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/same_deadline
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/shorter_deadline
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/missing_deadline
+=== RUN   TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/non_SQL_precision_deadline
+--- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/same_revision (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/skipped_revision (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/zero_revision (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/same_deadline (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/shorter_deadline (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/missing_deadline (0.00s)
+    --- PASS: TestConnectorBackingRenewalAllowsOnlyNextPolicyInterval/non_SQL_precision_deadline (0.00s)
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/account_version
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/account_limit
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/records_per_account
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/retention_interval
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/profile_limit
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_transitions
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_backup_increase
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_WAL_increase
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/installation
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/root
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/store
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_profile
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_profile_digest
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/metadata_slots
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/pool_backup_increase
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/pool_WAL_increase
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_horizon
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/cleanup_budget
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/proof_window
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/purge_allowance
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualification_identity
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualification_digest
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualified_row_size
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualified_WAL_size
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_copies
+=== RUN   TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/WAL_copies
+--- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/account_version (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/account_limit (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/records_per_account (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/retention_interval (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/profile_limit (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_transitions (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_backup_increase (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/source_WAL_increase (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/installation (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/root (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/store (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_profile (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_profile_digest (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/metadata_slots (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/pool_backup_increase (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/pool_WAL_increase (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_horizon (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/cleanup_budget (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/proof_window (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/purge_allowance (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualification_identity (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualification_digest (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualified_row_size (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/qualified_WAL_size (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/backup_copies (0.00s)
+    --- PASS: TestConnectorBackingRenewalDoesNotRefillOrChangeQualification/WAL_copies (0.00s)
+=== RUN   TestConnectorBackingRenewalPreservesOriginalValuesAndAliasedQualification
+--- PASS: TestConnectorBackingRenewalPreservesOriginalValuesAndAliasedQualification (0.00s)
+=== RUN   TestConnectorBackingSourceBudgetIncludesRoot
+--- PASS: TestConnectorBackingSourceBudgetIncludesRoot (0.00s)
+=== RUN   TestConnectorBackingDeploymentIncludesRetainedRenewalAllowance
+--- PASS: TestConnectorBackingDeploymentIncludesRetainedRenewalAllowance (0.00s)
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/different_measured_result
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/unqualified_public_layout
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/short_source_backing
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/short_aggregate_pool
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/late_protected_source
+=== RUN   TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/wrong_binding
+--- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/different_measured_result (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/unqualified_public_layout (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/short_source_backing (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/short_aggregate_pool (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/late_protected_source (0.00s)
+    --- PASS: TestConnectorIdentitySourceRequiresIndependentQualificationAndBacking/wrong_binding (0.00s)
+=== RUN   TestConnectorIdentitySourceStagesSuspensionAndCopiesPublicPins
+--- PASS: TestConnectorIdentitySourceStagesSuspensionAndCopiesPublicPins (0.00s)
+=== RUN   TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases
+=== RUN   TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/enroll
+=== RUN   TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/client
+=== RUN   TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/server
+--- PASS: TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/enroll (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/client (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsUseOneOriginalHandleAndAllPhases/server (0.00s)
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/client-key
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/server-key
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/purpose
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/id
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/phase
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/original-date
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/missing-final
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/source-role
+=== RUN   TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/late
+--- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/client-key (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/server-key (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/purpose (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/id (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/phase (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/original-date (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/missing-final (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/source-role (0.00s)
+    --- PASS: TestConnectorLifecycleEffectsRejectWrongCSRPhaseAndOriginal/late (0.00s)
+=== RUN   TestConnectorLifecycleEffectsNarrowBeforeFollowingRecoveryAndSQL
+--- PASS: TestConnectorLifecycleEffectsNarrowBeforeFollowingRecoveryAndSQL (0.00s)
+=== RUN   TestConnectorLifecycleEffectsUnknownSigningNeverRetriesOrRefunds
+--- PASS: TestConnectorLifecycleEffectsUnknownSigningNeverRetriesOrRefunds (0.00s)
+=== RUN   TestConnectorLifecycleEffectsStoredReplyUsesExplicitMonotonicSkip
+--- PASS: TestConnectorLifecycleEffectsStoredReplyUsesExplicitMonotonicSkip (0.00s)
+=== RUN   TestConnectorIssuanceAcceptsSequentialOriginalObservations
+=== RUN   TestConnectorIssuanceAcceptsSequentialOriginalObservations/client
+=== RUN   TestConnectorIssuanceAcceptsSequentialOriginalObservations/server
+--- PASS: TestConnectorIssuanceAcceptsSequentialOriginalObservations (0.01s)
+    --- PASS: TestConnectorIssuanceAcceptsSequentialOriginalObservations/client (0.00s)
+    --- PASS: TestConnectorIssuanceAcceptsSequentialOriginalObservations/server (0.00s)
+=== RUN   TestConnectorIssuanceStopsWhenSequentialProofCrossesOriginalEnd
+--- PASS: TestConnectorIssuanceStopsWhenSequentialProofCrossesOriginalEnd (0.00s)
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/intent_unavailable
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/outcome_unavailable
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/controller_changes_after_intent
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/blocking_proof_expires_original_operation
+=== RUN   TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/final_mutation
+--- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/intent_unavailable (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/outcome_unavailable (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/controller_changes_after_intent (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/blocking_proof_expires_original_operation (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgements/final_mutation (0.00s)
+=== RUN   TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome
+=== RUN   TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome/outcome_store
+=== RUN   TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome/acceptance
+--- PASS: TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome/outcome_store (0.00s)
+    --- PASS: TestConnectorProcessEnrollmentReconcilesOnlyExactStoredOutcome/acceptance (0.00s)
+=== RUN   TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS
+=== RUN   TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/client
+=== RUN   TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/server
+=== RUN   TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/uncertain_provider
+--- PASS: TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS (0.01s)
+    --- PASS: TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/client (0.00s)
+    --- PASS: TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/server (0.00s)
+    --- PASS: TestConnectorInitialCredentialsUsePodProofWithoutFabricatingTLS/uncertain_provider (0.00s)
+=== RUN   TestConnectorActivatedReplayAfterAuditWriteDeadline
+=== RUN   TestConnectorActivatedReplayAfterAuditWriteDeadline/process
+=== RUN   TestConnectorActivatedReplayAfterAuditWriteDeadline/client
+=== RUN   TestConnectorActivatedReplayAfterAuditWriteDeadline/server
+--- PASS: TestConnectorActivatedReplayAfterAuditWriteDeadline (0.01s)
+    --- PASS: TestConnectorActivatedReplayAfterAuditWriteDeadline/process (0.00s)
+    --- PASS: TestConnectorActivatedReplayAfterAuditWriteDeadline/client (0.01s)
+    --- PASS: TestConnectorActivatedReplayAfterAuditWriteDeadline/server (0.00s)
+=== RUN   TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies
+=== RUN   TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies/provider_unknown
+=== RUN   TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies/stored_reply_lost
+--- PASS: TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies (0.00s)
+    --- PASS: TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies/provider_unknown (0.00s)
+    --- PASS: TestConnectorRenewalPreservesOneUseSigningAcrossLostReplies/stored_reply_lost (0.00s)
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/intent_unavailable
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/source_changed_after_audit
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/source_blocked_beyond_original_observation
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/revoked_peer
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/provider_blocked
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/outcome_unavailable
+=== RUN   TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/final_source_changed
+--- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/intent_unavailable (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/source_changed_after_audit (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/source_blocked_beyond_original_observation (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/revoked_peer (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/provider_blocked (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/outcome_unavailable (0.00s)
+    --- PASS: TestConnectorRenewalRequiresAuditAndCurrentOriginalAuthority/final_source_changed (0.00s)
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/duplicate_peer
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/duplicate_ticket
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_acceptance
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_actor
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_backing
+=== RUN   TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_resource
+--- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/duplicate_peer (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/duplicate_ticket (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_acceptance (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_actor (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_backing (0.00s)
+    --- PASS: TestConnectorRetirementCanonicalSetRejectsSubstitutionAndDuplicates/different_resource (0.00s)
+=== RUN   TestConnectorRetirementTicketCanonicalBytesAreStableAndStrict
+--- PASS: TestConnectorRetirementTicketCanonicalBytesAreStableAndStrict (0.00s)
+=== RUN   TestConnectorRetirementIntentUsesHistoricalOriginAndOriginalDates
+--- PASS: TestConnectorRetirementIntentUsesHistoricalOriginAndOriginalDates (0.00s)
+=== RUN   TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort
+=== RUN   TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/missing
+=== RUN   TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/same_generation
+=== RUN   TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/other_UID
+=== RUN   TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/empty_digest
+--- PASS: TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort (0.00s)
+    --- PASS: TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/missing (0.00s)
+    --- PASS: TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/same_generation (0.00s)
+    --- PASS: TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/other_UID (0.00s)
+    --- PASS: TestConnectorRetirementExplicitSourceCannotReplaceOriginalCohort/empty_digest (0.00s)
+=== RUN   TestConnectorAcceptanceRequiresExactReservationBeforeV2Binding
+--- PASS: TestConnectorAcceptanceRequiresExactReservationBeforeV2Binding (0.00s)
+=== RUN   TestConnectorRetirementIntentMaximumAcceptedTextFitsExistingAuditEnvelope
+    connector_retirement_intent_test.go:219: extremal Go JSON retirement intent: 8114 bytes; actual SQL rendering remains a native fixture check
+--- PASS: TestConnectorRetirementIntentMaximumAcceptedTextFitsExistingAuditEnvelope (0.00s)
+=== RUN   TestConnectorRetirementExpiryUsesOriginalTicketWithoutLiveActor
+--- PASS: TestConnectorRetirementExpiryUsesOriginalTicketWithoutLiveActor (0.01s)
+=== RUN   TestConnectorRetirementUnknownCommitsKeepOriginalTicket
+=== RUN   TestConnectorRetirementUnknownCommitsKeepOriginalTicket/restriction
+=== RUN   TestConnectorRetirementUnknownCommitsKeepOriginalTicket/admission
+=== RUN   TestConnectorRetirementUnknownCommitsKeepOriginalTicket/business_outcome
+--- PASS: TestConnectorRetirementUnknownCommitsKeepOriginalTicket (0.01s)
+    --- PASS: TestConnectorRetirementUnknownCommitsKeepOriginalTicket/restriction (0.00s)
+    --- PASS: TestConnectorRetirementUnknownCommitsKeepOriginalTicket/admission (0.01s)
+    --- PASS: TestConnectorRetirementUnknownCommitsKeepOriginalTicket/business_outcome (0.00s)
+=== RUN   TestConnectorRetirementAuditFailureKeepsRestrictionExplicit
+--- PASS: TestConnectorRetirementAuditFailureKeepsRestrictionExplicit (0.00s)
+=== RUN   TestConnectorRetirementLateRestrictionStartsNoAudit
+--- PASS: TestConnectorRetirementLateRestrictionStartsNoAudit (0.00s)
+=== RUN   TestConnectorRetirementPreparationCannotOutliveShortenedRecovery
+--- PASS: TestConnectorRetirementPreparationCannotOutliveShortenedRecovery (0.00s)
+=== RUN   TestConnectorRetirementKnownRecoveryLossBlocksFinalAcknowledgement
+--- PASS: TestConnectorRetirementKnownRecoveryLossBlocksFinalAcknowledgement (0.00s)
+=== RUN   TestConnectorRetirementStoresExactBusinessOutcomeBeforeAudit
+--- PASS: TestConnectorRetirementStoresExactBusinessOutcomeBeforeAudit (0.00s)
+=== RUN   TestConnectorRetirementStoredOutcomeCannotExtendShortenedProof
+--- PASS: TestConnectorRetirementStoredOutcomeCannotExtendShortenedProof (0.00s)
+=== RUN   TestConnectorRetirementUnknownStoredOutcomeCannotRenewWriter
+--- PASS: TestConnectorRetirementUnknownStoredOutcomeCannotRenewWriter (0.00s)
+=== RUN   TestConnectorRetirementRetryAfterStoredOutcomeKeepsOriginalRecord
+--- PASS: TestConnectorRetirementRetryAfterStoredOutcomeKeepsOriginalRecord (0.01s)
+=== RUN   TestConnectorRetirementTicketPreservesMinimumOriginalDates
+--- PASS: TestConnectorRetirementTicketPreservesMinimumOriginalDates (0.00s)
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/admission_ends_too_late
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/earlier_acceptance_purge
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/longer_retention
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/changed_process
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/wrong_account
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/identical_operation
+=== RUN   TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/short_lifetime
+--- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/admission_ends_too_late (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/earlier_acceptance_purge (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/longer_retention (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/changed_process (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/wrong_account (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/identical_operation (0.00s)
+    --- PASS: TestConnectorRetirementTicketRejectsImpossibleUpfrontPromises/short_lifetime (0.00s)
+=== RUN   TestConnectorRetirementTicketCannotMatchRenewedCohort
+--- PASS: TestConnectorRetirementTicketCannotMatchRenewedCohort (0.00s)
+=== RUN   TestConnectorRetirementTicketCapacityIsAdditional
+--- PASS: TestConnectorRetirementTicketCapacityIsAdditional (0.00s)
+=== RUN   TestConnectorRetirementTicketRowsKeepSeparateOriginalBacking
+--- PASS: TestConnectorRetirementTicketRowsKeepSeparateOriginalBacking (0.00s)
+=== RUN   TestConnectorRetirementSuccessorPreservesLatePeersHistoricalCohort
+--- PASS: TestConnectorRetirementSuccessorPreservesLatePeersHistoricalCohort (0.00s)
+=== RUN   TestConnectorRetirementUnusedTicketCleanupHasIndependentWALBacking
+--- PASS: TestConnectorRetirementUnusedTicketCleanupHasIndependentWALBacking (0.00s)
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/current
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/denied
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/wrong-leaf
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/late
+=== RUN   TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/cancelled
+--- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew (0.00s)
+    --- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/current (0.00s)
+    --- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/denied (0.00s)
+    --- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/wrong-leaf (0.00s)
+    --- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/late (0.00s)
+    --- PASS: TestConnectorExactLeafRegistryDoesNotFallBackOrRenew/cancelled (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.135s
+=== RUN   TestConnectorRenewalRetainsOriginalBootstrapAnchor
+--- PASS: TestConnectorRenewalRetainsOriginalBootstrapAnchor (0.00s)
+=== RUN   TestConnectorAutomaticProcessKeepsOriginalRetirementBound
+--- PASS: TestConnectorAutomaticProcessKeepsOriginalRetirementBound (0.00s)
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/workload-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/caller-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-image
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-template
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-guard
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-roles
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/suspended
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/replacement-source
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/no-channel
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/first-ordinal
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/ordinal-ceiling
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-mutation
+--- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/workload-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/caller-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-image (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-template (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-guard (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-roles (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/suspended (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/replacement-source (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/no-channel (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/first-ordinal (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/ordinal-ceiling (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-mutation (0.00s)
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roles
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/serving-budget
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/suspended
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roots
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/deployment
+--- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roles (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/serving-budget (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/suspended (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roots (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/deployment (0.00s)
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_after_end/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_interval_too_long/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/missing_recovery_start/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_actor/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/recovery_after_end/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_source/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/request_interval_too_long/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/wrong_issuer/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/detached_actor/TLS
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/recovery_after_end/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_interval_too_long/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/request_interval_too_long/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/wrong_issuer/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/detached_actor/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_source/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/missing_recovery_start/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_actor/Pod
+=== RUN   TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_after_end/Pod
+--- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_after_end/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_interval_too_long/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/missing_recovery_start/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_actor/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/recovery_after_end/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_source/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/request_interval_too_long/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/wrong_issuer/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/detached_actor/TLS (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/recovery_after_end/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_interval_too_long/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/request_interval_too_long/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/wrong_issuer/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/detached_actor/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_source/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/missing_recovery_start/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/shortened_actor/Pod (0.00s)
+    --- PASS: TestConnectorHistoricalPermitRequiresOriginalIntervalIntersection/source_after_end/Pod (0.00s)
+=== RUN   TestConnectorProcessProofSeparatesLogicalIdentityAndBoundedChildren
+--- PASS: TestConnectorProcessProofSeparatesLogicalIdentityAndBoundedChildren (0.00s)
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/suspended-only
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/retiring-without-suspension
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/wrong-actor
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-pod
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-epoch
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/same-key
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-token-proof
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-workload-proof
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-native-guard
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-complete-source
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-backing-revision
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/longer-than-source
+=== RUN   TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/extended-interval
+--- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/suspended-only (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/retiring-without-suspension (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/wrong-actor (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-pod (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-epoch (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/same-key (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-token-proof (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-workload-proof (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-native-guard (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-complete-source (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/no-backing-revision (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/longer-than-source (0.00s)
+    --- PASS: TestConnectorRetirementProofCannotSupplyOrdinaryAuthority/extended-interval (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.011s

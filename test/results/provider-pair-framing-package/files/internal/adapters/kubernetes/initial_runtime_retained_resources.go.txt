@@ -1,0 +1,90 @@
+package kubernetes
+
+import (
+	"context"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+)
+
+// Fixed bootstrap/resource observations for one caller-owned native bracket.
+// This value does not include runtime source, SQL, provider or effect authority.
+// Callers must already own/join both the bridge and resource lifetimes, preserve
+// their original deadline and perform those independent current checks.
+type initialRuntimeRetainedResources struct {
+	bridge    contracts.InitialRuntimeBridgeSnapshot
+	resources contracts.InitialRuntimeResourceSnapshot
+	object    *core.Secret
+	until     time.Time
+}
+
+// readRetainedOriginalResources replaces no general current reader. It performs
+// one complete original handover proof with the fixed phase-two native guard,
+// then reads the exact two journals and brackets the resource read with actual
+// phase-policy reads. The existing bootstrap checks and denied probes are kept
+// unchanged; runtime source checks are the purpose-specific caller's duty.
+func (s *InitialRuntimeBridge) readRetainedOriginalResources(ctx context.Context, resources *InitialRuntimeResources) (initialRuntimeRetainedResources, error) {
+	var zero initialRuntimeRetainedResources
+	if s == nil || resources == nil || ctx == nil || ctx.Err() != nil ||
+		resources.preparer != s.preparer || resources.rootUID != s.rootUID || !equalJSON(resources.initial, s.initial) {
+		return zero, cfg.ErrInvalid
+	}
+	original, ok := ctx.Deadline()
+	if !ok {
+		return zero, cfg.ErrInvalid
+	}
+	// Select only the constructor's fixed retained candidate, never a phase
+	// from journal bytes. This performs the actual administrator check before
+	// any journal read in this bracket.
+	_, root, initial, until, err := s.preparer.currentHandoverWithFinal(ctx, s.guards[2])
+	if err != nil {
+		return zero, err
+	}
+	until = identity.Earlier(original, until)
+	if root.RootUID != s.rootUID || !equalJSON(initial, s.initial) {
+		return zero, cfg.ErrChanged
+	}
+	if err = initialHandoverDeadline(ctx, s.source.client.now, until); err != nil {
+		return zero, err
+	}
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	bridge, _, err := s.read(call)
+	if err != nil {
+		return zero, err
+	}
+	if bridge.State.Probe == nil || bridge.State.Probe.Receipt == nil || bridge.State.Retained == nil || bridge.State.Retained.Receipt == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	before, phase, err := s.phasePolicy(call, bridge.State)
+	if err != nil {
+		return zero, err
+	}
+	if phase != 2 {
+		return zero, cfg.ErrChanged
+	}
+	current, object, err := resources.read(call)
+	if err != nil {
+		return zero, err
+	}
+	inventory, err := resources.inventory(current.State)
+	if err != nil || !equalJSON(inventory.BridgeAdministration, s.administration) {
+		return zero, cfg.ErrChanged
+	}
+	after, lastPhase, err := s.phasePolicy(call, bridge.State)
+	if err != nil {
+		return zero, err
+	}
+	if lastPhase != phase || before.Generation != after.Generation || !equalJSON(before.Spec, after.Spec) {
+		return zero, cfg.ErrChanged
+	}
+	until = identity.Earlier(until, identity.Earlier(bridge.ValidUntil, current.ValidUntil))
+	if err = initialHandoverDeadline(call, s.source.client.now, until); err != nil {
+		return zero, err
+	}
+	bridge.ValidUntil, current.ValidUntil = until, until
+	return initialRuntimeRetainedResources{bridge: bridge, resources: current, object: object, until: until}, nil
+}

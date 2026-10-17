@@ -1,0 +1,31 @@
+{
+  "manifest": "aecfde0acb4ecef312d3abdad903e225f97dfc7905284a16a7a5a08f67f730d3",
+  "dependencies": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+  "runner": "300d3dce3285b355b70c1d2016c80f9331b35e8edb93c0572779b4b513fb5eda",
+  "started": 1791882724.6279423,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": [],
+    "variants": []
+  },
+  "phases": [],
+  "native": false,
+  "prior_freeze_failure": "../selection-1/freeze-infrastructure-failure.json",
+  "tmpdir": "/tmp/asservat-owner-bootstrap-selection-2-r2_z8g4r",
+  "tmpdir_free_before": 6259056640,
+  "runner_error": "OSError(28, 'No space left on device')",
+  "exit": 2,
+  "ended": 1791882725.2297301,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior_evidence": [],
+    "variants": []
+  },
+  "tmpdir_removed": true
+}

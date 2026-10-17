@@ -1,0 +1,61 @@
+package contracts
+
+import (
+	"io"
+	"time"
+)
+
+const InitialRuntimeResourcesFormat = "asservat-initial-runtime-resources/v1"
+const InitialRuntimeResourcesMaxBytes = 32 << 10
+const InitialRuntimeResourceCount = 19
+
+// The private installation journal carries only public template provenance.
+// It has no arbitrary object payload or credential fields. Item names and order
+// are compiled by the producer; the state itself confers no effect authority.
+type InitialRuntimeResourceState struct {
+	// Omission preserves original v1 bytes. A fresh v2 selection is bound before claims.
+	ObservationFormat  string                          `json:"observationFormat,omitempty"`
+	Format             string                          `json:"format"`
+	BindingDigest      string                          `json:"bindingDigest"`
+	SetupID            string                          `json:"setupID"`
+	CreatedAt          time.Time                       `json:"createdAt"`
+	Until              time.Time                       `json:"until"`
+	OwnerProvider      *OwnerProviderSelection         `json:"ownerProvider,omitempty"`
+	WorkerProvider     *ConfigurationProviderSelection `json:"workerProvider,omitempty"`
+	WorkerInputs       *ConfigurationWorkerInputClaim  `json:"workerInputs,omitempty"`
+	OwnerLayout        string                          `json:"ownerLayout,omitempty"`
+	OwnerBootstrap     *OwnerBootstrapSelectionClaim   `json:"ownerBootstrap,omitempty"`
+	OwnerIdentity      *OwnerIdentityProjectionClaim   `json:"ownerIdentity,omitempty"`
+	OwnerLaunch        *OwnerIdentityLaunchClaim       `json:"ownerLaunch,omitempty"`
+	WorkerLayout       string                          `json:"workerLayout,omitempty"`
+	CleanupProjection  *CaptureCleanupProjectionClaim  `json:"cleanupProjection,omitempty"`
+	CapacityProjection *CapacityRuntimeProjectionClaim `json:"capacityProjection,omitempty"`
+	// PermissionProjection is the ADR-189 permission runtime claim.
+	PermissionProjection *PermissionRuntimeProjectionClaim `json:"permissionProjection,omitempty"`
+	Objects              []InitialRuntimeResourceClaim     `json:"objects"`
+}
+
+type InitialRuntimeResourceClaim struct {
+	Item           string                         `json:"item"`
+	OperationID    string                         `json:"operationID"`
+	TemplateDigest string                         `json:"templateDigest"`
+	ClaimedAt      time.Time                      `json:"claimedAt"`
+	Until          time.Time                      `json:"until"`
+	Receipt        *InitialRuntimeResourceReceipt `json:"receipt,omitempty"`
+}
+
+type InitialRuntimeResourceReceipt struct {
+	UID             string `json:"uid"`
+	ResourceVersion string `json:"resourceVersion"`
+	Generation      int64  `json:"generation"`
+}
+
+type InitialRuntimeResourceSnapshot struct {
+	State                InitialRuntimeResourceState
+	UID, ResourceVersion string
+	ValidUntil           time.Time
+}
+
+func DecodeInitialRuntimeResourceState(r io.Reader) (InitialRuntimeResourceState, error) {
+	return decodeClosedRPC[InitialRuntimeResourceState](r, InitialRuntimeResourcesMaxBytes)
+}

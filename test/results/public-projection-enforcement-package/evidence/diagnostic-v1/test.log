@@ -1,0 +1,94 @@
+=== RUN   TestPublicRuntimeProjectionTimingDiagnostic
+    public_runtime_projection_timing_test.go:102: projection diagnostic original_remaining_ms=3551 duration_ms=3560 original_expired=true changed=true unavailable=false claim=true receipt=false physical_projection=true creates=1 root_valid=true
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=49 io_us=366 original_remaining_ms=3501 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=99 io_us=661 original_remaining_ms=3451 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=150 io_us=332 original_remaining_ms=3401 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=150 io_us=345 original_remaining_ms=3400 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=access-review elapsed_ms=151 io_us=262 original_remaining_ms=3399 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=200 io_us=397 original_remaining_ms=3351 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=denial-probe elapsed_ms=200 io_us=376 original_remaining_ms=3350 status=403 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=250 io_us=665 original_remaining_ms=3301 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=300 io_us=325 original_remaining_ms=3250 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=350 io_us=363 original_remaining_ms=3201 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=400 io_us=337 original_remaining_ms=3151 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=449 io_us=373 original_remaining_ms=3101 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=500 io_us=607 original_remaining_ms=3051 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=549 io_us=754 original_remaining_ms=3001 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=600 io_us=669 original_remaining_ms=2951 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=account elapsed_ms=650 io_us=314 original_remaining_ms=2901 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=lease elapsed_ms=700 io_us=317 original_remaining_ms=2851 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=role-journal-GET elapsed_ms=750 io_us=1102 original_remaining_ms=2800 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=799 io_us=365 original_remaining_ms=2751 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=850 io_us=667 original_remaining_ms=2701 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=900 io_us=317 original_remaining_ms=2650 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=900 io_us=338 original_remaining_ms=2650 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=access-review elapsed_ms=901 io_us=255 original_remaining_ms=2649 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=950 io_us=413 original_remaining_ms=2600 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=denial-probe elapsed_ms=951 io_us=331 original_remaining_ms=2600 status=403 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=1000 io_us=600 original_remaining_ms=2551 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=1050 io_us=320 original_remaining_ms=2500 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=1100 io_us=356 original_remaining_ms=2451 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=1150 io_us=344 original_remaining_ms=2401 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=1199 io_us=378 original_remaining_ms=2351 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=1250 io_us=710 original_remaining_ms=2300 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=1299 io_us=785 original_remaining_ms=2251 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=1350 io_us=628 original_remaining_ms=2200 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=account elapsed_ms=1399 io_us=305 original_remaining_ms=2151 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=lease elapsed_ms=1449 io_us=344 original_remaining_ms=2101 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=role-journal-PUT elapsed_ms=1503 io_us=4534 original_remaining_ms=2047 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=1550 io_us=350 original_remaining_ms=2001 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=1600 io_us=608 original_remaining_ms=1950 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=1649 io_us=296 original_remaining_ms=1901 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=1650 io_us=336 original_remaining_ms=1900 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=access-review elapsed_ms=1650 io_us=236 original_remaining_ms=1900 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=1699 io_us=384 original_remaining_ms=1851 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=denial-probe elapsed_ms=1700 io_us=335 original_remaining_ms=1851 status=403 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=1750 io_us=722 original_remaining_ms=1800 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=1799 io_us=321 original_remaining_ms=1751 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=1850 io_us=329 original_remaining_ms=1701 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=1900 io_us=295 original_remaining_ms=1651 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=1949 io_us=359 original_remaining_ms=1601 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=2000 io_us=552 original_remaining_ms=1551 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=2050 io_us=708 original_remaining_ms=1500 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=2099 io_us=606 original_remaining_ms=1451 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=account elapsed_ms=2150 io_us=358 original_remaining_ms=1401 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=lease elapsed_ms=2199 io_us=347 original_remaining_ms=1351 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=projection-create elapsed_ms=2252 io_us=3199 original_remaining_ms=1298 status=201 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=projection-lookup elapsed_ms=2300 io_us=1113 original_remaining_ms=1250 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=2350 io_us=338 original_remaining_ms=1201 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=2400 io_us=619 original_remaining_ms=1150 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=2449 io_us=354 original_remaining_ms=1101 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=2450 io_us=320 original_remaining_ms=1101 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=access-review elapsed_ms=2450 io_us=297 original_remaining_ms=1100 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=2499 io_us=364 original_remaining_ms=1051 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=denial-probe elapsed_ms=2500 io_us=306 original_remaining_ms=1051 status=403 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=2550 io_us=642 original_remaining_ms=1000 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=2599 io_us=362 original_remaining_ms=951 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=2650 io_us=340 original_remaining_ms=901 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=2699 io_us=530 original_remaining_ms=851 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=2750 io_us=372 original_remaining_ms=800 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=2800 io_us=642 original_remaining_ms=750 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=2850 io_us=831 original_remaining_ms=700 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=2900 io_us=659 original_remaining_ms=650 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=account elapsed_ms=2949 io_us=303 original_remaining_ms=601 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=lease elapsed_ms=2999 io_us=284 original_remaining_ms=551 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=role-journal-GET elapsed_ms=3050 io_us=1117 original_remaining_ms=500 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=3100 io_us=366 original_remaining_ms=450 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=3150 io_us=714 original_remaining_ms=400 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=3199 io_us=303 original_remaining_ms=351 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=3200 io_us=294 original_remaining_ms=350 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=access-review elapsed_ms=3201 io_us=280 original_remaining_ms=350 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=3249 io_us=388 original_remaining_ms=301 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=denial-probe elapsed_ms=3250 io_us=328 original_remaining_ms=300 status=403 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=policy elapsed_ms=3300 io_us=602 original_remaining_ms=250 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=binding elapsed_ms=3349 io_us=349 original_remaining_ms=201 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=namespace-or-other elapsed_ms=3399 io_us=354 original_remaining_ms=151 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=actor elapsed_ms=3450 io_us=349 original_remaining_ms=100 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=deployment elapsed_ms=3500 io_us=357 original_remaining_ms=51 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:105: projection request class=worker-journal elapsed_ms=3550 io_us=630 original_remaining_ms=0 status=200 failed=false cancelled=false
+    public_runtime_projection_timing_test.go:109: exact projection readback unavailable
+    public_runtime_roles_test.go:255: role-root diagnostic: writes=2 root=true api="v1" kind="Secret" namespace=true name=true type=true fields=1 decode=true valid=true
+--- FAIL: TestPublicRuntimeProjectionTimingDiagnostic (7.08s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	7.180s
+FAIL

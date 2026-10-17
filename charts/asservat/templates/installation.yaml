@@ -1,0 +1,23 @@
+{{- if .Values.runtime.enabled }}
+{{- fail "This chart installs configuration foundations only. Runnable Asservat services are not available in this version; runtime.enabled must be false." }}
+{{- end }}
+{{- if not (has .Values.mode (list "hub" "cluster" "combined")) }}
+{{- fail "mode must be hub, cluster or combined" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-install" .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/part-of: asservat
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | quote }}
+data:
+  format: asservat-installation-intent/v1
+  mode: {{ .Values.mode | quote }}
+  stage: configuration-foundation
+  runtimeAvailable: "false"
+  chartVersion: {{ .Chart.Version | quote }}

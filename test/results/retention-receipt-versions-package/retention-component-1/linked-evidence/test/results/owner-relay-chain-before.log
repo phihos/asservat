@@ -1,0 +1,6 @@
+--- FAIL: TestRelayRequestBoundaries (0.00s)
+    --- FAIL: TestRelayRequestBoundaries/valid (0.00s)
+        server_test.go:238: response <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/transport/ownerrelay	0.005s
+FAIL

@@ -1,0 +1,3 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-permissions.py
+Permission Kubernetes component exit: 1
+make: *** [Makefile:80: permission-integration] Error 1

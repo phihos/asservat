@@ -1,0 +1,38 @@
+package contracts
+
+import "io"
+
+const HubWorkerDeploymentFormat = "asservat-hub-worker-deployment/v1"
+const HubWorkerDeploymentRoot = "/run/asservat/hub-worker"
+
+// Private installation inputs for observation, not recovery acceptance. The
+// owner pool is still read from its independently protected Kubernetes source.
+type HubWorkerDeployment struct {
+	Format                 string                               `json:"format"`
+	InstallationID         string                               `json:"installationID"`
+	ClusterID              string                               `json:"clusterID"`
+	Namespace              WorkerObjectReference                `json:"namespace"`
+	FleetSource            WorkerObjectReference                `json:"fleetSource"`
+	OwnerSource            WorkerObjectReference                `json:"ownerSource"`
+	FleetGuard             OwnerDeploymentGuard                 `json:"fleetGuard"`
+	OwnerGuard             OwnerDeploymentGuard                 `json:"ownerGuard"`
+	LeaderLease            WorkerObjectReference                `json:"leaderLease"`
+	Kubernetes             OwnerProviderEndpoint                `json:"kubernetes"`
+	Postgres               OwnerPostgresEndpoint                `json:"postgres"`
+	AuditStore             OwnerAuditStore                      `json:"auditStore"`
+	KeyService             ConfigurationKeyService              `json:"keyService"`
+	Activation             *HubWorkerRuntimeActivation          `json:"activation,omitempty"`
+	ProviderAuthentication *ConfigurationProviderAuthentication `json:"providerAuthentication,omitempty"`
+	ProviderInputs         *ConfigurationWorkerInputProvenance  `json:"providerInputs,omitempty"`
+}
+
+type ConfigurationKeyService struct {
+	Endpoint   string   `json:"endpoint"`
+	Roots      [][]byte `json:"roots"`
+	AuditMount string   `json:"auditMount"`
+	AuditKey   string   `json:"auditKey"`
+}
+
+func DecodeHubWorkerDeployment(r io.Reader) (HubWorkerDeployment, error) {
+	return decodeClosedRPC[HubWorkerDeployment](r, OwnerDeploymentMaxBytes)
+}

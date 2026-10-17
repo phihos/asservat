@@ -1,0 +1,59 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: basic-context
+  namespace: payments
+spec:
+  description: Synthetic bounded context used by both v1 presets; no packet ring.
+  actions:
+  - id: context
+    kind: kubernetesSnapshot
+    parameters:
+      include:
+      - pod
+      - workload
+      - events
+      - endpoints
+      - rollout
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  - id: logs
+    kind: logs
+    parameters:
+      before: 30s
+      after: 10s
+      stream: both
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 10485760
+      timeout: 15s
+  - id: status
+    kind: fileRead
+    parameters:
+      namespace: targetProc
+      path: /proc/self/status
+      process: podMainProcesses
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 2s
+  - id: sockets
+    kind: networkSnapshot
+    parameters:
+      include:
+      - addresses
+      - routes
+      - sockets
+      - counters
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+  maxTotalBytes: 13631488
+  maxDuration: 30s

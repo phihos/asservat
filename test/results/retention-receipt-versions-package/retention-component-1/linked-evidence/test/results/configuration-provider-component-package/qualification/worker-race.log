@@ -1,0 +1,38 @@
+=== RUN   TestInstalledWorkerOriginalTemplateSeparatesPendingProjections
+--- PASS: TestInstalledWorkerOriginalTemplateSeparatesPendingProjections (0.03s)
+=== RUN   TestInstalledWorkerActivationRetainsOriginalJournalAndGuard
+--- PASS: TestInstalledWorkerActivationRetainsOriginalJournalAndGuard (0.03s)
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/legacy
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/unknown-layout
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/pending-object
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/refill
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/duplicate-operation
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-worker
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-guard
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-history
+--- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal (0.20s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/legacy (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/unknown-layout (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/pending-object (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/refill (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/duplicate-operation (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-worker (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-guard (0.02s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-history (0.03s)
+=== RUN   TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL
+--- PASS: TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL (0.01s)
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial/foreign-secret
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial/missing-uid
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial/another-plan-secret
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial/token-auth
+=== RUN   TestProviderWorkerRejectsForeignOrUnpinnedMaterial/missing-cluster
+--- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial (0.01s)
+    --- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial/foreign-secret (0.00s)
+    --- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial/missing-uid (0.00s)
+    --- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial/another-plan-secret (0.00s)
+    --- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial/token-auth (0.00s)
+    --- PASS: TestProviderWorkerRejectsForeignOrUnpinnedMaterial/missing-cluster (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.328s

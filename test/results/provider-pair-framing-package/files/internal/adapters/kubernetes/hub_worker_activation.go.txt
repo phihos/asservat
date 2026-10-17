@@ -1,0 +1,141 @@
+package kubernetes
+
+import (
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// HubWorkerActivationBound validates only the fixed original input shape. It
+// makes no current observation and cannot activate either optional projection.
+// A completed runtime may retain these historical dates; a still-pending
+// activation must separately finish before the original Until.
+func hubWorkerActivationShapeBound(in contracts.HubWorkerDeployment) bool {
+	a := in.Activation
+	if a == nil || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.Namespace.UID) || (a.WorkerLayout != contracts.HubWorkerInstalledLayout && a.WorkerLayout != contracts.HubWorkerProviderInstalledLayout) || !authorization.UUID(a.SetupID) || !preparationDigestValid(a.BindingDigest) || a.CreatedAt.Year() < 2020 || a.CreatedAt.After(time.Now()) || !a.CreatedAt.Equal(a.CreatedAt.Truncate(time.Microsecond)) || a.Until.Sub(a.CreatedAt) != 30*time.Minute {
+		return false
+	}
+	n := runtimeResourceNames(in.InstallationID)
+	seen := map[string]bool{}
+	for _, v := range []struct {
+		ref  contracts.WorkerObjectReference
+		name string
+	}{
+		{a.Resources, "asservat-runtime-resources-" + strings.ReplaceAll(in.InstallationID, "-", "")},
+		{a.Deployment, n.Worker}, {a.ServiceAccount, n.Worker}, {a.OwnerDeployment, n.Owner},
+	} {
+		if v.ref.Name != v.name || !authorization.UUID(v.ref.UID) || seen[v.ref.UID] {
+			return false
+		}
+		seen[v.ref.UID] = true
+	}
+	probeCount := 2
+	if a.CapacityProbe != nil {
+		probeCount = 3
+		if a.CapacityProbe.ServiceAccount != a.ServiceAccount || len(a.ConfigurationProbes) != 3 || a.ConfigurationProbes[2] != (contracts.OwnerConfigurationProbe{ConfigMap: installedProcessingSource(in.InstallationID), ServiceAccount: n.Worker}) {
+			return false
+		}
+	}
+	if in.OwnerSource.Name != n.OwnerSource || in.OwnerGuard.Name != n.OwnerSourceGuard || in.LeaderLease.Name != n.Lease || len(a.ConfigurationProbes) != probeCount || a.ConfigurationProbes[0] != (contracts.OwnerConfigurationProbe{ConfigMap: in.FleetSource.Name, ServiceAccount: n.Worker}) || a.ConfigurationProbes[1] != (contracts.OwnerConfigurationProbe{ConfigMap: n.OwnerSource, ServiceAccount: n.Worker}) || len(a.SchedulingLeases) != 1 || a.SchedulingLeases[0] != (contracts.OwnerSchedulingLease{Lease: n.Lease, ServiceAccount: n.Worker}) || a.InitialHistoryProbe == nil {
+		return false
+	}
+	g := a.WorkloadGuard
+	if g.Name != n.WorkloadGuard || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || !identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || g.PolicyGeneration >= 1<<53 {
+		return false
+	}
+	p := cfg.OwnerWorkloadAdministration{Name: g.Name, Deployment: a.OwnerDeployment.Name, DeploymentUID: a.OwnerDeployment.UID, ControlNamespace: cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}}
+	for _, actor := range g.Administrators {
+		p.Administrators = append(p.Administrators, cfg.KubernetesActor{Kind: actor.Kind, Name: actor.Name})
+	}
+	for _, probe := range a.ConfigurationProbes {
+		p.ConfigurationProbes = append(p.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: probe.ConfigMap, ServiceAccount: probe.ServiceAccount})
+	}
+	for _, lease := range a.SchedulingLeases {
+		p.SchedulingLeases = append(p.SchedulingLeases, cfg.OwnerSchedulingLease{Lease: lease.Lease, ServiceAccount: lease.ServiceAccount})
+	}
+	if a.CapacityProbe != nil {
+		p.CapacityProbe = &cfg.OwnerCapacityProbe{ServiceAccount: a.CapacityProbe.ServiceAccount.Name, ServiceAccountUID: a.CapacityProbe.ServiceAccount.UID}
+	}
+	h := a.InitialHistoryProbe
+	p.InitialHistoryProbe = &cfg.OwnerInitialHistoryProbe{Namespace: cfg.NamespaceRef{Name: h.Namespace.Name, UID: h.Namespace.UID}, ServiceAccount: h.ServiceAccount.Name, ServiceAccountUID: h.ServiceAccount.UID, Configuration: h.Configuration}
+	return p.Valid()
+}
+
+// BuildHubWorkerActivation copies only acknowledged original public provenance.
+// The runtime still reads the original journal and proves current enforcement;
+// this pure generator does not bless a supplied snapshot as current authority.
+func BuildHubWorkerActivation(installationID string, resources contracts.InitialRuntimeResourceSnapshot, inventory InitialRuntimeResourceInventory) (*contracts.HubWorkerRuntimeActivation, error) {
+	v := resources.State
+	if !authorization.UUID(installationID) || v.Format != contracts.InitialRuntimeResourcesFormat || (v.WorkerLayout != contracts.HubWorkerInstalledLayout && v.WorkerLayout != contracts.HubWorkerProviderInstalledLayout) || !authorization.UUID(resources.UID) || !authorization.UUID(v.SetupID) || !preparationDigestValid(v.BindingDigest) || len(v.Objects) != len(initialRuntimeResourceItems) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(time.Now()) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute {
+		return nil, cfg.ErrChanged
+	}
+	if v.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {
+		if v.OwnerLayout != contracts.OwnerProviderInstalledLayout || v.WorkerProvider == nil || providerconfig.ValidateConfigurationProviderSelection(installationID, *v.WorkerProvider) != nil {
+			return nil, cfg.ErrChanged
+		}
+	} else if v.WorkerProvider != nil || v.WorkerInputs != nil {
+		return nil, cfg.ErrChanged
+	}
+	ids := map[string]bool{v.SetupID: true}
+	uids := map[string]bool{resources.UID: true}
+	for i, c := range v.Objects {
+		if c.Item != initialRuntimeResourceItems[i] || !authorization.UUID(c.OperationID) || ids[c.OperationID] || !preparationDigestValid(c.TemplateDigest) || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(time.Now()) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.Equal(c.Until.Truncate(time.Microsecond)) || !c.ClaimedAt.Before(c.Until) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || c.Until.After(v.Until) || c.Receipt == nil || !authorization.UUID(c.Receipt.UID) || uids[c.Receipt.UID] || !identity.Text(c.Receipt.ResourceVersion, 128) || c.Receipt.Generation < 0 || c.Receipt.Generation >= 1<<53 {
+			return nil, cfg.ErrChanged
+		}
+		ids[c.OperationID], uids[c.Receipt.UID] = true, true
+	}
+	for _, e := range []struct {
+		index int
+		uid   string
+	}{
+		{0, inventory.OwnerAccount.UID}, {1, inventory.WorkerAccount.UID}, {10, inventory.OwnerDeployment.UID}, {11, inventory.WorkerDeployment.UID}, {12, inventory.OwnerService.UID}, {13, inventory.LeaderLease.UID}, {14, inventory.OwnerSource.UID},
+		{15, inventory.OwnerSourceGuard.PolicyUID}, {16, inventory.OwnerSourceGuard.BindingUID}, {17, inventory.WorkloadGuard.PolicyUID}, {18, inventory.WorkloadGuard.BindingUID},
+	} {
+		if v.Objects[e.index].Receipt.UID != e.uid {
+			return nil, cfg.ErrChanged
+		}
+	}
+	g := inventory.WorkloadGuard
+	if v.Objects[17].Receipt.Generation != g.PolicyGeneration || v.Objects[18].Receipt.ResourceVersion != g.BindingResourceVersion || !inventory.BridgeAdministration.Owner.Valid() {
+		return nil, cfg.ErrChanged
+	}
+	p := inventory.BridgeAdministration.Owner
+	if v.OwnerLayout == contracts.OwnerInstalledLayout || v.OwnerLayout == contracts.OwnerProviderInstalledLayout {
+		if p.CapacityProbe == nil || p.CapacityProbe.ServiceAccount != inventory.WorkerAccount.Name || p.CapacityProbe.ServiceAccountUID != inventory.WorkerAccount.UID {
+			return nil, cfg.ErrChanged
+		}
+	} else if v.OwnerLayout != "" || p.CapacityProbe != nil {
+		return nil, cfg.ErrChanged
+	}
+	if p.Name != g.Name || p.Deployment != inventory.OwnerDeployment.Name || p.DeploymentUID != inventory.OwnerDeployment.UID || p.ControlNamespace != (cfg.NamespaceRef{Name: inventory.Namespace.Name, UID: inventory.Namespace.UID}) || p.InitialHistoryProbe == nil || len(p.Administrators) != len(g.Administrators) {
+		return nil, cfg.ErrChanged
+	}
+	for i, actor := range p.Administrators {
+		if g.Administrators[i] != (contracts.OwnerDeploymentActor{Kind: actor.Kind, Name: actor.Name}) {
+			return nil, cfg.ErrChanged
+		}
+	}
+	a := &contracts.HubWorkerRuntimeActivation{SetupID: v.SetupID, BindingDigest: v.BindingDigest, WorkerLayout: v.WorkerLayout, CreatedAt: v.CreatedAt, Until: v.Until, Deployment: inventory.WorkerDeployment, ServiceAccount: inventory.WorkerAccount, OwnerDeployment: inventory.OwnerDeployment, WorkloadGuard: g}
+	a.WorkloadGuard.Administrators = append([]contracts.OwnerDeploymentActor(nil), g.Administrators...)
+	for _, probe := range p.ConfigurationProbes {
+		a.ConfigurationProbes = append(a.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: probe.ConfigMap, ServiceAccount: probe.ServiceAccount})
+	}
+	for _, lease := range p.SchedulingLeases {
+		a.SchedulingLeases = append(a.SchedulingLeases, contracts.OwnerSchedulingLease{Lease: lease.Lease, ServiceAccount: lease.ServiceAccount})
+	}
+	if p.CapacityProbe != nil {
+		a.CapacityProbe = &contracts.OwnerDeploymentCapacityProbe{ServiceAccount: contracts.WorkerObjectReference{Name: p.CapacityProbe.ServiceAccount, UID: p.CapacityProbe.ServiceAccountUID}}
+	}
+	h := p.InitialHistoryProbe
+	a.InitialHistoryProbe = &contracts.OwnerInitialHistoryProbe{Namespace: contracts.WorkerObjectReference{Name: h.Namespace.Name, UID: h.Namespace.UID}, ServiceAccount: contracts.WorkerObjectReference{Name: h.ServiceAccount, UID: h.ServiceAccountUID}, Configuration: h.Configuration}
+	a.Resources = contracts.WorkerObjectReference{Name: "asservat-runtime-resources-" + strings.ReplaceAll(installationID, "-", ""), UID: resources.UID}
+	if !hubWorkerActivationShapeBound(contracts.HubWorkerDeployment{InstallationID: installationID, Namespace: inventory.Namespace, FleetSource: inventory.FleetSource, OwnerSource: inventory.OwnerSource, OwnerGuard: inventory.OwnerSourceGuard, LeaderLease: inventory.LeaderLease, Activation: a}) {
+		return nil, cfg.ErrChanged
+	}
+	return a, nil
+}

@@ -1,0 +1,11 @@
+--- a/internal/adapters/kubernetes/owner_identity_reader_test.go
++++ b/internal/adapters/kubernetes/owner_identity_reader_test.go
+@@ -148,7 +148,7 @@
+ 					"guard-missing": ownerReadInitialGuard, "guard-lost": ownerReadFinalGuard, "allowing-probe": ownerReadInitialGuard,
+ 					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview, "token-revoked": ownerReadFinalTokenReview,
+ 					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
+-					"late-guard": ownerReadFinalPod, "cancelled": ownerReadInput,
++					"late-guard": ownerReadFinalDeployment, "cancelled": ownerReadInput,
+ 				}[mode]
+ 				var failure *OwnerIdentityReadFailure
+ 				if !errors.As(e, &failure) || failure.Check() != expected {

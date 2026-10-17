@@ -1,0 +1,20 @@
+{
+  "handle": 68992,
+  "exit": 0,
+  "before_handle": 33082,
+  "before_exit": 1,
+  "first_diagnostic_handle": 49582,
+  "first_diagnostic_exit": 1,
+  "payload_paths": 7,
+  "verified_dependencies": 356,
+  "changed_dependencies": [],
+  "changed_bases": [],
+  "changed_payload_since_final_checks": [],
+  "full_race_pass_entries": 51,
+  "pagination_entry": [
+    "=== RUN   TestPagedRangeBeyondTwoGiB",
+    "    framed_test.go:336: native=2147483721 data=244550 index=71288 tailDataRead=70 tailIndexRead=381",
+    "--- PASS: TestPagedRangeBeyondTwoGiB (3.95s)"
+  ],
+  "native_fixture_run": false
+}

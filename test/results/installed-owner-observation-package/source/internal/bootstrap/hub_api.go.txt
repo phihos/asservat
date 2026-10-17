@@ -1,0 +1,63 @@
+package bootstrap
+
+import (
+	"context"
+	"net"
+	"os"
+	"strconv"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// RunHubAPI currently starts the private owner subsystem only. Public browser,
+// MCP, federation ingress and evidence flows are not enabled by this entry point.
+// The installer owns the fixed protected projection; no flag or user request
+// can replace a provider endpoint, credential path or startup trust source.
+func RunHubAPI(ctx context.Context, podUID string) error {
+	files, err := os.OpenRoot(contracts.OwnerDeploymentRoot)
+	if err != nil {
+		return mounts.ErrUnavailable
+	}
+	defer files.Close()
+	// Select only the explicit original public mode before unrelated credentials
+	// or worker/native constructors. The concrete loader independently verifies
+	// actual installation receipts and current identity before any SQL authority.
+	mode, err := readOwnerInputs(ctx, files)
+	if err != nil {
+		return mounts.ErrUnavailable
+	}
+	if mode.config.Observation != nil {
+		d, err := NewOwnerObservationDeployment(ctx, files, podUID)
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		defer d.Close()
+		listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.NativePort)))
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		defer listener.Close()
+		return d.Run(listener)
+	}
+
+	d, err := NewOwnerDeployment(ctx, files, podUID)
+	if err != nil {
+		return mounts.ErrUnavailable
+	}
+	defer d.Close()
+	listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.Port)))
+	if err != nil {
+		return mounts.ErrUnavailable
+	}
+	defer listener.Close()
+	if d.Runtime.pool.NativePort != 0 {
+		nativeListener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.NativePort)))
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		defer nativeListener.Close()
+		return d.Run(listener, nativeListener)
+	}
+	return d.Run(listener)
+}

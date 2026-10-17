@@ -1,0 +1,5 @@
+--- FAIL: TestInitialPrivateContinuationPreservesExistingPolicyBytes (0.00s)
+    initial_preparer_private_test.go:302: policy profile "asservat-initial-preparation-activation/v1" changed: 54978715f6559bfe5df88233c8fdde2ce97afb3b570dd71ffb3932f81518b394
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.009s
+FAIL

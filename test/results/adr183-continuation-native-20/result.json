@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-20",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "With ADR-188 the continuation stopped exactly as in run 19, to the millisecond: 'worker/roles-provision/role:configuration-fleet after current=0s claim=1.751s role=3.101s stop=3.101s, 1.899s, operation 1.899s left (unavailable)'. Rate-limited request timing is deterministic, so this is the last replay of a claim whose role was never created, which is lookup-only, and not a timing overrun. The first attempt's cause is hidden because converge reported only the last error. Run 21 adds the first attempt and fixed SQL sub-step names to the stop message.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

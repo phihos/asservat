@@ -1,0 +1,55 @@
+cd web && npm run build
+npm notice run @asservat/console@0.0.0 build
+npm notice run npm run contracts && tsc --noEmit && vite build
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1350 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.51 kB │ gzip:   0.31 kB
+dist/assets/index-8wPE5Nwz.css               3.42 kB │ gzip:   1.26 kB
+dist/assets/EvidenceWorkspace-DMG5oJ-a.js  191.39 kB │ gzip:  22.96 kB
+dist/assets/index-DcSxota1.js              871.33 kB │ gzip: 148.29 kB
+
+✓ built in 228ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="/home/phil/.cache/asservat-build/tmp" go test -count=1 -run '^TestConsole(Browser|NativeRestart)WithBuiltPackage$' -v ./test/integration
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/12 14:01:46 http: TLS handshake error from 127.0.0.1:54574: remote error: tls: unknown certificate
+2026/10/12 14:01:46 http: TLS handshake error from 127.0.0.1:54594: remote error: tls: unknown certificate
+2026/10/12 14:01:47 http: TLS handshake error from 127.0.0.1:54616: remote error: tls: unknown certificate
+2026/10/12 14:01:47 http: TLS handshake error from 127.0.0.1:54630: remote error: tls: unknown certificate
+2026/10/12 14:01:47 http: TLS handshake error from 127.0.0.1:54642: remote error: tls: unknown certificate
+2026/10/12 14:01:47 http: TLS handshake error from 127.0.0.1:54662: remote error: tls: unknown certificate
+    console_native_restart_test.go:183: Synthetic C14/session/file source; actual built React, HTTPS, CSRF, canonical operations and browser download failure:
+        Built native-restart checks passed: 4 boundaries,2 accessibility scans, actual failed browser attachment and explicit fresh full-file download.
+--- PASS: TestConsoleNativeRestartWithBuiltPackage (2.35s)
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/12 14:01:48 http: TLS handshake error from 127.0.0.1:40072: remote error: tls: unknown certificate
+2026/10/12 14:01:48 http: TLS handshake error from 127.0.0.1:40080: remote error: tls: unknown certificate
+    console_test.go:130: console browser test failed: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        response.json: Protocol error (Network.getResponseBody): No data found for resource with given identifier
+        Response body is not available for a response that was navigated away from. Read response.body() before triggering any navigation.
+            at /home/phil/Projekte/asservat/web/tests/evidence-journey.mjs:28:82
+            at async evidenceJourney (/home/phil/Projekte/asservat/web/tests/evidence-journey.mjs:29:26)
+            at async file:///home/phil/Projekte/asservat/web/scripts/browser-test.mjs:142:3 {
+          log: [],
+          name: 'Error'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleBrowserWithBuiltPackage (7.44s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	9.807s
+FAIL
+make: *** [Makefile:27: console-browser-check] Error 1

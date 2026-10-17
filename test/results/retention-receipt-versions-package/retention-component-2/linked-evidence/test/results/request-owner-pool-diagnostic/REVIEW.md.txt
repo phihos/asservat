@@ -1,0 +1,11 @@
+# Request-owner connection occupancy diagnostic
+
+Source-only, not yet compiled or executed. One test path only. It reads actual public SQL role/state counts and the three local fixture-pool counters immediately before the existing `a := authority()` and the unchanged foreign-actor check/eight-way race, so the diagnostic cannot consume that authority interval. No backend IDs, query text, credentials, source/authority mutation, server connection-limit change, or pool reset is included.
+
+Smallest ordered native selector:
+
+`^TestContextAdmissionWithRealServices$/^(verified-publication-concurrent-idempotent-and-readable|download-worker-request-owners)$`
+
+The top-level fixture owns the shared capture/authority/retention/recovery pools. The publication child appears first in source and has eight concurrent publishers; request-owners later opens its independent three pools and executes eight claims. The existing publication reset covers only its own verifier/audit/publisher/catalog/intent pools. Native exchange/enrollment pools have child-bound t.Cleanup or lexical Close and no concrete leak was found there. The full-custody failure is retained in test/results/audit-create-native-1/custody with PostgreSQL FATAL at11:53:04.976. This diagnostic distinguishes retained shared occupancy from a hypothesized child leak; it does not claim either cause before measuring.
+
+The selector omits intervening native modes, so success would not disprove a later mode-specific lifetime gap. If not reproduced, add the exact preceding native-content, resume, interrupted, control-races, control-admission-race, preparation-race and native-exchange children to the ordered selection while retaining the full failure.

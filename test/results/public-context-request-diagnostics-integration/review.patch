@@ -1,0 +1,388 @@
+--- a/test/integration/public_context_journey_diagnostics_test.go
++++ b/test/integration/public_context_journey_diagnostics_test.go
+@@ -22,22 +22,54 @@
+ 	"asservat.local/asservat/internal/domain/targets"
+ )
+ 
+-// This fixed fixture-only inventory observes the ORIGINAL preview call. It
++// This fixed fixture-only inventory observes the original preview, then one
++// separately delimited original first request. Only diagnostic counters reset. It
+ // stores no error, identity, input, timestamp, receipt or provider text, and
+ // performs no additional SQL/API/time read. Every decorator delegates once and
+ // returns the original values and error. Report runs only after the call ends.
+-const journeyDiagnosticStages = 19
++const (
++	journeyRequestLookup = 19 + iota
++	journeyRequestPreview
++	journeyRequestAdmit
++	journeyCaptureCompleted
++	journeyCaptureJournal
++	journeyCaptureClaimIntent
++	journeyCaptureWriteIntent
++	journeyCaptureCompleteIntent
++	journeyCaptureAckIntent
++	journeyCaptureFreeze
++	journeyCaptureClaimOutcome
++	journeyCaptureWriteOutcome
++	journeyCaptureCompleteOutcome
++	journeyCaptureAckOutcome
++	journeyCaptureAckPair
++	journeyCaptureReconcileClaimIntent
++	journeyCaptureReconcileClaimOutcome
++	journeyCaptureFindIntent
++	journeyCaptureFindOutcome
++	journeyCaptureReconcileAckIntent
++	journeyCaptureReconcileAckOutcome
++	journeyRegionalRead
++	journeyRegionalSign
++	journeyDiagnosticStages
++)
+ 
+ var journeyDiagnosticNames = [journeyDiagnosticStages]string{
+ 	"audit-reserve", "audit-claim-intent", "audit-write-intent", "audit-complete-intent", "audit-ack-intent",
+ 	"audit-freeze", "audit-claim-outcome", "audit-write-outcome", "audit-complete-outcome", "audit-ack-outcome",
+ 	"preview-recovery", "preview-workload", "preview-pod", "preview-eligibility", "preview-capability",
+ 	"preview-retention", "preview-storage", "preview-processing", "preview-create",
++	"request-lookup", "request-preview-read", "request-admit",
++	"capture-completed", "capture-journal", "capture-claim-intent", "capture-write-intent", "capture-complete-intent", "capture-ack-intent", "capture-freeze",
++	"capture-claim-outcome", "capture-write-outcome", "capture-complete-outcome", "capture-ack-outcome", "capture-ack-pair",
++	"capture-reconcile-claim-intent", "capture-reconcile-claim-outcome", "capture-find-intent", "capture-find-outcome", "capture-reconcile-ack-intent", "capture-reconcile-ack-outcome",
++	"regional-read", "regional-sign",
+ }
+ 
+ type publicJourneyDiagnostics struct {
+ 	mu              sync.Mutex
+ 	stopped         bool
++	requestWindow   bool
+ 	calls, refusals [journeyDiagnosticStages]uint32
+ 	reasons         [journeyDiagnosticStages]uint8
+ 	first           int   // One-based; zero means no dependency returned a refusal.
+@@ -82,15 +114,34 @@
+ 		s.outcome = v
+ 	}
+ }
++
++// BeginRequest can reopen this recorder only once, after the preview has been
++// reported and its original call returned. It never touches operation state.
++func (s *publicJourneyDiagnostics) BeginRequest() bool {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if !s.stopped || s.requestWindow {
++		return false
++	}
++	s.calls, s.refusals, s.reasons = [journeyDiagnosticStages]uint32{}, [journeyDiagnosticStages]uint32{}, [journeyDiagnosticStages]uint8{}
++	s.first, s.outcome = 0, 0
++	s.requestWindow, s.stopped = true, false
++	return true
++}
++
+ func (s *publicJourneyDiagnostics) Report(t *testing.T) {
+ 	t.Helper()
+ 	s.mu.Lock()
+ 	s.stopped = true
+ 	calls, refusals, reasons, first, outcome := s.calls, s.refusals, s.reasons, s.first, s.outcome
++	phase := "preview"
++	if s.requestWindow {
++		phase = "request"
++	}
+ 	s.mu.Unlock()
+ 	for i, count := range calls {
+ 		if count != 0 {
+-			t.Logf("journey preview diagnostic stage=%s calls=%d refusals=%d reason=%s", journeyDiagnosticNames[i], count, refusals[i], journeyDiagnosticReason(reasons[i]))
++			t.Logf("journey %s diagnostic stage=%s calls=%d refusals=%d reason=%s", phase, journeyDiagnosticNames[i], count, refusals[i], journeyDiagnosticReason(reasons[i]))
+ 		}
+ 	}
+ 	name := "none"
+@@ -110,7 +161,7 @@
+ 	case 5:
+ 		status = "interrupted"
+ 	}
+-	t.Logf("journey preview diagnostic first-refusal=%s frozen-outcome=%s", name, status)
++	t.Logf("journey %s diagnostic first-refusal=%s frozen-outcome=%s", phase, name, status)
+ }
+ 
+ type publicJourneyAuditDiagnostics struct {
+@@ -174,7 +225,13 @@
+ // preview starts a fresh request, never replays to manufacture a diagnostic.
+ 
+ func (s *publicJourneyDiagnostics) Investigation(in captureapp.ContextInvestigation) captureapp.ContextInvestigation {
+-	p := publicJourneyPreviewDiagnostics{ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, ContextPreviewStore: in.Previews, RecoveryReader: in.Recovery, trace: s}
++	p := publicJourneyPreviewDiagnostics{ContextAdmissionReplay: in.Replay, ReviewedAdmissionTransaction: in.Admission, ContextTargets: in.Targets, ContextEligibilityReader: in.Eligibility, ContextCapabilityReader: in.Capabilities, ContextRetentionResolver: in.Retention, ContextStorageReader: in.Storage, ContextProcessingCoverageReader: in.Processing, ContextPreviewStore: in.Previews, RecoveryReader: in.Recovery, trace: s}
++	if in.Replay != nil {
++		in.Replay = p
++	}
++	if in.Admission != nil {
++		in.Admission = p
++	}
+ 	if in.Targets != nil {
+ 		in.Targets = p
+ 	}
+@@ -203,6 +260,8 @@
+ }
+ 
+ type publicJourneyPreviewDiagnostics struct {
++	captureapp.ContextAdmissionReplay
++	captureapp.ReviewedAdmissionTransaction
+ 	captureapp.ContextTargets
+ 	captureapp.ContextEligibilityReader
+ 	captureapp.ContextCapabilityReader
+--- a/test/integration/public_context_journey_test.go
++++ b/test/integration/public_context_journey_test.go
+@@ -125,6 +125,7 @@
+ 	investigation.Retention = retention
+ 	diagnostic := &publicJourneyDiagnostics{}
+ 	investigation = diagnostic.Investigation(investigation)
++	intents = diagnostic.Publication(intents)
+ 	investigation.Resolution, e = postgres.NewContextRequestResolutions(ctx, open("context_request_resolution_runtime", "synthetic-context-request-resolution"), s.a.RootID, s.recovery.guard)
+ 	publicJourneyRequire(t, "request resolution", e)
+ 	progress, e := postgres.NewContextProgressReads(ctx, open("context_progress_read_runtime", "synthetic-context-progress-read"), s.a.RootID, s.recovery.guard)
+@@ -137,7 +138,7 @@
+ 	catalog, e := postgres.NewContextPublications(ctx, open("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
+ 	publicJourneyRequire(t, "case catalog", e)
+ 	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: retention, Processing: processing, Now: time.Now}
+-	bridge := regional.bridge
++	bridge := diagnostic.Regional(regional.bridge)
+ 	bridge.Capabilities = nil
+ 	bridge.Recovery = nil
+ 	server := httptest.NewUnstartedServer(nil)
+@@ -169,7 +170,12 @@
+ 	key := "public-journey-original-capture"
+ 	request := map[string]any{"preview_id": preview.PreviewID, "idempotency_key": key}
+ 	regional.standby(t, ctx)
++	if !diagnostic.BeginRequest() {
++		t.Fatal("first-request diagnostic window unavailable")
++	}
+ 	reply, e = call("request_capture", request, true)
++	diagnostic.Report(t)
++	t.Logf("journey first-request original collector calls=%d", collector.calls.Load())
+ 	accepted := publicJourneyData[presentation.ContextAcceptedData](t, "browser first request", reply, e)
+ 	regional.joined(t, ctx)
+ 	if collector.calls.Load() != 1 || accepted.CaptureID == "" {
+--- /dev/null
++++ b/test/integration/public_context_request_diagnostics_test.go
+@@ -0,0 +1,225 @@
++package integration
++
++import (
++	"context"
++	"testing"
++	"time"
++
++	auditapp "asservat.local/asservat/internal/application/audit"
++	executionapp "asservat.local/asservat/internal/application/execution"
++	fleetapp "asservat.local/asservat/internal/application/fleet"
++	"asservat.local/asservat/internal/bootstrap"
++	"asservat.local/asservat/internal/domain/artifact"
++	auditvalue "asservat.local/asservat/internal/domain/audit"
++	capturevalue "asservat.local/asservat/internal/domain/capture"
++	fleetvalue "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++func (s publicJourneyPreviewDiagnostics) LookupContextAdmission(c context.Context, in capturevalue.ReplayQuery) (capturevalue.Accepted, bool, error) {
++	v, found, e := s.ContextAdmissionReplay.LookupContextAdmission(c, in)
++	s.trace.record(journeyRequestLookup, journeyDiagnosticError(e))
++	return v, found, e
++}
++func (s publicJourneyPreviewDiagnostics) ReadContextPreview(c context.Context, root, id string, actor identity.Principal) (capturevalue.ContextPreview, error) {
++	v, e := s.ContextPreviewStore.ReadContextPreview(c, root, id, actor)
++	s.trace.record(journeyRequestPreview, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyPreviewDiagnostics) AdmitReviewedContext(c context.Context, id string, in capturevalue.Admission) (capturevalue.Accepted, error) {
++	v, e := s.ReviewedAdmissionTransaction.AdmitReviewedContext(c, id, in)
++	s.trace.record(journeyRequestAdmit, journeyDiagnosticError(e))
++	return v, e
++}
++
++// These decorators inspect only the original returned error's closed code.
++// In particular an uncertain capture write is never replayed for diagnosis.
++type publicJourneyCaptureDiagnostics struct {
++	auditapp.CaptureOperationIntentReader
++	auditapp.CaptureOperationJournal
++	auditapp.CaptureOperationAcknowledgements
++	auditapp.ClosedOperationObjects
++	auditapp.CaptureOperationReader
++	trace *publicJourneyDiagnostics
++}
++
++func (s *publicJourneyDiagnostics) Publication(in auditapp.CaptureOperationPublication) auditapp.CaptureOperationPublication {
++	p := publicJourneyCaptureDiagnostics{in.Completed, in.Journal, in.Acknowledgements, in.Writer, in.Reader, s}
++	if in.Completed != nil {
++		in.Completed = p
++	}
++	if in.Journal != nil {
++		in.Journal = p
++	}
++	if in.Acknowledgements != nil {
++		in.Acknowledgements = p
++	}
++	if in.Writer != nil {
++		in.Writer = p
++	}
++	if in.Reader != nil {
++		in.Reader = p
++	}
++	return in
++}
++func (s publicJourneyCaptureDiagnostics) ReadCaptureOperationIntent(c context.Context, id string) (auditapp.CaptureOperationIntentSnapshot, error) {
++	v, e := s.CaptureOperationIntentReader.ReadCaptureOperationIntent(c, id)
++	s.trace.record(journeyCaptureCompleted, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) ReadCaptureOperation(c context.Context, id string) (auditvalue.OperationSnapshot, error) {
++	v, e := s.CaptureOperationJournal.ReadCaptureOperation(c, id)
++	s.trace.record(journeyCaptureJournal, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) ClaimCaptureWrite(c context.Context, in auditvalue.OperationIntent, phase string) (auditvalue.CaptureWriteClaim, error) {
++	v, e := s.CaptureOperationJournal.ClaimCaptureWrite(c, in, phase)
++	s.recordPhase(phase, journeyCaptureClaimIntent, journeyCaptureClaimOutcome, e)
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) FreezeOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.OperationSnapshot, error) {
++	v, e := s.CaptureOperationJournal.FreezeOperationOutcome(c, in)
++	s.trace.record(journeyCaptureFreeze, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) CreateClosedOperationIntent(c context.Context, in auditvalue.OperationIntent) (auditvalue.OperationWriteCompletion, error) {
++	v, e := s.ClosedOperationObjects.CreateClosedOperationIntent(c, in)
++	s.trace.record(journeyCaptureWriteIntent, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) CreateClosedOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.OperationWriteCompletion, error) {
++	v, e := s.ClosedOperationObjects.CreateClosedOperationOutcome(c, in)
++	s.trace.record(journeyCaptureWriteOutcome, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) RecordOperationCompletion(c context.Context, in auditvalue.OperationIntent, phase string, v auditvalue.OperationWriteCompletion) error {
++	e := s.CaptureOperationAcknowledgements.RecordOperationCompletion(c, in, phase, v)
++	s.recordPhase(phase, journeyCaptureCompleteIntent, journeyCaptureCompleteOutcome, e)
++	return e
++}
++func (s publicJourneyCaptureDiagnostics) AcknowledgeOperation(c context.Context, in auditvalue.OperationIntent, phase string, r auditvalue.Receipt) error {
++	e := s.CaptureOperationAcknowledgements.AcknowledgeOperation(c, in, phase, r)
++	s.recordPhase(phase, journeyCaptureAckIntent, journeyCaptureAckOutcome, e)
++	return e
++}
++func (s publicJourneyCaptureDiagnostics) AcknowledgeCapturePair(c context.Context, in auditvalue.OperationIntent) error {
++	e := s.CaptureOperationAcknowledgements.AcknowledgeCapturePair(c, in)
++	s.trace.record(journeyCaptureAckPair, journeyDiagnosticError(e))
++	return e
++}
++func (s publicJourneyCaptureDiagnostics) ClaimCaptureReconciliation(c context.Context, in auditvalue.OperationIntent, phase string) (auditvalue.CaptureReconciliationClaim, error) {
++	v, e := s.CaptureOperationJournal.ClaimCaptureReconciliation(c, in, phase)
++	s.recordPhase(phase, journeyCaptureReconcileClaimIntent, journeyCaptureReconcileClaimOutcome, e)
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) FindOperationIntent(c context.Context, in auditvalue.OperationIntent) (auditvalue.Receipt, error) {
++	v, e := s.CaptureOperationReader.FindOperationIntent(c, in)
++	s.trace.record(journeyCaptureFindIntent, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) FindOperationOutcome(c context.Context, in auditvalue.OperationOutcome) (auditvalue.Receipt, error) {
++	v, e := s.CaptureOperationReader.FindOperationOutcome(c, in)
++	s.trace.record(journeyCaptureFindOutcome, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyCaptureDiagnostics) AcknowledgeReconciledCapture(c context.Context, in auditvalue.OperationIntent, phase string, r auditvalue.Receipt, claim auditvalue.CaptureReconciliationClaim) error {
++	e := s.CaptureOperationAcknowledgements.AcknowledgeReconciledCapture(c, in, phase, r, claim)
++	s.recordPhase(phase, journeyCaptureReconcileAckIntent, journeyCaptureReconcileAckOutcome, e)
++	return e
++}
++func (s publicJourneyCaptureDiagnostics) recordPhase(phase string, intent, outcome int, e error) {
++	if phase == "intent" {
++		s.trace.record(intent, journeyDiagnosticError(e))
++	} else if phase == "outcome" {
++		s.trace.record(outcome, journeyDiagnosticError(e))
++	}
++}
++
++type publicJourneyRegionalDiagnostics struct {
++	executionapp.APIExecutionReader
++	fleetapp.APIContextWorkSigner
++	trace *publicJourneyDiagnostics
++}
++
++func (s *publicJourneyDiagnostics) Regional(in bootstrap.RegionalAPIContextStart) bootstrap.RegionalAPIContextStart {
++	p := publicJourneyRegionalDiagnostics{in.Read, in.Signer, s}
++	if in.Read != nil {
++		in.Read = p
++	}
++	if in.Signer != nil {
++		in.Signer = p
++	}
++	return in
++}
++func (s publicJourneyRegionalDiagnostics) ReadAPIContextWork(c context.Context, id string, actor identity.Identity, recovery artifact.RecoveryProof) (executionapp.APIContextWork, error) {
++	v, e := s.APIExecutionReader.ReadAPIContextWork(c, id, actor, recovery)
++	s.trace.record(journeyRegionalRead, journeyDiagnosticError(e))
++	return v, e
++}
++func (s publicJourneyRegionalDiagnostics) SignAPIContextWork(c context.Context, in fleetvalue.APIContextWork) ([]byte, error) {
++	v, e := s.APIContextWorkSigner.SignAPIContextWork(c, in)
++	s.trace.record(journeyRegionalSign, journeyDiagnosticError(e))
++	return v, e
++}
++
++type journeyDiagnosticCaptureRead struct {
++	read func(context.Context, string) (auditapp.CaptureOperationIntentSnapshot, error)
++}
++
++func (s journeyDiagnosticCaptureRead) ReadCaptureOperationIntent(c context.Context, id string) (auditapp.CaptureOperationIntentSnapshot, error) {
++	return s.read(c, id)
++}
++
++// Drive the actual publication entry point, preserving its normalization and
++// cancellation rather than testing a second copy of the production dispatch.
++func TestPublicJourneyDiagnosticsFirstRequestPublication(t *testing.T) {
++	for _, canceled := range []bool{false, true} {
++		t.Run(map[bool]string{false: "private-read-failure", true: "canceled-before-dispatch"}[canceled], func(t *testing.T) {
++			trace := &publicJourneyDiagnostics{}
++			if trace.BeginRequest() {
++				t.Fatal("request trace opened before preview returned")
++			}
++			trace.record(0, 0)
++			trace.freeze("success")
++			trace.Report(t)
++			if !trace.BeginRequest() || trace.first != 0 || trace.outcome != 0 || trace.calls[0] != 0 {
++				t.Fatal("request inherited preview diagnostics")
++			}
++			ctx, stop := context.WithCancel(t.Context())
++			defer stop()
++			if canceled {
++				stop()
++			}
++			private := &journeyDiagnosticPrivateError{}
++			id := "00000000-0000-4000-8000-000000000001"
++			calls := 0
++			publication := trace.Publication(auditapp.CaptureOperationPublication{RootID: "00000000-0000-4000-8000-000000000002", Now: time.Now, Completed: journeyDiagnosticCaptureRead{func(c context.Context, got string) (auditapp.CaptureOperationIntentSnapshot, error) {
++				calls++
++				if got != id || c.Err() != nil {
++					t.Fatal("publication changed original ID/context")
++				}
++				return auditapp.CaptureOperationIntentSnapshot{}, private
++			}}})
++			if publication.Journal != nil || publication.Writer != nil || publication.Reader != nil || publication.Acknowledgements != nil {
++				t.Fatal("decorator invented missing publication ports")
++			}
++			_, e := publication.AcknowledgedCaptureIntent(ctx, id)
++			if e != auditapp.ErrUnavailable {
++				t.Fatal("publication normalization changed")
++			}
++			if canceled {
++				if calls != 0 || trace.first != 0 {
++					t.Fatal("canceled publication dispatched")
++				}
++			} else if calls != 1 || trace.first != journeyCaptureCompleted+1 || trace.calls[journeyCaptureCompleted] != 1 || trace.reasons[journeyCaptureCompleted] != 9 {
++				t.Fatal("original publication refusal lost or replayed")
++			}
++			trace.Report(t) // Neither private Error nor Unwrap may be invoked.
++			before := trace.calls
++			trace.record(journeyCaptureJournal, 9)
++			if trace.BeginRequest() || trace.calls != before {
++				t.Fatal("completed first request reopened or observed a later call")
++			}
++		})
++	}
++}

@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-36",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure. The continuation completed: capacity initialized, the owner launched (the run-35 owner installation stop did not recur), and the post-launch capacity projection was published with its journal receipt. The hub-worker's capacity workload did not reach ReadyAt within 5 minutes. The hub-worker printed only a generic stop message, so the cause is not visible; the hub-worker now names the stopped child and stage, and the test dumps Pod restarts, logs and capacity_workload phases.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

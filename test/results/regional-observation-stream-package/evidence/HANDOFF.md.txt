@@ -1,0 +1,41 @@
+# Regional observation stream checkpoint v1
+
+Frozen seven-path component payload; parent owns integration. Execution handle `45733` joined with terminal exit **0**. No build remains. The frozen manifest's source-time `checks unrun` status is intentionally preserved; these actual results supersede it without rewriting the tested bytes.
+
+## Scope
+
+Adds the concrete regional HTTP/2 mutually authenticated stream and closed twelve-frame runner, preserving the existing wire, original five-second setup/request/proof bounds, original at-most-thirty-second socket residency, actual selected owner/certificate/channel binding, and process-owned connector keys. Empty standby carries routing identity only. Successful final receipt is followed by exact request EOF and response EOF, then joined closure; writes/flushes alone are not remote completion. No retry, authority cache, deadline renewal or new key issuance was added.
+
+The hub listener/holder, local locator/exact-holder forwarding, installed runtime selection and two-cluster conversation are not implemented by this payload. Those continue in a separate stage.
+
+## Actual validation
+
+The immutable `run.py` executed sequentially with `GOMAXPROCS=2`, `GOFLAGS=-p=2` and checkpoint-local `TMPDIR`. Exact commands are retained in each phase JSON; output is retained in the adjacent log.
+
+| Gate | Exit | Wall time |
+| --- | --- | --- |
+| compile | 0 | 1.659s |
+| race | 0 | 8.519s |
+| vet | 0 | 0.407s |
+| architecture | 0 | 1.509s |
+
+The selected race run contains 62 passing named entries. It includes actual loopback TLS 1.3/HTTP/2, client certificate requirement, selected candidate/SNI/root rejection, held-slot cancellation and joined native-proof/body work, cancellation during Hello/header ownership, original time bounds, closed frame order, failed-phase non-replay and missing/extra terminal EOF. Native workload/source/registry observations are explicitly synthetic. These results do not establish installed routing, two-cluster availability or sustained five-second service.
+
+All four gates checked all 1,684 dependency hashes, seven original bases/payloads, relevant live Go file set and freeze hashes before and after; every mismatch list is empty. No native lab or live-source edit occurred. This is new component work; there is no failing-before regression claim.
+
+## Integration evidence
+
+- `manifest.json`: `7ee1a55d0ffd09826eab08c402119317448ebead2a1d24cbef2dcf9a121f411c`
+- `freeze.json`: `c2182cf8aa646fb7f313176a8159d57bd86542e95a4ae69aefdfa90fb39948d6`
+- `payload.json`: exact seven payload hashes under `files/`.
+- `bases.json`: exact original path states, including absence for new paths.
+- `dependencies.json`: exact live source dependencies.
+- `overlay.json`: tested immutable overlay.
+- `evidence/{compile,race,vet,architecture}.{json,log}`: commands, real exits and before/after comparisons.
+- `result-files.json`: hashes of this handoff and every phase result/log.
+
+The two frozen documentation files describe their source-time staged state. Any integration status correction should be separately archived and must retain the component/native scope distinction.
+
+## Next
+
+Integrate these exact payloads after parent verification. Continue the separate bounded holder/listener implementation: exact standby removal before terminal receipt, retained slot until EOF/join, fresh SQL49 registry checks around metadata, exact-owner locator/forwarding, and original caller/socket bounds. No new build is authorized by this handoff.

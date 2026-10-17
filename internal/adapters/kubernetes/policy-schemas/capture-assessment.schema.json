@@ -1,0 +1,767 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture-assessment.schema.json",
+  "title": "Capture impact, data exposure and deletion notices",
+  "$defs": {
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "unknown"
+          ]
+        },
+        "hasUnknowns": {
+          "type": "boolean"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "applicationPause",
+              "applicationCPU",
+              "applicationAllocation",
+              "forcedGC",
+              "nodeCPU",
+              "collectorMemory",
+              "storageIO",
+              "uploadContention",
+              "applicationMutation",
+              "diagnosticInterference"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "level",
+        "hasUnknowns",
+        "effects",
+        "explanation"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "level": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "hasUnknowns": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "$ref": "https://asservat.io/spec/v1/privacy-common.schema.json#/$defs/privacy/properties/classification"
+        },
+        "basis": {
+          "enum": [
+            "conservativeMechanism",
+            "protectedWorkload",
+            "reviewedTransform"
+          ]
+        },
+        "assessmentRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "retainedPossible": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "userContent",
+              "credentials",
+              "personalIdentifiers",
+              "networkAddresses",
+              "paths",
+              "profileLabels",
+              "unknownApplicationData"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 7,
+          "uniqueItems": true
+        },
+        "transientOnly": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "userContent",
+              "credentials",
+              "personalIdentifiers",
+              "networkAddresses",
+              "paths",
+              "profileLabels",
+              "unknownApplicationData"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 7,
+          "uniqueItems": true
+        },
+        "unknownContent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "classification",
+        "basis",
+        "retainedPossible",
+        "transientOnly",
+        "unknownContent"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "verifiedNonPersonal"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "assessmentRef"
+            ],
+            "properties": {
+              "basis": {
+                "const": "reviewedTransform"
+              },
+              "retainedPossible": {
+                "maxItems": 0
+              },
+              "unknownContent": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "unknownContent": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "anchorRule": {
+          "enum": [
+            "firstAcquisitionOrEarlierSource",
+            "submissionPreparation"
+          ],
+          "description": "submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source."
+        },
+        "accessAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 315360000
+        },
+        "maximumAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 315360000
+        },
+        "deletionBudgetSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "policyDigests": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "automaticDeletion": {
+          "const": true
+        },
+        "managedCopiesOnly": {
+          "const": true
+        },
+        "preservationException": {
+          "enum": [
+            "none",
+            "possible",
+            "active"
+          ]
+        },
+        "deleteAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 315360000
+        }
+      },
+      "required": [
+        "anchorRule",
+        "accessAgeSeconds",
+        "maximumAgeSeconds",
+        "deletionBudgetSeconds",
+        "policyDigests",
+        "automaticDeletion",
+        "managedCopiesOnly",
+        "preservationException",
+        "deleteAgeSeconds"
+      ]
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "enum": [
+            "applicationPauseMs",
+            "applicationCpuMillicores",
+            "collectorMemoryBytes",
+            "outputBytes",
+            "uploadBytesPerSecond",
+            "applicationLatencyPercent",
+            "collectorStorageBytes"
+          ]
+        },
+        "phase": {
+          "enum": [
+            "whileArmed",
+            "perIncident"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "perProcess",
+            "perObservationPod",
+            "perIncidentPod",
+            "perNode",
+            "wholePlan"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "configuredLimit",
+            "modelEstimate",
+            "qualifiedMeasurement"
+          ]
+        },
+        "lower": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "upper": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "measuredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "environmentDigest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        },
+        "coverage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "dimension",
+        "phase",
+        "scope",
+        "basis",
+        "lower",
+        "upper",
+        "sourceRef",
+        "coverage"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "qualifiedMeasurement"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "measuredAt",
+              "environmentDigest"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "measuredAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "environmentDigest"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "capture-assessment/v1"
+        },
+        "assessmentID": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+        },
+        "planDigest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rulesDigest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            },
+            "capabilityDigest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            },
+            "metrics": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "state": {
+                  "enum": [
+                    "fresh",
+                    "stale",
+                    "unavailable"
+                  ]
+                },
+                "observedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "state": {
+                        "const": "unavailable"
+                      }
+                    }
+                  },
+                  "then": {
+                    "not": {
+                      "required": [
+                        "observedAt"
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "observedAt"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "rulesDigest",
+            "capabilityDigest",
+            "metrics"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "observationPods": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "incidentPods": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "observationPods",
+            "incidentPods"
+          ]
+        },
+        "combinedImpact": {
+          "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/impact"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "executionMode": {
+                "enum": [
+                  "onTrigger",
+                  "ongoing"
+                ]
+              },
+              "impact": {
+                "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/impact"
+              },
+              "data": {
+                "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/exposure"
+              },
+              "retention": {
+                "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/retention"
+              },
+              "quantities": {
+                "type": "array",
+                "items": {
+                  "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/quantity"
+                },
+                "minItems": 0,
+                "maxItems": 4
+              }
+            },
+            "required": [
+              "actionID",
+              "executionMode",
+              "impact",
+              "data",
+              "retention",
+              "quantities"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "combinedQuantities": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/quantity"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "interactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "minItems": 1,
+                "maxItems": 16,
+                "uniqueItems": true
+              },
+              "kind": {
+                "enum": [
+                  "profilerConflict",
+                  "measurementDistortion",
+                  "sharedPressure",
+                  "combinedCostUnknown"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "blocking": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "actionIDs",
+              "kind",
+              "message",
+              "blocking"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "minItems": 1,
+                "maxItems": 16,
+                "uniqueItems": true
+              },
+              "change": {
+                "enum": [
+                  "narrowScope",
+                  "shortenWindow",
+                  "lowerSampling",
+                  "metadataOnly",
+                  "fewerIncidentPods",
+                  "serialize",
+                  "removeAction",
+                  "futureOnly"
+                ]
+              },
+              "benefit": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 192
+              },
+              "coverageLoss": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 192
+              }
+            },
+            "required": [
+              "actionIDs",
+              "change",
+              "benefit",
+              "coverageLoss"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "handlingCodes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "minimizeCapture",
+              "restrictAccess",
+              "preferApprovedExtracts",
+              "reviewBeforeSharing",
+              "approvedClientsOnly",
+              "externalCopiesNotRecalled"
+            ]
+          },
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true
+        },
+        "handlingPolicyRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "assessmentID",
+        "planDigest",
+        "generatedAt",
+        "validUntil",
+        "basis",
+        "scope",
+        "combinedImpact",
+        "actions",
+        "combinedQuantities",
+        "interactions",
+        "alternatives",
+        "handlingCodes"
+      ]
+    },
+    "artifactNotice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "$ref": "https://asservat.io/spec/v1/privacy-common.schema.json#/$defs/privacy/properties/classification"
+        },
+        "mayContain": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "userContent",
+              "credentials",
+              "personalIdentifiers",
+              "networkAddresses",
+              "paths",
+              "profileLabels",
+              "unknownApplicationData"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 7,
+          "uniqueItems": true
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deleteBy": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deletionState": {
+          "enum": [
+            "scheduled",
+            "inProgress",
+            "verified",
+            "overdue",
+            "unknown",
+            "restrictedPreservation"
+          ]
+        },
+        "automaticDeletion": {
+          "const": true
+        },
+        "managedCopiesOnly": {
+          "const": true
+        },
+        "externalCopiesRecallable": {
+          "const": false
+        },
+        "handlingCodes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "minimizeCapture",
+              "restrictAccess",
+              "preferApprovedExtracts",
+              "reviewBeforeSharing",
+              "approvedClientsOnly",
+              "externalCopiesNotRecalled"
+            ]
+          },
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true
+        },
+        "preservationException": {
+          "type": "boolean"
+        },
+        "asOf": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "handlingPolicyRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "classification",
+        "mayContain",
+        "expiresAt",
+        "deleteBy",
+        "deletionState",
+        "automaticDeletion",
+        "managedCopiesOnly",
+        "externalCopiesRecallable",
+        "handlingCodes",
+        "preservationException",
+        "asOf"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {
+                "const": "verifiedNonPersonal"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "mayContain": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/assessment"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/artifactNotice"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+Running as user "root" and group "root". This could be dangerous.
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+AssertionError: Gadget captured no synthetic packets

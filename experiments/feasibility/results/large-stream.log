@@ -1,0 +1,4 @@
+=== RUN   TestLargeStreamingArtifact
+--- PASS: TestLargeStreamingArtifact (38.00s)
+PASS
+ok  	asservat.local/experiments/feasibility	38.004s

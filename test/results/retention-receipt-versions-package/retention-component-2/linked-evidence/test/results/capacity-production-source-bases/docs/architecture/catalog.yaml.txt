@@ -1,0 +1,1076 @@
+version: 1
+status: reviewed architecture; artifact/context foundations started, remaining paths planned
+applications:
+- id: A-INSTALL
+  entrypoint: asservat initial-install
+  deployment: Pod
+  location: management
+  privilege: scoped-initial-activation
+  components:
+  - C-04
+  - C-08
+  - C-20
+  - C-21
+  - C-24
+- id: A-KEY
+  entrypoint: asservat key-service
+  deployment: Deployment
+  location: configured-region
+  privilege: unprivileged
+  components:
+  - C-03
+  - C-20
+  - C-21
+  - C-24
+- id: A-MIGRATE
+  entrypoint: asservat migrate
+  deployment: Job
+  location: management
+  privilege: database-ddl
+  components:
+  - C-21
+  - C-24
+- id: A-HAPI
+  entrypoint: asservat hub-api
+  deployment: Deployment
+  location: management
+  privilege: unprivileged
+  components:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-09
+  - C-10
+  - C-13
+  - C-14
+  - C-15
+  - C-16
+  - C-17
+  - C-18
+  - C-19
+  - C-20
+  - C-21
+  - C-24
+- id: A-HWORK
+  entrypoint: asservat hub-worker
+  deployment: Deployment
+  location: management
+  privilege: unprivileged
+  components:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-07
+  - C-08
+  - C-09
+  - C-13
+  - C-14
+  - C-15
+  - C-16
+  - C-17
+  - C-18
+  - C-19
+  - C-20
+  - C-21
+  - C-24
+- id: A-CONN
+  entrypoint: asservat controller
+  deployment: Deployment
+  location: workload-cluster
+  privilege: unprivileged
+  components:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-10
+  - C-11
+  - C-12
+  - C-13
+  - C-14
+  - C-15
+  - C-16
+  - C-18
+  - C-19
+  - C-20
+  - C-21
+  - C-24
+- id: A-NODE
+  entrypoint: asservat node
+  deployment: DaemonSet
+  location: node
+  privilege: privileged
+  components:
+  - C-01
+  - C-03
+  - C-04
+  - C-05
+  - C-07
+  - C-08
+  - C-10
+  - C-11
+  - C-12
+  - C-13
+  - C-14
+  - C-15
+  - C-19
+  - C-21
+  - C-23
+  - C-24
+- id: A-CORE
+  entrypoint: asservat-core-helper
+  deployment: host-executable
+  location: node
+  privilege: host
+  components:
+  - C-22
+- id: A-GADGET
+  entrypoint: pinned-gadget
+  deployment: DaemonSet
+  location: node
+  privilege: privileged
+  components: []
+- id: A-ACQUIRE
+  entrypoint: asservat acquire
+  deployment: Job
+  location: region
+  privilege: unprivileged
+  components:
+  - C-14
+  - C-15
+  - C-18
+  - C-21
+  - C-24
+- id: A-ANALYZE
+  entrypoint: asservat analyze
+  deployment: Job
+  location: region
+  privilege: no-network
+  components:
+  - C-18
+  - C-23
+  - C-24
+- id: A-PUBLISH
+  entrypoint: asservat publish
+  deployment: Job
+  location: region
+  privilege: unprivileged
+  components:
+  - C-14
+  - C-15
+  - C-18
+  - C-21
+  - C-24
+components:
+- id: C-01
+  name: Configuration
+  layer: application
+  package_roots:
+  - internal/application/configuration
+  allowed_dependencies:
+  - C-24
+  responsibility: Accepted Kubernetes projections, freshness, immutable definitions and configuration handoff.
+  provided_ports:
+  - ConfigurationReader
+  - ConfigurationAcceptor
+  - PermissionReader
+  - NamespaceReader
+  - PermissionStore
+  - RetentionTopologyReader
+  - RetentionSourceReader
+  - RetentionJournal
+  - RetentionListReader
+  - RetentionWatcher
+  - RetentionWatch
+  - RetentionBootstrapReviewReader
+  - RetentionCheckpointStore
+  - RetentionAcceptanceJournal
+  - RetentionAcceptanceWriter
+  - RetentionProtectionReader
+  - PermissionTrustReader
+  - BindingWatcher
+  - BootstrapReviewReader
+- id: C-02
+  name: Identity
+  layer: application
+  package_roots:
+  - internal/application/identity
+  allowed_dependencies:
+  - C-24
+  responsibility: Validated actors, subject/group freshness and verified step-up context.
+  provided_ports:
+  - IdentityResolver
+  - BrowserSessionStore
+  - BrowserProvider
+  - BrowserSettingsReader
+  - BrowserSettingsProjection
+  - CredentialCipher
+  - LogoutVerifier
+  - StepUpVerifier
+- id: C-03
+  name: Authorization
+  layer: application
+  package_roots:
+  - internal/application/authorization
+  allowed_dependencies:
+  - C-01
+  - C-02
+  - C-24
+  responsibility: One rights evaluator, retained audience, review grants and grant spend rules.
+  provided_ports:
+  - AuthorizationEvaluator
+  - ContextDownloadAuthority
+  - ContextDownloadCatalog
+  - DownloadRetentionResolver
+  - DownloadEnvironmentReader
+  - ReviewService
+  - GrantFacet
+  - KeyOperationAuthorizer
+  - KeyOperationBackend
+  - KeyMaterialReader
+  - KeyConfigurationLedger
+  - KeyConfigurationGuard
+  - KeyService
+- id: C-04
+  name: Fleet
+  layer: application
+  package_roots:
+  - internal/application/fleet
+  allowed_dependencies:
+  - C-01
+  - C-02
+  - C-08
+  - C-24
+  responsibility: Enrollment, node/connector epochs, trust, compatibility and capability reports.
+  provided_ports:
+  - EnrollmentService
+  - PeerVerifier
+  - CapabilityReader
+  - WorkTrustReader
+  - RunActionVerifier
+  - PeerRegistry
+  - PeerAuthenticator
+  - EnrollmentLedger
+  - CertificateIssuer
+  - EnrollmentProofVerifier
+  - SigningLedger
+  - EnrollmentActivator
+  - AdministrationReader
+  - BootstrapCredentials
+  - BootstrapReservations
+  - EnrollmentAuthorityResolver
+  - BootstrapCredentialRecorder
+  - BootstrapActivator
+  - FleetTrustProjection
+  - RecoveryReader
+  - OwnerEndpointReader
+  - OwnerConfigurationReader
+  - OwnerConfigurationLedger
+  - OwnerCertificateIssuer
+  - OwnerPodToken
+  - OwnerEnrollmentProofReader
+  - OwnerEnrollmentLedger
+  - OwnerCertificateActivator
+  - OwnerCertificateRegistry
+  - OwnerCredentialEnrollment
+  - OwnerCredentialClient
+  - OwnerEnrollmentCleanup
+  - OwnerEnrollmentVerifier
+  - OwnerRouteReader
+  - OwnerPeerConnection
+  - OwnerServingIdentity
+  - OwnerClientIdentity
+  - OwnerProtectionReader
+  - InstallationWitnessReader
+  - InstallationWitnessConsumer
+  - InitialInstallationPreparation
+  - InitialInstallationActivation
+- id: C-05
+  name: Targets
+  layer: application
+  package_roots:
+  - internal/application/targets
+  allowed_dependencies:
+  - C-01
+  - C-24
+  responsibility: Resolve current whole-pod workloads, immutable runtime identity and dynamic peers.
+  provided_ports:
+  - TargetResolver
+  - PodResolver
+  - PeerResolver
+- id: C-06
+  name: Planning
+  layer: application
+  package_roots:
+  - internal/application/planning
+  allowed_dependencies:
+  - C-01
+  - C-05
+  - C-24
+  responsibility: Profile composition, typed plans, guidance, impact assessment and execution-mode split without acquisition.
+  provided_ports:
+  - PlanCompiler
+  - AssessmentService
+  - GuidanceService
+- id: C-07
+  name: Capacity
+  layer: application
+  package_roots:
+  - internal/application/capacity
+  allowed_dependencies:
+  - C-01
+  - C-24
+  responsibility: Protected allocations, prepaid slices, fair scheduling and conservative accounting.
+  provided_ports:
+  - CapacityFacet
+  - LocalAdmission
+  - FairScheduler
+  - ContextStorageBindings
+  - ContextControlBacking
+- id: C-08
+  name: Audit
+  layer: application
+  package_roots:
+  - internal/application/audit
+  allowed_dependencies:
+  - C-24
+  responsibility: Durable intent/result gates, protected immutable records and minimized references.
+  provided_ports:
+  - AuditGate
+  - AuditPublisher
+  - AuthorityLedger
+  - AuthorityWriter
+  - CaptureIntentLedger
+  - CaptureIntentWriter
+  - EnrollmentClaimLedger
+  - EnrollmentClaimWriter
+  - EnrollmentCertificateLedger
+  - EnrollmentCertificateWriter
+  - BootstrapIssueLedger
+  - BootstrapIssueWriter
+  - InitialInstallationWriter
+  - InitialInstallationAcknowledgements
+  - PolicyAcceptanceLedger
+  - PolicyAcceptanceWriter
+  - DownloadWorkerWriter
+  - DownloadWorkerAcknowledgements
+  - WorkerConfigurationWriter
+  - WorkerConfigurationAcknowledgements
+  - OwnerConfigurationWriter
+  - OwnerConfigurationAcknowledgements
+  - OwnerEnrollmentWriter
+  - OwnerEnrollmentAcknowledgements
+  - WorkerEnrollmentWriter
+  - WorkerEnrollmentAcknowledgements
+- id: C-09
+  name: Capture
+  layer: application
+  package_roots:
+  - internal/application/capture
+  allowed_dependencies:
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-15
+  - C-17
+  - C-19
+  - C-24
+  responsibility: Authenticated preview/accept/cancel, immutable operation identity and per-action progress.
+  provided_ports:
+  - CaptureService
+  - AdmissionTransaction
+  - ContextPreviewStore
+  - ContextAdmissionReplay
+  - CaptureReader
+  - PolicySourceWriter
+  - PolicySourceReader
+  - PolicyAcceptor
+  - SubmissionTrustReader
+  - PolicySubmissionSigner
+  - PolicySubmissionVerifier
+- id: C-10
+  name: Monitoring
+  layer: application
+  package_roots:
+  - internal/application/monitoring
+  allowed_dependencies:
+  - C-03
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-19
+  - C-24
+  responsibility: Policy activation, bounded sensors/trigger evaluation, correlation, rearm and suppression.
+  provided_ports:
+  - PolicyController
+  - TriggerEvaluator
+  - SignalSink
+- id: C-11
+  name: Execution
+  layer: application
+  package_roots:
+  - internal/application/execution
+  allowed_dependencies:
+  - C-02
+  - C-06
+  - C-03
+  - C-04
+  - C-07
+  - C-08
+  - C-12
+  - C-14
+  - C-24
+  responsibility: Local durable start disposition, bounded action DAG, target recheck and cancellation.
+  provided_ports:
+  - ExecutionDispatcher
+  - StartJournal
+  - ActionExecutor
+  - ContextWorkResolver
+  - ContextCollector
+- id: C-12
+  name: Recording
+  layer: application
+  package_roots:
+  - internal/application/recording
+  allowed_dependencies:
+  - C-03
+  - C-07
+  - C-08
+  - C-15
+  - C-24
+  responsibility: Fenced ongoing source sessions, rings, snapshot pinning, coverage and stopped-source grace.
+  provided_ports:
+  - SourceManager
+  - SnapshotExecutor
+  - SourceInventory
+- id: C-13
+  name: Live observation
+  layer: application
+  package_roots:
+  - internal/application/live
+  allowed_dependencies:
+  - C-03
+  - C-07
+  - C-08
+  - C-12
+  - C-15
+  - C-19
+  - C-24
+  responsibility: Finite view control, current-rights delivery, source projection, replay and loss.
+  provided_ports:
+  - LiveWatchService
+  - LiveProjectionOwner
+- id: C-14
+  name: Evidence
+  layer: application
+  package_roots:
+  - internal/application/evidence
+  allowed_dependencies:
+  - C-02
+  - C-07
+  - C-08
+  - C-15
+  - C-24
+  responsibility: Encrypt/upload/commit, artifact lineage and authoritative artifact metadata.
+  provided_ports:
+  - ContextDownloadCoordinator
+  - CurrentDownloadAuthority
+  - ContextDownloadControlLedger
+  - ContextDownloadRoutes
+  - ContextDownloadSources
+  - ContextDownloadPlans
+  - ContextDownloadRuntime
+  - ContextProducer
+  - PreparedContext
+  - ContextNativeReader
+  - ContextBatchNativeReader
+  - DownloadKeyGrants
+  - DownloadPeerToken
+  - DownloadPeerProofReader
+  - DownloadKeyBindingLedger
+  - DownloadWorkerLedger
+  - DownloadWorkerBindings
+  - DownloadWorkerJobs
+  - WorkerConfigurationReader
+  - WorkerConfigurationLedger
+  - WorkerConfigurationGuard
+  - WorkerEnrollmentBindings
+  - WorkerEnrollmentProofReader
+  - WorkerCSRVerifier
+  - WorkerEnrollmentLedger
+  - WorkerCertificateIssuer
+  - WorkerCertificateActivator
+  - WorkerEnrollmentExchange
+  - WorkerEnrollmentDelivery
+  - WorkerEnrollmentRouter
+  - WorkerEnrollmentRoute
+  - WorkerOwnerStore
+  - WorkerOwnerLookup
+  - WorkerOwnerEnrollment
+  - WorkerRequestOwners
+  - WorkerOwnerRegistration
+  - WorkerProofFactory
+  - WorkerCredentialClient
+  - WorkerCredentialSupervisor
+  - ContextDownloadWorker
+  - DownloadDestination
+  - DownloadSessions
+  - DownloadAuditAcknowledger
+  - DownloadAuthorityGate
+  - ContextPublicationGate
+  - ContextAcceptanceReader
+  - ContextVerificationRecorder
+  - ContextVerificationAuditor
+  - ContextCatalogPublisher
+  - ContextPublicationLedger
+  - EvidenceWriter
+  - CommitService
+  - ArtifactReader
+- id: C-15
+  name: Privacy
+  layer: application
+  package_roots:
+  - internal/application/privacy
+  allowed_dependencies:
+  - C-01
+  - C-07
+  - C-08
+  - C-24
+  responsibility: Retention resolution, managed-copy registration/lifecycle, restriction, cleanup verification and tombstones.
+  provided_ports:
+  - RetentionResolver
+  - RetentionShortener
+  - RetentionLedger
+  - RetentionCatchup
+  - LifecyclePublisher
+  - LifecycleJournal
+  - LifecycleWriter
+  - LifecycleSigner
+  - LifecycleVerifier
+  - RetentionReader
+  - RetainedPolicyReader
+  - AcceptedRetentionReader
+  - RetentionSelectorReader
+  - PolicyProtectionReader
+  - PolicySnapshotReader
+  - CopyLedger
+  - PrivacyService
+  - ContextRetirementReader
+- id: C-16
+  name: Catalog and history
+  layer: application
+  package_roots:
+  - internal/application/catalog
+  allowed_dependencies:
+  - C-02
+  - C-03
+  - C-15
+  - C-24
+  responsibility: Authorized cases, occurrences, history/repeat and bounded regional search.
+  provided_ports:
+  - CatalogQuery
+  - HistoryService
+  - SearchProjection
+- id: C-17
+  name: Sharing
+  layer: application
+  package_roots:
+  - internal/application/sharing
+  allowed_dependencies:
+  - C-03
+  - C-07
+  - C-08
+  - C-15
+  - C-24
+  responsibility: Manager assignments, concrete shares, bounded future materialization and revocation.
+  provided_ports:
+  - SharingService
+  - SharingFacet
+  - PublicationTransaction
+- id: C-18
+  name: Analysis
+  layer: application
+  package_roots:
+  - internal/application/analysis
+  allowed_dependencies:
+  - C-03
+  - C-07
+  - C-08
+  - C-14
+  - C-15
+  - C-19
+  - C-24
+  responsibility: Bounded query planning, exact inputs, staged Jobs, tool policy and result validation.
+  provided_ports:
+  - AnalysisService
+  - StageCoordinator
+  - AnalyzerRegistry
+- id: C-19
+  name: Delivery
+  layer: application
+  package_roots:
+  - internal/application/delivery
+  allowed_dependencies:
+  - C-08
+  - C-24
+  responsibility: Outbox claims, peer work transport, receipts, leases and content-minimized notifications.
+  provided_ports:
+  - WorkRouter
+  - ReceiptService
+  - OutboxPublisher
+- id: C-20
+  name: User and peer transports
+  layer: transport
+  package_roots:
+  - internal/transport
+  - internal/console
+  - web
+  - api/v1alpha1
+  - internal/contracts
+  allowed_dependencies:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-08
+  - C-09
+  - C-10
+  - C-11
+  - C-12
+  - C-13
+  - C-14
+  - C-15
+  - C-16
+  - C-17
+  - C-18
+  - C-19
+  - C-24
+  responsibility: Shared wire DTOs, typed browser/MCP/admission/federation/node handlers and React console presentation.
+  provided_ports:
+  - BrowserHandlers
+  - MCPHandlers
+  - PeerHandlers
+  - AdmissionHandlers
+  - KeyServiceHandlers
+  - WorkerEnrollmentHandler
+- id: C-21
+  name: Persistence adapters
+  layer: adapter
+  package_roots:
+  - internal/adapters/postgres
+  - migrations
+  - internal/adapters/kubernetes
+  - internal/adapters/objectstore
+  - internal/adapters/kms
+  - internal/adapters/oidc
+  - internal/adapters/jose
+  - internal/adapters/mtls
+  - internal/adapters/mounts
+  - internal/adapters/providerconfig
+  - internal/adapters/bleve
+  allowed_dependencies:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-09
+  - C-10
+  - C-11
+  - C-12
+  - C-13
+  - C-14
+  - C-15
+  - C-16
+  - C-17
+  - C-18
+  - C-19
+  - C-20
+  - C-24
+  responsibility: Implement consumer-owned ports with role-scoped SQL, Kubernetes, object, key, identity and cache clients.
+  provided_ports:
+  - PortImplementations
+- id: C-22
+  name: Host crash helper
+  layer: helper
+  package_roots:
+  - crash-helper
+  allowed_dependencies: []
+  responsibility: Bounded authenticated kernel crash handoff with no remote dependencies.
+  provided_ports:
+  - CoreHandoff
+- id: C-23
+  name: Mechanism adapters
+  layer: adapter
+  package_roots:
+  - internal/adapters/cri
+  - internal/adapters/linux
+  - internal/adapters/gadget
+  - internal/adapters/diagnostics
+  - internal/adapters/tools
+  allowed_dependencies:
+  - C-05
+  - C-10
+  - C-11
+  - C-12
+  - C-13
+  - C-18
+  - C-24
+  responsibility: Qualified runtime, BPF, file/process/endpoint and sandboxed tool implementations.
+  provided_ports:
+  - CollectorAdapters
+  - AnalyzerAdapters
+- id: C-24
+  name: Domain types
+  layer: domain
+  package_roots:
+  - internal/domain
+  allowed_dependencies: []
+  responsibility: Typed identities, bounded values and pure state rules separate from all persistence/wire DTOs.
+  provided_ports:
+  - DomainValues
+  - DomainTransitions
+interfaces:
+- id: I-01
+  name: Hub federation
+  caller: A-CONN
+  provider: A-HAPI
+  transport: outbound-mtls-json
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/internal-work.schema.json
+- id: I-02
+  name: Node control
+  caller: A-NODE
+  provider: A-CONN
+  transport: outbound-mtls-json
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/internal-work.schema.json
+- id: I-03
+  name: Core handoff
+  caller: A-CORE
+  provider: A-NODE
+  transport: unix-socket
+  spec: docs/architecture/interfaces.md
+- id: I-04
+  name: Gadget observation
+  caller: A-NODE
+  provider: A-GADGET
+  transport: qualified-node-local
+  spec: docs/architecture/interfaces.md
+- id: I-05
+  name: Artifact commit
+  caller: C-14
+  provider: C-15
+  transport: in-process-and-object-protocol
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/manifest.schema.json
+- id: I-06
+  name: Analysis stage handoff
+  caller: A-CONN
+  provider: A-ANALYZE
+  transport: kubernetes-job-and-encrypted-pvc
+  spec: docs/architecture/interfaces.md
+- id: I-07
+  name: Live delivery
+  caller: A-CONN
+  provider: A-HWORK
+  transport: outbound-mtls-transient
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/live-watch.schema.json
+- id: I-08
+  name: Configuration projection
+  caller: C-01
+  provider: C-21
+  transport: kubernetes-watch-and-port
+  spec: docs/architecture/interfaces.md
+- id: I-09
+  name: Transactional facets
+  caller: C-09
+  provider: C-21
+  transport: in-process
+  spec: docs/architecture/interfaces.md
+- id: I-10
+  name: Collector adapter
+  caller: C-11
+  provider: C-23
+  transport: in-process
+  spec: docs/architecture/interfaces.md
+- id: I-11
+  name: Analyzer adapter
+  caller: C-18
+  provider: C-23
+  transport: in-process-and-bounded-child
+  spec: docs/architecture/interfaces.md
+- id: I-12
+  name: Ingress to live owner
+  caller: A-HAPI
+  provider: A-HWORK
+  transport: same-cluster-mtls-json
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/live-watch.schema.json
+- id: I-13
+  name: Native artifact transient relay
+  caller: A-ACQUIRE
+  provider: A-HAPI
+  spec: docs/architecture/interfaces.md
+  schema: specs/contracts/artifact-download.schema.json
+- id: I-14
+  name: Private local key operations
+  caller: C-21
+  provider: A-KEY
+  transport: private-mtls-json
+  spec: docs/architecture/local-key-service.md
+  schema: specs/contracts/local-key-service.schema.json
+entity_owners:
+  InstallationProfile: C-01
+  CaptureProfile: C-01
+  RecipeDefinition: C-01
+  DebugPolicy: C-01
+  PermissionSource: C-01
+  AccessBinding: C-01
+  CollectionCeiling: C-01
+  EvidenceRetentionPolicy: C-01
+  Principal: C-02
+  BrowserLogin: C-02
+  BrowserSession: C-02
+  AccessDecision: C-03
+  AccessGrant: C-03
+  GrantReservation: C-03
+  AudienceAssignment: C-03
+  ClusterRegistration: C-04
+  CapabilityReport: C-04
+  WorkloadProjection: C-05
+  ResolvedTarget: C-05
+  AcceptedScope: C-06
+  Operation: C-09
+  Capture: C-09
+  ActionAttempt: C-09
+  PolicyActivation: C-10
+  SourceSession: C-12
+  SourceSnapshot: C-12
+  LiveWatch: C-13
+  LiveBatch: C-13
+  Artifact: C-14
+  ArtifactParent: C-14
+  ArtifactCopy: C-15
+  PrivacyDecision: C-15
+  DeletionWork: C-15
+  CaptureHistory: C-16
+  Case: C-16
+  Occurrence: C-16
+  Overview: C-16
+  EvidenceShare: C-17
+  SharingIntent: C-17
+  ManagerAssignment: C-17
+  SharingRegistration: C-17
+  SelectionApproval: C-17
+  CapacityAccount: C-07
+  CapacityReservation: C-07
+  AuditReference: C-08
+  AnalysisRun: C-18
+  DeliveryWork: C-19
+  InterfaceHelp: C-20
+  ArtifactDownload: C-14
+requirement_owners:
+  REQ-DEP-001: C-01
+  REQ-DEP-002: C-02
+  REQ-DEP-003: C-14
+  REQ-DEP-004: C-21
+  REQ-DEP-005: C-01
+  REQ-ACT-001: C-11
+  REQ-ACT-002: C-11
+  REQ-ACT-003: C-11
+  REQ-ACT-004: C-12
+  REQ-ACT-005: C-11
+  REQ-ACT-006: C-23
+  REQ-API-001: C-01
+  REQ-API-002: C-01
+  REQ-AUT-001: C-03
+  REQ-AUT-002: C-03
+  REQ-AUT-003: C-03
+  REQ-AUT-004: C-03
+  REQ-SHR-001: C-17
+  REQ-SHR-002: C-17
+  REQ-SHR-003: C-17
+  REQ-SHR-004: C-17
+  REQ-SHR-005: C-17
+  REQ-SHR-006: C-17
+  REQ-SHR-007: C-17
+  REQ-AUT-005: C-08
+  REQ-EVD-001: C-14
+  REQ-EVD-002: C-14
+  REQ-EVD-003: C-14
+  REQ-EVD-004: C-16
+  REQ-EVD-005: C-18
+  REQ-EVD-006: C-15
+  REQ-FED-001: C-04
+  REQ-FED-002: C-19
+  REQ-FED-003: C-04
+  REQ-EVT-001: C-19
+  REQ-EVT-002: C-19
+  REQ-MCP-001: C-20
+  REQ-MCP-002: C-20
+  REQ-MCP-003: C-20
+  REQ-MCP-004: C-20
+  REQ-TGT-001: C-05
+  REQ-TGT-002: C-05
+  REQ-TGT-003: C-05
+  REQ-TGT-004: C-05
+  REQ-TRG-001: C-10
+  REQ-TRG-002: C-10
+  REQ-TRG-003: C-10
+  REQ-TRG-004: C-10
+  REQ-TRG-005: C-10
+  REQ-TRG-006: C-10
+  REQ-PRF-001: C-11
+  REQ-PRF-002: C-11
+  REQ-PRF-003: C-18
+  REQ-PRF-004: C-18
+  REQ-PRF-005: C-18
+  REQ-PER-001: C-03
+  REQ-PER-002: C-03
+  REQ-PER-003: C-03
+  REQ-PER-004: C-03
+  REQ-PER-005: C-03
+  REQ-PER-006: C-03
+  REQ-PER-007: C-03
+  REQ-PER-008: C-03
+  REQ-UX-001: C-20
+  REQ-UX-002: C-20
+  REQ-UX-003: C-20
+  REQ-UX-004: C-20
+  REQ-UX-005: C-20
+  REQ-UX-006: C-20
+  REQ-PRV-001: C-15
+  REQ-PRV-002: C-15
+  REQ-PRV-003: C-15
+  REQ-PRV-004: C-15
+  REQ-PRV-005: C-15
+  REQ-PRV-006: C-15
+  REQ-PRV-007: C-15
+  REQ-CAP-001: C-07
+  REQ-CAP-002: C-07
+  REQ-CAP-003: C-07
+  REQ-CAP-004: C-07
+  REQ-CAP-005: C-07
+  REQ-CAP-006: C-07
+  REQ-DB-001: C-21
+  REQ-DB-002: C-21
+  REQ-DB-003: C-21
+  REQ-DB-004: C-21
+  REQ-DB-005: C-21
+  REQ-NET-001: C-12
+  REQ-NET-002: C-05
+  REQ-NET-003: C-12
+  REQ-NET-004: C-12
+  REQ-NET-005: C-12
+  REQ-SHR-008: C-17
+  REQ-TGT-005: C-05
+  REQ-TGT-006: C-05
+  REQ-TRG-007: C-10
+  REQ-ACT-007: C-11
+  REQ-EVD-007: C-18
+  REQ-AUT-006: C-03
+  REQ-MCP-005: C-20
+  REQ-PRV-008: C-15
+  REQ-NET-006: C-12
+  REQ-EXE-001: C-09
+  REQ-EXE-002: C-09
+  REQ-ACT-008: C-11
+  REQ-GDE-001: C-06
+  REQ-GDE-002: C-06
+  REQ-GDE-003: C-09
+  REQ-GDE-004: C-06
+  REQ-GDE-005: C-06
+  REQ-GDE-006: C-06
+  REQ-HIS-001: C-16
+  REQ-HIS-002: C-16
+  REQ-HIS-003: C-16
+  REQ-HIS-004: C-16
+  REQ-CPR-001: C-01
+  REQ-CPR-002: C-06
+  REQ-CPR-003: C-06
+  REQ-CPR-004: C-06
+  REQ-CPR-005: C-06
+  REQ-SYS-001: C-12
+  REQ-SYS-002: C-12
+  REQ-SYS-003: C-18
+  REQ-LIF-001: C-06
+  REQ-LIF-002: C-12
+  REQ-LIF-003: C-11
+  REQ-LIF-004: C-12
+  REQ-LIF-005: C-09
+  REQ-ASM-001: C-06
+  REQ-ASM-002: C-06
+  REQ-ASM-003: C-06
+  REQ-ASM-004: C-06
+  REQ-ASM-005: C-06
+  REQ-LIF-006: C-12
+  REQ-EVD-008: C-18
+  REQ-SAV-001: C-12
+  REQ-SAV-002: C-09
+  REQ-SAV-003: C-09
+  REQ-SAV-004: C-09
+  REQ-UI-001: C-20
+  REQ-UI-002: C-20
+  REQ-UI-003: C-20
+  REQ-UI-004: C-20
+  REQ-UI-005: C-20
+  REQ-UI-006: C-20
+  REQ-UI-007: C-20
+  REQ-DOM-001: C-24
+  REQ-DOM-002: C-24
+  REQ-DOM-003: C-24
+  REQ-DOM-004: C-24
+  REQ-DOM-005: C-24
+  REQ-INT-001: C-20
+  REQ-INT-002: C-20
+  REQ-INT-003: C-20
+  REQ-INT-004: C-20
+  REQ-INT-005: C-20
+  REQ-LIV-001: C-13
+  REQ-LIV-002: C-13
+  REQ-LIV-003: C-13
+  REQ-LIV-004: C-13
+  REQ-LIV-005: C-13
+  REQ-LIV-006: C-13
+  REQ-ARC-001: C-04
+  REQ-ARC-002: C-24
+  REQ-ARC-003: C-19
+  REQ-ARC-004: C-11
+  REQ-ARC-005: C-23
+  REQ-ARC-006: C-15
+  REQ-ARC-007: C-24
+  REQ-DLD-001: C-14
+  REQ-DLD-002: C-03
+  REQ-DLD-003: C-14
+  REQ-DLD-004: C-20
+  REQ-INV-001: C-03
+  REQ-INV-002: C-03
+  REQ-INV-003: C-20
+dependency_rules:
+  application_may_import_adapters: false
+  domain_may_import_infrastructure: false
+  composition_root: internal/bootstrap
+  cross_module_sql: named-facets-in-one-transaction
+  new_network_service: requires-architecture-decision

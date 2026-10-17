@@ -1,0 +1,9 @@
+{
+  "state": "frozen-not-run",
+  "change": [
+    "internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go"
+  ],
+  "prior": "caller2 preserved actual vet failure; production3 identical and all caller/affected races passed",
+  "dependency_sha256": "2198576c1a7663e7fb8e3523929a2326b5f995cd36a6b0b6d06c481d99ca4f48",
+  "manifest_sha256": "56003a7dc8866b6302e599c863b44a2cc863e393ada9b398ec0e2f8b276c21aa"
+}

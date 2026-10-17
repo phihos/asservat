@@ -1,0 +1,14 @@
+{
+  "cipherBytes": 2147632640,
+  "encodeUploadSeconds": 22.43237688,
+  "frameMiB": 8,
+  "frames": 256,
+  "fullVerifiedReadSeconds": 7.48629704,
+  "indexBytes": 65601,
+  "lastMiBResumeSeconds": 0.026945397,
+  "limits": "Single local run, synthetic incompressible stream, ciphertext-only local staging; KMS, production commit and distributed relays not tested",
+  "nativeBytes": 2147483648,
+  "nativeSHA256": "5c80f560b22e1f32c8ecc8d7a8ccbd19e0b015d98ba66ae82a4c642bf0b2b3e7",
+  "processVmHWM": "VmHWM:\t  136188 kB",
+  "resumeCipherBytesRead": 8389190
+}

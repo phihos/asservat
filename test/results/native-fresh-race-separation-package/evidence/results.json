@@ -1,0 +1,60 @@
+[
+  {
+    "step": "compile",
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/native-fresh-race-separation-20261012/overlay.json",
+      "./test/integration",
+      "-run",
+      "^$",
+      "-count=1",
+      "-timeout=60s"
+    ],
+    "exit": 0,
+    "timed_out": false,
+    "elapsed_seconds": 7.252,
+    "before": {
+      "dependencies": 1525,
+      "changes": [],
+      "manifest_sha256": "abc54809904ba960c1c5182cce255aa567fb7bb930f48d33e2f589255791ce06",
+      "dependencies_sha256": "ad0d4e406840544b071b85dee16b0c209d26d53deb452cb92428947664fef946",
+      "overlay_sha256": "9029c133aeef559e2984f27ae324438e60262660ce6aea8627575e716a3f6cad"
+    },
+    "after": {
+      "dependencies": 1525,
+      "changes": [],
+      "manifest_sha256": "abc54809904ba960c1c5182cce255aa567fb7bb930f48d33e2f589255791ce06",
+      "dependencies_sha256": "ad0d4e406840544b071b85dee16b0c209d26d53deb452cb92428947664fef946",
+      "overlay_sha256": "9029c133aeef559e2984f27ae324438e60262660ce6aea8627575e716a3f6cad"
+    }
+  },
+  {
+    "step": "vet",
+    "command": [
+      "go",
+      "vet",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/native-fresh-race-separation-20261012/overlay.json",
+      "./test/integration"
+    ],
+    "exit": 0,
+    "timed_out": false,
+    "elapsed_seconds": 1.043,
+    "before": {
+      "dependencies": 1525,
+      "changes": [],
+      "manifest_sha256": "abc54809904ba960c1c5182cce255aa567fb7bb930f48d33e2f589255791ce06",
+      "dependencies_sha256": "ad0d4e406840544b071b85dee16b0c209d26d53deb452cb92428947664fef946",
+      "overlay_sha256": "9029c133aeef559e2984f27ae324438e60262660ce6aea8627575e716a3f6cad"
+    },
+    "after": {
+      "dependencies": 1525,
+      "changes": [],
+      "manifest_sha256": "abc54809904ba960c1c5182cce255aa567fb7bb930f48d33e2f589255791ce06",
+      "dependencies_sha256": "ad0d4e406840544b071b85dee16b0c209d26d53deb452cb92428947664fef946",
+      "overlay_sha256": "9029c133aeef559e2984f27ae324438e60262660ce6aea8627575e716a3f6cad"
+    }
+  }
+]

@@ -1,0 +1,12 @@
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection
+--- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.046s

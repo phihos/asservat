@@ -1,0 +1,6 @@
+{
+  "internal/adapters/kubernetes/owner_observation_operation.go": null,
+  "internal/adapters/kubernetes/owner_observation_operation_routes.go": null,
+  "internal/adapters/kubernetes/owner_observation_operation_test.go": null,
+  "internal/adapters/kubernetes/owner_workload_guard.go": "9487e99d50fa68067a10dd718ad233b8a1d816dba7440c35fb4db52cb028b9a6"
+}

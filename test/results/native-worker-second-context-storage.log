@@ -1,0 +1,10 @@
+=== RUN   TestHubConfigurationWorkerInRestrictedPod
+    hub_worker_test.go:254: native worker image docker.io/library/asservat-context-worker@sha256:c4f4fd475b348d8d815bab8c7fcb6ca8ae35c946765e2391ae9ea32a0180743e Deployment 8b995d5a-99de-46ba-a96f-72f9fe1197a4 Restricted Pod with projected API tokens; native timed token renewal not measured
+    hub_worker_test.go:313: worker stopped before initial blocked root native worker process stopped
+    hub_worker_native_test.go:115: native worker status Running [{worker {nil &ContainerStateRunning{StartedAt:2026-10-11 01:42:53 +0200 CEST,} nil} {nil nil &ContainerStateTerminated{ExitCode:1,Signal:0,Reason:Error,Message:,StartedAt:2026-10-11 01:42:47 +0200 CEST,FinishedAt:2026-10-11 01:42:52 +0200 CEST,ContainerID:containerd://5819640c6cbd11c7b5e46103a705af2e0c40faa714661c37cc556d7426acb6af,}} true 1 docker.io/library/asservat-context-worker:context-ww0wxnlr docker.io/library/asservat-context-worker@sha256:c4f4fd475b348d8d815bab8c7fcb6ca8ae35c946765e2391ae9ea32a0180743e containerd://bdc01d4f8320047c297aa5764871bbe0780f587e0f669b87b04c93614bdd214d 0xc0002f421f map[cpu:{{100 -3} {<nil>} 100m DecimalSI} memory:{{67108864 0} {<nil>}  BinarySI}] &ResourceRequirements{Limits:ResourceList{cpu: {{500 -3} {<nil>} 500m DecimalSI},memory: {{268435456 0} {<nil>}  BinarySI},},Requests:ResourceList{cpu: {{100 -3} {<nil>} 100m DecimalSI},memory: {{67108864 0} {<nil>}  BinarySI},},Claims:[]ResourceClaim{},} [{inputs /run/asservat/hub-worker true 0xc00060e9a0 nil}] &ContainerUser{Linux:&LinuxContainerUser{UID:65532,GID:65532,SupplementalGroups:[65532],},} [] <nil>}]
+    hub_worker_native_test.go:120: 
+    hub_worker_native_test.go:135: native worker Pods did not terminate
+--- FAIL: TestHubConfigurationWorkerInRestrictedPod (31.91s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	31.973s
+FAIL

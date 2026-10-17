@@ -1,0 +1,7 @@
+--- FAIL: TestNativeHTTPSinkJoinsRunningDeadlineCallback (0.00s)
+    download_delivery_test.go:143: Send returned while its cancellation callback could still mutate the connection deadline
+FAIL
+FAIL	asservat.local/asservat/internal/transport/browser	0.024s
+FAIL
+
+EXIT=1

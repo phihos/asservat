@@ -1,0 +1,8 @@
+[
+  {
+    "after": "81ba8fb4cabc6f2ec30d5c5dd44fa9edb82ba89e4a0a8524ac8633f25e87636d",
+    "before": "4ec51dc897ddeb4134ea725a60282d1e8a52ebade845315c97727b598cf655f6",
+    "path": "internal/adapters/kubernetes/owner_local_observation_operation_test.go",
+    "scope": "test-only independent fake API handler lifetime; product authority and deadlines unchanged"
+  }
+]

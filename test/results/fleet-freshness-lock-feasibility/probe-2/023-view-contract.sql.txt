@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+SELECT json_object_agg(relname,cols) FROM (SELECT c.relname,json_agg(json_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod)) ORDER BY a.attnum) AS cols FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid WHERE c.oid IN ('public.fleet_current_trust'::regclass,'public.fleet_legacy_contract'::regclass) AND a.attnum>0 AND NOT a.attisdropped GROUP BY c.relname) x;

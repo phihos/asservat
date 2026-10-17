@@ -1,0 +1,29 @@
+{
+  "recorded_at": 1791897715.284845,
+  "previous_boot": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "current_boot": "68ccce0b-1249-42a4-8177-f4af22deeb03",
+  "classification": "interrupted by host reboot; no compile or whole-job exit available",
+  "terminal_result": null,
+  "saved_phase_exits": {
+    "sqlc-version": 0,
+    "sqlc-generate": 0
+  },
+  "unqualified": [
+    "compile",
+    "before-version-predicates",
+    "affected-races",
+    "vet",
+    "sql-and-contracts"
+  ],
+  "old_runner_absent": true,
+  "old_tmpfs_mirror_absent": true,
+  "joined_cleanup_claim": false,
+  "preserved_hashes": {
+    "manifest.json": "6a4b0baf0bc7dcf9d8f5fd889fd03c24521167490327feb38416df98b327c587",
+    "dependencies.json": "9c7bb752678f30b3a1e695dfdb0558e955faa1fdccc9c056ad5373fd97f089c0",
+    "runner.log": "e648b6ceb8136fa2ed6646fdbbb8b6f9a20407bdeec9a8a51460e9da9b7bbeff",
+    "generated-manifest.json": "908a054c3fa4e1f39e4cbe85d879fb88ebe33001aed66afb272601f0971307f0",
+    "combined-manifest.json": "f93cd1de1038961d3ff2f3a63df9fb512b1972c5e6ded788b886a888ac84a8a8",
+    "evidence/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

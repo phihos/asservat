@@ -1,0 +1,48 @@
+{
+  "files": [
+    {
+      "path": "manifest.json",
+      "sha256": "5bdae821351aba88ce4f794ca9ec24643ce9c271c64ed15748abe0b8532a1079"
+    },
+    {
+      "path": "dependencies.json",
+      "sha256": "52d6173a3994e764eaffd8410cbc78ca65f42fe68c246a4121398f6f308b344e"
+    },
+    {
+      "path": "changes.patch",
+      "sha256": "c2923f8e2371868e16550e8b888fc9a5bbc88283efc7a8040d96413a66ecc286"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "9a495d80ecefa4e1b6fff7068b954bcfa1b36dc93ee8bbf1cb71eb2b8c8af8f2"
+    },
+    {
+      "path": "checks.json",
+      "sha256": "b23576e89324ffe586b0523e375b12432efecdbd8a11520dc26e5b1cb84b4fbb"
+    },
+    {
+      "path": "before-overlay.json",
+      "sha256": "ef3e95e66d604d1a1e859c18546d63574edd288b6a5e50add2c7f6d96ddc5f05"
+    },
+    {
+      "path": "after-overlay.json",
+      "sha256": "abc90b13fb5e0ff9e40ffe2f28de0c977e10e28133545258bf77b5df532d910c"
+    },
+    {
+      "path": "evidence/after-race.log",
+      "sha256": "4ffb04c4e2cbeadb0ab59f05a0290fe4be1e2ada69106cbb145df7e58507d9e3"
+    },
+    {
+      "path": "evidence/before.log",
+      "sha256": "4d8b7516e46fdfa287c37736dba524121e982f1c47a1d1c80aaa00ee169f959c"
+    },
+    {
+      "path": "evidence/before_test.go.txt",
+      "sha256": "5c4d2edb412d69069494a8bb83733f2f9ab81a0d92985ddde4419af0b757321e"
+    },
+    {
+      "path": "evidence/vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "runnerSHA256": "1185154cf0b43bed0581340c6a5ae8d8142cd0e1318aa846e575288339128b92",
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 8.248,
+      "processJoined": true
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.139,
+      "processJoined": true
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "seconds": 10.586,
+      "processJoined": true
+    }
+  ],
+  "status": "passed",
+  "scope": "Fixture compilation, vet and documentation checks only; no native execution.",
+  "sourceUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "17931a30d8ea5d87658c6b757bd8c0b9b20f9a001d0addc456c9d301c3e9e3bc",
+    "compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "canonical.log": "190c1c9645bb77df6a487b8cb99ea395dad7a6371724f73f63102024c3afbf10"
+  }
+}

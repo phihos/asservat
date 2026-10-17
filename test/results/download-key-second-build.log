@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/context_publication_test.go:150:9: undefined: setup
+test/integration/context_publication_test.go:187:9: undefined: setup
+ok  	asservat.local/asservat/internal/application/evidence	0.004s
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

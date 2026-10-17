@@ -1,0 +1,169 @@
+package fleet
+
+import (
+	"context"
+	"slices"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// Notices are scheduling hints from the concrete fleet SQL observer. They do
+// not implement RecoveryReader, return a proof, or permit any effect. Keeping
+// the complete public value detects same-revision mutation before blocked SQL.
+func sameWorkerFleetValue(a, b value.Administration) bool {
+	return a.InstallationID == b.InstallationID && a.IssuerEpoch == b.IssuerEpoch && a.Issuer == b.Issuer && a.Revision == b.Revision && a.Suspended == b.Suspended &&
+		a.MaxActiveBootstraps == b.MaxActiveBootstraps && a.MaxBootstrapHistory == b.MaxBootstrapHistory && a.MaxClusters == b.MaxClusters &&
+		slices.Equal(a.Clients, b.Clients) && slices.Equal(a.Groups, b.Groups) && slices.Equal(a.DeliveryProfiles, b.DeliveryProfiles) && slices.Equal(a.Subjects, b.Subjects)
+}
+
+func cloneWorkerFleetValue(a value.Administration) *value.Administration {
+	a.Clients = slices.Clone(a.Clients)
+	a.Groups = slices.Clone(a.Groups)
+	a.DeliveryProfiles = slices.Clone(a.DeliveryProfiles)
+	a.Subjects = slices.Clone(a.Subjects)
+	return &a
+}
+
+// NoteFleetObservation belongs before the real SQL call. A changed or missing
+// source closes active work immediately, including while fencing is blocked.
+func (s *WorkerRuntimeAdmission) NoteFleetObservation(a value.Administration) {
+	if s == nil || s.self != s {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	if !a.Valid(time.Now()) || a.Suspended {
+		s.invalidateFleetLocked()
+		return
+	}
+	if s.fleetKnown != nil && !sameWorkerFleetValue(*s.fleetKnown, a) {
+		s.invalidateFleetLocked()
+	}
+	s.fleetKnown = cloneWorkerFleetValue(a)
+}
+
+// NoteFleetCommitted belongs only after an acknowledged real SQL observation.
+// Unknown commits and expired replies never issue a scheduling notification.
+func (s *WorkerRuntimeAdmission) NoteFleetCommitted(ctx context.Context, a value.Administration) {
+	if s == nil || s.self != s {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	if ctx == nil || ctx.Err() != nil || !a.Valid(time.Now()) || a.Suspended || s.fleetKnown == nil || !sameWorkerFleetValue(*s.fleetKnown, a) || !s.fleetKnown.ObservedAt.Equal(a.ObservedAt) || !s.fleetKnown.FreshUntil.Equal(a.FreshUntil) {
+		s.invalidateFleetLocked()
+		return
+	}
+	// A delayed completion cannot replace a later independent observation.
+	if s.fleetNotice != nil && !a.ObservedAt.After(s.fleetNotice.ObservedAt) {
+		return
+	}
+	s.fleetNotice = cloneWorkerFleetValue(a)
+	s.signalLocked()
+}
+
+func (s *WorkerRuntimeAdmission) invalidateFleetLocked() {
+	s.fleetNotice = nil
+	s.fleetKnown = nil
+	if s.active != nil {
+		s.active.cancel()
+	}
+	s.signalLocked()
+}
+
+// InvalidateFleetNotice is called before the concrete negative SQL call, and
+// also on an unknown/failed observation. It never writes SQL or clears recovery.
+func (s *WorkerRuntimeAdmission) InvalidateFleetNotice() {
+	if s == nil || s.self != s {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.closed {
+		s.invalidateFleetLocked()
+	}
+}
+
+type workerRuntimeLeaseKey struct{}
+
+// AwaitFleetObservation is solely for wrap/unwrap maintenance and owner audit,
+// before selecting any recovery proof, provider permit or audit candidate. It
+// waits for one independent source read begun after FIFO admission. The total
+// scheduling wait (queue plus this wait) has a fixed original five-second end.
+// The successful hint only shortens the lease to that original source end;
+// the caller still performs exactly one actual RecoveryState selection.
+func (p *WorkerRuntimeAdmissionLease) AwaitFleetObservation() error {
+	if p == nil || p.self != p || p.owner == nil {
+		return value.ErrUnavailable
+	}
+	s := p.owner
+	s.mu.Lock()
+	t := p.ticket
+	if t.purpose != workerWrapRefresh && t.purpose != workerUnwrapRefresh && t.purpose != workerOwnerAuditPurpose {
+		s.mu.Unlock()
+		return value.ErrUnavailable
+	}
+	// Reusing a consumed scheduling decision is not a new operation.
+	if t.scheduled {
+		s.mu.Unlock()
+		return value.ErrUnavailable
+	}
+	timer := time.NewTimer(time.Until(t.schedulingUntil))
+	defer timer.Stop()
+	for {
+		now := time.Now()
+		if s.closed || s.root.Err() != nil || t.ctx.Err() != nil || s.active != t || t.scheduled || !now.Before(t.schedulingUntil) {
+			t.cancel()
+			s.mu.Unlock()
+			return value.ErrUnavailable
+		}
+		n := s.fleetNotice
+		if n != nil && !n.ObservedAt.Before(t.grantedAt) && n.Valid(now) && !n.Suspended {
+			// This exact end cannot be extended by later notices or by SQL returning a
+			// newer observation. Blocking work must still check its current authority.
+			originalCancel := t.cancel
+			call, cancel := context.WithDeadline(t.ctx, n.FreshUntil)
+			t.ctx = call
+			t.cancel = func() { cancel(); originalCancel() }
+			t.scheduled = true
+			s.mu.Unlock()
+			return nil
+		}
+		changed, call := s.changed, t.ctx
+		s.mu.Unlock()
+		select {
+		case <-call.Done():
+		case <-timer.C:
+		case <-changed:
+		}
+		s.mu.Lock()
+	}
+}
+
+// ClaimOwnerAudit consumes the one owner-audit invocation on this already
+// scheduled ticket. Failure/unknown return cannot restart native/provider work
+// through the same ticket. It supplies only process admission, never authority.
+func (s *WorkerRuntimeAdmission) ClaimOwnerAudit(ctx context.Context) bool {
+	if s == nil || s.self != s || ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	p, ok := ctx.Value(workerRuntimeLeaseKey{}).(*WorkerRuntimeAdmissionLease)
+	if !ok || p == nil || p.self != p || p.owner != s {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := p.ticket
+	if s.closed || s.root.Err() != nil || s.active != t || t.purpose != workerOwnerAuditPurpose || !t.scheduled || t.ownerAuditTaken || t.ctx.Err() != nil || ctx.Err() != nil {
+		return false
+	}
+	t.ownerAuditTaken = true
+	return true
+}

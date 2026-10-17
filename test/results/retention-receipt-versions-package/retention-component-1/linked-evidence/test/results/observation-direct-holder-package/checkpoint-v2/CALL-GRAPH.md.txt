@@ -1,0 +1,54 @@
+# Direct holder source review
+
+State: frozen source only. No compile, test, architecture, specification or native result exists for this checkpoint. Counts below are structural estimates to be checked, not availability evidence. The rejected B100/B51 wrappers were not implemented.
+
+## Exact path and authority
+
+HWORK H uses its existing role70 MaxConns1 current-owner SQL read facet, installed local PermissionClient/OwnerEndpoints and original OwnerObservationPin. It has no owner client certificate. Holder A has its existing server key, current owner registry, concrete local caller/native reader and regional SQL49/holder dependencies. Regional R keeps its process-owned client key and the integrated four-ordinal operation. No new credential, native grant, SQL query/grant, rate limiter, address callback or remote Pod-IP assumption is added.
+
+H's complete candidate read uses the fixed original opted limit plus one and denies overflow. One complete same-RV EndpointSlice sequence retains all bindings for each present Ready Pod and supplies bounded local dial hints. The existing group-only method keeps its old return shape. Actual contacted TLS leaf membership, current SQL/configuration/roots and the initial exact selected native workload/address proof precede projected token access.
+
+Only the two fixed local v2 purposes accept that token: common-SNI locator GET and exact-SNI claim POST, with matching actual TLS ServerName/HTTP authority. The normal regional mTLS connection retains its original reachable Service bootstrap. Tokens stay in the local Authorization header/private bounded buffers and are cleared after joined cleanup. They are never regional frames, JSON, SQL, errors or audit.
+
+The caller constructor keeps fleet.ClusterObservationCallerPin. The now-integrated console ReadWorkerCaller producer supplies the original completed OwnerBootstrap root, account1, Deployment11/full original template/image, guard17/18 and positive configuration Launch provenance. Actual RS/Pod identities are native observations under Deployment11. This package does not publish a backend receipt or select the producer/runtime.
+
+## Complete original critical path
+
+| Step | Actual work | Bound carried into next work |
+|---|---|---|
+| H admission | Original valid request; process max2; complete current SQL candidates and one complete native Ready intersection | Minimum caller/query, candidate source/recovery, original route |
+| H selected peer | One actual common-SNI TLS; current exact registry1; genuine native initial; current registry2; then dedicated token read | Actual leaf, original native, newly returned SQL caps; no receipt renewal |
+| A GET | Pending slot before I/O; current own registry; genuine owner+HWORK initial native, two online TokenReviews; same existing owner operation current checks | Original GET socket/query, own current SQL/leaf, native, trusted token expiry |
+| A locator | Typed current local absence or exact positive reservation of one R standby+sequence | Reservation context is retained under the newly shortened SQL/native end, independently of GET-handler cancellation |
+| H selection | Current registry3 after GET; choose one authenticated positive; cancel and join losing local work | Earliest original H proof and returned exact locator end |
+| H claim | New real exact-SNI TLS at same native address and exact leaf; registry4; one POST with the same original token | Original selected end, current exact SQL/cert, no retry |
+| A claim | Atomic pending tuple spend; fresh own SQL; direct exact caller objects and two online reviews under original native guard; exact reservation.Select | Newly shortened SQL/token/caller cap immediately reaches metadata/conversation |
+| A/R exchange | Original actual exporter/leaf/source instance; ordinal1 and2 around SQL49; selected metadata; ordinal3 and4 around second SQL49 | Every accepted owner/source/recovery/backing/key/socket cap narrows following I/O |
+| Final native | A's genuine owner+HWORK final before question4; R's genuine native final before source value4; current keys/SQL/leaf afterwards | Original initial starts/ends remain binding; actual value4 mutation still denies |
+| Return | Exact Receipt, request EOF and response EOF; joined stream/handler; A final current output check; H registry5, genuine selected native final, registry6 | Result restricted to every original and later shorter cap before release |
+
+There is no positive minimum remaining accepted source/recovery time. A valid source may leave less than one second. Such a request denies if the complete actual path cannot finish; no source-age renewal, retry or invented fresh five seconds is allowed.
+
+## Concurrency, failures and lifetime
+
+H has at most two admitted operations and two active transport slots shared across them and losing candidates. Two bounded discovery workers each advance only after authenticated explicit absence. A candidate error ends that worker without being absence, but does not cancel another already-admitted candidate. If all workers finish without a positive, the result is unavailable. The preserved before variant returns on the first error; the new barrier-controlled regression holds an independent positive until that error has returned.
+
+Every positive A locator reserves/spends its original R standby before output. Parallel positive losers remain spent. GET output failure never reissues the locator. The retained entry binds original root/query/challenge, caller Pod and token, actual A serving leaf/process, native instance, current SQL identity, exact R exchange/sequence and original cutoff. Claim mismatch cannot manufacture a new entry; a matching claim spends before I/O. Unknown POST/Receipt/EOF cannot retry, refund, choose another standby or create another native proof.
+
+GET preparation cancellation remains linked until possible delivery and is joined before detachment. Retained proof/reservation lifetime descends from the process with the original GET socket cutoff, never from a GET context cancelled after handler return. POST cancellation joins actual native/SQL/frame/output work. Closed/spent entries stay charged until their original end; cleanup removes only the exact retained pointer. A process restart cannot reconstruct authority from returned IDs.
+
+A uses existing maximum16 pending slots and a separate same-size active-handler bound; the existing listener's process-wide accept/connection limits are not changed or selected here. All slots include cancelled work until joined cleanup. There is no installation-wide capacity claim.
+
+## Structural accounting, not timing
+
+For one page and one holder: H33 observer/6 independent probe calls (discovery5 + initial14 + final14), six selected-owner registry port calls; A51/6 (initial21 + claim9 + final21), approximately18 own-registry ports and two SQL49 pairs; R50/12 plus the selected metadata reader and seven current owner candidate/registry checks. A21 is owner14 plus two online reviews and exact caller account/Deployment/Pod/RS/Pod. Claim9 adds two namespace brackets to those seven direct caller reads. Other original source observers use these same existing clients.
+
+Each additional contacted candidate adds H14/3 and that A21/3 plus real SQL/TLS, with losing work joined. Different existing process buckets can refill while another leg runs, but setup/transit consumes the same original request/source lifetime. Port reads are not SQL query counts. No extra clients or unmeasured QPS increase is introduced. Full native H→A→R under shared/background clients, consecutive/concurrent operations, aged standbys, losing candidates, original recovery/source ages and all four metadata purposes remains mandatory before installed selection.
+
+## Source ownership and verification plan
+
+20 payload paths: 13 new Go files, four narrow existing Go helpers, new ADR150 and additive ADR144/architecture changes. Existing v1 bytes, public authenticators, ordinary full source ports, four ordinal numbers and metadata request digest are unchanged. The canonical decision index remains parent-owned; add the ADR150 link when integrating this reviewed record.
+
+23 top-level tests are staged. They cover real HTTPS/h2 plus the existing regional framed stream with synthetic SQL/native/CA authority; native boundary API fixtures separately assert real I/O count, current token/caller mutations, original expiry and joined Close. Other tests cover exact uint64/canonical closed codecs, current absence vs error, lost GET/POST, one-use concurrent claim, original token/leaf/sequence, complete candidate provenance/no fallback, shared socket ceiling and shortened reservation contexts. No test has run yet.
+
+Next allocated job: immutable-overlay compile, meaningful first-error failing-before, scoped new plus relevant legacy races, vet, exact-file architecture mirror. Then parent native fixture with actual APIs/SQL/TLS and unchanged limits. A passing local loopback test does not qualify native availability or installed production authority.

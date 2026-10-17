@@ -1,0 +1,36 @@
+package contracts
+
+import "io"
+
+const ConfigurationRoleInstallerFormat = "asservat-configuration-role-installer/v1"
+const ConfigurationRoleInstallerRoot = "/run/asservat/configuration-role-installer"
+const ConfigurationRoleInstallerMaxBytes = 96 << 10
+
+// Fixed privileged continuation before the ordinary reconciler can run. It
+// requires no accepted configuration projection and conveys no activation.
+type ConfigurationRoleInstaller struct {
+	CapacityProbe       *OwnerDeploymentCapacityProbe     `json:"capacityProbe,omitempty"`
+	InitialHistoryProbe *OwnerInitialHistoryProbe         `json:"initialHistoryProbe,omitempty"`
+	Format              string                            `json:"format"`
+	Launch              *ConfigurationRuntimeLaunchInputs `json:"launch,omitempty"`
+	Roles               ConfigurationRuntimeRoles         `json:"roles"`
+	OwnerDeployment     WorkerObjectReference             `json:"ownerDeployment"`
+	WorkloadGuard       OwnerDeploymentGuard              `json:"workloadGuard"`
+	FleetGuard          OwnerDeploymentGuard              `json:"fleetGuard"`
+	OwnerGuard          OwnerDeploymentGuard              `json:"ownerGuard"`
+	ConfigurationProbes []OwnerConfigurationProbe         `json:"configurationProbes"`
+	SchedulingLeases    []OwnerSchedulingLease            `json:"schedulingLeases"`
+	Kubernetes          OwnerProviderEndpoint             `json:"kubernetes"`
+	Postgres            OwnerPostgresEndpoint             `json:"postgres"`
+}
+
+func DecodeConfigurationRoleInstaller(r io.Reader) (ConfigurationRoleInstaller, error) {
+	return decodeClosedRPC[ConfigurationRoleInstaller](r, ConfigurationRoleInstallerMaxBytes)
+}
+
+// Generated only after protected immutable input creation returned real UIDs.
+// It selects no role, source, endpoint or alternate launch operation.
+type ConfigurationRuntimeLaunchInputs struct {
+	Configuration WorkerObjectReference `json:"configuration"`
+	Providers     WorkerObjectReference `json:"providers"`
+}

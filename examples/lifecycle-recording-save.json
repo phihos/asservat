@@ -1,0 +1,17 @@
+{
+  "executionMode": "ongoing",
+  "triggerKind": "recordingSave",
+  "triggeredAt": "2026-10-09T12:00:05Z",
+  "sourceSessionID": "00000000-0000-4000-8000-000000000191",
+  "sourceStartedAt": "2026-10-09T11:59:30Z",
+  "snapshotID": "00000000-0000-4000-8000-000000000198",
+  "requestedBefore": "20s",
+  "after": "0s",
+  "historyCoverage": "full",
+  "gapReasons": [],
+  "windowCoverage": "full",
+  "recordingSaveOrigin": {
+    "policyUID": "policy-trigger-lifecycles-uid",
+    "policyExecutionDigest": "4920c87bc4d15f2d7adbdde931973b7047c24a9bd0a086065f541a547bc41cb3"
+  }
+}

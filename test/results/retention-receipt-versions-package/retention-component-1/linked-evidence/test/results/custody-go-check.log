@@ -1,0 +1,17 @@
+go vet ./...
+go test -race -count=1 ./...
+ok  	asservat.local/asservat/internal/adapters/kms	1.044s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.111s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.693s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.682s
+?   	asservat.local/asservat/internal/adapters/postgres	[no test files]
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+ok  	asservat.local/asservat/internal/application/privacy	1.008s
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+ok  	asservat.local/asservat/test/integration	1.036s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 11 packages, 15 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 3 files match sqlc v1.31.1

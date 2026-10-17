@@ -1,0 +1,26 @@
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/11 18:50:11 http: TLS handshake error from 127.0.0.1:39422: remote error: tls: unknown certificate
+2026/10/11 18:50:11 http: TLS handshake error from 127.0.0.1:43920: remote error: tls: unknown certificate
+    console_test.go:117: console browser test failed: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+        
+        401 !== 403
+        
+            at file:///home/phil/Projekte/asservat/web/scripts/browser-test.mjs:115:10 {
+          generatedMessage: true,
+          code: 'ERR_ASSERTION',
+          actual: 401,
+          expected: 403,
+          operator: 'strictEqual',
+          diff: 'simple'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleBrowserWithBuiltPackage (6.58s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.595s
+FAIL

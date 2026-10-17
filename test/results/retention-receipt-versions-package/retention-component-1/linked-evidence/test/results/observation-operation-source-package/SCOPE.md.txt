@@ -1,0 +1,17 @@
+# ADR150 v2 channel consumer source stage
+
+Source-only, uncompiled, no runtime selection. These seven new paths build on the integrated ten-path value/port/SQL49 checkpoint. Legacy v1 files and formats are untouched.
+
+- `internal/contracts/observation_operation.go` and `_test.go`: distinct v2 native-bracket/source-value envelope, bounded closed codec, exact integer/unknown/duplicate-field checks. Metadata formats and request digest remain v1 byte-identical. The owner request uses the fixed future installed `owner-observation/v2` literal; regional reply uses independently selected `connector-observation/v2`.
+- `internal/adapters/mtls/observation_operation_wire.go` and `_test.go`: separate actual TLS exporter domain, pinned leaf/profile/channel reconstruction, original native versus actual source-value dates, wrong-purpose and phase rejection. No wire value instantiates native authority.
+- `internal/adapters/mtls/connector_operation_producer.go`: concrete process-owned keys plus the new native-operation port; private one-stream operation retains the actual stream/process root and original frame/request/socket/key/leaf bounds. Admission cancellation is linked then joined before transfer; native Close and admitted reads join. Each ordinal spends before actual native I/O, current private keys and pinned/current roots remain checked.
+- `internal/adapters/mtls/connector_operation_source.go`: same actual h2 stream and exact leaf/exporter through four ordinals; pair 3/4 cannot begin before pair 1/2 is accepted. The two returned SQL results must match the exact stored post-read values. Final result retains `FinalMatches` and `final.Last.Continues(first.Last)` against the same retained instance. This port is not the legacy full-source reader.
+- `internal/adapters/mtls/connector_operation_test.go`: real process keys and TLS exporter with explicit synthetic native/SQL facts. Covers normal first-phase return, admission cancellation, new bracket/channel/leaf/source between pairs, changed keys/roles/roots/backing, final mutation, original shorter caller/socket bounds and joined native/remote cleanup. These tests are unrun.
+
+The fixed current owner proof, regional phase ordering around metadata, actual v2 framing/Receipt/EOF and coordinator remain next within the same sustained implementation. No listener/loader selection is added to this checkpoint. Pending locator GET/POST ownership stays separate and must use the same private owner proof through final ordinal4.
+
+## Whole-path native timing gate
+
+The original start is HWORK request admission, before candidate SQL, Ready lookup, TLS and token access. The measured end is HWORK's successful final server native/SQL proof after B's result and A/R's exact final Receipt/EOF. Record all legs under that single caller interval: HWORK→B authentication; B→A locator/claim; A→R ordinals1/2; selected metadata; ordinals3/4; final A, B and HWORK checks. Also record each original source/native/leaf/socket deadline; the earliest wins.
+
+Per-process request counts are not a latency proof. Existing clients may refill while another leg runs, but neither proof nor caller dates reset. Actual native qualification must include already-used/shared clients, normal background observers and the original 20-QPS limit, alongside body-free per-leg durations/API counts. A cold/fresh bucket or synthetic source success cannot establish sustained five-second availability. No new limiter, rate, pool, deadline, retry or token relay is introduced.

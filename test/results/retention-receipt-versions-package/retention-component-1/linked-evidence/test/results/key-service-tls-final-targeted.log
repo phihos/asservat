@@ -1,0 +1,102 @@
+=== RUN   TestKeyServiceOriginalAuthorityBounds
+=== RUN   TestKeyServiceOriginalAuthorityBounds/ok
+=== RUN   TestKeyServiceOriginalAuthorityBounds/missing-authority
+=== RUN   TestKeyServiceOriginalAuthorityBounds/wrong-role
+=== RUN   TestKeyServiceOriginalAuthorityBounds/different-installation
+=== RUN   TestKeyServiceOriginalAuthorityBounds/unknown-authority
+=== RUN   TestKeyServiceOriginalAuthorityBounds/wrong-digest
+=== RUN   TestKeyServiceOriginalAuthorityBounds/wrong-peer
+=== RUN   TestKeyServiceOriginalAuthorityBounds/no-recovery
+=== RUN   TestKeyServiceOriginalAuthorityBounds/long-lease
+=== RUN   TestKeyServiceOriginalAuthorityBounds/future-observation
+=== RUN   TestKeyServiceOriginalAuthorityBounds/expired-after-authority
+=== RUN   TestKeyServiceOriginalAuthorityBounds/expired-after-backend
+=== RUN   TestKeyServiceOriginalAuthorityBounds/canceled-after-backend
+=== RUN   TestKeyServiceOriginalAuthorityBounds/malformed-output
+=== RUN   TestKeyServiceOriginalAuthorityBounds/mutated-binding
+--- PASS: TestKeyServiceOriginalAuthorityBounds (0.01s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/ok (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/missing-authority (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/wrong-role (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/different-installation (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/unknown-authority (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/wrong-digest (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/wrong-peer (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/no-recovery (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/long-lease (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/future-observation (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/expired-after-authority (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/expired-after-backend (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/canceled-after-backend (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/malformed-output (0.00s)
+    --- PASS: TestKeyServiceOriginalAuthorityBounds/mutated-binding (0.00s)
+=== RUN   TestKeyRequestDigestCoversExactOperation
+--- PASS: TestKeyRequestDigestCoversExactOperation (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/authorization	1.015s
+=== RUN   TestLocalKeyServiceTLSIsolationAndRevocation
+    key_service_test.go:232: real TLS wrap/read; exact binding and authority; collector/publisher/hub unwrap denial; current revocation on existing TLS connection
+--- PASS: TestLocalKeyServiceTLSIsolationAndRevocation (0.09s)
+=== RUN   TestLocalKeyServicePurposeAndSigning
+=== RUN   TestLocalKeyServicePurposeAndSigning/audit
+=== RUN   TestLocalKeyServicePurposeAndSigning/browser-credentials
+=== RUN   TestLocalKeyServicePurposeAndSigning/policy-submission
+--- PASS: TestLocalKeyServicePurposeAndSigning (0.10s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/audit (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/browser-credentials (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/policy-submission (0.03s)
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/unknown
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/alias
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/duplicate
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/trailing
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/oversized
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/null-input
+--- PASS: TestLocalKeyServiceRejectsWireSubstitution (0.06s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/unknown (0.00s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/alias (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/duplicate (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/trailing (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/oversized (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/null-input (0.00s)
+=== RUN   TestLocalKeyClientRejectsMalformedResponses
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/digest
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/expired
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/operation
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/unknown
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/duplicate
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/oversized
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/redirect
+--- PASS: TestLocalKeyClientRejectsMalformedResponses (0.16s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/digest (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/expired (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/operation (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/unknown (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/duplicate (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/oversized (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/redirect (0.02s)
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue
+--- PASS: TestLocalKeyServiceBoundsAndCurrentTLS (0.05s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection (0.02s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue (0.03s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.519s
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/0
+    framed_test.go:115: nativeBytes=0 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/4096
+    framed_test.go:115: nativeBytes=4096 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/16777295
+    framed_test.go:115: nativeBytes=16777295 wraps=3 unwraps=3 largestKeysetBytes=131
+--- PASS: TestArtifactKeyCallsIndependentOfPayloadSize (0.41s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/0 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/4096 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/16777295 (0.40s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	1.452s

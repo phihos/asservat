@@ -1,0 +1,13 @@
+{
+  "internal/adapters/postgres/download_workers.go": "50af36debb7c19e3b3608d40dc4ef29509473bb14c27bd735d9f5e8f7e3b155f",
+  "internal/adapters/postgres/worker_enrollment.go": "c629cbd4217657339189afe7168f79f5aacd6c1416d74f4ce6cb55e09713bed3",
+  "internal/adapters/postgres/worker_current_audit.go": "b01148ffc2300d4241f16fba58ba2d48c6300c91f45ab1273f1fd3e622105e9f",
+  "internal/adapters/postgres/custodydb/worker_enrollment.sql.go": "6cf56af01bb8acd42adb7cd787c273815da56328901f71ed28368e322832e82e",
+  "internal/adapters/postgres/public_runtime_role_plan.go": "e4ba4fadc1c968e2854075ec7e31d6770ccd7931e252419d25bc5f51e85edc98",
+  "internal/adapters/postgres/owner_identity_role_plan.go": "70a954461d45007a15cf999a93661323391b06e2c014aad7c4b0a38962a3987a",
+  "internal/contracts/public_runtime_roles.go": "9f82ec846c543c72c48e200e1196f8235bb83fe8b5ffd456984c9b5bcda5ccd9",
+  "migrations/00027_worker_enrollment.sql": "4ed5a8b4fd6d6c23a2d1542802ac3165d4902132ed3f060c10646f3322d86d40",
+  "migrations/queries/worker_enrollment.sql": "fb079938ade8cd504eef36109788af511319ec94b6a0d3ddb34e70975d014813",
+  "test/results/custody-regression-20261013-1/custody.log": "5f306567f10c3a1d78028da56ea495c823697df546f9ae5f977ccfd996689097",
+  "test/results/custody-regression-20261013-1/custody-postgres.log": "802173f56d4f1e37ebbf66e2a5140c2841437c5c6f8a666dbcedbfbcc1643d00"
+}

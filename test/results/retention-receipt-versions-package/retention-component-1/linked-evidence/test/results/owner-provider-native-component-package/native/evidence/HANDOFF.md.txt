@@ -1,0 +1,30 @@
+# Native owner provider authentication fixture
+
+Status: frozen compile/vet PASS, actual native execution is unrun. Handle 41032 terminal0: compile 3.205s, vet 0.599s; both payloads/bases and all 1,972 dependencies unchanged before/after. No runtime selection or exported product helper is added.
+
+Two new test paths are `internal/adapters/kms/owner_provider_native_fixture_test.go` and `owner_provider_native_test.go`. The five control files are now integrated live and independently match the exact qualified `control-lease-1` payloads. They are dependencies, not payloads in this candidate. Both native test paths have an absent live base. The prior `native-auth-1` remains immutable/unrun; `dependency-delta.json` records the parent integration delta.
+
+- Manifest: `64fe52fe255890070f35b9d19ffd84ce10ceaf5ab5f8caf9adf01390d421a79b`.
+- 1,972 live dependencies: `fa2b5842edbf96b470a1b4648d8a492263e7f90012cdacdd85639c2339e27cd8`.
+- Sequential compile/vet runner: `891047705affd0ed47d807f6e997ac54e4dcba394f34bc31b2d77660f2b66b1d`.
+
+The runner uses `GOMAXPROCS=2`, `GOFLAGS=-p=2`, its own explicit TMPDIR, create-only output, complete before/after hash checks, and a finite 240-second subprocess bound. It unsets the native opt-in/fixture variables. It does not execute the native test, make external requests, or repeat unchanged component races.
+
+## Parent-owned native command contract
+
+The approved closed context harness mode is `--owner-provider-auth`, selecting exactly `TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao` in `./internal/adapters/kms`, one owned cluster. It must set `ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE=1` and supply `ASSERVAT_CONTEXT_FIXTURES` with the existing one-cluster `clusters[].config` and `nativeProviders` TLS KMS/S3/Postgres/root values. The existing owned control-plane node must remain joined to the provider network: the external Bao TokenReview endpoint uses that exact node's native DNS name and actual Kubernetes CA, without an insecure TLS override. The parent staged the closed harness selector separately.
+
+Fixture setup uses only the owned lab's `synthetic-root` provider credential and actual administrator kubeconfig. It creates a Restricted namespace, two distinct accounts, a reviewer-only TokenReview ClusterRole, and scheduling-gated inert Pods. No test container runs, no image is pulled, and the owner account independently lacks TokenReview permission. The actual 600-second bound Pod JWTs are API-issued, not forged. Setup credentials never enter the generated four runtime policy sets.
+
+Named observations:
+
+1. All four generated roles: actual standard login, self lookup, positive renewal, preserved issue/hard/JWT bounds and unchanged previous lease observation.
+2. First actual Transit encrypt/decrypt and purpose-separated PKI signs; every cross-purpose effect and token creation denied.
+3. Wrong audience and an added default policy denied.
+4. Delete the original bound Pod, positively observe TokenReview denial, make one rejected renewal, then log in with a fresh Pod/token on the same original account. This is explicitly not a 600-second expiry qualification and grants no installed application authority to the replacement Pod.
+5. Provider-operator reviewer-token rotation using a second actual reviewer Pod; new login remains possible after deleting the old reviewer Pod.
+6. Same-name recreated account cannot replace the original UID in the control client.
+
+The aggregate native context is 150 seconds; every provider call retains its original five-second bound. Cleanup uses separately bounded exact-UID Kubernetes deletes and bounded self revocation, followed by the parent harness's joined cluster/container/network cleanup and frozen-source verification. Provider reply bodies, tokens, credential payloads and secret hashes are not logged.
+
+The fixture qualifies protocol/ACL behavior only. Protected provider recipe installation, actual owner process execution, current installed native/recovery/SQL effect checks, kubelet's timed projection rotation, S3 credential capability/rotation, and actual 600-second JWT expiry remain distinct gates. No full installed startup or public enablement follows from this test.

@@ -1,0 +1,108 @@
+package bootstrap
+
+import (
+	"context"
+	"crypto/tls"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/transport/clusterobservation"
+)
+
+// NewRegionalObservationOperationHandler composes one original installed
+// regional profile with its concrete SQL49 registry and actual receiving
+// stream/TLS state. It does not enable a listener or choose a profile from wire.
+// The holder and listener retain their independent process/socket ceilings.
+func NewRegionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, pin value.ConnectorObservationPin, ingress *mtls.OwnerObservationOperationIngress, registry *postgres.ConnectorObservationOperationRegistry, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
+	if registry == nil {
+		return nil, value.ErrInvalid
+	}
+	return regionalObservationOperationHandler(host, holder, pin, ingress, registry, now)
+}
+
+// The private seam permits deterministic tests of current SQL failure. Only the
+// public constructor above is used by installed composition, with the fixed
+// concrete registry. No wire/request can supply this dependency.
+func regionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, pin value.ConnectorObservationPin, ingress *mtls.OwnerObservationOperationIngress, registry app.ConnectorObservationOperationRegistry, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
+	if !pin.Valid() || ingress == nil || registry == nil || now == nil {
+		return nil, value.ErrInvalid
+	}
+	pin = pin.Clone()
+	return clusterobservation.NewHubObservationOperationHandler(host, holder, func(root, setup context.Context, state *tls.ConnectionState, hello contracts.ClusterObservationHello, stream *clusterobservation.HubObservationOperationStream) (clusterobservation.HubObservationOperationConversation, error) {
+		if setup == nil || setup.Err() != nil || hello.RootID != pin.Profile.RootID || hello.ClusterID != pin.Profile.Binding.ClusterID {
+			return nil, value.ErrUnavailable
+		}
+		coordinator, err := mtls.NewHubConnectorObservationOperation(root, pin, ingress, registry, stream, state, hello, now)
+		if err != nil {
+			return nil, err
+		}
+		if setup.Err() != nil {
+			coordinator.Close()
+			return nil, value.ErrUnavailable
+		}
+		return &regionalObservationOperationStandby{coordinator: coordinator}, nil
+	}, now)
+}
+
+// A standby is created before any query. Only the accepted locator record can
+// lend its exact private native operation after this original holder sequence
+// is spent. This wrapper never opens, rediscovers, renews or closes that proof.
+type regionalObservationOperationStandby struct {
+	coordinator            *mtls.HubConnectorObservationOperation
+	mu                     sync.Mutex
+	operation              *mtls.OwnerObservationOperation
+	bound, started, closed bool
+}
+
+func (s *regionalObservationOperationStandby) bind(operation *mtls.OwnerObservationOperation) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if operation == nil || s.closed || s.bound || s.started {
+		return value.ErrUnavailable
+	}
+	s.bound = true
+	s.operation = operation
+	return nil
+}
+func (s *regionalObservationOperationStandby) ObserveCluster(ctx context.Context, request value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+	s.mu.Lock()
+	if s.closed || !s.bound || s.started || ctx == nil || ctx.Err() != nil {
+		s.mu.Unlock()
+		return value.ClusterObservationResult{}, value.ErrUnavailable
+	}
+	s.started = true
+	operation := s.operation
+	s.mu.Unlock()
+	return s.coordinator.ObserveClusterOperation(ctx, request, operation)
+}
+func (s *regionalObservationOperationStandby) Close() {
+	s.mu.Lock()
+	s.closed = true
+	s.mu.Unlock()
+	s.coordinator.Close()
+}
+
+// ObserveRegionalOperation consumes the already selected original holder once.
+// Its caller owns the accepted locator's original finite root and sole proof
+// Close. An uncertain result is spent; calling Lookup again is not recovery.
+func ObserveRegionalOperation(ctx context.Context, holder *clusterobservation.HubObservationOperationHolder, locator clusterobservation.HubObservationLocator, request value.ClusterObservationRequest, operation *mtls.OwnerObservationOperation) (value.ClusterObservationResult, error) {
+	var zero value.ClusterObservationResult
+	if holder == nil || operation == nil {
+		return zero, value.ErrUnavailable
+	}
+	claim, err := holder.Claim(ctx, locator, request)
+	if err != nil {
+		return zero, err
+	}
+	defer claim.Close()
+	standby, ok := claim.Conversation().(*regionalObservationOperationStandby)
+	if !ok || standby.bind(operation) != nil {
+		return zero, value.ErrUnavailable
+	}
+	return claim.Observe()
+}

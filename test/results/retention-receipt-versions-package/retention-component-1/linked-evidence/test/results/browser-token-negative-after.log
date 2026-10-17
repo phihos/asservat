@@ -1,0 +1,3 @@
+ok  	asservat.local/asservat/internal/adapters/oidc	2.757s
+ok  	asservat.local/asservat/internal/application/identity	1.007s
+ok  	asservat.local/asservat/internal/transport/browser	1.022s

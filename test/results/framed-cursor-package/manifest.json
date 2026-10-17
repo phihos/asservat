@@ -1,0 +1,37 @@
+[
+  {
+    "path": "docs/architecture/artifact-format.md",
+    "base_sha256": "f90149f1b76702796f8d06f7d3c86046ef0cd7d2c11843a1f31e0d83a88d4f50",
+    "sha256": "e96b61f5d89efd1d9e65886fdd83ac30832f75da7f2a616fd5bafdb090617711"
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/cursor.go",
+    "base_sha256": null,
+    "sha256": "a2684d4dc5d8da69214be2cda8dbeb071deab62a567c8f9df4efd3e65c8bc5ab"
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/cursor_test.go",
+    "base_sha256": null,
+    "sha256": "b3a9581decb1a04267891b34096bf3f0b213e5c8a697ed371ba1012b723c335a"
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/decode.go",
+    "base_sha256": "195dcfbfd84fe26ba39c33e8c592001c1ec7ae30f446f18fdabef6162d98dd2f",
+    "sha256": "de38aab0b512033e97e4ac5e62d2ca64562a57d8cac44f266e882e67acbea2be"
+  },
+  {
+    "path": "internal/adapters/objectstore/framed/reader_boundary_test.go",
+    "base_sha256": null,
+    "sha256": "e606a79b7a09e4de6e8ff4b60fd144634c16b19f3efe928063648200c62cc3e6"
+  },
+  {
+    "path": "internal/domain/artifact/framed_read_work.go",
+    "base_sha256": null,
+    "sha256": "7ff623325169262665c3ca9d8c05325b723a3d1b9f8f803079bb9280d025a8f4"
+  },
+  {
+    "path": "internal/domain/artifact/framed_read_work_test.go",
+    "base_sha256": null,
+    "sha256": "900549512c8cf29f37e260481d2bd9696d1eb6f5159aac9a3746d09805ee865a"
+  }
+]

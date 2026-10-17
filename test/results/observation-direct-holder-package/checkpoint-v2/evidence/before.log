@@ -1,0 +1,6 @@
+=== RUN   TestDirectHolderUnavailableFirstCandidateKeepsIndependentPositive
+    cluster_observation_operation_client_test.go:264: unavailable first candidate cancelled independent pending positive current signing trust unavailable
+--- FAIL: TestDirectHolderUnavailableFirstCandidateKeepsIndependentPositive (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.020s
+FAIL

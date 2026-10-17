@@ -1,0 +1,22 @@
+{
+  "test/integration/capacity_context_test.go": {
+    "before": "7d5d847c6e5da7336c915d54e9a339820f29bbcd103dcefe19fcf5f8cad596ea",
+    "after": "5c067e4e80a5fa23e7f0867db5f6fc71858dd1132e02ed8815f142fb4667d9fe"
+  },
+  "test/integration/capacity_lineage_test.go": {
+    "before": null,
+    "after": "16abe02c36ed409d84bb40b9f93b33418986658c60510bf21f232fba8bfc052d"
+  },
+  "test/integration/capacity_session_test.go": {
+    "before": "7aae359cb3b3280d5e5e728dfa67f31e9c6d0ca8713d61084f8b242418745f97",
+    "after": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054"
+  },
+  "test/integration/owner_capacity_probe_test.go": {
+    "before": "8603874e25db6a8ba5466770ec5113b645eb7421a54d47a434ec936671c644fb",
+    "after": "8d303acb419de205f04e4ad376ae67b6c352a3b3979887b2f84ca3222336f7c7"
+  },
+  "test/integration/retention_effect_fixture_test.go": {
+    "before": "2933193f64184110cb8d89676b72ce33771ce0b8b9323fea2feec69011a0fb44",
+    "after": "c3f4b3c88e406b5b1684b4cfa923b3840c82efa579d18dc310543523c18af1ae"
+  }
+}

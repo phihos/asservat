@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "base_sha256": "e036a0fd051684b4fc29493c7170d4f84cc1120e007690857ec04277236fd837",
+    "sha256": "49e4278be6b1fcbef5cdbe9d6a3f52c82e297c261d82412a834e37b9ac297afc"
+  },
+  {
+    "path": "test/integration/context_native_fixture_test.go",
+    "base_sha256": null,
+    "sha256": "ae793feb079252dcce198d9456625d09976362e2b2d474c8914986bdb4cf7095"
+  }
+]

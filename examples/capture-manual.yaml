@@ -1,0 +1,25 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugCapture
+metadata:
+  name: manual-ledger-diagnostic
+  namespace: payments
+spec:
+  target:
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: StatefulSet
+      name: ledger
+      uid: workload-ledger-uid
+    maxPods: 1
+    selection: lowestOrdinal
+    adoption: pinUID
+    ordinals:
+    - 0
+  recipeRef:
+    name: bounded-live-diagnostics
+    digest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
+  reason: Investigate a synthetic ledger stall.
+  grantRef: 00000000-0000-4000-8000-000000000044
+  idempotencyKey: manual-ledger-request-001
+  deadline: '2026-10-09T12:05:00Z'

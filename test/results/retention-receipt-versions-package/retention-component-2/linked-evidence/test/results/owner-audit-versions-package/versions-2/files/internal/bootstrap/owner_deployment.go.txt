@@ -1,0 +1,342 @@
+package bootstrap
+
+import (
+	"asservat.local/asservat/internal/domain/authorization"
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"fmt"
+	"net"
+	"os"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/application/evidence"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	configuration "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// OwnerDeployment composes only the private owner subsystem. Installation and
+// continuously reconciled audited configuration/recovery are independent; this
+// process cannot initialize them, accept profiles or clear RecoveryBlocked.
+type OwnerDeployment struct {
+	Runtime       *OwnerRuntime
+	Router        *evidence.WorkerEnrollmentRouter
+	inputs        *ownerInputs
+	trust         *mtls.WorkerTrustCatalog
+	root          context.Context
+	cancel        context.CancelFunc
+	closers       []func()
+	mu            sync.Mutex
+	closed        bool
+	running       bool
+	owners        sync.WaitGroup
+	once          sync.Once
+	catalogDigest [32]byte
+}
+
+func ownerRandomID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return ""
+	}
+	b[6] = (b[6] & 15) | 64
+	b[8] = (b[8] & 63) | 128
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+// NewOwnerDeployment borrows an installation-owned mount root. The caller
+// retains it until Run/Close has stopped all use. No path comes from a request.
+func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerDeployment, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	in, err := readOwnerInputs(ctx, files)
+	if err != nil {
+		return nil, err
+	}
+	// The full runtime never substitutes empty routing/native adapters for the
+	// independently selected own-observation startup phase.
+	if in.config.Observation != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	root, cancel := context.WithCancel(ctx)
+	d := &OwnerDeployment{inputs: in, root: root, cancel: cancel}
+	d.closers = append(d.closers, in.closeHTTP)
+	complete := false
+	defer func() {
+		if !complete {
+			d.Close()
+		}
+	}()
+	startup, end := context.WithTimeout(root, 30*time.Second)
+	defer end()
+	pools := map[string]*pgxpool.Pool{}
+	users := map[string]bool{}
+	roles := []string{"enrollment", "audit", "activation", "registry", "routing"}
+	if in.config.Native != nil {
+		roles = append(roles, "native-read")
+	}
+	for _, role := range roles {
+		c, err := in.sqlConfig(startup, "sql-"+role+".json")
+		if err != nil || c == nil || users[c.ConnConfig.User] {
+			return nil, mounts.ErrUnavailable
+		}
+		users[c.ConnConfig.User] = true
+		pool, err := pgxpool.NewWithConfig(startup, c)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		pools[role] = pool
+		d.closers = append(d.closers, pool.Close)
+	}
+	c := in.config
+	configs, err := postgres.NewOwnerConfigurations(startup, pools["registry"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	current, err := configs.ReadOwnerConfiguration(startup)
+	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
+		return nil, mounts.ErrUnavailable
+	}
+	pool := current.Configuration.Pool
+	roots, _, err := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	ledgers := map[string]*postgres.OwnerEnrollments{}
+	for _, role := range []string{"enrollment", "audit", "activation", "registry"} {
+		l, err := postgres.NewOwnerEnrollments(startup, pools[role], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID, ownerRandomID)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		ledgers[role] = l
+	}
+	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	actors := make([]configuration.KubernetesActor, len(c.WorkloadGuard.Administrators))
+	for i, a := range c.WorkloadGuard.Administrators {
+		actors[i] = configuration.KubernetesActor{Kind: a.Kind, Name: a.Name}
+	}
+	g := c.WorkloadGuard
+	schedulingLeases := make([]configuration.OwnerSchedulingLease, len(c.SchedulingLeases))
+	for i, l := range c.SchedulingLeases {
+		schedulingLeases[i] = configuration.OwnerSchedulingLease{Lease: l.Lease, ServiceAccount: l.ServiceAccount}
+	}
+	configurationProbes := make([]configuration.OwnerConfigurationProbe, len(c.ConfigurationProbes))
+	for i, p := range c.ConfigurationProbes {
+		configurationProbes[i] = configuration.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
+	}
+	var initialHistory *configuration.OwnerInitialHistoryProbe
+	if p := c.InitialHistoryProbe; p != nil {
+		initialHistory = &configuration.OwnerInitialHistoryProbe{Namespace: configuration.NamespaceRef{Name: p.Namespace.Name, UID: p.Namespace.UID}, ServiceAccount: p.ServiceAccount.Name, ServiceAccountUID: p.ServiceAccount.UID, Configuration: p.Configuration}
+	}
+	starts, err := ownerDeploymentStarts(c.APIContextStarts)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	capacityProbe, err := ownerDeploymentCapacityProbe(c.CapacityProbe)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: pool.Deployment, DeploymentUID: pool.DeploymentUID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	proofs, err := kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	routes := &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}
+	h, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, h.CloseIdleConnections)
+	seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, seal.Close)
+	open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, open.Close)
+	storageHTTP, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, storageHTTP.CloseIdleConnections)
+	store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, mountedStorage{in.providerInputs}, storageHTTP)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, store.Close)
+	audits := &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: seal, Open: open}
+	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pool, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	services := map[string]*app.OwnerEnrollmentCoordinator{}
+	for _, usage := range []string{"server", "client"} {
+		role := c.KeyService.ServerRole
+		if usage == "client" {
+			role = c.KeyService.ClientRole
+		}
+		issuer, err := kms.NewOwnerCertificateIssuerForPoolWithTokenSource(c.KeyService.Endpoint, c.KeyService.PKIMount, role, pool, usage, roots, in.token("owner-"+usage+"-sign.token"), h, time.Now)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.closers = append(d.closers, issuer.Close)
+		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuer, Now: time.Now}
+	}
+	reader, err := postgres.NewWorkerRouting(startup, pools["routing"], c.PermissionRootID, c.InstallationID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.trust, err = mtls.NewWorkerTrustCatalog(c.InstallationID, nil)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	if _, err = d.refreshWorkerTrust(startup); err != nil {
+		return nil, err
+	}
+	d.Router, err = evidence.NewWorkerEnrollmentRouter(root, c.InstallationID, reader, time.Now, c.Concurrency)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	var nativeConfig *OwnerNativeRuntimeConfig
+	if (c.Native == nil) != (pool.NativePort == 0) {
+		return nil, mounts.ErrUnavailable
+	}
+	if c.Native != nil {
+		nativeConfig, err = d.nativeConfiguration(startup, pools["native-read"], observer)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
+		return &evidence.WorkerRequestOwners{Router: d.Router, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}, nil
+	}, WorkerTrust: d.trust, Workers: reader, Locators: reader, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig})
+	if err != nil || startup.Err() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	complete = true
+	return d, nil
+}
+
+func (d *OwnerDeployment) refreshWorkerTrust(ctx context.Context) ([32]byte, error) {
+	var zero [32]byte
+	b, err := mounts.Read(ctx, d.inputs.files, "worker-controls.json", 16<<20)
+	if err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	defer clear(b)
+	digest := sha256.Sum256(b)
+	if digest == d.catalogDigest {
+		return digest, nil
+	}
+	wire, err := contracts.DecodeOwnerWorkerTrust(bytes.NewReader(b))
+	if err != nil || wire.Format != contracts.OwnerWorkerTrustFormat || wire.Controls == nil || len(wire.Controls) > 256 {
+		return zero, mounts.ErrUnavailable
+	}
+	if err = d.trust.Replace(wire.Controls); err != nil {
+		return zero, mounts.ErrUnavailable
+	}
+	d.catalogDigest = digest
+	return digest, nil
+}
+
+func (d *OwnerDeployment) Close() {
+	if d == nil {
+		return
+	}
+	d.once.Do(func() {
+		d.mu.Lock()
+		d.closed = true
+		d.mu.Unlock()
+		if d.cancel != nil {
+			d.cancel()
+		}
+		// Disable both owners before joining either. Runtime.Run owns its
+		// readiness/native children; the router also admits independent control
+		// registrations and retains busy deliveries through their final close.
+		if d.Router != nil {
+			d.Router.Close()
+		}
+		if d.Runtime != nil {
+			d.Runtime.Close()
+		}
+		d.owners.Wait()
+		if d.Router != nil {
+			d.Router.CloseAndJoin()
+		}
+		for i := len(d.closers) - 1; i >= 0; i-- {
+			d.closers[i]()
+		}
+	})
+}
+
+// Run owns the listener on acceptance. A missing/malformed current catalog
+// stops the subsystem; retaining an earlier snapshot is not a refresh success.
+func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener) error {
+	if d == nil || d.Runtime == nil || d.root == nil || listener == nil {
+		return mounts.ErrUnavailable
+	}
+	d.mu.Lock()
+	if d.closed || d.running || d.root.Err() != nil {
+		d.mu.Unlock()
+		return mounts.ErrUnavailable
+	}
+	d.running = true
+	d.owners.Add(1)
+	d.mu.Unlock()
+	defer func() {
+		// The body has joined Runtime.Run. Release this registration before
+		// shared shutdown waits, including when external Close owns it.
+		d.owners.Done()
+		d.Close()
+	}()
+	done := make(chan error, 1)
+	go func() { done <- d.Runtime.Run(listener, additional...) }()
+	timer := time.NewTicker(time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-d.root.Done():
+			d.Runtime.Close()
+			return <-done
+		case <-timer.C:
+			if _, err := d.refreshWorkerTrust(d.root); err != nil {
+				d.cancel()
+				d.Runtime.Close()
+				<-done
+				return err
+			}
+		}
+	}
+}

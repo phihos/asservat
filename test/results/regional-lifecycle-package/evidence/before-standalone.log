@@ -1,0 +1,4 @@
+=== RUN   TestConnectorLifecycleLegacyStandaloneNativeCounts
+    connector_lifecycle_nested_regression_test.go:153: legacy-native ordinal=1 elapsed=1.836951335s remaining=3.163043414s observer=54 probe=12 failed=false
+--- PASS: TestConnectorLifecycleLegacyStandaloneNativeCounts (1.99s)
+PASS

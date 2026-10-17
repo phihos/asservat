@@ -1,0 +1,41 @@
+=== RUN   TestKeycloakProvider
+=== RUN   TestKeycloakProvider/product-browser-sessions
+=== RUN   TestKeycloakProvider/product-browser-sessions/signed-policy-submission
+    browser_sessions_test.go:331: real browser identity, JWS through nonexportable OpenBao key, sign-only ACL, explicit versions, provider retirement and current-key revocation passed
+=== NAME  TestKeycloakProvider/product-browser-sessions
+    identity_provider_test.go:227: actual confidential OIDC/S256/nonce, opaque cookies, encrypted SQL credentials, current identity and single refresh across eight callers passed
+=== RUN   TestKeycloakProvider/product-browser-sessions/CSRF-read-overlapping-committed-provider-refresh
+=== RUN   TestKeycloakProvider/product-browser-sessions/live-reader-across-short-interval-and-explicit-refresh
+=== RUN   TestKeycloakProvider/product-browser-sessions/current-request-before-local-logout
+=== RUN   TestKeycloakProvider/product-browser-sessions/live-reader-revoked-by-local-logout
+=== RUN   TestKeycloakProvider/product-browser-sessions/current-request-revoked-by-local-logout
+=== RUN   TestKeycloakProvider/product-browser-sessions/explicit-post-owned-provider-refresh-without-tab-polling
+    browser_sessions_test.go:645: actual Keycloak/SQL/OpenBao one-use refresh continues after explicit POST without tab polling; fixed session and read-only GET preserved; accepted download/process journal is synthetic and no native bytes transferred
+=== RUN   TestKeycloakProvider/product-browser-sessions/protected-settings
+    browser_sessions_test.go:677: current settings, source continuity, role separation, monotonic lifetime, outage logout, lock expiry and never-reused epochs passed
+=== RUN   TestKeycloakProvider/product-browser-sessions/already-due-refresh-schedule
+=== RUN   TestKeycloakProvider/product-browser-sessions/SQL-fences
+=== RUN   TestKeycloakProvider/product-browser-sessions/bounded-cleanup-role
+=== NAME  TestKeycloakProvider/product-browser-sessions
+    identity_provider_test.go:227: browser group removal, local and actual provider back-channel logout, SQL replay/expiry/epoch/role fences and OpenBao credential encryption passed; protected bootstrap remains unqualified
+=== NAME  TestKeycloakProvider
+    identity_provider_test.go:284: authorization code+S256, ID/refresh rejection, rotating refresh and current stable group rename/add/removal passed
+    identity_provider_test.go:306: nested stable group IDs, ancestor inheritance, direct/inherited deduplication, slash-containing names and removal passed
+    identity_provider_test.go:333: ordinary profile update allowed; user cannot self-assign authority-bearing stable group IDs
+    identity_provider_test.go:353: real authorization code replay and wrong PKCE verifier rejected
+    identity_provider_test.go:361: separate human/workload clients, password grant denial and disabled-user refresh denial passed; existing JWT remains valid only within original application freshness bounds
+--- PASS: TestKeycloakProvider (8.96s)
+    --- PASS: TestKeycloakProvider/product-browser-sessions (7.37s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/signed-policy-submission (0.04s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/CSRF-read-overlapping-committed-provider-refresh (0.08s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/live-reader-across-short-interval-and-explicit-refresh (5.23s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/current-request-before-local-logout (0.05s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/live-reader-revoked-by-local-logout (0.00s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/current-request-revoked-by-local-logout (0.00s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/explicit-post-owned-provider-refresh-without-tab-polling (0.20s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/protected-settings (0.32s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/already-due-refresh-schedule (0.05s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/SQL-fences (0.30s)
+        --- PASS: TestKeycloakProvider/product-browser-sessions/bounded-cleanup-role (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.011s

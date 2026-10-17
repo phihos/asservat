@@ -1,0 +1,9 @@
+{
+  "cipherBytes": 67113029,
+  "ciphertextRead": 53477377,
+  "limitation": "Separate seeded incompressible stream; sequential read/discard work measurement, not resumed whole-file integrity proof",
+  "nativeBytes": 67108864,
+  "nativeOffset": 51380224,
+  "rangeMilliseconds": 42.624,
+  "requestedRangeBytes": 1048576
+}

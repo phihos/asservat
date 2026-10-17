@@ -1,0 +1,15 @@
+{
+  "scope": "Test-only SQL role names preserve deterministic UUID uniqueness",
+  "files": [
+    {
+      "path": "test/integration/connector_identity_names_test.go",
+      "base_sha256": null,
+      "new_sha256": "c3b2873c88755182a956a92e16718be34c28b0eb48787fffa695196fa2d8977f"
+    },
+    {
+      "path": "test/integration/connector_identity_test.go",
+      "base_sha256": "4d6bed6910140a1971473e6e550044b44fa7f2e3a3bab6f263b53c68231163db",
+      "new_sha256": "2e0d8b7b244e0569f61fd6bfb72509c1863215a632fb243245daa90009def0ea"
+    }
+  ]
+}

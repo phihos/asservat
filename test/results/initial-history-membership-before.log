@@ -1,0 +1,10 @@
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres/original-creator-membership-survives-revoke
+    initial_history_role_test.go:80: creator grant before_count=1 before_exact=true after_count=1 after_exact=true
+=== NAME  TestInitialSQLHistoryRoleWithRealPostgres
+    initial_history_role_test.go:116: history create failed: history_phase=history-role-privileges sqlstate=none expired=false
+--- FAIL: TestInitialSQLHistoryRoleWithRealPostgres (0.26s)
+    --- PASS: TestInitialSQLHistoryRoleWithRealPostgres/original-creator-membership-survives-revoke (0.02s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.314s
+FAIL

@@ -1,0 +1,5 @@
+--- FAIL: TestKeyServiceRequiresCurrentKeyConfiguration (0.00s)
+    key_service_test.go:39: a service without current key configuration accepted an operation
+FAIL
+FAIL	asservat.local/asservat/internal/application/authorization	0.002s
+FAIL

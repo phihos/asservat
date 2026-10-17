@@ -1,0 +1,39 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "capture_id": "00000000-0000-4000-8000-000000000031",
+    "revision": 2,
+    "phase": "Running",
+    "actions": [
+      {
+        "action_id": "context",
+        "phase": "Succeeded"
+      },
+      {
+        "action_id": "core",
+        "phase": "WaitingApproval"
+      }
+    ],
+    "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000031",
+    "approval_navigation_uri": "https://asservat.example.invalid/grants/00000000-0000-4000-8000-000000000044",
+    "grant_id": "00000000-0000-4000-8000-000000000044",
+    "retry_after_seconds": 5,
+    "can_cancel": true,
+    "blockers": [
+      {
+        "code": "GrantRequired",
+        "message": "Core approval pending; context is available.",
+        "responsible_role": "approver",
+        "retryable": false
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

@@ -1,0 +1,5 @@
+--- FAIL: TestWorkerTemporaryStorageCredentialNeedsKnownExpiry (0.00s)
+    download_worker_native_inputs_test.go:105: temporary storage credentials with unknown expiry admitted for a finite worker
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.048s
+FAIL

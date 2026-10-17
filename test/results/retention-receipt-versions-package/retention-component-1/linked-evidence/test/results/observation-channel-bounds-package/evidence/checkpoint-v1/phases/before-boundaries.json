@@ -1,0 +1,6 @@
+{
+  "post-metadata candidate lost original shorter owner cutoff": 1,
+  "metadata result lost newly observed owner cutoff": 1,
+  "expired retained cutoff admitted another candidate read": 1,
+  "metadata result survived original cutoff during key lock wait": 1
+}

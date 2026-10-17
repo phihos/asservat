@@ -1,0 +1,18 @@
+{
+  "scope": "Fixture-only original eligibility reason whitelist and unchanged CurrentIdentity delegation; no production fix, deadline change or replay",
+  "paths": [
+    {
+      "path": "test/integration/public_context_journey_diagnostics_test.go",
+      "base_sha256": "e006be61d36dc67c4c80c60cf6e55e71541db83e9b29f6e0382a4885ba42c4b1",
+      "payload_sha256": "58316bf16d9fb7232019905df5beec34ecb5ceca0e791390800b32c81b608133"
+    },
+    {
+      "path": "test/integration/public_context_regional_diagnostics_test.go",
+      "base_sha256": "851d6fffcffdab8b14655e8d184badce4f7ed52afd6ef3ad671d9cc4b67daa71",
+      "payload_sha256": "72839ba05946879f40a41fe5b7056151d0bab9145ee4fea339ee27e5dd6c60cf"
+    }
+  ],
+  "review_patch_sha256": "ead27e85a3e793b6abfe536fe860d7c782cbcb981943a471996a4c5beadd3e64",
+  "native7_result_sha256": "ddf59b276948e38e7a63ed6fa65b86dd823358a021280e81eecaedf3f3e62240",
+  "native7_independent_verification_sha256": "0bb378895ab361597dcdc520b1183fb347fe11d3e259c797bab08eda3d841061"
+}

@@ -1,0 +1,8 @@
+=== RUN   TestHelmClusterInstallWithRealServices
+    helm_cluster_test.go:118: helm install mode=cluster: Helm command: exit status 1: Release "asservat" does not exist. Installing it now.
+        Error: failed post-install: resource Job/asservat-region/asservat-cluster-installer not ready. status: Failed, message: Job Failed. failed: 3/1
+        
+--- FAIL: TestHelmClusterInstallWithRealServices (35.71s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	35.783s
+FAIL

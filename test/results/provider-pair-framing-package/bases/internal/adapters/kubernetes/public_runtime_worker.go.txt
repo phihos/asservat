@@ -1,0 +1,231 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	coordination "k8s.io/api/coordination/v1"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+func publicRuntimeWorkerPurpose(purpose string) bool {
+	switch purpose {
+	case "capture-cleanup", "capture-verifier", "capture-finalizer", "capacity", "capacity-capture":
+		return true
+	default:
+		return false
+	}
+}
+
+func publicRuntimeWorkerBindingValid(in contracts.PublicRuntimeRoles) bool {
+	w := in.Worker
+	prefix := strings.ReplaceAll(in.InstallationID, "-", "")
+	names := runtimeResourceNames(in.InstallationID)
+	if w.WorkerLayout != contracts.HubWorkerInstalledLayout || !authorization.UUID(w.ResourceSetupID) || !authorization.UUID(w.ConfigurationSetupID) || !preparationDigestValid(w.ResourceBinding) || !installationRefValid(w.FleetGuardName, w.Resources.UID) || w.Resources.Name != "asservat-runtime-resources-"+prefix || !authorization.UUID(w.Resources.UID) || w.ConfigurationRoot.Name != "asservat-configuration-roles-"+prefix || !authorization.UUID(w.ConfigurationRoot.UID) || w.Resources.UID == w.ConfigurationRoot.UID {
+		return false
+	}
+	c := w.Configuration
+	if c.Format != contracts.ConfigurationRuntimeRolesFormat || c.InstallationID != in.InstallationID || c.InitialClaimID != in.InitialClaimID || c.ClusterID != in.ClusterID || c.Namespace != in.Namespace || c.Deployment != w.Deployment.Reference || c.ServiceAccount != w.Account.Reference || c.OwnerSource.UID != in.OwnerConfigurationUID || c.OwnerSource.Name != names.OwnerSource || !installationRefValid(c.FleetSource.Name, c.FleetSource.UID) || !preparationDigestValid(c.LayoutDigest) {
+		return false
+	}
+	seen := map[string]bool{w.Resources.UID: true, w.ConfigurationRoot.UID: true}
+	for _, entry := range []struct {
+		value contracts.PublicRuntimeWorkerObject
+		name  string
+	}{{w.Deployment, names.Worker}, {w.Account, names.Worker}, {w.Lease, names.Lease}} {
+		v := entry.value
+		if v.Reference.Name != entry.name || !authorization.UUID(v.Reference.UID) || seen[v.Reference.UID] || !authorization.UUID(v.OperationID) || !preparationDigestValid(v.TemplateDigest) {
+			return false
+		}
+		seen[v.Reference.UID] = true
+	}
+	return w.Deployment.OperationID != w.Account.OperationID && w.Deployment.OperationID != w.Lease.OperationID && w.Account.OperationID != w.Lease.OperationID
+}
+
+// BuildPublicRuntimeWorkerBinding translates original completed producer
+// receipts into a closed input. This pure function provides provenance only;
+// the role root independently reads the same journals and live objects before
+// any credential effect. A supplied snapshot is never current authority.
+func BuildPublicRuntimeWorkerBinding(resources contracts.InitialRuntimeResourceSnapshot, inventory InitialRuntimeResourceInventory, configuration contracts.ConfigurationRuntimeRoleSnapshot) (contracts.PublicRuntimeWorkerBinding, error) {
+	var zero contracts.PublicRuntimeWorkerBinding
+	v := resources.State
+	c := configuration.State
+	if v.WorkerLayout != contracts.HubWorkerInstalledLayout || !authorization.UUID(resources.UID) || !authorization.UUID(configuration.UID) || len(v.Objects) != len(initialRuntimeResourceItems) || c.Launch == nil || c.Launch.Receipt == nil || !configurationRoleStateValid(c.Input, c, time.Now()) || inventory.Namespace != c.Input.Namespace || inventory.WorkerDeployment != c.Input.Deployment || inventory.WorkerAccount != c.Input.ServiceAccount || inventory.FleetSource != c.Input.FleetSource || inventory.OwnerSource != c.Input.OwnerSource {
+		return zero, cfg.ErrChanged
+	}
+	object := func(index int, ref contracts.WorkerObjectReference) (contracts.PublicRuntimeWorkerObject, error) {
+		e := v.Objects[index]
+		if e.Item != initialRuntimeResourceItems[index] || e.Receipt == nil || e.Receipt.UID != ref.UID {
+			return contracts.PublicRuntimeWorkerObject{}, cfg.ErrChanged
+		}
+		return contracts.PublicRuntimeWorkerObject{Reference: ref, OperationID: e.OperationID, TemplateDigest: e.TemplateDigest}, nil
+	}
+	d, err := object(11, inventory.WorkerDeployment)
+	if err != nil {
+		return zero, err
+	}
+	a, err := object(1, inventory.WorkerAccount)
+	if err != nil {
+		return zero, err
+	}
+	l, err := object(13, inventory.LeaderLease)
+	if err != nil {
+		return zero, err
+	}
+	w := contracts.PublicRuntimeWorkerBinding{Resources: contracts.WorkerObjectReference{Name: "asservat-runtime-resources-" + strings.ReplaceAll(c.Input.InstallationID, "-", ""), UID: resources.UID}, ResourceSetupID: v.SetupID, ResourceBinding: v.BindingDigest, WorkerLayout: v.WorkerLayout, FleetGuardName: inventory.FleetGuard.Name, Deployment: d, Account: a, Lease: l, ConfigurationRoot: contracts.WorkerObjectReference{Name: "asservat-configuration-roles-" + strings.ReplaceAll(c.Input.InstallationID, "-", ""), UID: configuration.UID}, ConfigurationSetupID: c.OperationID, Configuration: c.Input}
+	in := contracts.PublicRuntimeRoles{InstallationID: c.Input.InstallationID, InitialClaimID: c.Input.InitialClaimID, ClusterID: c.Input.ClusterID, Namespace: c.Input.Namespace, OwnerConfigurationUID: c.Input.OwnerSource.UID, Worker: w}
+	if !publicRuntimeWorkerBindingValid(in) {
+		return zero, cfg.ErrChanged
+	}
+	return w, nil
+}
+
+func (s *PublicRuntimeRoleRoot) workerRead(ctx context.Context, path string, out any) error {
+	raw, e := s.client.api.Get().AbsPath(path).MaxRetries(0).DoRaw(ctx)
+	defer clear(raw)
+	if e != nil {
+		return cfg.ErrUnavailable
+	}
+	if permissionJSON(raw, 128<<10, 32768) != nil || strictGuardJSON(raw, out) != nil {
+		return cfg.ErrChanged
+	}
+	until, ok := ctx.Deadline()
+	if !ok || ctx.Err() != nil || !s.client.now().Before(until) {
+		return cfg.ErrUnavailable
+	}
+	return nil
+}
+
+func (s *PublicRuntimeRoleRoot) workerJournal(ctx context.Context, ref contracts.WorkerObjectReference) ([]byte, error) {
+	var obj core.Secret
+	if err := s.workerRead(ctx, "/api/v1/namespaces/"+s.input.Namespace.Name+"/secrets/"+ref.Name, &obj); err != nil {
+		return nil, err
+	}
+	if obj.APIVersion != "v1" || obj.Kind != "Secret" || !ownerMetadata(obj.ObjectMeta, s.input.Namespace.Name, ref.Name, ref.UID) || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || len(obj.Labels) != 0 || len(obj.Annotations) != 0 || obj.Type != core.SecretTypeOpaque || obj.Immutable != nil && *obj.Immutable || len(obj.Data) != 1 || len(obj.StringData) != 0 || len(obj.Data["state.json"]) == 0 {
+		return nil, cfg.ErrChanged
+	}
+	return obj.Data["state.json"], nil
+}
+
+func (s *PublicRuntimeRoleRoot) currentWorker(ctx context.Context) error {
+	if !publicRuntimeWorkerBindingValid(s.input) {
+		return cfg.ErrChanged
+	}
+	w := s.input.Worker
+	raw, e := s.workerJournal(ctx, w.Resources)
+	if e != nil {
+		return e
+	}
+	defer clear(raw)
+	v, e := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(raw))
+	if e != nil || v.Format != contracts.InitialRuntimeResourcesFormat || v.SetupID != w.ResourceSetupID || v.BindingDigest != w.ResourceBinding || v.WorkerLayout != w.WorkerLayout || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(s.client.now()) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || len(v.Objects) != len(initialRuntimeResourceItems) {
+		return cfg.ErrChanged
+	}
+	ids := map[string]bool{v.SetupID: true}
+	uids := map[string]bool{}
+	for i, c := range v.Objects {
+		if c.Item != initialRuntimeResourceItems[i] || !authorization.UUID(c.OperationID) || ids[c.OperationID] || !preparationDigestValid(c.TemplateDigest) || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(s.client.now()) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.After(c.ClaimedAt) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || c.Until.After(v.Until) || c.Receipt == nil || !authorization.UUID(c.Receipt.UID) || uids[c.Receipt.UID] || !identity.Text(c.Receipt.ResourceVersion, 128) {
+			return cfg.ErrChanged
+		}
+		ids[c.OperationID] = true
+		uids[c.Receipt.UID] = true
+	}
+	for _, pair := range []struct {
+		index  int
+		object contracts.PublicRuntimeWorkerObject
+	}{{1, w.Account}, {11, w.Deployment}, {13, w.Lease}} {
+		c := v.Objects[pair.index]
+		p := pair.object
+		if c.OperationID != p.OperationID || c.TemplateDigest != p.TemplateDigest || c.Receipt.UID != p.Reference.UID {
+			return cfg.ErrChanged
+		}
+	}
+	var d apps.Deployment
+	if e = s.workerRead(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+w.Deployment.Reference.Name, &d); e != nil {
+		return e
+	}
+	if d.APIVersion != "apps/v1" || d.Kind != "Deployment" || !configurationRoleDeploymentBound(d, w.Configuration) || len(d.Spec.Template.Spec.Containers) != 1 || d.Annotations[initialRuntimeResourceMarker] != w.Deployment.OperationID {
+		return cfg.ErrChanged
+	}
+	raw, e = s.workerJournal(ctx, w.ConfigurationRoot)
+	if e != nil {
+		return e
+	}
+	defer clear(raw)
+	state, err := contracts.DecodeConfigurationRuntimeRoleState(bytes.NewReader(raw))
+	if err != nil || state.OperationID != w.ConfigurationSetupID || !configurationRoleStateValid(w.Configuration, state, s.client.now()) {
+		return cfg.ErrChanged
+	}
+	annotationCount := 1
+	if revision, exists := d.Annotations["deployment.kubernetes.io/revision"]; exists {
+		if revision != "1" {
+			return cfg.ErrChanged
+		}
+		annotationCount++
+	}
+	if *d.Spec.Replicas == 1 {
+		if state.Launch == nil || state.Launch.Receipt == nil || !configurationLaunchSpec(d, w.Configuration, state.Launch) || d.Generation != v.Objects[11].Receipt.Generation+1 || len(d.Annotations) != annotationCount+1 {
+			return cfg.ErrChanged
+		}
+	} else if state.Launch != nil || len(d.Annotations) != annotationCount || d.Generation != v.Objects[11].Receipt.Generation {
+		return cfg.ErrChanged
+	}
+	n := runtimeResourceNames(s.input.InstallationID)
+	expected, e := BuildInstalledHubWorkerWorkload(HubWorkerWorkloadPlan{Namespace: s.input.Namespace.Name, Name: n.Worker, ServiceAccount: n.Worker, Configuration: n.WorkerInputs, Credentials: n.WorkerProviders, Image: d.Spec.Template.Spec.Containers[0].Image, FleetSource: w.Configuration.FleetSource.Name, OwnerSource: n.OwnerSource, FleetGuard: w.FleetGuardName, OwnerGuard: n.OwnerSourceGuard, LeaderLease: n.Lease}, s.input.InstallationID)
+	if e != nil {
+		return cfg.ErrChanged
+	}
+	if preparationDigest(expected.Deployment) != w.Deployment.TemplateDigest || preparationDigest(expected.Account) != w.Account.TemplateDigest {
+		return cfg.ErrChanged
+	}
+	copy := d.DeepCopy()
+	*copy.Spec.Replicas = 0
+	copy.Annotations = nil
+	if normalizeInitialRuntimeObject(copy) != nil || normalizeInitialRuntimeObject(expected.Deployment) != nil || !equalJSON(copy, expected.Deployment) {
+		return cfg.ErrChanged
+	}
+	var account core.ServiceAccount
+	if e = s.workerRead(ctx, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+w.Account.Reference.Name, &account); e != nil {
+		return e
+	}
+	if e = workerOriginalObject(&account, expected.Account, w.Account, s.input.Namespace.Name); e != nil {
+		return e
+	}
+	var lease coordination.Lease
+	if e = s.workerRead(ctx, "/apis/coordination.k8s.io/v1/namespaces/"+s.input.Namespace.Name+"/leases/"+w.Lease.Reference.Name, &lease); e != nil {
+		return e
+	}
+	// Holder/timestamps are scheduling state, never credential authority. Retain
+	// exact immutable identity and original template while allowing that state.
+	lease.Spec = coordination.LeaseSpec{}
+	wantLease := &coordination.Lease{TypeMeta: metav1.TypeMeta{APIVersion: "coordination.k8s.io/v1", Kind: "Lease"}, ObjectMeta: metav1.ObjectMeta{Name: n.Lease, Namespace: s.input.Namespace.Name}}
+	if preparationDigest(wantLease) != w.Lease.TemplateDigest {
+		return cfg.ErrChanged
+	}
+	return workerOriginalObject(&lease, wantLease, w.Lease, s.input.Namespace.Name)
+}
+
+func workerOriginalObject(got, want runtime.Object, p contracts.PublicRuntimeWorkerObject, namespace string) error {
+	m, e := meta.Accessor(got)
+	if e != nil {
+		return cfg.ErrChanged
+	}
+	if got.GetObjectKind().GroupVersionKind() != want.GetObjectKind().GroupVersionKind() || m.GetNamespace() != namespace || m.GetName() != p.Reference.Name || string(m.GetUID()) != p.Reference.UID || !identity.Text(m.GetResourceVersion(), 128) || m.GetDeletionTimestamp() != nil || len(m.GetOwnerReferences()) != 0 || len(m.GetFinalizers()) != 0 || len(m.GetAnnotations()) != 1 || m.GetAnnotations()[initialRuntimeResourceMarker] != p.OperationID {
+		return cfg.ErrChanged
+	}
+	m.SetAnnotations(nil)
+	if normalizeInitialRuntimeObject(got) != nil || normalizeInitialRuntimeObject(want) != nil || !equalJSON(got, want) {
+		return cfg.ErrChanged
+	}
+	return nil
+}

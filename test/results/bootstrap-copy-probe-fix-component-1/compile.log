@@ -1,0 +1,12 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/helm_bootstrap_test.go:271:71: not enough arguments in call to initialBootstrapVerifyCopyClosure
+	have (*"testing".T, "context".Context, *"k8s.io/client-go/kubernetes".Clientset, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+	want (*"testing".T, "context".Context, "k8s.io/client-go/kubernetes".Interface, *rest.Config, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+test/integration/helm_bootstrap_test.go:290:72: not enough arguments in call to initialBootstrapVerifyCopyClosure
+	have (*"testing".T, "context".Context, *"k8s.io/client-go/kubernetes".Clientset, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+	want (*"testing".T, "context".Context, "k8s.io/client-go/kubernetes".Interface, *rest.Config, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+test/integration/helm_bootstrap_test.go:361:67: not enough arguments in call to initialBootstrapVerifyCopyClosure
+	have (*"testing".T, "context".Context, *"k8s.io/client-go/kubernetes".Clientset, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+	want (*"testing".T, "context".Context, "k8s.io/client-go/kubernetes".Interface, *rest.Config, contracts.InitialBootstrap, bootstrapRetirementEvidence)
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

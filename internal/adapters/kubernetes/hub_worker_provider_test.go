@@ -1,0 +1,136 @@
+package kubernetes
+
+import (
+	"encoding/json"
+	"reflect"
+	"strings"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+	core "k8s.io/api/core/v1"
+)
+
+func providerWorkerPlan(t *testing.T) (HubWorkerWorkloadPlan, string, string, contracts.ConfigurationProviderSelection) {
+	t.Helper()
+	s, _ := initialRuntimeResourceFixture(t)
+	n := s.names
+	p := HubWorkerWorkloadPlan{Namespace: s.initial.Namespace.Name, Name: n.Worker, ServiceAccount: n.Worker, Configuration: n.WorkerInputs, Credentials: n.WorkerProviders,
+		Image: s.preparer.plan.Workload.Image, FleetSource: s.initial.FleetSource.Name, OwnerSource: n.OwnerSource, FleetGuard: s.initial.FleetGuard.Name, OwnerGuard: n.OwnerSourceGuard, LeaderLease: n.Lease}
+	selection := contracts.ConfigurationProviderSelection{AuthMount: "configuration-auth", AuthMountAccessor: "auth_kubernetes_original", AuditCredentials: contracts.WorkerObjectReference{Name: n.WorkerProviders, UID: ownerID(2901)}}
+	return p, s.initial.InstallationID, s.initial.ClusterID, selection
+}
+
+func TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL(t *testing.T) {
+	p, installation, cluster, selection := providerWorkerPlan(t)
+	old, err := BuildInstalledHubWorkerWorkload(p, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := json.Marshal(old)
+	w, err := BuildProviderHubWorkerWorkload(p, installation, cluster, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources
+	if len(sources) != 11 || *w.Deployment.Spec.Replicas != 0 || sources[1].Secret == nil || sources[1].Secret.Name != selection.AuditCredentials.Name ||
+		!reflect.DeepEqual(sources[1].Secret.Items, []core.KeyToPath{{Key: contracts.ConfigurationProviderAuditCredentialFile, Path: contracts.ConfigurationProviderAuditCredentialFile}}) ||
+		sources[1].Secret.Optional == nil || *sources[1].Secret.Optional {
+		t.Fatal("provider storage can substitute SQL or silently be absent")
+	}
+	jwt := sources[10].ServiceAccountToken
+	if jwt == nil || jwt.Path != contracts.ConfigurationProviderTokenFile || jwt.Audience != contracts.ConfigurationProviderAudience(installation, cluster) || jwt.ExpirationSeconds == nil || *jwt.ExpirationSeconds != 600 {
+		t.Fatal("provider JWT has wrong original native projection")
+	}
+	if sources[5].Secret == nil || sources[5].Secret.Name == selection.AuditCredentials.Name || len(sources[5].Secret.Items) != 4 {
+		t.Fatal("mutable provider material shares original SQL projection")
+	}
+	rule := w.Role.Rules[len(w.Role.Rules)-2]
+	if !reflect.DeepEqual(rule.APIGroups, []string{""}) || !reflect.DeepEqual(rule.Resources, []string{"secrets"}) || !reflect.DeepEqual(rule.ResourceNames, []string{selection.AuditCredentials.Name}) || !reflect.DeepEqual(rule.Verbs, []string{"get"}) {
+		t.Fatal("runtime can read unrelated secrets or administer provider material")
+	}
+	inputRule := w.Role.Rules[len(w.Role.Rules)-3]
+	if !reflect.DeepEqual(inputRule.APIGroups, []string{""}) || !reflect.DeepEqual(inputRule.Resources, []string{"configmaps"}) || !reflect.DeepEqual(inputRule.ResourceNames, []string{p.Configuration}) || !reflect.DeepEqual(inputRule.Verbs, []string{"get"}) {
+		t.Fatal("current input read grants another ConfigMap or mutation")
+	}
+	sqlRule := w.Role.Rules[len(w.Role.Rules)-1]
+	if !reflect.DeepEqual(sqlRule.APIGroups, []string{""}) || !reflect.DeepEqual(sqlRule.Resources, []string{"secrets"}) || !reflect.DeepEqual(sqlRule.ResourceNames, []string{"asservat-configuration-runtime-" + strings.ReplaceAll(installation, "-", "")}) || !reflect.DeepEqual(sqlRule.Verbs, []string{"get"}) {
+		t.Fatal("current SQL material read grants unrelated Secret or mutation")
+	}
+	// Undo only the six reviewed additions, then compare the complete object
+	// graph. Security fields, optional receipts and all existing RBAC stay exact.
+	sources[1].Secret.Items = old.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources[1].Secret.Items
+	w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources = sources[:10]
+	w.Role.Rules = w.Role.Rules[:len(w.Role.Rules)-3]
+	w.Deployment.Spec.Template.Spec.Tolerations = old.Deployment.Spec.Template.Spec.Tolerations
+	if !reflect.DeepEqual(w, old) {
+		t.Fatal("fresh provider template changed another installed boundary")
+	}
+	oldAgain, _ := BuildInstalledHubWorkerWorkload(p, installation)
+	after, _ := json.Marshal(oldAgain)
+	if string(before) != string(after) {
+		t.Fatal("new builder changed legacy bytes")
+	}
+}
+
+func TestProviderWorkerRejectsForeignOrUnpinnedMaterial(t *testing.T) {
+	p, installation, cluster, selection := providerWorkerPlan(t)
+	for _, mode := range []string{"foreign-secret", "missing-uid", "another-plan-secret", "token-auth", "missing-cluster"} {
+		t.Run(mode, func(t *testing.T) {
+			plan, s, c := p, selection, cluster
+			switch mode {
+			case "foreign-secret":
+				s.AuditCredentials.Name = "foreign"
+			case "missing-uid":
+				s.AuditCredentials.UID = ""
+			case "another-plan-secret":
+				plan.Credentials = "foreign"
+			case "token-auth":
+				s.AuthMount = "token"
+			case "missing-cluster":
+				c = ""
+			}
+			if _, err := BuildProviderHubWorkerWorkload(plan, installation, c, s); err == nil {
+				t.Fatal("unbound provider material entered original template")
+			}
+		})
+	}
+}
+
+// API scalar defaults here are synthetic and match the existing independently
+// qualified template matcher; this is not a native Kubernetes result.
+func TestProviderWorkerPinsNativeEvictionBounds(t *testing.T) {
+	p, installation, cluster, selection := providerWorkerPlan(t)
+	w, err := BuildProviderHubWorkerWorkload(p, installation, cluster, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := w.Deployment.Spec.Template.DeepCopy()
+	template.Spec.DNSPolicy = core.DNSClusterFirst
+	template.Spec.SchedulerName = core.DefaultSchedulerName
+	template.Spec.Containers[0].TerminationMessagePath = core.TerminationMessagePathDefault
+	template.Spec.Containers[0].TerminationMessagePolicy = core.TerminationMessageReadFile
+	digest, err := ConnectorAPITemplateDigest(*template)
+	if err != nil || len(template.Spec.Tolerations) != 2 {
+		t.Fatal("worker2 template cannot be pinned by actual matcher", err)
+	}
+	for name, change := range map[string]func(*core.PodTemplateSpec){
+		"missing":       func(v *core.PodTemplateSpec) { v.Spec.Tolerations = nil },
+		"longer":        func(v *core.PodTemplateSpec) { *v.Spec.Tolerations[0].TolerationSeconds = 301 },
+		"unbounded":     func(v *core.PodTemplateSpec) { v.Spec.Tolerations[0].TolerationSeconds = nil },
+		"duplicate":     func(v *core.PodTemplateSpec) { v.Spec.Tolerations = append(v.Spec.Tolerations, v.Spec.Tolerations[0]) },
+		"mutable mount": func(v *core.PodTemplateSpec) { v.Spec.Containers[0].VolumeMounts[0].ReadOnly = false },
+	} {
+		t.Run(name, func(t *testing.T) {
+			v := template.DeepCopy()
+			change(v)
+			got, e := ConnectorAPITemplateDigest(*v)
+			if e == nil && got == digest {
+				t.Fatal("changed process retained original template proof")
+			}
+		})
+	}
+	legacy, err := BuildInstalledHubWorkerWorkload(p, installation)
+	if err != nil || len(legacy.Deployment.Spec.Template.Spec.Tolerations) != 0 {
+		t.Fatal("new native profile changed v1", err)
+	}
+}

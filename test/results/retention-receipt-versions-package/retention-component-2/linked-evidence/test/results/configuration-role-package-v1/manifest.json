@@ -1,0 +1,342 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "scope": "ADR140 configuration-role component checkpoint; native qualification pending",
+  "files": [
+    {
+      "path": "docs/architecture/configuration-credential-provisioning.md",
+      "base_sha256": null,
+      "payload_sha256": "938d2446e57d599144b830ae1a4465a7c53b028f4e91413d6477ab8b16cf7d67",
+      "bytes": 6592,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "docs/decisions/140-installed-public-runtime-producers.md",
+      "base_sha256": null,
+      "payload_sha256": "0f6f3878e8db5ce140e80a80cd67ffa65c2e4a5a3c2b41868b754d3564937a9c",
+      "bytes": 3885,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_operation.go",
+      "base_sha256": null,
+      "payload_sha256": "1cb417f43e1ac5b756dc6960190bb7408189a4b435b49a2bedf132663c57b95a",
+      "bytes": 3328,
+      "path5_sha256": "1cb417f43e1ac5b756dc6960190bb7408189a4b435b49a2bedf132663c57b95a",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_operation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "a77ad61681b47fbb6010352f586c9d65ea169b94967c5c02e735fcea72cc17db",
+      "bytes": 9982,
+      "path5_sha256": "a77ad61681b47fbb6010352f586c9d65ea169b94967c5c02e735fcea72cc17db",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_recheck.go",
+      "base_sha256": null,
+      "payload_sha256": "e9de8c125f4b65c451cb919449d6aa40b658df7d5aef84fa649ec12a5034cde8",
+      "bytes": 5183,
+      "path5_sha256": "e9de8c125f4b65c451cb919449d6aa40b658df7d5aef84fa649ec12a5034cde8",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source.go",
+      "base_sha256": null,
+      "payload_sha256": "3d6e5c961b5d097a14ec9d5869199afc4017ce0ff4b9ca9936689d08ef13c914",
+      "bytes": 12219,
+      "path5_sha256": "3d6e5c961b5d097a14ec9d5869199afc4017ce0ff4b9ca9936689d08ef13c914",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+      "base_sha256": null,
+      "payload_sha256": "f016f927096932a183a4165825cb0c446cb2c833e6cf2e47515105843a0adf3d",
+      "bytes": 14286,
+      "path5_sha256": "f016f927096932a183a4165825cb0c446cb2c833e6cf2e47515105843a0adf3d",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b252bb9bff55ce844e65ec24ba1ce155cb54f86be86b4d389bc57c6f7de0cd52",
+      "bytes": 5244,
+      "path5_sha256": "b252bb9bff55ce844e65ec24ba1ce155cb54f86be86b4d389bc57c6f7de0cd52",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_projection.go",
+      "base_sha256": null,
+      "payload_sha256": "f1068e2d7fa7856f70f59856037856c8bfaae5b1b5edd8bd2f102847700e99ab",
+      "bytes": 8065,
+      "path5_sha256": "f1068e2d7fa7856f70f59856037856c8bfaae5b1b5edd8bd2f102847700e99ab",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "7fd8f9276e7c270ce4af151fd71805a397bb44b4ee089ba404358c415805296e",
+      "bytes": 15951,
+      "path5_sha256": "7fd8f9276e7c270ce4af151fd71805a397bb44b4ee089ba404358c415805296e",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_projection.go",
+      "base_sha256": null,
+      "payload_sha256": "fe86b35293592b613608d0235cbaeba84eeba3dcce5de8978dfa0218796e68d4",
+      "bytes": 9673,
+      "path5_sha256": "fe86b35293592b613608d0235cbaeba84eeba3dcce5de8978dfa0218796e68d4",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "47f782d0014628572a7ca826906fe83d506a436f5767d57b885fd4f5cfbcd075",
+      "bytes": 19568,
+      "path5_sha256": "47f782d0014628572a7ca826906fe83d506a436f5767d57b885fd4f5cfbcd075",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_roles_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8e2fec43abb2082e758097f620f05da5bdf2536c3f5c08051ab3e92fdd52b88d",
+      "bytes": 21215,
+      "path5_sha256": "8e2fec43abb2082e758097f620f05da5bdf2536c3f5c08051ab3e92fdd52b88d",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_role_current.go",
+      "base_sha256": null,
+      "payload_sha256": "24104cd616eb4c69cdfd1e21049679177b6fe7d696d6fafa389c480fda57d480",
+      "bytes": 3404,
+      "path5_sha256": "24104cd616eb4c69cdfd1e21049679177b6fe7d696d6fafa389c480fda57d480",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_credential.go",
+      "base_sha256": null,
+      "payload_sha256": "e3319f24bdba0cf71b9c16b390db130250fc3fcb98b4738629106736bf939638",
+      "bytes": 3745,
+      "path5_sha256": "e3319f24bdba0cf71b9c16b390db130250fc3fcb98b4738629106736bf939638",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_role_plan.go",
+      "base_sha256": null,
+      "payload_sha256": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938",
+      "bytes": 3453,
+      "path5_sha256": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_role_plan_test.go",
+      "base_sha256": null,
+      "payload_sha256": "f240e58c09857c460b153f6fb05bf42c9dd477bca6934f2b6afcc9f5d9faf1f1",
+      "bytes": 1902,
+      "path5_sha256": "f240e58c09857c460b153f6fb05bf42c9dd477bca6934f2b6afcc9f5d9faf1f1",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "928dc60903a3086d79c6899285028d97a6932be10265a19fd01401fe7613cc2f",
+      "bytes": 20464,
+      "path5_sha256": "928dc60903a3086d79c6899285028d97a6932be10265a19fd01401fe7613cc2f",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/current_owner_configuration_audit.go",
+      "base_sha256": null,
+      "payload_sha256": "546dc6ea51839de0ad6a5dc930e496e21231084afe042e7547d58c5d262c9139",
+      "bytes": 4213,
+      "path5_sha256": "546dc6ea51839de0ad6a5dc930e496e21231084afe042e7547d58c5d262c9139",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_credential.go",
+      "base_sha256": null,
+      "payload_sha256": "aaf8a7a405b67b61260bc29968dbd47cee89eba6565e8d7ae3a15ba755660f66",
+      "bytes": 3505,
+      "path5_sha256": "aaf8a7a405b67b61260bc29968dbd47cee89eba6565e8d7ae3a15ba755660f66",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+      "base_sha256": null,
+      "payload_sha256": "815788ef05b7fa734e7bab8b2da978780b037df0423622bde623c0308f5a430e",
+      "bytes": 9932,
+      "path5_sha256": "815788ef05b7fa734e7bab8b2da978780b037df0423622bde623c0308f5a430e",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_role_plan_test.go",
+      "base_sha256": null,
+      "payload_sha256": "0cf8d676159d2649ee8bdbbaf930b420d3f138ce6ab8549fcaa570e8c14136bd",
+      "bytes": 2708,
+      "path5_sha256": "0cf8d676159d2649ee8bdbbaf930b420d3f138ce6ab8549fcaa570e8c14136bd",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "2aaed5b2d0e52f2ff71ce8206c8f7e8c913da57ff8eea3da18f67828753a3003",
+      "bytes": 23471,
+      "path5_sha256": "2aaed5b2d0e52f2ff71ce8206c8f7e8c913da57ff8eea3da18f67828753a3003",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_installer.go",
+      "base_sha256": null,
+      "payload_sha256": "6a93d189b8a37f18eb135fe7b794820574d98cf713abc24a80e969e7417226d7",
+      "bytes": 9955,
+      "path5_sha256": "6a93d189b8a37f18eb135fe7b794820574d98cf713abc24a80e969e7417226d7",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/bootstrap/hub_worker.go",
+      "base_sha256": "8a2c17592ab4d1e20e1be113e6ed25ffd683ff7d9d41aa6cc211e69244072758",
+      "payload_sha256": "b9869ec069bc0aae790a53fbcbf59aab0a3eda1e8c789da76620ea826df52a99",
+      "bytes": 11254,
+      "path5_sha256": "2bcda0d14b4ca7d56706aaee65f62a716e47911635cd42a9c3e3237086d79c9f",
+      "same_as_path5": false
+    },
+    {
+      "path": "internal/contracts/configuration_role_installer.go",
+      "base_sha256": null,
+      "payload_sha256": "6f4da5a8ccdd75c34dca547be9129ae0de1a27e766641ad17a46c2605a181b57",
+      "bytes": 1313,
+      "path5_sha256": "6f4da5a8ccdd75c34dca547be9129ae0de1a27e766641ad17a46c2605a181b57",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/contracts/configuration_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "32eac2ee070d594d595df49279d37a414bc06218c53f911ca12f95cfd3ce87a1",
+      "bytes": 6722,
+      "path5_sha256": "32eac2ee070d594d595df49279d37a414bc06218c53f911ca12f95cfd3ce87a1",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/contracts/public_audit_keys.go",
+      "base_sha256": null,
+      "payload_sha256": "beea54547db346ba97a9dcc90015d61cbb30cb40f6afa73cda44072484b7ab01",
+      "bytes": 2400,
+      "path5_sha256": "beea54547db346ba97a9dcc90015d61cbb30cb40f6afa73cda44072484b7ab01",
+      "same_as_path5": true
+    },
+    {
+      "path": "internal/contracts/public_runtime_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "0c19a81d252a5e8b7872022ae20910e2747c673e0a95c89571d58eee052912fa",
+      "bytes": 7332,
+      "path5_sha256": "0c19a81d252a5e8b7872022ae20910e2747c673e0a95c89571d58eee052912fa",
+      "same_as_path5": true
+    },
+    {
+      "path": "specs/contracts/capture-account-key.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "63816f46fdb889efaa02cb968a6051eb7cd21c55185f6e1ee513c5dc82de8915",
+      "bytes": 1196,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/configuration-role-installer.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "eb34031acdafe8885e23b37dbeba97a31bd033f01bed9d8f40a898b10e623a10",
+      "bytes": 2392,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/configuration-runtime-credentials.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "843019d45d3c4b5419e44f5ee941c3ca81e058d20b5aaee6ad1dc74007210350",
+      "bytes": 1824,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/configuration-runtime-role-state.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "3682d584e24591f99974e28090883a037e5370262b5f9a814ac62db309f067b9",
+      "bytes": 6727,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/configuration-runtime-roles.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "ef21d71cbc86c412aa313e9ae836485f570a3261bca84b8f1748961351c27ec4",
+      "bytes": 3018,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/public-audit-keys.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "c455c375c4548b347240c28e74454e3a4af9c11d1094a1db2213a3b3eda2e8d6",
+      "bytes": 1856,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/public-runtime-credentials.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "846a603546d7bec1948d36b8f5c0169aee2d0d3c1b319e0af62e573afeae345b",
+      "bytes": 1858,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/public-runtime-role-state.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "4ca1a06066bec74742f397998faa3f61f031eccf43c452803bb23fda93525953",
+      "bytes": 4809,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "specs/contracts/public-runtime-roles.schema.json",
+      "base_sha256": null,
+      "payload_sha256": "757409cfc1c6c820b98258d4ea90fbbaabe5e64b4e7a337d67f5486de6139366",
+      "bytes": 1523,
+      "path5_sha256": null,
+      "same_as_path5": null
+    },
+    {
+      "path": "test/integration/configuration_role_reconciliation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "4e14b1262ee77fe409659c14e4dcdc1ae348a9dfe4ff8d6951b3b1ccb8e568d9",
+      "bytes": 7907,
+      "path5_sha256": "4e14b1262ee77fe409659c14e4dcdc1ae348a9dfe4ff8d6951b3b1ccb8e568d9",
+      "same_as_path5": true
+    },
+    {
+      "path": "test/integration/configuration_runtime_roles_test.go",
+      "base_sha256": null,
+      "payload_sha256": "84cc9d129767a03cb5bd7ac3d2165936223379b68c447ffc7b67f7df0277fa75",
+      "bytes": 18608,
+      "path5_sha256": "84cc9d129767a03cb5bd7ac3d2165936223379b68c447ffc7b67f7df0277fa75",
+      "same_as_path5": true
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base_sha256": "91f307f7574f10cc59c9ae791f4305f5500fa2cb4a33bd4dca17c04f1b7b922f",
+      "payload_sha256": "04566bdb0e564f7b15574669a4b034ea78afcb9b6903002b91b35a5b58828252",
+      "bytes": 21624,
+      "path5_sha256": "04566bdb0e564f7b15574669a4b034ea78afcb9b6903002b91b35a5b58828252",
+      "same_as_path5": true
+    },
+    {
+      "path": "test/integration/public_runtime_roles_test.go",
+      "base_sha256": null,
+      "payload_sha256": "3810a01e1491a6c37c9cb19170412a82c15631dfb9f036df36a0a0f2289ce9ef",
+      "bytes": 18396,
+      "path5_sha256": "3810a01e1491a6c37c9cb19170412a82c15631dfb9f036df36a0a0f2289ce9ef",
+      "same_as_path5": true
+    }
+  ]
+}

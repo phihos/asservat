@@ -1,0 +1,16 @@
+{
+  "test/results/native-interrupted-phase-ownership": [
+    "after.json",
+    "before.json",
+    "context_native_content_test.go.after.txt",
+    "context_native_content_test.go.before.txt",
+    "context_native_content_test.go.diff",
+    "context_native_interrupted_test.go.after.txt",
+    "context_native_interrupted_test.go.before.txt",
+    "context_native_interrupted_test.go.diff",
+    "native_exchange_test.go.after.txt",
+    "native_exchange_test.go.before.txt",
+    "native_exchange_test.go.diff",
+    "qualified-failure"
+  ]
+}

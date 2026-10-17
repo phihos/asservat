@@ -1,0 +1,64 @@
+{
+  "manifest": "ce9f8b8e499c196ae268dc1a512dc7803e22edfbb456846ee338522e21da0664",
+  "dependencies": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+  "runner": "b129d42deeb2584df58f00cf38312ce75747aa428ebe2a4b0ea961b3e3f9ec9c",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior": []
+  },
+  "phases": [
+    {
+      "name": "schema-regressions",
+      "command": [
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-schema-5/schema-regressions.py"
+      ],
+      "exit": 0,
+      "seconds": 1.220444917678833,
+      "log_sha256": "f61e9afdd86534e61ec2b73e5f9261d19cc7888697a5a93b59149e6358556c12",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior": []
+      }
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 2,
+      "seconds": 5.5653076171875,
+      "log_sha256": "f2ef387ccc562aaa803542d5f51fbfd3b8206d8b1f3e6b5c447d27682d4df8df",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "prior": []
+      }
+    }
+  ],
+  "native": false,
+  "go_jobs": false,
+  "tmpdir": "/tmp/asservat-selection-schema-5-nnf0yg2d",
+  "mirror_changed": [],
+  "exit": 2,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "prior": []
+  },
+  "tmpdir_removed": true
+}

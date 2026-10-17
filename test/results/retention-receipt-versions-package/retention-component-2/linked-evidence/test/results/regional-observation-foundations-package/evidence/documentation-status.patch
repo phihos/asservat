@@ -1,0 +1,14 @@
+--- a/docs/architecture/cluster-observations.md
++++ b/docs/architecture/cluster-observations.md
+@@ -2,8 +2,9 @@
+ 
+ This is the bounded ADR-144 composition under implementation. The integrated
+ owner startup/local HWORK components and the following regional conversation
+-have separate qualification. The latter currently has source-only components;
+-it has not passed a compiled, installed or native multi-cluster workflow.
++have separate qualification. The regional proof, framing, channel state and
++digest components passed focused compile/race/vet checks. The concrete stream,
++routing and installed native multi-cluster workflow remain unqualified.
+ 
+ ## Reachability and authority
+ 

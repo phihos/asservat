@@ -1,0 +1,5 @@
+--- FAIL: TestConnectorSQLFixtureRolesKeepCompleteDeterministicIdentity (0.00s)
+    connector_identity_names_test.go:22: fixture role lost its unique identity or exceeds PostgreSQL's identifier limit ci_100000000000_source
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.012s
+FAIL

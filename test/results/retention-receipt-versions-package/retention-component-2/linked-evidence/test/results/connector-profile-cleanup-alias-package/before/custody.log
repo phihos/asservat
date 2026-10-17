@@ -1,0 +1,12 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row
+    connector_profile_cleanup_guard_test.go:54: live-profile cleanup must reach its original reference denial, not a SQL compilation failure ERROR: record "a" has no field "process_id" (SQLSTATE 42703)
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:493: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+--- FAIL: TestContextAdmissionWithRealServices (2.10s)
+    --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast (1.77s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row (0.05s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.152s
+FAIL

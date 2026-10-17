@@ -1,0 +1,16 @@
+# Launch wrapper identity follow-up
+
+Session 29328 ended with exit 0. Integrate the exact two-path `delta.json` over worker-launch-1, or use this checkpoint's complete 19-path manifest. The other 17 payloads are unchanged. No live bases or dependencies changed between the two runs.
+
+Manifest: `936dc7150d1b5e45d78f94fbd2a93095686516968c9d0232a3b3f35c502b6a5e`.
+Dependencies (2,551): `0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38`.
+Runner: `0d8c1ab7e0bb471d2f57f643231e6336a9d0c399a4bf7d845d87620e7387e0e6`.
+Result: `c8f4e7cf94d0f0eac047519835aa9326f85f8cda50eb7fd329506d2903dfc425`.
+
+The original private constructor now pins the exact Launch wrapper address. Every exported phase rejects a copied wrapper before it can consume the original private worker phase. Copying had shared the core phase state, so the prior implementation did not permit double effects, but it failed the stronger original-wrapper identity contract. The new regression first rejects the copied handle and then admits the exact original handle, preventing an unconditional-denial false positive. Existing foreign-root/context/order/closed/expired cases now use the actual private constructor and remain meaningful.
+
+Actual checks: three-package compile (Kubernetes, PostgreSQL and bootstrap) passed in 13.184 seconds. With the prior Launch implementation and new test, the copied-wrapper assertion failed as intended, exit 1 in 11.281 seconds, with no compile or cleanup-timeout failure. Corrected copied/foreign-handle races passed 2 top-level / 7 named entries in 11.580 seconds. Kubernetes/PostgreSQL vet passed in 1.566 seconds. Every payload/base/dependency/inventory/auxiliary hash set remained unchanged before and after each phase. Owned tmpfs scratch was removed after terminal. No native or generation job ran.
+
+The full package scope, 47 top-level / 121 named corrected race results, three other intended counterexamples and remaining native/runtime limits remain in `../worker-launch-1/HANDOFF.md` (SHA256 `5dc8fe2a65f7340091a35657a4bc401ce79ad4987fa970a82ca7424151006610`). Those unchanged suites were not repeated for this identity-only follow-up. The actual original-root native fixture still targets CompleteInputs, not Launch. No installed command switch or complete runtime readiness is claimed.
+
+Parent can now layer this delta with the original 19-path package and the separately owned owner projection/shutdown packages. The shared lifetime payload is exactly console's previously qualified `eb5f7e4d7fcf9c842c7bfe7dc76e819a5167760c9c48d13e91cb0764ccd6ef9e`; none of the other six owner shutdown files were copied into this worker package.

@@ -1,0 +1,723 @@
+
+ RUN  v5.0.3 /home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/web
+
+ ❯ src/evidence/EvidenceWorkspace.test.tsx (17 tests | 15 failed) 6201ms
+   × offers native download for context without a debugger whitelist 3ms
+   × offers native download for pcapng without a debugger whitelist 0ms
+   × offers native download for ELF core without a debugger whitelist 0ms
+   × offers native download for runtime dump without a debugger whitelist 0ms
+   × offers native download for pprof without a debugger whitelist 0ms
+   × offers native download for logs without a debugger whitelist 0ms
+   × offers native download for syscalls without a debugger whitelist 0ms
+   × offers native download for new-artifact-format without a debugger whitelist 0ms
+   × does not invent Preparing metadata and supplies only the verified local attachment path when ready 1013ms
+   × keeps request recovery visible even if case access becomes unavailable 1013ms
+   × does not call a server completion proof of local disk storage 1010ms
+   × keeps unknown cancellation prominent even when a status read still says ready 1010ms
+   × removes the idle download affordance at artifact expiry without a new request 1ms
+   × shows a recorded terminal transfer after expiry without inventing native details or restarting work 1007ms
+   × labels a new interrupted browser download as a full restart and waits for Stop before preparing it 1009ms
+ ❯ src/evidence/evidence.test.ts (20 tests | 20 failed) 19043ms
+   × reads only the exact case and does not prepare or fetch bytes implicitly 1010ms
+   × retains the same preparation key after unknown replies and same-user refresh 1001ms
+   × rejects a substituted case or download, foreign path and invented preparing metadata 1001ms
+   × keeps cancellation uncertain, blocks delivery, and retries the original cancellation key 1004ms
+   × does not revive a terminal session on a later status reply 1001ms
+   × withholds content on local expiry and clears protected results after scope cancellation 1002ms
+   × discards late preparation after scope loss and resets receipts for another identity 1002ms
+   × does not repeatedly poll a ready file while the developer is reading its metadata 1001ms
+   × bounds distant expiry timers and removes them on scope loss 2ms
+   × bounds terminal status by the existing managed read interval when native metadata is present=true 1002ms
+   × bounds terminal status by the existing managed read interval when native metadata is present=false 1000ms
+   × continues only acknowledged Preparing on the original key and stops on unknown outcome 1001ms
+   × passive status cannot authorize preparation and cancellation stops continuation 1002ms
+   × accepts a minimal stop receipt without revealing native or terminal artifact metadata 1001ms
+   × starts a new browser download only after acknowledged Stop and retains both keys through lost replies 1005ms
+   × does not prepare a replacement after pending Stop result 1001ms
+   × does not prepare a replacement after foreign Stop result 1002ms
+   × accepts a minimal restrictive Stop receipt without inventing artifact metadata 1001ms
+   × does not prepare after scope loss while waiting for Stop 1001ms
+   × keeps the chosen new request after an unknown Stop is confirmed by later terminal status 1002ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 35 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for context without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for pcapng without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for ELF core without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for runtime dump without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for pprof without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for logs without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for syscalls without a debugger whitelist
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > offers native download for new-artifact-format without a debugger whitelist
+Error: ENOENT: no such file or directory, open '/home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/examples/mcp-shared-case-notice-result.json'
+ ❯ example src/evidence/test-fixtures.ts:6:46
+      4| export { session } from '../capture/test-fixtures';
+      5| export const id = (n: number) => `00000000-0000-4000-8000-${String(n).…
+      6| const example = (name: string) => JSON.parse(readFileSync(new URL('../…
+       |                                              ^
+      7| export function caseResult(): Output<'get_case'> {
+      8|   const value = example('mcp-shared-case-notice-result.json');
+ ❯ caseResult src/evidence/test-fixtures.ts:8:17
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:22:57
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > does not invent Preparing metadata and supplies only the verified local attachment path when ready
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_2_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_2_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:31:32
+     29| it('does not invent Preparing metadata and supplies only the verified …
+     30|   const { controller } = await mount();
+     31|   fireEvent.click(await screen.findByRole('button', { name: 'Download'…
+       |                                ^
+     32|   await screen.findByRole('heading', { name: 'Preparing the native fil…
+     33|   expect(screen.queryByText('SHA-256')).toBeNull(); expect(screen.quer…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > keeps request recovery visible even if case access becomes unavailable
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_4_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_4_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:43:62
+     41| });
+     42| it('keeps request recovery visible even if case access becomes unavail…
+     43|   const { client, controller } = await mount(); await screen.findByRol…
+       |                                                              ^
+     44|   client.responder = () => { throw new Error('unknown commit'); };
+     45|   fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > does not call a server completion proof of local disk storage
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_6_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_6_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:52:50
+     50| });
+     51| it('does not call a server completion proof of local disk storage', as…
+     52|   const { client } = await mount(); await screen.findByRole('button', …
+       |                                                  ^
+     53|   client.responder = () => downloadResult('Completed');
+     54|   fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > keeps unknown cancellation prominent even when a status read still says ready
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_8_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_8_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:65:62
+     63|
+     64| it('keeps unknown cancellation prominent even when a status read still…
+     65|   const { client, controller } = await mount(); await screen.findByRol…
+       |                                                              ^
+     66|   fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+     67|   await screen.findByRole('heading', { name: 'Preparing the native fil…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > removes the idle download affordance at artifact expiry without a new request
+Error: ENOENT: no such file or directory, open '/home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/examples/mcp-shared-case-notice-result.json'
+ ❯ example src/evidence/test-fixtures.ts:6:46
+      4| export { session } from '../capture/test-fixtures';
+      5| export const id = (n: number) => `00000000-0000-4000-8000-${String(n).…
+      6| const example = (name: string) => JSON.parse(readFileSync(new URL('../…
+       |                                              ^
+      7| export function caseResult(): Output<'get_case'> {
+      8|   const value = example('mcp-shared-case-notice-result.json');
+ ❯ caseResult src/evidence/test-fixtures.ts:8:17
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:81:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > shows a recorded terminal transfer after expiry without inventing native details or restarting work
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_a_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_a_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:98:62
+     96|
+     97| it('shows a recorded terminal transfer after expiry without inventing …
+     98|   const { client, controller } = await mount(); await screen.findByRol…
+       |                                                              ^
+     99|   const completed = downloadResult('Completed'); if (completed.status …
+    100|   completed.data.expires_at = new Date(Date.now() - 1000).toISOString(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/35]⎯
+
+ FAIL  src/evidence/EvidenceWorkspace.test.tsx > labels a new interrupted browser download as a full restart and waits for Stop before preparing it
+TestingLibraryElementError: Unable to find role="button" and name "Download"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_c_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"capture-workspace evidence-workspace"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"page-intro"[39m
+      [36m>[39m
+        [36m<h1[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [0mEvidence[0m
+        [36m</h1>[39m
+        [36m<p>[39m
+          [0mInspect the saved details, or download the native file for your preferred compatible local tools.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"notice"[39m
+        [33mrole[39m=[32m"alert"[39m
+      [36m>[39m
+        [0mThe evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.[0m
+      [36m</p>[39m
+      [36m<section[39m
+        [33maria-busy[39m=[32m"false"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"button secondary"[39m
+          [33mdata-rac[39m=[32m""[39m
+          [33mdata-react-aria-pressable[39m=[32m"true"[39m
+          [33mid[39m=[32m"react-aria-_r_c_"[39m
+          [33mtabindex[39m=[32m"0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mCheck evidence access[0m
+        [36m</button>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ ../../../../../../Projekte/asservat/web/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/evidence/EvidenceWorkspace.test.tsx:117:16
+    115| it('labels a new interrupted browser download as a full restart and wa…
+    116|   const { client } = await mount();
+    117|   await screen.findByRole('button', { name: 'Download' });
+       |                ^
+    118|   client.responder = () => downloadResult('Interrupted');
+    119|   fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/35]⎯
+
+ FAIL  src/evidence/evidence.test.ts > reads only the exact case and does not prepare or fetch bytes implicitly
+ FAIL  src/evidence/evidence.test.ts > retains the same preparation key after unknown replies and same-user refresh
+ FAIL  src/evidence/evidence.test.ts > rejects a substituted case or download, foreign path and invented preparing metadata
+ FAIL  src/evidence/evidence.test.ts > keeps cancellation uncertain, blocks delivery, and retries the original cancellation key
+ FAIL  src/evidence/evidence.test.ts > does not revive a terminal session on a later status reply
+ FAIL  src/evidence/evidence.test.ts > withholds content on local expiry and clears protected results after scope cancellation
+ FAIL  src/evidence/evidence.test.ts > discards late preparation after scope loss and resets receipts for another identity
+ FAIL  src/evidence/evidence.test.ts > does not repeatedly poll a ready file while the developer is reading its metadata
+ FAIL  src/evidence/evidence.test.ts > bounds terminal status by the existing managed read interval when native metadata is present=true
+ FAIL  src/evidence/evidence.test.ts > bounds terminal status by the existing managed read interval when native metadata is present=false
+ FAIL  src/evidence/evidence.test.ts > continues only acknowledged Preparing on the original key and stops on unknown outcome
+ FAIL  src/evidence/evidence.test.ts > passive status cannot authorize preparation and cancellation stops continuation
+ FAIL  src/evidence/evidence.test.ts > accepts a minimal stop receipt without revealing native or terminal artifact metadata
+ FAIL  src/evidence/evidence.test.ts > starts a new browser download only after acknowledged Stop and retains both keys through lost replies
+ FAIL  src/evidence/evidence.test.ts > does not prepare a replacement after pending Stop result
+ FAIL  src/evidence/evidence.test.ts > does not prepare a replacement after foreign Stop result
+ FAIL  src/evidence/evidence.test.ts > accepts a minimal restrictive Stop receipt without inventing artifact metadata
+ FAIL  src/evidence/evidence.test.ts > does not prepare after scope loss while waiting for Stop
+ FAIL  src/evidence/evidence.test.ts > keeps the chosen new request after an unknown Stop is confirmed by later terminal status
+AssertionError: expected undefined to be truthy
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ src/evidence/evidence.test.ts:10:64
+      8|   const controller = new Evidence(client, newID); controllers.push(con…
+      9|   const scope = new AbortController(); controller.attach(session, scop…
+     10|   await vi.waitFor(() => expect(controller.snapshot().details).toBeTru…
+       |                                                                ^
+     11|   return { client, controller, scope, newID };
+     12| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/35]⎯
+
+ FAIL  src/evidence/evidence.test.ts > bounds distant expiry timers and removes them on scope loss
+Error: ENOENT: no such file or directory, open '/home/phil/.cache/asservat-build/planning/native-download-restart-20261012/work/examples/mcp-shared-case-notice-result.json'
+ ❯ example src/evidence/test-fixtures.ts:6:46
+      4| export { session } from '../capture/test-fixtures';
+      5| export const id = (n: number) => `00000000-0000-4000-8000-${String(n).…
+      6| const example = (name: string) => JSON.parse(readFileSync(new URL('../…
+       |                                              ^
+      7| export function caseResult(): Output<'get_case'> {
+      8|   const value = example('mcp-shared-case-notice-result.json');
+ ❯ caseResult src/evidence/test-fixtures.ts:8:17
+ ❯ src/evidence/evidence.test.ts:98:58
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/35]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  35 failed | 2 passed (37)
+   Start at  13:15:33
+   Duration  19.95s (tests 92%, environment 5%, import 2%, transform 1%)
+

@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/application/execution	1.012s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.711s
+ok  	asservat.local/asservat/internal/adapters/jose	1.496s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	6.719s
+ok  	asservat.local/asservat/test/integration	1.052s

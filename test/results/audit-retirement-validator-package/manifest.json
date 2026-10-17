@@ -1,0 +1,39 @@
+{
+  "files": [
+    {
+      "path": "migrations/00058_audit_retirement_validator_scope.sql",
+      "baseSHA256": null,
+      "sha256": "544cc6dbedd8a08981fea5c264dd7055067f2bb341e3eeef0d945b0307e3eb58"
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "baseSHA256": "d0232903e062a23aa0b21308bd5704fca1991af8da22c2b026949e08cfb0d383",
+      "sha256": "a9340e515e639318ee62b18fb083ba4dd90d07b9f2b24c7f542c1c1007cea5a8"
+    },
+    {
+      "path": "test/integration/capture_intent_lifecycle_test.go",
+      "baseSHA256": "2e7e25923ff98fb8d7d03f3f73e9bfc9910a70e53db2049848e6bc8172cbee76",
+      "sha256": "1ff01b2c1c2d5fcb24ce7a571cb6d2e4488d818d40103260a6bac33d48a20701"
+    },
+    {
+      "path": "test/integration/operation_audit_lifecycle_test.go",
+      "baseSHA256": "3937d7183f55be1b4864adda91bcbb3ed6fc755996ae0cee4af42791fe6922cd",
+      "sha256": "a749bdfc7caa6340afb9591bef02b6a257904ca08a9da89889fa959d0d598470"
+    },
+    {
+      "path": "migrations/README.md",
+      "baseSHA256": "647033a670c06f765dc053f060753451e35bd69ef4f0eb12c72209ec94de0da9",
+      "sha256": "6a62b1036e0cd0a3d79ea222ada1b44d09f875aec7bf150a6a5647a2f0a8dd2d"
+    },
+    {
+      "path": "docs/architecture/capture-intent-lifecycle.md",
+      "baseSHA256": "4f4005cfcbd227c16320e2e3a5a3bd0f2af3c181984a432a05aaa0d9a25ff3a2",
+      "sha256": "6b700b19f2f1a253b4bd196f2c8e958dbfbe03d5597dfa894307d7473ea6fff1"
+    },
+    {
+      "path": "docs/architecture/operation-audit-lifecycle.md",
+      "baseSHA256": "dcdebe6307cee49882e2e3f8a55497b3135251b3903e396c880f0e453e1fb3e3",
+      "sha256": "5c70b0e97f4737e12e99d32a4448f80845d68d1381555f5d3055f790f20df2fa"
+    }
+  ]
+}

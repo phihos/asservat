@@ -1,0 +1,6 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:173: fixture admin PUT /admin/realms/asservat-test/users/profile status 400
+--- FAIL: TestKeycloakProvider (0.79s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.840s
+FAIL

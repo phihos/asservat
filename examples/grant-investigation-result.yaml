@@ -1,0 +1,44 @@
+schemaVersion: grant/v1
+id: 00000000-0000-4000-8000-000000000082
+kind: AccessGrant
+spec:
+  requester:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  grantType: rawQuery
+  target:
+    kind: artifact
+    caseID: 00000000-0000-4000-8000-000000000002
+    artifacts:
+    - artifactID: 00000000-0000-4000-8000-000000000004
+      digest: '4444444444444444444444444444444444444444444444444444444444444444'
+  operations:
+  - read_memory
+  - download_artifact
+  reason: Inspect a bounded region of the synthetic core.
+  notAfter: '2026-10-09T12:50:00Z'
+  limits:
+    maxBytes: 6442450944
+    maxExecutions: 20
+    maxDuration: 30m
+  issuedAt: '2026-10-09T12:00:00Z'
+  approver:
+    issuer: https://identity.example.invalid/realms/company
+    subject: incident-approver-456
+    clientID: asservat-browser
+    identityType: human
+  resultOrigin:
+    parentGrantID: 00000000-0000-4000-8000-000000000081
+    captureUID: 00000000-0000-4000-8000-000000000045
+    executionDigest: d3a5adbd38a80a8d859b62c31fe7e1662a2b27dcd774ff60a631907c5337fd71
+    resultAccessDigest: b20a9e528587356bfde5cf78eeff40e35f6d0b76a448de5d8a173137d8e88568
+    actionID: core
+status:
+  phase: Approved
+  revision: 1
+  reservedBytes: 0
+  spentBytes: 0
+  executionsSpent: 0
+  executionsReserved: 0

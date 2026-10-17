@@ -1,0 +1,38 @@
+{
+  "phase": "after",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-bound-worker-20261012/overlay-after.json",
+    "-race",
+    "./internal/application/evidence",
+    "-run",
+    "^Test(ContextRuntime|WorkerCurrent|WorkerPending)",
+    "-count=1",
+    "-timeout=90s",
+    "-v"
+  ],
+  "exit": 1,
+  "seconds": 6.222,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "payload": {
+    "internal/application/evidence/context_native_runtime.go": "9fc3c38bb7bea8cdd3b4165c686a147dc9382fdd6271915d9ffd2e758008a187",
+    "internal/application/evidence/context_native_bound_worker_test.go": "349e91023c7a66928c850c0962279a81134e9ae578c8f4bcfc9f06c2d13961b6"
+  },
+  "dependencies_count": 1210,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-bound-worker-20261012/tmp"
+  }
+}

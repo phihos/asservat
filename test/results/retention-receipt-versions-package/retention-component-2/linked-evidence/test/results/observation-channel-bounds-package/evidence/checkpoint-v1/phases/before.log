@@ -1,0 +1,17 @@
+=== RUN   TestOperationChannelCarriesSelectedOwnerCutoffs
+=== RUN   TestOperationChannelCarriesSelectedOwnerCutoffs/following-candidate
+    connector_operation_channel_bounds_test.go:63: post-metadata candidate lost original shorter owner cutoff
+=== RUN   TestOperationChannelCarriesSelectedOwnerCutoffs/returned-result
+    connector_operation_channel_bounds_test.go:30: metadata result lost newly observed owner cutoff
+--- FAIL: TestOperationChannelCarriesSelectedOwnerCutoffs (0.22s)
+    --- FAIL: TestOperationChannelCarriesSelectedOwnerCutoffs/following-candidate (0.11s)
+    --- FAIL: TestOperationChannelCarriesSelectedOwnerCutoffs/returned-result (0.10s)
+=== RUN   TestOperationChannelExpiredRetainedCutoffDeniesBeforeAnotherRead
+    connector_operation_channel_bounds_test.go:107: expired retained cutoff admitted another candidate read current signing trust unavailable 1
+--- FAIL: TestOperationChannelExpiredRetainedCutoffDeniesBeforeAnotherRead (0.11s)
+=== RUN   TestOperationChannelOriginalSelectedCutoffSurvivesKeyLockWait
+    connector_operation_channel_bounds_test.go:175: metadata result survived original cutoff during key lock wait
+--- FAIL: TestOperationChannelOriginalSelectedCutoffSurvivesKeyLockWait (0.11s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.463s
+FAIL

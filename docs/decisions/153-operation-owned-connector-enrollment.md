@@ -1,0 +1,58 @@
+# ADR-153: Bind connector enrollment and signing to one native operation
+
+Status: implemented component; reproduced before/after deadline, race and canonical
+checks pass. Native composition and installed selection remain pending. See
+[implementation progress](../implementation-progress.md) for the exact scope.
+
+## Context
+
+ADR-126 requires current online Pod-token and live controller/source proof before connector process admission and bounded certificate signing. The original coordinator nests a complete standalone attester four times inside one original five-second admission. That attester itself performs two complete source reads, two independent workload guard proofs, two online TokenReviews and two full workload chains. Signing repeats that graph and reads the complete source again at each phase.
+
+The actual direct-observation native run 3 failed initial regional enrollment after 4.959285964 seconds, before any H/A/R request. Required input materialization had succeeded in less than 0.5 milliseconds and owner enrollment in 2.93 seconds. The archived run retains its failed positive regional helper join assertion; external teardown alone does not prove that join. These facts identify the failed phase, not the exact nested request or sole latency cause.
+
+Source accounting exposes a structural defect independently: a standalone attestation requires 54 observer and 12 probe requests. Admission makes four such attestations (216/48), while each signing operation adds four full sources (272/60). At the existing observer client limit of 20 QPS with burst 20, the cold native-only lower bounds are 9.8 seconds and 12.6 seconds respectively. Both exceed the original five seconds before SQL, audit or provider work. Complete initial Reconcile retains eight further full source reads around these three operations, totaling 872/192 and a 42.6-second cold observer floor inside its original thirty seconds.
+
+ADR-150 deliberately changes only the closed observation conversation. It does not authorize changing enrollment or signing by installing a cached implementation behind a general proof interface.
+
+## Decision
+
+Introduce a separate, closed, process-local lifecycle operation for each process admission, client signing and server signing call. Keep the general process attester, source/registry readers, historical bootstrap issuance, retirement and ADR-150 interfaces unchanged. Existing runtime selectors and installer inputs do not choose this component merely because it exists.
+
+The operation owns the original purpose and request ID, exact process/Pod identity, both CSR/key digests, original token, full source/profile/roles/backing, native guard pins and cancellation. The first returned proof must match both requested CSR digests, independently parsed by the coordinator. All nested mutable input is owned. The operation is not recreated from a returned value, JSON object or matching correlation ID. Each later request needs a new private object even when it is resolving an exact retained journal outcome.
+
+The application establishes its original at-most-five-second interval before any native work, intersecting the caller and original at-most-thirty-second Reconcile interval. Every newly learned earlier source, token, issuer root, recovery, backing or caller cap immediately bounds subsequent I/O. No phase renews an interval; clock rollback, expiry, cancellation or known mutation permanently closes the operation.
+
+Initial and Final each perform a genuine complete independent native boundary: both source and workload guards are independently enforced, the exact original token is reviewed online, and live namespace/account/Pod/ReplicaSet/Deployment security facts agree with the exact source. Pure validation may consume the actual denied-probe ConfigMap and Deployment responses within that boundary instead of discarding them and repeating nested full readers. A complete source-value read follows the native boundary, including the final denied probe, so mutation during that probe cannot be hidden by its earlier body. Existing status/resource-version-only startup changes remain allowed; security-relevant workload digest bytes stay unchanged.
+
+The two intermediate phases perform actual current reads of both policy/binding pairs, the complete source and backing, the original token through online TokenReview, and the live namespace/account/Pod/ReplicaSet/Deployment chain. They retain the original bounded native enforcement observation and do not claim to perform new denied probes. The final independent boundary must complete before a successful result or certificate can be delivered.
+
+The explicit carrier keeps `Original` with unchanged initial proof/configuration timestamps, separately dated current `Source`, and `FinalProof` only after actual final native I/O. `Until` can only shorten the original and current caps. Continuity requires the same original dates, source/security facts, roles and binding; the coordinator additionally retains the same private operation instance. No public/general source interface accepts these returned values as a newly acquired full observation.
+
+## Effects and uncertainty
+
+Use the existing private effect runners, audit formats, SQL duties and provider attempts. Legacy entry points continue their complete reads. Explicit lifecycle entry points select the new native operation and then privately produce existing current SQL inputs with the initial proof dates untouched. Signing also carries the actual current source-value observation. The conversion is owned by the coordinator holding the original operation, not an exported constructor accepting arbitrary correlations.
+
+The independent recovery read remains at every phase under the immediately shortened native/caller bound. Current SQL trust/root/profile/process checks and database-time checks after locks remain unchanged. There is no schema migration or new grant merely to represent local native composition.
+
+| Native phase | Admission boundary | Signing boundary |
+| --- | --- | --- |
+| Initial complete observation | Before original Prepare and audit Begin | Before original Prepare and audit Begin |
+| Intermediate actual current values | Before outcome Store | Before irreversible Claim, provider Sign, verification and Store |
+| Intermediate actual current values | After audit Finish, before current Accept | After audit Finish, before current Activate |
+| Final complete independent observation | Before acknowledged process result | Before final current certificate verification and delivery |
+
+Exact already-stored outcomes/certificates may skip the pre-effect phase only through the existing journal replay rules. The monotonic sequence is Initial→BeforeActivation→Final; it never reopens signing or audit. Unknown claims, writes or activations retain their original charge. Final failure suppresses successful output without refunding or reversing a committed effect. No failed operation reopens, no provider POST is retried, and no replacement ID or native proof replenishes budget.
+
+Concurrent/repeated/reordered reads close the operation. Close cancels and joins admitted native work before clearing its owned token/CSR buffers. It grants neither remote Joined status nor permission to reuse a SQL/provider attempt.
+
+A transient A→B→A mutation between observations is not disproven. Neither the prior repeated standalone reads nor this bounded operation establishes continuously observed history or instantaneous partition-proof revocation. Independent namespace admission and finite original observations remain the stated boundary.
+
+## Qualification
+
+The intended conflict-free graph is 22 observer/6 probe requests for each complete boundary and 12/0 for each intermediate phase: 68/12 per operation. With the unchanged eight outside-operation source reads, initial Reconcile targets 316/60. The native-only floor is about 3.4 seconds for one depleted operation and 15.8 seconds for a depleted complete Reconcile. These counts are design targets until verified; they leave no guaranteed reserve for a short accepted recovery interval or actual SQL/audit/provider contention.
+
+Preserve the native3 failure and the meaningful before regression using the actual full HTTPS attester, original clients and real admission coordinator. The latter must reach valid initial proof and retained admission before failing repeated proof under the original bound. A fixture/setup failure is not that regression.
+
+Component qualification must cover real initial/final I/O, exact request/CSR/phase and original-instance continuity, complete source/role/backing mutation, native denial loss, token/controller changes, status-only startup, clock rollback/equal starts, shortened deadlines after blocking work, concurrent Read/Close and joined cleanup. Application tests retain independent recovery, SQL effect ordering, nonrefundable unknown signing, stored-reply reconciliation and final failure after committed acceptance.
+
+Native acceptance then measures complete initial and renewing Reconcile with real Kubernetes, SQL, encrypted audit and provider work on the actual retained clients, preserving the original five-/thirty-second bounds, QPS, pools and grants. Only afterward can the H/A/R fixture reach and measure its own original five-second observation path. Neither this component nor a synthetic success enables installed regional runtime or proves sustained availability.

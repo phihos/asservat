@@ -1,0 +1,129 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-12 22:05:03.427 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 22:05:03.427 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 22:05:03.438 UTC [43] LOG:  database system was shut down at 2026-10-12 22:05:03 UTC
+2026-10-12 22:05:03.451 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+2026-10-12 22:05:03.730 UTC [37] LOG:  received fast shutdown request
+waiting for server to shut down....2026-10-12 22:05:03.733 UTC [37] LOG:  aborting any active transactions
+2026-10-12 22:05:03.734 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-12 22:05:03.734 UTC [41] LOG:  shutting down
+2026-10-12 22:05:03.737 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-12 22:05:04.107 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.081 s, sync=0.273 s, total=0.374 s; sync files=303, longest=0.105 s, average=0.001 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-12 22:05:04.127 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-12 22:05:04.154 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 22:05:04.154 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-12 22:05:04.154 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-12 22:05:04.158 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 22:05:04.170 UTC [59] LOG:  database system was shut down at 2026-10-12 22:05:04 UTC
+2026-10-12 22:05:04.179 UTC [1] LOG:  database system is ready to accept connections
+2026-10-12 22:05:04.542 UTC [70] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-12 22:05:04.542 UTC [70] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-12 22:05:08.651 UTC [86] ERROR:  empty connector digest
+2026-10-12 22:05:08.651 UTC [86] CONTEXT:  PL/pgSQL function public.connector_digest(jsonb) line 9 at RAISE
+2026-10-12 22:05:08.651 UTC [86] STATEMENT:  SELECT public.connector_digest($1::jsonb)
+2026-10-12 22:05:08.723 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_00" by role "postgres"
+2026-10-12 22:05:08.773 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_01" by role "postgres"
+2026-10-12 22:05:08.818 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_02" by role "postgres"
+2026-10-12 22:05:08.863 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_03" by role "postgres"
+2026-10-12 22:05:08.915 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_04" by role "postgres"
+2026-10-12 22:05:08.967 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_05" by role "postgres"
+2026-10-12 22:05:09.014 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_06" by role "postgres"
+2026-10-12 22:05:09.060 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_10" by role "postgres"
+2026-10-12 22:05:09.107 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_11" by role "postgres"
+2026-10-12 22:05:09.153 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_12" by role "postgres"
+2026-10-12 22:05:09.201 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_13" by role "postgres"
+2026-10-12 22:05:09.251 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_14" by role "postgres"
+2026-10-12 22:05:09.296 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_15" by role "postgres"
+2026-10-12 22:05:09.343 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_16" by role "postgres"
+2026-10-12 22:05:09.394 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_17" by role "postgres"
+2026-10-12 22:05:09.442 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_18" by role "postgres"
+2026-10-12 22:05:09.489 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_19" by role "postgres"
+2026-10-12 22:05:09.537 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_20" by role "postgres"
+2026-10-12 22:05:09.661 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_30" by role "postgres"
+2026-10-12 22:05:09.709 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_31" by role "postgres"
+2026-10-12 22:05:09.760 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_32" by role "postgres"
+2026-10-12 22:05:09.808 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_33" by role "postgres"
+2026-10-12 22:05:09.857 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_34" by role "postgres"
+2026-10-12 22:05:09.910 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_40" by role "postgres"
+2026-10-12 22:05:09.959 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_41" by role "postgres"
+2026-10-12 22:05:10.007 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_42" by role "postgres"
+2026-10-12 22:05:10.060 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_43" by role "postgres"
+2026-10-12 22:05:10.111 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_44" by role "postgres"
+2026-10-12 22:05:10.162 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_45" by role "postgres"
+2026-10-12 22:05:10.214 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_70" by role "postgres"
+2026-10-12 22:05:10.265 UTC [91] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_71" by role "postgres"
+2026-10-12 22:05:11.211 UTC [126] ERROR:  permission denied for table permission_stream
+2026-10-12 22:05:11.211 UTC [126] STATEMENT:  SELECT * FROM permission_stream LIMIT 0
+2026-10-12 22:05:11.212 UTC [126] ERROR:  permission denied for function reserve_capacity_root
+2026-10-12 22:05:11.212 UTC [126] STATEMENT:  SELECT public.reserve_capacity_root(NULL,NULL,NULL,NULL,NULL)
+2026-10-12 22:05:11.212 UTC [126] ERROR:  permission denied for table capacity_workload
+2026-10-12 22:05:11.212 UTC [126] STATEMENT:  UPDATE capacity_workload SET mutation_xid=pg_current_xact_id() WHERE false
+2026-10-12 22:05:11.227 UTC [127] ERROR:  permission denied for table capacity_source
+2026-10-12 22:05:11.227 UTC [127] STATEMENT:  UPDATE capacity_source SET suspended=false WHERE false
+2026-10-12 22:05:11.228 UTC [127] ERROR:  permission denied for function reserve_capacity_root
+2026-10-12 22:05:11.228 UTC [127] STATEMENT:  SELECT public.reserve_capacity_root(NULL,NULL,NULL,NULL,NULL)
+2026-10-12 22:05:11.228 UTC [125] ERROR:  permission denied for table capture_audit_root
+2026-10-12 22:05:11.228 UTC [125] STATEMENT:  SELECT * FROM capture_audit_root LIMIT 0
+2026-10-12 22:05:11.228 UTC [125] ERROR:  permission denied for table capture_audit_allocation
+2026-10-12 22:05:11.228 UTC [125] STATEMENT:  UPDATE capture_audit_allocation SET valid_until=valid_until WHERE false
+2026-10-12 22:05:11.228 UTC [125] ERROR:  permission denied for function back_capacity_root
+2026-10-12 22:05:11.228 UTC [125] STATEMENT:  SELECT public.back_capacity_root(NULL,NULL,NULL,NULL,NULL)
+2026-10-12 22:05:11.228 UTC [125] ERROR:  permission denied for function capacity_role_ok
+2026-10-12 22:05:11.228 UTC [125] STATEMENT:  SELECT public.capacity_role_ok(NULL,'capacity')
+2026-10-12 22:05:11.229 UTC [125] ERROR:  permission denied for table capacity_source
+2026-10-12 22:05:11.229 UTC [125] STATEMENT:  UPDATE capacity_source SET root_mutation_xid=pg_current_xact_id() WHERE false
+2026-10-12 22:05:11.279 UTC [130] FATAL:  too many connections for role "as_10000000000040008000000000000001_pub_70"
+2026-10-12 22:05:11.321 UTC [133] FATAL:  too many connections for role "as_10000000000040008000000000000001_pub_71"
+2026-10-12 22:05:11.378 UTC [137] FATAL:  too many connections for role "as_10000000000040008000000000000001_pub_43"
+2026-10-12 22:05:11.436 UTC [141] FATAL:  too many connections for role "as_10000000000040008000000000000001_pub_44"
+2026-10-12 22:05:11.494 UTC [145] FATAL:  too many connections for role "as_10000000000040008000000000000001_pub_45"
+2026-10-12 22:05:11.604 UTC [125] ERROR:  capacity root completion state unavailable
+2026-10-12 22:05:11.604 UTC [125] CONTEXT:  PL/pgSQL function public.publish_capacity_root(uuid,jsonb,bytea,bytea,jsonb) line 7 at RAISE
+2026-10-12 22:05:11.604 UTC [125] STATEMENT:  -- name: PublishCapacityRoot :one
+	SELECT publish_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::jsonb)::jsonb AS result
+	
+2026-10-12 22:05:11.921 UTC [125] ERROR:  capacity original phase unavailable
+2026-10-12 22:05:11.921 UTC [125] CONTEXT:  PL/pgSQL function public.capacity_finish_enrollment(uuid,text,jsonb,bytea,bytea,bytea,jsonb,boolean) line 19 at RAISE
+	SQL function "publish_capacity_enrollment" statement 1
+2026-10-12 22:05:11.921 UTC [125] STATEMENT:  -- name: PublishCapacityEnrollment :one
+	SELECT publish_capacity_enrollment($1::uuid,$2::jsonb,$3::bytea,$4::bytea,$5::bytea,$6::jsonb)::jsonb AS enrollment
+	

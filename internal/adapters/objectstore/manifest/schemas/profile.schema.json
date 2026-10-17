@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/profile.schema.json",
+  "title": "Asservat profile metadata v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "profile/v1"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "pprof",
+        "go-trace",
+        "jfr",
+        "nettrace",
+        "speedscope",
+        "v8-cpuprofile"
+      ]
+    },
+    "runtime": {
+      "type": "string",
+      "enum": [
+        "go",
+        "jvm",
+        "dotnet",
+        "python",
+        "node",
+        "native"
+      ]
+    },
+    "profileType": {
+      "type": "string",
+      "enum": [
+        "cpu",
+        "heap",
+        "allocs",
+        "goroutine",
+        "block",
+        "mutex",
+        "threadcreate",
+        "offCpu",
+        "wall",
+        "lock",
+        "events",
+        "runtimeTrace"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "snapshot",
+        "interval",
+        "cumulative",
+        "delta"
+      ]
+    },
+    "sampleTypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "type",
+          "unit"
+        ]
+      },
+      "maxItems": 16
+    },
+    "durationNanoseconds": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "samplePeriod": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "unit",
+            "value"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lostSamples": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "symbolCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resolvedLocations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "totalLocations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        }
+      },
+      "required": [
+        "resolvedLocations",
+        "totalLocations"
+      ]
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "forceGC": {
+          "type": "boolean"
+        },
+        "settingsKnown": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sourceRef",
+        "forceGC",
+        "settingsKnown"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "format",
+    "runtime",
+    "profileType",
+    "mode",
+    "sampleTypes",
+    "durationNanoseconds",
+    "samplePeriod",
+    "lostSamples",
+    "symbolCoverage",
+    "acquisition"
+  ]
+}

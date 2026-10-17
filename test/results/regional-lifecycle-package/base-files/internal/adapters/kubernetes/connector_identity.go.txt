@@ -1,0 +1,154 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	admission "k8s.io/api/admissionregistration/v1"
+)
+
+const connectorIdentityDenial = "Asservat connector identity configuration administrator is required."
+
+type ConnectorIdentityProtection struct{ *configMapProtection }
+
+func ConnectorIdentityAdmission(p cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error) {
+	return configMapAdmission(p, "protected-connector-namespace", connectorIdentityDenial)
+}
+func NewConnectorIdentityProtection(observer, probe *PermissionClient, plan cfg.ConfigMapAdministration, pin GuardPin) (*ConnectorIdentityProtection, error) {
+	g, err := newConfigMapProtection(observer, probe, plan, pin, "protected-connector-namespace", connectorIdentityDenial)
+	if err != nil {
+		return nil, err
+	}
+	return &ConnectorIdentityProtection{g}, nil
+}
+
+type ConnectorIdentitySource struct {
+	client                        *PermissionClient
+	protection                    *ConnectorIdentityProtection
+	name, uid, installation, root string
+	binding                       value.PeerBinding
+}
+
+var _ app.ConnectorIdentitySourceReader = (*ConnectorIdentitySource)(nil)
+var _ app.ConnectorIdentityConfigurationReader = (*ConnectorIdentitySource)(nil)
+
+func NewConnectorIdentitySource(c *PermissionClient, p *ConnectorIdentityProtection, name, uid, root string, binding value.PeerBinding) (*ConnectorIdentitySource, error) {
+	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(root) || !binding.Valid() || binding.Role != value.ConnectorPeer {
+		return nil, value.ErrInvalid
+	}
+	return &ConnectorIdentitySource{client: c, protection: p, name: name, uid: uid, root: root, installation: binding.InstallationID, binding: binding}, nil
+}
+
+func (s *ConnectorIdentitySource) snapshot(ctx context.Context) (value.ConnectorIdentitySource, time.Time, error) {
+	c, u, e := s.snapshotConfiguration(ctx)
+	return c.Source, u, e
+}
+func (s *ConnectorIdentitySource) snapshotConfiguration(ctx context.Context) (app.ConnectorIdentityConfiguration, time.Time, error) {
+	var out app.ConnectorIdentityConfiguration
+	data, _, err := s.client.installationConfig(ctx, s.name, s.uid)
+	if err != nil || len(data) != 1 || len(data["connector-identity.json"]) < 1 || len(data["connector-identity.json"]) > 128<<10 {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	b := []byte(data["connector-identity.json"])
+	var wire contracts.ConnectorIdentityConfiguration
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if d.Decode(&wire) != nil {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	encoded, err := json.Marshal(wire)
+	a, z := jsontext.Value(b), jsontext.Value(encoded)
+	if err != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) || wire.Format != contracts.ConnectorIdentityFormat || wire.InstallationID != s.installation || wire.Revision < 1 || wire.Revision > 2147483647 {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	// Only the separately versioned backing is excluded from behavioral scope.
+	// Every role, root, workload, suspension and issuer field remains bound.
+	behavior := wire
+	behavior.Backing = nil
+	behaviorBytes, err := json.Marshal(behavior)
+	canonicalBehavior := jsontext.Value(behaviorBytes)
+	if err != nil || canonicalBehavior.Canonicalize() != nil {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	profile := value.ConnectorCredentialProfile{RootID: wire.RootID, Binding: value.PeerBinding{InstallationID: wire.InstallationID, ClusterID: wire.ClusterID, IssuerEpoch: wire.IssuerEpoch, PeerID: wire.PeerID, Role: value.ConnectorPeer}, Revision: identity.Revision{UID: s.uid, Generation: wire.Revision, Digest: sha256.Sum256(canonicalBehavior)}, ServerName: wire.ServerName, Deployment: value.ConnectorDeployment{Namespace: wire.Deployment.Namespace, NamespaceUID: wire.Deployment.NamespaceUID, ServiceAccount: wire.Deployment.ServiceAccount, AccountUID: wire.Deployment.AccountUID, Deployment: wire.Deployment.Deployment, DeploymentUID: wire.Deployment.DeploymentUID, ServingSlots: wire.Deployment.ServingSlots, RetainedProcesses: wire.Deployment.RetainedProcesses}, ClientIssuerRoots: wire.ClientIssuerRoots, ServerIssuerRoots: wire.ServerIssuerRoots, Suspended: wire.Suspended, Retiring: wire.Retiring}
+	// Syntax is checked separately; no protection proof is synthesized here.
+
+	roles := value.ConnectorIdentityRoles{Source: wire.Roles.Source, Journal: wire.Roles.Journal, Acknowledgement: wire.Roles.Acknowledgement, Cleanup: wire.Roles.Cleanup, Verifier: wire.Roles.Verifier, Finalizer: wire.Roles.Finalizer}
+	if !profile.WellFormed() || profile.RootID != s.root || profile.Binding != s.binding || !roles.Valid() {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	_, clientUntil, err := mtls.OwnerTrustRoots(profile.ClientIssuerRoots, s.client.now())
+	if err != nil {
+		return out, time.Time{}, err
+	}
+	_, serverUntil, err := mtls.OwnerTrustRoots(profile.ServerIssuerRoots, s.client.now())
+	if err != nil {
+		return out, time.Time{}, err
+	}
+
+	var backing app.ConnectorIdentityBacking
+	bd := json.NewDecoder(bytes.NewReader(wire.Backing))
+	bd.DisallowUnknownFields()
+	if bd.Decode(&backing) != nil || !backing.Valid() || backing.Policy.RootID != profile.RootID || backing.Policy.InstallationID != profile.Binding.InstallationID {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	bb, e := json.Marshal(backing)
+	left, right := jsontext.Value(wire.Backing), jsontext.Value(bb)
+	if e != nil || left.Canonicalize() != nil || right.Canonicalize() != nil || !bytes.Equal(left, right) {
+		return out, time.Time{}, value.ErrInvalid
+	}
+	out = app.ConnectorIdentityConfiguration{Source: value.ConnectorIdentitySource{Observation: value.ConnectorCredentialObservation{Profile: profile, Backing: value.ConnectorBackingObservation{Revision: backing.Policy.BackingRevision, Digest: sha256.Sum256(left), SourceDigest: sha256.Sum256(a)}}, Roles: roles}, Backing: backing.Clone()}
+	return out, identity.Earlier(clientUntil, serverUntil), nil
+}
+func (s *ConnectorIdentitySource) ReadConnectorIdentitySource(ctx context.Context) (value.ConnectorIdentitySource, error) {
+	c, e := s.ReadConnectorIdentityConfiguration(ctx)
+	return c.Source, e
+}
+func (s *ConnectorIdentitySource) ReadConnectorIdentityConfiguration(ctx context.Context) (app.ConnectorIdentityConfiguration, error) {
+	var out app.ConnectorIdentityConfiguration
+	if s == nil || ctx == nil {
+		return out, value.ErrInvalid
+	}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	start := s.client.now()
+	protection, until, err := s.protection.current(ctx)
+	if err != nil {
+		return out, err
+	}
+	first, rootsUntil, err := s.snapshotConfiguration(ctx)
+	if err != nil {
+		return out, err
+	}
+	last, lastRootsUntil, err := s.snapshotConfiguration(ctx)
+	if err != nil || last.Source.Roles != first.Source.Roles || !last.Source.Observation.SameSource(first.Source.Observation) || !connectorBackingEqual(first.Backing, last.Backing) {
+		return out, value.ErrUnavailable
+	}
+	if _, err = checkAdmissionGuard(ctx, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding); err != nil {
+		return out, err
+	}
+	first.Source.Observation.Profile.ProtectionDigest = protection
+	first.Source.Observation.ObservedAt = start
+	first.Source.Observation.FreshUntil = identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, identity.Earlier(rootsUntil, lastRootsUntil)))
+	if !first.Valid(s.client.now()) || ctx.Err() != nil {
+		return out, value.ErrUnavailable
+	}
+	return first, nil
+}
+
+func connectorBackingEqual(a, b app.ConnectorIdentityBacking) bool {
+	x, e := json.Marshal(a)
+	y, f := json.Marshal(b)
+	return e == nil && f == nil && bytes.Equal(x, y)
+}

@@ -1,0 +1,33 @@
+{
+  "manifest": "c1a5cea791a75f3af5e5c12e23e0f815dbe18e68e91de8c09f4c4d5dc68681dd",
+  "dependencies": "497f97cf5263c888b6d294d61785a5c5fdc1ada197f170cc76473209a0674e7e",
+  "runner_sha256": "8e7947e5ee18b0560c44929941d25cd4ea66c4c90253988b40623b6867310535",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "started_at": 1791844017.4508228,
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-vet=off",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/overlay.json",
+    "./test/integration",
+    "-run",
+    "^TestCapacityPolicyTimestampVectors$",
+    "-count=1",
+    "-v"
+  ],
+  "exit": 0,
+  "log_sha256": "51908cec7e49b9df4b3844f8ab84274a2e14049730740a455288077d404f317d",
+  "ended_at": 1791844038.051015,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "terminal_exit": 0
+}

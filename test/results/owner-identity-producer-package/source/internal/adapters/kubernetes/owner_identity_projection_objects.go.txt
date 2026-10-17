@@ -1,0 +1,128 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+)
+
+const ownerIdentityObjectMarker = "asservat.io/owner-identity-object"
+
+func ownerIdentityObjectAnnotations(a contracts.OwnerIdentityActivation, p *contracts.OwnerIdentityProjectionClaim, purpose string) map[string]string {
+	annotations := ownerIdentityAnnotations(a, p)
+	child := p.Credentials
+	if purpose == "configuration" {
+		child = p.Configuration
+	}
+	if child != nil {
+		annotations[ownerIdentityObjectMarker] = child.OperationID
+	}
+	return annotations
+}
+func (s *OwnerIdentityProjection) object(p *contracts.OwnerIdentityProjectionClaim, purpose string, input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation, data map[string][]byte) (any, string, string, error) {
+	prefix := "/api/v1/namespaces/" + a.Input.Namespace.Name
+	annotations := ownerIdentityObjectAnnotations(a, p, purpose)
+	if purpose == "credentials" && p.Credentials != nil {
+		name := s.root.resources.names.OwnerProviders
+		return &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: a.Input.Namespace.Name, Annotations: annotations}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}, prefix + "/secrets", name, nil
+	}
+	if purpose == "configuration" && p.Configuration != nil {
+		b, e := json.Marshal(input)
+		if e != nil || len(b) > contracts.OwnerDeploymentMaxBytes {
+			return nil, "", "", cfg.ErrInvalid
+		}
+		name := s.root.resources.names.OwnerInputs
+		return &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: a.Input.Namespace.Name, Annotations: annotations}, Immutable: ptr.To(true), Data: map[string]string{"deployment.json": string(b)}}, prefix + "/configmaps", name, nil
+	}
+	return nil, "", "", cfg.ErrInvalid
+}
+func (s *OwnerIdentityProjection) createObject(ctx context.Context, p *contracts.OwnerIdentityProjectionClaim, purpose string, input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation, data map[string][]byte) error {
+	object, collection, _, e := s.object(p, purpose, input, a, data)
+	if e != nil {
+		return e
+	}
+	// MaxRetries(0) forbids reissuing an uncertain CREATE. The response does not
+	// supply independent target verification; every success is followed by GET.
+	raw, e := s.root.bridge.source.client.api.Post().AbsPath(collection).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(ctx)
+	clear(raw)
+	if e != nil {
+		return cfg.ErrUnavailable
+	}
+	until, ok := ctx.Deadline()
+	if !ok {
+		return cfg.ErrInvalid
+	}
+	return initialHandoverDeadline(ctx, s.root.resources.now, until)
+}
+func (s *OwnerIdentityProjection) readObject(ctx context.Context, p *contracts.OwnerIdentityProjectionClaim, purpose string, input contracts.OwnerDeployment, a contracts.OwnerIdentityActivation, data map[string][]byte) (contracts.OwnerIdentityObjectReceipt, error) {
+	var zero contracts.OwnerIdentityObjectReceipt
+	want, collection, name, e := s.object(p, purpose, input, a, data)
+	if e != nil {
+		return zero, e
+	}
+	raw, e := s.root.bridge.source.client.api.Get().AbsPath(collection + "/" + name).MaxRetries(0).DoRaw(ctx)
+	defer clear(raw)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	child := p.Credentials
+	if purpose == "configuration" {
+		child = p.Configuration
+	}
+	if child == nil || permissionJSON(raw, 1<<20, 131072) != nil {
+		return zero, cfg.ErrChanged
+	}
+	var metadata meta.ObjectMeta
+	switch desired := want.(type) {
+	case *core.Secret:
+		var actual core.Secret
+		if strictGuardJSON(raw, &actual) != nil {
+			return zero, cfg.ErrChanged
+		}
+		defer clearRuntimeProjection(actual.Data)
+		if actual.APIVersion != "v1" || actual.Kind != "Secret" || actual.Immutable == nil || !*actual.Immutable || actual.Type != core.SecretTypeOpaque || len(actual.StringData) != 0 || len(actual.Data) != len(desired.Data) {
+			return zero, cfg.ErrChanged
+		}
+		for key, b := range desired.Data {
+			if !bytes.Equal(actual.Data[key], b) {
+				return zero, cfg.ErrChanged
+			}
+		}
+		metadata = actual.ObjectMeta
+	case *core.ConfigMap:
+		var actual core.ConfigMap
+		if strictGuardJSON(raw, &actual) != nil || actual.APIVersion != "v1" || actual.Kind != "ConfigMap" || actual.Immutable == nil || !*actual.Immutable || len(actual.BinaryData) != 0 || !equalJSON(actual.Data, desired.Data) {
+			return zero, cfg.ErrChanged
+		}
+		metadata = actual.ObjectMeta
+	default:
+		return zero, cfg.ErrInvalid
+	}
+	if !authorization.UUID(string(metadata.UID)) || !ownerMetadata(metadata, a.Input.Namespace.Name, name, string(metadata.UID)) || len(metadata.Labels) != 0 || len(metadata.OwnerReferences) != 0 || len(metadata.Finalizers) != 0 || !equalJSON(metadata.Annotations, ownerIdentityObjectAnnotations(a, p, purpose)) {
+		return zero, cfg.ErrChanged
+	}
+	now := s.root.resources.now().UTC().Truncate(time.Microsecond)
+	receipt := contracts.OwnerIdentityObjectReceipt{Object: contracts.WorkerObjectReference{Name: name, UID: string(metadata.UID)}, ResourceVersion: metadata.ResourceVersion, ObservedAt: now}
+	if child.Receipt != nil {
+		if child.Receipt.Object != receipt.Object || child.Receipt.ResourceVersion != receipt.ResourceVersion {
+			return zero, cfg.ErrChanged
+		}
+		receipt = *child.Receipt
+	}
+	until, ok := ctx.Deadline()
+	if !ok {
+		return zero, cfg.ErrInvalid
+	}
+	if initialHandoverDeadline(ctx, s.root.resources.now, until) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return receipt, nil
+}

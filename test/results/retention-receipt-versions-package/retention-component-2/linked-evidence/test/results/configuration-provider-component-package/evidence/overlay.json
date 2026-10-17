@@ -1,0 +1,14 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/hub_worker_provider.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/kubernetes/hub_worker_provider.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/hub_worker_provider_test.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/kubernetes/hub_worker_provider_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/configuration_provider_artifact.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/providerconfig/configuration_provider_artifact.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/configuration_provider_artifact_test.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/providerconfig/configuration_provider_artifact_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/configuration_provider_recipe.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/providerconfig/configuration_provider_recipe.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/configuration_provider_recipe_test.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/providerconfig/configuration_provider_recipe_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/owner_provider_recipe.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/adapters/providerconfig/owner_provider_recipe.go",
+    "/home/phil/Projekte/asservat/internal/contracts/configuration_provider_auth.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/contracts/configuration_provider_auth.go",
+    "/home/phil/Projekte/asservat/internal/contracts/configuration_provider_auth_test.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/contracts/configuration_provider_auth_test.go",
+    "/home/phil/Projekte/asservat/internal/contracts/configuration_provider_selection.go": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/candidate-component-v2/files/internal/contracts/configuration_provider_selection.go"
+  }
+}

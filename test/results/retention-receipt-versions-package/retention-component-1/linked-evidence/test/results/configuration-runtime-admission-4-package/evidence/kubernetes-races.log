@@ -1,0 +1,162 @@
+=== RUN   TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput
+--- PASS: TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput (0.15s)
+=== RUN   TestConfigurationProviderRuntimeSharedReconcilerContention
+    configuration_worker_provider_contention_test.go:87: purpose=audit-wrap original_available=4.99999673s elapsed=3.605983399s observer=72 probe=21 fleet=2 owner=2 fenced=0 error=<nil>
+    configuration_worker_provider_contention_test.go:87: purpose=audit-unwrap original_available=4.99999108s elapsed=2.910551252s observer=130 probe=36 fleet=3 owner=3 fenced=0 error=<nil>
+--- PASS: TestConfigurationProviderRuntimeSharedReconcilerContention (6.68s)
+=== RUN   TestConfigurationProviderRuntimeContentionRetainsAcceptedSourceEnd
+    configuration_worker_provider_contention_test.go:91: purpose=audit-wrap original_available=4.247920451s elapsed=2.857711565s observer=72 probe=21 fleet=2 owner=2 fenced=0 error=<nil>
+    configuration_worker_provider_contention_test.go:91: purpose=audit-unwrap original_available=3.14240936s elapsed=3.143706956s observer=135 probe=41 fleet=3 owner=3 fenced=0 error=permission configuration unavailable
+    configuration_worker_provider_contention_test.go:91: shared native lower bound cannot support audit-unwrap within original interval: permission configuration unavailable
+--- FAIL: TestConfigurationProviderRuntimeContentionRetainsAcceptedSourceEnd (7.35s)
+=== RUN   TestConfigurationMaterialReadsOnlyOriginalMountedObjects
+--- PASS: TestConfigurationMaterialReadsOnlyOriginalMountedObjects (0.06s)
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_stale_mounted_credential
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_original_root
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_malformed_operation
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_stale_rotation
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_returned_manifest
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_role_purpose
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_UID
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_extra_unmounted_key
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_malformed
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/mounted_foreign_key
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_UID
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_mutable
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_extra_key
+=== RUN   TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_missing_key
+--- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts (0.76s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_stale_mounted_credential (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_original_root (0.04s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_malformed_operation (0.04s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_stale_rotation (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_returned_manifest (0.04s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_role_purpose (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_UID (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_extra_unmounted_key (0.06s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/storage_malformed (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/mounted_foreign_key (0.05s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_UID (0.06s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_mutable (0.08s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_extra_key (0.07s)
+    --- PASS: TestConfigurationMaterialRejectsIdentityShapeAndStaleMounts/SQL_missing_key (0.08s)
+=== RUN   TestConfigurationMaterialRetainsOriginalDeadlineAfterBlockingRead
+--- PASS: TestConfigurationMaterialRetainsOriginalDeadlineAfterBlockingRead (0.25s)
+=== RUN   TestConfigurationProviderRuntimeSharedLimiterFitsOriginalBound
+--- PASS: TestConfigurationProviderRuntimeSharedLimiterFitsOriginalBound (6.62s)
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/source
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/source_during_final_guard
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/account
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/Pod
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/ReplicaSet
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/worker_input
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/journal
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/SQL_material
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/audit_material
+=== RUN   TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/guard
+--- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation (10.55s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/source (1.46s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/source_during_final_guard (1.59s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/account (0.84s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/Pod (1.06s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/ReplicaSet (1.21s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/worker_input (0.95s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/journal (0.76s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/SQL_material (1.08s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/audit_material (1.12s)
+    --- PASS: TestConfigurationProviderRuntimeFinalRejectsCurrentMutation/guard (0.47s)
+=== RUN   TestConfigurationProviderRuntimeCopyAndForeignReaderDoNotConsumeOriginal
+--- PASS: TestConfigurationProviderRuntimeCopyAndForeignReaderDoNotConsumeOriginal (1.19s)
+=== RUN   TestConfigurationProviderRuntimeOwnsMaterial
+--- PASS: TestConfigurationProviderRuntimeOwnsMaterial (1.17s)
+=== RUN   TestConfigurationProviderRuntimeKeepsEarlierEnd
+--- PASS: TestConfigurationProviderRuntimeKeepsEarlierEnd (0.26s)
+=== RUN   TestConfigurationProviderRuntimeCloseJoinsAdmittedRead
+--- PASS: TestConfigurationProviderRuntimeCloseJoinsAdmittedRead (0.28s)
+=== RUN   TestConfigurationProviderRuntimeDenialBelongsOnlyToOriginalOperation
+--- PASS: TestConfigurationProviderRuntimeDenialBelongsOnlyToOriginalOperation (1.71s)
+=== RUN   TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient
+=== RUN   TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient/observer
+=== RUN   TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient/probe
+--- PASS: TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient (1.38s)
+    --- PASS: TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient/observer (0.22s)
+    --- PASS: TestConfigurationProviderRuntimeRotatedTokenDoesNotAdoptSameClient/probe (1.16s)
+=== RUN   TestConfigurationProviderRuntimeInitialProbeStillRequiresOriginalAccount
+--- PASS: TestConfigurationProviderRuntimeInitialProbeStillRequiresOriginalAccount (0.19s)
+=== RUN   TestConfigurationWorkerSourceReadersUseActualEightReadBrackets
+--- PASS: TestConfigurationWorkerSourceReadersUseActualEightReadBrackets (0.18s)
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/suspended
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/changed_during_final_guard
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/probe_account
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/cancelled
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/suspended
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/changed_during_final_guard
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/probe_account
+=== RUN   TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/cancelled
+--- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension (1.32s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/suspended (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/changed_during_final_guard (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/probe_account (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/fleet/cancelled (0.15s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/suspended (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/changed_during_final_guard (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/probe_account (0.17s)
+    --- PASS: TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension/owner/cancelled (0.15s)
+=== RUN   TestConfigurationWorkerTokensObserveActualBearerAndOriginalClients
+--- PASS: TestConfigurationWorkerTokensObserveActualBearerAndOriginalClients (0.22s)
+=== RUN   TestConfigurationWorkerTokenIntervalNeverReextendsAdmittedChild
+--- PASS: TestConfigurationWorkerTokenIntervalNeverReextendsAdmittedChild (0.19s)
+=== RUN   TestConfigurationWorkerTokenTransportRetainsOriginalIdleClose
+--- PASS: TestConfigurationWorkerTokenTransportRetainsOriginalIdleClose (0.00s)
+=== RUN   TestConfigurationWorkerTokenBodyCloseDoesNotReleaseBlockedRead
+--- PASS: TestConfigurationWorkerTokenBodyCloseDoesNotReleaseBlockedRead (0.15s)
+=== RUN   TestConfigurationWorkerTokenCloseJoinsBlockedResponseAndDiscardsLateBytes
+--- PASS: TestConfigurationWorkerTokenCloseJoinsBlockedResponseAndDiscardsLateBytes (0.15s)
+=== RUN   TestInstalledWorkerCapacityReadProbeGraphIsClosed
+--- PASS: TestInstalledWorkerCapacityReadProbeGraphIsClosed (0.00s)
+=== RUN   TestInstalledWorkerOriginalRoleReceiptsCoverCapacityGraph
+--- PASS: TestInstalledWorkerOriginalRoleReceiptsCoverCapacityGraph (0.03s)
+=== RUN   TestInstalledWorkerOriginalTemplateSeparatesPendingProjections
+--- PASS: TestInstalledWorkerOriginalTemplateSeparatesPendingProjections (0.03s)
+=== RUN   TestInstalledWorkerActivationRetainsOriginalJournalAndGuard
+--- PASS: TestInstalledWorkerActivationRetainsOriginalJournalAndGuard (0.02s)
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/legacy
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/unknown-layout
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/pending-object
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/refill
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/duplicate-operation
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-worker
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-guard
+=== RUN   TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-history
+--- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal (0.20s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/legacy (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/unknown-layout (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/pending-object (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/refill (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/duplicate-operation (0.03s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-worker (0.02s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-guard (0.02s)
+    --- PASS: TestInstalledWorkerActivationRejectsUnacknowledgedOrChangedOriginal/different-history (0.02s)
+=== RUN   TestInstalledWorkerOwnerReadGraphIsClosed
+--- PASS: TestInstalledWorkerOwnerReadGraphIsClosed (0.00s)
+=== RUN   TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial
+=== RUN   TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial/capacity
+=== RUN   TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial/cleanup
+--- PASS: TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial (0.44s)
+    --- PASS: TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial/capacity (0.22s)
+    --- PASS: TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial/cleanup (0.22s)
+=== RUN   TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts
+=== RUN   TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/journal
+=== RUN   TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/worker
+=== RUN   TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/metadata
+--- PASS: TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts (0.64s)
+    --- PASS: TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/journal (0.22s)
+    --- PASS: TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/worker (0.21s)
+    --- PASS: TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts/metadata (0.22s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	42.229s
+FAIL

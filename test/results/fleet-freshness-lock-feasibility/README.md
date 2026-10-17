@@ -1,0 +1,19 @@
+# Fleet view-lock feasibility evidence
+
+This archive records a PostgreSQL 18.6 view-lock experiment, not a production migration, observer implementation, recovery protocol, or installed workflow qualification. No native run, service, build, SQL mutation, or cleanup action was performed during independent verification. Only Docker metadata and process existence were read.
+
+Probe 2 terminated with exit 0 in 25.781 seconds: 31 exact cases passed. Its materialized observation CTE preserved the existing nine-column view contract. Six shared-lock forms allowed an independently committed observation renewal while the exact holder still blocked a separate semantic update. Two exclusive-lock forms demonstrated direct observation-row update mechanics only; they did not qualify a producer bypass of authority locking. The independent exclusive-authority and ordinary-join controls blocked renewal. Three NOWAIT refusals, four privilege/read-only negatives, and fourteen binding/recovery negatives passed. Each binding negative first had a positive admission baseline. Actual PostgreSQL backend IDs and blocking edges, original SQL, command exits, and server logs are retained.
+
+Probe 1 remains a failed result (exit 2, 7.039 seconds), after four passing privilege checks. Its descriptive PostgreSQL application_name exceeded 63 bytes; a truncation NOTICE caused the single-line JSON parser to reject the first semantic-blocking result. The following line records the real expected blocking edge. Probe 2 changed only the bounded application name/associated bookkeeping and output location, with unchanged SQL/schema cases. The original failure, complete first-run artifacts, and precise correction patch are preserved.
+
+The independent verification checked every artifact hash and exact file set (79 + result for probe 1; 409 + result for probe 2), each command log and joined-process record (43 and 208), four payload hashes and thirteen frozen source copies per run. All original source-change lists were empty. Twelve of those thirteen current repository files still match. scripts/test-context-storage.py changed afterward in the recorded journey selector integration; the archived integration record binds its exact old and new hashes. This later change is not a source mutation during the probes.
+
+Both owned containers and anonymous volumes are absent. All recorded subprocess PIDs/process groups, former container init PIDs, and exact probe-runner processes are absent on the same boot. The recorded removal commands, current read-only Docker absence results, source comparisons, case checks, and original-to-archive path/hash mapping are in independent-verification.json.
+
+## Archive layout and reproduction
+
+probe-1/ and probe-2/ preserve every original file byte. Python and SQL filenames have only an added .txt suffix so test discovery cannot execute archived sources. The original result.json and manifest.json hashes remain unchanged; use the explicit archive mapping for suffixed paths. provenance/ includes the failed-run review, probe-2 correction, and subsequent source integration record.
+
+For a separately authorized rerun, restore one probe directory's four manifest payloads to their original filenames in a fresh planning directory, retain the frozen repository source set under its expected paths, and read its original README.md and probe.py before execution. probe.py owns a new finite Docker lab and verifies those source hashes; changing roots or prerequisites must be recorded as a new run. This archive's verification script performs only artifact checks, metadata reads, and archival copying; it does not run the probe.
+
+Production producer monotonicity, semantic version transitions, migration/backfill, restore/activation behavior, scoped runtime ACLs and sustained observer availability still need their own implementation and qualification. Synthetic activation and deliberately narrow mechanical test roles remain explicit.

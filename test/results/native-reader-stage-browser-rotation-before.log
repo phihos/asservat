@@ -1,0 +1,8 @@
+--- FAIL: TestBrowserReadOnlyResolveRecognizesCommittedCredentialReplacement (0.00s)
+    --- FAIL: TestBrowserReadOnlyResolveRecognizesCommittedCredentialReplacement/old-token-valid (0.00s)
+        browser_rotation_test.go:26: committed same-session refresh became terminal or returned old identity identity not eligible 2
+    --- FAIL: TestBrowserReadOnlyResolveRecognizesCommittedCredentialReplacement/old-token-denied (0.00s)
+        browser_rotation_test.go:26: committed same-session refresh became terminal or returned old identity identity not eligible 1
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.006s
+FAIL

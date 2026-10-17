@@ -1,0 +1,40 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-http-port-trace-20261012/overlay.json",
+    "-race",
+    "./test/integration",
+    "-run",
+    "^TestNativeHTTPTrace",
+    "-count=1",
+    "-timeout=60s",
+    "-v"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-http-port-trace-20261012/tmp"
+  },
+  "exit": 0,
+  "elapsed_seconds": 11.329,
+  "before": {
+    "base_mismatches": [],
+    "dependency_mismatches": [],
+    "payload_mismatches": []
+  },
+  "after": {
+    "base_mismatches": [],
+    "dependency_mismatches": [],
+    "payload_mismatches": []
+  },
+  "payload": {
+    "test/integration/context_native_content_test.go": "9c756b43fe6a75e4d953ca46a3bc0a4455a01f8a3c1ca31b9ca9cda6d624a49c",
+    "test/integration/context_native_resume_test.go": "31aa1a06ea6ba102f55f21c442bc4b2da1d8bd0e9e65d85198bd7acdf3a75f56",
+    "test/integration/native_http_trace_test.go": "3a1c4901a76203a3185b8e9f3ee1abf3e89604caf228a8eae0a80f018b569309"
+  },
+  "dependencies_count": 1454,
+  "dependencies_sha256": "fd609fa031637d5bdc30aa9b709e3b76aa0736efe2eccca5bda087a394db20a1",
+  "bases_sha256": "ce223de370d801915c481a69c582edf7d3705d0e67580d0c6327d32ed025c6e9"
+}

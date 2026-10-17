@@ -1,0 +1,6 @@
+=== RUN   TestPublicationExpiryAfterArtifactLockWait
+    admission_test.go:278: expired grant published a child after waiting for artifact lock <nil>
+--- FAIL: TestPublicationExpiryAfterArtifactLockWait (0.55s)
+FAIL
+exit status 1
+FAIL	asservat.local/experiments/control-crash	0.553s

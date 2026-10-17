@@ -1,0 +1,28 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-7/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=180s",
+    "-run",
+    "^TestOwnerIdentityProducer",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "expected_before_failure": false,
+  "seconds": 36.669,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

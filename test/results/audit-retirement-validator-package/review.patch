@@ -1,0 +1,134 @@
+--- a/migrations/00058_audit_retirement_validator_scope.sql
++++ b/migrations/00058_audit_retirement_validator_scope.sql
+@@ -0,0 +1,13 @@
++-- +goose Up
++-- Deferred retirement checks run after the fixed writer/view has returned. They
++-- must read their own exact rows without giving capture cleanup roles access to
++-- the shared lifecycle/history tables. The original read-only trigger bodies,
++-- exception conditions, owner identities and deferred timing remain unchanged.
++ALTER FUNCTION public.require_operation_audit_retirement() SECURITY DEFINER;
++ALTER FUNCTION public.require_operation_audit_history_retirement() SECURITY DEFINER;
++-- Keep relation resolution fixed and direct invocation unavailable to runtime.
++ALTER FUNCTION public.require_operation_audit_retirement() SET search_path=pg_catalog,pg_temp;
++ALTER FUNCTION public.require_operation_audit_history_retirement() SET search_path=pg_catalog,pg_temp;
++REVOKE ALL ON FUNCTION public.require_operation_audit_retirement(),public.require_operation_audit_history_retirement() FROM PUBLIC;
++
++-- No destructive Down or runtime base-table grants.
+--- a/internal/adapters/postgres/custody.go
++++ b/internal/adapters/postgres/custody.go
+@@ -24,7 +24,7 @@
+ 	"github.com/jackc/pgx/v5/pgxpool"
+ )
+ 
+-const currentSchemaVersion = 57
++const currentSchemaVersion = 58
+ 
+ type Ledger struct{ pool *pgxpool.Pool }
+ 
+--- a/test/integration/capture_intent_lifecycle_test.go
++++ b/test/integration/capture_intent_lifecycle_test.go
+@@ -38,6 +38,24 @@
+ 			roles[purpose] = p
+ 			defer p.Close()
+ 		}
++		t.Run("deferred-retirement-role-isolation", func(t *testing.T) {
++			// Native positive H0/H2 retirement below must work through the private
++			// views, without granting reads or writes on the shared base tables.
++			for _, purpose := range []string{"cleanup", "verify", "retire"} {
++				for _, relation := range []string{"operation_audit_lifecycle", "operation_audit_history"} {
++					var readable, writable bool
++					if err := roles[purpose].QueryRow(ctx, `SELECT has_any_column_privilege(current_user,$1,'SELECT'),has_any_column_privilege(current_user,$1,'INSERT,UPDATE,REFERENCES') OR has_table_privilege(current_user,$1,'DELETE,TRUNCATE,TRIGGER')`, "public."+relation).Scan(&readable, &writable); err != nil || readable || writable {
++						t.Fatal("capture cleanup acquired shared table privileges", purpose, relation, readable, writable, err)
++					}
++				}
++				for _, function := range []string{"public.require_operation_audit_retirement()", "public.require_operation_audit_history_retirement()"} {
++					var executable bool
++					if err := roles[purpose].QueryRow(ctx, `SELECT has_function_privilege(current_user,$1,'EXECUTE')`, function).Scan(&executable); err != nil || executable {
++						t.Fatal("capture cleanup acquired direct validator execution", purpose, function, executable, err)
++					}
++				}
++			}
++		})
+ 		config, e := postgres.New(ctx, roles["source"])
+ 		if e != nil {
+ 			t.Fatal(e)
+--- a/test/integration/operation_audit_lifecycle_test.go
++++ b/test/integration/operation_audit_lifecycle_test.go
+@@ -437,8 +437,10 @@
+ 						tx.Rollback(ctx)
+ 						t.Fatal(e)
+ 					}
+-					if e = tx.Commit(ctx); e == nil {
+-						t.Fatal("stranded marker committed")
++					e = tx.Commit(ctx)
++					var rejected *pgconn.PgError
++					if !errors.As(e, &rejected) || rejected.Code != "23514" || rejected.Message != "stranded audit retirement transaction" {
++						t.Fatal("stranded marker must fail the deferred retirement check", e)
+ 					}
+ 				}
+ 				if historySeconds > 0 && in.ID == a.ID {
+--- a/migrations/README.md
++++ b/migrations/README.md
+@@ -1,6 +1,6 @@
+ # Custody migrations and query bindings
+ 
+-`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 25; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
++`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 58; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
+ 
+ Use `make sql-tools` for pinned sqlc v1.31.1 and goose v3.28.0, with sufficient build space. `make sql-check` regenerates bindings in a private temporary directory and compares them with `internal/adapters/postgres/custodydb`. Intentional query/schema changes use the pinned `sqlc generate`, then review generated code and run the real PostgreSQL test.
+ 
+@@ -53,3 +53,10 @@
+ `00027_worker_enrollment.sql` records immutable worker public-key enrollment, per-period signing attempts, public certificate/chain, independent encrypted audit acknowledgement and activation. No provider-call refund follows expiry; activation and signing/audit use disjoint roles. [Contract](../docs/architecture/worker-enrollment.md).
+ 
+ `00030_owner_enrollment.sql` adds immutable hub Pod/process/key registration, irreversible per-period signing spend, encrypted audit acknowledgements, separate activation/current registry and expiry-safe bounded pruning. [Contract](../docs/architecture/owner-registration.md).
++
++`00058_audit_retirement_validator_scope.sql` preserves the original deferred
++retirement predicates while allowing their two read-only trigger functions to
++read shared lifecycle/history rows as the migration owner. Runtime capture
++cleanup roles retain only their private filtered views and fixed effects; they
++receive no shared-table or direct-validator execution grant. The fixed search
++path and qualified relation names are retained. See [capture-intent lifecycle](../docs/architecture/capture-intent-lifecycle.md).
+--- a/docs/architecture/capture-intent-lifecycle.md
++++ b/docs/architecture/capture-intent-lifecycle.md
+@@ -41,3 +41,19 @@
+ The new custody fixture targets atomic admission rollback, role separation, same-live-request persistence timing, concurrent claims, finite reconciliation, actual two-object inventory, direct empty-digest denial and positive H=0/H>0 retirement. Its H>0 path rolls back a completed SQL transfer to cooling, then races two finalizers and proves that draining the healthy record leaves a separate same-account unknown writer charged. It also waits past a genuine original 30-second audit write cutoff while the original 40-second capture interval remains open, and verifies passive provenance after pair cleanup. Its source/identity/retention roots and accepted backup profile are explicitly synthetic. Actual collector acquisition, production backend IAM/backup measurement and regional routing are outside that SQL/S3 fixture.
+ 
+ The separate ADR-134 acquisition fixture exposed two admission-boundary defects before any capture or audit row committed: a nanosecond live request cutoff failed the SQL-precision record check, and its configured 60-second audit retention left the original purge at admission +14 seconds while the capture required a +30-second write interval. Deterministic regressions reproduce both. The correction truncates only the live request cutoff downward and configures 120-second fixture audit retention, placing original purge at +74 seconds with the same 30-second write interval, 15-second cleanup budget, one-second proof and H=0. Collapsed sub-microsecond intervals still fail. The [corrected native acquisition run](../../test/results/continuation134-native-after-admission-fix.log) passes preview/request, original encrypted intent acknowledgement and explicit continuation into one API acquisition. It verifies, publishes and reads 362 native bytes after target/executor deletion. Its terminal report records two passing entries, 1,348 unchanged source hashes and complete cleanup. Fixture human/bootstrap/retention facts remain explicit; installed regional/public transport qualification remains pending.
++
++## Deferred-validator role correction
++
++Migration 00058 corrects the execution context of the two read-only deferred
++retirement checks. Their original predicates read the shared lifecycle/history
++tables after a capture cleanup view or fixed function returns. Running those
++checks as the restricted caller caused SQLSTATE 42501, including on otherwise
++valid cleanup transactions. They now use their existing migration owner, fixed
++search path and fully qualified relations. Runtime roles gain no base-table
++privileges or direct EXECUTE permission. The same deferred checks still reject
++stranded retirement markers at commit; original deadlines, recovery checks,
++private filtered views, fixed effects and charge-release conditions are unchanged.
++
++The failed full regression and its exact SQL errors are retained in
++[implementation progress](../implementation-progress.md). Qualification of this
++correction is pending; no installed workflow is enabled by the change.
+--- a/docs/architecture/operation-audit-lifecycle.md
++++ b/docs/architecture/operation-audit-lifecycle.md
+@@ -273,3 +273,19 @@
+ The [twenty-path component result](../../test/results/audit-create-pinning-integration.json)
+ does not extend positive completion, finite retirement or installed-backend
+ qualification to those legacy writers.
++
++## Deferred-validator role correction
++
++Migration 00058 corrects the execution context of the two read-only deferred
++retirement checks. Their original predicates read the shared lifecycle/history
++tables after a capture cleanup view or fixed function returns. Running those
++checks as the restricted caller caused SQLSTATE 42501, including on otherwise
++valid cleanup transactions. They now use their existing migration owner, fixed
++search path and fully qualified relations. Runtime roles gain no base-table
++privileges or direct EXECUTE permission. The same deferred checks still reject
++stranded retirement markers at commit; original deadlines, recovery checks,
++private filtered views, fixed effects and charge-release conditions are unchanged.
++
++The failed full regression and its exact SQL errors are retained in
++[implementation progress](../implementation-progress.md). Qualification of this
++correction is pending; no installed workflow is enabled by the change.

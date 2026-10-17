@@ -1,0 +1,125 @@
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/empty
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for ""
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/null
+    current_receipt_versions_test.go:82: current authority does not match immutable-version requirement for "null"
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/oversize
+--- FAIL: TestReachableAuditReceiptsRequireImmutableVersions (0.01s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/immutable (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/empty (0.00s)
+    --- FAIL: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/oversize (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.018s
+FAIL

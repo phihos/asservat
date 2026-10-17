@@ -1,0 +1,543 @@
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/original
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/empty
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/maximum-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/utf8-byte-bound
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/unicode-control
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/ascii-control
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/printable-unicode
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/maximum-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/empty-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/oversize
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-size
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/negative-size
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/wrong-key
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/unknown-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/missing-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/casefold-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/json-null-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/fractional-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/enormous-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/short-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/fractional-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/text-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/numeric-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/text-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/overflow-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/negative-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/sql-null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/json-null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/array
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/oversize-json
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/missing-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/foreign-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/foreign-event
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/cancel-propagates
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/original
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/empty
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/maximum-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/utf8-byte-bound
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/unicode-control
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/ascii-control
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/printable-unicode
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/maximum-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/empty-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/oversize
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-size
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/negative-size
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/wrong-key
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/unknown-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/missing-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/casefold-field
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/json-null-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/fractional-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/enormous-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/short-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-digest
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/fractional-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/text-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/numeric-version
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-etag
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/text-bytes
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/overflow-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/negative-octet
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/sql-null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/json-null
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/array
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/oversize-json
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/missing-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/foreign-root
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/foreign-event
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/invalid-utf8
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/truncated-json
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-byte
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/duplicate
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/exponent
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/integer-fraction
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/digest-exponent
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/overflow-json-number
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/cancel-propagates
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/pure-invoker-public-capability
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-1
+    retention_receipt_plan_test.go:103: synthetic indexed population rows=1 elapsed=1.97757ms
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=1 checkpoint_rows=1 lifecycle_rows=1 index=retention_checkpoint_invalid_receipt elapsed=651.673µs bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=1 checkpoint_rows=1 lifecycle_rows=1 index=retention_decision_invalid_receipt elapsed=551.333µs bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:138: all-valid planning_ms=0.346 execution_ms=0.244
+    retention_receipt_plan_test.go:226: all-valid node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=6 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_decision index=<nil> rows=0 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_catchup_effect index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:146: schema56-baseline planning_ms=0.248 execution_ms=0.031
+    retention_receipt_plan_test.go:226: schema56-baseline node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_decision index=<nil> rows=0 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:160: earliest-invalid-checkpoint planning_ms=0.259 execution_ms=0.05
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=5 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_decision index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_catchup_effect index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:163: latest-invalid-lifecycle planning_ms=0.276 execution_ms=0.177
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:165: malformed-byte-retained planning_ms=0.266 execution_ms=0.118
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:172: foreign-decision-root planning_ms=0.262 execution_ms=0.029
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_decision index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_catchup_effect index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:176: foreign-decision-attempt planning_ms=0.261 execution_ms=0.057
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=0 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_decision index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_catchup_effect index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:193: invalid-other-source planning_ms=0.287 execution_ms=0.303
+    retention_receipt_plan_test.go:226: invalid-other-source node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=1 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_catchup index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_decision index=<nil> rows=2 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=2 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_decision index=<nil> rows=1 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_catchup_effect index=<nil> rows=2 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=1 shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:198: partial-index physical bytes=32768; includes pre-existing fixture rows and reusable pages
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-256
+    retention_receipt_plan_test.go:103: synthetic indexed population rows=256 elapsed=93.694624ms
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=256 checkpoint_rows=256 lifecycle_rows=256 index=retention_checkpoint_invalid_receipt elapsed=10.332793ms bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=256 checkpoint_rows=256 lifecycle_rows=256 index=retention_decision_invalid_receipt elapsed=22.119362ms bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:138: all-valid planning_ms=0.476 execution_ms=3.074
+    retention_receipt_plan_test.go:226: all-valid node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1316 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=1312 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=0 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=256 removed=<nil> shared_hit=1280 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=256 removed=255 shared_hit=768 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=256 removed=1 shared_hit=512 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:146: schema56-baseline planning_ms=0.42 execution_ms=0.173
+    retention_receipt_plan_test.go:226: schema56-baseline node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=35 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=35 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=0 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Hash relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Index Only Scan relation=retention_decision index=retention_pending_audit rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:160: earliest-invalid-checkpoint planning_ms=0.45 execution_ms=3.215
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1314 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=1312 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=0 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=256 removed=<nil> shared_hit=1280 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=256 removed=255 shared_hit=768 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=256 removed=1 shared_hit=512 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Seq Scan relation=retention_checkpoint index=<nil> rows=1 loops=1 removed=4 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:163: latest-invalid-lifecycle planning_ms=0.466 execution_ms=13.126
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1349 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=1312 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=0 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=0 loops=256 removed=<nil> shared_hit=1280 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=256 removed=255 shared_hit=768 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=256 removed=1 shared_hit=512 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=256 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=6 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=256 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=1 loops=1 removed=0 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:165: malformed-byte-retained planning_ms=0.463 execution_ms=13.04
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1349 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=1312 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=0 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=0 loops=256 removed=<nil> shared_hit=1280 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=256 removed=255 shared_hit=768 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=256 removed=1 shared_hit=512 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=256 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=6 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=256 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=1 loops=1 removed=0 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:172: foreign-decision-root planning_ms=0.464 execution_ms=0.132
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Hash Join relation=<nil> index=<nil> rows=1 loops=1 removed=4 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_checkpoint index=<nil> rows=5 loops=1 removed=0 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=0.2 loops=5 removed=<nil> shared_hit=24 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=5 removed=204 shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0.2 loops=5 removed=1 shared_hit=10 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:176: foreign-decision-attempt planning_ms=0.453 execution_ms=0.127
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Hash Join relation=<nil> index=<nil> rows=1 loops=1 removed=4 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_checkpoint index=<nil> rows=5 loops=1 removed=0 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=0.2 loops=5 removed=<nil> shared_hit=24 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=5 removed=204 shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0.2 loops=5 removed=1 shared_hit=10 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:193: invalid-other-source planning_ms=0.458 execution_ms=13.043
+    retention_receipt_plan_test.go:226: invalid-other-source node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=1349 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Hash Join relation=<nil> index=<nil> rows=0 loops=1 removed=256 shared_hit=1312 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_checkpoint index=<nil> rows=256 loops=1 removed=1 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Hash relation=<nil> index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_catchup index=<nil> rows=256 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=256 removed=<nil> shared_hit=1280 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_catchup_effect index=<nil> rows=1 loops=256 removed=256 shared_hit=768 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=256 removed=1 shared_hit=512 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Seq Scan relation=retention_checkpoint index=<nil> rows=0 loops=1 removed=257 shared_hit=29 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=8 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=6 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=257 loops=1 removed=<nil> shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=1 removed=1 shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:198: partial-index physical bytes=32768; includes pre-existing fixture rows and reusable pages
+=== RUN   TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-4096
+    retention_receipt_plan_test.go:103: synthetic indexed population rows=4096 elapsed=1.32647582s
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=4096 checkpoint_rows=4096 lifecycle_rows=4096 index=retention_checkpoint_invalid_receipt elapsed=158.688002ms bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:104: index-backfill synthetic_history=4096 checkpoint_rows=4096 lifecycle_rows=4096 index=retention_decision_invalid_receipt elapsed=350.928273ms bytes=8192; synthetic receipts are canonical versioned values, no runtime effects or production migration latency claim
+    retention_receipt_plan_test.go:138: all-valid planning_ms=0.415 execution_ms=11.904
+    retention_receipt_plan_test.go:226: all-valid node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=33364 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=25103 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=474 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=4096 removed=<nil> shared_hit=24576 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=4096 removed=<nil> shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=4096 removed=1 shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=8259 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=8259 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=4096 loops=1 removed=<nil> shared_hit=67 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=4096 removed=<nil> shared_hit=8192 shared_read=0
+    retention_receipt_plan_test.go:226: all-valid node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:146: schema56-baseline planning_ms=0.351 execution_ms=1.882
+    retention_receipt_plan_test.go:226: schema56-baseline node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=528 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=528 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=474 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Nested Loop relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Index Only Scan relation=retention_decision index=retention_pending_audit rows=0 loops=1 removed=<nil> shared_hit=1 shared_read=0
+    retention_receipt_plan_test.go:226: schema56-baseline node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_decision_id_key rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:160: earliest-invalid-checkpoint planning_ms=0.415 execution_ms=9.679
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=25107 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=25105 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=4096 removed=<nil> shared_hit=24576 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=4096 removed=<nil> shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=4096 removed=1 shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=1 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: earliest-invalid-checkpoint node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:163: latest-invalid-lifecycle planning_ms=0.426 execution_ms=12.629
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=29747 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=25105 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=0 loops=4096 removed=<nil> shared_hit=24576 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=4096 removed=<nil> shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=4096 removed=1 shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4640 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4164 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=4096 loops=1 removed=<nil> shared_hit=67 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=4096 removed=<nil> shared_hit=4097 shared_read=0
+    retention_receipt_plan_test.go:226: latest-invalid-lifecycle node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:165: malformed-byte-retained planning_ms=0.42 execution_ms=12.775
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=29747 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=25105 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=0 loops=4096 removed=<nil> shared_hit=24576 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=4096 removed=<nil> shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=4096 removed=1 shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4640 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4164 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=4096 loops=1 removed=<nil> shared_hit=67 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=4096 removed=<nil> shared_hit=4097 shared_read=0
+    retention_receipt_plan_test.go:226: malformed-byte-retained node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=0 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:172: foreign-decision-root planning_ms=0.435 execution_ms=0.038
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=0 shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=7 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_decision index=retention_decision_pkey rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-root node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:176: foreign-decision-attempt planning_ms=0.425 execution_ms=0.037
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Merge Join relation=<nil> index=<nil> rows=1 loops=1 removed=0 shared_hit=14 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=7 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=1 removed=<nil> shared_hit=3 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_decision index=retention_decision_pkey rows=1 loops=1 removed=0 shared_hit=4 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Merge Join relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Nested Loop relation=<nil> index=<nil> rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=0 removed=<nil> shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:226: foreign-decision-attempt node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=0 loops=0 removed=0 shared_hit=0 shared_read=0
+    retention_receipt_plan_test.go:193: invalid-other-source planning_ms=0.421 execution_ms=12.882
+    retention_receipt_plan_test.go:226: invalid-other-source node=Result relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=29750 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=4096 shared_hit=25106 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=1 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_catchup index=retention_catchup_pkey rows=4096 loops=1 removed=<nil> shared_hit=53 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=0 loops=4096 removed=<nil> shared_hit=24577 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=1 loops=4096 removed=<nil> shared_hit=12288 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_decision index=retention_decision_pkey rows=0 loops=4096 removed=1 shared_hit=12289 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Only Scan relation=retention_checkpoint index=retention_checkpoint_invalid_receipt rows=0 loops=1 removed=<nil> shared_hit=2 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Merge Join relation=<nil> index=<nil> rows=0 loops=1 removed=<nil> shared_hit=4642 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Nested Loop relation=<nil> index=<nil> rows=1 loops=1 removed=<nil> shared_hit=4166 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_catchup_effect index=retention_catchup_effect_pkey rows=4097 loops=1 removed=<nil> shared_hit=67 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Only Scan relation=retention_decision index=retention_decision_invalid_receipt rows=0 loops=4097 removed=<nil> shared_hit=4099 shared_read=0
+    retention_receipt_plan_test.go:226: invalid-other-source node=Index Scan relation=retention_checkpoint index=retention_checkpoint_pkey rows=4096 loops=1 removed=1 shared_hit=476 shared_read=0
+    retention_receipt_plan_test.go:198: partial-index physical bytes=32768; includes pre-existing fixture rows and reusable pages
+--- PASS: TestRetentionReceiptPredicatesWithRealPostgres (2.92s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint (0.02s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/original (0.01s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/empty (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/maximum-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/utf8-byte-bound (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/unicode-control (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/ascii-control (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/printable-unicode (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/maximum-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/empty-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/oversize (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-size (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/negative-size (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/wrong-key (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/unknown-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/missing-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/casefold-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/json-null-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/fractional-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/enormous-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/short-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/long-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/fractional-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/text-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/numeric-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/null-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/text-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/overflow-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/negative-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/sql-null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/json-null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/array (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/oversize-json (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/missing-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/zero-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/foreign-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/foreign-event (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/checkpoint/cancel-propagates (0.00s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle (0.01s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/original (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/empty (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/maximum-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/utf8-byte-bound (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/unicode-control (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/ascii-control (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/printable-unicode (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/maximum-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/empty-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/oversize (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-size (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/negative-size (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/wrong-key (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/unknown-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/missing-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/casefold-field (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/json-null-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/fractional-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/enormous-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/short-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/long-digest (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/fractional-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/text-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/numeric-version (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/null-etag (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/text-bytes (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/overflow-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/negative-octet (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/sql-null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/json-null (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/array (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/oversize-json (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/missing-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/foreign-root (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/foreign-event (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/invalid-utf8 (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/truncated-json (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/zero-byte (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/duplicate (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/exponent (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/integer-fraction (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/digest-exponent (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/overflow-json-number (0.00s)
+        --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/lifecycle/cancel-propagates (0.00s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/pure-invoker-public-capability (0.00s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-1 (0.05s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-256 (0.27s)
+    --- PASS: TestRetentionReceiptPredicatesWithRealPostgres/default-plan-history-4096 (2.56s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.976s

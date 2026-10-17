@@ -1,0 +1,28 @@
+{
+  "integratedAt": "2026-10-12T10:21:38.066207+00:00",
+  "payloads": 46,
+  "dependencies": 1373,
+  "reviewedHelm137Dependencies": [
+    "internal/adapters/kms/initial_provider.go",
+    "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+    "internal/adapters/kubernetes/initial_bootstrap_projection.go",
+    "internal/adapters/kubernetes/initial_bootstrap_state.go",
+    "internal/adapters/kubernetes/initial_preparer_cleanup_objects.go",
+    "internal/adapters/kubernetes/initial_preparer_handover.go",
+    "internal/adapters/kubernetes/initial_preparer_policy.go",
+    "internal/adapters/kubernetes/initial_preparer_provider_projection.go",
+    "internal/adapters/kubernetes/initial_provider_material.go",
+    "internal/adapters/kubernetes/initial_workload_template.go",
+    "internal/bootstrap/initial_bootstrap.go",
+    "internal/bootstrap/initial_preparer.go",
+    "internal/contracts/initial_bootstrap.go",
+    "internal/contracts/initial_preparer.go",
+    "internal/contracts/initial_provider.go"
+  ],
+  "manifestSHA256": "da824b4e8eb71d431b24e221cbc9b6a7fe7d1ca2ba0ee527fba7264e753445c2",
+  "schemaHead": 53,
+  "schemaVersionFileBefore": "1b32b818b130080401320eba83b74e549d2c2910cb8ccc8b511da84a59001515",
+  "schemaVersionFileAfter": "881180330abcac4f926db93237144255e157eb11d02e9ffbc4f5b5f1bdea2c85",
+  "nativeQualification": "pending",
+  "publicRuntimeEnabled": false
+}

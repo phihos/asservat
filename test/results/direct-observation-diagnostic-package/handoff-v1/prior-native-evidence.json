@@ -1,0 +1,6 @@
+{
+  "test/results/direct-observation-native-1/result.json": "e30353efee8994d00bcab1c7bd5cbb133c5f77132a55942a7b1cbfc68fce9fc5",
+  "test/results/direct-observation-native-1/direct/context-storage.log": "44cb48063ffebc401e443a01c72d3dfe9b9eef1da82db95c4eeda7b61eb93858",
+  "test/results/direct-observation-native-1/direct/context-storage-kubelet.log": "2796e7a6fc3d63158f89dfc30cdb355fb313c7e23e5b1cd48940aa964d80984d",
+  "test/results/direct-observation-native-1/direct/context-storage-postgres.log": "2b4c47291fe1d3175e80280b12cec8debde142fdf226c44305c7afa6524cbe87"
+}

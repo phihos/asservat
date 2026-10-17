@@ -1,0 +1,6 @@
+{
+  "path": "test/integration/context_native_content_test.go",
+  "before": "0aad055183482e9981ffea557410c01febddd7adcbcc89e2e1550da9c15ac60d",
+  "after": "6767fee1263a835bfd485234d5a8d7b5939738cf6390a9417dd76fe7d15325a2",
+  "scope": "test-only fixed labels; behavior and authority unchanged"
+}

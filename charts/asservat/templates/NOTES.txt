@@ -1,0 +1,15 @@
+Asservat configuration foundation installed (mode: {{ .Values.mode }}).
+
+This development chart installs four CRDs and a release inventory ConfigMap.
+It does not run the hub, console, MCP server, connectors or collectors.
+Creating configuration resources does not grant access or start collection.
+Helm success means this foundation was installed; it is not platform readiness.
+
+The first supported identity provider is Keycloak, operated separately.
+PostgreSQL, object storage, KMS and identity are operator-owned prerequisites.
+Do not put credentials or evidence in Helm values.
+
+Read the packaged README before an upgrade. Helm does not upgrade or remove
+the CRDs in crds/; apply reviewed CRD changes separately before upgrading.
+Uninstall leaves CRDs and their objects in place. Never delete the release
+namespace or CRDs as a shortcut for evidence or accounting cleanup.

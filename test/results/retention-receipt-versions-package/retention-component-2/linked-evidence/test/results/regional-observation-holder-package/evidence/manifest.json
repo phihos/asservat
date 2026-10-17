@@ -1,0 +1,26 @@
+{
+  "basesSHA256": "fa009f98f445d6691094b76ce95c0ec718d57cb27ece426222f2544b30d34f73",
+  "dependenciesSHA256": "21651ab4cfab3dea7e95543e83f32398ab7d8ac7545daf86aeb5d9e0a3d31ac0",
+  "liveDependencies": 1866,
+  "next": "Await parent build allocation; run sequential compile, selected races, vet, Go architecture. Actual receiving listener socket ownership and exact-holder forwarding remain separate.",
+  "overlaySHA256": "498bdbaa7326c90bcf7fb10e647819621f98ac076f0c596aaea3140755e0aa1f",
+  "ownedPaths": 12,
+  "paths": [
+    "docs/architecture/cluster-observations.md",
+    "docs/decisions/144-cluster-local-observations.md",
+    "internal/adapters/mtls/connector_observation_hub.go",
+    "internal/adapters/mtls/connector_observation_hub_test.go",
+    "internal/adapters/postgres/connector_observation_registry.go",
+    "internal/adapters/postgres/connector_observation_registry_test.go",
+    "internal/application/fleet/connector_observation_registry.go",
+    "internal/transport/clusterobservation/hub_handler.go",
+    "internal/transport/clusterobservation/hub_handler_test.go",
+    "internal/transport/clusterobservation/hub_holder.go",
+    "internal/transport/clusterobservation/hub_holder_test.go",
+    "internal/transport/clusterobservation/hub_stream.go"
+  ],
+  "payloadSHA256": "b774677de9129927437bc630d140ad8a063c69cf32968e597f82ccc2ac9c9531",
+  "scope": "Exact local hub holder, receiving HTTP/2 stream/handler, four-proof coordinator and fixed scoped SQL49 registry wrapper; no listener/runtime/forwarding activation",
+  "status": "source frozen; checks unrun",
+  "syntheticScope": "Loopback HTTP/2 mutual-TLS transport tests and actual process-key/exporter coordinator tests retain synthetic native source/workload/registry facts. No installed listener socket, native SQL, two-cluster or sustained availability verdict."
+}

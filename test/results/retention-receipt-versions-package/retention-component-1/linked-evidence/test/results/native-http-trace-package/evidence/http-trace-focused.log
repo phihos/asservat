@@ -1,0 +1,8 @@
+=== RUN   TestNativeHTTPTraceForwardsOriginalAuthority
+--- PASS: TestNativeHTTPTraceForwardsOriginalAuthority (0.00s)
+=== RUN   TestNativeHTTPTracePreservesAuditUnknownSpendAndSnapshot
+--- PASS: TestNativeHTTPTracePreservesAuditUnknownSpendAndSnapshot (0.00s)
+=== RUN   TestNativeHTTPTraceBoundedIndependentBuffer
+--- PASS: TestNativeHTTPTraceBoundedIndependentBuffer (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.053s

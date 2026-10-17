@@ -1,0 +1,9 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:282: authorization code+S256, ID/refresh rejection, rotating refresh and current stable group rename/add/removal passed
+    identity_provider_test.go:304: nested stable group IDs, ancestor inheritance, direct/inherited deduplication, slash-containing names and removal passed
+    identity_provider_test.go:331: ordinary profile update allowed; user cannot self-assign authority-bearing stable group IDs
+    identity_provider_test.go:351: real authorization code replay and wrong PKCE verifier rejected
+    identity_provider_test.go:359: separate human/workload clients, password grant denial and disabled-user refresh denial passed; existing JWT remains valid only within original application freshness bounds
+--- PASS: TestKeycloakProvider (1.85s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.904s

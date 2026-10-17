@@ -1,0 +1,23 @@
+{
+  "scope": "Disposable VM, synthetic native and nested-PID-namespace processes; no Kubernetes/runtime attribution, KMS wrapping or production authority.",
+  "command": [
+    "python3",
+    "experiments/control-crash/vm/lab.py",
+    "ssh",
+    "ASSERVAT_RUN_ID=run-4 python3 /opt/asservat-lab/run.py"
+  ],
+  "exit": 0,
+  "result": "pass",
+  "cases": 14,
+  "recordedUTC": "2026-10-09T19:29:59.923483+00:00",
+  "inputSHA256": {
+    "experiments/control-crash/helper/src/main.rs": "fed21d6a28cb0a52826ce12910d24dbfc45c9e7aa0bc6b5fe74b3995fe14425b",
+    "experiments/control-crash/helper/Cargo.toml": "44bbc5c6cf3802e3c5961dec9483b02b8c70d12096629cdf5e18981c2c1c9a5a",
+    "experiments/control-crash/helper/Cargo.lock": "ed93948c923c48c9c6ae45bb97b83206cd74cf77bac87954c295be1e240bb084",
+    "experiments/control-crash/vm/fixture.c": "b1d632a35ed5d6b352b46fb974fe979661334ab4f024b12190e528e7157a5aa4",
+    "experiments/control-crash/vm/run.py": "dfa0191d21ce12debfb892e70fa8d89b3b0b54e97cf8b568e41a916839389740",
+    "experiments/control-crash/go/cmd/receiver/main.go": "08a72b26d4d1ef88376a55d29d4144a6960ad37cbddcc8b9bd5f0ffa2e2481b0",
+    "experiments/control-crash/go/go.mod": "84b9c68cb5ffe0603f5846c1605cd8ac37eeeb37503f164362ce8c1ff68f146a",
+    "experiments/control-crash/go/go.sum": "ce39a7bb086113e949dd1fdec8005ca0559e222b1f027d9da98417182760c0fa"
+  }
+}

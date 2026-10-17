@@ -1,0 +1,1653 @@
+--- /dev/null
++++ b/internal/domain/planning/go_profile_endpoint.go
+@@ -0,0 +1,226 @@
++package planning
++
++import (
++	"errors"
++	"net"
++	"net/netip"
++	"regexp"
++	"strconv"
++	"strings"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/execution"
++	"asservat.local/asservat/internal/domain/identity"
++	"asservat.local/asservat/internal/domain/targets"
++)
++
++const GoEndpointPathPolicy = "go-pprof/v1"
++
++var (
++	ErrProfileEndpointInvalid     = errors.New("invalid profile endpoint configuration")
++	ErrProfileEndpointAmbiguous   = errors.New("profile endpoint ambiguous")
++	ErrProfileEndpointUnavailable = errors.New("profile endpoint unavailable")
++	ErrProfileEndpointDenied      = errors.New("profile endpoint outside configured scope")
++	ErrProfileHostNetwork         = errors.New("profile endpoints for host-network pods require separate qualification")
++)
++
++// GoEndpointBinding is the existing recipe endpointBindings shape. It has no
++// numeric port, address, path, header, credential or container override.
++// Names retain the public schema's length-only semantics, with the internal
++// control-free UTF-8/63-byte narrowing described by GoEndpointReference.
++type GoEndpointBinding struct {
++	Name, TemplateRef, AddressMode, PortName string
++}
++
++func (b GoEndpointBinding) Valid() bool {
++	return GoEndpointReference(b.Name) && GoEndpointReference(b.TemplateRef) && endpointAddressMode(b.AddressMode) && targets.ProfilePortName(b.PortName)
++}
++
++// GoEndpointReference intentionally adds no DNS-label pattern: canonical recipe
++// name/templateRef and action source.profileRef schemas require 1..63 characters.
++// This internal mechanism is narrower: valid UTF-8, no control characters and
++// at most 63 bytes, consistent with GoProfileRequest.SourceRef. It is not a
++// wire decoder or a claim to accept every schema-valid Unicode reference.
++func GoEndpointReference(s string) bool { return identity.Text(s, 63) }
++
++// GoEndpointSource identifies a public protected catalog entry or public trust/
++// credential policy, not a Secret. Digest covers its public definition; it must
++// never be a secret-payload hash. NamespaceUID identifies the source object's
++// namespace (empty for a cluster-scoped object), not its applicability.
++// The loader must independently establish protection, acceptance and freshness.
++type GoEndpointSource struct {
++	ClusterID, NamespaceUID, ResourceUID, Name string
++	Digest                                     artifact.Digest
++}
++
++func (s GoEndpointSource) Valid() bool {
++	return authorization.UUID(s.ClusterID) && (s.NamespaceUID == "" || authorization.UUID(s.NamespaceUID)) && authorization.UUID(s.ResourceUID) && GoEndpointReference(s.Name) && s.Digest != (artifact.Digest{})
++}
++
++func (s GoEndpointSource) InCluster(r targets.Request) bool {
++	return s.Valid() && s.ClusterID == r.ClusterID
++}
++
++type GoEndpointTLS struct {
++	Trust      GoEndpointSource
++	ServerName string
++}
++
++// GoEndpointAudience binds an independently resolved workload root. Neither
++// pod labels, declared ports, a service-account name nor the binding author is
++// a credential audience. Bare Pods use the unowned Pod UID as workload root.
++type GoEndpointAudience struct {
++	ClusterID, NamespaceUID, WorkloadKind, WorkloadUID string
++}
++
++func (a GoEndpointAudience) Valid() bool {
++	return authorization.UUID(a.ClusterID) && authorization.UUID(a.NamespaceUID) && authorization.UUID(a.WorkloadUID) && (a.WorkloadKind == "Deployment" || a.WorkloadKind == "StatefulSet" || a.WorkloadKind == "Pod")
++}
++
++func (a GoEndpointAudience) Matches(r targets.Request) bool {
++	return a.Valid() && a.ClusterID == r.ClusterID && a.NamespaceUID == r.Namespace.UID && a.WorkloadKind == r.Workload.Kind && a.WorkloadUID == r.Workload.UID
++}
++
++type GoEndpointCredential struct {
++	Policy    GoEndpointSource
++	Audiences []GoEndpointAudience
++}
++
++// GoEndpointDefinition is a typed accepted-input contract, not proof that the
++// source was protected or accepted. Fixed path policy and named dependencies
++// are resolved without opening a connection or retrieving credential material.
++type GoEndpointDefinition struct {
++	// Empty permits any authorized namespace in the enrolled cluster. This
++	// scope is separate from the protected source object's namespace.
++	ScopeNamespaceUID        string
++	Source                   GoEndpointSource
++	PathPolicy, Host         string
++	AddressModes             []string
++	MinimumPort, MaximumPort uint16
++	LoopbackFamily           string // ipv4 or ipv6, required iff loopback is permitted
++	TLS                      *GoEndpointTLS
++	Credential               *GoEndpointCredential
++}
++
++func (d GoEndpointDefinition) Valid() bool {
++	if !d.Source.Valid() || (d.ScopeNamespaceUID != "" && !authorization.UUID(d.ScopeNamespaceUID)) || d.PathPolicy != GoEndpointPathPolicy || !validEndpointHost(d.Host) || d.MinimumPort == 0 || d.MaximumPort < d.MinimumPort || len(d.AddressModes) < 1 || len(d.AddressModes) > 2 {
++		return false
++	}
++	seen := map[string]bool{}
++	for _, mode := range d.AddressModes {
++		if !endpointAddressMode(mode) || seen[mode] {
++			return false
++		}
++		seen[mode] = true
++	}
++	if seen["targetLoopback"] {
++		if d.LoopbackFamily != "ipv4" && d.LoopbackFamily != "ipv6" {
++			return false
++		}
++	} else if d.LoopbackFamily != "" {
++		return false
++	}
++	if d.TLS != nil && (!d.TLS.Trust.Valid() || !validEndpointServerName(d.TLS.ServerName)) {
++		return false
++	}
++	if d.Credential != nil {
++		if d.TLS == nil || !d.Credential.Policy.Valid() || len(d.Credential.Audiences) < 1 || len(d.Credential.Audiences) > 64 {
++			return false
++		}
++		seen := map[GoEndpointAudience]bool{}
++		for _, a := range d.Credential.Audiences {
++			if !a.Valid() || seen[a] {
++				return false
++			}
++			seen[a] = true
++		}
++	}
++	return true
++}
++
++type GoEndpointProfile struct {
++	Definition  GoEndpointDefinition
++	AddressMode string
++	Port        uint16
++}
++
++type GoEndpointCatalog struct {
++	Templates              []GoEndpointDefinition
++	Profiles               []GoEndpointProfile
++	ObservedAt, FreshUntil time.Time
++}
++
++// GoEndpointInput is private planning input. The original caller deadline and
++// complete catalog observation must already include their own earlier bounds.
++type GoEndpointInput struct {
++	SourceRef   string
++	Bindings    []GoEndpointBinding
++	Catalog     GoEndpointCatalog
++	Network     targets.ProfileNetwork
++	Parameters  execution.GoProfileParameters
++	NativeLimit int64
++	Deadline    time.Time
++}
++
++// GoEndpointPlan preserves the resolved route separately from a network socket
++// and the target network namespace. RouteIP alone must never authorize dialing.
++// The exact Pod/node/boot must be independently rechecked by a qualified dialer.
++type GoEndpointPlan struct {
++	SourceRef, SourceKind  string
++	Definition             GoEndpointDefinition
++	DefinitionDigest       artifact.Digest
++	EndpointDigest         artifact.Digest
++	Target                 targets.Request
++	Pin                    artifact.PinnedPod
++	NodeUID, NodeBootID    string
++	AddressMode            string
++	RouteIP                netip.Addr
++	Port                   uint16
++	DeclaredPortName       string
++	Parameters             execution.GoProfileParameters
++	NativeLimit            int64
++	ObservedAt, ValidUntil time.Time
++}
++
++// MatchesAcquisition compares immutable input only. It grants neither a start
++// nor current authority, and never changes the action's original lifetime.
++func (p GoEndpointPlan) MatchesAcquisition(r execution.GoProfileRequest) bool {
++	return p.EndpointDigest != (artifact.Digest{}) && r.Binding.ClusterID == p.Target.ClusterID && r.Pin == p.Pin && r.NodeUID == p.NodeUID && r.NodeBootID == p.NodeBootID && r.SourceRef == p.SourceRef && r.EndpointDigest == p.EndpointDigest && r.Parameters == p.Parameters && r.NativeLimit == p.NativeLimit
++}
++
++func endpointAddressMode(s string) bool { return s == "targetLoopback" || s == "podIP" }
++
++var endpointDNS = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
++
++func validEndpointServerName(s string) bool {
++	if len(s) == 0 || len(s) > 253 {
++		return false
++	}
++	if ip, err := netip.ParseAddr(s); err == nil {
++		return ip.Zone() == "" && !ip.Is4In6() && !ip.IsUnspecified() && !ip.IsMulticast()
++	}
++	for _, label := range strings.Split(s, ".") {
++		if len(label) > 63 || !endpointDNS.MatchString(label) {
++			return false
++		}
++	}
++	return true
++}
++
++func validEndpointHost(s string) bool {
++	if len(s) > 253 || strings.ContainsAny(s, "/\\?#@%\r\n\t ") {
++		return false
++	}
++	if validEndpointServerName(s) && !strings.Contains(s, ":") {
++		return true
++	}
++	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
++		ip, err := netip.ParseAddr(s[1 : len(s)-1])
++		return err == nil && ip.Is6() && validEndpointServerName(ip.String())
++	}
++	host, port, err := net.SplitHostPort(s)
++	n, portErr := strconv.ParseUint(port, 10, 16)
++	return err == nil && portErr == nil && n > 0 && strconv.FormatUint(n, 10) == port && validEndpointServerName(host)
++}
+--- /dev/null
++++ b/internal/domain/planning/go_profile_endpoint_test.go
+@@ -0,0 +1,102 @@
++package planning
++
++import (
++	"strings"
++	"testing"
++)
++
++func endpointDefinitionFixture() GoEndpointDefinition {
++	s := GoEndpointSource{ClusterID: "11111111-1111-4111-8111-111111111111", ResourceUID: "22222222-2222-4222-8222-222222222222", Name: "pprof", Digest: [32]byte{1}}
++	return GoEndpointDefinition{Source: s, PathPolicy: GoEndpointPathPolicy, Host: "pprof.example.invalid:6060", AddressModes: []string{"targetLoopback", "podIP"}, MinimumPort: 6000, MaximumPort: 6999, LoopbackFamily: "ipv4"}
++}
++
++func TestGoEndpointDefinitionRejectsUnsafeConfiguration(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		change func(*GoEndpointDefinition)
++	}{
++		{"path-override", func(d *GoEndpointDefinition) { d.PathPolicy = "/debug/pprof/../../metadata" }},
++		{"URL-host", func(d *GoEndpointDefinition) { d.Host = "https://pprof.example.invalid" }},
++		{"host-header", func(d *GoEndpointDefinition) { d.Host = "pprof\r\nAuthorization: secret" }},
++		{"unicode-host", func(d *GoEndpointDefinition) { d.Host = "profíle.example.invalid" }},
++		{"zone-address", func(d *GoEndpointDefinition) { d.Host = "[fe80::1%eth0]:6060" }},
++		{"zero-port", func(d *GoEndpointDefinition) { d.MinimumPort = 0 }},
++		{"reversed-ports", func(d *GoEndpointDefinition) { d.MinimumPort = 7000 }},
++		{"unknown-mode", func(d *GoEndpointDefinition) { d.AddressModes = []string{"collectorLoopback"} }},
++		{"duplicate-mode", func(d *GoEndpointDefinition) { d.AddressModes = []string{"podIP", "podIP"} }},
++		{"implicit-family", func(d *GoEndpointDefinition) { d.LoopbackFamily = "" }},
++		{"unknown-family", func(d *GoEndpointDefinition) { d.LoopbackFamily = "auto" }},
++		{"unbound-definition", func(d *GoEndpointDefinition) { d.Source.Digest = [32]byte{} }},
++		{"credential-without-TLS", func(d *GoEndpointDefinition) { d.Credential = &GoEndpointCredential{Policy: d.Source} }},
++		{"TLS-with-system-trust", func(d *GoEndpointDefinition) { d.TLS = &GoEndpointTLS{ServerName: "pprof.example.invalid"} }},
++		{"TLS-wildcard-target", func(d *GoEndpointDefinition) {
++			d.TLS = &GoEndpointTLS{Trust: d.Source, ServerName: "*.example.invalid"}
++		}},
++		{"credential-without-audience", func(d *GoEndpointDefinition) {
++			d.TLS = &GoEndpointTLS{Trust: d.Source, ServerName: "pprof.example.invalid"}
++			d.Credential = &GoEndpointCredential{Policy: d.Source}
++		}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			d := endpointDefinitionFixture()
++			if !d.Valid() {
++				t.Fatal("fixture")
++			}
++			tc.change(&d)
++			if d.Valid() {
++				t.Fatal("unsafe configuration accepted")
++			}
++		})
++	}
++	for _, host := range []string{"pprof.example.invalid", "127.0.0.1:6060", "[::1]:6060", "[::1]"} {
++		d := endpointDefinitionFixture()
++		d.Host = host
++		if !d.Valid() {
++			t.Fatalf("valid Host rejected: %s", host)
++		}
++	}
++}
++
++func TestGoEndpointBindingsKeepExistingRecipeShape(t *testing.T) {
++	b := GoEndpointBinding{Name: "local-pprof", TemplateRef: "go-pprof-loopback", AddressMode: "targetLoopback", PortName: "diagnostics"}
++	if !b.Valid() {
++		t.Fatal("existing recipe binding invalid")
++	}
++	for _, port := range []string{"6060", "Diagnostics", "diagnostics-too-long", "debug/http", "debug_1", ""} {
++		b.PortName = port
++		if b.Valid() {
++			t.Fatalf("invalid port name %q", port)
++		}
++	}
++}
++
++func TestGoEndpointReferenceUsesDocumentedInternalStringBounds(t *testing.T) {
++	for _, tc := range []struct {
++		name  string
++		valid bool
++	}{
++		{"local-pprof", true},
++		{"local pprof", true}, // Public schemas impose no DNS-label pattern.
++		{"évidence", true},
++		{strings.Repeat("a", 63), true},
++		{strings.Repeat("é", 31) + "a", true},
++		{"", false},
++		{strings.Repeat("a", 64), false},
++		{strings.Repeat("é", 32), false}, // Explicit internal byte-limit narrowing.
++		{"profile\nother", false},
++		{"profile\x00other", false},
++		{string([]byte{0xff}), false},
++	} {
++		if GoEndpointReference(tc.name) != tc.valid {
++			t.Fatalf("reference bound for %q", tc.name)
++		}
++		b := GoEndpointBinding{Name: tc.name, TemplateRef: "pprof", AddressMode: "podIP", PortName: "diagnostics"}
++		if b.Valid() != tc.valid {
++			t.Fatalf("binding name bound for %q", tc.name)
++		}
++		b.Name, b.TemplateRef = "local", tc.name
++		if b.Valid() != tc.valid {
++			t.Fatalf("template reference bound for %q", tc.name)
++		}
++	}
++}
+--- /dev/null
++++ b/internal/domain/targets/profile_network.go
+@@ -0,0 +1,69 @@
++package targets
++
++import (
++	"net/netip"
++	"regexp"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++const MaxProfilePodPorts = 256
++
++var profilePortName = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
++
++// ProfilePortName matches EvidenceRecipe.spec.endpointBindings.portName. A
++// declaration is a routing hint for the whole Pod, never process attribution.
++func ProfilePortName(s string) bool {
++	return len(s) > 0 && len(s) <= 15 && profilePortName.MatchString(s)
++}
++
++type ProfilePodPort struct {
++	Name, Protocol string
++	Port           uint16
++}
++
++// ProfileNetwork contains only public routing observations from one exact Pod
++// resource version. There is no container selector, credential or netns handle.
++// HostNetwork is retained to explain an unavailable capability, not to authorize
++// node-loopback access. Target retains its original observation interval.
++type ProfileNetwork struct {
++	Target      PodResolution
++	HostNetwork bool
++	Ports       []ProfilePodPort
++	PrimaryIP   netip.Addr
++	PodIPs      []netip.Addr
++}
++
++func (p ProfileNetwork) Valid(now time.Time) bool {
++	if !p.Target.Valid(now) || p.Target.ExecutionClass != artifact.ContextNodeExecution || len(p.Ports) > MaxProfilePodPorts || len(p.PodIPs) > 2 {
++		return false
++	}
++	// Public bindings intentionally retain their existing narrower name grammar.
++	// Unrelated valid Kubernetes port names must not invalidate a whole Pod;
++	// the Kubernetes adapter checks declaration syntax with its native library.
++	for _, port := range p.Ports {
++		if port.Port == 0 || (port.Name != "" && !identity.Text(port.Name, 15)) || (port.Protocol != "TCP" && port.Protocol != "UDP" && port.Protocol != "SCTP") {
++			return false
++		}
++	}
++	if !p.PrimaryIP.IsValid() {
++		return len(p.PodIPs) == 0
++	}
++	if !profilePodIP(p.PrimaryIP) || (len(p.PodIPs) > 0 && p.PodIPs[0] != p.PrimaryIP) {
++		return false
++	}
++	seenFamily := map[bool]bool{}
++	for _, ip := range p.PodIPs {
++		if !profilePodIP(ip) || seenFamily[ip.Is4()] {
++			return false
++		}
++		seenFamily[ip.Is4()] = true
++	}
++	return true
++}
++
++func profilePodIP(ip netip.Addr) bool {
++	return ip.IsValid() && ip.Zone() == "" && !ip.Is4In6() && ip.IsGlobalUnicast() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast()
++}
+--- /dev/null
++++ b/internal/domain/targets/profile_network_test.go
+@@ -0,0 +1,65 @@
++package targets
++
++import (
++	"net/netip"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++func TestProfileNetworkRetainsPodWideRoutingFacts(t *testing.T) {
++	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
++	fixture := func() ProfileNetwork {
++		r := Request{ClusterID: "11111111-1111-4111-8111-111111111111", Namespace: cfg.NamespaceRef{Name: "app", UID: "namespace"}, Workload: cfg.WorkloadRef{Kind: "Pod", Name: "app", UID: "pod"}, PodName: "app", PodUID: "pod"}
++		p := PodResolution{Request: r, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: "namespace", Name: "app", UID: "pod", NodeName: "node"}, NodeUID: "node", NodeBootID: "22222222-2222-4222-8222-222222222222", PodResourceVersion: "12", WorkloadResourceVersion: "12", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
++		return ProfileNetwork{Target: p, Ports: []ProfilePodPort{{Name: "debug", Protocol: "TCP", Port: 6060}}, PrimaryIP: netip.MustParseAddr("10.4.0.2"), PodIPs: []netip.Addr{netip.MustParseAddr("10.4.0.2"), netip.MustParseAddr("fd00::2")}}
++	}
++	for _, tc := range []struct {
++		name   string
++		change func(*ProfileNetwork)
++	}{
++		{"wrong-primary", func(p *ProfileNetwork) { p.PrimaryIP = netip.MustParseAddr("10.4.0.3") }},
++		{"duplicate-family", func(p *ProfileNetwork) { p.PodIPs[1] = netip.MustParseAddr("10.4.0.3") }},
++		{"loopback-pod-ip", func(p *ProfileNetwork) { p.PrimaryIP = netip.MustParseAddr("127.0.0.1"); p.PodIPs = nil }},
++		{"metadata-ip", func(p *ProfileNetwork) { p.PrimaryIP = netip.MustParseAddr("169.254.169.254"); p.PodIPs = nil }},
++		{"mapped-address", func(p *ProfileNetwork) { p.PrimaryIP = netip.MustParseAddr("::ffff:10.4.0.2"); p.PodIPs = nil }},
++		{"missing-primary", func(p *ProfileNetwork) { p.PrimaryIP = netip.Addr{} }},
++		{"old-target", func(p *ProfileNetwork) { p.Target.FreshUntil = now }},
++		{"invalid-protocol", func(p *ProfileNetwork) { p.Ports[0].Protocol = "HTTP" }},
++		{"invalid-port", func(p *ProfileNetwork) { p.Ports[0].Port = 0 }},
++		{"API-target", func(p *ProfileNetwork) {
++			p.Target.ExecutionClass = artifact.ContextAPIExecution
++			p.Target.NodeUID = ""
++			p.Target.NodeBootID = ""
++			p.Target.Pin.NodeName = ""
++		}},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			p := fixture()
++			if !p.Valid(now) {
++				t.Fatal("fixture")
++			}
++			tc.change(&p)
++			if p.Valid(now) {
++				t.Fatal("unsafe routing facts accepted")
++			}
++		})
++	}
++	p := fixture()
++	p.PrimaryIP = netip.Addr{}
++	p.PodIPs = nil
++	if !p.Valid(now) {
++		t.Fatal("unallocated IP must permit loopback planning")
++	}
++	p = fixture()
++	p.Ports = append(p.Ports, p.Ports[0])
++	if !p.Valid(now) {
++		t.Fatal("observer must retain duplicate declarations for resolver ambiguity")
++	}
++	p.HostNetwork = true
++	if !p.Valid(now) {
++		t.Fatal("observer must retain host-network fact for explicit unavailable reason")
++	}
++}
+--- /dev/null
++++ b/internal/application/planning/go_profile_endpoint.go
+@@ -0,0 +1,206 @@
++package planning
++
++import (
++	"cmp"
++	"encoding/json"
++	"net/netip"
++	"slices"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/execution"
++	"asservat.local/asservat/internal/domain/identity"
++	value "asservat.local/asservat/internal/domain/planning"
++)
++
++// ResolveGoProfileEndpoint is pure resolution, without probing, credential
++// retrieval, authorization, admission or network I/O. Catalog values must come
++// from the independent protected/current configuration path, never a capture
++// caller. This function cannot establish that source acceptance itself.
++func ResolveGoProfileEndpoint(in value.GoEndpointInput, now time.Time) (value.GoEndpointPlan, error) {
++	var out value.GoEndpointPlan
++	if !value.GoEndpointReference(in.SourceRef) || !in.Parameters.Valid() || in.NativeLimit < 1 || len(in.Bindings) > 16 || !in.Network.Valid(now) || !now.Before(in.Deadline) || !identity.Fresh(in.Catalog.ObservedAt, in.Catalog.FreshUntil, now, 5*time.Second) {
++		return out, value.ErrProfileEndpointInvalid
++	}
++	cap := execution.MaximumGoProfileBytes
++	if in.Parameters.Type == "runtimeTrace" {
++		cap = execution.MaximumGoTraceBytes
++	}
++	if in.NativeLimit > cap || len(in.Catalog.Templates)+len(in.Catalog.Profiles) > 128 {
++		return out, value.ErrProfileEndpointInvalid
++	}
++	if in.Network.HostNetwork {
++		return out, value.ErrProfileHostNetwork
++	}
++	names := map[string]bool{}
++	templates := map[string]value.GoEndpointDefinition{}
++	profiles := map[string]value.GoEndpointProfile{}
++	for _, d := range in.Catalog.Templates {
++		if !d.Valid() {
++			return out, value.ErrProfileEndpointInvalid
++		}
++		if !profileDefinitionApplicable(d, in) {
++			continue
++		}
++		if names[d.Source.Name] {
++			return out, value.ErrProfileEndpointAmbiguous
++		}
++		names[d.Source.Name], templates[d.Source.Name] = true, d
++	}
++	for _, p := range in.Catalog.Profiles {
++		if !p.Definition.Valid() {
++			return out, value.ErrProfileEndpointInvalid
++		}
++		if !slices.Contains(p.Definition.AddressModes, p.AddressMode) || p.Port < p.Definition.MinimumPort || p.Port > p.Definition.MaximumPort {
++			return out, value.ErrProfileEndpointInvalid
++		}
++		if !profileDefinitionApplicable(p.Definition, in) {
++			continue
++		}
++		name := p.Definition.Source.Name
++		if names[name] {
++			return out, value.ErrProfileEndpointAmbiguous
++		}
++		names[name], profiles[name] = true, p
++	}
++	bindings := map[string]value.GoEndpointBinding{}
++	for _, b := range in.Bindings {
++		if !b.Valid() {
++			return out, value.ErrProfileEndpointInvalid
++		}
++		if _, found := bindings[b.Name]; found {
++			return out, value.ErrProfileEndpointAmbiguous
++		}
++		if _, found := profiles[b.Name]; found {
++			return out, value.ErrProfileEndpointAmbiguous
++		}
++		bindings[b.Name] = b
++	}
++	if b, found := bindings[in.SourceRef]; found {
++		d, present := templates[b.TemplateRef]
++		if !present {
++			return out, value.ErrProfileEndpointUnavailable
++		}
++		if !slices.Contains(d.AddressModes, b.AddressMode) {
++			return out, value.ErrProfileEndpointDenied
++		}
++		var port uint16
++		matches := 0
++		for _, p := range in.Network.Ports {
++			if p.Name == b.PortName {
++				matches++
++				if p.Protocol == "TCP" {
++					port = p.Port
++				}
++			}
++		}
++		if matches > 1 {
++			return out, value.ErrProfileEndpointAmbiguous
++		}
++		if matches == 0 || port == 0 {
++			return out, value.ErrProfileEndpointUnavailable
++		}
++		if port < d.MinimumPort || port > d.MaximumPort {
++			return out, value.ErrProfileEndpointDenied
++		}
++		out.Definition, out.SourceKind, out.AddressMode, out.Port, out.DeclaredPortName = d, "templateBinding", b.AddressMode, port, b.PortName
++	} else if p, found := profiles[in.SourceRef]; found {
++		out.Definition, out.SourceKind, out.AddressMode, out.Port = p.Definition, "administratorProfile", p.AddressMode, p.Port
++	} else {
++		return out, value.ErrProfileEndpointUnavailable
++	}
++	// Only the selected applicable definition can expose a dependency/credential
++	// denial. Foreign catalog entries are indistinguishable from absent entries.
++	if err := profileDefinitionInScope(out.Definition, in); err != nil {
++		return value.GoEndpointPlan{}, err
++	}
++	if credential := out.Definition.Credential; credential != nil {
++		matched := false
++		for _, audience := range credential.Audiences {
++			matched = matched || audience.Matches(in.Network.Target.Request)
++		}
++		if !matched {
++			return value.GoEndpointPlan{}, value.ErrProfileEndpointDenied
++		}
++	}
++	if out.AddressMode == "podIP" {
++		if !in.Network.PrimaryIP.IsValid() {
++			return value.GoEndpointPlan{}, value.ErrProfileEndpointUnavailable
++		}
++		out.RouteIP = in.Network.PrimaryIP
++	} else if out.Definition.LoopbackFamily == "ipv4" {
++		out.RouteIP = netip.MustParseAddr("127.0.0.1")
++	} else {
++		out.RouteIP = netip.MustParseAddr("::1")
++	}
++	out.Definition = cloneProfileDefinition(out.Definition)
++	out.SourceRef, out.Target, out.Pin = in.SourceRef, in.Network.Target.Request, in.Network.Target.Pin
++	out.NodeUID, out.NodeBootID = in.Network.Target.NodeUID, in.Network.Target.NodeBootID
++	out.Parameters, out.NativeLimit = in.Parameters, in.NativeLimit
++	out.ObservedAt = identity.Earlier(in.Catalog.ObservedAt, in.Network.Target.ObservedAt)
++	out.ValidUntil = identity.Earlier(in.Deadline, identity.Earlier(in.Catalog.FreshUntil, in.Network.Target.FreshUntil))
++	// Current observations/resource versions are provenance, not immutable
++	// endpoint scope. All resolved network and public policy facts are included.
++	definition := struct {
++		Format     string                     `json:"format"`
++		Definition value.GoEndpointDefinition `json:"definition"`
++	}{"asservat-go-profile-definition/v1", out.Definition}
++	_, definitionDigest, err := profileEndpointCanonical(definition)
++	if err != nil {
++		return value.GoEndpointPlan{}, value.ErrProfileEndpointInvalid
++	}
++	out.DefinitionDigest = definitionDigest
++	scope := struct {
++		Format string               `json:"format"`
++		Plan   value.GoEndpointPlan `json:"plan"`
++	}{"asservat-go-profile-endpoint/v1", out}
++	scope.Plan.ObservedAt, scope.Plan.ValidUntil = time.Time{}, time.Time{}
++	_, digest, err := profileEndpointCanonical(scope)
++	if err != nil || out.DefinitionDigest == (artifact.Digest{}) || digest == (artifact.Digest{}) {
++		return value.GoEndpointPlan{}, value.ErrProfileEndpointInvalid
++	}
++	out.EndpointDigest = digest
++	return out, nil
++}
++
++func profileDefinitionApplicable(d value.GoEndpointDefinition, in value.GoEndpointInput) bool {
++	r := in.Network.Target.Request
++	return d.Source.InCluster(r) && (d.ScopeNamespaceUID == "" || d.ScopeNamespaceUID == r.Namespace.UID)
++}
++
++func profileDefinitionInScope(d value.GoEndpointDefinition, in value.GoEndpointInput) error {
++	if !d.Valid() {
++		return value.ErrProfileEndpointInvalid
++	}
++	r := in.Network.Target.Request
++	if !d.Source.InCluster(r) || (d.ScopeNamespaceUID != "" && d.ScopeNamespaceUID != r.Namespace.UID) || (d.TLS != nil && !d.TLS.Trust.InCluster(r)) || (d.Credential != nil && !d.Credential.Policy.InCluster(r)) {
++		return value.ErrProfileEndpointDenied
++	}
++	return nil
++}
++
++func cloneProfileDefinition(d value.GoEndpointDefinition) value.GoEndpointDefinition {
++	d.AddressModes = slices.Clone(d.AddressModes)
++	slices.Sort(d.AddressModes)
++	if d.TLS != nil {
++		tls := *d.TLS
++		d.TLS = &tls
++	}
++	if d.Credential != nil {
++		credential := *d.Credential
++		credential.Audiences = slices.Clone(credential.Audiences)
++		slices.SortFunc(credential.Audiences, func(a, b value.GoEndpointAudience) int {
++			return cmp.Or(cmp.Compare(a.ClusterID, b.ClusterID), cmp.Compare(a.NamespaceUID, b.NamespaceUID), cmp.Compare(a.WorkloadKind, b.WorkloadKind), cmp.Compare(a.WorkloadUID, b.WorkloadUID))
++		})
++		d.Credential = &credential
++	}
++	return d
++}
++
++func profileEndpointCanonical(v any) ([]byte, artifact.Digest, error) {
++	b, err := json.Marshal(v)
++	if err != nil {
++		return nil, artifact.Digest{}, err
++	}
++	return canonical(b)
++}
+--- /dev/null
++++ b/internal/application/planning/go_profile_endpoint_test.go
+@@ -0,0 +1,315 @@
++package planning
++
++import (
++	"errors"
++	"fmt"
++	"net/netip"
++	"reflect"
++	"slices"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/execution"
++	value "asservat.local/asservat/internal/domain/planning"
++	"asservat.local/asservat/internal/domain/targets"
++)
++
++func endpointID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
++
++func endpointInput() (value.GoEndpointInput, time.Time) {
++	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
++	r := targets.Request{ClusterID: endpointID(1), Namespace: cfg.NamespaceRef{Name: "payments", UID: endpointID(2)}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: endpointID(3)}, PodName: "api-pod", PodUID: endpointID(4)}
++	p := targets.PodResolution{Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID, NodeName: "node", ControllerUID: endpointID(7)}, NodeUID: endpointID(5), NodeBootID: endpointID(6), PodResourceVersion: "37", WorkloadResourceVersion: "14", ObservedAt: now.Add(-time.Second), FreshUntil: now.Add(4 * time.Second)}
++	d := value.GoEndpointDefinition{Source: value.GoEndpointSource{ClusterID: r.ClusterID, ResourceUID: endpointID(8), Name: "go-pprof", Digest: artifact.Digest{1}}, PathPolicy: value.GoEndpointPathPolicy, Host: "pprof.example.invalid", AddressModes: []string{"targetLoopback", "podIP"}, MinimumPort: 6000, MaximumPort: 6999, LoopbackFamily: "ipv4"}
++	in := value.GoEndpointInput{SourceRef: "local-pprof", Bindings: []value.GoEndpointBinding{{Name: "local-pprof", TemplateRef: "go-pprof", AddressMode: "targetLoopback", PortName: "diagnostics"}}, Catalog: value.GoEndpointCatalog{Templates: []value.GoEndpointDefinition{d}, ObservedAt: now.Add(-2 * time.Second), FreshUntil: now.Add(3 * time.Second)}, Network: targets.ProfileNetwork{Target: p, Ports: []targets.ProfilePodPort{{Name: "diagnostics", Port: 6060, Protocol: "TCP"}}, PrimaryIP: netip.MustParseAddr("10.0.0.3"), PodIPs: []netip.Addr{netip.MustParseAddr("10.0.0.3"), netip.MustParseAddr("fd00::3")}}, Parameters: execution.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: 10 * time.Second}, NativeLimit: 16 << 20, Deadline: now.Add(2 * time.Second)}
++	return in, now
++}
++
++func addEndpointCredential(in *value.GoEndpointInput) {
++	d := &in.Catalog.Templates[0]
++	trust := d.Source
++	trust.ResourceUID = endpointID(9)
++	trust.Name = "pprof-trust"
++	policy := d.Source
++	policy.ResourceUID = endpointID(10)
++	policy.Name = "pprof-credential"
++	d.TLS = &value.GoEndpointTLS{Trust: trust, ServerName: "pprof.example.invalid"}
++	r := in.Network.Target.Request
++	d.Credential = &value.GoEndpointCredential{Policy: policy, Audiences: []value.GoEndpointAudience{{ClusterID: r.ClusterID, NamespaceUID: r.Namespace.UID, WorkloadKind: r.Workload.Kind, WorkloadUID: r.Workload.UID}}}
++}
++
++func TestGoEndpointResolvesExistingRecipeAndAdministratorProfiles(t *testing.T) {
++	for _, mode := range []string{"loopback-v4", "loopback-v6", "pod-ip", "administrator", "statefulset", "unowned-pod", "control-namespace-source"} {
++		t.Run(mode, func(t *testing.T) {
++			in, now := endpointInput()
++			expectedIP := "127.0.0.1"
++			expectedKind := "templateBinding"
++			switch mode {
++			case "control-namespace-source":
++				in.Catalog.Templates[0].Source.NamespaceUID = endpointID(90)
++				in.Catalog.Templates[0].ScopeNamespaceUID = in.Network.Target.Request.Namespace.UID
++				addEndpointCredential(&in)
++			case "loopback-v6":
++				in.Catalog.Templates[0].LoopbackFamily = "ipv6"
++				expectedIP = "::1"
++			case "pod-ip":
++				in.Bindings[0].AddressMode = "podIP"
++				expectedIP = "10.0.0.3"
++			case "administrator":
++				d := in.Catalog.Templates[0]
++				d.Source.Name = "local-pprof"
++				in.Catalog.Templates = nil
++				in.Catalog.Profiles = []value.GoEndpointProfile{{Definition: d, AddressMode: "podIP", Port: 6061}}
++				in.Bindings = nil
++				in.Network.Ports = nil
++				expectedIP = "10.0.0.3"
++				expectedKind = "administratorProfile"
++			case "statefulset":
++				in.Network.Target.Request.Workload.Kind = "StatefulSet"
++				in.Network.Target.Pin.ControllerUID = in.Network.Target.Request.Workload.UID
++			case "unowned-pod":
++				r := &in.Network.Target.Request
++				r.Workload = cfg.WorkloadRef{Kind: "Pod", Name: r.PodName, UID: r.PodUID}
++				in.Network.Target.Pin.ControllerUID = ""
++			}
++			p, err := ResolveGoProfileEndpoint(in, now)
++			if err != nil || p.RouteIP.String() != expectedIP || p.SourceKind != expectedKind || p.EndpointDigest == (artifact.Digest{}) || p.DefinitionDigest == (artifact.Digest{}) || p.Pin != in.Network.Target.Pin || p.Target != in.Network.Target.Request || p.NodeBootID != in.Network.Target.NodeBootID {
++				t.Fatalf("resolution: %+v %v", p, err)
++			}
++			if !p.ValidUntil.Equal(in.Deadline) || !p.ObservedAt.Equal(in.Catalog.ObservedAt) {
++				t.Fatal("original observation/caller bound lost")
++			}
++			if mode == "administrator" && (p.Port != 6061 || p.DeclaredPortName != "") {
++				t.Fatal("fully configured profile incorrectly requires declaration")
++			}
++			if mode != "administrator" && (p.Port != 6060 || p.DeclaredPortName != "diagnostics") {
++				t.Fatal("declared port not bound")
++			}
++		})
++	}
++}
++
++func TestGoEndpointRejectsAmbiguityAndCredentialRedirection(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		change func(*value.GoEndpointInput)
++		want   error
++	}{
++		{"duplicate-declaration", func(in *value.GoEndpointInput) { in.Network.Ports = append(in.Network.Ports, in.Network.Ports[0]) }, value.ErrProfileEndpointAmbiguous},
++		{"same-name-different-port", func(in *value.GoEndpointInput) {
++			p := in.Network.Ports[0]
++			p.Port++
++			in.Network.Ports = append(in.Network.Ports, p)
++		}, value.ErrProfileEndpointAmbiguous},
++		{"same-name-UDP", func(in *value.GoEndpointInput) {
++			p := in.Network.Ports[0]
++			p.Protocol = "UDP"
++			in.Network.Ports = append(in.Network.Ports, p)
++		}, value.ErrProfileEndpointAmbiguous},
++		{"duplicate-binding", func(in *value.GoEndpointInput) { in.Bindings = append(in.Bindings, in.Bindings[0]) }, value.ErrProfileEndpointAmbiguous},
++		{"duplicate-template", func(in *value.GoEndpointInput) {
++			in.Catalog.Templates = append(in.Catalog.Templates, in.Catalog.Templates[0])
++		}, value.ErrProfileEndpointAmbiguous},
++		{"namespace-shadow", func(in *value.GoEndpointInput) {
++			d := in.Catalog.Templates[0]
++			d.ScopeNamespaceUID = in.Network.Target.Request.Namespace.UID
++			d.Source.ResourceUID = endpointID(19)
++			in.Catalog.Templates = append(in.Catalog.Templates, d)
++		}, value.ErrProfileEndpointAmbiguous},
++		{"catalog-kind-shadow", func(in *value.GoEndpointInput) {
++			in.Catalog.Profiles = []value.GoEndpointProfile{{Definition: in.Catalog.Templates[0], AddressMode: "podIP", Port: 6060}}
++		}, value.ErrProfileEndpointAmbiguous},
++		{"binding-profile-shadow", func(in *value.GoEndpointInput) {
++			d := in.Catalog.Templates[0]
++			d.Source.Name = in.SourceRef
++			in.Catalog.Profiles = []value.GoEndpointProfile{{Definition: d, AddressMode: "podIP", Port: 6060}}
++		}, value.ErrProfileEndpointAmbiguous},
++		{"undeclared-port", func(in *value.GoEndpointInput) { in.Network.Ports = nil }, value.ErrProfileEndpointUnavailable},
++		{"UDP-only", func(in *value.GoEndpointInput) { in.Network.Ports[0].Protocol = "UDP" }, value.ErrProfileEndpointUnavailable},
++		{"no-IP", func(in *value.GoEndpointInput) {
++			in.Bindings[0].AddressMode = "podIP"
++			in.Network.PrimaryIP = netip.Addr{}
++			in.Network.PodIPs = nil
++		}, value.ErrProfileEndpointUnavailable},
++		{"out-of-range", func(in *value.GoEndpointInput) { in.Network.Ports[0].Port = 7070 }, value.ErrProfileEndpointDenied},
++		{"unapproved-address-mode", func(in *value.GoEndpointInput) {
++			in.Catalog.Templates[0].AddressModes = []string{"targetLoopback"}
++			in.Bindings[0].AddressMode = "podIP"
++		}, value.ErrProfileEndpointDenied},
++		{"foreign-catalog-namespace", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].ScopeNamespaceUID = endpointID(20) }, value.ErrProfileEndpointUnavailable},
++		{"foreign-catalog-cluster", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].Source.ClusterID = endpointID(20) }, value.ErrProfileEndpointUnavailable},
++		{"credential-workload", func(in *value.GoEndpointInput) {
++			addEndpointCredential(in)
++			in.Catalog.Templates[0].Credential.Audiences[0].WorkloadUID = endpointID(21)
++		}, value.ErrProfileEndpointDenied},
++		{"credential-namespace", func(in *value.GoEndpointInput) {
++			addEndpointCredential(in)
++			in.Catalog.Templates[0].Credential.Audiences[0].NamespaceUID = endpointID(21)
++		}, value.ErrProfileEndpointDenied},
++		{"credential-cluster", func(in *value.GoEndpointInput) {
++			addEndpointCredential(in)
++			in.Catalog.Templates[0].Credential.Audiences[0].ClusterID = endpointID(21)
++		}, value.ErrProfileEndpointDenied},
++		{"foreign-trust-policy", func(in *value.GoEndpointInput) {
++			addEndpointCredential(in)
++			in.Catalog.Templates[0].TLS.Trust.ClusterID = endpointID(21)
++		}, value.ErrProfileEndpointDenied},
++		{"foreign-credential-policy", func(in *value.GoEndpointInput) {
++			addEndpointCredential(in)
++			in.Catalog.Templates[0].Credential.Policy.ClusterID = endpointID(21)
++		}, value.ErrProfileEndpointDenied},
++		{"host-network", func(in *value.GoEndpointInput) { in.Network.HostNetwork = true }, value.ErrProfileHostNetwork},
++		{"expired-catalog", func(in *value.GoEndpointInput) { in.Catalog.FreshUntil = in.Catalog.ObservedAt }, value.ErrProfileEndpointInvalid},
++		{"expired-target", func(in *value.GoEndpointInput) { in.Network.Target.FreshUntil = in.Network.Target.ObservedAt }, value.ErrProfileEndpointInvalid},
++		{"expired-caller", func(in *value.GoEndpointInput) { in.Deadline = in.Catalog.ObservedAt }, value.ErrProfileEndpointInvalid},
++		{"missing-template", func(in *value.GoEndpointInput) { in.Bindings[0].TemplateRef = "missing" }, value.ErrProfileEndpointUnavailable},
++		{"template-without-binding", func(in *value.GoEndpointInput) { in.SourceRef = "go-pprof" }, value.ErrProfileEndpointUnavailable},
++		{"unbounded-native-output", func(in *value.GoEndpointInput) { in.NativeLimit = execution.MaximumGoProfileBytes + 1 }, value.ErrProfileEndpointInvalid},
++		{"too-many-bindings", func(in *value.GoEndpointInput) { in.Bindings = make([]value.GoEndpointBinding, 17) }, value.ErrProfileEndpointInvalid},
++		{"too-many-definitions", func(in *value.GoEndpointInput) { in.Catalog.Templates = make([]value.GoEndpointDefinition, 129) }, value.ErrProfileEndpointInvalid},
++		{"catalog-clock-rollback", func(in *value.GoEndpointInput) { in.Catalog.ObservedAt = in.Deadline }, value.ErrProfileEndpointInvalid},
++		{"source-reference-byte-bound", func(in *value.GoEndpointInput) { in.SourceRef = strings.Repeat("é", 32) }, value.ErrProfileEndpointInvalid},
++		{"source-reference-control", func(in *value.GoEndpointInput) { in.SourceRef = "local\npprof" }, value.ErrProfileEndpointInvalid},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			in, now := endpointInput()
++			tc.change(&in)
++			p, err := ResolveGoProfileEndpoint(in, now)
++			if !errors.Is(err, tc.want) || !reflect.DeepEqual(p, value.GoEndpointPlan{}) {
++				t.Fatalf("unsafe resolution: %+v %v, want %v", p, err, tc.want)
++			}
++		})
++	}
++}
++
++func TestGoEndpointDigestBindsResolvedRouteAndPolicyWithoutFreshnessRenewal(t *testing.T) {
++	base, now := endpointInput()
++	addEndpointCredential(&base)
++	p, err := ResolveGoProfileEndpoint(base, now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, tc := range []struct {
++		name   string
++		change func(*value.GoEndpointInput)
++	}{
++		{"port", func(in *value.GoEndpointInput) { in.Network.Ports[0].Port++ }},
++		{"loopback-family", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].LoopbackFamily = "ipv6" }},
++		{"source-definition", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].Source.Digest[0]++ }},
++		{"source-replacement", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].Source.ResourceUID = endpointID(40) }},
++		{"TLS-name", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].TLS.ServerName = "other.example.invalid" }},
++		{"TLS-trust", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].TLS.Trust.Digest[0]++ }},
++		{"credential-policy", func(in *value.GoEndpointInput) { in.Catalog.Templates[0].Credential.Policy.Digest[0]++ }},
++		{"duration", func(in *value.GoEndpointInput) { in.Parameters.Duration = time.Second }},
++		{"byte-limit", func(in *value.GoEndpointInput) { in.NativeLimit-- }},
++		{"pod-replacement", func(in *value.GoEndpointInput) {
++			in.Network.Target.Pin.UID = endpointID(44)
++			in.Network.Target.Request.PodUID = endpointID(44)
++		}},
++		{"node-reboot", func(in *value.GoEndpointInput) { in.Network.Target.NodeBootID = endpointID(45) }},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			in, n := endpointInput()
++			addEndpointCredential(&in)
++			tc.change(&in)
++			q, e := ResolveGoProfileEndpoint(in, n)
++			if e != nil || q.EndpointDigest == p.EndpointDigest {
++				t.Fatalf("material scope not bound: %v", e)
++			}
++		})
++	}
++	in, n := endpointInput()
++	addEndpointCredential(&in)
++	slices.Reverse(in.Catalog.Templates[0].AddressModes)
++	in.Network.Target.PodResourceVersion = "99"
++	in.Network.Target.WorkloadResourceVersion = "100"
++	in.Catalog.ObservedAt = n
++	in.Catalog.FreshUntil = n.Add(time.Second)
++	in.Network.Target.ObservedAt = n
++	in.Network.Target.FreshUntil = n.Add(2 * time.Second)
++	q, e := ResolveGoProfileEndpoint(in, n)
++	if e != nil || q.EndpointDigest != p.EndpointDigest || !q.ValidUntil.Equal(n.Add(time.Second)) {
++		t.Fatal("freshness changed scope or earlier cutoff lost", e)
++	}
++	// Mutating caller-owned catalog storage after resolution cannot mutate a plan.
++	in.Catalog.Templates[0].TLS.ServerName = "mutated.example.invalid"
++	in.Catalog.Templates[0].Credential.Audiences[0].WorkloadUID = endpointID(50)
++	in.Catalog.Templates[0].AddressModes[0] = "invalid"
++	if !reflect.DeepEqual(q.Definition, p.Definition) {
++		t.Fatal("resolved definition aliases input")
++	}
++}
++
++func TestGoEndpointPlanMatchesExistingAcquisitionContractOnly(t *testing.T) {
++	in, now := endpointInput()
++	p, err := ResolveGoProfileEndpoint(in, now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	r := execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: in.Network.Target.Request.ClusterID, ArtifactID: endpointID(30), AttemptID: endpointID(31), MediaType: execution.GoProfileMediaType}, Pin: p.Pin, NodeUID: p.NodeUID, NodeBootID: p.NodeBootID, SourceRef: p.SourceRef, EndpointDigest: p.EndpointDigest, Parameters: p.Parameters, NativeLimit: p.NativeLimit, NotBefore: now, Deadline: now.Add(15 * time.Second)}
++	if r.Validate(now) != nil || !p.MatchesAcquisition(r) {
++		t.Fatal("valid resolved endpoint cannot match mechanism")
++	}
++	r.EndpointDigest[0]++
++	if p.MatchesAcquisition(r) {
++		t.Fatal("changed endpoint bypassed accepted digest")
++	}
++	r.EndpointDigest = p.EndpointDigest
++	r.NodeBootID = endpointID(41)
++	if p.MatchesAcquisition(r) {
++		t.Fatal("replacement boot accepted")
++	}
++}
++
++func TestGoEndpointMixedCatalogDoesNotDisableSelectedScope(t *testing.T) {
++	for _, selected := range []string{"template", "administrator"} {
++		t.Run(selected, func(t *testing.T) {
++			in, now := endpointInput()
++			if selected == "administrator" {
++				d := in.Catalog.Templates[0]
++				d.Source.Name = in.SourceRef
++				in.Catalog.Profiles = []value.GoEndpointProfile{{Definition: d, AddressMode: "podIP", Port: 6060}}
++				in.Catalog.Templates, in.Bindings = nil, nil
++			}
++			base, err := ResolveGoProfileEndpoint(in, now)
++			if err != nil {
++				t.Fatal(err)
++			}
++			other, _ := endpointInput()
++			// Both unique names and names overlapping the selected scope must
++			// remain invisible when they only apply elsewhere.
++			for _, name := range []string{"foreign-only", "go-pprof", "local-pprof"} {
++				foreignNamespace := other.Catalog.Templates[0]
++				foreignNamespace.Source.Name = name
++				foreignNamespace.ScopeNamespaceUID = endpointID(70)
++				in.Catalog.Templates = append(in.Catalog.Templates, foreignNamespace)
++				foreignCluster := foreignNamespace
++				foreignCluster.ScopeNamespaceUID = ""
++				foreignCluster.Source.ClusterID = endpointID(71)
++				in.Catalog.Profiles = append(in.Catalog.Profiles, value.GoEndpointProfile{Definition: foreignCluster, AddressMode: "podIP", Port: 6061})
++			}
++			got, err := ResolveGoProfileEndpoint(in, now)
++			if err != nil || !reflect.DeepEqual(got, base) {
++				t.Fatalf("unrelated catalog entries changed selected plan: %+v %v", got, err)
++			}
++			// Absence and out-of-scope existence return the same minimized error.
++			for _, name := range []string{"foreign-only", "absent"} {
++				denied := in
++				denied.SourceRef, denied.Bindings = name, nil
++				p, err := ResolveGoProfileEndpoint(denied, now)
++				if !errors.Is(err, value.ErrProfileEndpointUnavailable) || !reflect.DeepEqual(p, value.GoEndpointPlan{}) {
++					t.Fatalf("foreign administrator entry disclosed: %+v %v", p, err)
++				}
++				denied.SourceRef = "local"
++				denied.Bindings = []value.GoEndpointBinding{{Name: "local", TemplateRef: name, AddressMode: "targetLoopback", PortName: "diagnostics"}}
++				p, err = ResolveGoProfileEndpoint(denied, now)
++				if !errors.Is(err, value.ErrProfileEndpointUnavailable) || !reflect.DeepEqual(p, value.GoEndpointPlan{}) {
++					t.Fatalf("foreign template entry disclosed: %+v %v", p, err)
++				}
++			}
++		})
++	}
++}
+--- /dev/null
++++ b/internal/application/targets/profile_network.go
+@@ -0,0 +1,13 @@
++package targets
++
++import (
++	"context"
++
++	value "asservat.local/asservat/internal/domain/targets"
++)
++
++// ProfileNetworkReader observes the exact selected Pod; it does not choose a
++// workload, connect to an endpoint or grant collection/credential authority.
++type ProfileNetworkReader interface {
++	ObserveProfileNetwork(context.Context, value.Request) (value.ProfileNetwork, error)
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/profile_network.go
+@@ -0,0 +1,173 @@
++package kubernetes
++
++import (
++	"context"
++	"encoding/json"
++	"net/netip"
++	"time"
++
++	port "asservat.local/asservat/internal/application/targets"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/identity"
++	value "asservat.local/asservat/internal/domain/targets"
++	"k8s.io/apimachinery/pkg/util/validation"
++)
++
++var _ port.ProfileNetworkReader = (*PodTargets)(nil)
++
++// ObserveProfileNetwork reads passive routing facts, then reuses the existing
++// exact namespace/Pod/owner/node resolution. The final Pod version must match
++// the initial routing response. No replacement selection or endpoint probing
++// occurs, and the original outer interval covers all constituent reads.
++func (c *PodTargets) ObserveProfileNetwork(parent context.Context, r value.Request) (value.ProfileNetwork, error) {
++	var out value.ProfileNetwork
++	if parent == nil || c == nil || c.client == nil || c.executionClass != artifact.ContextNodeExecution || !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(r.PodName)) != 0 {
++		return out, value.ErrInvalid
++	}
++	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
++	defer cancel()
++	start := c.client.now()
++	if ctx.Err() != nil {
++		return out, value.ErrUnavailable
++	}
++	raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+r.Namespace.Name+"/pods/"+r.PodName, nil)
++	if err != nil {
++		return out, targetReadError(err)
++	}
++	network, observed, err := decodeProfileNetwork(raw)
++	if err != nil {
++		return out, err
++	}
++	if observed.Name != r.PodName || observed.Namespace != r.Namespace.Name || observed.UID != r.PodUID || observed.Deleting {
++		return out, value.ErrChanged
++	}
++	resolved, err := c.ResolvePod(ctx, r)
++	if err != nil {
++		return out, err
++	}
++	if resolved.PodResourceVersion != observed.RV || resolved.Pin.NodeName != observed.Node {
++		return out, value.ErrChanged
++	}
++	resolved.ObservedAt = start
++	resolved.FreshUntil = identity.Earlier(start.Add(5*time.Second), resolved.FreshUntil)
++	if deadline, ok := ctx.Deadline(); ok {
++		resolved.FreshUntil = identity.Earlier(resolved.FreshUntil, deadline)
++	}
++	network.Target = resolved
++	if c.client.current(ctx, start, 5*time.Second) != nil || !network.Valid(c.client.now()) {
++		return out, value.ErrUnavailable
++	}
++	return network, nil
++}
++
++// Decode only routing fields. API response bounds belong to PermissionClient;
++// container/environment/configuration contents never enter the returned value.
++type profileNetworkMetadata struct {
++	permissionMetadata
++	Node string
++}
++
++func decodeProfileNetwork(raw []byte) (value.ProfileNetwork, profileNetworkMetadata, error) {
++	var out value.ProfileNetwork
++	var metadata profileNetworkMetadata
++	var fields, m, spec map[string]json.RawMessage
++	bad := func() (value.ProfileNetwork, profileNetworkMetadata, error) {
++		return value.ProfileNetwork{}, profileNetworkMetadata{}, value.ErrUnavailable
++	}
++	if json.Unmarshal(raw, &fields) != nil || json.Unmarshal(fields["metadata"], &m) != nil || json.Unmarshal(fields["spec"], &spec) != nil || spec == nil {
++		return bad()
++	}
++	var kind, api string
++	if json.Unmarshal(fields["kind"], &kind) != nil || kind != "Pod" || json.Unmarshal(fields["apiVersion"], &api) != nil || api != "v1" {
++		return bad()
++	}
++	for key, dst := range map[string]*string{"name": &metadata.Name, "namespace": &metadata.Namespace, "uid": &metadata.UID, "resourceVersion": &metadata.RV} {
++		if json.Unmarshal(m[key], dst) != nil || !identity.Text(*dst, 253) {
++			return bad()
++		}
++	}
++	metadata.Deleting = m["deletionTimestamp"] != nil && string(m["deletionTimestamp"]) != "null"
++	if b, exists := spec["hostNetwork"]; exists {
++		if string(b) == "null" || json.Unmarshal(b, &out.HostNetwork) != nil {
++			return bad()
++		}
++	}
++	if json.Unmarshal(spec["nodeName"], &metadata.Node) != nil || len(validation.IsDNS1123Subdomain(metadata.Node)) != 0 {
++		return bad()
++	}
++	containers := 0
++	for _, field := range []string{"containers", "initContainers", "ephemeralContainers"} {
++		b, exists := spec[field]
++		if !exists && field != "containers" {
++			continue
++		}
++		var entries []map[string]json.RawMessage
++		if json.Unmarshal(b, &entries) != nil || (field == "containers" && len(entries) == 0) || len(entries)+containers > 256 {
++			return bad()
++		}
++		containers += len(entries)
++		for _, entry := range entries {
++			if entry == nil {
++				return bad()
++			}
++			var ports []map[string]json.RawMessage
++			if b, exists := entry["ports"]; exists {
++				if string(b) == "null" || json.Unmarshal(b, &ports) != nil || len(ports)+len(out.Ports) > value.MaxProfilePodPorts || (field == "ephemeralContainers" && len(ports) > 0) {
++					return bad()
++				}
++			}
++			for _, fields := range ports {
++				p := value.ProfilePodPort{Protocol: "TCP"}
++				if json.Unmarshal(fields["containerPort"], &p.Port) != nil || p.Port == 0 {
++					return bad()
++				}
++				for key, dst := range map[string]*string{"name": &p.Name, "protocol": &p.Protocol} {
++					if b, exists := fields[key]; exists && (string(b) == "null" || json.Unmarshal(b, dst) != nil) {
++						return bad()
++					}
++				}
++				if p.Name != "" && len(validation.IsValidPortName(p.Name)) != 0 {
++					return bad()
++				}
++				out.Ports = append(out.Ports, p)
++			}
++		}
++	}
++	if b, exists := fields["status"]; exists {
++		var status map[string]json.RawMessage
++		if json.Unmarshal(b, &status) != nil || status == nil {
++			return bad()
++		}
++		if b, exists := status["podIP"]; exists {
++			var text string
++			if string(b) == "null" || json.Unmarshal(b, &text) != nil {
++				return bad()
++			}
++			if text != "" {
++				ip, err := netip.ParseAddr(text)
++				if err != nil {
++					return bad()
++				}
++				out.PrimaryIP = ip
++			}
++		}
++		if b, exists := status["podIPs"]; exists {
++			var addresses []map[string]json.RawMessage
++			if string(b) == "null" || json.Unmarshal(b, &addresses) != nil || len(addresses) > 2 {
++				return bad()
++			}
++			for _, fields := range addresses {
++				var text string
++				if json.Unmarshal(fields["ip"], &text) != nil {
++					return bad()
++				}
++				ip, err := netip.ParseAddr(text)
++				if err != nil {
++					return bad()
++				}
++				out.PodIPs = append(out.PodIPs, ip)
++			}
++		}
++	}
++	return out, metadata, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/profile_network_test.go
+@@ -0,0 +1,301 @@
++package kubernetes
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"net/http"
++	"reflect"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	planner "asservat.local/asservat/internal/application/planning"
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/execution"
++	plan "asservat.local/asservat/internal/domain/planning"
++	value "asservat.local/asservat/internal/domain/targets"
++)
++
++func profileNetworkRequest() value.Request {
++	return value.Request{ClusterID: permissionCluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "root-uid"}, PodName: "app", PodUID: "pod-uid"}
++}
++
++func profileNetworkPod() map[string]any {
++	p := targetMetadata("Pod", "app", "pod-uid")
++	p["metadata"].(map[string]any)["ownerReferences"] = []any{targetOwner("ReplicaSet", "rs", "rs-uid")}
++	p["spec"] = map[string]any{"nodeName": "node", "containers": []any{map[string]any{"name": "MUST-NOT-LEAK", "env": []any{map[string]any{"name": "secret", "value": "MUST-NOT-LEAK"}}, "ports": []any{map[string]any{"name": "diagnostics", "containerPort": 6060}}}}, "initContainers": []any{map[string]any{"name": "sidecar", "restartPolicy": "Always", "ports": []any{map[string]any{"name": "9-metrics", "containerPort": 9090, "protocol": "TCP"}}}}, "ephemeralContainers": []any{map[string]any{"name": "debug"}}}
++	p["status"] = map[string]any{"podIP": "10.0.0.5", "podIPs": []any{map[string]any{"ip": "10.0.0.5"}, map[string]any{"ip": "fd00::5"}}}
++	return p
++}
++
++func profileNetworkAPIObject(path string) map[string]any {
++	switch path {
++	case "/apis/apps/v1/namespaces/payments/replicasets/rs":
++		p := targetMetadata("ReplicaSet", "rs", "rs-uid")
++		p["metadata"].(map[string]any)["ownerReferences"] = []any{targetOwner("Deployment", "app", "root-uid")}
++		return p
++	case "/apis/apps/v1/namespaces/payments/deployments/app":
++		return targetMetadata("Deployment", "app", "root-uid")
++	case "/api/v1/nodes/node":
++		p := targetMetadata("Node", "node", "node-uid")
++		p["status"] = map[string]any{"nodeInfo": map[string]any{"bootID": "22222222-2222-4222-8222-222222222222"}}
++		return p
++	}
++	return nil
++}
++
++func TestProfileNetworkExactWholePodObservation(t *testing.T) {
++	for _, mode := range []string{"valid", "init-duplicate", "host-network", "replacement", "changed-rv", "changed-port-rv", "node-reboot", "earlier-outer", "late", "denied"} {
++		t.Run(mode, func(t *testing.T) {
++			var pods, nodes atomic.Int64
++			var clock *atomic.Int64
++			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
++				p := profileNetworkAPIObject(r.URL.Path)
++				if r.URL.Path == "/api/v1/namespaces/payments/pods/app" {
++					n := pods.Add(1)
++					p = profileNetworkPod()
++					m := p["metadata"].(map[string]any)
++					spec := p["spec"].(map[string]any)
++					if mode == "denied" {
++						w.WriteHeader(403)
++						permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "Status", "status": "Failure", "reason": "Forbidden", "code": 403, "message": "MUST-NOT-LEAK"})
++						return true
++					}
++					if mode == "replacement" && n > 1 {
++						m["uid"] = "replacement"
++					}
++					if (mode == "changed-rv" || mode == "changed-port-rv") && n > 1 {
++						m["resourceVersion"] = "new-rv"
++					}
++					if mode == "changed-port-rv" && n > 1 {
++						spec["containers"].([]any)[0].(map[string]any)["ports"].([]any)[0].(map[string]any)["containerPort"] = 6061
++					}
++					if mode == "init-duplicate" {
++						spec["initContainers"].([]any)[0].(map[string]any)["ports"] = []any{map[string]any{"name": "diagnostics", "containerPort": 6060}}
++					}
++					if mode == "host-network" {
++						spec["hostNetwork"] = true
++					}
++					if mode == "earlier-outer" && n == 1 {
++						clock.Add(int64(2 * time.Second))
++					}
++				}
++				if r.URL.Path == "/api/v1/nodes/node" {
++					n := nodes.Add(1)
++					if mode == "node-reboot" && n == 2 {
++						p["status"].(map[string]any)["nodeInfo"].(map[string]any)["bootID"] = "33333333-3333-4333-8333-333333333333"
++					}
++					if mode == "late" && n == 2 {
++						clock.Add(int64(6 * time.Second))
++					}
++				}
++				if p == nil {
++					return false
++				}
++				permissionReply(w, p)
++				return true
++			})
++			clock = f.clock
++			start := time.Unix(0, clock.Load()).UTC()
++			reader, _ := NewPodTargets(f.client)
++			got, err := reader.ObserveProfileNetwork(context.Background(), profileNetworkRequest())
++			if mode == "valid" || mode == "init-duplicate" || mode == "host-network" || mode == "earlier-outer" {
++				now := time.Unix(0, clock.Load()).UTC()
++				if err != nil || !got.Valid(now) || got.Target.Request != profileNetworkRequest() || got.Target.PodResourceVersion != "rv-pod-uid" || got.PrimaryIP.String() != "10.0.0.5" || len(got.PodIPs) != 2 || len(got.Ports) != 2 || pods.Load() != 3 || nodes.Load() != 2 {
++					t.Fatalf("observation: %+v %v", got, err)
++				}
++				if !got.Target.ObservedAt.Equal(start) || !got.Target.FreshUntil.Equal(start.Add(5*time.Second)) {
++					t.Fatal("nested resolver renewed original outer interval")
++				}
++				b, _ := json.Marshal(got)
++				if strings.Contains(string(b), "MUST-NOT-LEAK") || strings.Contains(string(b), "sidecar") {
++					t.Fatal("container configuration leaked")
++				}
++				// Exercise the actual pure planner with the observed pod-wide facts.
++				d := plan.GoEndpointDefinition{Source: plan.GoEndpointSource{ClusterID: permissionCluster, ResourceUID: "44444444-4444-4444-8444-444444444444", Name: "pprof", Digest: artifact.Digest{1}}, PathPolicy: plan.GoEndpointPathPolicy, Host: "pprof.example.invalid", AddressModes: []string{"targetLoopback"}, MinimumPort: 6000, MaximumPort: 6999, LoopbackFamily: "ipv4"}
++				input := plan.GoEndpointInput{SourceRef: "local", Bindings: []plan.GoEndpointBinding{{Name: "local", TemplateRef: "pprof", AddressMode: "targetLoopback", PortName: "diagnostics"}}, Catalog: plan.GoEndpointCatalog{Templates: []plan.GoEndpointDefinition{d}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Network: got, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 1024, Deadline: now.Add(5 * time.Second)}
++				resolved, e := planner.ResolveGoProfileEndpoint(input, now)
++				if mode == "init-duplicate" {
++					if !errors.Is(e, plan.ErrProfileEndpointAmbiguous) {
++						t.Fatal("init-sidecar duplicate not rejected", e)
++					}
++				} else if mode == "host-network" {
++					if !errors.Is(e, plan.ErrProfileHostNetwork) {
++						t.Fatal("host-network qualification gap hidden", e)
++					}
++				} else if e != nil || resolved.Port != 6060 || resolved.RouteIP.String() != "127.0.0.1" {
++					t.Fatalf("synthetic API observer/planner boundary: %+v %v", resolved, e)
++				}
++				return
++			}
++			if err == nil || !reflect.DeepEqual(got, value.ProfileNetwork{}) || strings.Contains(err.Error(), "MUST-NOT-LEAK") {
++				t.Fatalf("unsafe result: %+v %v", got, err)
++			}
++			if mode == "denied" && !errors.Is(err, value.ErrDenied) {
++				t.Fatal("denial classification lost")
++			}
++		})
++	}
++}
++
++func TestProfileNetworkRejectsMalformedAndUnboundedFields(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		change func(map[string]any)
++	}{
++		{"port-case-alias", func(p map[string]any) {
++			spec := p["spec"].(map[string]any)
++			spec["containers"].([]any)[0].(map[string]any)["ports"] = []any{map[string]any{"name": "diagnostics", "ContainerPort": 6060}}
++		}},
++		{"ephemeral-ports", func(p map[string]any) {
++			p["spec"].(map[string]any)["ephemeralContainers"] = []any{map[string]any{"name": "debug", "ports": []any{map[string]any{"containerPort": 6060}}}}
++		}},
++		{"oversized-port", func(p map[string]any) {
++			p["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["ports"] = []any{map[string]any{"containerPort": 65536}}
++		}},
++		{"too-many-ports", func(p map[string]any) {
++			ports := make([]any, 257)
++			for i := range ports {
++				ports[i] = map[string]any{"containerPort": 6000 + i}
++			}
++			p["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["ports"] = ports
++		}},
++		{"metadata-case-alias", func(p map[string]any) { m := p["metadata"].(map[string]any); m["UID"] = m["uid"]; delete(m, "uid") }},
++		{"invalid-address", func(p map[string]any) { p["status"].(map[string]any)["podIP"] = "fd00::not-an-address" }},
++		{"too-many-addresses", func(p map[string]any) {
++			p["status"].(map[string]any)["podIPs"] = []any{map[string]any{"ip": "10.0.0.1"}, map[string]any{"ip": "10.0.0.2"}, map[string]any{"ip": "10.0.0.3"}}
++		}},
++		{"hostNetwork-null", func(p map[string]any) { p["spec"].(map[string]any)["hostNetwork"] = nil }},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			p := profileNetworkPod()
++			tc.change(p)
++			raw, e := json.Marshal(p)
++			if e != nil {
++				t.Fatal(e)
++			}
++			_, _, err := decodeProfileNetwork(raw)
++			if err == nil {
++				t.Fatal("malformed routing fields accepted")
++			}
++		})
++	}
++}
++
++func TestProfileNetworkPreservesCallerCancellationAndDeadline(t *testing.T) {
++	t.Run("blocked-read", func(t *testing.T) {
++		started := make(chan struct{})
++		ended := make(chan struct{})
++		f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
++			if r.URL.Path != "/api/v1/namespaces/payments/pods/app" {
++				return false
++			}
++			close(started)
++			<-r.Context().Done()
++			close(ended)
++			return true
++		})
++		reader, _ := NewPodTargets(f.client)
++		ctx, cancel := context.WithCancel(context.Background())
++		defer cancel()
++		done := make(chan error, 1)
++		go func() { _, err := reader.ObserveProfileNetwork(ctx, profileNetworkRequest()); done <- err }()
++		select {
++		case <-started:
++		case <-time.After(time.Second):
++			t.Fatal("read did not start")
++		}
++		cancel()
++		select {
++		case err := <-done:
++			if err == nil {
++				t.Fatal("canceled observation returned success")
++			}
++		case <-time.After(time.Second):
++			t.Fatal("canceled read did not join")
++		}
++		select {
++		case <-ended:
++		case <-time.After(time.Second):
++			t.Fatal("API request was not canceled")
++		}
++	})
++	t.Run("original-deadline", func(t *testing.T) {
++		f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
++			p := profileNetworkAPIObject(r.URL.Path)
++			if r.URL.Path == "/api/v1/namespaces/payments/pods/app" {
++				p = profileNetworkPod()
++			}
++			if p == nil {
++				return false
++			}
++			permissionReply(w, p)
++			return true
++		})
++		f.clock.Store(time.Now().UTC().UnixNano())
++		reader, _ := NewPodTargets(f.client)
++		deadline := time.Now().Add(time.Second)
++		ctx, cancel := context.WithDeadline(context.Background(), deadline)
++		defer cancel()
++		got, err := reader.ObserveProfileNetwork(ctx, profileNetworkRequest())
++		if err != nil || !got.Target.FreshUntil.Equal(deadline) {
++			t.Fatal("original caller deadline not retained", err, got.Target.FreshUntil, deadline)
++		}
++	})
++	t.Run("invalid-composition", func(t *testing.T) {
++		var reader *PodTargets
++		if _, err := reader.ObserveProfileNetwork(context.Background(), profileNetworkRequest()); err == nil {
++			t.Fatal("nil reader accepted")
++		}
++		reader = &PodTargets{}
++		if _, err := reader.ObserveProfileNetwork(nil, profileNetworkRequest()); err == nil {
++			t.Fatal("nil context accepted")
++		}
++	})
++}
++
++func TestProfileNetworkNormalizesEquivalentIPAddresses(t *testing.T) {
++	var pods atomic.Int64
++	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
++		p := profileNetworkAPIObject(r.URL.Path)
++		if r.URL.Path == "/api/v1/namespaces/payments/pods/app" {
++			p = profileNetworkPod()
++			primary := "fd00::5"
++			if pods.Add(1) == 1 {
++				primary = "FD00:0000:0000:0000:0000:0000:0000:0005"
++			}
++			p["status"] = map[string]any{"podIP": primary, "podIPs": []any{map[string]any{"ip": "fd00::5"}, map[string]any{"ip": "10.0.0.5"}}}
++		}
++		if p == nil {
++			return false
++		}
++		permissionReply(w, p)
++		return true
++	})
++	reader, _ := NewPodTargets(f.client)
++	var first plan.GoEndpointPlan
++	for i := 0; i < 2; i++ {
++		network, err := reader.ObserveProfileNetwork(context.Background(), profileNetworkRequest())
++		if err != nil || network.PrimaryIP.String() != "fd00::5" || network.PodIPs[0] != network.PrimaryIP {
++			t.Fatalf("equivalent IPv6 representation rejected: %+v %v", network, err)
++		}
++		now := time.Unix(0, f.clock.Load()).UTC()
++		d := plan.GoEndpointDefinition{Source: plan.GoEndpointSource{ClusterID: permissionCluster, ResourceUID: "44444444-4444-4444-8444-444444444444", Name: "pprof", Digest: artifact.Digest{1}}, PathPolicy: plan.GoEndpointPathPolicy, Host: "pprof.example.invalid", AddressModes: []string{"podIP"}, MinimumPort: 6000, MaximumPort: 6999}
++		in := plan.GoEndpointInput{SourceRef: "local", Bindings: []plan.GoEndpointBinding{{Name: "local", TemplateRef: "pprof", AddressMode: "podIP", PortName: "diagnostics"}}, Catalog: plan.GoEndpointCatalog{Templates: []plan.GoEndpointDefinition{d}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Network: network, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 1024, Deadline: now.Add(5 * time.Second)}
++		resolved, err := planner.ResolveGoProfileEndpoint(in, now)
++		if err != nil || resolved.RouteIP.String() != "fd00::5" {
++			t.Fatalf("normalized route rejected: %+v %v", resolved, err)
++		}
++		if i == 0 {
++			first = resolved
++		} else if !reflect.DeepEqual(first, resolved) {
++			t.Fatal("equivalent address presentation changed route or digest")
++		}
++	}
++	if pods.Load() != 6 {
++		t.Fatal("unexpected replacement or fallback read")
++	}
++}
+--- a/docs/architecture/runtime-profiles.md
++++ b/docs/architecture/runtime-profiles.md
+@@ -2,7 +2,7 @@
+ 
+ This component implements the C-11/C-23 mechanism boundary for the existing
+ `profile` action (REQ-PRF-001/002 and REQ-LIF-001). It is not an installed profile
+-feature. Profile-specific acceptance, start/quota admission, endpoint resolution,
++feature. Profile-specific acceptance, start/quota admission, protected endpoint catalog acceptance,
+ protected node networking, semantic verification and publication remain required.
+ The existing 4096-byte pod-status authorities and public routes are unchanged.
+ 
+@@ -55,8 +55,9 @@
+ 
+ ## Named endpoint and network boundary
+ 
+-`GoProfileDialer` is a required trusted capability, not an implemented node
+-resolver. It resolves only the admitted source/digest, rechecks exact pod/node
++The passive endpoint planner below resolves a named route without contacting the
++workload. `GoProfileDialer` remains a required trusted capability, not an
++implemented node resolver. It resolves only the admitted source/digest, rechecks exact pod/node
+ identity and credential audience and opens the connection from the target node.
+ For target-loopback it must enter the exact qualified target network namespace;
+ ordinary collector loopback is forbidden. Pod IP and declared port are routing
+@@ -132,3 +133,100 @@
+ sequence is accepted endpoint/template resolution and profile-specific admission,
+ qualified node dialer/current guard, bounded custody/manifest verification, then
+ the same shared capture/catalog/native-download workflow and isolated analysis.
++
++
++## Passive named endpoint planning
++
++`planning.ResolveGoProfileEndpoint` composes the existing recipe binding fields
++(`name`, `templateRef`, `addressMode`, `portName`), an independently supplied
++protected catalog observation and the exact selected whole-pod network facts.
++It also supports fully configured administrator profiles with fixed numeric
++ports; these do not require the application to declare an otherwise approved
++port. The input contract is private. This is not a new public endpoint API or an
++implementation of catalog protection, durable acceptance or source supervision.
++
++The complete bounded catalog contains at most 128 template/profile entries;
++a recipe has at most 16 bindings. Sources carry cluster, optional namespace UID,
++resource UID, entry name and public definition digest. Source namespace identity
++is provenance: a definition stored in a protected control namespace can serve an
++application namespace. A separate definition scope names that application
++namespace UID or permits any authorized namespace in the enrolled cluster. The
++resolver validates entry shape separately from applicability. Valid entries for
++other namespaces or clusters are ignored before name resolution, including
++foreign entries sharing an allowed entry's name. Selecting a foreign entry
++returns the same empty result and `ProfileUnavailable` as an absent name.
++Duplicate applicable names across catalog kinds or overlapping scopes, duplicate
++local bindings and applicable binding/profile collisions remain ambiguous.
++There is no namespace shadowing or last-entry-wins behavior. A template is usable only through an explicit binding;
++its existence is not an implicit request to contact an endpoint.
++
++Canonical recipe `name`/`templateRef` and profile `source.profileRef` schemas impose
++only a 1–63-character string length, not a DNS-label pattern. The internal
++mechanism narrows these references to valid UTF-8 with no control characters and
++at most 63 bytes, matching the existing `GoProfileRequest.SourceRef` contract.
++This is an explicit internal limit, not complete Unicode wire-schema parity;
++future public decoding still validates the canonical schemas separately.
++
++Named ports resolve across all regular and init container declarations, including
++restartable init sidecars. Multiple matching declarations are ambiguous even
++when their numeric port is identical or only one uses TCP. One matching TCP
++port must be inside the template's range. The observer retains duplicates for
++this decision instead of silently deduplicating. Container names are neither
++retained in this routing projection nor exposed as a configuration/permission
++choice. Ephemeral-container port declarations are rejected; Kubernetes does not
++allow them. [Kubernetes Pod API](https://kubernetes.io/docs/reference/kubernetes-api/core/pod-v1/).
++
++Administrator definitions fix `go-pprof/v1` path policy, permitted address modes,
++port range, HTTP Host and, when relevant, an explicit loopback family (`ipv4` or
++`ipv6`). `targetLoopback` produces 127.0.0.1 or ::1 **in the pinned target network
++namespace**; the plan is not a dialable socket or a namespace handle. `podIP`
++uses the observed primary Pod IP and validates any published dual-stack list
++against it by parsed address value. Equivalent expanded/uppercase IPv6 spellings
++are normalized with `netip` before comparison and digesting. This handles the
++legacy Pod IP fields; newer Kubernetes IP fields can require canonical text.
++Zones, mapped IPv4-in-IPv6, loopback, link-local, unspecified and multicast Pod
++addresses remain excluded. [Kubernetes IP validation](https://github.com/kubernetes/apimachinery/blob/v0.37.0/pkg/util/validation/ip.go).
++There is no DNS lookup, secondary-address retry, address-family fallback, replacement Pod or endpoint probe. Missing IP affects pod-IP routing,
++not passive loopback planning. Host-network Pods produce an explicit unavailable
++reason until a separate mechanism is qualified; neither address mode permits
++access to the node's loopback through this slice.
++
++TLS pins a named public trust definition and an exact server name. A credential
++policy is also a named public dependency, never a Secret value or secret-payload
++hash. Credentials require TLS and a nonempty finite audience of exact
++cluster/namespace/workload-kind/workload-UID roots. The selected Pod must belong
++to one of those roots through independent target resolution. Port declarations,
++labels and service-account names cannot establish a credential audience. Actual
++credential retrieval, current policy acceptance, certificate verification and
++socket opening remain required in the node dialer; the pure planner performs
++none of those effects.
++
++The resolver canonicalizes copies of the selected definition, sorts set-valued
++address modes/audiences and computes a definition digest plus endpoint digest.
++The endpoint digest includes source identity/public digest, resolved policy and
++TLS/credential references, exact target/root/Pod/node/boot, route IP, address
++mode, port/binding, profile parameters and native limit. Current resource versions
++and observation timestamps do not change immutable scope. This computed digest
++binds the actual input values; it does not prove that their claimed public source
++digest was independently accepted. The configuration producer must establish
++that correspondence before these inputs can be used for execution planning.
++`MatchesAcquisition` compares against the existing `GoProfileRequest`; it is not
++an authorization decision and cannot renew that request's action lifetime.
++
++`PodTargets.ObserveProfileNetwork` uses the fixed enrolled-cluster API transport
++and only GETs. It reads bounded routing facts, invokes the existing exact
++namespace/Pod/owner/node resolver, and requires the final Pod resource version
++and node to match the original routing response. It returns at most 256 declared
++ports and two Pod IPs, without container environment or free-form workload data.
++The whole operation retains its original at-most-five-second interval and any
++earlier caller deadline. Composition retains the earliest catalog, target and
++caller cutoff; later source reads cannot manufacture a fresh interval.
++
++The new tests are synthetic TLS API and pure planning regressions, including an
++actual adapter-to-planner path. They are staged qualification work, not a native
++node/network or installed feature result. Current qualification is recorded in
++[implementation progress](../implementation-progress.md). Remaining integration
++is protected catalog definition/acceptance and observation, profile admission
++and runtime-domain reservation, current credential policy, qualified node/netns
++dialing and guard composition, then the existing encrypted custody/publication
++and authenticated native-download workflow. No public capability is enabled.
+--- a/specs/profiles.md
++++ b/specs/profiles.md
+@@ -86,3 +86,29 @@
+ Profile-specific admission, qualified named node endpoints and semantic
+ publication remain prerequisites; this component does not enable a public
+ profile capability or widen the pod-status collector.
++
++
++### Passive endpoint resolution boundary
++
++The initial internal planner supports the existing recipe bindings and fully
++configured named administrator profiles. Mixed catalogs may include entries for
++other namespaces or clusters; those entries cannot disable an otherwise allowed
++selection or disclose their definitions through an error. Absent and out-of-scope
++names both yield `ProfileUnavailable`. It rejects duplicate applicable names
++across catalog kinds/scopes, binding/profile collisions and every duplicate
++named-port resolution across regular and init containers, including restartable
++sidecars. A single TCP declaration must satisfy the template's port range.
++Administrator profiles may fix an approved numeric port without requiring a
++Pod port declaration. Neither form grants process attribution.
++
++Loopback address family is an explicit administrator definition. Pod-IP routing
++uses the observed primary IP without DNS or address/Pod fallback; equivalent
++IPv6 spellings in legacy Pod IP fields normalize to the same route and digest.
++Absent IP does not prevent passive loopback planning. Host-network endpoints remain unavailable
++until separately qualified. Planning does not test endpoint reachability.
++Credentialed definitions require pinned TLS trust/server identity and an exact
++permitted workload-root audience. Source and computed endpoint digests bind the
++resolved public configuration and mechanism parameters, while current
++observations retain their original earliest cutoffs. A pure catalog value or
++matching digest is not proof of protected source acceptance or permission to
++use credentials. See the [runtime-profile boundary](../docs/architecture/runtime-profiles.md).

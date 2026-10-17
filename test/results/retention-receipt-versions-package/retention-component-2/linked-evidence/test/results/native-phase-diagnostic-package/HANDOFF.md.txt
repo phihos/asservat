@@ -1,0 +1,57 @@
+# Native phase diagnostic handoff
+
+Temporary four-path test-only package. No product, SQL, wire, limits, authority,
+retry, source renewal, fixture deadline or pool behavior changes. Apply only
+after validating every base and the 1,507 recorded dependencies. Existing
+native-active-enrollment-qualified failure evidence remains unchanged.
+
+Manifest SHA256:
+`9fa74e2ba247a68a3f3ad39704bffda37eabbae7c17367184d331b4efa9495bc`.
+
+Files:
+
+- New `test/integration/native_phase_diagnostic_test.go`: bounded fixed-stage
+  timings of existing calls, exact forwarding decorators and two focused tests.
+- `context_native_content_test.go`: preparation/metadata/HTTP composition hooks,
+  recording disabled across the same forty warm polls, real healthy audit
+  constructor retained with decorated ports.
+- `context_native_interrupted_test.go`: exact original browser session resolver
+  and Client.Do timing. Deliberate abort and all assertions are unchanged.
+- `context_publication_test.go`: direct timings around the existing permission,
+  retention and recovery reads, including the original permission projection
+  remaining interval before the publication gate. No additional observation.
+
+The source path matters: setupWithKeys performs processing initialization and
+publication before startNativeFixtureObservations is installed. The last native
+exchange failure therefore occurred before the ongoing observer existed. The
+new timing distinguishes original projection expiry from a quick mismatch; it
+does not renew a projection or presume expiry was the cause.
+
+Handle **88387** ended **0**. `run_checks.py` ran sequentially with
+GOMAXPROCS=2, GOFLAGS=-p=2 and the stage's explicit TMPDIR:
+
+1. `go test -overlay overlay.json -race ./test/integration -run
+   '^TestNativePhaseDiagnostic' -count=1 -timeout=60s -v`: exit 0, both named
+   recorder tests PASS, Go 1.060s, total compile/run 14.117s.
+2. `go vet -overlay overlay.json ./test/integration`: exit 0, 1.644s.
+
+Each step verifies original bases, all 1,507 dependency files and all payloads
+before and after; every mismatch list is empty. Exact commands and outputs are
+in `evidence/{focused,vet}.{json,log}`. No service test was run or counted as
+passing. The focused race compiled the full integration package.
+
+No diagnostic query hook is installed; the production constructor's Tracer ban
+remains intact. There is no extra SQL/API request, pool change, query text/args,
+identity, evidence, metadata, credential or raw error in retained output. Closed
+labels and error classifications have rejection coverage. Timings use Go's
+monotonic clock and report durations/remaining bounds, not absolute timestamps.
+Per-port totals include nested work and must not be summed as exclusive time;
+they cannot distinguish server lock, network, pool or CPU scheduling latency.
+The small in-memory clock/mutex/recording overhead is not zero or separately
+benchmarked. Each fixed stage retains only its last 16 completions and first
+error, plus bounded per-label counts/duration totals.
+
+Next: parent reviews/integrates and owns a frozen native selector covering the
+remaining failure boundary. Do not infer a product correction or raise limits
+from timing alone. Remove this temporary instrumentation after diagnosis and
+preserve its native reports independently.

@@ -1,0 +1,16 @@
+{
+  "format": "asservat-framed/v1",
+  "number": 0,
+  "frames": [
+    {
+      "sequence": 0,
+      "nativeOffset": 0,
+      "nativeBytes": 4096,
+      "dataOffset": 0,
+      "dataBytes": 4352,
+      "codec": "identity",
+      "nativeSHA256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "dataSHA256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
+}

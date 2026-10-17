@@ -1,0 +1,10 @@
+{
+  "name": "adr183-go-check-4",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 2,
+  "status": "failed",
+  "results": "The forwarder test now passes. One failure in Kubernetes group 2: TestConfigurationWorkerBlockedPostLockReadRetainsOriginalEnd ('blocked read escaped original bound source.values-owner-read'). Same class: the read returned at its original end when its derived timer fired a moment before the caller context recorded expiry, and the test required ctx.Err() != nil. Fixed for adr183-go-check-5 by checking return time against the recorded end directly (neither early nor late) and waiting for expiry before the follow-on check; 20 -race repetitions passed.",
+  "sourceHashBefore": "f02a44484d0dcf6cf09a08968a1b46ee902717cf0db4fa7d7d8bcafbbf204af3",
+  "sourceHashAfter": "f02a44484d0dcf6cf09a08968a1b46ee902717cf0db4fa7d7d8bcafbbf204af3",
+  "log": "go-check.log"
+}

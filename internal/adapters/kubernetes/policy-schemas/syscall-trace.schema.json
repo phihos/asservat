@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/syscall-trace.schema.json",
+  "title": "Bounded pod-wide syscall acquisition parameters",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "processes": {
+      "const": "allPodProcesses"
+    },
+    "mode": {
+      "enum": [
+        "metadata",
+        "arguments"
+      ]
+    },
+    "before": {
+      "anyOf": [
+        {
+          "const": "0s"
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        }
+      ]
+    },
+    "after": {
+      "anyOf": [
+        {
+          "const": "0s"
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        }
+      ]
+    },
+    "syscalls": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "const": "all"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "const": "include"
+            },
+            "names": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_]{1,64}$"
+              },
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "mode",
+            "names"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "enum": [
+        "all",
+        "errors"
+      ]
+    },
+    "ring": {
+      "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/ring"
+    },
+    "maxFrozenBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 268435456
+    },
+    "maxConcurrentSnapshots": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "maxEvents": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "maxEventsPerSecond": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "maxTrackedThreads": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16384
+    },
+    "arguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxBytesPerEvent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "captureBuffers": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "maxBytesPerEvent",
+        "captureBuffers"
+      ]
+    }
+  },
+  "required": [
+    "processes",
+    "mode",
+    "before",
+    "after",
+    "syscalls",
+    "result",
+    "ring",
+    "maxFrozenBytes",
+    "maxConcurrentSnapshots",
+    "maxEvents",
+    "maxEventsPerSecond",
+    "maxTrackedThreads"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "arguments"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "arguments"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "arguments"
+          ]
+        }
+      }
+    }
+  ]
+}

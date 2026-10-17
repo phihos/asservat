@@ -1,0 +1,3 @@
+Owned TLS Keycloak ready; running provider qualification
+Provider test exit: 0
+{"terminalExit": 0, "testExit": 0, "passedEntries": 12, "sourceHashes": 890, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

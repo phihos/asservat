@@ -1,0 +1,42 @@
+{
+  "phase": "before-value",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/before-value.json",
+    "-vet=off",
+    "-count=1",
+    "-timeout=60s",
+    "-run",
+    "^TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess$/^opted17$",
+    "-v",
+    "./internal/domain/fleet"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 1,
+  "seconds": 0.713,
+  "expectedFailure": true,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

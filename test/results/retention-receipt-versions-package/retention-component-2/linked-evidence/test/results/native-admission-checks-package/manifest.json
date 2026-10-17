@@ -1,0 +1,66 @@
+{
+  "scope": "Two synchronous native constructor/Attach current-check consolidations. Exact one-use private checked value; public/effect/frame checks and original bounds retained. Component races/vet qualified; native availability still pending.",
+  "files": [
+    {
+      "path": "internal/application/evidence/native_exchange.go",
+      "base_sha256": "9520254a39a515f868edf3e12e755a173d7584019e04afc8fbd117d4e0724b36",
+      "sha256": "40e221f66b8aca2b6496d1890c87f24bfd36d59bbab4c89bd4be4e8cadf978c1",
+      "bytes": 6535
+    },
+    {
+      "path": "internal/transport/native/admission_budget_test.go",
+      "base_sha256": null,
+      "sha256": "2adaf1f495ca721c696d978cdea488401286ca40baa3c722747d5f0029d06cdb",
+      "bytes": 2320
+    },
+    {
+      "path": "internal/transport/native/admission_check.go",
+      "base_sha256": null,
+      "sha256": "75d36d7b0c22f6da903e0202d25786d2312e7579ca348ab8f8facb5b00c31336",
+      "bytes": 2519
+    },
+    {
+      "path": "internal/transport/native/admission_check_test.go",
+      "base_sha256": null,
+      "sha256": "71119c6fcaf72773510384ba472687d7b7b8b96f055c580e188f264fec629ccd",
+      "bytes": 12288
+    },
+    {
+      "path": "internal/transport/native/operation.go",
+      "base_sha256": "dcc871ca7e3a9d37c1e4315b2cfad5b039da4ca5d0dc974b9ba6dac315216815",
+      "sha256": "5039122f2b18bd01a2491e471f98d5b25f423d9852a33d4b09289442794481fd",
+      "bytes": 16098
+    },
+    {
+      "path": "internal/transport/native/registration.go",
+      "base_sha256": "aac903fde4097fb5e00a1c1d372701443861dbd75a33a6d361b8ff96dd518ca4",
+      "sha256": "ec180da35b5c52db51a707e7faff687262ddbfae932ea12e03fc1ff7679b2d13",
+      "bytes": 3019
+    },
+    {
+      "path": "internal/transport/native/router.go",
+      "base_sha256": "6421fa677e1621193750bd5a29adff2d0b110d43039e3c5a15b9eece9e15e81c",
+      "sha256": "8cc7888b57d852df6b4b2a728042fc4f86fda17c8dd942b473b4f8872f994070",
+      "bytes": 5636
+    }
+  ],
+  "prior_native_motivation": {
+    "handle": 87345,
+    "exit": 1,
+    "unchanged_source_hashes": 1501,
+    "cleanup": [],
+    "files": {
+      "test/results/native-admission-callback-diagnostic.log": "9710e2b2d2ef2e7f4453ad3af898a0e89c2b13b6ac0713870194734459391faa",
+      "test/results/native-admission-callback-diagnostic-check.log": "7cd4c2d01dc5f568fcba6fd36ed2eac33365cc0b889fcbf4fe244284cb4085da",
+      "test/results/native-admission-callback-diagnostic-environment.json": "ecd61ac3d4f60eabf8c997d7a26d73fccf89c6c498ebc19619b9a130f8da395e",
+      "test/results/native-admission-callback-diagnostic-postgres.log": "408034000ffd1b0754818f9b8a90d5d8bbb064dbee5e8f84afa91722107e6125"
+    }
+  },
+  "verification": {
+    "handle": 22419,
+    "before_exit": 1,
+    "after_race_exit": 0,
+    "vet_exit": 0,
+    "dependencies_count": 1505
+  }
+}

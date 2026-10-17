@@ -1,0 +1,78 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "artifacts": [
+      {
+        "artifact_id": "00000000-0000-4000-8000-000000000004",
+        "digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "kind": "liveCore",
+        "data_class": "raw",
+        "completeness": "complete",
+        "expires_at": "2026-10-09T17:55:00Z",
+        "handling_notice": {
+          "classification": "potentialPersonalData",
+          "mayContain": [
+            "userContent",
+            "credentials",
+            "personalIdentifiers"
+          ],
+          "expiresAt": "2026-10-09T17:55:00Z",
+          "deleteBy": "2026-10-09T18:00:00Z",
+          "deletionState": "scheduled",
+          "automaticDeletion": true,
+          "managedCopiesOnly": true,
+          "externalCopiesRecallable": false,
+          "handlingCodes": [
+            "minimizeCapture",
+            "restrictAccess",
+            "preferApprovedExtracts",
+            "reviewBeforeSharing",
+            "approvedClientsOnly",
+            "externalCopiesNotRecalled"
+          ],
+          "preservationException": false,
+          "asOf": "2026-10-09T12:20:00Z"
+        }
+      },
+      {
+        "artifact_id": "00000000-0000-4000-8000-000000000003",
+        "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "kind": "runtimeDiagnostic",
+        "data_class": "extract",
+        "completeness": "complete",
+        "expires_at": "2026-10-09T17:55:00Z",
+        "handling_notice": {
+          "classification": "potentialPersonalData",
+          "mayContain": [
+            "paths",
+            "personalIdentifiers"
+          ],
+          "expiresAt": "2026-10-09T17:55:00Z",
+          "deleteBy": "2026-10-09T18:00:00Z",
+          "deletionState": "scheduled",
+          "automaticDeletion": true,
+          "managedCopiesOnly": true,
+          "externalCopiesRecallable": false,
+          "handlingCodes": [
+            "minimizeCapture",
+            "restrictAccess",
+            "preferApprovedExtracts",
+            "reviewBeforeSharing",
+            "approvedClientsOnly",
+            "externalCopiesNotRecalled"
+          ],
+          "preservationException": false,
+          "asOf": "2026-10-09T12:20:00Z"
+        }
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

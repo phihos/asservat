@@ -1,0 +1,10 @@
+{
+  "deltaPaths": 5,
+  "dependencies": 2162,
+  "nativeQualified": false,
+  "newPaths": 14,
+  "payloadPaths": 20,
+  "reusedEvidence": "reused-evidence.json",
+  "runtimeSelection": false,
+  "state": "corrected fixture frozen; checkpoint-v3 checks unrun"
+}

@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/transport/presentation	2.312s
+ok  	asservat.local/asservat/internal/application/audit	1.009s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.026s [no tests to run]
+ok  	asservat.local/asservat/test/integration	1.055s

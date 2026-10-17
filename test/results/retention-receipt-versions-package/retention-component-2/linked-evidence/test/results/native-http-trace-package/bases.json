@@ -1,0 +1,5 @@
+{
+  "test/integration/context_native_content_test.go": "cb1e9345df613560c56b7fcaf8c3c63a2aae5fe13aa39636446b24e9b130acc0",
+  "test/integration/context_native_resume_test.go": "4fdab4f32d897319b03464c9885262ee75acd8197dc31b9661b87efb5c9d3379",
+  "test/integration/native_http_trace_test.go": null
+}

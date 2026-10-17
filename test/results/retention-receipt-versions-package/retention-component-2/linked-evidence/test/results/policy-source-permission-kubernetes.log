@@ -1,0 +1,14 @@
+=== RUN   TestPermissionsWithRealKubernetes
+=== RUN   TestPermissionsWithRealKubernetes/paginated_observation_and_multiple_owner_proposal
+=== RUN   TestPermissionsWithRealKubernetes/reader_cannot_write_or_read_other_scopes
+=== RUN   TestPermissionsWithRealKubernetes/dry_run_conflict_and_malformed_deny
+=== RUN   TestPermissionsWithRealKubernetes/watch_retains_rapid_ownership_transitions
+=== RUN   TestPermissionsWithRealKubernetes/binding_recreation_and_namespace_UID_pin
+--- PASS: TestPermissionsWithRealKubernetes (14.48s)
+    --- PASS: TestPermissionsWithRealKubernetes/paginated_observation_and_multiple_owner_proposal (0.06s)
+    --- PASS: TestPermissionsWithRealKubernetes/reader_cannot_write_or_read_other_scopes (0.01s)
+    --- PASS: TestPermissionsWithRealKubernetes/dry_run_conflict_and_malformed_deny (1.76s)
+    --- PASS: TestPermissionsWithRealKubernetes/watch_retains_rapid_ownership_transitions (0.54s)
+    --- PASS: TestPermissionsWithRealKubernetes/binding_recreation_and_namespace_UID_pin (0.86s)
+PASS
+ok  	asservat.local/asservat/test/integration	15.563s

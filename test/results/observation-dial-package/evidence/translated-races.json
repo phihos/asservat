@@ -1,0 +1,60 @@
+{
+  "accepted": true,
+  "after": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-vet=off",
+    "-v",
+    "-run=^TestOwnerObservation(TranslatedDial|DialConstructor)",
+    "./internal/adapters/mtls"
+  ],
+  "exit": 0,
+  "expectedTests": [
+    "TestOwnerObservationDialConstructorStillBoundsInput",
+    "TestOwnerObservationTranslatedDialCancellationJoins",
+    "TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority",
+    "TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST",
+    "TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial"
+  ],
+  "failedTop": [],
+  "namedPass": 44,
+  "passedTop": [
+    "TestOwnerObservationDialConstructorStillBoundsInput",
+    "TestOwnerObservationTranslatedDialCancellationJoins",
+    "TestOwnerObservationTranslatedDialKeepsOriginalTLSAuthority",
+    "TestOwnerObservationTranslatedDialNeverReplaysUnknownPOST",
+    "TestOwnerObservationTranslatedDialPreservesTLSAndCandidateDenial"
+  ],
+  "phase": "translated-races",
+  "seconds": 2.839,
+  "skips": []
+}

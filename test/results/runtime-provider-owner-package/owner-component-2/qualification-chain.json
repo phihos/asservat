@@ -1,0 +1,22 @@
+{
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/dependencies.json": "56c191bd6685f980841e7e43ef8e4cdc55df450b2ebd6cf5caf8a966264cb764",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/compile.log": "86f4ac392af711c2159890059c1f0f0bb5d4df6f0e47e407d9173e949c7dcfb7",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/fixture-bounds.log": "b6294155148b3845bd8c07f91760fca6a97beceb0dbeb48ea0650bc1b588e279",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/go-architecture.log": "2f7fb472fa5ad912f6c1ffd47ac9a7cf1c39d0d079498891786136ecd8194a28",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/original-owner-races.log": "3d03da11f9dfa14b0b0370e010c725cc3c3f816b123fe0b04d78e9b0d1602505",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/selectors.log": "d9d734ee1c2de67b748aeef1c4126433aa438ad8375ca953916f12b1df11414d",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/manifest.json": "c0843d5bff32a156af35d392009a2b94338375b38f9f26ac5d1c004dca29f300",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/result.json": "3d1f916b5388e672340331763d949f053f22255ea2072b62493bce810f525599",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/run.py": "1e45634a99a03ce4e1e8c19f9213a9ef8d6f3eda3810a9df363e26a8108257ea",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-1/runner.log": "400f25861c00caf813cd543db54f5e733f8694e32f616ec627e232770b199c17",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/delta.json": "87c270d7db069c16c8bf7fee977421d538747937715b36701868b139fdb16d7d",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/delta.patch": "7b1a7f589ad4bd6f75d00ffc48d0c0a529385b2486809d1cf33b10e7529551bb",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/dependencies.json": "56c191bd6685f980841e7e43ef8e4cdc55df450b2ebd6cf5caf8a966264cb764",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/evidence/compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/manifest.json": "75f015f9b7e0258eb1829c05a83f7d3ae9c2ded9657a28db6eaaedfb35153ed1",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/result.json": "69d8d0b00355097cd0f45d999573fefb1da5a5444a6537b3f5768be818862a63",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/run.py": "cf717d34972f0c36d51eab21135359491e6c43bb6a46d7ce4764529da7dafef1",
+  "/home/phil/.cache/asservat-build/planning/runtime-provider-owner-native-20261013/checks/owner-component-2/runner.log": "e1e3fead2afdcde51e23360dacafa9b81364f3597c4c0e30544f27c128d688a1"
+}

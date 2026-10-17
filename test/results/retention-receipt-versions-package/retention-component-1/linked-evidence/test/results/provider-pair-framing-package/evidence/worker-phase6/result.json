@@ -1,0 +1,86 @@
+{
+  "manifest": "a9a90281001b10224bff196f3e43557a1af70d6b2060bda6bf38341b7829c8c9",
+  "dependencies": "215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce",
+  "runner": "dd2bbb45a022932f425187a20af7f8f87a4d2007df0ab8eca8936dbae5f23441",
+  "started": 1791874297.7612169,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "before": []
+  },
+  "phases": [
+    {
+      "name": "controlled-before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-phase-6/before-overlay.json",
+        "-count=1",
+        "-timeout=30s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder$/^owner_marked_closed$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 10.278833866119385,
+      "log_sha256": "29a8c806155f1126c7bd85852dd115415de98d09817f86e79b672e46841e962c",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "before": []
+      },
+      "pass_entries": 0,
+      "intended_assertion": true
+    },
+    {
+      "name": "corrected-test",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-phase-6/overlay.json",
+        "-count=1",
+        "-timeout=30s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 11.28008770942688,
+      "log_sha256": "ca7e4bcb32a1ff3db35f9e1e6f828630b6329c802b39312ccb1ad903d8b51002",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "before": []
+      },
+      "pass_entries": 10
+    }
+  ],
+  "native": false,
+  "exit": 0,
+  "ended": 1791874319.628783,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "before": []
+  },
+  "scratch": "/tmp/asservat-worker-phase-6-59b5f5845fdb4cb7a23f722aeffbba9a",
+  "scratch_removed": true
+}

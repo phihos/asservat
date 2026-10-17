@@ -1,0 +1,35 @@
+# ADR150 v2 regional source/producer component
+
+Seven new Go files are ready for integration from `files/`. No live source was edited. The checked component does not enable a listener, loader, route or installed v2 selection. Its actual v2 framed stream/channel/coordinator and the complete HWORK→B→A→R native path remain unfinished.
+
+## Frozen inputs
+
+`manifest.json` lists all seven paths, null original bases and exact payload hashes. `bases.json`, `payload.json`, `dependencies.json`, `overlay.json`, `mirror-manifest.json`, `freeze.json` and `run.py` contain the complete immutable candidate. There are 1,929 exact dependencies and 1,936 mirror paths, copied by exact path with pre/post coverage checks. Do not install the mirror/evidence as product packages.
+
+Manifest: `5f31989cc99a39cc303c6bec43b282e3824d63bcbc8c3f33631c5ccbfce158f9`.
+Freeze: `57cf942aabe89eae4a06ffa0719d0552a7e4586e9f27576b71914d7d8ed0c6b4`.
+Runner: `ae6d8e0dab5408ffedaf3adcb865ad9a4387d2f8affd772d5c3a0638d2b0b82f`.
+
+## Behavior and compatibility
+
+The distinct v2 envelope separates original native-bracket dates from each actual source-value read and carries a correlation UUID plus original request, actual leaf/exporter and final ordinal. Roles/issuer roots/workload pins remain independently supplied. The actual TLS exporter uses its own v2 domain. Existing v1 code, wire bytes, digest functions and full-proof ports are untouched.
+
+The regional producer owns one concrete native operation and original process/key/leaf/stream bounds. First-frame cancellation is linked during admission and joined before ownership transfer; successful frame return does not cancel the retained native handle. Each ordinal is spent before I/O. Current private process keys and pinned/current issuer checks remain before/after values; Close cancels and joins native and admitted work.
+
+The hub source owns one actual stream/query instance across both current SQL49 invocations. Pair3/4 requires accepted pair1/2, and registration results must match its exact stored actual source values. The final pair must satisfy `FinalMatches` and continue the original bracket, exporter, leaf, source and process. Unknown/error/changed/duplicate/concurrent phases cannot reopen or refill the instance. This component does not supply SQL authority itself; the already integrated concrete SQL49 wrapper remains required.
+
+The new codec preserves exact large integer generations/backing revisions by reusing the existing closed integer-preserving routing codec. Default RFC8785 conversion rounded an original backing revision in the actual failing regression. Only the new v2 codec was corrected; generic/v1 canonicalization is unchanged.
+
+## Actual tests and retained failures
+
+Checkpoint-v1 compile failed on a new test's out-of-scope variable; its original report/log remain preserved. Checkpoint-v2 compile passed, and all selected mTLS races passed, but the new exact-integer contract test failed on `(1<<60)-1`. That is the meaningful before evidence for the v2 codec correction, not a fixture rewrite. `DELTA.json` identifies the v2-only codec/declarative deterministic-byte test delta.
+
+Final checkpoint-v3 handle62662 exited0: focused integer race2.490s, four-package compile8.971s, selected races7.845s, four-package vet2.285s, Go architecture1.633s. The selected race log has 15 top-level / 90 named PASS entries. All before/after dependency/base/payload/mirror/file-set/freeze checks were unchanged. `RESULT.json` and `evidence-hashes.json` pin every exact log/report and command, including both prior failures. Explicit private-cache TMPDIR, GOMAXPROCS2 and GOFLAGS-p2 were used.
+
+Coverage includes actual process-owned keys and retained mutual TLS/h2 exporters; four actual synthetic native-port reads; exact first/final pair binding; final native/source/key/role/root changes; admission cancellation; original shorter phase/socket ends; native and remote read joins; v1 exporter/purpose rejection; duplicate/unknown/noninteger/overflow/trailing/over-bound wire negatives; exact deterministic bytes; and selected unchanged legacy source/producer tests. Native facts and SQL registrations are synthetic in these component tests. The new v2 payload exchange is a typed test exchange over the actual TLS correlation, not yet the real v2 framed stream. This is not native or installed availability qualification.
+
+## Next sustained implementation
+
+Continue the approved map with the concrete owner proof, regional phase channel and same-stream coordinator. The locator-created native handle must be handed internally to the one exact claim rather than reopened after standby creation. Preserve four proof ordinals, final native bracket before ordinal4, current SQL/private-key checks and exact Receipt/EOF. The source-only `../COORDINATOR-LIFETIME.md` records that next boundary and is deliberately outside this tested freeze.
+
+Then compose finite pending locator delivery/spent state, receiver/forwarder and outer HWORK. Full timing starts at original HWORK request entry and includes candidate SQL, API proofs, TLS/token review, transit, four ordinals, metadata and terminal/final checks with shared clients/background observers. The original five-second interval and 20-QPS clients remain unchanged; component timing proves no sustained end-to-end availability.

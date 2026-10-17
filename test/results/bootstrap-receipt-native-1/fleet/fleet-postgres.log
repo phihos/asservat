@@ -1,0 +1,315 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-13 15:30:33.268 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 15:30:33.268 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 15:30:33.280 UTC [43] LOG:  database system was shut down at 2026-10-13 15:30:33 UTC
+2026-10-13 15:30:33.290 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-13 15:30:33.463 UTC [37] LOG:  received fast shutdown request
+.2026-10-13 15:30:33.466 UTC [37] LOG:  aborting any active transactions
+2026-10-13 15:30:33.467 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-13 15:30:33.467 UTC [41] LOG:  shutting down
+2026-10-13 15:30:33.472 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-13 15:30:34.399 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.020 s, sync=0.884 s, total=0.932 s; sync files=303, longest=0.010 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-13 15:30:34.413 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-13 15:30:34.485 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 15:30:34.485 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-13 15:30:34.485 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-13 15:30:34.488 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 15:30:34.496 UTC [95] LOG:  database system was shut down at 2026-10-13 15:30:34 UTC
+2026-10-13 15:30:34.500 UTC [1] LOG:  database system is ready to accept connections
+2026-10-13 15:30:34.536 UTC [100] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-13 15:30:34.536 UTC [100] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-13 15:31:06.591 UTC [117] ERROR:  bootstrap issuance receipts are immutable
+2026-10-13 15:31:06.591 UTC [117] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-13 15:31:06.591 UTC [117] STATEMENT:  UPDATE fleet_bootstrap_intent SET credential_sha256=decode(repeat('ab',32),'hex') WHERE installation_id=$1
+2026-10-13 15:31:06.591 UTC [117] ERROR:  bootstrap issuance receipts are immutable
+2026-10-13 15:31:06.591 UTC [117] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-13 15:31:06.591 UTC [117] STATEMENT:  UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1
+2026-10-13 15:31:07.166 UTC [119] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.166 UTC [119] STATEMENT:  -- name: AcknowledgeBootstrapIssue :execrows
+	UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=clock_timestamp(),audit_digest=$3,
+	 audit_object_key=$4,audit_object_version=$5,audit_object_etag=$6,audit_object_bytes=$7,audit_object_sha256=$8
+	WHERE installation_id=$1 AND id=$2 AND credential_recorded_at IS NOT NULL AND audit_acknowledged_at IS NULL
+	
+2026-10-13 15:31:07.173 UTC [120] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.173 UTC [120] STATEMENT:  -- name: CreateIssuedBootstrap :exec
+	INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,
+	 issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,$10,$11,$12)
+	
+2026-10-13 15:31:07.181 UTC [117] ERROR:  bootstrap issuance receipts are immutable
+2026-10-13 15:31:07.181 UTC [117] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-13 15:31:07.181 UTC [117] STATEMENT:  UPDATE fleet_bootstrap_intent SET issued_at=NULL WHERE installation_id=$1
+2026-10-13 15:31:07.181 UTC [118] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:07.181 UTC [118] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:07.182 UTC [118] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.182 UTC [118] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:07.182 UTC [118] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.182 UTC [118] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-13 15:31:07.183 UTC [118] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:07.183 UTC [118] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:07.183 UTC [119] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:07.183 UTC [119] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:07.184 UTC [119] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.184 UTC [119] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:07.184 UTC [119] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.184 UTC [119] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-13 15:31:07.185 UTC [119] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:07.185 UTC [119] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:07.185 UTC [120] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:07.185 UTC [120] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:07.185 UTC [120] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.185 UTC [120] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:07.186 UTC [120] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.186 UTC [120] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-13 15:31:07.186 UTC [120] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:07.186 UTC [120] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:07.187 UTC [128] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:07.187 UTC [128] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:07.187 UTC [128] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.187 UTC [128] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:07.187 UTC [128] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.187 UTC [128] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-13 15:31:07.188 UTC [128] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:07.188 UTC [128] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:07.758 UTC [138] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.758 UTC [138] STATEMENT:  UPDATE fleet_bootstrap_intent SET not_after=not_after+interval '1 minute' WHERE installation_id=$1
+2026-10-13 15:31:07.759 UTC [138] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-13 15:31:07.759 UTC [138] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-13 15:31:07.759 UTC [138] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:07.759 UTC [138] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:07.759 UTC [138] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:07.759 UTC [138] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:07.760 UTC [138] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:07.760 UTC [138] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:07.760 UTC [130] ERROR:  bootstrap intent binding is immutable
+2026-10-13 15:31:07.760 UTC [130] CONTEXT:  PL/pgSQL function guard_bootstrap_intent() line 9 at RAISE
+2026-10-13 15:31:07.760 UTC [130] STATEMENT:  UPDATE fleet_bootstrap_intent SET display_name='replacement' WHERE installation_id=$1
+2026-10-13 15:31:07.789 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.789 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.789 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.794 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.794 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.794 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.800 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.800 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.800 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.804 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.804 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.804 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.810 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.810 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.810 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.815 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.815 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.815 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.820 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.820 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.820 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.825 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.825 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.825 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.830 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.830 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.830 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.836 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.836 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.836 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.842 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.842 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.842 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.846 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.846 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.846 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.851 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.851 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.851 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.856 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.856 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.856 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.861 UTC [139] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.861 UTC [139] DETAIL:  text versus uuid
+2026-10-13 15:31:07.861 UTC [139] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:07.877 UTC [140] ERROR:  inconsistent types deduced for parameter $1 at character 216
+2026-10-13 15:31:07.877 UTC [140] DETAIL:  text versus uuid
+2026-10-13 15:31:07.877 UTC [140] STATEMENT:  INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$6,$9,'bootstrap-issue/v1/' || $1::text || '/' || $9::text || '/record','v1',$6)
+2026-10-13 15:31:08.364 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.364 UTC [141] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:08.364 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.364 UTC [141] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1
+2026-10-13 15:31:08.365 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.365 UTC [141] STATEMENT:  UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1
+2026-10-13 15:31:08.365 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.365 UTC [141] STATEMENT:  DELETE FROM fleet_trust WHERE installation_id=$1
+2026-10-13 15:31:08.366 UTC [141] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:08.366 UTC [141] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-13 15:31:08.366 UTC [141] ERROR:  permission denied for table fleet_bootstrap
+2026-10-13 15:31:08.366 UTC [141] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-13 15:31:08.367 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.367 UTC [141] STATEMENT:  INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until,recovery_blocked) VALUES($1,$2,'injected',1,$3,clock_timestamp(),clock_timestamp()+interval '1 second',false)
+2026-10-13 15:31:08.367 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.367 UTC [141] STATEMENT:  UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time() WHERE installation_id=$1
+2026-10-13 15:31:08.368 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.368 UTC [141] STATEMENT:  UPDATE fleet_trust SET activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()) WHERE installation_id=$1
+2026-10-13 15:31:08.368 UTC [141] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.368 UTC [141] STATEMENT:  UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()) WHERE installation_id=$1
+2026-10-13 15:31:08.368 UTC [141] ERROR:  cannot update column "recovery_blocked" of view "fleet_current_trust"
+2026-10-13 15:31:08.368 UTC [141] DETAIL:  View columns that are not columns of their base relation are not updatable.
+2026-10-13 15:31:08.368 UTC [141] STATEMENT:  UPDATE fleet_current_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:08.368 UTC [141] ERROR:  permission denied for view fleet_current_trust
+2026-10-13 15:31:08.368 UTC [141] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1
+2026-10-13 15:31:08.799 UTC [144] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 15:31:08.799 UTC [144] STATEMENT:  -- name: AcknowledgeOwnerConfiguration :execrows
+	UPDATE hub_owner_configuration_revision SET audit_receipt_json=$5
+	WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4 AND audit_receipt_json IS NULL
+	
+2026-10-13 15:31:08.975 UTC [144] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:08.975 UTC [144] STATEMENT:  DELETE FROM hub_owner_configuration
+2026-10-13 15:31:08.975 UTC [144] ERROR:  owner configuration identity, revision and original deadline cannot roll back or renew
+2026-10-13 15:31:08.975 UTC [144] CONTEXT:  PL/pgSQL function guard_owner_configuration_head() line 14 at RAISE
+2026-10-13 15:31:08.975 UTC [144] STATEMENT:  UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()
+2026-10-13 15:31:08.975 UTC [144] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.975 UTC [144] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 15:31:08.976 UTC [144] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 15:31:08.976 UTC [144] STATEMENT:  UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')
+2026-10-13 15:31:08.976 UTC [145] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:08.976 UTC [145] STATEMENT:  DELETE FROM hub_owner_configuration
+2026-10-13 15:31:08.976 UTC [145] ERROR:  owner configuration identity, revision and original deadline cannot roll back or renew
+2026-10-13 15:31:08.976 UTC [145] CONTEXT:  PL/pgSQL function guard_owner_configuration_head() line 14 at RAISE
+2026-10-13 15:31:08.976 UTC [145] STATEMENT:  UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()
+2026-10-13 15:31:08.977 UTC [145] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.977 UTC [145] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 15:31:08.977 UTC [145] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 15:31:08.977 UTC [145] STATEMENT:  UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')
+2026-10-13 15:31:08.977 UTC [146] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:08.977 UTC [146] STATEMENT:  DELETE FROM hub_owner_configuration
+2026-10-13 15:31:08.978 UTC [146] ERROR:  owner configuration identity, revision and original deadline cannot roll back or renew
+2026-10-13 15:31:08.978 UTC [146] CONTEXT:  PL/pgSQL function guard_owner_configuration_head() line 14 at RAISE
+2026-10-13 15:31:08.978 UTC [146] STATEMENT:  UPDATE hub_owner_configuration SET source_uid=gen_random_uuid()
+2026-10-13 15:31:08.978 UTC [146] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:08.978 UTC [146] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 15:31:08.978 UTC [146] ERROR:  permission denied for table hub_owner_configuration_revision
+2026-10-13 15:31:08.978 UTC [146] STATEMENT:  UPDATE hub_owner_configuration_revision SET snapshot_json=decode('00','hex')
+2026-10-13 15:31:08.979 UTC [146] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:08.979 UTC [146] STATEMENT:  UPDATE hub_owner_configuration SET generation=generation+1
+2026-10-13 15:31:08.979 UTC [145] ERROR:  owner configuration revision and audit are immutable
+2026-10-13 15:31:08.979 UTC [145] CONTEXT:  PL/pgSQL function guard_owner_configuration_revision() line 14 at RAISE
+2026-10-13 15:31:08.979 UTC [145] STATEMENT:  UPDATE hub_owner_configuration_revision SET audit_receipt_json=decode('00','hex')
+2026-10-13 15:31:09.397 UTC [144] ERROR:  owner configuration revision capacity or initial state invalid
+2026-10-13 15:31:09.397 UTC [144] CONTEXT:  PL/pgSQL function guard_owner_configuration_revision() line 8 at RAISE
+2026-10-13 15:31:09.397 UTC [144] STATEMENT:  INSERT INTO hub_owner_configuration_revision(installation_id,cluster_id,source_uid,generation,snapshot_json) SELECT installation_id,cluster_id,source_uid,1025,snapshot_json FROM hub_owner_configuration_revision WHERE installation_id=$1 AND generation=4
+2026-10-13 15:31:09.881 UTC [155] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:09.881 UTC [155] STATEMENT:  -- name: AcknowledgeOwnerEnrollment :execrows
+	UPDATE hub_owner_enrollment SET audit_receipt_json=$2 WHERE id=$1 AND audit_receipt_json IS NULL
+	
+2026-10-13 15:31:15.516 UTC [160] ERROR:  owner signing spend cannot be refunded before expiry
+2026-10-13 15:31:15.516 UTC [160] CONTEXT:  PL/pgSQL function guard_owner_certificate() line 6 at RAISE
+2026-10-13 15:31:15.516 UTC [160] STATEMENT:  DELETE FROM hub_owner_certificate WHERE id=$1
+2026-10-13 15:31:15.517 UTC [160] ERROR:  owner identity, audit, retirement and consumed periods are immutable
+2026-10-13 15:31:15.517 UTC [160] CONTEXT:  PL/pgSQL function guard_owner_enrollment() line 25 at RAISE
+2026-10-13 15:31:15.517 UTC [160] STATEMENT:  UPDATE hub_owner_enrollment SET highest_epoch=-1 WHERE id=$1
+2026-10-13 15:31:20.794 UTC [155] ERROR:  canceling statement due to user request
+2026-10-13 15:31:20.794 UTC [155] CONTEXT:  while locking tuple (0,52) in relation "hub_owner_configuration"
+2026-10-13 15:31:20.794 UTC [155] STATEMENT:  -- name: LockOwnerConfiguration :one
+	SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE
+	
+2026-10-13 15:31:20.854 UTC [159] ERROR:  owner registration still holds possible live certificates
+2026-10-13 15:31:20.854 UTC [159] CONTEXT:  PL/pgSQL function guard_owner_enrollment() line 5 at RAISE
+2026-10-13 15:31:20.854 UTC [159] STATEMENT:  DELETE FROM hub_owner_enrollment WHERE id=$1
+2026-10-13 15:31:20.917 UTC [160] ERROR:  permission denied for table hub_owner_certificate
+2026-10-13 15:31:20.917 UTC [160] STATEMENT:  UPDATE hub_owner_certificate SET activated_at=clock_timestamp() WHERE enrollment_id=$1
+2026-10-13 15:31:20.917 UTC [158] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:20.917 UTC [158] STATEMENT:  UPDATE hub_owner_enrollment SET retired_at=clock_timestamp() WHERE id=$1
+2026-10-13 15:31:20.918 UTC [156] ERROR:  permission denied for table hub_owner_certificate
+2026-10-13 15:31:20.918 UTC [156] STATEMENT:  UPDATE hub_owner_certificate SET activated_at=clock_timestamp() WHERE enrollment_id=$1
+2026-10-13 15:31:20.918 UTC [157] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:20.918 UTC [157] STATEMENT:  UPDATE hub_owner_enrollment SET audit_receipt_json='x' WHERE id=$1
+2026-10-13 15:31:20.919 UTC [159] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:20.919 UTC [159] STATEMENT:  UPDATE hub_owner_enrollment SET highest_epoch=0 WHERE id=$1
+2026-10-13 15:31:20.920 UTC [160] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:20.920 UTC [160] STATEMENT:  UPDATE hub_owner_configuration SET generation=0 WHERE installation_id=$1
+2026-10-13 15:31:20.920 UTC [160] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:20.920 UTC [160] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:21.982 UTC [169] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:21.982 UTC [169] STATEMENT:  -- name: AcknowledgeOwnerEnrollment :execrows
+	UPDATE hub_owner_enrollment SET audit_receipt_json=$2 WHERE id=$1 AND audit_receipt_json IS NULL
+	
+2026-10-13 15:31:27.625 UTC [174] ERROR:  owner signing spend cannot be refunded before expiry
+2026-10-13 15:31:27.625 UTC [174] CONTEXT:  PL/pgSQL function guard_owner_certificate() line 6 at RAISE
+2026-10-13 15:31:27.625 UTC [174] STATEMENT:  DELETE FROM hub_owner_certificate WHERE id=$1
+2026-10-13 15:31:27.626 UTC [174] ERROR:  owner identity, audit, retirement and consumed periods are immutable
+2026-10-13 15:31:27.626 UTC [174] CONTEXT:  PL/pgSQL function guard_owner_enrollment() line 25 at RAISE
+2026-10-13 15:31:27.626 UTC [174] STATEMENT:  UPDATE hub_owner_enrollment SET highest_epoch=-1 WHERE id=$1
+2026-10-13 15:31:32.907 UTC [169] ERROR:  canceling statement due to user request
+2026-10-13 15:31:32.907 UTC [169] CONTEXT:  while locking tuple (0,40) in relation "hub_owner_configuration"
+2026-10-13 15:31:32.907 UTC [169] STATEMENT:  -- name: LockOwnerConfiguration :one
+	SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE
+	
+2026-10-13 15:31:32.965 UTC [173] ERROR:  owner registration still holds possible live certificates
+2026-10-13 15:31:32.965 UTC [173] CONTEXT:  PL/pgSQL function guard_owner_enrollment() line 5 at RAISE
+2026-10-13 15:31:32.965 UTC [173] STATEMENT:  DELETE FROM hub_owner_enrollment WHERE id=$1
+2026-10-13 15:31:33.027 UTC [174] ERROR:  permission denied for table hub_owner_certificate
+2026-10-13 15:31:33.027 UTC [174] STATEMENT:  UPDATE hub_owner_certificate SET activated_at=clock_timestamp() WHERE enrollment_id=$1
+2026-10-13 15:31:33.027 UTC [172] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:33.027 UTC [172] STATEMENT:  UPDATE hub_owner_enrollment SET retired_at=clock_timestamp() WHERE id=$1
+2026-10-13 15:31:33.028 UTC [170] ERROR:  permission denied for table hub_owner_certificate
+2026-10-13 15:31:33.028 UTC [170] STATEMENT:  UPDATE hub_owner_certificate SET activated_at=clock_timestamp() WHERE enrollment_id=$1
+2026-10-13 15:31:33.028 UTC [171] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:33.028 UTC [171] STATEMENT:  UPDATE hub_owner_enrollment SET audit_receipt_json='x' WHERE id=$1
+2026-10-13 15:31:33.029 UTC [173] ERROR:  permission denied for table hub_owner_enrollment
+2026-10-13 15:31:33.029 UTC [173] STATEMENT:  UPDATE hub_owner_enrollment SET highest_epoch=0 WHERE id=$1
+2026-10-13 15:31:33.029 UTC [174] ERROR:  permission denied for table hub_owner_configuration
+2026-10-13 15:31:33.029 UTC [174] STATEMENT:  UPDATE hub_owner_configuration SET generation=0 WHERE installation_id=$1
+2026-10-13 15:31:33.029 UTC [174] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:33.029 UTC [174] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-13 15:31:33.676 UTC [179] ERROR:  permission denied for table fleet_peer
+2026-10-13 15:31:33.676 UTC [179] STATEMENT:  UPDATE fleet_peer SET enabled=true
+2026-10-13 15:31:33.676 UTC [179] ERROR:  permission denied for table fleet_peer_certificate
+2026-10-13 15:31:33.676 UTC [179] STATEMENT:  DELETE FROM fleet_peer_certificate
+2026-10-13 15:31:33.677 UTC [179] ERROR:  permission denied for table fleet_trust
+2026-10-13 15:31:33.677 UTC [179] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 15:31:33.677 UTC [179] ERROR:  permission denied for table permission_stream
+2026-10-13 15:31:33.677 UTC [179] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-13 15:31:33.678 UTC [179] ERROR:  permission denied for table context_capture
+2026-10-13 15:31:33.678 UTC [179] STATEMENT:  UPDATE context_capture SET state='intent_audited'
+2026-10-13 15:31:33.813 UTC [180] ERROR:  new row for relation "fleet_peer" violates check constraint "fleet_peer_check3"
+2026-10-13 15:31:33.813 UTC [180] DETAIL:  Failing row contains (bf92f15b-1632-42e1-9dee-059996f0545e, 5c4fe7c3-101a-4260-86cb-1c6d6d87d0bf, b2123afa-c2c1-4e2e-ad34-b584c4573550, a815188f-a445-4135-8f27-57ca77775cd3, connector, 1, t, 2026-10-13 16:31:33.802803+00, null, null, null, null).
+2026-10-13 15:31:33.813 UTC [180] STATEMENT:  UPDATE fleet_peer SET audit_id=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_sha256=NULL WHERE installation_id=$1

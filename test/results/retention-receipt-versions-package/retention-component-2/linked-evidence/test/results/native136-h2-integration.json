@@ -1,0 +1,9 @@
+{
+  "integratedAt": "2026-10-12T10:31:53.783616+00:00",
+  "payloads": 5,
+  "dependencies": 6,
+  "manifestSHA256": "5bdae821351aba88ce4f794ca9ec24643ce9c271c64ed15748abe0b8532a1079",
+  "failingBefore": "actual TLS/HTTP2 stream reset",
+  "focusedRaces": "passed",
+  "publicRuntimeEnabled": false
+}

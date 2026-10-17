@@ -1,0 +1,22 @@
+{
+  "component": "/home/phil/.cache/asservat-build/planning/owner-audit-inventory-20261013/checks/native-policy-component-2",
+  "componentPins": {
+    "manifest.json": "f348bbbe2f65d4feb489dc174feb4749256c390fa088fb91f0caba68747da77c",
+    "dependencies.json": "10313521ff72d745b3ff9c0d7a6a38d646bc492ce077d62400d6c5c784a7d119",
+    "args.json": "694f7c46c35eb3ea65c81046e34f75d8480323f2e894adf2318e6cf0b91dabfd",
+    "run.py": "1bfd057b5c26eaf9353f67c3f10112660d2d7dbfe0af8a2b31224a56f082524b",
+    "result.json": "e74f246811a46e89882a07cfd75869fac6891e732ffe4f281f6c095c578bc239"
+  },
+  "runner": "0638522b95f2cd85d93ace3079bb2fbee64208a836b7b7965cc38f816094c4ae",
+  "before": {
+    "componentPins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [],
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scope": "read-only scoped physical owner audit inventory; no installed reserve/retirement/refund",
+  "scratch": "/tmp/asservat-owner-inventory-native-2ps5fuzp"
+}

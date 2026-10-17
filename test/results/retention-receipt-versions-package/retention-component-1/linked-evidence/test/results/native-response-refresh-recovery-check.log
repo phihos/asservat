@@ -1,0 +1,2 @@
+Database-recovery integration exit: 0
+{"terminalExit": 0, "testExit": 0, "passedEntries": 3, "sourceHashes": 925, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

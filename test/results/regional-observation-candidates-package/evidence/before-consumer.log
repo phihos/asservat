@@ -1,0 +1,8 @@
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/opted-valid
+    cluster_observation_client_test.go:310: original selected candidate reader current signing trust unavailable 1 0
+--- FAIL: TestInstalledObservationClientSelectsOriginalCandidateReader (0.00s)
+    --- FAIL: TestInstalledObservationClientSelectsOriginalCandidateReader/opted-valid (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.013s
+FAIL

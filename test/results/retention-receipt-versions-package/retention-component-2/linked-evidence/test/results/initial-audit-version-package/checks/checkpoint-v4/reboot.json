@@ -1,0 +1,8 @@
+{
+  "bootID": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "interruptedHandle": 45687,
+  "priorTerminal": "unknown; handle absent after confirmed reboot",
+  "priorTmpEvidence": "lost; no test verdict retained",
+  "nonSourceExclusion": "core.4751 is absent from frozen source set; metadata inspected, contents untouched; its timestamp predates this reboot",
+  "payloadManifestSHA256": "b9654aa55acd161e91ce5779fed0633d5fc07c000b790ebc668a431a272c7ce2"
+}

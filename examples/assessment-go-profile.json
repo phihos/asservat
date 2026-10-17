@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "capture-assessment/v1",
+  "assessmentID": "00000000-0000-4000-8000-000000000161",
+  "planDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "generatedAt": "2026-10-09T12:00:00Z",
+  "validUntil": "2026-10-09T12:05:00Z",
+  "basis": {
+    "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "metrics": {
+      "state": "unavailable"
+    }
+  },
+  "scope": {
+    "observationPods": 0,
+    "incidentPods": 1
+  },
+  "combinedImpact": {
+    "level": "moderate",
+    "hasUnknowns": true,
+    "effects": [
+      "applicationAllocation",
+      "applicationCPU"
+    ],
+    "explanation": "Known mechanism effects are a minimum; workload headroom, combined overhead and placement are unmeasured. Limits are not predictions."
+  },
+  "actions": [
+    {
+      "actionID": "cpu",
+      "executionMode": "onTrigger",
+      "impact": {
+        "level": "moderate",
+        "hasUnknowns": true,
+        "effects": [
+          "applicationCPU",
+          "applicationAllocation"
+        ],
+        "explanation": "Sampling runs in the application; overhead and interference depend on the runtime and enabled profilers."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "paths",
+          "profileLabels",
+          "personalIdentifiers"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 86100,
+        "maximumAgeSeconds": 86400,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 86400
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 16777216,
+          "sourceRef": "action:cpu:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        }
+      ]
+    },
+    {
+      "actionID": "heap",
+      "executionMode": "onTrigger",
+      "impact": {
+        "level": "moderate",
+        "hasUnknowns": true,
+        "effects": [
+          "applicationCPU",
+          "applicationAllocation"
+        ],
+        "explanation": "Sampling runs in the application; overhead and interference depend on the runtime and enabled profilers."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "paths",
+          "profileLabels",
+          "personalIdentifiers"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 86100,
+        "maximumAgeSeconds": 86400,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 86400
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 16777216,
+          "sourceRef": "action:heap:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        }
+      ]
+    },
+    {
+      "actionID": "mutex",
+      "executionMode": "onTrigger",
+      "impact": {
+        "level": "moderate",
+        "hasUnknowns": true,
+        "effects": [
+          "applicationCPU",
+          "applicationAllocation"
+        ],
+        "explanation": "Sampling runs in the application; overhead and interference depend on the runtime and enabled profilers."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "paths",
+          "profileLabels",
+          "personalIdentifiers"
+        ],
+        "transientOnly": [],
+        "unknownContent": false
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 86100,
+        "maximumAgeSeconds": 86400,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 86400
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 16777216,
+          "sourceRef": "action:mutex:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        }
+      ]
+    }
+  ],
+  "combinedQuantities": [
+    {
+      "dimension": "outputBytes",
+      "phase": "perIncident",
+      "scope": "wholePlan",
+      "basis": "configuredLimit",
+      "lower": 0,
+      "upper": 50331648,
+      "sourceRef": "sum-of-compatible-declared-limits",
+      "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+    }
+  ],
+  "interactions": [
+    {
+      "actionIDs": [
+        "cpu",
+        "heap",
+        "mutex"
+      ],
+      "kind": "combinedCostUnknown",
+      "message": "Concurrent application/kernel work may interact; no matching combined benchmark or fresh pressure data is available.",
+      "blocking": false
+    }
+  ],
+  "alternatives": [],
+  "handlingCodes": [
+    "minimizeCapture",
+    "restrictAccess",
+    "preferApprovedExtracts",
+    "reviewBeforeSharing",
+    "approvedClientsOnly",
+    "externalCopiesNotRecalled"
+  ],
+  "handlingPolicyRef": "company-debug-evidence/v1"
+}

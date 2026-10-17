@@ -1,0 +1,49 @@
+=== RUN   TestInitialRuntimeObjectRoundTripWithRealKubernetes
+=== RUN   TestInitialRuntimeObjectRoundTripWithRealKubernetes/legacy
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-account kind=ServiceAccount original-template=65d5b64c331803605d43deda73ed7d69eeebaa160c0567bcde06ad0611511d76
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-account kind=ServiceAccount original-template=241ffb762aac358203b449d7b3078e9e56be345a4a460e423b1d5e440377e83f
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-role kind=Role original-template=3857903a7fe78697183e9ad3157eb3a716d696c0ce08ff2a516846860b8f0146
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-binding kind=RoleBinding original-template=53683b8159be5d0548caf57ca5545ac29fae6a877673ff8fdd9b7c677cf06f11
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-cluster-role kind=ClusterRole original-template=3e8648d4d3b5137d266c377849925f1138232a1b8935ecad4fa80c258052efba
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-cluster-binding kind=ClusterRoleBinding original-template=18052e1e08f0f4abb2cfd6570fda8fa9f753b31c7aebb2d8b29f0333f2ebdf81
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-role kind=Role original-template=533c176315faedb70daa031342d0c065052e849466a58f8a90dce3240eeaf6f2
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-binding kind=RoleBinding original-template=7a7040ef92b8b932aaea3cd4e8c9e1881bc31a3780f0b0200d0b3f1a61aea75f
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-cluster-role kind=ClusterRole original-template=f5fe4760de60104766dd8791617ff76b70d7c97ace605fd4c999936fc2a4b1c8
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-cluster-binding kind=ClusterRoleBinding original-template=da5566ce750ceb5b14e56e3950eef98bf7b040742486a24875173f9cf3c65e02
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-deployment kind=Deployment original-template=4453d5a84ef34d485b8ae01c69d773ed5f34f9eb812f3898fd2aa99910f0da3f
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-deployment kind=Deployment original-template=abf9e692298420a2d7e9c4aaa1558a7e5de76b63734d4914042b4028e654db07
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-service kind=Service original-template=2f59057df1ede67cd65db3de5ec9be74e2d578055cd68f90e96d004a954013ca
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-lease kind=Lease original-template=164781276ab6b7992eb1102d40a8e39690112b2dbdd5f0ecb17b87582f983ca7
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source kind=ConfigMap original-template=045868264505de8a7f58c037a2789c891136a0a956daf396046b89d0c992d898
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source-policy kind=ValidatingAdmissionPolicy original-template=0d6db9d1dc411d07031ca9036804cc0457eb9366303c36f443b162be16135ccc
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source-binding kind=ValidatingAdmissionPolicyBinding original-template=18cf160fe82b28f6e7c87772a17aa2a1ece00b2f09bb5d9409e5cf5f34cfd057
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-workload-policy kind=ValidatingAdmissionPolicy original-template=6422b8ebc67b8e6bacc514fffe1c24a660ce784cc7fcd5a477771c12bf2be123
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-workload-binding kind=ValidatingAdmissionPolicyBinding original-template=fbced45e4eb2c64119f5532684b2b9e7f39ec813093356c8186b0aa165554a62
+    initial_runtime_object_roundtrip_native_test.go:56: All 19 fixed objects round-tripped through the real API (installed-owner=false); both Deployments stayed at zero; no activation/provider/runtime authority tested.
+=== RUN   TestInitialRuntimeObjectRoundTripWithRealKubernetes/installed-owner
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-account kind=ServiceAccount original-template=95f928a300e46b385d80d5eede82547a8c3655d05b3b288b74ba6f9edebd8b8d
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-account kind=ServiceAccount original-template=93a006b72173bf6615db7cdc44846dec018c6e5ecb52406b7cd8964b965756a1
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-role kind=Role original-template=f6c23fa53cbb0736a9a5709895d4858835c129795be0d543aaa8adda9b907052
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-binding kind=RoleBinding original-template=932883b00359cade7a05acaf1ce7e79bf5aa4f5dd3f7bd1b2c9270741dca375c
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-cluster-role kind=ClusterRole original-template=5cc00e734e685c93fd4e7abd0c4aafd00c489b9fa9b7aa3456f75c4998d4734c
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-cluster-binding kind=ClusterRoleBinding original-template=087cde9cd5011367ea6fd4a03084717bc04b13676b3d6f41acba71e8d9ae07b5
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-role kind=Role original-template=9ceed96e9388147671496f076836978c06053a884ca995c06fd43d6f680a6918
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-binding kind=RoleBinding original-template=08d9b393938b7d44f4f2fce246ed60b28f454bddd4a05b592a5b6ce30ddcf297
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-cluster-role kind=ClusterRole original-template=bf564a1085d5c2592ad689fddd64d202e3d25bdc3075953e1b9c1c6b3c690fe4
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-cluster-binding kind=ClusterRoleBinding original-template=3ec9f4ec77a02085754b9ba3147d08d750fd9310a1a89daf29f664279f768362
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-deployment kind=Deployment original-template=a2005fee5c4e26f629af207c2706ae6b0f0bc9022157f9cb52260e94d0139ff0
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-deployment kind=Deployment original-template=d240f05ed5d750063aca3c59aa3c6ea50d67b5b5968a6ecf5ef2eb8ef734740a
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-service kind=Service original-template=75174e115412c1290ac9a091a37c136d8e01b5594363d2c608594b6616b5a9ab
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=worker-lease kind=Lease original-template=d6d236d24d631e6f250066c5a251f5547c82e5c8bfa675c0a5e17d1d68de3aa8
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source kind=ConfigMap original-template=12249d8585e50b530a77b446a6b52dde6fb896fae264756a13fe107854a15d1e
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source-policy kind=ValidatingAdmissionPolicy original-template=05b8f2f46a864fbf73767af9e637152cf09379e192ba3c4e86a15e9cdfb70313
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-source-binding kind=ValidatingAdmissionPolicyBinding original-template=f2f2bae77e7e93fc53f1aad92574b30e1bf92b982b83ac1edbc30fc32b6e0c17
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-workload-policy kind=ValidatingAdmissionPolicy original-template=0b6f1d574f78e3b0c4d0c485fdb6c473d1ea41cd11c55298bb2533cc3294103d
+    initial_runtime_object_roundtrip_native_test.go:56: roundtrip item=owner-workload-binding kind=ValidatingAdmissionPolicyBinding original-template=959ab629100b0c9e53bbc4a9f74a8937945eb9e145ed6f7c23546f348ab1acfb
+    initial_runtime_object_roundtrip_native_test.go:56: actual API installed owner template accepted with original digest 8289a7e3772a542b3159cc102d4c9f7c6f71898e319c3012983d3140511ef352
+    initial_runtime_object_roundtrip_native_test.go:56: All 19 fixed objects round-tripped through the real API (installed-owner=true); both Deployments stayed at zero; no activation/provider/runtime authority tested.
+--- PASS: TestInitialRuntimeObjectRoundTripWithRealKubernetes (21.23s)
+    --- PASS: TestInitialRuntimeObjectRoundTripWithRealKubernetes/legacy (9.82s)
+    --- PASS: TestInitialRuntimeObjectRoundTripWithRealKubernetes/installed-owner (11.41s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	22.280s

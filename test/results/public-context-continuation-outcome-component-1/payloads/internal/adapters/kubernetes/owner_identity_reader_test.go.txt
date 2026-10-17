@@ -1,0 +1,212 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	admission "k8s.io/api/admissionregistration/v1"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	access "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+)
+
+func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
+	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "token-read-error", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled", "startup-pending", "startup-guard-lost", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-regressed", "startup-receipt-replaced"} {
+		t.Run(mode, func(t *testing.T) {
+			x := newOwnerIdentityObjectFixture(t)
+			in := x.reader.input
+			a := x.reader.activation
+			policy, binding, e := OwnerWorkloadAdmission(x.plan)
+			if e != nil {
+				t.Fatal(e)
+			}
+			g := in.WorkloadGuard
+			policy.UID = types.UID(g.PolicyUID)
+			policy.ResourceVersion = "1"
+			policy.Generation = g.PolicyGeneration
+			policy.Status.ObservedGeneration = g.PolicyGeneration
+			policy.Status.TypeChecking = &admission.TypeChecking{}
+			binding.UID = types.UID(g.BindingUID)
+			binding.ResourceVersion = g.BindingResourceVersion
+			ns := core.Namespace{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Namespace"}, ObjectMeta: meta.ObjectMeta{Name: in.Namespace.Name, UID: types.UID(in.Namespace.UID), ResourceVersion: "1"}}
+			rs := apps.ReplicaSet{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "ReplicaSet"}, ObjectMeta: meta.ObjectMeta{Name: "owner-replica", Namespace: in.Namespace.Name, UID: types.UID(ownerID(3500)), ResourceVersion: "1", OwnerReferences: []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: a.Input.Deployment.Name, UID: types.UID(a.Input.Deployment.UID), Controller: ptr.To(true)}}}, Spec: apps.ReplicaSetSpec{Replicas: ptr.To(int32(1)), Selector: x.deployment.Spec.Selector.DeepCopy(), Template: *x.deployment.Spec.Template.DeepCopy()}}
+			pod := core.Pod{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Pod"}, ObjectMeta: meta.ObjectMeta{Name: "owner-pod", Namespace: in.Namespace.Name, UID: types.UID(x.reader.podUID), ResourceVersion: "1", Labels: rs.Spec.Template.Labels, OwnerReferences: []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "ReplicaSet", Name: rs.Name, UID: rs.UID, Controller: ptr.To(true)}}}, Spec: *rs.Spec.Template.Spec.DeepCopy(), Status: core.PodStatus{Phase: core.PodRunning}}
+			pod.Spec.NodeName = "synthetic-node"
+			if mode == "pod-owner-changed" {
+				pod.OwnerReferences[0].UID = types.UID(ownerID(3501))
+			}
+			if mode == "pod-unassigned" {
+				pod.Spec.NodeName = ""
+			}
+			start := time.Now().UTC()
+			var offset atomic.Int64
+			x.reader.client.now = func() time.Time { return time.Now().UTC().Add(time.Duration(offset.Load())) }
+			payload, _ := json.Marshal(map[string]int64{"iat": start.Add(-time.Second).Unix(), "exp": start.Add(5 * time.Minute).Unix()})
+			token := []byte("e30." + base64.RawURLEncoding.EncodeToString(payload) + ".synthetic-signature")
+			var reviews atomic.Int32
+			startupMode := strings.HasPrefix(mode, "startup-")
+			receipt := x.state.OwnerLaunch.Receipt
+			if startupMode && mode != "startup-receipt-regressed" {
+				x.state.OwnerLaunch.Receipt = nil
+				x.writeJournal(t)
+			}
+			var journalReads atomic.Int32
+			deploymentPath := "/apis/apps/v1/namespaces/" + in.Namespace.Name + "/deployments/" + a.Input.Deployment.Name
+			x.extra = func(w http.ResponseWriter, r *http.Request) bool {
+				switch r.URL.Path {
+				case "/api/v1/namespaces/" + in.Namespace.Name + "/secrets/" + a.Input.Resources.Name:
+					n := int32(0)
+					if startupMode {
+						n = journalReads.Add(1)
+					}
+					if n == 3 && mode == "startup-receipt-replaced" {
+						x.state.OwnerLaunch.Receipt.ResourceVersion += "x"
+						x.writeJournal(t)
+					}
+					if n == 3 && mode == "startup-after-receipt-changed" {
+						x.state.OwnerLaunch.Until = x.state.OwnerLaunch.Until.Add(-time.Microsecond)
+						x.writeJournal(t)
+					}
+					if n == 2 {
+						if mode == "startup-receipt-regressed" {
+							x.state.OwnerLaunch.Receipt = nil
+						} else if mode == "startup-launch-replaced" {
+							x.state.OwnerLaunch.OperationID = ownerID(3900)
+						} else {
+							x.state.OwnerLaunch.Receipt = receipt
+						}
+						x.writeJournal(t)
+					}
+					return false
+				case "/api/v1/namespaces/" + in.Namespace.Name:
+					permissionReply(w, ns)
+				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + g.Name:
+					if mode == "guard-missing" || mode == "guard-lost" && reviews.Load() >= 2 || mode == "startup-guard-lost" && reviews.Load() >= 1 {
+						http.NotFound(w, r)
+					} else {
+						permissionReply(w, policy)
+					}
+				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + g.Name:
+					permissionReply(w, binding)
+				case "/apis/authentication.k8s.io/v1/selfsubjectreviews":
+					permissionReply(w, auth.SelfSubjectReview{Status: auth.SelfSubjectReviewStatus{UserInfo: auth.UserInfo{Username: "synthetic-probe", Groups: []string{"system:authenticated"}}}})
+				case "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews":
+					permissionReply(w, access.SelfSubjectAccessReview{Status: access.SubjectAccessReviewStatus{Allowed: true}})
+				case deploymentPath:
+					if r.Method != http.MethodPut {
+						return false
+					}
+					if r.URL.Query().Get("dryRun") != "All" {
+						t.Error("persistent guard probe attempted")
+					}
+					if mode == "allowing-probe" {
+						permissionReply(w, x.deployment)
+						break
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(403)
+					permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: "apps", Kind: "deployments", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + g.Name + "' with binding '" + g.Name + "' denied request: " + ownerWorkloadDenial}}}})
+				case "/apis/authentication.k8s.io/v1/tokenreviews":
+					n := reviews.Add(1)
+					var request auth.TokenReview
+					if json.NewDecoder(r.Body).Decode(&request) != nil || request.Spec.Token != string(token) || len(request.Spec.Audiences) != 1 || request.Spec.Audiences[0] != OwnerEnrollmentAudience(in.InstallationID) {
+						t.Error("wrong original token or audience")
+					}
+					reply := auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Status: auth.TokenReviewStatus{Authenticated: true, Audiences: request.Spec.Audiences, User: auth.UserInfo{Username: "system:serviceaccount:" + in.Namespace.Name + ":" + a.Input.ServiceAccount.Name, UID: a.Input.ServiceAccount.UID, Extra: map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {pod.Name}, "authentication.kubernetes.io/pod-uid": {string(pod.UID)}}}}}
+					if mode == "wrong-token-pod" {
+						reply.Status.User.Extra["authentication.kubernetes.io/pod-uid"] = auth.ExtraValue{ownerID(3501)}
+					}
+					if mode == "wrong-token-account" {
+						reply.Status.User.UID = ownerID(3501)
+					}
+					if (mode == "token-revoked" || mode == "startup-token-revoked") && n == 2 {
+						reply.Status.Authenticated = false
+					}
+					if mode == "late-guard" && n == 2 {
+						offset.Store(int64(5 * time.Second))
+					}
+					permissionReply(w, reply)
+				case "/api/v1/namespaces/" + in.Namespace.Name + "/pods/" + pod.Name:
+					permissionReply(w, pod)
+				case "/apis/apps/v1/namespaces/" + in.Namespace.Name + "/replicasets/" + rs.Name:
+					permissionReply(w, rs)
+				default:
+					return false
+				}
+				return true
+			}
+			probe := *x.reader.client
+			guard, e := NewOwnerWorkloadProtection(x.reader.client, &probe, x.plan, GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+			if e != nil {
+				t.Fatal(e)
+			}
+			reader, e := NewInstalledOwnerIdentityReader(x.reader.client, guard, in, a, ownerTokenFunc(func(context.Context) ([]byte, error) {
+				if mode == "token-read-error" {
+					return nil, context.DeadlineExceeded
+				}
+				return append([]byte(nil), token...), nil
+			}), x.reader.podUID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			verifyStart := time.Now()
+			ctx, end := context.WithDeadline(context.Background(), verifyStart.Add(5*time.Second))
+			defer end()
+			if mode == "cancelled" {
+				end()
+			}
+			verify := reader.Verify
+			if startupMode {
+				verify = reader.VerifyStartup
+			}
+			until, e := verify(ctx, x.manifest, x.mounted)
+			if mode == "startup-receipt-regressed" && journalReads.Load() != 2 {
+				t.Fatal("receipt regression was treated as retryable pending", journalReads.Load())
+			}
+			if mode == "startup-pending" && (journalReads.Load() != 4 || reviews.Load() != 3) {
+				t.Fatal("pending startup omitted full fresh native proof", journalReads.Load(), reviews.Load())
+			}
+			if mode == "valid" || mode == "startup-pending" {
+				if e != nil || !until.After(time.Now()) || until.After(verifyStart.Add(5*time.Second)) {
+					t.Fatal("current original Pod/guard unavailable", e)
+				}
+			} else if e == nil {
+				t.Fatal("unavailable/replaced/revoked proof accepted")
+			}
+			if mode != "valid" && mode != "startup-pending" && mode != "startup-launch-replaced" {
+				expected := map[string]OwnerIdentityReadCheck{
+					"guard-missing": ownerReadInitialGuard, "guard-lost": ownerReadFinalGuard, "allowing-probe": ownerReadInitialGuard,
+					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview, "token-revoked": ownerReadFinalTokenReview,
+					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
+					"late-guard": ownerReadFinalDeployment, "cancelled": ownerReadInput,
+					"startup-guard-lost": ownerReadInitialGuard, "startup-token-revoked": ownerReadInitialTokenReview, "startup-after-receipt-changed": ownerReadInitialJournal, "startup-receipt-regressed": ownerReadFinalJournal, "startup-receipt-replaced": ownerReadInitialJournal,
+				}[mode]
+				var failure *OwnerIdentityReadFailure
+				if !errors.As(e, &failure) || failure.Check() != expected {
+					t.Fatalf("wrong native diagnostic: mode=%s error=%v", mode, e)
+				}
+				if mode == "token-read-error" && !errors.Is(e, context.DeadlineExceeded) {
+					t.Fatal("original token error identity lost")
+				}
+			}
+			if mode == "startup-launch-replaced" && !errors.Is(e, cfg.ErrChanged) {
+				t.Fatal("pending launch replacement did not deny", e)
+			}
+			if e != nil && strings.Contains(e.Error(), string(token)) {
+				t.Fatal("token leaked")
+			}
+		})
+	}
+}

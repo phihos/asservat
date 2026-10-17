@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-provider-auth.schema.json",
+  "title": "Original owner Kubernetes-auth provider selection v1",
+  "description": "Standalone public profile, at most 8 KiB. Not accepted by the legacy OwnerDeployment loader. Runtime must independently verify original workload/projection identities and exact generated recipe; no credential or authority is encoded here. Fixed four service roles, 300-second lease and 900-second hard maximum, fixed audience and paths are derived by the recipe generator. S3 is the explicitly selected original scoped Secret; no workload identity variant or external IAM administration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "authMount",
+    "authMountAccessor",
+    "serviceAccount",
+    "auditCredentials",
+    "recipeSHA256"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-owner-kubernetes-auth/v1"
+    },
+    "authMount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])",
+      "not": {
+        "const": "token"
+      }
+    },
+    "authMountAccessor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])"
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "auditCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "recipeSHA256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

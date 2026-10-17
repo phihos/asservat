@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-09",
+  "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification",
+  "applications": 12,
+  "components": 24,
+  "interfaces": 14,
+  "domainEntitiesMapped": 49,
+  "requirementsMapped": 176,
+  "positiveChecks": 1219,
+  "rejectedInvalidCases": 120
+}

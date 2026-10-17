@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:263: owned Pod did not finish normal deletion executor client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+--- FAIL: TestContextAdmissionWithRealServices (22.45s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-api-runner (22.40s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	22.509s
+FAIL

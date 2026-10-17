@@ -1,0 +1,11 @@
+{
+  "paths": 69,
+  "dependencies": 1557,
+  "files": {
+    "payload": "b3ab2d721d3048565c7671ded7d2f84a94d78446295fcbfbe2458a1c065afb9d",
+    "bases": "fa7ef570d7a0376bad2baf4e639287b369c172eb697970088fe49ec85cb491ed",
+    "dependencies": "7f0e0a3512dcd6616b8633b3862ec7cfb42454cddaad08f3c5e6af2c1eea50ab",
+    "origins": "e51bcbdb89a0b53b5e2ce6a9e3278c03b655a2e4310064515d04051e372070de",
+    "overlay": "45c8977fb776bb5891ac71ffdf196ee6a7c9ebaf98ff7ec837b2530c51b4f35c"
+  }
+}

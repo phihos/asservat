@@ -1,0 +1,53 @@
+from pathlib import Path
+import hashlib,json,os,signal,subprocess,time,shutil
+C=Path(__file__).resolve().parent;L=Path('/home/phil/Projekte/asservat')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+manifest=json.loads((C/'manifest.json').read_text());deps=json.loads((C/'dependencies.json').read_text());recorder=json.loads((C/'recorder.json').read_text())
+goldens={}
+def check():
+ return {'dependencies':[p for p,v in deps.items() if h(L/p)!=v], 'bases':[v['path'] for v in manifest if h(L/v['path'])!=v['base_sha256']], 'payloads':[v['path'] for v in manifest if h(C/'files'/v['path'])!=v['payload_sha256']], 'recorder':[] if h(C/recorder['path'])==recorder['sha256'] and h(L/recorder['production_path'])==recorder['production_sha256'] else ['changed'], 'goldens':[p for p,v in goldens.items() if h(C/p)!=v]}
+with (C/'evidence/started').open('x'):pass
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(C/'tmp'),ASSERVAT_RECIPE_GOLDEN_OUTPUT=str(C/'evidence/golden'))
+env.pop('ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE',None);env.pop('ASSERVAT_CONTEXT_FIXTURES',None)
+inp=C/'files/internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json'
+with (C/'evidence/golden/inputs.json').open('xb') as f:f.write(inp.read_bytes())
+overlay='-overlay='+str(C/'overlay.json');pkg='./internal/adapters/kms';binary=C/'tmp/kms.test'
+steps=[
+ ('record-original',['go','test','-overlay='+str(C/'recorder-overlay.json'),'-count=1','-timeout=120s','-v','-run','^TestRecordOriginalOwnerProviderRecipeGolden$',pkg],L),
+ ('compile',['go','test',overlay,'-run','^$','./internal/adapters/providerconfig',pkg],L),
+ ('compile-race-binary',['go','test',overlay,'-race','-c','-o',str(binary),pkg],L),
+ ('race-kms',[str(binary),'-test.count=1','-test.timeout=180s','-test.v','-test.run=^TestOwnerProvider'],C/'tmp/package'),
+ ('race-providerconfig',['go','test',overlay,'-race','-count=1','-timeout=180s','-v','./internal/adapters/providerconfig'],L),
+ ('vet',['go','vet',overlay,'./internal/adapters/providerconfig',pkg],L),
+]
+result={'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'runner_sha256':h(C/'run.py'),'paths':len(manifest),'dependencies':len(deps),'native_executed':False,'original_recipe_sha256':recorder['production_sha256'],'commands':[]};terminal=0
+for name,command,cwd in steps:
+ before=check()
+ if any(before.values()):terminal=1;result['before_failure']=before;break
+ start=time.monotonic()
+ with (C/'evidence'/f'{name}.log').open('x') as log:
+  p=subprocess.Popen(command,cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  print(json.dumps({'phase':name,'pid':p.pid}),flush=True)
+  try:code=p.wait(timeout=240)
+  except subprocess.TimeoutExpired:
+   os.killpg(p.pid,signal.SIGTERM)
+   try:p.wait(timeout=5)
+   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+   code=124
+ if name=='record-original' and code==0:
+  names=['inputs','original','namespace-uid','account-uid','server-role','audit-key']
+  if sorted(p.name for p in (C/'evidence/golden').iterdir())!=sorted(n+'.json' for n in names):code=125
+  else:
+   for n in names:
+    source=C/'evidence/golden'/(n+'.json');key=str(source.relative_to(C));goldens[key]=h(source)
+    target=C/'tmp/package/testdata/owner-provider-recipe-v1'/(n+'.json');shutil.copyfile(source,target)
+    goldens[str(target.relative_to(C))]=h(target)
+   with (C/'goldens.json').open('x') as f:json.dump(goldens,f,sort_keys=True,indent=2);f.write('\n')
+ after=check();report={'phase':name,'command':command,'cwd':str(cwd),'exit':code,'seconds':round(time.monotonic()-start,3),'before':before,'after':after};result['commands'].append(report)
+ with (C/'evidence'/f'{name}.json').open('x') as out:json.dump(report,out,indent=2);out.write('\n')
+ print(json.dumps(report),flush=True)
+ if code or any(after.values()):terminal=1;break
+result.update(terminal_exit=terminal,final_hash_check=check(),golden_sha256=goldens)
+if any(result['final_hash_check'].values()):result['terminal_exit']=terminal=1
+with (C/'result.json').open('x') as out:json.dump(result,out,indent=2);out.write('\n')
+print(json.dumps(result),flush=True);raise SystemExit(terminal)

@@ -1,0 +1,27 @@
+# ADR-155 — Unchanged fleet observation persistence contention
+
+Status: selected for staged implementation. Requirements: REQ-FED-001 and REQ-DB-005. The exact SQL lock/failure chain is reproduced; the new classification is not yet qualified or integrated.
+
+## Problem
+
+A protected installer operation holds the fleet recovery row FOR SHARE through bounded native work. The independent source observer's unchanged freshness UPDATE needs FOR UPDATE and can encounter the original one-second lock timeout. The generic failure path then suspends a previously current unchanged source. Actual PostgreSQL qualification reproduced that sequence and subsequent owner constructor refusal; it did not identify the original full-bootstrap refusal's exact predicate.
+
+The shared recovery/suspension lock remains necessary. It must not become FOR KEY SHARE or disappear merely to improve availability. Source observation cannot approve recovery or alter the original authority deadline.
+
+## Decision
+
+Recognize only the actual SQL adapter's failed persistence of an independently read unchanged positive source. Before the lock, read the existing complete fleet row and check database time after that read. Exact installation/issuer/source UID/generation/digest, positive suspension/recovery state, original dates and the independent source's complete validity must agree. This nonlocking comparison grants no UPDATE or COMMIT authority. Preserve the original locked predicate and all normal effect checks.
+
+Only the last callback's actual LockFleetTrust error with SQLSTATE55P03 can mark this classification. That callback immediately returns before any source UPDATE or COMMIT attempt. Reset local callback state on the existing bounded serialization/deadlock retry. Pool, connection, other-statement, cancellation and unknown COMMIT errors cannot select this outcome. The generic Ledger error mapping and rollback cleanup remain unchanged.
+
+After rollback/release, read the complete actual row and database time again through the same pool. Require the entire public row, including original timestamps, to remain equal and positive/current. Pin actual postmaster start, database OID and primary state before transaction admission and recheck after blocking confirmation; an independently accepted replacement incarnation cannot reuse the old classification. Include all added reads in the original five-second SQL operation budget. Use the earliest original operation/caller/source/stored deadline, with no fresh timeout. This path writes nothing and returns an unavailable error, never success, a permit, accepted freshness or a scheduling hint.
+
+TrustObserver suppresses its extra suspension only for this typed persistence failure after a positive source read. All source-read errors, changed/new/missing/suspended/recovery state, expiry, failed confirmation and unknown outcomes retain current fencing. The same error returned by a source reader is insufficient. The bootstrap wrapper still invalidates pending and active notices for every failed SQL outcome and never emits a committed notice on this path.
+
+The previous stored observation remains usable only until its original expiry and current recovery checks. The next ordinary cadence obtains an independent source observation. It does not renew or retry the failed proof, and no selected effect changes its deadline. No migration, grant, pool, limiter, cadence, statement/lock timeout or role changes are required.
+
+## Qualification
+
+Source-only tests cover exact row/source/incarnation comparisons, unavailable error classification, source-versus-persistence ordering and pending/active notice cancellation. The staged actual SQL cases exercise unchanged bridge contention with byte-identical retained row/deadline, expiry without a refreshed observation, and unchanged fencing attempts for changed or expired sources. A test-only TLS bridge drops one successful COMMIT acknowledgement; the actual committed row must be observed before ordinary fencing. Separate cases delay delivery of the actual server lock-abort error until the original bridge releases and the actual row changes, enters recovery, or receives an independently newer observation. Final confirmation must reject all three, and the original failure CAS must preserve the newer observation. No passing result for this new behavior is claimed. The earlier diagnostic's two actual SQL cases and source hashes remain separate evidence.
+
+Installed owner execution and the original owner phase timing budget still require native qualification. This decision does not enable public services or the v2 observation backend.

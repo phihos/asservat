@@ -1,0 +1,16 @@
+{
+  "status": "staged-only; unbuilt; component1 still running",
+  "scope": "one test fixture; no production, operation deadline, rate, role, selection or package timeout changes",
+  "baseManifest": "3780b50edc9d4587dd8283ab039461ca9266a516032959d7d2ce3e78122bbb6c",
+  "paths": {
+    "internal/adapters/kubernetes/owner_installation_driver_test.go": {
+      "beforeSHA256": "da7c43fa05bc126332e9754eeba1ac289335976f009aeb4df4e2ef46c04ee06f",
+      "afterSHA256": "d39337a4f7bb9c547bb85131ac095fb3c64a25834c5258aa8d37c1cdbefce285"
+    }
+  },
+  "reviewPatchSHA256": "7088afd44069e6d36312403eb16766dd33ee35940f8a0b28b9f39eb70fcb5a64",
+  "observedEvidenceSHA256": "b9a0617f67afc6b5183ce40ac89e162e8020a0baaa8983e736507d4d4bced3ba",
+  "wholeSequenceWatchdogSeconds": 130,
+  "originalPerOperationMaxSeconds": 5,
+  "qualificationRequired": "exact failed parent and all three children under race, PostgreSQL suite, vet, Go architecture; retain prior full Kubernetes inventory and later whole Go gate"
+}

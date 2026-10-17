@@ -1,0 +1,10 @@
+--- FAIL: TestLocalKeyServiceRejectsWireSubstitution (0.01s)
+    --- FAIL: TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed (0.00s)
+        key_service_test.go:293: invalid body response 200
+    key_service_test.go:298: malformed input reached authority
+--- FAIL: TestLocalKeyClientRejectsMalformedResponses (0.02s)
+    --- FAIL: TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed (0.00s)
+        key_service_test.go:364: malformed response returned a key
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.045s
+FAIL

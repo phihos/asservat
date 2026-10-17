@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/context_native_content_test.go": "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/changes/test/integration/context_native_content_test.go",
+    "/home/phil/Projekte/asservat/test/integration/context_native_interrupted_test.go": "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/changes/test/integration/context_native_interrupted_test.go",
+    "/home/phil/Projekte/asservat/test/integration/context_publication_test.go": "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/changes/test/integration/context_publication_test.go",
+    "/home/phil/Projekte/asservat/test/integration/native_phase_diagnostic_test.go": "/home/phil/.cache/asservat-build/planning/native-phase-diagnostic-20261012/changes/test/integration/native_phase_diagnostic_test.go"
+  }
+}

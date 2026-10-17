@@ -1,0 +1,14 @@
+{
+  "docs/architecture/cluster-observations.md": {
+    "base": "5cae54d64176342923e62f9259199db998e866621ce1083a325dc94741f36e74",
+    "sha256": "0bb3499e01b2cfc37dd80ce78acc79e5f24adae375d743e9065239f114849bcf"
+  },
+  "docs/decisions/157-protected-observation-dial-endpoint.md": {
+    "base": "b66c4f1a8cc6d5d768515608bd756c82afa6ab56f3f31121f1e4c297a3fd6a8f",
+    "sha256": "07293025718b88529c230417bbd60239b74d810744afb06920926d2d58064e4b"
+  },
+  "docs/decisions/README.md": {
+    "base": "b79ab221036e8583a601e89ae4754b363644bea139e8a9d0fbb9ed7a1b38351d",
+    "sha256": "39b1f5d8bad56692f3129d22e0f787dbfe9fc544f458a8d20e644e98a6cbe43e"
+  }
+}

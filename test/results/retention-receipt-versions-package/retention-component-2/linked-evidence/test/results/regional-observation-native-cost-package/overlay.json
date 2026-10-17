@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/owner_observation_native_cost_counter_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-native-timing-20261013/checkpoint-v2/files/test/integration/owner_observation_native_cost_counter_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_observation_native_cost_fixture_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-native-timing-20261013/checkpoint-v2/files/test/integration/owner_observation_native_cost_fixture_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_observation_native_cost_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-native-timing-20261013/checkpoint-v2/files/test/integration/owner_observation_native_cost_test.go"
+  }
+}

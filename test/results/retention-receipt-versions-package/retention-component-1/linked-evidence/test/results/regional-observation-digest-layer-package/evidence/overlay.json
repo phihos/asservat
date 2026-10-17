@@ -1,0 +1,10 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_channel.go": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/files/internal/adapters/mtls/connector_observation_channel.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_channel_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/files/internal/adapters/mtls/connector_observation_channel_test.go",
+    "/home/phil/Projekte/asservat/internal/application/fleet/cluster_observation_digest.go": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/files/internal/application/fleet/cluster_observation_digest.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/cluster_observation_digest.go": "",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/digest_parity_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/files/internal/transport/clusterobservation/digest_parity_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/wire.go": "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/files/internal/transport/clusterobservation/wire.go"
+  }
+}

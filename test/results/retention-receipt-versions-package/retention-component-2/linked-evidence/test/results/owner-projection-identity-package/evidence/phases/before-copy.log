@@ -1,0 +1,20 @@
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/admitted
+    owner_projection_operation_test.go:39: copied outer handle entered or poisoned original operation
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/after-lock
+    owner_projection_operation_test.go:39: copied outer handle entered or poisoned original operation
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/apply
+    owner_projection_operation_test.go:39: copied outer handle entered or poisoned original operation
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/final
+    owner_projection_operation_test.go:39: copied outer handle entered or poisoned original operation
+=== RUN   TestOwnerProjectionOperationRejectsCopiedOuterHandle/result
+    owner_projection_operation_test.go:39: copied outer handle entered or poisoned original operation
+--- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle (0.29s)
+    --- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle/admitted (0.06s)
+    --- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle/after-lock (0.05s)
+    --- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle/apply (0.05s)
+    --- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle/final (0.05s)
+    --- FAIL: TestOwnerProjectionOperationRejectsCopiedOuterHandle/result (0.08s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.335s
+FAIL

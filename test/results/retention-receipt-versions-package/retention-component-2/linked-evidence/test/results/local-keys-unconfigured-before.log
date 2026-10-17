@@ -1,0 +1,10 @@
+--- FAIL: TestBrowserCredentialPortsRejectUnconfiguredProviders (0.00s)
+    --- FAIL: TestBrowserCredentialPortsRejectUnconfiguredProviders/typed-nil-remote/encrypt (0.00s)
+        local_roundtrip_test.go:162: unconfigured provider panicked
+    --- FAIL: TestBrowserCredentialPortsRejectUnconfiguredProviders/typed-nil-remote/decrypt (0.00s)
+        local_roundtrip_test.go:172: unconfigured provider panicked
+    --- FAIL: TestBrowserCredentialPortsRejectUnconfiguredProviders/zero-remote/encrypt (0.00s)
+        local_roundtrip_test.go:162: unconfigured provider panicked
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.003s
+FAIL

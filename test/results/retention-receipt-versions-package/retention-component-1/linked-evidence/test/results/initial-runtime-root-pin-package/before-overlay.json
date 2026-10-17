@@ -1,0 +1,5 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_root_pin_test.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-root-pin-20261012/checks/root-pin-1/source/internal/adapters/kubernetes/initial_runtime_root_pin_test.go"
+  }
+}

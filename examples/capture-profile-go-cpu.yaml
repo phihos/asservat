@@ -1,0 +1,53 @@
+apiVersion: asservat.io/v1alpha1
+kind: CaptureProfile
+metadata:
+  name: go-cpu-v1
+  namespace: asservat-builtin-profiles
+spec:
+  name: go-cpu
+  version: v1
+  definition:
+    displayName: Short Go CPU profile
+    description: Ten-second CPU profile using the qualified go-pprof-loopback endpoint
+      template.
+    recipe:
+      description: Ten-second CPU profile using the qualified go-pprof-loopback endpoint
+        template.
+      actions:
+      - id: cpu
+        kind: profile
+        parameters:
+          runtime: go
+          type: cpu
+          source:
+            kind: httpEndpoint
+            profileRef: api-local-pprof
+          duration: 10s
+          forceGC: false
+          mode: interval
+        required: true
+        impact: intrusive
+        limits:
+          maxBytes: 16777216
+          timeout: 15s
+        executionMode: onTrigger
+      maxTotalBytes: 16777216
+      maxDuration: 30s
+      endpointBindings:
+      - name: api-local-pprof
+        templateRef: go-pprof-loopback
+        addressMode: targetLoopback
+        portName: diagnostics
+    editableFields:
+    - actionID: cpu
+      field: profileDuration
+      label: Sample duration
+    - actionID: cpu
+      field: actionTimeout
+      label: Completion deadline
+    - actionID: cpu
+      field: actionMaxBytes
+      label: Output limit
+  availability:
+    enabled: true
+    deprecated: false

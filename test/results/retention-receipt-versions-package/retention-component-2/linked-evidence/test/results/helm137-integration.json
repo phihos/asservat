@@ -1,0 +1,9 @@
+{
+  "integratedAt": "2026-10-12T10:20:36.242423+00:00",
+  "payloads": 58,
+  "dependencies": 21,
+  "manifestSHA256": "60aa5ff1ca09dc3b783ed508f6c8fd863088a7eeba6a4bfd9626c9b4d706d552",
+  "verified": true,
+  "nativeQualification": "pending",
+  "publicRuntimeEnabled": false
+}

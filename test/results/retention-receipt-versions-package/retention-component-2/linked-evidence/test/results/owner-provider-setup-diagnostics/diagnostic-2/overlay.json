@@ -1,0 +1,13 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/setup_reader.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/providerconfig/setup_reader.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/setup_values.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/providerconfig/setup_values.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/owner_provider_setup.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/providerconfig/owner_provider_setup.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/owner_provider_setup_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/providerconfig/owner_provider_setup_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/validate.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/providerconfig/validate.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_effects_native_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/kms/owner_provider_effects_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_native_fixture_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/kms/owner_provider_native_fixture_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_setup_native_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/changes/internal/adapters/kms/owner_provider_setup_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/providerconfig/setup_probe_record_test.go": "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/diagnostic-2/record_test.go.txt"
+  }
+}

@@ -1,0 +1,51 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceBudgetPolicy
+metadata:
+  name: payments-default
+  namespace: asservat-system
+spec:
+  poolRef: regional-evidence
+  scope:
+    clusterID: 00000000-0000-4000-8000-000000000001
+    namespaceSelector:
+      matchLabels:
+        platform.example.invalid/evidence-budget: payments
+  namespaceEnvelope:
+    maxWorkloadAccounts: 4
+    maxStoredBytes: 111669149696
+    maxObjects: 80000
+  workload:
+    protected:
+      bytes: 17179869184
+      objects: 10000
+    hardLimit:
+      bytes: 34359738368
+      objects: 20000
+    contextReserve:
+      bytes: 1073741824
+      objects: 1000
+    dump:
+      burst: 1
+      minimumIntervalSeconds: 900
+      maxStartsPerRollingHour: 2
+      maxInputBytesPerRollingHour: 4294967296
+    maxConcurrentExpensive: 1
+    maxQueuedExpensive: 1
+    maxQueueAgeSeconds: 30
+    upload:
+      bytesPerSecond: 33554432
+      burstBytes: 4194304
+    maxUploadRequestsPerSecond: 20
+    maxSpoolBytes: 2147483648
+    onFull: RejectNewExpensive
+  node:
+    maxConcurrentExpensive: 2
+    maxQueuedExpensive: 10
+    upload:
+      bytesPerSecond: 67108864
+      burstBytes: 8388608
+    maxSpoolBytes: 4294967296
+    impactProfileRef: standard-node
+    unhealthySamples: 3
+    sampleIntervalSeconds: 5
+    recoveryHealthySeconds: 60

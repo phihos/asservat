@@ -1,0 +1,109 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// OpenProviderOwnerIdentityRoles creates only the original private password
+// journal. Every SQL role still requires its own positively acknowledged claim.
+// The fixed named CREATE is never repeated after an uncertain reply by this
+// root; both existing and newly observed roots require independent final proof.
+func (s *OwnerIdentityRoleRoot) OpenProviderOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	return s.openProviderOwnerIdentityRoles(ctx, false)
+}
+func (s *OwnerIdentityRoleRoot) InspectProviderOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	return s.openProviderOwnerIdentityRoles(ctx, true)
+}
+func (s *OwnerIdentityRoleRoot) openProviderOwnerIdentityRoles(ctx context.Context, inspect bool) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var out contracts.OwnerIdentityRoleSnapshot
+	if s == nil || ctx == nil || ctx.Err() != nil || s.input.OwnerLayout != contracts.OwnerProviderInstalledLayout {
+		return out, cfg.ErrInvalid
+	}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	err := s.providerOperation(call, true, func(bounded context.Context) (ownerIdentityOperationNative, error) {
+		return s.readOwnerIdentityOperationNative(bounded, s.input.LayoutDigest, true)
+	}, func(bounded context.Context, first ownerIdentityOperationNative) error {
+		var err error
+		bounded, narrow := context.WithDeadline(bounded, first.until)
+		defer narrow()
+		state := first.roles.State
+		uid := first.roles.UID
+		if first.missing {
+			if inspect {
+				return cfg.ErrUnavailable
+			}
+			resources := first.retained.resources.State
+			if s.createAttempted || resources.OwnerIdentity != nil || resources.OwnerLaunch != nil || !s.resources.now().Before(resources.Until) {
+				return cfg.ErrUnavailable
+			}
+			now := s.resources.now().UTC().Truncate(time.Microsecond)
+			state = contracts.OwnerIdentityRoleState{Format: contracts.OwnerIdentityRoleStateFormat, Input: s.input, OperationID: uuid.NewString(), CreatedAt: now, Until: resources.Until}
+			for _, purpose := range contracts.OwnerIdentityRolePurposes() {
+				var password [32]byte
+				if _, err = rand.Read(password[:]); err != nil {
+					clear(password[:])
+					return cfg.ErrUnavailable
+				}
+				state.Roles = append(state.Roles, contracts.PublicRuntimeRoleMaterial{Purpose: purpose, Password: base64.RawURLEncoding.EncodeToString(password[:])})
+				clear(password[:])
+			}
+			if !ownerIdentityRoleStateValid(s.input, state, now) {
+				return cfg.ErrUnavailable
+			}
+			encoded, err := json.Marshal(state)
+			defer clear(encoded)
+			if err != nil || len(encoded) > contracts.OwnerIdentityRoleMaxBytes {
+				return cfg.ErrUnavailable
+			}
+			until := identity.Earlier(first.until, resources.Until)
+			effect, cancel := context.WithDeadline(bounded, until)
+			defer cancel()
+			if initialHandoverDeadline(effect, s.resources.now, until) != nil {
+				return cfg.ErrUnavailable
+			}
+			object := &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: s.name(), Namespace: s.input.Namespace.Name}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": encoded}}
+			s.createAttempted = true
+			s.pendingOperationRoot = &state
+			raw, created := s.bridge.source.client.api.Post().AbsPath(s.path()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(effect)
+			defer clear(raw)
+			if created == nil {
+				ack, _, err := s.decode(raw, until)
+				if err != nil || !equalJSON(ack.State, state) {
+					return cfg.ErrChanged
+				}
+				uid = ack.UID
+				s.operationRootUID = ack.UID
+			}
+			// A lost reply grants only this exact original state lookup, including
+			// on errors. The final bracket does not replay the CREATE.
+		}
+		last, err := s.readOwnerIdentityOperationNative(bounded, s.input.LayoutDigest, true)
+		if err != nil || last.missing || !ownerIdentityOperationOriginalsEqual(first, last) || uid != "" && last.roles.UID != uid || !equalJSON(last.roles.State, state) || !first.missing && last.roles.ResourceVersion != first.roles.ResourceVersion {
+			return cfg.ErrUnavailable
+		}
+		last.roles.ValidUntil = identity.Earlier(first.until, last.roles.ValidUntil)
+		if initialHandoverDeadline(bounded, s.resources.now, last.roles.ValidUntil) != nil {
+			return cfg.ErrUnavailable
+		}
+		s.operationRootUID = last.roles.UID
+		s.pendingOperationRoot = nil
+		out = last.roles
+		return nil
+	})
+	if err != nil {
+		return contracts.OwnerIdentityRoleSnapshot{}, err
+	}
+	return out, nil
+}

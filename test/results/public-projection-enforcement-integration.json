@@ -1,0 +1,162 @@
+{
+  "manifestSHA256": "b0698de844ed18b24bb95d908d21ec47321bf58156462298cf1767ed8dd17abe",
+  "dependenciesSHA256": "5292bc3cf938c5c761365aa701d9b57a470997f94d861fc55e6e820b3fe597d6",
+  "dependencyCount": 2600,
+  "files": [
+    {
+      "path": "docs/architecture/configuration-credential-provisioning.md",
+      "base_sha256": "3a976d421ee76608bedb14780c39ac320d45e94f79f18496f0f23b86aa4bfc16",
+      "payload_sha256": "97bc669fbbbfd59b793e441631d54c77509c4e581161cd0eb20f38e6f0f2b0f5",
+      "dependency_only": false
+    },
+    {
+      "path": "docs/decisions/140-installed-public-runtime-producers.md",
+      "base_sha256": "146a1c6f0669d66fa50b18cd55d12f38415393b586ac466799cd63cb8b91ac75",
+      "payload_sha256": "c79942ee4f07a17bdb2ea4d7d7c18f57a05f575acb1460cfdfcbc69c921fd56b",
+      "dependency_only": false
+    },
+    {
+      "path": "docs/decisions/148-public-projection-enforcement.md",
+      "base_sha256": null,
+      "payload_sha256": "083c19d5ac3893e57c677a62e3dc3f11b3a6cd68cdcdfcca1d841459945ce352",
+      "dependency_only": false
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base_sha256": "6d04ac31f1d68624c67d0c10791bccedc5962bc19dd11953fb813010634c5054",
+      "payload_sha256": "9d3ef21432d593fbb2c55f97b1bd3c74974f661a3f63c18ad5ecdc73168d819d",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_projection_journal.go",
+      "base_sha256": null,
+      "payload_sha256": "27d9c504695ce8472b076e37c9afda80a3de275861cb9ab26f22ae6e85a6136c",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_projection_operation.go",
+      "base_sha256": null,
+      "payload_sha256": "168b56b0c00c9a679d8751fd05f1cea8c4f1c5d0f444688e91704d87a0785012",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_projection_operation_test.go",
+      "base_sha256": null,
+      "payload_sha256": "eaf8b16528a3bcf66f7cc1b4531ec918716bdd88c44e3c1c73544d5f9c91fbc0",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_projection.go",
+      "base_sha256": "fe86b35293592b613608d0235cbaeba84eeba3dcce5de8978dfa0218796e68d4",
+      "payload_sha256": "68d415c462efba281ef70344860da5c53332032a3457e2b36e16e5479df1f09f",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_projection_timing_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7a25797e0ce574bab70703d528b958da37d9ddeef3bdf8bc5538efca1f4eb05a",
+      "dependency_only": false
+    },
+    {
+      "path": "specs/deployment-profiles.md",
+      "base_sha256": "4970bc34c0ce8f7f028d1af7c1214cd93fb4b94ae50cdb584eb1c80ba36106e9",
+      "payload_sha256": "aa990785bcdea97153c0f7b420f19c49a58e48cba436ba398f31d4a4ae04c7e5",
+      "dependency_only": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_worker_test.go",
+      "base_sha256": "bb2be7fe31e231cf918bed04a3ebcd34a35d40579d198294988218b26df1bd70",
+      "payload_sha256": "62b47a991574cc0b0f95bc44a7640f7ac29a50cc20b54ae73a895351059e9c86",
+      "dependency_only": true
+    }
+  ],
+  "qualification": {
+    "manifest": "b0698de844ed18b24bb95d908d21ec47321bf58156462298cf1767ed8dd17abe",
+    "dependencies": "5292bc3cf938c5c761365aa701d9b57a470997f94d861fc55e6e820b3fe597d6",
+    "runner": "4d11ad71a8e9c104cd08e7fcd2fc1484e71fef2b5b574ec2aef3c531a1c34122",
+    "before": {
+      "payload": [],
+      "base": [],
+      "dependencies": []
+    },
+    "started": 1791854134.60597,
+    "phases": [
+      {
+        "name": "before",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/before.json",
+          "./internal/adapters/kubernetes",
+          "-run",
+          "^TestPublicRuntimeProjectionTimingDiagnostic$",
+          "-count=1",
+          "-timeout=45s",
+          "-v"
+        ],
+        "exit": 1,
+        "seconds": 9.64042329788208,
+        "log_sha256": "9860106a7792ce826459bf44e83ebbaca9a906d9e827186460a67f9542ecf529"
+      },
+      {
+        "name": "after",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/overlay.json",
+          "./internal/adapters/kubernetes",
+          "-run",
+          "^(TestPublicRuntimeProjection|TestPublicProjection)",
+          "-count=1",
+          "-timeout=4m",
+          "-v"
+        ],
+        "exit": 0,
+        "seconds": 150.03212428092957,
+        "log_sha256": "7f0ad85ec4073e14e7c69427488c79decc5591fd43709c84a46ce103cc18443e"
+      },
+      {
+        "name": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/overlay.json",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "seconds": 1.0901994705200195,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "contracts",
+        "command": [
+          "make",
+          "spec-check",
+          "architecture-check",
+          "go-architecture-check",
+          "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+        ],
+        "exit": 2,
+        "seconds": 3.8132541179656982,
+        "log_sha256": "6ead9df126c1107fb7deff12127a9ece6604fe6787d7c7d766af507e0a63d99e"
+      }
+    ],
+    "intended_before": true,
+    "exit": 2,
+    "ended": 1791854300.2856007,
+    "after": {
+      "payload": [],
+      "base": [],
+      "dependencies": []
+    }
+  },
+  "integratedAt": 1791854682.5328882,
+  "scope": "Component verification only; native installed runtime unqualified. Original freshness/QPS unchanged. Projection Go/vet pass; two static mirror runs failed on missing copied link targets and live gates remain pending."
+}

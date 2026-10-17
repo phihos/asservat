@@ -1,0 +1,29 @@
+{
+  "scope": "compile and vet only; actual scoped IAM native test remains pending",
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/overlay.json",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 46.506
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/overlay.json",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 2.398
+    }
+  ]
+}

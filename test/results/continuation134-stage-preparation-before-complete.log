@@ -1,0 +1,8 @@
+--- FAIL: TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys (0.00s)
+    api_preparation_once_test.go:59: second invocation generated keys
+    api_preparation_once_test.go:71: not exactly one original key/acquisition effect 2 1
+--- FAIL: TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry (0.00s)
+    api_preparation_once_test.go:84: unknown preparation recreated keys/interval StoredPendingVerification <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/execution	0.029s
+FAIL

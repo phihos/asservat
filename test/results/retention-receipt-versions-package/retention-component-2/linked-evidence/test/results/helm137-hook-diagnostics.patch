@@ -1,0 +1,64 @@
+--- before/test/integration/helm_bootstrap_test.go
++++ after/test/integration/helm_bootstrap_test.go
+@@ -459,6 +459,11 @@
+ 	var terminal *core.Pod
+ 	var commandErr error
+ 	flipped := false
++	defer func() {
++		if t.Failed() && original != "" {
++			helmBootstrapFailureLogs(t, api, d, name, original)
++		}
++	}()
+ 	for !commandJoined || terminal == nil {
+ 		select {
+ 		case commandErr = <-done:
+@@ -549,6 +554,49 @@
+ 	return terminal
+ }
+ 
++// Capture bounded diagnostics before the owned fixture cleanup removes the
++// failed hook. Helm's generic failed-Pod error does not identify which command
++// failed. This reads only the same original Pod and its fixed product commands;
++// it never reads provider Secrets or treats a diagnostic as a test outcome.
++func helmBootstrapFailureLogs(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, name string, uid types.UID) {
++	t.Helper()
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	pod, err := api.CoreV1().Pods(d.BootstrapNamespace).Get(ctx, name, meta.GetOptions{})
++	if err != nil || pod.UID != uid {
++		t.Logf("original hook diagnostic unavailable: %v", err)
++		return
++	}
++	containers := append(append([]core.Container{}, pod.Spec.InitContainers...), pod.Spec.Containers...)
++	statuses := append(append([]core.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...)
++	if len(containers) != 4 || len(statuses) > 4 {
++		t.Log("original hook diagnostic has unexpected command count")
++		return
++	}
++	for _, status := range statuses {
++		valid := false
++		for _, c := range containers {
++			valid = valid || c.Name == status.Name && c.Image == d.Image
++		}
++		if !valid {
++			t.Log("original hook diagnostic has unexpected image or command identity")
++			return
++		}
++		if status.State.Terminated != nil {
++			t.Logf("original hook command %s terminated: exit=%d reason=%s", status.Name, status.State.Terminated.ExitCode, status.State.Terminated.Reason)
++		} else if status.State.Waiting != nil {
++			t.Logf("original hook command %s waiting: reason=%s", status.Name, status.State.Waiting.Reason)
++			continue
++		}
++		out, err := api.CoreV1().Pods(d.BootstrapNamespace).GetLogs(name, &core.PodLogOptions{Container: status.Name, TailLines: ptr.To(int64(32)), LimitBytes: ptr.To(int64(8192))}).DoRaw(ctx)
++		if err != nil {
++			t.Logf("original hook command %s logs unavailable: %v", status.Name, err)
++			continue
++		}
++		t.Logf("original hook command %s bounded output: %s", status.Name, out)
++	}
++}
++
+ type helmBootstrapProviderWatch struct {
+ 	stop   func()
+ 	values chan string

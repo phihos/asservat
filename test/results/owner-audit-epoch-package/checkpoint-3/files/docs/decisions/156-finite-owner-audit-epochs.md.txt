@@ -1,0 +1,128 @@
+# ADR-156: Finite owner configuration audit epochs
+
+Status: accepted direction; standalone values and compatibility tests are staged,
+unqualified and unselected. No runtime, schema, grant or installation format is
+enabled by this record.
+
+## Decision
+
+The required versioned audit storage contract includes every physical version,
+marker and unfinished upload. A source that remains unchanged cannot depend on
+retaining one original configuration audit forever, or create fake Kubernetes
+generation changes merely to acquire another audit key. C-21 will use separately
+identified, independently audited owner configuration acceptance epochs. Each
+epoch contains the complete original semantic configuration, an immutable
+attempt and qualified reserve reference, and finite original dates.
+
+The new epoch format is separate from SQL29's existing v1 configuration receipt.
+Existing input, record, receipt, key and encryption context bytes remain exact.
+There is no optional epoch field silently ignored by a legacy observer or
+consumer, no format negotiation, and no fallback from a missing epoch to v1.
+Selecting it requires a complete installer, accepted reader, effect and cleanup
+graph in a future reviewed format. The current observer is unchanged.
+
+## Policy and backing
+
+The protected installer supplies a finite positive automatic rollover interval, admission, dependency,
+retention, deletion, metadata and residual-copy bounds. It also declares finite
+per-epoch bytes and counts, the maximum open epochs and dependent effects. The
+standalone values check arithmetic and consistency, not physical qualification.
+There are no new default durations or claimed supported capacities. Routine
+rollover and cleanup use the configured policy automatically; no personal
+approval, annotation change or manual task is required for each epoch.
+
+The admission window must exceed the rollover interval, giving explicit overlap.
+The arithmetic lower bound for open slots is the ceiling of the full original
+residual horizon divided by the interval, plus one pending claim and the explicit
+uncertain-attempt allowance. An insufficient configured limit is rejected with
+the required minimum, never silently increased. This lower bound does not prove
+cleanup latency or physical backing. An exhausted uncertainty allowance stops
+new claims with all original obligations still charged; no finite reserve can
+absorb indefinitely unresolved writers.
+
+Before any epoch effect, a purpose-fixed installer facet must positively bind a
+dedicated control-audit allocation to actual system backing, original source,
+store, root, policy and qualification identities. Existing evidence/processing
+lanes cannot implicitly supply this reserve. Later capacity adoption retains the
+same allocation without a second charge. Allocation references are public
+provenance values, never a credential or proof of a successful reservation.
+
+The maximum open-epoch count covers the current epoch, at most one pending
+attempt, and all still-charged failed or retiring epochs. Counts and ciphertext,
+marker, multipart and metadata allowances are independently finite; a zero-byte
+copy or marker is still an object obligation. Unknown multipart bytes remain
+reserved. Compromised writers can exceed an IAM prefix through additional keys
+or versions; the contract does not claim that IAM enforces a storage quota.
+
+## Original dates and current acceptance
+
+Each epoch fixes its claim anchor, last new-admission time, latest possible
+dependency end, retained-audit cutoff, deletion deadline, metadata deadline and
+residual-copy deadline before any write. Checked positive durations derive all
+dates from that anchor. Refresh, renewal, receipt reconciliation, restart and
+head rollover cannot move them. Actual provider and SQL effects remain inside
+their original independent five-second or narrower intervals.
+
+New work requires the current positively acknowledged epoch, complete unchanged
+source and current recovery. Admission records the exact original epoch and
+maximum possible dependent end and the exact purpose-owned effect/attempt ID
+before its effect. The whole new dependency must fit current retained receipt
+availability, even when a five-second source observation is still fresh. Already admitted work checks
+that original epoch's current non-revocation and retained receipt, unchanged
+source/recovery, and the original dependency/effect ends. Head rollover alone
+neither revokes valid in-flight work nor extends it. It cannot substitute a
+successor receipt for an old attempt. Actual source suspension/change or epoch
+revocation still fences work under the applicable current rules.
+
+The new accepted-epoch port is distinct from the raw configuration observation
+port. An independent admitted-effect reference retains original identity and
+dates. Domain validity only describes well-formed values: callers must not
+manufacture SQL acceptance, recovery, reservation or non-revocation from it.
+
+## One-use effects and bounded history
+
+A pending claim consumes one pre-backed attempt before a single provider effect.
+Unknown outcomes are exact lookup-only, never another CREATE/PUT, renamed epoch
+or renewed interval. A successor needs a separate admitted slot and original
+cadence. An uncertain writer stays charged and may stop installation/renewal
+until its existing recovery protocol resolves it. Positive acknowledgement and
+head selection are separate: late completion can record charged history without
+making changed, suspended or expired state current.
+
+The successor is verified from its own complete snapshot and current recovery;
+it does not require an infinite predecessor receipt chain. Retain a bounded
+current/pending/retiring set plus an installation-owned monotonic nonreuse
+watermark. Restore must independently fence and reconcile that state before
+selection; loss or rollback cannot recreate old authority or a reusable ordinal.
+
+Old certificates, uncertain signing attempts and worker/request dependencies
+remain pinned through their original possible ends and cleanup requirements.
+New signing periods use a new finite admission. Long-lived registration and
+enrollment audit remain separately charged; epoch rollover neither renews nor
+deletes those ancestry records.
+
+Removal requires positive writer quiescence, complete exact-key inventory of
+all versions, markers and uploads, deletion/abort and verified absence, plus
+separate metadata/residual-copy completion. Expiry, a historical receipt, an
+empty first page or a currently missing source is insufficient. The current
+read-only first-page inventory diagnostic is not a retirement reader or release
+facet. Historical immutable identity remains usable after source/root expiry;
+current provider inventory credentials have independent authority and bounds.
+
+## Ownership and remaining work
+
+C-21 owns protected provisioning and owner acceptance. C-15 retains managed-copy
+accounting and retirement; C-20 owns any later selected format/schema. The fleet
+domain contains identity/policy/epoch values. The audit domain, which already
+depends on fleet, owns the full record/key/receipt contract; fleet does not import
+audit. Application ports distinguish current epoch selection from exact admitted
+dependency checks. No generic callback or cached authority adapter is introduced.
+
+A separate migration/grant proposal must define producer, attempt, acknowledgement,
+current admission, historical inventory and independent retirement facets before
+SQL implementation. Qualify actual reserve provisioning, unchanged-source
+rollover, old/new concurrent dependencies, unknown outcomes, expiry/revocation,
+restore nonreuse and full physical deletion with actual services. Pure tests
+cannot qualify provider IAM, storage backing, steady runtime availability or
+retirement. Existing runtime formats remain selected until that complete graph
+passes.

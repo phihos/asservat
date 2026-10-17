@@ -1,0 +1,66 @@
+{
+  "name": "direct",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestDirectHolderObservationWithRealKubernetes$"
+  ],
+  "exit": 0,
+  "seconds": 227.398,
+  "diskBeforeBytes": 429971468288,
+  "tmpFreeBeforeBytes": 16780025856,
+  "sourceSnapshotUnchanged": true,
+  "requiredPassedTests": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "passedTests": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "missingRequiredTests": [],
+  "validationErrors": [],
+  "harnessSourceMismatches": [],
+  "harnessSourceFileSetMismatch": [],
+  "sourceUnchanged": true,
+  "helperIdentity": {
+    "helperSHA256": "9bbcaa4d011c676d54ecf0892c246bf5c1452745c057371de69255c895e5774c",
+    "runtimeSelection": false,
+    "setupAuthority": "synthetic installer/issuer acceptance; actual API/SQL/S3/TLS path",
+    "fullInstalledHWORKBackground": false
+  },
+  "helperRegression": {
+    "scope": "actual helper issuer; synthetic permit and CA, no native authority",
+    "passedTests": [
+      "TestNativeFixtureConnectorIssuerOriginalSigningInstant",
+      "TestNativeFixtureConnectorIssuerOriginalSigningInstant/client",
+      "TestNativeFixtureConnectorIssuerOriginalSigningInstant/server",
+      "TestNativeFixtureConnectorIssuerStillRejectsExpiredOrCancelled",
+      "TestNativeFixtureConnectorIssuerStillRejectsExpiredOrCancelled/cancelled",
+      "TestNativeFixtureConnectorIssuerStillRejectsExpiredOrCancelled/expired",
+      "TestNativeFixtureConnectorIssuerStillRejectsExpiredOrCancelled/wrong-key"
+    ],
+    "testExit": 0,
+    "logSHA256": "b199237069dfaf3f7ee04af726edb43117096f9b374b9d50f878086f92b9fa7d",
+    "skippedTests": [],
+    "failedTests": []
+  },
+  "buildScratchRemoved": true,
+  "cleanupFailures": [],
+  "testExit": 0,
+  "archiveHashes": {
+    "harness.log": "7b72d883de71f6bfec908eca4869d488b6f2e30fd2218a716290ffce9b1d9746",
+    "context-storage.log": "b3ab474104a3ff543d024f23af73a5e05d179b8afc3b5c795fe80781b2d84fbb",
+    "context-storage-environment.json": "adb12a0b0161815a81c2f8749389a34abdb58c26eb09e40bf2d0f2cff334f695",
+    "context-storage-helper-issuer.log": "b199237069dfaf3f7ee04af726edb43117096f9b374b9d50f878086f92b9fa7d"
+  }
+}

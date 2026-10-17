@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-context-storage.py",
+    "--regional-context-start",
+    "journey"
+  ],
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestContextAdmissionWithRealServices",
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "result": "Native public journey passes with ADR-178 delegated source frames: preview, request (hub-run execution, regional source frames at accept/attach/work/pre-result, regional capture/encryption/upload), publication, case, native download with continuation, Stop and revocation over real PostgreSQL, Kubernetes, S3 and TLS. First request whole duration 3.478381267s.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log"
+}

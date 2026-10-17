@@ -1,0 +1,13 @@
+{
+  "recorded_unix": 1791852769.4946368,
+  "removed_path": "/home/phil/.cache/asservat-build/planning/capacity-configuration-probe-20261013/checks/probe-v1/tmp",
+  "files": 7,
+  "logical_bytes": 70424828,
+  "own_processes_absent": [
+    658238,
+    658261,
+    669274
+  ],
+  "result_before": "6b74dbadc84986b342311115b53e3b739806272c5ea65360f5a9542a242051ac",
+  "absent_after": true
+}

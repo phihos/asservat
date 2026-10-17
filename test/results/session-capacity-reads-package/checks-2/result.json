@@ -1,0 +1,16 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/overlay.json",
+    "-run",
+    "^$",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "seconds": 7.125,
+  "changedDependencies": [],
+  "changedPayload": [],
+  "scratchRemoved": true
+}

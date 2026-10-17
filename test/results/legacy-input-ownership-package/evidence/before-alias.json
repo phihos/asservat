@@ -1,0 +1,29 @@
+{
+  "phase": "before-alias",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/before-overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-v",
+    "-run",
+    "^Test(LegacyInputOwnership|InitialRuntimeBridgeInstalledOriginalSourceProbes)",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 1,
+  "seconds": 14.081,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  }
+}

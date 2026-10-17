@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+--- PASS: TestContextAdmissionWithRealServices (2.40s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (2.06s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.456s

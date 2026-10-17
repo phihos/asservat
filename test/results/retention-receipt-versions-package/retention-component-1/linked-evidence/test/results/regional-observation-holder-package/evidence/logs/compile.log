@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/fleet	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/mtls	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/clusterobservation	0.034s [no tests to run]

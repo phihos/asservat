@@ -1,0 +1,142 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go",
+    "before": null,
+    "after": "511991098b85a9bb07c4bafaddd5db46bab6e07afa0728e75964ed5b9a9661a2"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_launch.go",
+    "before": null,
+    "after": "947f0dfdc9e6561954ea99ebaca245d960ccb670ba8d338fad6ccfb380998301"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+    "before": null,
+    "after": "22e9bfca2cc230462fd5fa065acb22a6edc249dae4ec5f742417629457894b72"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input.go",
+    "before": null,
+    "after": "ad6d1a44cc68b4732eaf90957ec4a59b2be0922fcbe8c289e56ee6da226761b1"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input_objects_test.go",
+    "before": null,
+    "after": "26ac33d00603e618afad9ff1568edf7d900e3a3d9f6fff8fb1368eb3b0d12330"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input_test.go",
+    "before": null,
+    "after": "1a22865537c4a83da56a8091882f6b55e8bced0b2ab7cfa6623c49a67d5b6016"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_observation_client.go",
+    "before": null,
+    "after": "949e99ac45d1106d0bbb281d5f9c08cad4219d93286af22089cd3bd6d2104816"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_observation_connection.go",
+    "before": null,
+    "after": "628738eac95fddfff8d85f37f05206b30580d39c3039fec3e550aa86960be098"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_observation_connection_test.go",
+    "before": null,
+    "after": "c99a9ea5166b40cac7f4035ec3687eb106520179411d91a90e2f198116968c09"
+  },
+  {
+    "path": "internal/adapters/postgres/capture.go",
+    "before": "9cfa6f1f7e459376fd7ccd82345042e4be1babc35635b456055a0edc76b0100d",
+    "after": "16bd69c4349acb3215c635e8953ca78d1ba11c77f402ed3e2101d02a56cd4b89"
+  },
+  {
+    "path": "internal/adapters/postgres/custody.go",
+    "before": "d323c07339530fcbe31aacf8ba31868457f851c3a17139d3ce6a62ea2869c9d6",
+    "after": "825da441c32bb6165c9a6f456b263946dec0f2321ad70a5a537435a623a0b898"
+  },
+  {
+    "path": "internal/adapters/postgres/processing_capture.go",
+    "before": null,
+    "after": "10ee82e4776fa99fd3b58271a159014d7a34224111604d0e2c51c016fcafceff"
+  },
+  {
+    "path": "internal/adapters/postgres/processing_capture_test.go",
+    "before": null,
+    "after": "3448ecabf5e7ed836e163fecd4ad9365b785c8ab619d2e3ab268a855312eef4f"
+  },
+  {
+    "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+    "before": "701772474c7bf42efda8de0d85987ce7731f1bd293463253af3d9ce1de7c6bc0",
+    "after": "e4ba4fadc1c968e2854075ec7e31d6770ccd7931e252419d25bc5f51e85edc98"
+  },
+  {
+    "path": "internal/application/capture/context_investigation.go",
+    "before": "1a0d90b90696b9e00e432c39ecee4f925b579430a04c889e8296fb38d669fb40",
+    "after": "843b80085bbe7bf6e06f62993a669162a9f1426fb34be74acc8d58f9deb9e293"
+  },
+  {
+    "path": "internal/application/capture/context_investigation_test.go",
+    "before": "253199f976d8e3b9c41acff204879bab660b4b3500df25c0cde6133a7333efc2",
+    "after": "da10b02d9240475940fde2945b9eb6e3f0eeadbf4a2a390aefa48fa53ce9bb7c"
+  },
+  {
+    "path": "internal/application/capture/context_processing.go",
+    "before": null,
+    "after": "728cdf6768500ffa57056a875c9982056261516d5ec2326542aa08a74d2d3d7d"
+  },
+  {
+    "path": "internal/application/capture/context_processing_test.go",
+    "before": null,
+    "after": "9f4920ba991aeb3bacefdeaae7aea8cba84b7e29eb81e1a39875522f4f743a28"
+  },
+  {
+    "path": "internal/domain/capture/processing.go",
+    "before": null,
+    "after": "c0db8da72eed64245ca3dfdd136908deffe23bfb956f0b27ddc8727d4b3e452b"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_exchange.go",
+    "before": null,
+    "after": "eb085bc6676ba1f678329184aae2943d6eba59af2021eeb226ae53b34ecb2b05"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_exchange_test.go",
+    "before": null,
+    "after": "92b2b76d5302bad009dc997a296db48d3f1186420d08eb08ee081546ba1a0c61"
+  },
+  {
+    "path": "internal/transport/presentation/context_operations.go",
+    "before": "ace989876e80dd266f3ec6304baa4374972a94489e946243ea14d0b8483ea6c7",
+    "after": "6899c8d3dd538e656d66a45e3438a7d604d7399f25f32fdcf7f9ec438dc61ae8"
+  },
+  {
+    "path": "internal/transport/presentation/context_processing_test.go",
+    "before": null,
+    "after": "eae5d40dcb7154c513faf94c1727fce14c8f1ee3ac76b6c33a42abc1a829d51c"
+  },
+  {
+    "path": "test/integration/capacity_context_test.go",
+    "before": "5c067e4e80a5fa23e7f0867db5f6fc71858dd1132e02ed8815f142fb4667d9fe",
+    "after": "f692bab1efc0ef4813c40a82cfb02892e5f9fb8d836c360154d87f84b38edc9e"
+  },
+  {
+    "path": "test/integration/capacity_processing_coverage_test.go",
+    "before": null,
+    "after": "92084132de9f4cbf5ea2cac116d245e867bc40923e2c9245819408892e538d28"
+  },
+  {
+    "path": "test/integration/context_continuation_native_test.go",
+    "before": "686ff205dbaf0829736495cd98429ac25550637e2a87ada247490b4a795c22b8",
+    "after": "b5e93ceb1a0fabf680a60cdb066e59e971f374efc5f83dc5d9e47bba3d9e3cfb"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "before": null,
+    "after": "0590278c8ca52deaceee9c3cb686f9c30281a5b85f684e409f5bb511ab5eefd9"
+  },
+  {
+    "path": "test/integration/initial_runtime_bridge_native_test.go",
+    "before": null,
+    "after": "07c16ced94ce5d67f5004555f8749e6ec271ad85fbbc249bf80673edce0beb29"
+  }
+]

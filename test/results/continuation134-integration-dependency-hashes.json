@@ -1,0 +1,13 @@
+{
+  "meaning": "Current integration dependency snapshot after parent52 correction; not payload replacements. Native52 qualified by parent separately. ADR134 continuation native journey remains unrun.",
+  "files": {
+    "internal/application/audit/capture_operation.go": "7f19fc20db2758d9a0ade3d3f99e6827f0352e437feeffa746f713400e45db6d",
+    "internal/adapters/postgres/capture_audit.go": "bf98231cc2a7bffd166a179292e912cb5e2c1b48970793daa0a74c0ffebf7e77",
+    "internal/adapters/postgres/capture_audit_read.go": "38f7b693348279e535463cd2a5493cecddb6bbd5427472a7a9abd36dab3024cf",
+    "internal/adapters/postgres/capture_audit_backing.go": "16825b6ff2255de2623771a4f669207de6d4174712e421af15f63f96b3c2727c",
+    "test/fixtures/sql/runtime-roles.sql": "f16f44dd7ec9d04fc05cd24e7258d45de07d2d03cb047b0043a09ff8c083c2ad",
+    "test/integration/capture_admission_test.go": "dc5bfddb1bf5a0be118626dc3a85856f96848c51a42f9b4aa6465a324760b3b0",
+    "test/integration/capture_intent_lifecycle_test.go": "2e7e25923ff98fb8d7d03f3f73e9bfc9910a70e53db2049848e6bc8172cbee76",
+    "internal/adapters/postgres/context_storage_read.go": "3f204f13fa03a185d48e52da1bf12b6aa46f82c377e5e15258a258d38c4142e5"
+  }
+}

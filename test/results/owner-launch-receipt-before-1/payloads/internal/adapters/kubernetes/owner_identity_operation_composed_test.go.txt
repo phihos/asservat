@@ -1,0 +1,229 @@
+package kubernetes
+
+import (
+	"context"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+// This test-only SQL stand-in never claims PostgreSQL qualification. It drives
+// the actual concrete native phase methods/CAS against the loopback API and
+// counts irreversible role effects separately from original claim receipts.
+type ownerIdentityOperationSQLFixture struct {
+	root          *OwnerIdentityRoleRoot
+	beforeCurrent func()
+	beforeFinal   func()
+	effects       map[string]string
+	creates       int
+	loseEffect    bool
+}
+
+func (s *ownerIdentityOperationSQLFixture) ReadOwnerIdentityRoleIncarnation(context.Context) (uint32, time.Time, error) {
+	return 42, time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond), nil
+}
+func (s *ownerIdentityOperationSQLFixture) VerifyOwnerIdentityOperation(ctx context.Context, operation *OwnerIdentityOperation) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if _, err := operation.AdmittedOwnerIdentityRoles(ctx, s.root); err != nil {
+		return zero, err
+	}
+	if s.beforeCurrent != nil {
+		s.beforeCurrent()
+	}
+	current, err := operation.ReadOwnerIdentityRolesAfterLock(ctx, s.root)
+	if err != nil {
+		return zero, err
+	}
+	for _, role := range current.State.Roles {
+		if role.Claim == nil || role.Receipt == nil || s.effects[role.Purpose] != role.Claim.OperationID {
+			return zero, cfg.ErrUnavailable
+		}
+	}
+	if s.beforeFinal != nil {
+		s.beforeFinal()
+	}
+	return operation.ReadOwnerIdentityRolesFinal(ctx, s.root)
+}
+func (s *ownerIdentityOperationSQLFixture) AdvanceOwnerIdentityRoleOperation(ctx context.Context, operation *OwnerIdentityOperation) (OwnerIdentityRoleAdvance, error) {
+	return s.advance(ctx, operation, false)
+}
+func (s *ownerIdentityOperationSQLFixture) InspectOwnerIdentityRoleOperation(ctx context.Context, operation *OwnerIdentityOperation) (OwnerIdentityRoleAdvance, error) {
+	return s.advance(ctx, operation, true)
+}
+func (s *ownerIdentityOperationSQLFixture) advance(ctx context.Context, operation *OwnerIdentityOperation, inspect bool) (OwnerIdentityRoleAdvance, error) {
+	var zero OwnerIdentityRoleAdvance
+	if _, err := operation.AdmittedOwnerIdentityRoles(ctx, s.root); err != nil {
+		return zero, err
+	}
+	if s.beforeCurrent != nil {
+		s.beforeCurrent()
+	}
+	current, err := operation.ReadOwnerIdentityRolesAfterLock(ctx, s.root)
+	if err != nil {
+		return zero, err
+	}
+	purpose, fresh, err := operation.OwnerIdentityRoleAttempt(ctx, s.root)
+	if err != nil {
+		return zero, err
+	}
+	index := slices.Index(contracts.OwnerIdentityRolePurposes(), purpose)
+	claim := current.State.Roles[index].Claim
+	if fresh {
+		if _, exists := s.effects[purpose]; exists {
+			return zero, cfg.ErrChanged
+		}
+		if err := operation.BeginOwnerIdentityRoleCreate(ctx, s.root); err != nil {
+			return zero, err
+		}
+		s.effects[purpose] = claim.OperationID
+		s.creates++
+		if s.loseEffect {
+			s.loseEffect = false
+			return zero, cfg.ErrUnavailable
+		}
+	} else {
+		if s.effects[purpose] != claim.OperationID {
+			return zero, cfg.ErrUnavailable
+		}
+		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(s.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(index), RoleOID: uint32(6000 + index), LayoutDigest: s.root.input.LayoutDigest}
+		if !inspect {
+			if _, err = operation.AcknowledgeOwnerIdentityRole(ctx, s.root, receipt); err != nil {
+				return zero, err
+			}
+		}
+	}
+	if s.beforeFinal != nil {
+		s.beforeFinal()
+	}
+	final, err := operation.ReadOwnerIdentityRolesFinal(ctx, s.root)
+	if err != nil {
+		return zero, err
+	}
+	status := OwnerIdentityRoleAdvancePending
+	if !fresh && (!inspect || current.State.Roles[index].Receipt != nil) {
+		status = OwnerIdentityRoleAdvanceComplete
+	}
+	return OwnerIdentityRoleAdvance{Status: status, Snapshot: final}, nil
+}
+
+func TestProviderOwnerOperationOpenAndFourOriginalRolePhases(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	startOwnerIdentityOperationAcceptedObserver(t, f)
+	opened, err := f.root.OpenProviderOwnerIdentityRoles(context.Background())
+	if err != nil {
+		t.Fatal("fresh-only root open", err)
+	}
+	producer := &ownerIdentityOperationSQLFixture{root: f.root, effects: map[string]string{}}
+	for index, purpose := range contracts.OwnerIdentityRolePurposes() {
+		pending, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer)
+		if err != nil || pending.Status != OwnerIdentityRoleAdvancePending || pending.Snapshot.UID != opened.UID || pending.Snapshot.State.Roles[index].Receipt != nil {
+			t.Fatal("single effect did not return original pending state", purpose, err)
+		}
+		claim := *pending.Snapshot.State.Roles[index].Claim
+		complete, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer)
+		if err != nil || complete.Status != OwnerIdentityRoleAdvanceComplete || complete.Snapshot.State.Roles[index].Receipt == nil || !ownerIdentityFixtureTimeClaimEqual(claim, *complete.Snapshot.State.Roles[index].Claim) {
+			t.Fatal("current receipt replaced original attempt", purpose, err)
+		}
+	}
+	if producer.creates != 4 {
+		t.Fatal("unexpected synthetic SQL effect count", producer.creates)
+	}
+	verified, err := f.root.VerifyProviderOwnerIdentityRoles(context.Background(), producer)
+	if err != nil || verified.UID != opened.UID || !verified.ValidUntil.After(time.Now()) {
+		t.Fatal("final readonly four-role verification", err)
+	}
+	f.api.mu.Lock()
+	creates := f.api.posts[f.root.path()+"/"+f.root.name()]
+	f.api.mu.Unlock()
+	if creates != 1 {
+		t.Fatal("private root CREATE repeated", creates)
+	}
+}
+
+func TestProviderOwnerOperationClaimBeforePostLockDenialStaysSpent(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	if _, err := f.root.OpenProviderOwnerIdentityRoles(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	producer := &ownerIdentityOperationSQLFixture{root: f.root, effects: map[string]string{}, beforeCurrent: func() { f.fault.Store(6) }}
+	purpose := contracts.OwnerIdentityRolePurposes()[0]
+	if _, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer); err == nil {
+		t.Fatal("post-lock denied administrator reached effect")
+	}
+	if producer.creates != 0 {
+		t.Fatal("claim alone authorized SQL effect")
+	}
+	f.fault.Store(0)
+	producer.beforeCurrent = nil
+	// The first native claim was acknowledged before the denial. Fresh current
+	// checks on the next call cannot turn it into an unissued replacement.
+	if _, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer); err == nil {
+		t.Fatal("spent claim fabricated existing SQL result")
+	}
+	if producer.creates != 0 {
+		t.Fatal("spent-but-unissued effect was retried")
+	}
+	actual, err := f.root.OpenProviderOwnerIdentityRoles(context.Background())
+	if err != nil || actual.State.Roles[0].Claim == nil || actual.State.Roles[0].Receipt != nil {
+		t.Fatal("spent original claim was erased", err)
+	}
+}
+
+func TestProviderOwnerOperationUnknownEffectOnlyReconcilesOriginalResult(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	if _, err := f.root.OpenProviderOwnerIdentityRoles(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	producer := &ownerIdentityOperationSQLFixture{root: f.root, effects: map[string]string{}, loseEffect: true}
+	purpose := contracts.OwnerIdentityRolePurposes()[0]
+	if _, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer); err == nil {
+		t.Fatal("lost effect reply reported positive completion")
+	}
+	complete, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), purpose, producer)
+	if err != nil || complete.Status != OwnerIdentityRoleAdvanceComplete || producer.creates != 1 {
+		t.Fatal("unknown effect repeated or failed exact lookup", err, producer.creates)
+	}
+}
+
+func TestProviderOwnerAcceptedObservationDoesNotRefreshOnRead(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	f.accepted.mu.Lock()
+	before := f.accepted.value
+	f.accepted.value.ObservedAt = time.Now().UTC().Add(-6 * time.Second)
+	f.accepted.value.FreshUntil = time.Now().UTC().Add(-time.Second)
+	f.accepted.mu.Unlock()
+	if _, err := f.root.OpenProviderOwnerIdentityRoles(context.Background()); err == nil {
+		t.Fatal("expired accepted SQL observation refreshed itself through native reads")
+	}
+	f.accepted.mu.Lock()
+	after := f.accepted.value
+	f.accepted.mu.Unlock()
+	if after.FreshUntil.Equal(before.FreshUntil) || !after.FreshUntil.Before(time.Now()) {
+		t.Fatal("test did not retain expired accepted value")
+	}
+}
+
+func TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks(t *testing.T) {
+	for _, fault := range []int32{1, 2} {
+		t.Run(strconv.Itoa(int(fault)), func(t *testing.T) {
+			f := newOwnerIdentityOperationFixture(t)
+			if _, err := f.root.OpenProviderOwnerIdentityRoles(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			producer := &ownerIdentityOperationSQLFixture{root: f.root, effects: map[string]string{}, beforeFinal: func() { f.fault.Store(fault) }}
+			if _, err := f.root.AdvanceProviderOwnerIdentityRole(context.Background(), contracts.OwnerIdentityRolePurposes()[0], producer); err == nil {
+				t.Fatal("final native enforcement loss returned positive result")
+			}
+			// Same public object identities remain. The complete final negative
+			// bracket must run again; the initial bracket cannot be reused here.
+			if producer.creates != 1 {
+				t.Fatal("fixture did not reach the final boundary", producer.creates)
+			}
+		})
+	}
+}

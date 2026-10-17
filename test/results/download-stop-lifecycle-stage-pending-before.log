@@ -1,0 +1,5 @@
+--- FAIL: TestPendingStopFailureDoesNotStarveAnotherPrepaidObligation (0.00s)
+    download_stop_pending_test.go:46: earliest failed Stop starved an independent obligation download unavailable [22222222-2222-4222-8222-222222222222] [22222222-2222-4222-8222-222222222222] []
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.002s
+FAIL

@@ -1,0 +1,35 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000704",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "sources": [
+      {
+        "source_handle": "opaque-source-handle",
+        "handle_expires_at": "2026-10-09T12:06:00Z",
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "workload_uid": "deployment-checkout-uid",
+        "pod_uid": "pod-checkout-8k2p",
+        "action_id": "syscalls",
+        "owner_kind": "policy",
+        "owner_id": "policy-uid",
+        "state": "Ready",
+        "projections": [
+          "syscallMetadata"
+        ],
+        "eligible": true,
+        "blocker_codes": [],
+        "save_via": "recordingSave",
+        "lease_until": "2026-10-09T12:05:30Z"
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "Live rows are transient and untrusted; save before raw inspection."
+  ],
+  "provenance": []
+}

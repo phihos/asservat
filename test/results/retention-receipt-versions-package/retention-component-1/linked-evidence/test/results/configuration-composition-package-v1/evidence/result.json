@@ -1,0 +1,60 @@
+{
+  "manifest_sha256": "ea0bcfc20db0788b4d28a818d6ef2e40b6edf2362913dc0582978cc74ee856fd",
+  "dependencies_sha256": "98e4787ac7705e8d15f852c6fb498cdebd7da33303aa192d55726980d2de716f",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-composition-1/overlay.json",
+        "-run",
+        "^$",
+        "-vet=off",
+        "./cmd/asservat",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 11.883576257008826
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-composition-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-v",
+        "-timeout=90s",
+        "-run",
+        "^(TestConfigurationRoleInstaller|TestConfigurationInstallerGenerated|TestProvisionedHubWorker)",
+        "./internal/bootstrap",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 14.158131368996692
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-composition-1/overlay.json",
+        "./cmd/asservat",
+        "./internal/bootstrap",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 1.0263786510040518
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 55,
+  "checked_dependencies": 1455
+}

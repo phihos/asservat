@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+UPDATE public.fleet_trust SET activated_database_oid=0; UPDATE public.fleet_observation SET activated_database_oid=0;

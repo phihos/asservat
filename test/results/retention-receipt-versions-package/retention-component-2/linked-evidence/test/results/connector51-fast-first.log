@@ -1,0 +1,24 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:492: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort
+=== RUN   TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation
+=== RUN   TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release
+=== RUN   TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output
+--- PASS: TestContextAdmissionWithRealServices (38.09s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast (3.04s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.62s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast (32.17s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused (15.47s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort (0.82s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation (15.88s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release (1.33s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output (1.22s)
+PASS
+ok  	asservat.local/asservat/test/integration	39.147s

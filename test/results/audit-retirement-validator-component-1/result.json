@@ -1,0 +1,98 @@
+{
+  "native": false,
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-count=1",
+        "-run=^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 17.004,
+      "logSHA256": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+      "joined": true,
+      "after": {
+        "changed": [],
+        "fileSet": []
+      }
+    },
+    {
+      "name": "postgres-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=5m",
+        "-v",
+        "./internal/adapters/postgres",
+        "./migrations"
+      ],
+      "exit": 0,
+      "seconds": 18.504,
+      "logSHA256": "0e30323de4a864f99b72fb6af18dfcb4c494d8bab2ef63a4c1b1cb8f1f3de03d",
+      "joined": true,
+      "after": {
+        "changed": [],
+        "fileSet": []
+      }
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 2.501,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "joined": true,
+      "after": {
+        "changed": [],
+        "fileSet": []
+      }
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "sql-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check",
+        "ASSERVAT_BUILD_TMP=/home/phil/.cache/asservat-build/audit-retirement-validator-gates-xnobm033",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "seconds": 11.003,
+      "logSHA256": "d9678fe99687f355a6b0b0abfbeb24c71565958094cf67a401e306f447b674eb",
+      "joined": true,
+      "after": {
+        "changed": [],
+        "fileSet": []
+      }
+    }
+  ],
+  "sourceCount": 3036,
+  "scratch": "/home/phil/.cache/asservat-build/audit-retirement-validator-gates-xnobm033",
+  "lastOwnedProcess": {
+    "phase": "canonical",
+    "pid": 244471
+  },
+  "generatedValidationSHA256": "f9a3d88b80d00033eb4fdf655f331c3db9fb1844d4a1a33c8384faa903deb8cc",
+  "joined": true,
+  "validationRestored": true,
+  "scratchRemoved": true,
+  "after": {
+    "changed": [],
+    "fileSet": []
+  },
+  "exit": 0
+}

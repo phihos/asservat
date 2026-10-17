@@ -1,0 +1,126 @@
+{
+  "integratedAt": 1791853378.9678051,
+  "native": {
+    "manifest_sha256": "64fe52fe255890070f35b9d19ffd84ce10ceaf5ab5f8caf9adf01390d421a79b",
+    "dependencies_sha256": "fa2b5842edbf96b470a1b4648d8a492263e7f90012cdacdd85639c2339e27cd8",
+    "runner_sha256": "891047705affd0ed47d807f6e997ac54e4dcba394f34bc31b2d77660f2b66b1d",
+    "paths": 2,
+    "dependencies": 1972,
+    "native_executed": false,
+    "commands": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-2/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 3.205,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-2/overlay.json",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 0.599,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": []
+        }
+      }
+    ],
+    "terminal_exit": 0,
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": []
+    }
+  },
+  "harness": {
+    "commands": [
+      {
+        "test": "test-owner-provider-selection.py",
+        "exit": 0,
+        "seconds": 0.516
+      },
+      {
+        "test": "test-runtime-object-selection.py",
+        "exit": 0,
+        "seconds": 0.598
+      },
+      {
+        "test": "test-regional-context-selection.py",
+        "exit": 0,
+        "seconds": 0.861
+      },
+      {
+        "test": "test-helm-bootstrap-selection.py",
+        "exit": 0,
+        "seconds": 1.875
+      },
+      {
+        "test": "test-initial-bootstrap-selection.py",
+        "exit": 0,
+        "seconds": 0.678
+      }
+    ],
+    "sourceBefore": {
+      "test-context-storage.py": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311",
+      "test-owner-provider-selection.py": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+    },
+    "sourceAfter": {
+      "test-context-storage.py": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311",
+      "test-owner-provider-selection.py": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+    },
+    "scope": "Pure fixture selector and existing fixture utility checks; no provider or Kubernetes execution."
+  },
+  "files": [
+    {
+      "path": "internal/adapters/kms/owner_provider_native_fixture_test.go",
+      "base_sha256": null,
+      "payload_sha256": "4f7048b4367d387169de65ce0cd3525c42e01a263fe43a704cab6f1c12855ef6",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-1/files/internal/adapters/kms/owner_provider_native_fixture_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_native_test.go",
+      "base_sha256": null,
+      "payload_sha256": "03a4d96775f7c0dce74e60acc23f1c22914117c6781705e25f8f89ee1e32db23",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-1/files/internal/adapters/kms/owner_provider_native_test.go"
+    },
+    {
+      "base_sha256": "6469ad104ad15d19a76384497c24ca7d909f141ce64807b15160d2f2f0552ce4",
+      "path": "scripts/test-context-storage.py",
+      "payload_sha256": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311"
+    },
+    {
+      "base_sha256": null,
+      "path": "scripts/test-owner-provider-selection.py",
+      "payload_sha256": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+    }
+  ],
+  "scope": "Native test compilation/vet and exclusive harness selection only. Actual provider/Kubernetes execution not yet run."
+}

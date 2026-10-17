@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/public-runtime-role-state.schema.json",
+  "title": "Private public runtime SQL role creation state",
+  "description": "At most 48KiB under actual protected Secret UID/resourceVersion CAS. Exactly one ordered entry per compiled purpose. Original setup is thirty minutes; each first SQL claim retains at most five seconds. Unknown claims/outcomes permit exact role lookup only. Relational validation enforces unique passwords, claim IDs, OIDs and immutable role provenance. No credentials enter public status.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "input",
+    "operationID",
+    "createdAt",
+    "until",
+    "roles",
+    "mac"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-public-runtime-role-state/v1"
+    },
+    "input": {
+      "$ref": "https://asservat.io/spec/v1/public-runtime-roles.schema.json"
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "password"
+        ],
+        "properties": {
+          "purpose": {
+            "enum": [
+              "identity-read",
+              "browser-settings",
+              "browser-session",
+              "browser-cleanup",
+              "refresh-admit",
+              "refresh-owner",
+              "refresh-read",
+              "permission-read",
+              "retention-read",
+              "storage-read",
+              "progress-read",
+              "case-read",
+              "processing-read",
+              "capture-intent-read",
+              "download-source",
+              "catalog-read",
+              "download-plan",
+              "worker-config-read"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "claim": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationID",
+              "claimedAt",
+              "until",
+              "databaseOID",
+              "postmasterAt"
+            ],
+            "properties": {
+              "operationID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "claimedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "databaseOID": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4294967295
+              },
+              "postmasterAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "roleName",
+              "roleOID",
+              "layoutDigest"
+            ],
+            "properties": {
+              "roleName": {
+                "type": "string",
+                "pattern": "^as_[0-9a-f]{32}_pub_[0-9]{2}$"
+              },
+              "roleOID": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4294967295
+              },
+              "layoutDigest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "dependentRequired": {
+          "receipt": [
+            "claim"
+          ]
+        }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "secretUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "mac": {
+      "$ref": "https://asservat.io/spec/v1/public-audit-keys.schema.json#/$defs/material"
+    }
+  }
+}

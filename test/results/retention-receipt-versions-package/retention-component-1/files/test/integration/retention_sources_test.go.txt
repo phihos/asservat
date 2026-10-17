@@ -1,0 +1,281 @@
+package integration
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/configuration"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Actual SQL roles, transactions and S3 encryption. Source guard and bootstrap
+// review are explicit synthetic inputs; this is not a production Ready source.
+func qualifyRetentionSources(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys) {
+	runtime := poolFor("retention_source_runtime", "synthetic-retention-source")
+	defer runtime.Close()
+	auditor := poolFor("retention_source_audit_runtime", "synthetic-retention-source-audit")
+	defer auditor.Close()
+	for _, test := range []struct {
+		p *pgxpool.Pool
+		q string
+	}{
+		{runtime, "UPDATE retention_source SET recovery_blocked=false"},
+		{runtime, "UPDATE retention_source SET protection_digest=protection_digest"},
+		{runtime, "UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()"},
+		{runtime, "DELETE FROM retention_checkpoint"},
+		{auditor, "UPDATE retention_checkpoint SET transition_json=transition_json"},
+		{auditor, "UPDATE retention_source SET suspended=false"},
+		{runtime, "UPDATE custody_attempt SET effective_delete_by=delete_by"},
+	} {
+		if _, err := test.p.Exec(ctx, test.q); err == nil {
+			t.Fatal("excess source privilege", test.q)
+		}
+	}
+	setup := func(t *testing.T) (*postgres.RetentionSources, *postgres.RetentionSources, app.RetentionTransition) {
+		t.Helper()
+		root, cluster := custodyID(), custodyID()
+		if _, err := admin.Exec(ctx, "INSERT INTO permission_stream(id,epoch,trust_digest,lease_until) VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds')", root, custodyID(), make([]byte, 32)); err != nil {
+			t.Fatal(err)
+		}
+		s, err := postgres.NewRetentionSources(ctx, runtime, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, err := postgres.NewRetentionSources(ctx, auditor, root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref := privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: "control", Hub: true, ProtectionDigest: artifact.Digest{5}}
+		start, err := s.BeginRetention(ctx, root, ref, custodyID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		policy := privacy.ScopedPolicy{Name: "baseline", Policy: privacy.Policy{Revision: identity.Revision{UID: "baseline-uid", Generation: 1, Digest: artifact.Digest{7}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 7200, DeletionBudgetSeconds: 300}, CaseDefaultSeconds: 3600, CaseMaximumSeconds: 7200, AuditDefaultSeconds: 3600, AuditMaximumSeconds: 7200, LegalExceptions: "disabled"}
+		snapshot := privacy.PolicySnapshot{SourceClusterID: cluster, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []privacy.ScopedPolicy{policy}}
+		snapshot.Revision = identity.Revision{UID: ref.ControlNamespaceUID, Generation: 1, Digest: app.RetentionSnapshotDigest(snapshot)}
+		list := app.PolicyList{Snapshot: snapshot, ResourceVersion: "100", Versions: map[string]string{"baseline-uid": "90"}}
+		review := value.RetentionBootstrapReview{Resource: value.Resource{Kind: "ConfigMap", Name: "retention-bootstrap", UID: "bootstrap-uid", ClusterID: cluster, Namespace: "asservat-system", NamespaceUID: ref.ControlNamespaceUID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-installer", PoliciesDigest: app.RetentionSnapshotDigest(snapshot), ProtectionDigest: ref.ProtectionDigest, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+		return s, a, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Review: &review}
+	}
+	qualifyRetentionObservation(t, ctx, admin, poolFor, store, keys, setup)
+	advance := func(t *testing.T, s *postgres.RetentionSources, prior app.RetentionCheckpoint, maximum int64, version string) (app.RetentionTransition, app.RetentionCheckpoint) {
+		t.Helper()
+		j, err := app.ResumeRetentionJournal(prior.Transition.List)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := prior.Transition.List.Snapshot.Policies[0]
+		p.Policy.Revision.Generation++
+		p.Policy.Revision.Digest = artifact.Digest{byte(p.Policy.Revision.Generation)}
+		p.Policy.MaximumSeconds = maximum
+		e := app.PolicyEvent{Type: "MODIFIED", ResourceVersion: version, Policy: &p}
+		if err = j.Apply(e); err != nil {
+			t.Fatal(err)
+		}
+		list, err := j.HistoricalCheckpoint()
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := prior.Transition.Fence
+		f.Sequence = prior.Record.Sequence
+		request := app.RetentionTransition{ID: custodyID(), Fence: f, List: list, Event: &e}
+		out, err := s.AcceptRetention(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return request, out
+	}
+	qualifyRetentionReceiptHistory(t, ctx, admin, poolFor, store, keys, setup, advance)
+	t.Run("retention-source-bootstrap-and-eight-way-idempotency", func(t *testing.T) {
+		s, a, request := setup(t)
+		bad := request
+		review := *request.Review
+		review.ProtectionDigest = artifact.Digest{99}
+		bad.Review = &review
+		if _, err := s.AcceptRetention(ctx, bad); err == nil {
+			t.Fatal("wrong guard accepted")
+		}
+		bad = request
+		bad.Review = nil
+		if _, err := s.AcceptRetention(ctx, bad); err == nil {
+			t.Fatal("historical values self-accepted")
+		}
+		var wg sync.WaitGroup
+		results := make(chan error, 8)
+		for range 8 {
+			wg.Go(func() { _, err := s.AcceptRetention(ctx, request); results <- err })
+		}
+		wg.Wait()
+		close(results)
+		for err := range results {
+			if err != nil {
+				t.Fatal("duplicate checkpoint failed", err)
+			}
+		}
+		var count int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM retention_checkpoint WHERE root_id=$1", request.Fence.RootID).Scan(&count); err != nil || count != 1 {
+			t.Fatal("duplicate journal", err, count)
+		}
+		first, err := s.AcceptRetention(ctx, request)
+		if err != nil || first.Audited {
+			t.Fatal("checkpoint was already audited", err)
+		}
+		f := request.Fence
+		f.Sequence = first.Record.Sequence
+		if err = s.AdvanceRetentionCursor(ctx, f, "bookmark:opaque"); err != nil {
+			t.Fatal(err)
+		}
+		resumed, err := s.BeginRetention(ctx, f.RootID, f.Source, f.Epoch)
+		if err != nil || resumed.ResumeCursor != "bookmark:opaque" || resumed.Checkpoint == nil || resumed.Checkpoint.Record.ID != first.Record.ID || resumed.Checkpoint.Transition.List.ResourceVersion != request.List.ResourceVersion {
+			t.Fatal("bookmark changed history or was not durable", err)
+		}
+		if err = s.AdvanceRetentionCursor(ctx, request.Fence, "stale:cursor"); err == nil {
+			t.Fatal("old sequence advanced cursor")
+		}
+		if err = admin.QueryRow(ctx, "SELECT count(*) FROM retention_catchup j JOIN retention_checkpoint c ON c.id=j.checkpoint_id WHERE c.root_id=$1", f.RootID).Scan(&count); err != nil || count != 1 {
+			t.Fatal("bookmark scheduled another evidence scan", count, err)
+		}
+		writer := &objectstore.RetentionAcceptanceObjects{Store: store, Seal: keys, Open: keys}
+		receipt, err := writer.WriteRetentionAcceptance(ctx, first.Record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		repeated, err := writer.WriteRetentionAcceptance(ctx, first.Record)
+		if err != nil || repeated != receipt {
+			t.Fatal("lost PUT response replay", err)
+		}
+		if err = a.AcknowledgeRetentionAcceptance(ctx, request.ID, receipt); err != nil {
+			t.Fatal(err)
+		}
+		if err = a.AcknowledgeRetentionAcceptance(ctx, request.ID, receipt); err != nil {
+			t.Fatal("ack replay", err)
+		}
+		wrong := receipt
+		wrong.ETag = "different"
+		if err = a.AcknowledgeRetentionAcceptance(ctx, request.ID, wrong); err == nil {
+			t.Fatal("audit receipt rewritten")
+		}
+		if _, err = s.AcceptRetention(ctx, bad); err == nil {
+			t.Fatal("different request reused accepted ID")
+		}
+		pending, err := a.PendingRetentionAcceptances(ctx, 64)
+		if err != nil || len(pending) != 0 {
+			t.Fatal("ack did not drain outbox", err)
+		}
+		if _, err = admin.Exec(ctx, "UPDATE retention_checkpoint SET transition_json='{}' WHERE id=$1", request.ID); err == nil {
+			t.Fatal("immutable checkpoint trigger bypassed")
+		}
+	})
+	t.Run("retention-source-restart-preserves-shortening-before-relaxation", func(t *testing.T) {
+		s, a, request := setup(t)
+		first, err := s.AcceptRetention(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, lower := advance(t, s, first, 600, "policy:lower")
+		f := lower.Transition.Fence
+		f.Sequence = lower.Record.Sequence
+		if err = s.SuspendRetention(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = s.BeginRetention(ctx, f.RootID, f.Source, f.Epoch); err == nil {
+			t.Fatal("suspended epoch resurrected")
+		}
+		restarted, err := postgres.NewRetentionSources(ctx, runtime, f.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		start, err := restarted.BeginRetention(ctx, f.RootID, f.Source, custodyID())
+		if err != nil || start.Checkpoint == nil || start.Checkpoint.Record.ID != lower.Record.ID || start.Checkpoint.Transition.List.Snapshot.Policies[0].Policy.MaximumSeconds != 600 {
+			t.Fatal("shortening lost on restart", err)
+		}
+		if err = s.SuspendRetention(ctx, f); err != nil {
+			t.Fatal(err)
+		} // stale process cannot suspend successor
+		if _, err = s.RenewRetention(ctx, f); err == nil {
+			t.Fatal("old epoch renewed")
+		}
+		if _, err = restarted.BeginRetention(ctx, f.RootID, f.Source, custodyID()); err == nil {
+			t.Fatal("two controller epochs became active")
+		}
+		// Checkpoint history must retain the original fence. Only the new request
+		// carries the resumed epoch; change it after constructing the next event.
+		j, err := app.ResumeRetentionJournal(start.Checkpoint.Transition.List)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := start.Checkpoint.Transition.List.Snapshot.Policies[0]
+		p.Policy.MaximumSeconds = 7200
+		p.Policy.Revision.Generation++
+		p.Policy.Revision.Digest = artifact.Digest{3}
+		e := app.PolicyEvent{Type: "MODIFIED", ResourceVersion: "policy:raised", Policy: &p}
+		if err = j.Apply(e); err != nil {
+			t.Fatal(err)
+		}
+		list, err := j.HistoricalCheckpoint()
+		if err != nil {
+			t.Fatal(err)
+		}
+		next := app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Event: &e}
+		raised, err := restarted.AcceptRetention(ctx, next)
+		if err != nil || raised.Record.PreviousDigest != lower.Record.CheckpointDigest {
+			t.Fatal("resume rewrote history", err)
+		}
+		rows, err := a.PendingRetentionAcceptances(ctx, 64)
+		if err != nil || len(rows) != 3 {
+			t.Fatal("intermediate obligation missing", err, len(rows))
+		}
+		publisher := app.RetentionAcceptancePublisher{Journal: a, Writer: &objectstore.RetentionAcceptanceObjects{Store: store, Seal: keys, Open: keys}}
+		if err = publisher.Publish(ctx, 64); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, "UPDATE retention_source SET recovery_blocked=true WHERE root_id=$1", f.RootID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = restarted.BeginRetention(ctx, f.RootID, f.Source, start.Fence.Epoch); err == nil {
+			t.Fatal("restore block cleared by observation")
+		}
+		rf := raised.Transition.Fence
+		rf.Sequence = raised.Record.Sequence
+		if _, err = restarted.RenewRetention(ctx, rf); err == nil {
+			t.Fatal("restore block lease renewed")
+		}
+		if _, err = s.AcceptRetention(ctx, request); err != nil {
+			t.Fatal("historical read became current authority check", err)
+		}
+	})
+	t.Run("retention-source-expiry-rechecked-after-root-lock", func(t *testing.T) {
+		s, _, request := setup(t)
+		request.Fence.LeaseUntil = time.Now().UTC().Add(150 * time.Millisecond)
+		tx, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SELECT id FROM permission_stream WHERE id=$1 FOR UPDATE", request.Fence.RootID); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { _, err := s.AcceptRetention(ctx, request); done <- err }()
+		time.Sleep(200 * time.Millisecond)
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err = <-done; err == nil {
+			t.Fatal("expired lock waiter accepted")
+		}
+		var count int
+		if err = admin.QueryRow(ctx, "SELECT count(*) FROM retention_checkpoint WHERE root_id=$1", request.Fence.RootID).Scan(&count); err != nil || count != 0 {
+			t.Fatal("failed acceptance left a checkpoint", err)
+		}
+	})
+}

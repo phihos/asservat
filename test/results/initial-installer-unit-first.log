@@ -1,0 +1,6 @@
+--- FAIL: TestInitialInstallerClosedInputsAndPlan (0.00s)
+    initial_installer_test.go:27: protected mounted file unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.017s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.009s [no tests to run]
+FAIL

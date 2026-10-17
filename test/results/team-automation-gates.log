@@ -1,0 +1,63 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 49 schemas, 48 MCP tools, 163 examples, 171 requirements, 171 scenarios, 11 tasks, 1127 local links, 344 rejected invalid examples (7500 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 10, "components": 24, "interfaces": 13, "domainEntitiesMapped": 47, "requirementsMapped": 171, "positiveChecks": 933, "rejectedInvalidCases": 120}
+/tmp/asservat-openapi-validation/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 47 domain entities, 72 browser operations, 48 MCP schema pairs, 332 resolved references.
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 10 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.704s
+ok  	asservat.local/asservat/internal/adapters/kms	1.179s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	9.663s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.307s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.818s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.795s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.416s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.971s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.019s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.031s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.089s
+ok  	asservat.local/asservat/internal/application/evidence	1.049s
+ok  	asservat.local/asservat/internal/application/execution	1.035s
+ok  	asservat.local/asservat/internal/application/fleet	1.030s
+ok  	asservat.local/asservat/internal/application/identity	1.035s
+ok  	asservat.local/asservat/internal/application/planning	1.070s
+ok  	asservat.local/asservat/internal/application/privacy	1.056s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+?   	asservat.local/asservat/internal/contracts	[no test files]
+ok  	asservat.local/asservat/internal/domain/artifact	1.013s
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.016s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.015s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.014s
+ok  	asservat.local/asservat/internal/domain/identity	1.016s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.017s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.035s
+ok  	asservat.local/asservat/test/integration	1.058s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 37 packages, 147 internal import edges; catalog ownership and layer/dependency rules checked
+/tmp/asservat-openapi-validation/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 modes, 4 canonical CRDs, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06

@@ -1,0 +1,11 @@
+{
+  "name": "adr186-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-185 steps 1-4, ADR-186 operation-scoped public role proof, the continuation public sources and public roles phases, the retained resource reader, provider-proof startup phase and the shared identity projection file list",
+  "results": "55 full packages and 551 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (group 4)",
+  "sourceHashBefore": "2b9c4d6011ac5d0989b5083b5c696634d20bac77e28917d475338d0316a53894",
+  "sourceHashAfter": "2b9c4d6011ac5d0989b5083b5c696634d20bac77e28917d475338d0316a53894",
+  "log": "go-check.log"
+}

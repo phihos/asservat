@@ -1,0 +1,74 @@
+[
+  {
+    "path": "evidence/launch-1/manifest.json",
+    "sha256": "520dd99c3e6c2a88674e88de0c693cf60ddf2f8cfd14033f172f60ea2580428d"
+  },
+  {
+    "path": "evidence/launch-1/dependencies.json",
+    "sha256": "6b5d9cc00ff5ebf19c58d2d53218496b2861197c2c0b09712023beee2bff5a7b"
+  },
+  {
+    "path": "evidence/launch-1/result.json",
+    "sha256": "1681b00b41a04ea4a0464c419733d60d6b065063c79032ce249479f0d88d75ff"
+  },
+  {
+    "path": "evidence/launch-1/compile.log",
+    "sha256": "3cd338cd54867012413aee74099639ab0fa56fde83f4012df4a579af9a52b2b2"
+  },
+  {
+    "path": "evidence/launch-1/race.log",
+    "sha256": "7701922001d01f8856ee426fadd61c5e72b94f1048a174c6345b1b4fab724bba"
+  },
+  {
+    "path": "evidence/launch-1/vet.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "evidence/launch-3/manifest.json",
+    "sha256": "417cbfffc730ed3023e16ba404fc7db34fc5bc088ced315d5293d3464a54fccf"
+  },
+  {
+    "path": "evidence/launch-3/dependencies.json",
+    "sha256": "8d347914f9cd35d51226c376a5d92ffcd92f8c74ffca885048ce398cfbeee549"
+  },
+  {
+    "path": "evidence/launch-3/result.json",
+    "sha256": "295e4812e497beab6ebd2220fa70bdb920afeb385a020837774d3ef62495d486"
+  },
+  {
+    "path": "evidence/launch-3/compile.log",
+    "sha256": "c747e8ae0c3225537a2aab507c0da4fb771b7ba9ac74c75e311dec33dde72b6d"
+  },
+  {
+    "path": "evidence/launch-3/race.log",
+    "sha256": "157d8626ba45266702265909cb89fb5799d6aa80a8a1f023c0f408ebc0c5f086"
+  },
+  {
+    "path": "evidence/launch-3/vet.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "evidence/launch-4/manifest.json",
+    "sha256": "8d8599f895f475eef9555848bac0e88dbbc69cbc94f4bca72f25264b0e678d15"
+  },
+  {
+    "path": "evidence/launch-4/dependencies.json",
+    "sha256": "8d347914f9cd35d51226c376a5d92ffcd92f8c74ffca885048ce398cfbeee549"
+  },
+  {
+    "path": "evidence/launch-4/result.json",
+    "sha256": "0e27b91bcab5b4be4d8d5f8c612b5e1bbfd7220a169e36cae711a297d00ff4a0"
+  },
+  {
+    "path": "evidence/launch-4/compile.log",
+    "sha256": "1df29434d95f6c11012b9f9f1fae6c013a4e61884d81ec6b2588d9c4992aa89b"
+  },
+  {
+    "path": "evidence/launch-4/race.log",
+    "sha256": "4f2395574fe5ea353ff037b5a0c5f222f9ea1e73ee50e6a1615362db3cbd71a4"
+  },
+  {
+    "path": "evidence/launch-4/vet.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

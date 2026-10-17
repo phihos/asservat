@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+    download_sessions_test.go:151: download unavailable
+--- FAIL: TestContextAdmissionWithRealServices (1.49s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (1.14s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.547s
+FAIL

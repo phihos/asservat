@@ -1,0 +1,22 @@
+[
+  {
+    "path": "test/integration/download_jobs_kube_test.go",
+    "base": "a561fc5c0f8d727c9bb0804a6759d1d08f0643b7014ffdf18224e1922230ec0a",
+    "sha256": "9f7ce3a34a80aa84d5d7b6fd92ac04952170167d34bf2f0cb4639c3185d9a665"
+  },
+  {
+    "path": "test/integration/worker_pki_test.go",
+    "base": "a92a0ef3499c125f2e26a448bf715aee1f42e4ed5ea5a82fbed8f837d1a74e7b",
+    "sha256": "f661b940209324648fe9371e180c68d64af1f30fdf0a628cea42bb8d5a00c4ad"
+  },
+  {
+    "path": "test/integration/worker_configuration_kube_test.go",
+    "base": "c29b04c0e3748b9d6c92ff01adecf2aa0f46555f37afde25b23c3f6fc21d2a34",
+    "sha256": "a3b1856812d9df196e054c88b6cb6df3a4d86f56587dd14d74f9904872fa7c12"
+  },
+  {
+    "path": "test/integration/native_worker_pod_test.go",
+    "base": null,
+    "sha256": "ec7528b6527ab2bae788e60e2a135235f1b1428a00c325a8f5622e0c836e09fb"
+  }
+]

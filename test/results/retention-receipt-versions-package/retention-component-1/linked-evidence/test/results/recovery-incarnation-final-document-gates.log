@@ -1,0 +1,7 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 63 schemas, 48 MCP tools, 165 examples, 176 requirements, 176 scenarios, 11 tasks, 2112 local links, 526 rejected invalid examples (8623 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 11, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1083, "rejectedInvalidCases": 120}
+/tmp/asservat-openapi-validation/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 49 domain entities, 72 browser operations, 48 MCP schema pairs, 332 resolved references.

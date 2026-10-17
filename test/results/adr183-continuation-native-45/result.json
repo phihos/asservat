@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-45",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained test-fixture failure: the new connector PKI operator-prerequisite request used a helper without the owned OpenBao TLS root ('fixture request failed') before the continuation started. Now uses the native providers' admin client.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

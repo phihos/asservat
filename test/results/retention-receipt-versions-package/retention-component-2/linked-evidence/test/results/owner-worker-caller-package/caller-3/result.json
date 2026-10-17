@@ -1,0 +1,123 @@
+{
+  "started": 1791890105.0388288,
+  "manifest": "56003a7dc8866b6302e599c863b44a2cc863e393ada9b398ec0e2f8b276c21aa",
+  "dependencies": "2198576c1a7663e7fb8e3523929a2326b5f995cd36a6b0b6d06c481d99ca4f48",
+  "runner": "8458e3a69d22039ffa5477384dc241c6580414c6397f754ae007130c3f15f135",
+  "native": false,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": [],
+    "qualified_prior_evidence": [],
+    "prior_unrun_payloads": []
+  },
+  "phases": [
+    {
+      "name": "copy-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestOwnerBootstrapWorkerCallerCloseAndCopyDeny$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 16.004253149032593,
+      "log_sha256": "13a6a6932bd559be98f40e445c1d0dfb9363df6a745212370cc70d793b3b756b",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": [],
+        "qualified_prior_evidence": [],
+        "prior_unrun_payloads": []
+      },
+      "pass_entries": 1,
+      "top_level_passes": 1,
+      "missing_required_passes": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-3/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.0006608963012695,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": [],
+        "qualified_prior_evidence": [],
+        "prior_unrun_payloads": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.0005974769592285,
+      "log_sha256": "b85daac7b1fa0e2d768c96595df06ded3dc38ed97d76950dd78ae9a12b2b759d",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "variants": [],
+        "qualified_prior_evidence": [],
+        "prior_unrun_payloads": []
+      },
+      "pass_entries": 0,
+      "top_level_passes": 0,
+      "missing_required_passes": []
+    }
+  ],
+  "boot_id": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "excluded_live_paths": [
+    "docs/implementation-progress.md"
+  ],
+  "tmpdir": "/tmp/asservat-owner-worker-caller-3-ggej2h7n",
+  "tmp_free_before": 16780025856,
+  "mirror_changed": [],
+  "exit": 0,
+  "ended": 1791890123.8315384,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "variants": [],
+    "qualified_prior_evidence": [],
+    "prior_unrun_payloads": []
+  },
+  "tmpdir_removed": true
+}

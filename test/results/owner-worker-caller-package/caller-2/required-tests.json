@@ -1,0 +1,16 @@
+{
+  "caller-race": [
+    "TestOwnerBootstrapWorkerCallerOriginalReceipts",
+    "TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement",
+    "TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent",
+    "TestOwnerBootstrapWorkerCallerCloseAndCopyDeny",
+    "TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead",
+    "TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable",
+    "TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable"
+  ],
+  "affected-race": [
+    "TestOwnerBootstrapOriginalAllocationAndGeneratedInput",
+    "TestConfigurationWorkerLaunchPlanPinsSoleEditAndOriginalDates",
+    "TestConfigurationWorkerLaunchPlanRejectsMissingPredecessorsAndExistingAttempt"
+  ]
+}

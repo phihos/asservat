@@ -1,0 +1,16 @@
+# Original owner projection operation receiver
+
+Scope: three guarded paths only. The private constructor pins the exact outer receiver; each of the five exported operation boundaries rejects a shallow copy before touching the inner owner. Rejection leaves the original admission/result usable. Original phase ordering, context/end checks, actual native/SQL effects and driver bounds remain unchanged. No wire/role/SQL grant changes and no runtime selection.
+
+Base: exact integrated owner-projection-2 payloads, independently checked before this run. Preserve prior30 evidence; this package supersedes only these three payloads.
+
+Qualification: actual session90019 terminal0. Two-package compile0 (10.230s); before-copy1 (13.058s), all five intended assertions; corrected races0 (21.894s), five top-level/13 named PASS including actual composed loopback projection+launch; two-package vet0 (1.766s). The before variant uses the original native boundary file verbatim (SHA5c377755116524959e28b45bdbc32f0a1b4be1f162bd7eb454139628503c753a), with additive self field/constructor/test setup needed by the same test. This is controlled receiver-check reversal evidence, not a previous installed vulnerability claim.
+
+All three base/payload hashes,2,593 live dependencies/inventory, source freeze and exact before file remained unchanged before/between/after phases. GOMAXPROCS2/-p2; fresh owned /tmp checked >=4GiB and1MiB fsync, removed after terminal. Compile/build wrapper600s; package original30s before/180s affected races. No new native test ran. Loopback's synthetic API/SQL/provider authority and unqualified original20QPS full installed timing remain explicit.
+
+Manifest: `92586dc39d1d098a31c9f5805ff166c18cf56c05733489d8d17894e116a5df26`
+Dependencies: `bbbf5d64da5e21a33797f48c16394c7b666d1e2b827edc93748a4c73b0d9f87c`
+Runner: `6fa5ae4c35bc903ca97d3d41e96e029c391f97b3732f7e0b51185d0aeea0ca85`
+Result: `769f16ec62a09fc3322e987b017aa2fa8497c42fd6af578b5afb0768cab55063`
+
+Exact commands/log hashes are retained in result.json. Next: parent guarded integration, then actual owner path only after original protected public inputs and actual accepted-source observer exist. No additional build started.

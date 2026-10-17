@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-11",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "With ADR-184/185 (eight-probe workload guard, six owner identity purposes, provider-installed owner RBAC, public settings): resources, bridge, worker roles (22 s), worker inputs and launch passed; the ADR-185 public sources step (settings ConfigMaps, empty cluster catalog, catalog guard) passed natively; the accepted owner source passed. Stopped at public/roles-binding (changed): a plain resource journal read after the guard bridge sees the advanced guard. Run 12 reads through the bridge's retained reader (new exported InitialRuntimeBridge.ReadRetainedResources).",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

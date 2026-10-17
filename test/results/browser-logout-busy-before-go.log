@@ -1,0 +1,8 @@
+--- FAIL: TestLogoutBusyOnlyBeforeRevocation (0.00s)
+    --- FAIL: TestLogoutBusyOnlyBeforeRevocation/uncertain_revocation_cannot_be_retried (0.00s)
+        session_busy_test.go:48: logout effect boundary lost: status=409 ends=1 headers=map[Cache-Control:[no-store, private] Content-Security-Policy:[default-src 'none'; frame-ancestors 'none'] Content-Type:[application/problem+json] Pragma:[no-cache] Referrer-Policy:[no-referrer] Retry-After:[1] X-Content-Type-Options:[nosniff] X-Frame-Options:[DENY]]
+    --- FAIL: TestLogoutBusyOnlyBeforeRevocation/failed_revocation_cannot_be_retried (0.00s)
+        session_busy_test.go:48: logout effect boundary lost: status=503 ends=1 headers=map[Cache-Control:[no-store, private] Content-Security-Policy:[default-src 'none'; frame-ancestors 'none'] Content-Type:[application/problem+json] Pragma:[no-cache] Referrer-Policy:[no-referrer] Retry-After:[1] X-Content-Type-Options:[nosniff] X-Frame-Options:[DENY]]
+FAIL
+FAIL	asservat.local/asservat/internal/transport/browser	0.005s
+FAIL

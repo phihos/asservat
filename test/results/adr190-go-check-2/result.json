@@ -1,0 +1,1 @@
+{"name":"adr190-go-check-2","command":"make go-check","exit":0,"status":"passed","scope":"Full Go gate after ADR-190 step 5 and step 7 owner composition; source hash unchanged before/after; 0 failed test events; kubernetes race groups 1-7 verified with 0 explicit skips."}

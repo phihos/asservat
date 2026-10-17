@@ -1,0 +1,12 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_launch_operation.go",
+    "before": "6c83259ac7a8f6cb1908b780c9a57cb7d77b1895853937b69a7763d078551750",
+    "after": "c0a0dabba9bfc70b6ba6933464d39320f2a8edf86c680e77bd0a7e905c9bf8c7"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_launch_operation_test.go",
+    "before": "4a3ae3ec5d8f8e15fc82ced21218a65a315e86cbe366e116e36890b472f68bd8",
+    "after": "5bc93a1e3df6fd0db0f5c0226d062bae0490947ae38c6fa83eb454f34d51ee42"
+  }
+]

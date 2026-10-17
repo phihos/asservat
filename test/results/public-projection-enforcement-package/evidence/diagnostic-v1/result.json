@@ -1,0 +1,35 @@
+{
+  "manifest": "7ff3813ad9626a745c0cda90c498f9da49b8145a669a6b593f29958e175e2ef1",
+  "dependencies": "531b2a55440e03747e9d9d9ac2133dadacb562740de4a59022196d517ff37e49",
+  "runner": "b5c0d796619c7e227725ddd8476c7d2ba83cbc1b3572d3660967e9cd6103232c",
+  "before": {
+    "payload": [],
+    "base": [],
+    "dependencies": []
+  },
+  "started": 1791853236.152186,
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-vet=off",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/diagnostic-v1/overlay.json",
+    "./internal/adapters/kubernetes",
+    "-run",
+    "^TestPublicRuntimeProjectionTimingDiagnostic$",
+    "-count=1",
+    "-timeout=45s",
+    "-v"
+  ],
+  "exit": 1,
+  "ended": 1791853254.390357,
+  "after": {
+    "payload": [],
+    "base": [],
+    "dependencies": []
+  },
+  "log_sha256": "f590489b4ea21b3b60098af89e29335ddaf3123028bf0078977acc0e39753ffe",
+  "diagnostic_reached": true,
+  "build_failed": false
+}

@@ -1,0 +1,5 @@
+=== RUN   TestContextCommitWithRealServices
+    context_commit_test.go:36: run make context-integration for owned real-service fixtures
+--- SKIP: TestContextCommitWithRealServices (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	0.012s

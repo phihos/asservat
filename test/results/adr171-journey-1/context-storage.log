@@ -1,0 +1,410 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-regional-api-journey
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=api_execution_prepare_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.433401ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=api_execution_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.021347ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=api_execution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.110858ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=owner_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.256579ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=owner_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=15.481242ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready role=owner_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=14.925246ms
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=api_execution_prepare_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=api_execution_read_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=api_execution_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=authority_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=owner_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=owner_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=owner_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=owner_enrollment_read_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=peer_read_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=postgres state=active connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=retention_source_read_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-role=retention_source_runtime state=idle connections=1
+    public_context_journey_test.go:121: journey SQL phase=regional-ready database-connections=12 maximum=48 reserved=0 superuser-reserved=3
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=api_execution_prepare_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.433401ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=api_execution_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.021347ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=api_execution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.110858ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=context_catalog_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=14.898996ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.2293ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.862516ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.33207ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_stop_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.919657ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_stop_lifecycle_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.030958ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_stop_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.980327ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_stop_writer_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.461122ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_worker_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.068817ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=download_worker_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.132559ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_history_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.010817ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_key_bind_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.845776ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_key_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.783295ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_metadata_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.903806ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.666773ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=native_plan_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.826226ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=owner_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.256579ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=owner_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=15.481242ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=owner_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=14.925246ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.33727ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.460411ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.858106ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_enrollment_activate_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.637084ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_enrollment_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.078718ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_enrollment_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.080818ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready role=worker_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.297891ms
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=api_execution_prepare_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=api_execution_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=api_execution_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=authority_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=context_catalog_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_audit_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_stop_ack_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_stop_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_stop_writer_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_worker_audit_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=download_worker_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=native_key_bind_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=native_key_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=native_metadata_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=native_owner_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=native_plan_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=owner_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=owner_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=owner_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=owner_enrollment_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=peer_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=postgres state=active connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=retention_source_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=retention_source_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_enrollment_activate_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_enrollment_audit_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_enrollment_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-role=worker_owner_runtime state=idle connections=1
+    public_context_journey_test.go:124: journey SQL phase=native-ready database-connections=32 maximum=48 reserved=0 superuser-reserved=3
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=api_execution_prepare_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.433401ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=api_execution_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.021347ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=api_execution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.110858ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=capture_operation_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.975257ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=capture_operation_admit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.810985ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=capture_operation_journal_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=18.909825ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=capture_operation_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.523632ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=capture_operation_source_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.801445ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_case_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.868496ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_catalog_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=10 empty-acquires=1 canceled-acquires=0 empty-wait=14.898996ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_preview_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.502682ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_progress_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.797745ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_request_resolution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.27437ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=context_storage_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.244479ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.2293ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.862516ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.33207ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_stop_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.919657ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_stop_lifecycle_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.030958ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_stop_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.980327ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_stop_writer_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.461122ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_worker_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.068817ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=download_worker_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.132559ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_history_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.010817ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_key_bind_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.845776ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_key_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.783295ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_metadata_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.903806ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.666773ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=native_plan_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.826226ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=owner_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.256579ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=owner_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.481242ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=owner_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.925246ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.33727ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.460411ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.858106ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_enrollment_activate_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.637084ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_enrollment_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.078718ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_enrollment_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.080818ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit role=worker_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.297891ms
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=api_execution_prepare_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=api_execution_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=api_execution_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=authority_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=capture_operation_ack_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=capture_operation_admit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=capture_operation_journal_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=capture_operation_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_case_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_catalog_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_preview_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_progress_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_request_resolution_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=context_storage_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_audit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_stop_ack_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_stop_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_stop_writer_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_worker_audit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=download_worker_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=native_key_bind_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=native_key_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=native_metadata_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=native_owner_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=native_plan_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=owner_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=owner_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=owner_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=owner_enrollment_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=peer_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=postgres state=active connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=retention_source_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=retention_source_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_enrollment_activate_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_enrollment_audit_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_enrollment_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-role=worker_owner_runtime state=idle connections=1
+    public_context_journey_test.go:155: journey SQL phase=before-audit database-connections=41 maximum=48 reserved=0 superuser-reserved=3
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=api_execution_prepare_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.433401ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=api_execution_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.021347ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=api_execution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.110858ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=capture_operation_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.975257ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=capture_operation_admit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.810985ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=capture_operation_journal_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=18.909825ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=capture_operation_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.523632ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=capture_operation_source_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.801445ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_case_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.868496ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_catalog_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=10 empty-acquires=1 canceled-acquires=0 empty-wait=14.898996ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_preview_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.502682ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_progress_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.797745ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_request_resolution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.27437ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=context_storage_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.244479ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.2293ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.862516ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.33207ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_stop_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.919657ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_stop_lifecycle_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.030958ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_stop_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.980327ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_stop_writer_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.461122ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_worker_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.068817ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=download_worker_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.132559ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_history_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.010817ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_key_bind_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.845776ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_key_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.783295ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_metadata_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.903806ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.666773ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=native_plan_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.826226ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=operation_audit_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.610834ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=operation_audit_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=15.328061ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=operation_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=8 empty-acquires=1 canceled-acquires=0 empty-wait=15.071718ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=owner_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.256579ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=owner_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.481242ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=owner_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.925246ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.33727ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.460411ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.858106ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_enrollment_activate_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.637084ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_enrollment_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.078718ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_enrollment_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.080818ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready role=worker_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.297891ms
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=api_execution_prepare_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=api_execution_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=api_execution_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=authority_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=capture_operation_ack_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=capture_operation_admit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=capture_operation_journal_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=capture_operation_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_case_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_catalog_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_preview_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_progress_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_request_resolution_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=context_storage_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_stop_ack_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_stop_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_stop_writer_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_worker_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=download_worker_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=native_key_bind_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=native_key_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=native_metadata_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=native_owner_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=native_plan_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=operation_audit_ack_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=operation_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=owner_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=owner_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=owner_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=owner_enrollment_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=peer_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=postgres state=active connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=retention_source_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=retention_source_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_configuration_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_configuration_read_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_configuration_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_enrollment_activate_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_enrollment_audit_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_enrollment_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-role=worker_owner_runtime state=idle connections=1
+    public_context_journey_test.go:157: journey SQL phase=assembly-ready database-connections=43 maximum=48 reserved=0 superuser-reserved=3
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-reserve calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-claim-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-write-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-complete-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-ack-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-freeze calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-claim-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-write-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-complete-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=audit-ack-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-recovery calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-workload calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-eligibility calls=2 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-capability calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-retention calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-storage calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-processing calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic stage=preview-create calls=1 refusals=0 reason=none
+    public_context_journey_test.go:168: journey preview diagnostic first-refusal=none frozen-outcome=success
+    public_context_journey_test.go:182: actual SQL discovery and original H2 standby setup elapsed=534.354531ms
+    context_start_exchange_test.go:130: journey original regional exchange completed reason=none stream-stage=none stream-reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-reserve calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-claim-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-write-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-complete-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-ack-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-freeze calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-claim-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-write-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-complete-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=audit-ack-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-recovery calls=5 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-pod calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-eligibility calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-capability calls=4 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-retention calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-storage calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=preview-processing calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=request-lookup calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=request-preview-read calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=request-admit calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-completed calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-journal calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-claim-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-write-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-complete-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-ack-intent calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-freeze calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-claim-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-write-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-complete-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-ack-outcome calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=capture-ack-pair calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=regional-read calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=regional-sign calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=regional-verify calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-read calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-target calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-eligibility calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-retention calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-process calls=2 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-prepare calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-keys calls=1 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic stage=runner-eligibility-identity calls=4 refusals=0 reason=none
+    public_context_journey_test.go:190: journey request diagnostic first-refusal=none frozen-outcome=unavailable
+    public_context_journey_test.go:190: journey original eligibility identity calls-context-canceled=0 calls-context-deadline=0
+    public_context_journey_test.go:192: journey first-request original collector calls=0 whole-request-duration=2.078188471s hub-stream-stage=hub-receipt hub-stream-reason=denied
+    public_context_journey_test.go:193: browser first request did not return a current successful envelope: {"schema_version":"mcp-result/v1","request_id":"10000000-0000-4000-8000-000000000058","data_class":"metadata","status":"error","data":{"code":"OutcomeUnknown","message":"The submission outcome could not be confirmed. Retry with the same preview and request key; do not automatically create another capture.","retryable":true},"truncated":false,"next_cursor":null,"narrowing_hint":null,"warnings":[],"provenance":[]}
+    native_exchange_test.go:469: native fixture observation longest-refresh=36.408108ms widest-completion-gap=1.037271533s
+    panic.go:694: journey SQL phase=exit role=api_execution_prepare_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.433401ms
+    panic.go:694: journey SQL phase=exit role=api_execution_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=15.021347ms
+    panic.go:694: journey SQL phase=exit role=api_execution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.110858ms
+    panic.go:694: journey SQL phase=exit role=capture_operation_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=7 empty-acquires=1 canceled-acquires=0 empty-wait=14.975257ms
+    panic.go:694: journey SQL phase=exit role=capture_operation_admit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=14.810985ms
+    panic.go:694: journey SQL phase=exit role=capture_operation_journal_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=7 empty-acquires=1 canceled-acquires=0 empty-wait=18.909825ms
+    panic.go:694: journey SQL phase=exit role=capture_operation_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.523632ms
+    panic.go:694: journey SQL phase=exit role=capture_operation_source_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.801445ms
+    panic.go:694: journey SQL phase=exit role=context_case_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.868496ms
+    panic.go:694: journey SQL phase=exit role=context_catalog_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=12 empty-acquires=1 canceled-acquires=0 empty-wait=14.898996ms
+    panic.go:694: journey SQL phase=exit role=context_preview_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.502682ms
+    panic.go:694: journey SQL phase=exit role=context_progress_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.797745ms
+    panic.go:694: journey SQL phase=exit role=context_request_resolution_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.27437ms
+    panic.go:694: journey SQL phase=exit role=context_storage_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=15.244479ms
+    panic.go:694: journey SQL phase=exit role=download_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.2293ms
+    panic.go:694: journey SQL phase=exit role=download_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.862516ms
+    panic.go:694: journey SQL phase=exit role=download_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.33207ms
+    panic.go:694: journey SQL phase=exit role=download_stop_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.919657ms
+    panic.go:694: journey SQL phase=exit role=download_stop_lifecycle_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.030958ms
+    panic.go:694: journey SQL phase=exit role=download_stop_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.980327ms
+    panic.go:694: journey SQL phase=exit role=download_stop_writer_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=4 empty-acquires=1 canceled-acquires=0 empty-wait=14.461122ms
+    panic.go:694: journey SQL phase=exit role=download_worker_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.068817ms
+    panic.go:694: journey SQL phase=exit role=download_worker_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.132559ms
+    panic.go:694: journey SQL phase=exit role=native_history_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.010817ms
+    panic.go:694: journey SQL phase=exit role=native_key_bind_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.845776ms
+    panic.go:694: journey SQL phase=exit role=native_key_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=14.783295ms
+    panic.go:694: journey SQL phase=exit role=native_metadata_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.903806ms
+    panic.go:694: journey SQL phase=exit role=native_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.666773ms
+    panic.go:694: journey SQL phase=exit role=native_plan_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=14.826226ms
+    panic.go:694: journey SQL phase=exit role=operation_audit_ack_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=8 empty-acquires=1 canceled-acquires=0 empty-wait=14.610834ms
+    panic.go:694: journey SQL phase=exit role=operation_audit_config_runtime owned-pools=1 total=0 acquired=0 idle=0 acquires=5 empty-acquires=1 canceled-acquires=0 empty-wait=15.328061ms
+    panic.go:694: journey SQL phase=exit role=operation_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=20 empty-acquires=1 canceled-acquires=0 empty-wait=15.071718ms
+    panic.go:694: journey SQL phase=exit role=owner_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.256579ms
+    panic.go:694: journey SQL phase=exit role=owner_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=22 empty-acquires=1 canceled-acquires=0 empty-wait=15.481242ms
+    panic.go:694: journey SQL phase=exit role=owner_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=9 empty-acquires=1 canceled-acquires=0 empty-wait=14.925246ms
+    panic.go:694: journey SQL phase=exit role=worker_configuration_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.33727ms
+    panic.go:694: journey SQL phase=exit role=worker_configuration_read_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=2 empty-acquires=1 canceled-acquires=0 empty-wait=15.460411ms
+    panic.go:694: journey SQL phase=exit role=worker_configuration_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=7 empty-acquires=1 canceled-acquires=0 empty-wait=14.858106ms
+    panic.go:694: journey SQL phase=exit role=worker_enrollment_activate_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.637084ms
+    panic.go:694: journey SQL phase=exit role=worker_enrollment_audit_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=15.078718ms
+    panic.go:694: journey SQL phase=exit role=worker_enrollment_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=6 empty-acquires=1 canceled-acquires=0 empty-wait=15.080818ms
+    panic.go:694: journey SQL phase=exit role=worker_owner_runtime owned-pools=1 total=1 acquired=0 idle=1 acquires=3 empty-acquires=1 canceled-acquires=0 empty-wait=14.297891ms
+    panic.go:694: journey SQL phase=exit database-role=api_execution_prepare_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=api_execution_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=api_execution_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=authority_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=capture_operation_ack_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=capture_operation_admit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=capture_operation_journal_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=capture_operation_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_case_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_catalog_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_preview_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_progress_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_request_resolution_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=context_storage_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_stop_ack_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_stop_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_stop_writer_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_worker_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=download_worker_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=native_key_bind_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=native_key_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=native_metadata_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=native_owner_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=native_plan_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=operation_audit_ack_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=operation_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=owner_configuration_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=owner_configuration_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=owner_configuration_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=owner_enrollment_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=peer_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=postgres state=active connections=1
+    panic.go:694: journey SQL phase=exit database-role=retention_source_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=retention_source_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_configuration_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_configuration_read_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_configuration_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_enrollment_activate_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_enrollment_audit_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_enrollment_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-role=worker_owner_runtime state=idle connections=1
+    panic.go:694: journey SQL phase=exit database-connections=43 maximum=48 reserved=0 superuser-reserved=3
+--- FAIL: TestContextAdmissionWithRealServices (8.92s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-regional-api-journey (8.83s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	8.984s
+FAIL

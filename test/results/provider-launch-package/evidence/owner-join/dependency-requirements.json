@@ -1,0 +1,9 @@
+{
+  "shared_lifetime": {
+    "path": "internal/adapters/kms/owner_provider_lifetime.go",
+    "current_live_sha256": "2526990d27ec6e8b91408ba78dba114e85270a697b83219fd466cf11cc6aa856",
+    "required_combined_payload_sha256": "eb5f7e4d7fcf9c842c7bfe7dc76e819a5167760c9c48d13e91cb0764ccd6ef9e",
+    "supplier": "MCP 19-path Launch/CloseAndJoin package; excluded here to avoid duplicate ownership"
+  },
+  "combined_validation": "Root combined compile/scoped races/vet; no repeat controlled-before required to retain unchanged proof."
+}

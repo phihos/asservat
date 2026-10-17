@@ -1,0 +1,80 @@
+package native
+
+import (
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"context"
+	"encoding/json"
+	"time"
+)
+
+type registeredExchange struct{ registration *NativeRegistration }
+
+func (p *registeredExchange) Wait(ctx context.Context) (evidence.NativeExchange, error) {
+	return p.registration.Wait(ctx)
+}
+func (p *registeredExchange) Close() { p.registration.Close() }
+
+var _ evidence.NativeExchangeRegistrar = (*HubRouter)(nil)
+
+func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+	if before == nil || check == nil || input.Complete == nil || !input.Source.Valid(input.Operation.SourceVersion) {
+		return nil, artifact.ErrInvalid
+	}
+	// Snapshot all slice-backed source fields before local registration. Every
+	// command is built from this private fixed request, never the worker's Hello.
+	encoded, e := json.Marshal(input.Source)
+	if e != nil {
+		return nil, e
+	}
+	var source evidence.NativeContextSource
+	if json.Unmarshal(encoded, &source) != nil {
+		return nil, artifact.ErrInvalid
+	}
+	operation := input.Operation
+	delivery := input.Delivery
+	registration, e := r.Register(ctx, operation, func(owner, admission context.Context, origin evidence.NativeOrigin, _ contracts.NativeHello) (*HubOperation, error) {
+		gate, e := evidence.NewNativeFrameGate(owner, func(call context.Context) (value.NativeLease, error) { return check(call, origin) }, time.Now)
+		if e != nil {
+			return nil, e
+		}
+		fail := func(err error) (*HubOperation, error) {
+			gate.Close()
+			_ = gate.Wait(context.Background())
+			return nil, err
+		}
+		if e = before(admission, origin); e != nil {
+			return fail(e)
+		}
+		checked, e := checkNativeAdmission(admission, gate)
+		if e != nil {
+			return fail(e)
+		}
+		lease := checked.lease
+		wire, e := json.Marshal(operation)
+		if e != nil {
+			return fail(e)
+		}
+		payload := encoded
+		if operation.Kind == value.NativeObserve {
+			payload = []byte("null")
+		}
+		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
+		if operation.Kind == value.NativeResponse {
+			command.WindowID = delivery.WindowID
+			command.Offset = delivery.Offset
+			command.Length = delivery.Length
+		}
+		result, e := newHubOperationChecked(gate, checked, command, source, delivery, input.Complete)
+		if e != nil {
+			return fail(e)
+		}
+		return result, nil
+	})
+	if e != nil {
+		return nil, e
+	}
+	return &registeredExchange{registration}, nil
+}

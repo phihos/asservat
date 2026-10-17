@@ -1,0 +1,11 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "go-architecture-check"
+  ],
+  "exit": 0,
+  "seconds": 13.571
+}

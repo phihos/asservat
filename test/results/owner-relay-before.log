@@ -1,0 +1,10 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/owner_credentials_test.go:112:17: c.ServingCertificate undefined (type *OwnerCredentials has no field or method ServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:114:17: c.ServingCertificate undefined (type *OwnerCredentials has no field or method ServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:117:19: c.VerifyServingCertificate undefined (type *OwnerCredentials has no field or method VerifyServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:119:17: c.VerifyServingCertificate undefined (type *OwnerCredentials has no field or method VerifyServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:123:17: c.VerifyServingCertificate undefined (type *OwnerCredentials has no field or method VerifyServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:125:17: c.ServingCertificate undefined (type *OwnerCredentials has no field or method ServingCertificate)
+internal/adapters/mtls/owner_credentials_test.go:129:22: client.ServingCertificate undefined (type *OwnerCredentials has no field or method ServingCertificate)
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL

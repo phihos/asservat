@@ -1,0 +1,7 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:260: original activation ace6819e-24a1-41f4-b719-b69ee83ceb37 image docker.io/library/asservat-context-worker@sha256:1af516de028e40784784be5e025fbe433b14c77ae18b509a83df576195df488a exit 0
+    initial_bootstrap_chain_test.go:291: copy tombstone marker lacks exact independent denial configmaps "install-copy-closure-probe" is forbidden: ValidatingAdmissionPolicy 'bootstrap-chain-10000000-install-bootstrap' with binding 'bootstrap-chain-10000000-install-bootstrap' denied request: Asservat trusted bootstrap identities must remain occupied; observation probes cannot mutate them.
+--- FAIL: TestInitialBootstrapChainWithRealServices (274.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	274.095s
+FAIL

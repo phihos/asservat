@@ -1,0 +1,54 @@
+{
+  "name": "direct",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestDirectHolderObservationWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "seconds": 128.686,
+  "diskBeforeBytes": 421030645760,
+  "tmpFreeBeforeBytes": 16731344896,
+  "sourceSnapshotUnchanged": true,
+  "requiredPassedTests": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "passedTests": [],
+  "missingRequiredTests": [
+    "TestDirectHolderObservationWithRealKubernetes",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+    "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+    "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+  ],
+  "validationErrors": [
+    "native test exit missing or nonzero",
+    "missing required selected PASS names"
+  ],
+  "harnessSourceMismatches": [],
+  "harnessSourceFileSetMismatch": [],
+  "sourceUnchanged": true,
+  "helperIdentity": {
+    "helperSHA256": "30fba810e9ff2392f2195c5aa4c469248d46534c76f5e32acd627be6adcf74d1",
+    "runtimeSelection": false,
+    "setupAuthority": "synthetic installer/issuer acceptance; actual API/SQL/S3/TLS path",
+    "fullInstalledHWORKBackground": false
+  },
+  "buildScratchRemoved": true,
+  "cleanupFailures": [],
+  "testExit": 1,
+  "archiveHashes": {
+    "harness.log": "dbf60749d00b58fbbbd48a6ded853fc7bc9c9fd3213126d763a4f457ebd9eefe",
+    "context-storage.log": "c5f223369585d5343c56542be8a915df3353c8d4eec6a3d26fcbb7f281f37b98",
+    "context-storage-environment.json": "db2bbd445e9148516247eef7e73731c6f3fe052543f35531f6da716dd0be9513",
+    "context-storage-kubelet.log": "93e3ab6035673dc31d0cc3504e3ca55439da8db4fff87b3701e122993b7df6d8",
+    "context-storage-postgres.log": "217d13de8489d2351374a903be754386140d1f1bde87fe840cbdecabb7182911"
+  }
+}

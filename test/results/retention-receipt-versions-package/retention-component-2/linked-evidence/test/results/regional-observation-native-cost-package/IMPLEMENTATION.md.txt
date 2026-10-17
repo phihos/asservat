@@ -1,0 +1,25 @@
+# First native receiver cost counterexample
+
+Status: source-only; no compilation, unit result or native result yet. Three new integration test files; no production, harness or contract mutation. The existing context harness already accepts the exact named selector below.
+
+The test creates one actual Restricted, digest-pinned pause Deployment, its account, real controller Pod/ReplicaSet and three-port Service/EndpointSlice. It installs the real owner workload admission policy and independently denied probe. The protected template and every UID are derived from the original API objects. The native workload is fixture-owned; it does not run the product owner binary or prove clean-namespace installation history.
+
+Real scoped PostgreSQL enrollment, encrypted S3 audit and certificate activation feed process-owned client/server credentials. Initial installation/recovery/source observations, enrollment proof and the private CA/wrapping key are explicitly synthetic authority. Runtime reads use the existing read-only SQL facets. A separate joined fixture owner refreshes the same accepted configuration every second under a new bounded observation; it does not run from any runtime read. Source failure cancels the test and fails cleanup.
+
+One newly constructed observer/probe pair retains the exact production 20-QPS/burst20 clients. The workload and guard share the required observer. Priming uses a separate setup-only pair, so the timed admission receives a full initial burst rather than being handicapped by setup traffic. No extra concurrent observation clients are introduced.
+
+The measured path is the concrete `OwnerObservationRoutingPeers.CheckObservationRouting` before/after pair over an actual mutual-TLS1.3/h2 connection. Its query is created once immediately before TLS and supplied through a one-use channel. The second check keeps the first result's original earlier expiry, as the actual handler does. Omitting holder lookup gives the pair its most favorable possible scheduling cost. This is admission-cost evidence, not native network routing, the receiving listener, a real regional four-proof exchange or installed-v2 qualification.
+
+A useful counterexample must complete the first proof (at least 94 observer requests), enter the second proof, and deny within the original limiter-bound interval. A first-proof/configuration/template/SQL failure is a test failure, not a substitute counterexample. The HTTP handler and client cleanup are joined. A separate one-second test cleanup allowance never reaches an authority or API context. The test also rejects an unexpected second HTTP handler invocation.
+
+Only numeric request categories, failure totals, phase durations, original remaining interval and typed SQL port counts are retained. The fixed-label wrapper forwards original request/response/error objects and never reads a payload or header. RoundTrip timing ends at response headers and excludes limiter wait; enclosing phase time includes limiter wait. No trace hook is inserted into the production SQL driver. Pool.Stat records acquisition totals, not statements or lock time. The configuration reader pool is shared with the independent source owner, and those totals are labeled shared alongside the number of source refreshes; exact runtime port calls are counted separately. The registry read pool belongs only to the measured reader at that point.
+
+Planned local gates: integration compile-only, the three `TestOwnerObservationCostCounter*` tests under race, integration vet. Native services must not be claimed from a skipped named test.
+
+Planned exclusive native command (parent-owned):
+
+```
+python scripts/test-context-storage.py --run '^TestOwnerObservationReceiverOriginalBudgetWithRealServices$'
+```
+
+Use the repository's qualified Python environment. Preserve its exact source hashes, binary/tool/image identities, actual exit and complete owned teardown. A passing named test records expected original-bound denial and the availability counterexample. It does not certify a usable regional route. After an approved correction, preserve this original result and turn the appropriate success expectation into a separate immutable before/after candidate.

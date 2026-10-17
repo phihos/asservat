@@ -1,0 +1,55 @@
+from pathlib import Path
+import hashlib, json, os, signal, subprocess, time
+stage = Path(__file__).resolve().parent
+repo = Path('/home/phil/Projekte/asservat')
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+maps = {n: json.loads((stage / (n + '.json')).read_text()) for n in ['payload', 'bases', 'dependencies', 'mirror']}
+
+def check():
+    actual = set(subprocess.run(['rg', '--files', '-g', '*.go', '-g', 'go.mod', '-g', 'go.sum'], cwd=repo, capture_output=True, text=True, check=True).stdout.splitlines())
+    expected = {p for p in maps['dependencies'] if p.endswith('.go') or Path(p).name in {'go.mod', 'go.sum'}}
+    mirror_set = {str(p.relative_to(stage / 'mirror')) for p in (stage / 'mirror').rglob('*') if p.is_file()}
+    return {'live': [p for p,h in maps['dependencies'].items() if sha(repo/p) != h],
+            'bases': [p for p,h in maps['bases'].items() if sha(repo/p) != h],
+            'payload': [p for p,h in maps['payload'].items() if sha(stage/'files'/p) != h],
+            'fileSet': sorted(actual ^ expected),
+            'mirror': [p for p,h in maps['mirror'].items() if sha(stage/'mirror'/p) != h],
+            'mirrorSet': sorted(mirror_set ^ set(maps['mirror'])),
+            'freeze': [p for p,h in json.loads((stage/'freeze.json').read_text()).items() if sha(stage/p) != h]}
+
+evidence = stage/'evidence'
+evidence.mkdir(exist_ok=False)
+env = os.environ.copy()
+env.update(GOMAXPROCS='2', GOFLAGS='-p=2', TMPDIR=str(stage/'tmp'))
+overlay = ['-overlay', str(stage/'overlay.json')]
+packages = ['./internal/domain/fleet','./internal/contracts','./internal/transport/clusterobservation']
+selected = '^TestClusterObservation(Routing|MaximumClosedWire|WireRejects|Frames|ApplicationDigest|Order|PreservesExact|RequestCannot)'
+steps = [
+    ('compile',['go','test',*overlay,'-vet=off','-run','^$',*packages],repo),
+    ('race',['go','test',*overlay,'-race','-vet=off','-count=1','-timeout=120s','-run',selected,'-v',*packages],repo),
+    ('vet',['go','vet',*overlay,*packages],repo),
+    ('architecture',['make','go-architecture-check'],stage/'mirror'),
+]
+for name, command, cwd in steps:
+    before=check()
+    if any(before.values()):
+        (evidence/(name+'-preflight.json')).write_text(json.dumps(before,indent=2)+'\n')
+        raise SystemExit('immutable input preflight failed')
+    start=time.monotonic()
+    with (evidence/(name+'.log')).open('x') as log:
+        process=subprocess.Popen(command,cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        print(json.dumps({'phase':name,'pid':process.pid,'command':command,'cwd':str(cwd)}),flush=True)
+        try:
+            code=process.wait(timeout=240)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid,signal.SIGTERM)
+            try: process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid,signal.SIGKILL);process.wait()
+            code=124
+    after=check()
+    report={'phase':name,'command':command,'cwd':str(cwd),'exit':code,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+    with (evidence/(name+'.json')).open('x') as out:
+        json.dump(report,out,indent=2);out.write('\n')
+    print(json.dumps(report),flush=True)
+    if code != 0 or any(after.values()): raise SystemExit(1)

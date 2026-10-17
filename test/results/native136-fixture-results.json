@@ -1,0 +1,22 @@
+{
+  "before": {
+    "handle": 74290,
+    "exit": 1,
+    "test": "TestNativeContentFixtureUsesItsExactHTTPCookie",
+    "result": "real C02 rejects the HTTP fixture cookie"
+  },
+  "after": {
+    "handle": 44016,
+    "exit": 0,
+    "selector": "^TestNativeContentFixture",
+    "race": true,
+    "package": "./test/integration",
+    "seconds": 1.123
+  },
+  "vet": {
+    "handle": 19811,
+    "exit": 0,
+    "package": "./test/integration"
+  },
+  "native": "UNRUN"
+}

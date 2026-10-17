@@ -1,0 +1,13 @@
+# asservat.local/asservat/internal/adapters/kubernetes
+internal/adapters/kubernetes/download_jobs.go:146:52: undefined: artifact.ErrNotFound
+internal/adapters/kubernetes/download_jobs.go:361:26: undefined: artifact.ErrNotFound
+internal/adapters/kubernetes/download_jobs.go:364:47: undefined: artifact.ErrNotFound
+# asservat.local/asservat/internal/adapters/kubernetes [asservat.local/asservat/internal/adapters/kubernetes.test]
+internal/adapters/kubernetes/download_jobs.go:146:52: undefined: artifact.ErrNotFound
+internal/adapters/kubernetes/download_jobs.go:361:26: undefined: artifact.ErrNotFound
+internal/adapters/kubernetes/download_jobs.go:364:47: undefined: artifact.ErrNotFound
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+FAIL	asservat.local/asservat/internal/adapters/kubernetes [build failed]
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

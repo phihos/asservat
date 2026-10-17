@@ -1,0 +1,5 @@
+--- FAIL: TestConnectorRetirementStoresExactBusinessOutcomeBeforeAudit (0.00s)
+    connector_retirement_service_test.go:212: business outcome not frozen exactly once before outcome writer {27000000-0000-4000-8000-000000000003 true false} exact business outcome not frozen before provider work 0 0
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.002s
+FAIL

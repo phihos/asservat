@@ -1,0 +1,291 @@
+# Healthy public-operation audit lifecycle
+
+[ADR-112](../decisions/112-healthy-operation-audit-retirement.md) extends C-08's
+[operation audit](operation-audit.md) with positive writer completion, an
+independently acknowledged deletion certificate and actual SQL/account
+retirement. It covers only the bounded public-operation intent/outcome pair.
+It does not reinterpret context's four-copy checkpoint or qualify large-download
+audit pairs. No browser/MCP handler, runtime loader or Helm deployment is enabled.
+
+## Explicit selection and unchanged legacy records
+
+`NewHealthyOperationAuditor` and `NewHealthyOperationJournal` require explicit
+protected installation policy and the same normal/resolution lane. New healthy
+admission requires the explicitly accepted `operation-audit-history/v3`
+qualification, including H=0; historical binding validation stays compatible.
+`HealthyOperationAuditor.Configured()` checks immutable composition, not current
+authority. `presentation.NewHealthyAuditedOperations` selects this protocol for
+both independently backed lanes and rejects nil/zero-value auditors. The legacy
+constructor retains its existing checks and protocol. Neither constructor is
+mounted by runtime; protected provisioning and lifecycle qualification remain
+required before enablement. The wrapper
+adds a frozen `Lifecycle` to the original typed intent. `Finish` deterministically
+reconstitutes the same binding from original dates and copied configuration;
+caller mismatch is rejected and the finishing time never becomes a new anchor.
+
+Nil lifecycle retains the exact previous JSON representation and v1 encrypted
+format. Bound records use separate v2 intent/outcome framing. Migration 00041
+adds no child to old rows, and legacy reserve cannot accept a new healthy binding.
+A historical GET cannot upgrade a record to the new writer protocol.
+
+The producer does one conditional small PUT and one exact bounded GET, compares
+its complete receipt and verifies encrypted contents. Only then, after all owned
+synchronous work joins, can it return `OperationWriteCompletion`. HTTP 412,
+failed/canceled verification, mismatched bytes/version/ETag and uncertain PUTs
+produce no completion. The SQL one-use claim remains spent. A lost SQL completion
+reply can recover the identical persisted completion; a lost provider response
+cannot. Conditional S3 writes prevent overwrite, but an existing object is not
+proof that this invocation completed its write. [S3 conditional-write documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html).
+
+The normal producer needs only wrapping/opening and its fixed object store.
+Cleanup adds the separately pinned certificate signer. Independent verification
+needs read/open/public-signature capabilities, with no seal/sign or deletion
+methods. SQL credentials remain separate even when their adapters share code.
+Actual provider IAM, signer/bootstrap and configuration acceptance must preserve
+that separation; fixture-admin bucket observations are not runtime-role evidence.
+
+## Fixed phases and two-object peak
+
+Each record keeps its existing two slots of at most 64 KiB throughout:
+
+1. Both acknowledged original receipts and their exact positive completions
+   precede an original-purge lease. The original write interval and retained
+   access cutoff must have ended. Recovery is locked before pool, account,
+   operation and lifecycle rows; the original maximum-five-second lease is
+   rechecked after every blocking step.
+2. Cleanup inventories all bounded versions, delete markers, current keys and
+   multipart uploads under the exact operation prefix. Unexpected keys,
+   truncation and unknown deletion results deny success. A second complete
+   inventory must be empty before the immutable purge result is recorded.
+3. One irreversible certificate claim authorizes one signed/encrypted object
+   in a freed slot. Its once-frozen write interval is at most thirty seconds
+   and ends early enough to preserve the full minimum proof window P. A separate
+   verifier spends one of two durable attempts before checking the exact
+   receipt/signature/encrypted result. The same original maximum-five-second
+   context covers the claim, provider read/open and SQL acknowledgement. Unknown
+   claim replies return no permit; failure or lost acknowledgement stays spent.
+4. After the fixed certificate cutoff, a terminal lease permits purging the
+   three registered key names. A separate current absence acknowledgement
+   precedes finalization. A new lease clears the old terminal acknowledgement;
+   old fences cannot refund capacity.
+5. The finalizer deletes operation and lifecycle atomically. H=0 releases the
+   charge immediately. H>0 moves the same charge to cooling; no operation,
+   trace, case or input/output digest remains in that table.
+
+The certificate contains root/operation/store identity, original issuer/database
+incarnation, ciphertext/writer digests and fixed purge/proof dates. It contains
+no actor, groups, native content/hash, user reason or chosen destination. It uses
+its own signature purpose and framing. No mutable finalization marker is part of
+its audit payload. Its physical deletion needs no fourth immutable object:
+positive certificate writer closure plus independent current absence and the
+atomic SQL transition form the terminal checkpoint.
+
+`OperationCleanup.Advance` composes the finite phases. Calling it before the
+next fixed phase is due returns unavailable without moving dates or issuing
+another write. It is not a scheduler. A bounded lease budget of 2–32 prevents
+unbounded new durable cleanup generations. Exhaustion/unknown writes remain
+charged and require reconciliation; no absent row or timeout is a refund proof.
+
+## Backed SQL history and finite accounts
+
+Let D be the original audit hard deadline, H the accepted maximum supported
+logically recoverable SQL/replica/backup/WAL history, B a cleanup allowance and
+P the minimum certificate proof window. All dates use integer seconds and
+microsecond-precision UTC without rounding later:
+
+| Frozen date | Calculation |
+| --- | --- |
+| Original access ends / original purge due | D − 2H − 3B − P |
+| Certificate purge due | D − 2H − 2B |
+| Operation identity SQL retirement deadline | D − 2H − B |
+| Cooling release eligible | D − H − B |
+| Cooling/account SQL deletion deadline | D − H |
+| End of supported logically recoverable metadata history | D |
+
+The first date must be strictly after the original write interval. Short
+retention is rejected if the schedule does not fit. The certificate cannot be
+created too late to provide P; historical/unknown certificates cannot manufacture
+closure. Terminal healthy cleanup can run after a missed deadline, but preserves
+all original dates and marks Overdue. Cooling also retains the additional safe
+floor `actual identifying-row retirement + H`. This floor delays reuse; it is
+not permission to retain data longer or claim that the missed deadline was met.
+Overdue state is available before drain and the drain result carries the breach
+without retaining an identifying tombstone forever.
+
+`operation_audit_history` aggregates only exact root/lane/principal-HMAC and
+original release/delete dates, preserving the profile and original incarnation.
+Different dates never silently coalesce into a later deadline. Every count still
+occupies its original record allowance and account slot. Saturated cooling cannot
+borrow resolution capacity or evict another principal's records. A fixed function
+rechecks current recovery, locks in the same order, atomically decrements just
+that count and removes an empty account only when no other live/unknown/cooling
+obligation exists. Missing replay releases zero. `OperationHistoryCleanup.Sweep`
+handles at most sixteen due keys per call and returns released count/Overdue;
+it creates no supervisor or new user action.
+
+The existing pool row also retains a bounded normalized history profile and a
+monotonic backing-protection deadline. Admission protects through original D;
+a late cooling drain protects through at least actual drain+H. This root-only
+state contains no principal/operation identifier. Even after all identifying
+rows disappear, configuration cannot shrink the backed pool or change that
+profile while the final residual generation remains protected. Renewal, pause
+and safe increases remain possible. These accounting fields grant no current
+operation/recovery authority and cannot lengthen a retention date. Their column
+writes belong only to fixed source-managed functions.
+
+Each admitted record backs a fixed lifecycle child and at most one aggregate
+contribution. The two new tables bring the schema-40 installation inventory from
+63 to 65 tables. Private same-transaction markers and deferred constraints forbid
+stranded claims; rollback preserves the original row and charge. Runtime roles
+have no direct history INSERT/DELETE, marker UPDATE or counter-decrement rights.
+Functions use fixed trusted search paths, qualified relations and revoked PUBLIC
+EXECUTE, following PostgreSQL's [security-definer guidance](https://www.postgresql.org/docs/18/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY).
+
+A policy pins qualification UUID/digest/layout, full row/index/TOAST footprint,
+full-transaction WAL bounds, backup/WAL copy counts, backed metadata slots and
+finite purge generations. Admission checks reserves per slot using division to
+avoid integer overflow. It reserves two residual generations and all fixed plus
+finite lease transitions. Qualification must cover the deployment's accepted
+traffic/replay/rollback/row-lock envelope; these numbers are accepted results,
+not measured by this adapter. Account correlation and historical obligations
+cannot be silently changed. Current source/revision renewal may preserve compatible
+backing, never forget existing charges. The explicitly accepted monotonic v3
+resource upgrade below is the only additional profile compatibility rule.
+
+
+## Prepaid independent certificate verification
+
+[ADR-125](../decisions/125-prepaid-operation-certificate-verification.md) corrects
+retry work after positive certificate completion. `OperationCleanup.Advance` calls
+`ClaimOperationCertificateVerification` on the independent acknowledgement facet
+before any provider GET/unwrap. The SQL adapter locks current recovery, pool,
+account, operation and lifecycle in their existing order; it compares the original
+retirement and exact stored writer receipt and spends one of two attempts. Only
+the acknowledgement role can increment this counter. Source-managed new v3 rows
+start at zero; direct INSERT, decrement, jumps and combined claim/ack mutations
+are rejected. Producer, cleanup and finalizer credentials cannot acquire attempts.
+
+The returned deadline is the minimum of the original caller bound, the original
+five-second claim interval, current recovery freshness and the immutable certificate
+write end. After blocking locks and COMMIT it must still be current. The caller
+keeps it through provider verification and acknowledgement, without starting a new
+interval. Lost claim replies permit no provider call and remain spent; failed
+verification or acknowledgement does not reset either allowance. Current recovery,
+issuer/database incarnation and the original proof window remain mandatory.
+
+The v3 qualification reserves `21 + 3 * MaxPurgeLeases` full-transaction transitions
+per residual generation, retaining the two-generation multiplier and accepted
+footprint/copy bounds. Twenty-one includes all original sixteen fixed transitions,
+three optional overdue transitions and two verifier claims. H=0 also requires v3
+row/WAL qualification and explicit backing; it does not acquire a managed backup
+horizon. Certificate key/provider backing must cover the positive producer's fixed
+sign/wrap/readback plus both independent verification attempts. These are bounded
+mechanism counts, not measured provider throughput or production capacity claims.
+
+All pre48 rows are conservatively marked with two spent attempts by the constant
+column default. No individual backfill UPDATE changes their bindings or dates.
+Historical nil/v1/v2 policies remain structurally readable, but new healthy
+constructors and SQL admission reject those profiles. An already acknowledged
+historical certificate still follows its original terminal cleanup path. A pending
+historical verification receives no fresh allowance. The normal coordinator
+rejects such unacknowledged history before original purge or certificate creation,
+so it starts no doomed provider work and preserves the originals. Its unknown work
+and charge remain for qualified reconciliation; previously opted-in overdue-original
+cleanup retains its separate restrictive path.
+
+Accepted v3 policy may cover outstanding old profiles without converting their
+records. SQL compares the same normalized common profile used before48, allowing
+only recognized nil-H0/v1/v2/v3 qualification to advance to v3 with nondecreasing
+row footprint, WAL bound and copy counts. Root/lane/installation/store, backup
+identity/digest/horizon, maximum purge leases and overdue mode remain unchanged.
+The candidate must back the entire current pool, including outstanding and residual
+history. A new accepted qualification identity/digest can express the measured new
+layout; an ordinary source observation or migration cannot supply that acceptance.
+Unknown layouts, reduced coverage and unrelated profile changes deny. This does not
+accept old uncertain effects, move their dates or make their counters reusable.
+
+The application regression failed before the correction with eight provider calls
+and zero durable claims. Focused staged race tests cover acknowledgement/provider
+failure, unknown claim replies, claim/provider waits and cancellation. The real
+SQL/S3 fixture source additionally tests two concurrent claims, denied third,
+independent-role boundaries, exact original recovery expiry after a held pool lock,
+and actual certificate verification. A separate owned scratch database tests the
+actual47→48 migration and acknowledged historical cleanup with explicitly synthetic
+receipts. At this checkpoint those external additions are compile-qualified only;
+parent-owned fixture reports determine their actual result.
+
+H is not just a backup TTL. PostgreSQL keeps deleted row versions under MVCC,
+and ordinary vacuum makes space reusable rather than proving media erasure.
+The qualified horizon must cover snapshots, cleanup/vacuum and replica delay,
+plus every still-supported backup chain/WAL recovery point containing the data.
+[PostgreSQL vacuum documentation](https://www.postgresql.org/docs/18/routine-vacuuming.html),
+[continuous archiving documentation](https://www.postgresql.org/docs/18/continuous-archiving.html).
+No request or cleanup transaction runs VACUUM FULL. Unmanaged operator backups
+cannot be erased by this ledger and cannot be counted as qualified managed
+retention. Restore remains fenced separately; ordinary online activation is not
+conditioned on proving every historical physical byte has vanished.
+
+## Compatibility, qualification and required follow-up
+
+Separate producer, independent ack, cleanup and finalizer SQL roles enforce the
+phase boundaries. Original post-lock identity/recovery/lease deadlines remain
+binding. The PostgreSQL process/database incarnation is immutable provenance;
+XID reuse or a restored transaction marker cannot bypass it. The present code
+continues to deny old-row cleanup after a restart. Required future support must
+separate original writer provenance from a new current cleanup incarnation via
+independently accepted reconciliation of the whole audit ledger, claims and
+unknown spend. An ordinary source refresh cannot supply that proof.
+
+Focused Go tests cover positive/unknown writes, joined completion, exact
+cryptographic content, frozen configuration/legacy bytes, qualification/backing
+bounds and protected object inventory. The real-service fixture sources add
+H=0/H>0 two-object peak observations, original deletion before certificate claim,
+separate role SQLSTATE denials, terminal acknowledgement, actual account-lock
+expiry, rollback between SQL deletion and cooling transfer, concurrent finalizers
+and history drains, mixed hard dates, late actual-H debt, saturated pools and
+same-principal new/live/unknown spend. Both selected native cases now pass in the
+[terminal report](../../test/results/operation-lifecycle-native-second-check.log),
+with unchanged source hashes and complete cleanup. The first run exposed two
+SQL operator-precedence errors; explicit parentheses corrected them without
+changing the lifecycle checks. Synthetic accepted backup bounds in
+those fixtures do not qualify pgBackRest, replicas or a physical footprint.
+
+Before enabling public operation audit, supply protected policy/qualification
+acceptance, supported backup/WAL profiles, key/role/bucket provisioning, continuous
+bounded cleanup, late-before-certificate and exhausted/unknown-writer
+reconciliation, aggregate overdue/security reporting and the qualified restart/
+restore bridge. Legacy40 records still have no finite cleanup path. Account-HMAC
+key migration cannot discard existing accounts or residual history. No full
+S-02/REQ-PRV-004 completion follows from this healthy subset.
+
+Known write and certificate receipts now use an exact version/ETag GET, with
+complete length and ciphertext-digest verification, before checking the encrypted
+record. A different latest version cannot make the verifier adopt another copy.
+The [component regression](../../test/results/audit-version-pinning-integration.json)
+also covers initial installation and download-stop audit; actual backend results
+remain separately recorded in [implementation progress](../implementation-progress.md).
+
+Legacy reconciling audit writers now preserve the successful conditional PUT's
+version before semantic verification. Their definite-conflict readback and
+separate read-only Find remain distinct from the positive-completion writers
+above. Download-window creation also reads its acknowledged version directly,
+so an unrelated later version cannot prevent verification of the known original.
+The [twenty-path component result](../../test/results/audit-create-pinning-integration.json)
+does not extend positive completion, finite retirement or installed-backend
+qualification to those legacy writers.
+
+## Deferred-validator role correction
+
+Migration 00058 corrects the execution context of the two read-only deferred
+retirement checks. Their original predicates read the shared lifecycle/history
+tables after a capture cleanup view or fixed function returns. Running those
+checks as the restricted caller caused SQLSTATE 42501, including on otherwise
+valid cleanup transactions. They now use their existing migration owner, fixed
+search path and fully qualified relations. Runtime roles gain no base-table
+privileges or direct EXECUTE permission. The same deferred checks still reject
+stranded retirement markers at commit; original deadlines, recovery checks,
+private filtered views, fixed effects and charge-release conditions are unchanged.
+
+The failed full regression and its exact SQL errors are retained in
+[implementation progress](../implementation-progress.md). Qualification of this
+correction is pending; no installed workflow is enabled by the change.

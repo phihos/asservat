@@ -1,0 +1,393 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"reflect"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"github.com/google/uuid"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// ConfigurationRuntimeRoleRoot belongs only to the prior purpose-fixed
+// configuration installer. Its actual source proof is independent of accepted
+// SQL configuration; it grants no serving/recovery/activation authority.
+type ConfigurationRuntimeRoleRoot struct {
+	client       *PermissionClient
+	source       *ConfigurationRoleSource
+	input        contracts.ConfigurationRuntimeRoles
+	ctx          context.Context
+	cancel       context.CancelFunc
+	mu           sync.Mutex
+	closed, busy bool
+	joined       sync.WaitGroup
+}
+
+func NewConfigurationRuntimeRoleRoot(ctx context.Context, source *ConfigurationRoleSource, input contracts.ConfigurationRuntimeRoles) (*ConfigurationRuntimeRoleRoot, error) {
+	if ctx == nil || ctx.Err() != nil || source == nil || source.client == nil || source.input != input {
+		return nil, cfg.ErrInvalid
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &ConfigurationRuntimeRoleRoot{client: source.client, source: source, input: input, ctx: root, cancel: cancel}, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+}
+func (s *ConfigurationRuntimeRoleRoot) enter(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	bounded, finishProof, proofErr := s.source.operation(bounded)
+	if proofErr != nil {
+		cancel()
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+		return nil, nil, proofErr
+	}
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	return bounded, func() {
+		cancel()
+		finishProof()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+	}, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) name() string {
+	return "asservat-configuration-roles-" + strings.ReplaceAll(s.input.InstallationID, "-", "")
+}
+func (s *ConfigurationRuntimeRoleRoot) path() string {
+	return "/api/v1/namespaces/" + s.input.Namespace.Name + "/secrets"
+}
+func (s *ConfigurationRuntimeRoleRoot) current(ctx context.Context) (time.Time, error) {
+	p, e := s.source.ReadConfigurationRoleSource(ctx)
+	return p.FreshUntil, e
+}
+func configurationRoleStateValid(input contracts.ConfigurationRuntimeRoles, v contracts.ConfigurationRuntimeRoleState, now time.Time) bool {
+	if v.Format != contracts.ConfigurationRuntimeRoleStateFormat || v.Input != input || !authorization.UUID(v.OperationID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) {
+		return false
+	}
+	purposes := contracts.ConfigurationRuntimeRolePurposes()
+	if len(v.Roles) != len(purposes) {
+		return false
+	}
+	passwords := map[string]bool{}
+	ids := map[string]bool{v.OperationID: true}
+	oids := map[uint32]bool{}
+	for n, role := range v.Roles {
+		b, err := base64.RawURLEncoding.DecodeString(role.Password)
+		valid := err == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == role.Password
+		clear(b)
+		if role.Purpose != purposes[n] || !valid || passwords[role.Password] {
+			return false
+		}
+		passwords[role.Password] = true
+		if c := role.Claim; c != nil {
+			if !authorization.UUID(c.OperationID) || ids[c.OperationID] || c.DatabaseOID == 0 || c.PostmasterAt.Year() < 2020 || c.PostmasterAt.After(c.ClaimedAt) || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(now) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.After(c.ClaimedAt) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || c.Until.After(v.Until) {
+				return false
+			}
+			if !configurationRoleSourceMatches(input, c.Sources, c.ClaimedAt) || c.Until.After(c.Sources.FreshUntil) {
+				return false
+			}
+			ids[c.OperationID] = true
+		}
+		if r := role.Receipt; r != nil {
+			// Exact purpose-derived name and SQL privileges are independently verified
+			// by the SQL producer. The root cannot assign or choose a different role.
+			ordinal, known := contracts.ConfigurationRuntimeRoleOrdinal(role.Purpose)
+			expected := "as_" + strings.ReplaceAll(input.InstallationID, "-", "") + "_cfg_" + string([]byte{'0' + byte(ordinal/10), '0' + byte(ordinal%10)})
+			if !known || role.Claim == nil || r.RoleName != expected || r.RoleOID == 0 || r.RoleOID == 10 || oids[r.RoleOID] || r.LayoutDigest != input.LayoutDigest {
+				return false
+			}
+			oids[r.RoleOID] = true
+		}
+	}
+	if p := v.Projection; p != nil {
+		if !authorization.UUID(p.OperationID) || ids[p.OperationID] || p.ClaimedAt.Before(v.CreatedAt) || p.ClaimedAt.After(now) || !p.ClaimedAt.Equal(p.ClaimedAt.Truncate(time.Microsecond)) || !p.Until.After(p.ClaimedAt) || p.Until.Sub(p.ClaimedAt) > 5*time.Second || p.Until.After(v.Until) || p.SecretUID != "" && !authorization.UUID(p.SecretUID) {
+			return false
+		}
+		for _, r := range v.Roles {
+			if r.Receipt == nil {
+				return false
+			}
+		}
+		ids[p.OperationID] = true
+	}
+	if v.Launch != nil && !configurationLaunchValid(input, v, ids, now) {
+		return false
+	}
+	return true
+}
+func (s *ConfigurationRuntimeRoleRoot) decode(raw []byte, started, until time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	if permissionJSON(raw, permissionPageBytes, 131072) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	var object core.Secret
+	if strictGuardJSON(raw, &object) != nil || object.APIVersion != "v1" || object.Kind != "Secret" || object.Namespace != s.input.Namespace.Name || object.Name != s.name() || !authorization.UUID(string(object.UID)) || object.ResourceVersion == "" || object.DeletionTimestamp != nil || len(object.OwnerReferences) != 0 || len(object.Finalizers) != 0 || object.Type != core.SecretTypeOpaque || object.Immutable != nil && *object.Immutable || len(object.Data) != 1 || len(object.StringData) != 0 {
+		return zero, nil, cfg.ErrChanged
+	}
+	data, ok := object.Data["state.json"]
+	if !ok {
+		return zero, nil, cfg.ErrChanged
+	}
+	state, err := contracts.DecodeConfigurationRuntimeRoleState(bytes.NewReader(data))
+	if err != nil || !configurationRoleStateValid(s.input, state, s.client.now()) {
+		return zero, nil, cfg.ErrChanged
+	}
+	if !s.client.now().Before(until) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	return contracts.ConfigurationRuntimeRoleSnapshot{State: state, UID: string(object.UID), ResourceVersion: object.ResourceVersion, ObservedAt: started, ValidUntil: until}, &object, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) read(ctx context.Context) (contracts.ConfigurationRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	started := s.client.now()
+	first, e := s.source.ReadConfigurationRoleSource(ctx)
+	if e != nil {
+		return zero, nil, e
+	}
+	return s.readObserved(ctx, first, started)
+}
+
+// Exact readback uses the operation's current proof and original deadline. It
+// neither starts another nested proof nor creates authority from Secret data.
+func (s *ConfigurationRuntimeRoleRoot) readObserved(ctx context.Context, first contracts.ConfigurationRoleObservation, started time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	if !configurationRoleSourceMatches(s.input, first, s.client.now()) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	until := first.FreshUntil
+	if d, ok := ctx.Deadline(); ok && d.Before(until) {
+		until = d
+	}
+	until = until.UTC()
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	raw, e := s.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(bounded)
+	if e != nil {
+		return zero, nil, e
+	}
+	out, object, e := s.decode(raw, started, until)
+	if e != nil {
+		return zero, nil, e
+	}
+	if bounded.Err() != nil || !s.client.now().Before(until) || !configurationRoleSourceMatches(s.input, first, s.client.now()) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	out.ValidUntil = until
+	out.Sources = first
+	out.Sources.FreshUntil = until
+	return out, object, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) ReadConfigurationRuntimeRoles(ctx context.Context) (contracts.ConfigurationRuntimeRoleSnapshot, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	started := s.client.now()
+	proof, err := s.source.ReadConfigurationRoleSource(ctx)
+	if err != nil {
+		return zero, err
+	}
+	out, _, err := s.readObserved(ctx, proof, started)
+	return out, err
+}
+
+// Open is called only after the SQL installer independently checked current
+// activation. Existing state always wins; it never imports replacement passwords.
+func (s *ConfigurationRuntimeRoleRoot) OpenConfigurationRuntimeRoles(ctx context.Context) (contracts.ConfigurationRuntimeRoleSnapshot, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	started := s.client.now()
+	proof, err := s.source.ReadConfigurationRoleSource(ctx)
+	if err != nil {
+		return zero, err
+	}
+	out, _, err := s.readObserved(ctx, proof, started)
+	if err == nil {
+		return out, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return zero, err
+	}
+	until := proof.FreshUntil
+	bounded, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	now := s.client.now().UTC().Truncate(time.Microsecond)
+	state := contracts.ConfigurationRuntimeRoleState{Format: contracts.ConfigurationRuntimeRoleStateFormat, Input: s.input, OperationID: uuid.NewString(), CreatedAt: now, Until: now.Add(30 * time.Minute)}
+	for _, purpose := range contracts.ConfigurationRuntimeRolePurposes() {
+		var p [32]byte
+		if _, err = rand.Read(p[:]); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		state.Roles = append(state.Roles, contracts.ConfigurationRuntimeRoleMaterial{Purpose: purpose, Password: base64.RawURLEncoding.EncodeToString(p[:])})
+		clear(p[:])
+	}
+	if !configurationRoleStateValid(s.input, state, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	b, err := json.Marshal(state)
+	if err != nil || len(b) > contracts.ConfigurationRuntimeRoleMaxBytes {
+		return zero, cfg.ErrUnavailable
+	}
+	defer clear(b)
+	object := &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: s.name(), Namespace: s.input.Namespace.Name}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": b}}
+	raw, err := s.client.api.Post().AbsPath(s.path()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
+	if err != nil {
+		// Original named lookup only. No SQL claim exists in a new root, and no
+		// missing/unknown CREATE is reissued in this call.
+		out, _, lookup := s.readObserved(bounded, proof, started)
+		if lookup != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		return out, nil
+	}
+	out, _, err = s.decode(raw, now, until)
+	if err != nil || !reflect.DeepEqual(out.State, state) {
+		return zero, cfg.ErrChanged
+	}
+	// Independently read exact server identity/content under the same interval.
+	observed, _, err := s.readObserved(bounded, proof, started)
+	if err != nil || observed.UID != out.UID || !reflect.DeepEqual(observed.State, state) {
+		return zero, cfg.ErrChanged
+	}
+	return observed, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) ClaimConfigurationRuntimeRole(ctx context.Context, purpose string, database uint32, postmaster time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, bool, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+	defer end()
+	old, object, err := s.read(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+	n := slices.Index(contracts.ConfigurationRuntimeRolePurposes(), purpose)
+	if n < 0 || database == 0 || postmaster.Year() < 2020 {
+		return zero, false, cfg.ErrInvalid
+	}
+	if old.State.Roles[n].Claim != nil {
+		return old, false, nil
+	}
+	now := s.client.now().UTC().Truncate(time.Microsecond)
+	until := old.ValidUntil
+	if old.State.Until.Before(until) {
+		until = old.State.Until
+	}
+	until = until.UTC().Truncate(time.Microsecond)
+	if !now.Before(until) || postmaster.After(now) {
+		return zero, false, cfg.ErrUnavailable
+	}
+	next := old.State
+	next.Roles = append([]contracts.ConfigurationRuntimeRoleMaterial(nil), old.State.Roles...)
+	next.Roles[n].Claim = &contracts.ConfigurationRuntimeRoleClaim{OperationID: uuid.NewString(), ClaimedAt: now, Until: until, DatabaseOID: database, PostmasterAt: postmaster.UTC(), Sources: old.Sources}
+	got, err := s.update(ctx, old, object, next, until)
+	if err != nil {
+		return zero, false, err
+	}
+	return got, true, nil
+}
+func (s *ConfigurationRuntimeRoleRoot) CompleteConfigurationRuntimeRole(ctx context.Context, original contracts.ConfigurationRuntimeRoleSnapshot, purpose string, receipt contracts.PublicRuntimeRoleReceipt) error {
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
+	old, object, err := s.read(ctx)
+	if err != nil {
+		return err
+	}
+	n := slices.Index(contracts.ConfigurationRuntimeRolePurposes(), purpose)
+	if n < 0 || old.UID != original.UID || old.State.OperationID != original.State.OperationID || len(original.State.Roles) != len(old.State.Roles) || old.State.Roles[n].Claim == nil || !reflect.DeepEqual(old.State.Roles[n].Claim, original.State.Roles[n].Claim) || old.State.Roles[n].Password != original.State.Roles[n].Password {
+		return cfg.ErrChanged
+	}
+	if current := old.State.Roles[n].Receipt; current != nil {
+		if *current == receipt {
+			return nil
+		}
+		return cfg.ErrChanged
+	}
+	next := old.State
+	next.Roles = append([]contracts.ConfigurationRuntimeRoleMaterial(nil), old.State.Roles...)
+	next.Roles[n].Receipt = &receipt
+	if !configurationRoleStateValid(s.input, next, s.client.now()) {
+		return cfg.ErrInvalid
+	}
+	_, err = s.update(ctx, old, object, next, old.ValidUntil)
+	return err
+}
+func (s *ConfigurationRuntimeRoleRoot) update(ctx context.Context, old contracts.ConfigurationRuntimeRoleSnapshot, object *core.Secret, next contracts.ConfigurationRuntimeRoleState, until time.Time) (contracts.ConfigurationRuntimeRoleSnapshot, error) {
+	var zero contracts.ConfigurationRuntimeRoleSnapshot
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	if bounded.Err() != nil || !s.client.now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	b, err := json.Marshal(next)
+	if err != nil || len(b) > contracts.ConfigurationRuntimeRoleMaxBytes {
+		return zero, cfg.ErrUnavailable
+	}
+	defer clear(b)
+	object = object.DeepCopy()
+	object.Data = map[string][]byte{"state.json": b}
+	raw, err := s.client.api.Put().AbsPath(s.path()+"/"+s.name()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
+	// Even an exact lookup after an uncertain CAS cannot positively acknowledge
+	// the first claim. Callers must reopen read-only and never repeat SQL creation.
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	out, _, err := s.decode(raw, old.ObservedAt, until)
+	if err != nil || out.UID != old.UID || out.ResourceVersion == old.ResourceVersion || !reflect.DeepEqual(out.State, next) || bounded.Err() != nil {
+		return zero, cfg.ErrChanged
+	}
+	if !configurationRoleSourceMatches(s.input, old.Sources, s.client.now()) || bounded.Err() != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	out.Sources = old.Sources
+	out.Sources.FreshUntil = out.ValidUntil
+	return out, nil
+}

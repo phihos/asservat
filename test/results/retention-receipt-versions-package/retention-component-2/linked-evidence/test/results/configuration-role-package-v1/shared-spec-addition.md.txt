@@ -1,0 +1,19 @@
+Proposed additive paragraph for specs/deployment-profiles.md; merge manually.
+
+[ADR-140](../docs/decisions/140-installed-public-runtime-producers.md) requires
+fixed protected post-activation credential producers before installed public
+startup. The retired initial SQL manager MUST NOT be reopened. The three
+configuration-reconciler credential purposes MAY use independently current
+guarded source/workload proof in place of expired stored source-observation
+freshness, but MUST retain original positive installation activation, current
+database incarnation/issuer/recovery/suspension checks and original bounded
+one-use claims. Other public credential purposes MUST retain their independently
+accepted current configuration requirement. Proof reuse MUST be local to one
+original operation, recheck actual negative enforcement and canonical facts
+before effects and after blocking locks, and never extend the earliest original
+deadline. Unknown effects remain lookup-only. Immutable credential projections
+confer no activation or current authority. Installed provisioning MUST validate
+the full aggregate runtime/rollout/reconciler/verifier/installer PostgreSQL
+connection budget; partial role inventories or isolated component tests do not
+enable public serving. The command switch MUST be composed with its actual
+protected projection producer and installed qualification.

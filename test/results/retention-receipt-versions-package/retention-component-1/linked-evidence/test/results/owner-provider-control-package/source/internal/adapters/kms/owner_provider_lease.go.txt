@@ -1,0 +1,119 @@
+package kms
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"sync"
+	"time"
+)
+
+// ownerProviderLease is a private, positively acknowledged credential borrow.
+// The source gives this request an owned token copy and its ORIGINAL usable end.
+// Releasing the borrow never claims provider revocation. The concrete token
+// owner must retain a draining credential until every borrow actually closes.
+type ownerProviderLease struct {
+	token   []byte
+	until   time.Time
+	release func()
+}
+
+type ownerProviderLeaseSource func(context.Context) (ownerProviderLease, error)
+
+// ownerProviderLeaseTransport is selected only by the new fixed owner profile.
+// It supplies no native, recovery, enrollment, audit or signing authority and
+// performs no credential refresh or provider inspection on the effect path.
+type ownerProviderLeaseTransport struct {
+	base   http.RoundTripper
+	source ownerProviderLeaseSource
+	now    func() time.Time
+}
+
+func (t *ownerProviderLeaseTransport) CloseIdleConnections() {
+	if t != nil {
+		if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+			closer.CloseIdleConnections()
+		}
+	}
+}
+
+func (t *ownerProviderLeaseTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if t == nil || t.base == nil || t.source == nil || t.now == nil || request == nil || request.Context().Err() != nil {
+		return nil, ErrKeyService
+	}
+	lease, err := t.source(request.Context())
+	defer clear(lease.token)
+	release := lease.release
+	if release == nil {
+		release = func() {}
+		err = ErrKeyService
+	}
+	if err != nil || !ValidProviderToken(lease.token) || !t.now().Before(lease.until) || request.Context().Err() != nil {
+		release()
+		return nil, ErrKeyService
+	}
+	call, cancel := context.WithDeadline(request.Context(), lease.until)
+	r := request.Clone(call)
+	if r.Header == nil {
+		r.Header = make(http.Header)
+	}
+	r.GetBody = nil // a credentialed effect never acquires transparent replay.
+	r.Header.Del("Idempotency-Key")
+	r.Header.Del("X-Idempotency-Key")
+	r.Header.Set("X-Vault-Token", string(lease.token))
+	response, err := t.base.RoundTrip(r)
+	if err != nil || response == nil || response.Body == nil || call.Err() != nil || !t.now().Before(lease.until) {
+		cancel()
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		release()
+		return nil, ErrKeyService
+	}
+	response.Body = &ownerProviderLeaseBody{
+		body: response.Body, reader: io.LimitReader(response.Body, 32769),
+		ctx: call, cancel: cancel, until: lease.until, now: t.now, release: release,
+	}
+	return response, nil
+}
+
+// Keep the original cancellation alive through the whole response, including
+// slow body reads. Renewal cannot move this body's original end forward.
+type ownerProviderLeaseBody struct {
+	body    io.ReadCloser
+	reader  io.Reader
+	ctx     context.Context
+	cancel  context.CancelFunc
+	until   time.Time
+	now     func() time.Time
+	release func()
+	once    sync.Once
+	err     error
+}
+
+func (b *ownerProviderLeaseBody) Read(p []byte) (int, error) {
+	if b.ctx.Err() != nil || !b.now().Before(b.until) {
+		return 0, ErrKeyService
+	}
+	n, err := b.reader.Read(p)
+	if b.ctx.Err() != nil || !b.now().Before(b.until) {
+		clear(p[:n])
+		return 0, ErrKeyService
+	}
+	if err != nil && err != io.EOF {
+		clear(p[:n])
+		return 0, ErrKeyService
+	}
+	return n, err
+}
+
+func (b *ownerProviderLeaseBody) Close() error {
+	b.once.Do(func() {
+		b.cancel()
+		if b.body.Close() != nil {
+			b.err = ErrKeyService
+		}
+		b.release()
+	})
+	return b.err
+}

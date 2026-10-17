@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestRegionalInstallerWithRealKubernetes$"
+  ],
+  "exit": 1,
+  "seconds": 128.827,
+  "requiredPassed": [
+    "TestRegionalInstallerWithRealKubernetes"
+  ],
+  "scope": "ADR-193 step 5 installer: InstallRegionalConnector against one owned cluster with a synthetic offer and envelope; both guards proven with the connector account token, ungating, idempotent rerun, denied non-administrator source write. No hub or enrollment in this test.",
+  "missing": [
+    "TestRegionalInstallerWithRealKubernetes"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "failed"
+}

@@ -1,0 +1,72 @@
+{
+  "manifest": "ce9f8b8e499c196ae268dc1a512dc7803e22edfbb456846ee338522e21da0664",
+  "dependencies": "494e03d3011f21ad979eadc01d147dbc57f46a71320b4f9aaaa2a5bfc83609b4",
+  "runner": "cabef0070b704269040c2331d9c8c8dc884f8a642f3ce8c851cc10e363ecfdb9",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "links": [],
+    "link_directories": [],
+    "prior": []
+  },
+  "phases": [
+    {
+      "name": "schema-regressions",
+      "command": [
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-schema-6/schema-regressions.py"
+      ],
+      "exit": 0,
+      "seconds": 0.9651103019714355,
+      "log_sha256": "f61e9afdd86534e61ec2b73e5f9261d19cc7888697a5a93b59149e6358556c12",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "links": [],
+        "link_directories": [],
+        "prior": []
+      }
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "seconds": 8.730321884155273,
+      "log_sha256": "e1cbb8de03fc92239f8f561e11b9e64dd3a915f2ff7d1f103692852ce541959b",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "links": [],
+        "link_directories": [],
+        "prior": []
+      }
+    }
+  ],
+  "native": false,
+  "go_jobs": false,
+  "tmpdir": "/tmp/asservat-selection-schema-6-p2acrrv7",
+  "mirror_changed": [],
+  "exit": 0,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "links": [],
+    "link_directories": [],
+    "prior": []
+  },
+  "tmpdir_removed": true
+}

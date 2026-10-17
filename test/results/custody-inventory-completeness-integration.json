@@ -1,0 +1,33 @@
+{
+  "manifestSHA256": "8be34e7a29b037f5f56fdf2b8897da68ceb69369a4fa03bccc120bfe7ce4249f",
+  "componentResultSHA256": "566f4238b8e930fb4fc83b355b99132b537b8f66eaad2feac5cb4228d1109dbc",
+  "verifiedDependencies": 4363,
+  "files": {
+    "internal/adapters/objectstore/custody.go": {
+      "baseSHA256": "b5aef2a98863ea08bc8a605ae38c41684f90ad07e6ef10374560260e9a79969d",
+      "sha256": "ba122994e17e44a72f7851aa2975b1f48b9a6bfb931f2daab7e9719fd7974c0b"
+    },
+    "internal/adapters/objectstore/custody_test.go": {
+      "baseSHA256": "2276b0be2d486c58cfd45386d37d851ff6998fd4b43fa02c278ae3a65768c12a",
+      "sha256": "38480a32a36347d290f6e4db7e243ab33f94f426e42e6859611d0eadcaff1f1a"
+    },
+    "internal/adapters/objectstore/operation_lifecycle_test.go": {
+      "baseSHA256": "cfe446a95e52d44d6bd4edfc3ae943b196bd0f0b274bc83f73bd3d1270ed8597",
+      "sha256": "d10b20f0ca6d8e636c180611878bf2fd948fe0b29e309fdf1824cb860d381a93"
+    },
+    "internal/adapters/objectstore/download_stop_lifecycle_test.go": {
+      "baseSHA256": "f8825bd03e1434f70a777af7578c9ff47ffeb1cf9c8b23694f58ff8eaad6a63c",
+      "sha256": "e83484a50c40eee1337f372c785b8f387e92e86a5b87a5e8583c89947dda6f28"
+    },
+    "docs/architecture/custody-transactions.md": {
+      "baseSHA256": "1c847fc08dcaac9fc8247f789e7128ee1601f5c638b627f5cd7bd8ddce1e330f",
+      "sha256": "0956944569d9c75d8090ac4317b0c5d8447463cb9c01b5ab7397ff5c6cbae5cc"
+    },
+    "internal/adapters/objectstore/custody_inventory_completeness_test.go": {
+      "baseSHA256": null,
+      "sha256": "d4e38b3419ecef576db5b34188edbd74106f73e947d4fcc863229a5405c70496"
+    }
+  },
+  "nativeQualified": false,
+  "runtimeEnablement": false
+}

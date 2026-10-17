@@ -1,0 +1,90 @@
+package bootstrap
+
+import (
+	"encoding/json"
+	"reflect"
+	"slices"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// BuildConfigurationRoleInstallerInput generates only the non-secret, fixed
+// continuation input from the existing protected deployment documents and
+// retained actual object references. It does not observe, accept or activate
+// either source. The installer independently checks all current native and SQL
+// authority before opening or spending its original private role root.
+//
+// There is deliberately no role list, grant, path, pool-size or new setup ID
+// parameter. The original activation claim is checked against SQL at execution;
+// naming one here confers no authority and cannot reopen the initial manager.
+func BuildConfigurationRoleInstallerInput(owner contracts.OwnerDeployment, worker contracts.HubWorkerDeployment, ownerDeployment, workerDeployment, workerAccount contracts.WorkerObjectReference, initialClaimID string) ([]byte, error) {
+	if owner.Format != contracts.OwnerDeploymentFormat || validateHubWorkerInputs(worker) != nil || owner.InstallationID != worker.InstallationID || owner.ClusterID != worker.ClusterID || owner.Namespace != worker.Namespace || owner.ConfigurationUID != worker.OwnerSource.UID || !reflect.DeepEqual(owner.Kubernetes, worker.Kubernetes) {
+		return nil, configurationRoleInputInvalid
+	}
+	// The existing role bootstraps use distinct one-connection administrator
+	// pools. All provider identity fields must match; the runtime's configured
+	// pool size does not become an installer grant or connection multiplier.
+	ownerSQL, workerSQL := owner.Postgres, worker.Postgres
+	ownerSQL.MaxConnections, workerSQL.MaxConnections = 1, 1
+	if !reflect.DeepEqual(ownerSQL, workerSQL) {
+		return nil, configurationRoleInputInvalid
+	}
+	for _, source := range []contracts.WorkerObjectReference{worker.FleetSource, worker.OwnerSource} {
+		if !slices.Contains(owner.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: source.Name, ServiceAccount: workerAccount.Name}) {
+			return nil, configurationRoleInputInvalid
+		}
+	}
+	if !slices.Contains(owner.SchedulingLeases, contracts.OwnerSchedulingLease{Lease: worker.LeaderLease.Name, ServiceAccount: workerAccount.Name}) {
+		return nil, configurationRoleInputInvalid
+	}
+	in := contracts.ConfigurationRoleInstaller{
+		Format: contracts.ConfigurationRoleInstallerFormat,
+		Roles: contracts.ConfigurationRuntimeRoles{
+			Format:         contracts.ConfigurationRuntimeRolesFormat,
+			InstallationID: worker.InstallationID, InitialClaimID: initialClaimID,
+			ClusterID: worker.ClusterID, Namespace: worker.Namespace,
+			Deployment: workerDeployment, ServiceAccount: workerAccount,
+			FleetSource: worker.FleetSource, OwnerSource: worker.OwnerSource,
+			LayoutDigest: postgres.ConfigurationRuntimeRoleLayoutDigest(),
+		},
+		OwnerDeployment: ownerDeployment, WorkloadGuard: owner.WorkloadGuard,
+		FleetGuard: worker.FleetGuard, OwnerGuard: worker.OwnerGuard,
+		ConfigurationProbes: owner.ConfigurationProbes,
+		SchedulingLeases:    owner.SchedulingLeases,
+		Kubernetes:          worker.Kubernetes, Postgres: workerSQL,
+	}
+	if _, _, err := configurationRoleInstallerPlan(in); err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(in)
+	if err != nil || len(b) > contracts.ConfigurationRoleInstallerMaxBytes {
+		clear(b)
+		return nil, configurationRoleInputInvalid
+	}
+	return b, nil
+}
+
+// BuildConfigurationReconcilerInstallerInput is the installed continuation
+// after the protected inert workload/input producer has independently retained
+// these real object UIDs. The old generator remains a provision-only component
+// path; it cannot infer a launch disposition from a running Deployment.
+func BuildConfigurationReconcilerInstallerInput(owner contracts.OwnerDeployment, worker contracts.HubWorkerDeployment, ownerDeployment, workerDeployment, workerAccount contracts.WorkerObjectReference, initialClaimID string, inputs contracts.ConfigurationRuntimeLaunchInputs) ([]byte, error) {
+	b, err := BuildConfigurationRoleInstallerInput(owner, worker, ownerDeployment, workerDeployment, workerAccount, initialClaimID)
+	if err != nil {
+		return nil, err
+	}
+	var in contracts.ConfigurationRoleInstaller
+	if json.Unmarshal(b, &in) != nil {
+		return nil, configurationRoleInputInvalid
+	}
+	in.Launch = &inputs
+	if _, _, err = configurationRoleInstallerPlan(in); err != nil {
+		return nil, err
+	}
+	b, err = json.Marshal(in)
+	if err != nil || len(b) > contracts.ConfigurationRoleInstallerMaxBytes {
+		return nil, configurationRoleInputInvalid
+	}
+	return b, nil
+}

@@ -1,0 +1,212 @@
+package evidence
+
+import (
+	"context"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+)
+
+// WorkerOwnerStore holds locator metadata only. Claim checks current authority;
+// Read returns no authority. The receiver must resolve an exact live local owner
+// and repeat ordinary enrollment checks before any cryptographic effect.
+type WorkerOwnerStore interface {
+	WorkerOwnerLookup
+	ClaimWorkerOwner(context.Context, value.DownloadWorker, artifact.DownloadAuthority, value.WorkerOwnerRequest) (value.WorkerOwnerLease, error)
+	ReleaseWorkerOwner(context.Context, value.WorkerOwnerLease) error
+}
+type WorkerOwnerLookup interface {
+	ReadWorkerOwner(context.Context, string, string) (value.WorkerOwnerLease, error)
+}
+
+type WorkerOwnerEnrollment interface {
+	BeginOwnedWorkerEnrollment(context.Context, value.WorkerOwnerLease, []byte, []byte) (WorkerEnrollmentDelivery, error)
+}
+
+// Resolve through the already bounded router, retaining the exact registration
+// across shared-store reads. Never recreate a handle from a wire locator.
+func (s *WorkerRequestOwners) BeginOwnedWorkerEnrollment(ctx context.Context, lease value.WorkerOwnerLease, token, csr []byte) (WorkerEnrollmentDelivery, error) {
+	if s == nil || s.Router == nil || ctx == nil || ctx.Err() != nil || lease.Request.PodUID != s.PodUID || lease.Request.ProcessEpoch != s.ProcessEpoch || !lease.Valid(s.Router.now()) {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	r := s.Router
+	r.mu.Lock()
+	entry := r.entries[workerRouteKey{lease.Request.SessionID, lease.Request.WorkerID}]
+	var h *WorkerOwnerRegistration
+	if !r.closed && entry != nil && !entry.closed {
+		h = entry.owner
+	}
+	r.mu.Unlock()
+	if h == nil || !h.lease.Equal(lease) {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	return h.BeginWorkerEnrollment(ctx, lease, token, csr)
+}
+
+type WorkerRequestOwners struct {
+	Router               *WorkerEnrollmentRouter
+	Store                WorkerOwnerStore
+	PodUID, ProcessEpoch string
+	NewID                func() string
+}
+
+// Registration must be closed by its authenticated control owner. Cancellation
+// independently closes local routing; a lost SQL release expires at the original
+// deadline. It never starts a background cleanup goroutine or renews a lease.
+type WorkerOwnerRegistration struct {
+	lease value.WorkerOwnerLease
+	route *WorkerEnrollmentRoute
+	store WorkerOwnerStore
+	once  sync.Once
+	err   error
+}
+
+func (h *WorkerOwnerRegistration) Lease() value.WorkerOwnerLease { return h.lease }
+
+// BeginWorkerEnrollment is the exact-owner receiver facet for a future private
+// authenticated relay. The locator/fence never substitutes for peer admission
+// or the operation's current human and Pod checks. Old handles cannot route to
+// a newer local operation, even when the shared record changes during lookup.
+func (h *WorkerOwnerRegistration) BeginWorkerEnrollment(ctx context.Context, expected value.WorkerOwnerLease, token, csr []byte) (WorkerEnrollmentDelivery, error) {
+	if h == nil || ctx == nil || h.route == nil || h.store == nil || !expected.Equal(h.lease) || h.route.ctx.Err() != nil || !h.lease.Valid(h.route.router.now()) {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	joined, admitted := h.route.router.borrowOwnerWork()
+	if !admitted {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	defer joined()
+	call, cancel := context.WithDeadline(ctx, h.lease.Request.Until)
+	stop := context.AfterFunc(h.route.ctx, cancel)
+	defer stop()
+	keep := false
+	defer func() {
+		if !keep {
+			cancel()
+		}
+	}()
+	r := h.lease.Request
+	current := func(ctx context.Context) bool {
+		l, err := h.store.ReadWorkerOwner(ctx, r.SessionID, r.WorkerID)
+		return err == nil && l.Equal(h.lease) && l.Valid(h.route.router.now()) && ctx.Err() == nil && h.route.ctx.Err() == nil
+	}
+	if !current(call) {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	d, err := h.route.router.beginWorkerEnrollment(call, r.InstallationID, r.SessionID, r.WorkerID, token, csr, h.route)
+	if err != nil {
+		return nil, err
+	}
+	if !current(d.Context()) {
+		d.Close()
+		return nil, artifact.ErrDownloadExpired
+	}
+	keep = true
+	return &workerEnrollmentDelivery{ctx: d.Context(), certificate: d.Certificate(), release: func() { d.Close(); cancel() }}, nil
+}
+
+func (h *WorkerOwnerRegistration) Close(ctx context.Context) error {
+	if h == nil {
+		return nil
+	}
+	h.once.Do(func() {
+		joined, admitted := h.route.router.borrowOwnerWork()
+		h.route.Close()
+		if !admitted {
+			// Shutdown has closed dependency admission. A release not yet
+			// issued remains occupied until the original SQL lease expires.
+			h.err = artifact.ErrDownloadUnavailable
+			return
+		}
+		defer joined()
+		if ctx == nil {
+			h.err = artifact.ErrInvalid
+			return
+		}
+		// A disconnected request still releases only its exact routing fence.
+		cleanup, end := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer end()
+		h.err = h.store.ReleaseWorkerOwner(cleanup, h.lease)
+	})
+	return h.err
+}
+
+func (s *WorkerRequestOwners) Register(ctx context.Context, op *WorkerEnrollmentOperation) (*WorkerOwnerRegistration, error) {
+	if s == nil || s.Router == nil || s.Store == nil || s.NewID == nil || !value.UUID(s.PodUID) || !value.UUID(s.ProcessEpoch) {
+		return nil, artifact.ErrInvalid
+	}
+	joined, admitted := s.Router.borrowOwnerWork()
+	if !admitted {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	defer joined()
+	route, err := s.Router.Register(ctx, op)
+	if err != nil {
+		return nil, err
+	}
+	keep := false
+	defer func() {
+		if !keep {
+			route.Close()
+		}
+	}()
+	call, end := context.WithDeadline(route.ctx, op.bound())
+	defer end()
+	shorten, finish := workerEffectContext(&call, op.bound)
+	defer finish()
+	a, err := op.current(call)
+	if err != nil || a.Scope != op.scope || !a.Valid(s.Router.now()) || a.Environment.InstallationID != s.Router.installation {
+		return nil, artifact.ErrDownloadExpired
+	}
+	shorten()
+	o, err := s.Router.bindings.ReadDownloadWorkerEnrollment(call, op.target.SessionID, op.target.WorkerID)
+	if err != nil || !o.Valid(s.Router.now()) || !sameWorkerTarget(workerTarget(o.Worker), op.target) || !a.Valid(s.Router.now()) {
+		return nil, artifact.ErrDownloadExpired
+	}
+	if op.pinned != nil {
+		latest, e := op.current(call)
+		if e != nil || !a.Valid(s.Router.now()) || !o.Valid(s.Router.now()) {
+			return nil, artifact.ErrDownloadExpired
+		}
+		a = latest
+	}
+	shorten()
+	request := value.WorkerOwnerRequest{ID: s.NewID(), InstallationID: s.Router.installation, SessionID: op.target.SessionID, WorkerID: op.target.WorkerID, PodUID: s.PodUID, ProcessEpoch: s.ProcessEpoch, Until: op.bound().UTC().Truncate(time.Microsecond)}
+	if !request.Valid(s.Router.now()) {
+		return nil, artifact.ErrInvalid
+	}
+	l, err := s.Store.ClaimWorkerOwner(call, o.Worker, a, request)
+	if err != nil {
+		// An uncertain claim remains occupied until expiry; do not guess its
+		// fence, release another owner or retry with a later deadline.
+		return nil, err
+	}
+	h := &WorkerOwnerRegistration{lease: l, route: route, store: s.Store}
+	if l.Request != request || !l.Valid(s.Router.now()) || route.ctx.Err() != nil {
+		// Only an exact valid returned fence may be released.
+		if l.Request == request && l.Valid(l.Started) {
+			_ = h.Close(ctx)
+		}
+		return nil, artifact.ErrDownloadExpired
+	}
+	if op.pinned != nil {
+		if _, e := op.current(call); e != nil || request.Until.After(op.bound()) {
+			_ = h.Close(ctx)
+			return nil, artifact.ErrDownloadExpired
+		}
+	}
+	s.Router.mu.Lock()
+	active := !s.Router.closed && !route.closed && route.ctx.Err() == nil && s.Router.entries[route.key] == route && l.Valid(s.Router.now())
+	if active {
+		route.owner = h
+	}
+	s.Router.mu.Unlock()
+	if !active {
+		_ = h.Close(ctx)
+		return nil, artifact.ErrDownloadExpired
+	}
+	keep = true
+	return h, nil
+}

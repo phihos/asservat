@@ -1,0 +1,70 @@
+# Closed regional routing values and codecs
+
+Frozen six-path checkpoint-v1. The live repository was never edited by this
+agent. Manifest `8fe5c7d08ece4a9b65c0e8841eadaf6660677150cc1bd4fe955ad13395389bae`
+and freeze `3a450e89f4928958f96128f253b1770307920de3a74d79fe9d5d004f86514cd4`
+remain unchanged after qualification. `files/`, `originals/`, `payload.json`,
+`bases.json`, `dependencies.json`, `overlay.json` and `mirror.json` preserve the
+exact reviewed sources and 1,894 live dependencies. The mirror contains the
+same payload over those dependencies, so the unchanged architecture checker
+can read new domain source files without relaxing its pure-value allowlist.
+
+## Scope and contracts
+
+New domain locator query/locator/claim values retain the original request and
+challenge, permission root and regional cluster, independently authenticated
+holder installation/hub cluster/issuer/Pod/process, original exchange and exact
+nonzero uint64 sequence. Permission root and installation are independent pins;
+trusted installed delegation still has to bind them. Dates stay within the
+original request. No decoded value claims a holder or grants authority.
+
+New C-20 codecs fix `/internal/cluster-observation/locator/v1` and `/claim/v1`,
+distinct formats/media types, a canonical closed seven-key GET target <=2 KiB,
+a closed locator <=4 KiB and complete claim envelope <=196 KiB with independent
+192 KiB request/4 KiB locator limits. Unknown/duplicate/missing/null/aliased
+fields, malformed/noncanonical queries, wrong purposes, changed tuple/bounds
+and noncanonical dates deny. The new sequence codec uses direct uint64 parsing
+and `CanonicalizeRawInts(false)` to avoid RFC8785's default rounding beyond
+2^53. Existing observation encoders, canonical digest owner and four proof
+ordinals are untouched; retained encoding/order/digest/frame tests pass.
+
+No receiver, routing/runtime selection, SQL query/field/grant or installed-v2
+producer is added. No legacy behavior is replaced, so there is no applicable
+preexisting public behavior to reproduce before these new value APIs compile.
+The integer tests explicitly cover 2^53 boundaries and MaxUint64, rejection of
+overflow/fraction/exponent/string/zero, and exact nested round trips. They do
+not reinterpret old wire formats.
+
+## Actual verification
+
+Approved sequential runner `run.py`, SHA256
+`55e5a4bd8c61236b4274ea81213a524f96a144d71bb9eb9e12c6aaa77f1b0f0a`, ran with
+GOMAXPROCS=2, GOFLAGS=-p=2 and the checkpoint's dedicated TMPDIR. It refuses an
+existing evidence directory. Handle **50090**, terminal **0**:
+
+- Three-package compile (`go test -vet=off -run '^$'` with immutable overlay): 0, 1.945s.
+- Selected routing plus retained observation value/wire/frame/digest/order races,
+  count1, original120s test bound: 0, 5.901s. **154 named PASS entries**, including
+  **108 new routing** and **46 retained** entries; counts include subtests.
+- Same three-package `go vet`: 0, 0.394s.
+- Unchanged `make go-architecture-check` in the hashed source mirror: 0, 1.251s;
+  53 packages,297 internal edges.
+
+Actual commands, original240s phase caps, exits and before/after source checks
+are in `evidence/*.json` and `RESULT.json`; all live/base/payload/file-set/mirror/
+freeze mismatch arrays are empty. No build or native job remains active.
+No spec/design gate or real-service result is claimed for this allocation.
+Parent may run combined canonical gates after integration.
+
+## Next boundary
+
+Implement the actual closed receiving locator/claim handlers and exact current
+same-pool installed delegation, then bounded complete candidate read and one
+exact-SNI claim forwarding. Common-SNI locator and exact-SNI claim must remain
+mutually exclusive based on actual TLS plus HTTP authority. No HWORK token
+forwarding or unknown POST replay. Parent assigns the shared fresh installed-v2
+generator/carrier/loader/receipt consumers to console_delivery; this agent owns
+domain pool limit and routing query/receive/forward consumers. No field is
+selected until those consumers agree. Native multi-owner/two-cluster latency
+and actual API counts inside the original five seconds remain mandatory;
+component codec tests provide no such qualification.

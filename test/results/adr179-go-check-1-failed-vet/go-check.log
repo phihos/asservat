@@ -1,0 +1,22 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/investigation-schemas.py
+Investigation schemas OK: nine bounded implemented subsets; all references local
+go vet ./...
+# asservat.local/asservat/test/integration
+# [asservat.local/asservat/test/integration]
+vet: test/integration/context_start_exchange_test.go:344:72: cannot use runner.Targets (variable of type interface{ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)}) as contextstart.QueryTargets value in struct literal: interface{ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)} does not implement contextstart.QueryTargets (missing method ResolveWorkload)
+make: *** [Makefile:52: go-check] Fehler 1
+exit=2

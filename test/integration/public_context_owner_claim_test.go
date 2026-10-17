@@ -1,0 +1,340 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+)
+
+// A fixture-only scheduling observation of one ORIGINAL successful SQL claim.
+// It is neither completed Register/enrollment nor current effect authority.
+// No SQL poll, retry, replacement, pool change or background goroutine is added.
+type publicJourneyOwnerClaim struct {
+	target  value.WorkerCredentialTarget
+	request value.WorkerOwnerRequest
+	lease   value.WorkerOwnerLease
+}
+type publicJourneyOwnerClaims struct {
+	evidence.WorkerOwnerStore
+	pod, epoch string
+	mu         sync.Mutex
+	armed      bool
+	last, next int64 // Fixture bookkeeping of acknowledged fences, never authority.
+	ready      chan publicJourneyOwnerClaim
+}
+
+func newPublicJourneyOwnerClaims(store evidence.WorkerOwnerStore, pod, epoch string) *publicJourneyOwnerClaims {
+	return &publicJourneyOwnerClaims{WorkerOwnerStore: store, pod: pod, epoch: epoch, armed: true, next: 1, ready: make(chan publicJourneyOwnerClaim, 1)}
+}
+
+// Arm discards any earlier acknowledged claim and observes only the next one.
+// Native14 showed the first preparation's own registration claims fence 1 and
+// releases it after its one-second wait; that stale signal must not schedule
+// enrollment before the continuation's registration (fence 2) exists.
+func (s *publicJourneyOwnerClaims) Arm() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.ready:
+	default:
+	}
+	s.armed, s.next = true, s.last+1
+}
+func (s *publicJourneyOwnerClaims) ClaimWorkerOwner(ctx context.Context, w value.DownloadWorker, a artifact.DownloadAuthority, request value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
+	lease, err := s.WorkerOwnerStore.ClaimWorkerOwner(ctx, w, a, request)
+	// Unknown/pending/canceled returns retain their exact result/error and never notify.
+	// Register cancels this helper context on normal return; later cancellation
+	// cannot retroactively turn an acknowledged claim into an unacknowledged one.
+	// The first acknowledged return after arming is retained unchanged for the
+	// waiter's exact target/fence checks; a later claim cannot overwrite it.
+	if err == nil && ctx != nil && ctx.Err() == nil {
+		target := value.WorkerCredentialTarget{InstallationID: w.Binding.InstallationID, SessionID: w.Intent.SessionID, WorkerID: w.Intent.ID, PodUID: w.Binding.PodUID, CreatedAt: w.Intent.CreatedAt, RunUntil: w.Intent.RunUntil}
+		s.mu.Lock()
+		if lease.Fence > s.last {
+			s.last = lease.Fence
+		}
+		if s.armed {
+			s.armed = false
+			s.ready <- publicJourneyOwnerClaim{target, request, lease}
+		}
+		s.mu.Unlock()
+	}
+	return lease, err
+}
+func (s *publicJourneyOwnerClaims) Wait(parent context.Context, target value.WorkerCredentialTarget) error {
+	// Keep the original readiness wait at one second, clipped by its caller.
+	ctx, cancel := context.WithTimeout(parent, time.Second)
+	defer cancel()
+	s.mu.Lock()
+	next := s.next
+	s.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case observed := <-s.ready:
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		got, want := observed.target, target
+		sameTime := got.CreatedAt.Equal(want.CreatedAt) && got.RunUntil.Equal(want.RunUntil)
+		got.CreatedAt, got.RunUntil, want.CreatedAt, want.RunUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+		request := observed.request
+		// Only the exact next fence after arming is adopted; an intervening or
+		// earlier claim is not. The product remains responsible for authority.
+		exact := observed.lease.Equal(value.WorkerOwnerLease{Request: request, Fence: next, Started: observed.lease.Started})
+		if !target.Valid() || got != want || !sameTime || !exact || request.InstallationID != target.InstallationID || request.SessionID != target.SessionID || request.WorkerID != target.WorkerID || request.PodUID != s.pod || request.ProcessEpoch != s.epoch || !observed.lease.Valid(time.Now()) {
+			return artifact.ErrDownloadUnavailable
+		}
+		return nil
+	}
+}
+
+type journeyOwnerClaimProbe struct {
+	want                    context.Context
+	worker                  value.DownloadWorker
+	authority               artifact.DownloadAuthority
+	request                 value.WorkerOwnerRequest
+	lease                   value.WorkerOwnerLease
+	err                     error
+	claims, reads, releases int
+	entered, release        chan struct{}
+}
+
+func (p *journeyOwnerClaimProbe) ClaimWorkerOwner(ctx context.Context, w value.DownloadWorker, a artifact.DownloadAuthority, r value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
+	if ctx != p.want || w != p.worker || a != p.authority || r != p.request {
+		panic("original claim argument changed")
+	}
+	p.claims++
+	if p.entered != nil {
+		close(p.entered)
+		<-p.release
+	}
+	return p.lease, p.err
+}
+func (p *journeyOwnerClaimProbe) ReadWorkerOwner(ctx context.Context, session, worker string) (value.WorkerOwnerLease, error) {
+	if ctx != p.want || session != p.request.SessionID || worker != p.request.WorkerID {
+		panic("original lookup argument changed")
+	}
+	p.reads++
+	return p.lease, p.err
+}
+func (p *journeyOwnerClaimProbe) ReleaseWorkerOwner(ctx context.Context, lease value.WorkerOwnerLease) error {
+	if ctx != p.want || lease != p.lease {
+		panic("original release argument changed")
+	}
+	p.releases++
+	return p.err
+}
+func newJourneyOwnerClaimProbe() (*journeyOwnerClaimProbe, value.WorkerCredentialTarget) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	target := value.WorkerCredentialTarget{InstallationID: custodyID(), SessionID: custodyID(), WorkerID: custodyID(), PodUID: custodyID(), CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	request := value.WorkerOwnerRequest{ID: custodyID(), InstallationID: target.InstallationID, SessionID: target.SessionID, WorkerID: target.WorkerID, PodUID: custodyID(), ProcessEpoch: custodyID(), Until: now.Add(5 * time.Second)}
+	// This is only an interface-delegation fixture, not synthetic accepted SQL.
+	w := value.DownloadWorker{Intent: value.DownloadWorkerIntent{ID: target.WorkerID, SessionID: target.SessionID, CreatedAt: target.CreatedAt, RunUntil: target.RunUntil}, Binding: value.KeyWorkerBinding{InstallationID: target.InstallationID, PodUID: target.PodUID}}
+	return &journeyOwnerClaimProbe{want: context.WithValue(context.Background(), struct{}{}, "original-context"), worker: w, request: request, lease: value.WorkerOwnerLease{Request: request, Fence: 1, Started: now}}, target
+}
+func TestPublicJourneyOwnerClaimDelegatesAndNotifiesOnce(t *testing.T) {
+	p, target := newJourneyOwnerClaimProbe()
+	s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	got, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	if got != p.lease || err != nil || p.claims != 1 || len(s.ready) != 1 {
+		t.Fatal("original claim result or single notification changed")
+	}
+	if err = s.Wait(p.want, target); err != nil || p.reads != 0 {
+		t.Fatal("acknowledged original wait polled SQL or failed")
+	}
+	// All independent interface facets still delegate with their original results.
+	got, err = s.ReadWorkerOwner(p.want, target.SessionID, target.WorkerID)
+	if got != p.lease || err != nil || p.reads != 1 {
+		t.Fatal("lookup facet changed")
+	}
+	if err = s.ReleaseWorkerOwner(p.want, p.lease); err != nil || p.releases != 1 {
+		t.Fatal("release facet changed")
+	}
+	// A subsequent successful delegate return cannot recreate a consumed signal.
+	got, err = s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	if got != p.lease || err != nil || p.claims != 2 || len(s.ready) != 0 {
+		t.Fatal("one-shot observation was reset")
+	}
+}
+func TestPublicJourneyOwnerClaimFailuresAndCancellation(t *testing.T) {
+	for _, cause := range []error{artifact.ErrDownloadUnavailable, &evidence.DownloadWorkerPending{}, context.Canceled, context.DeadlineExceeded, &journeyDownloadPrivateError{}} {
+		p, target := newJourneyOwnerClaimProbe()
+		p.err = cause
+		s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+		got, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+		if got != p.lease || err != cause || p.claims != 1 || len(s.ready) != 0 {
+			t.Fatal("failed or uncertain claim notified or changed")
+		}
+		ctx, cancel := context.WithCancel(p.want)
+		cancel()
+		if !errors.Is(s.Wait(ctx, target), context.Canceled) || p.reads != 0 || p.claims != 1 {
+			t.Fatal("wait retried/polled or ignored caller cancellation")
+		}
+	}
+	// A delegate may return a value and nil after cancellation. Keep that exact
+	// return but do not let another live waiter treat it as an acknowledged claim.
+	p, target := newJourneyOwnerClaimProbe()
+	canceled, stopClaim := context.WithCancel(p.want)
+	stopClaim()
+	p.want = canceled
+	s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	got, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	if got != p.lease || err != nil || p.claims != 1 || len(s.ready) != 0 {
+		t.Fatal("canceled delegate result changed or notified")
+	}
+	live, stopWait := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer stopWait()
+	if !errors.Is(s.Wait(live, target), context.DeadlineExceeded) || p.reads != 0 || p.claims != 1 {
+		t.Fatal("canceled claim became readiness for a live waiter")
+	}
+	p, target = newJourneyOwnerClaimProbe()
+	s = newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	ctx, cancel := context.WithCancel(p.want)
+	cancel()
+	if !errors.Is(s.Wait(ctx, target), context.Canceled) || p.reads != 0 {
+		t.Fatal("ready signal rescued a canceled caller")
+	}
+	// Register's normal defer cancels its helper after a successful return.
+	// This does not erase the earlier acknowledgement; it grants no authority.
+	p, target = newJourneyOwnerClaimProbe()
+	helper, endHelper := context.WithCancel(p.want)
+	p.want = helper
+	s = newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	got, err = s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	endHelper()
+	if got != p.lease || err != nil || s.Wait(context.Background(), target) != nil || p.claims != 1 || p.reads != 0 {
+		t.Fatal("normal helper cleanup erased the original acknowledgement")
+	}
+}
+func TestPublicJourneyOwnerClaimPinsAndOriginalDeadline(t *testing.T) {
+	for _, change := range []string{"installation", "session", "worker", "pod", "created", "run-until", "owner", "process", "request", "fence", "expiry", "caller-deadline"} {
+		t.Run(change, func(t *testing.T) {
+			p, target := newJourneyOwnerClaimProbe()
+			s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+			switch change {
+			case "installation":
+				target.InstallationID = custodyID()
+			case "session":
+				target.SessionID = custodyID()
+			case "worker":
+				target.WorkerID = custodyID()
+			case "pod":
+				target.PodUID = custodyID()
+			case "created":
+				target.CreatedAt = target.CreatedAt.Add(-time.Second)
+			case "run-until":
+				target.RunUntil = target.RunUntil.Add(time.Second)
+			case "owner":
+				s.pod = custodyID()
+			case "process":
+				s.epoch = custodyID()
+			case "request":
+				p.lease.Request.ID = custodyID()
+			case "fence":
+				p.lease.Fence = 2
+			case "expiry":
+				p.request.Until = time.Now().Add(-time.Second)
+				p.lease.Request = p.request
+			}
+			got, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+			if got != p.lease || err != nil || p.claims != 1 {
+				t.Fatal("delegate result changed")
+			}
+			ctx := p.want
+			if change == "caller-deadline" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				defer cancel()
+			}
+			err = s.Wait(ctx, target)
+			if err == nil || p.reads != 0 || p.claims != 1 {
+				t.Fatal("mismatch/expiry adopted or wait polled/retried")
+			}
+			if change == "caller-deadline" && !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatal("caller bound changed")
+			}
+		})
+	}
+}
+
+func TestPublicJourneyOwnerClaimWaitsForOriginalCompletion(t *testing.T) {
+	p, target := newJourneyOwnerClaimProbe()
+	p.entered, p.release = make(chan struct{}), make(chan struct{})
+	s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	done := make(chan error, 1)
+	go func() {
+		got, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+		if got != p.lease || err != nil {
+			done <- artifact.ErrInvalid
+			return
+		}
+		done <- nil
+	}()
+	<-p.entered
+	if len(s.ready) != 0 {
+		close(p.release)
+		<-done
+		t.Fatal("claim observed before original delegate returned")
+	}
+	close(p.release)
+	if err := <-done; err != nil {
+		t.Fatal("original claim return changed")
+	}
+	if err := s.Wait(p.want, target); err != nil || p.reads != 0 {
+		t.Fatal("completed original claim failed or polled SQL")
+	}
+	// A missing claim remains unavailable under the original one-second bound.
+	empty := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	if err := empty.Wait(p.want, target); !errors.Is(err, context.DeadlineExceeded) || p.reads != 0 || p.claims != 1 {
+		t.Fatal("pending wait created work, polled or changed its bound")
+	}
+	// Cancellation also joins a wait that was admitted while its parent was live.
+	ctx, cancel := context.WithCancel(p.want)
+	waiting := make(chan struct{})
+	waited := make(chan error, 1)
+	go func() { close(waiting); waited <- empty.Wait(ctx, target) }()
+	<-waiting
+	cancel()
+	select {
+	case err := <-waited:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal("blocked wait ignored cancellation")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("canceled readiness wait did not join")
+	}
+}
+
+func TestPublicJourneyOwnerClaimArmIgnoresEarlierRegistration(t *testing.T) {
+	p, target := newJourneyOwnerClaimProbe()
+	s := newPublicJourneyOwnerClaims(p, p.request.PodUID, p.request.ProcessEpoch)
+	// The first preparation's own registration claims and later releases fence 1.
+	if _, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request); err != nil || len(s.ready) != 1 {
+		t.Fatal("first registration claim not observed")
+	}
+	s.Arm()
+	short, stop := context.WithTimeout(p.want, 20*time.Millisecond)
+	defer stop()
+	if err := s.Wait(short, target); !errors.Is(err, context.DeadlineExceeded) || p.reads != 0 {
+		t.Fatal("stale earlier registration scheduled enrollment")
+	}
+	// An intervening claim with an unexpected fence is not adopted.
+	p.lease.Fence = 3
+	s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request)
+	if err := s.Wait(p.want, target); err == nil {
+		t.Fatal("non-successor fence adopted")
+	}
+	s.Arm()
+	p.lease.Fence = 4
+	if _, err := s.ClaimWorkerOwner(p.want, p.worker, p.authority, p.request); err != nil || s.Wait(p.want, target) != nil || p.reads != 0 || p.claims != 3 {
+		t.Fatal("continuation's own successor claim not observed exactly once")
+	}
+}

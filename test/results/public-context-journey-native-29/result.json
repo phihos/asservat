@@ -1,0 +1,38 @@
+{
+  "mode": "journey",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--regional-context-start",
+    "journey"
+  ],
+  "runnerSHA256": "8098d2a6bebe5462c76da222db9b2d785a7df861a9ff17df57f7b1c11aba0b1f",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 3121,
+  "sourceSnapshotSHA256": "0482a1ca2d4b348e46b11c121566bb785d47c2c48c107ef5291de634ae41eeac",
+  "expectedHarnessSourceCount": 2367,
+  "requiredPassedTests": [
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "expectedSkippedTests": [],
+  "scratch": "/home/phil/.cache/asservat-build/public-context-journey-native-29-tmp",
+  "validationErrors": [],
+  "processJoined": false,
+  "diskBeforeBytes": 412527239168,
+  "tmpFreeBeforeBytes": 16758947840,
+  "reviewedPayloadsSHA256": "68153f12ce3f63862d126212b67bc54d6387febf4a6d4ba8f598d113511677e6",
+  "reviewedPayloadsMatch": false,
+  "runnerError": "reviewed journey payload changed before launch",
+  "signalReceived": null,
+  "runnerUnchanged": true,
+  "finalProcessGroupAbsent": true,
+  "reviewedPayloadsUnchanged": true,
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "0482a1ca2d4b348e46b11c121566bb785d47c2c48c107ef5291de634ae41eeac",
+    "runner.py": "8098d2a6bebe5462c76da222db9b2d785a7df861a9ff17df57f7b1c11aba0b1f",
+    "expected-harness-sources.json": "cbe041588f41cc9f1faa64bc0bb0ae1c3184e4eb807539d3b92ea23bb677c20c"
+  },
+  "exit": 1
+}

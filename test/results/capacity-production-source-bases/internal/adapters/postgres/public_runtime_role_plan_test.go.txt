@@ -1,0 +1,60 @@
+package postgres
+
+import (
+	"fmt"
+	"slices"
+	"testing"
+
+	"asservat.local/asservat/internal/contracts"
+)
+
+func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
+	const installation = "10000000-0000-4000-8000-000000000001"
+	want := []string{"identity-read", "browser-settings", "browser-session", "browser-cleanup", "refresh-admit", "refresh-owner", "refresh-read", "permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "capture-intent-read", "download-source", "catalog-read", "download-plan", "worker-config-read"}
+	for n, purpose := range want {
+		expectedOrdinal := n
+		if n >= 7 {
+			expectedOrdinal = n + 3
+		}
+		ordinal, known := contracts.PublicRuntimeRoleOrdinal(purpose)
+		name, valid := PublicRuntimeRoleName(installation, purpose)
+		if !known || !valid || ordinal != expectedOrdinal || len(name) > 63 || name != fmt.Sprintf("as_10000000000040008000000000000001_pub_%02d", expectedOrdinal) {
+			t.Fatalf("fixed purpose identity changed: %s", purpose)
+		}
+	}
+	before := PublicRuntimeRoleLayoutDigest()
+	roles, projection := contracts.PublicRuntimeRolePurposes(), contracts.PublicRuntimeHubRolePurposes()
+	roles[0], projection[0] = "capacity", "capacity-capture"
+	if !slices.Equal(contracts.PublicRuntimeRolePurposes(), want) || !slices.Equal(contracts.PublicRuntimeHubRolePurposes(), want) || PublicRuntimeRoleLayoutDigest() != before {
+		t.Fatal("caller mutation changed source-owned role inventory")
+	}
+	for _, unknown := range []string{"capacity", "capacity-capture", "administrator", "identity-read ", "identity-read; DROP ROLE postgres"} {
+		if _, known := contracts.PublicRuntimeRoleOrdinal(unknown); known {
+			t.Fatalf("unimplemented purpose acquired an ordinal: %s", unknown)
+		}
+		if _, known := publicRuntimeRoleGrants(unknown); known {
+			t.Fatalf("unimplemented purpose acquired grants: %s", unknown)
+		}
+	}
+}
+
+func TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges(t *testing.T) {
+	grants, ok := publicRuntimeRoleGrants("download-source")
+	if !ok {
+		t.Fatal("missing fixed source role")
+	}
+	for _, table := range []string{"custody_copy", "context_case_locator"} {
+		if !slices.Contains(grants, publicRuntimeGrant{"table", table, "", "SELECT"}) {
+			t.Fatalf("missing exact source read: %s", table)
+		}
+	}
+	for _, g := range grants {
+		if g.privilege == "SELECT" || g.kind == "schema" {
+			continue
+		}
+		if g.privilege == "UPDATE" && (g.object == "fleet_current_trust" && g.column == "installation_id" || g.object == "permission_stream" && g.column == "id" || g.object == "retention_source" && g.column == "root_id") {
+			continue
+		}
+		t.Fatalf("source role gained an effect grant: %+v", g)
+	}
+}

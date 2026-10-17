@@ -1,0 +1,13 @@
+=== RUN   TestHubConfigurationWorkerInRestrictedPod
+    hub_worker_test.go:282: native worker image docker.io/library/asservat-context-worker@sha256:109a54e633015d15ca75d9c3a02fb5da15c369d352c175946c134abeab9e9261 Deployment 5a103b16-f43c-400d-a3ba-8d029ef81e9f Restricted Pod with projected API tokens; native timed token renewal not measured
+    hub_worker_test.go:385: nativePod=true; mounted reconciliation used real protected sources, scheduling Lease and scoped SQL/S3/OpenBao; missing root stayed recovery-blocked, one fixture recovery acceptance enabled automatic audited observation, guard removal fenced reads and lease loss joined shutdown
+    hub_worker_native_test.go:140: garbage collector metadata update denied deployments.apps "worker" is forbidden: ValidatingAdmissionPolicy 'configuration-worker-pod-namespace' with binding 'configuration-worker-pod-namespace' denied request: Asservat private hub namespace requires an installation administrator or a qualified Kubernetes controller operation.
+    hub_worker_native_test.go:157: deleting Deployment 2026-10-11 01:52:47 +0200 CEST [foregroundDeletion]
+    hub_worker_native_test.go:161: remaining Pod worker-7455f4f978-jjbdl deleting 2026-10-11 01:53:02 +0200 CEST finalizers []
+    hub_worker_native_test.go:167: remaining ReplicaSet worker-7455f4f978 deleting 2026-10-11 01:52:47 +0200 CEST finalizers [foregroundDeletion]
+    hub_worker_native_test.go:184: controller teardown E1010 23:52:31.481828       1 replica_set.go:640] "Unhandled Error" err="sync \"configuration-worker-pod/worker-7455f4f978\" failed with read version: 639 is not as new as written version: 645 for group resource replicasets.apps" logger="UnhandledError"
+    hub_worker_native_test.go:190: native worker Pods did not terminate
+--- FAIL: TestHubConfigurationWorkerInRestrictedPod (76.62s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	76.685s
+FAIL

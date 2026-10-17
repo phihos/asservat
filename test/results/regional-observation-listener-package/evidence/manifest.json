@@ -1,0 +1,21 @@
+{
+  "status": "frozen source; checks unrun",
+  "scope": "Explicit separately selected regional observation listener; actual accept-time and purpose slot ownership; no bootstrap/runtime/forwarding selection",
+  "paths": [
+    "docs/architecture/cluster-observations.md",
+    "docs/decisions/144-cluster-local-observations.md",
+    "internal/transport/native/owner_observation_server.go",
+    "internal/transport/native/owner_regional_observation_server.go",
+    "internal/transport/native/owner_regional_observation_server_test.go"
+  ],
+  "ownedPaths": 5,
+  "liveDependencies": 1884,
+  "basesSHA256": "0082b9b0d8c4d77740b57f25a49d4a28f8e9c95f68fd073685c5f437a12867d9",
+  "payloadSHA256": "19a71b586f30b935a161da2e5d63aad5fc3c57aef0ead66986107865d773ad6d",
+  "dependenciesSHA256": "85db0ece62aaac7d116db75b8980b77d9ab95bec41e9829761384ce0cd22f9ce",
+  "overlaySHA256": "c692993c434cbde9af0e327f07cf7628d1eb5342445797d7dc9b4f78ede9a34b",
+  "runnerSHA256": "021b1b8b13731cda35e2bc641e2f8be97e3de16f1443de5862ca401de42dc327",
+  "selected": "^TestOwner(RegionalObservationListener|Observation)",
+  "syntheticScope": "Actual listener/TLS/h2/holder tests with synthetic proof/coordinator; no native API/SQL or two-cluster availability",
+  "next": "Run only parent allocated sequential compile/selected race/vet job; preserve actual terminal result and hashes"
+}

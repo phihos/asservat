@@ -1,0 +1,155 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"net/url"
+	"os"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestPeerRegistryWithRealServices(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if path == "" {
+		t.Skip("run make custody-integration")
+	}
+	var f struct{ Postgres string }
+	raw, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(raw, &f) != nil {
+		t.Fatal("fixture unavailable")
+	}
+	ctx := context.Background()
+	admin, err := pgxpool.New(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	u, err := url.Parse(f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, tlsConfig := pgTLSBridge(t, u.Host)
+	c, err := pgxpool.ParseConfig("postgres://peer_read_runtime:synthetic-peer-read@" + address + "/custody_test?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ConnConfig.TLSConfig = tlsConfig
+	c.ConnConfig.Fallbacks = nil
+	c.MaxConns = 8
+	pool, err := pgxpool.NewWithConfig(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	t.Run("read-role-cannot-mint-authority", func(t *testing.T) {
+		for _, sql := range []string{"UPDATE fleet_peer SET enabled=true", "DELETE FROM fleet_peer_certificate", "UPDATE fleet_trust SET recovery_blocked=false", "UPDATE permission_stream SET suspended=false", "UPDATE context_capture SET state='intent_audited'"} {
+			if _, e := pool.Exec(ctx, sql); e == nil {
+				t.Fatal("read role mutated authority")
+			}
+		}
+	})
+	for _, mode := range []string{"active", "revocation", "root-suspended", "recovery", "database-process-changed", "database-recreated", "epoch", "cluster", "missing-audit", "empty-audit-version", "null-audit-version", "expired-trust", "invalid-trust-revision", "expired-peer", "unknown-certificate", "rotation", "blocked-read"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			binding := value.PeerBinding{InstallationID: uuid.NewString(), ClusterID: uuid.NewString(), IssuerEpoch: uuid.NewString(), PeerID: uuid.NewString(), Role: value.ConnectorPeer}
+			cert := value.PeerCertificate{Binding: binding, Digest: artifact.Digest{1}, NotBefore: now, NotAfter: now.Add(time.Hour)}
+			_, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'fixture',1,$3,false,false,$4,$5)`, binding.InstallationID, binding.IssuerEpoch, cert.Digest[:], now, now.Add(30*time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := seedSyntheticFleetObservation(ctx, admin, binding.InstallationID); err != nil {
+				t.Fatal(err)
+			}
+			_, err = admin.Exec(ctx, `INSERT INTO fleet_peer(installation_id,peer_id,cluster_id,issuer_epoch,role,revision,enabled,not_after,audit_id,audit_object_key,audit_object_version,audit_object_sha256) VALUES($1,$2,$3,$4,'connector',1,true,$5,$6,'synthetic-audit','v1',$7)`, binding.InstallationID, binding.PeerID, binding.ClusterID, binding.IssuerEpoch, now.Add(time.Hour), uuid.NewString(), []byte(cert.Digest[:]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = admin.Exec(ctx, `INSERT INTO fleet_peer_certificate(installation_id,peer_id,slot,certificate_sha256,not_before,not_after) VALUES($1,$2,0,$3,$4,$5)`, binding.InstallationID, binding.PeerID, cert.Digest[:], cert.NotBefore, cert.NotAfter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry, e := postgres.NewPeerRegistry(ctx, pool, binding.InstallationID)
+			if e != nil {
+				t.Fatal(e)
+			}
+			auth := fleetapp.PeerAuthenticator{Registry: registry, Now: time.Now}
+			first, e := auth.AuthenticatePeer(ctx, cert)
+			if e != nil || !first.ValidUntil.Before(now.Add(6*time.Second)) {
+				t.Fatal("baseline", first, e)
+			}
+			update := func(sql string, args ...any) {
+				t.Helper()
+				if _, e := admin.Exec(ctx, sql, args...); e != nil {
+					t.Fatal(e)
+				}
+			}
+			switch mode {
+			case "revocation":
+				update("UPDATE fleet_peer SET enabled=false,revision=revision+1 WHERE installation_id=$1", binding.InstallationID)
+			case "root-suspended":
+				update("UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", binding.InstallationID)
+			case "recovery":
+				update("UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", binding.InstallationID)
+			case "database-process-changed":
+				update("UPDATE fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 microsecond' WHERE installation_id=$1", binding.InstallationID)
+			case "database-recreated":
+				update("UPDATE fleet_trust SET activated_database_oid=0::oid WHERE installation_id=$1", binding.InstallationID)
+			case "epoch":
+				update("UPDATE fleet_trust SET issuer_epoch=$2 WHERE installation_id=$1", binding.InstallationID, uuid.NewString())
+			case "cluster":
+				cert.Binding.ClusterID = uuid.NewString()
+			case "missing-audit":
+				if _, e := admin.Exec(ctx, "UPDATE fleet_peer SET audit_id=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_sha256=NULL WHERE installation_id=$1", binding.InstallationID); e == nil {
+					t.Fatal("unaudited enabled peer accepted")
+				}
+				update("UPDATE fleet_peer SET enabled=false,audit_id=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_sha256=NULL WHERE installation_id=$1", binding.InstallationID)
+			case "empty-audit-version":
+				update("UPDATE fleet_peer SET audit_object_version='' WHERE installation_id=$1", binding.InstallationID)
+			case "null-audit-version":
+				update("UPDATE fleet_peer SET audit_object_version='null' WHERE installation_id=$1", binding.InstallationID)
+			case "expired-trust":
+				update("UPDATE fleet_observation SET observed_at=clock_timestamp()-interval '31 seconds',fresh_until=clock_timestamp()-interval '2 seconds' WHERE installation_id=$1", binding.InstallationID)
+			case "invalid-trust-revision":
+				update("UPDATE fleet_trust SET source_digest=$2 WHERE installation_id=$1", binding.InstallationID, make([]byte, 32))
+			case "expired-peer":
+				update("UPDATE fleet_peer SET not_after=clock_timestamp()-interval '1 second' WHERE installation_id=$1", binding.InstallationID)
+			case "unknown-certificate":
+				cert.Digest = artifact.Digest{2}
+			case "rotation":
+				second := cert
+				second.Digest = artifact.Digest{2}
+				update(`INSERT INTO fleet_peer_certificate(installation_id,peer_id,slot,certificate_sha256,not_before,not_after) VALUES($1,$2,1,$3,$4,$5)`, binding.InstallationID, binding.PeerID, second.Digest[:], second.NotBefore, second.NotAfter)
+				if _, e = auth.AuthenticatePeer(ctx, second); e != nil {
+					t.Fatal("rotation not accepted", e)
+				}
+				update("DELETE FROM fleet_peer_certificate WHERE installation_id=$1 AND slot=0", binding.InstallationID)
+			case "blocked-read":
+				tx, e := admin.BeginTx(ctx, pgx.TxOptions{})
+				if e != nil {
+					t.Fatal(e)
+				}
+				defer tx.Rollback(ctx)
+				if _, e = tx.Exec(ctx, "LOCK TABLE fleet_peer IN ACCESS EXCLUSIVE MODE"); e != nil {
+					t.Fatal(e)
+				}
+			}
+			_, e = auth.AuthenticatePeer(ctx, cert)
+			if mode == "active" {
+				if e != nil {
+					t.Fatal(e)
+				}
+			} else if e == nil {
+				t.Fatal("invalid current registration accepted", mode)
+			}
+		})
+	}
+}

@@ -1,0 +1,487 @@
+{
+  "format": "read-only-feature-baseline/v1",
+  "capturedAt": "2026-10-12T13:45:11.602419+00:00",
+  "workspace": "/home/phil/Projekte/asservat",
+  "scope": "First-release feature and milestone inventory, not an overall completion score or ETA",
+  "liveSchemaHead": 53,
+  "buildsOrNativeRunsExecuted": false,
+  "classification": [
+    "designed",
+    "implemented component",
+    "integrated with synthetic authority",
+    "native-qualified for named scope",
+    "installed/user-usable for named scope",
+    "production-qualified"
+  ],
+  "inventorySHA256": "a3b748d06dd60c28137e076eff5ceb450fabaf49be792d9bddbcced014858dfa",
+  "sources": [
+    {
+      "path": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/PLAN.md",
+      "citation": "/home/phil/.cache/asservat-build/planning/capacity-producer-20261012/PLAN.md",
+      "sha256": "a4b47cea95eb052ced195518cef643cdabc3ba5ae232bebeaf9c4b1ff61e40c5",
+      "bytes": 16753
+    },
+    {
+      "path": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/CAPACITY-INPUTS.md",
+      "citation": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/CAPACITY-INPUTS.md",
+      "sha256": "e9837221f30547a3106ed9e1a1ae610a37bbbca80a4b684d71a6657ba6b16aee",
+      "bytes": 7104
+    },
+    {
+      "path": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/READINESS.md",
+      "citation": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/READINESS.md",
+      "sha256": "5653a50f173f9a43c475c16f9460069f0986360868ecc831d6812ff6b7e68584",
+      "bytes": 6432
+    },
+    {
+      "path": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/RECONCILER-PROVISIONING.md",
+      "citation": "/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/RECONCILER-PROVISIONING.md",
+      "sha256": "3ba0e0df4eba71ff41180d4958a98b4b6a7d8bf97e6b581263ff6308a310fcec",
+      "bytes": 10316
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/charts/asservat/templates/bootstrap-runner.yaml",
+      "citation": "/home/phil/Projekte/asservat/charts/asservat/templates/bootstrap-runner.yaml",
+      "sha256": "112cf9bd0d3d1bce6e25794638bcdb42dfa4234a595bc740bc47045f4af902c2",
+      "bytes": 4627
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/charts/asservat/templates/installation.yaml",
+      "citation": "/home/phil/Projekte/asservat/charts/asservat/templates/installation.yaml:1",
+      "sha256": "ac093ac3d8cb6d6591499c29e523fd597953b162fc2ba36ba4d77d4bc571419b",
+      "bytes": 956
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/artifact-format.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/artifact-format.md",
+      "sha256": "e96b61f5d89efd1d9e65886fdd83ac30832f75da7f2a616fd5bafdb090617711",
+      "bytes": 19336
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/browser-sessions.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/browser-sessions.md",
+      "sha256": "2d8559267c60bc524ca1735029e67dfedbe25a6b7ecb9e21fe3d338f8c71b020",
+      "bytes": 13982
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/build-or-reuse.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/build-or-reuse.md:11",
+      "sha256": "0f2661077e65759e2a0564e9f8acd1d26edd786be0560ccbfd46add0a6df6926",
+      "bytes": 14401
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/context-investigation.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/context-investigation.md",
+      "sha256": "bc8d958b3644aafb9091e002af6d566955a64de849485ced5a15be58b65f4d27",
+      "bytes": 8317
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/context-native-content.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/context-native-content.md",
+      "sha256": "f13b5c6b6cc67c79bc95da5b3ca4b0ec98251ebd6b338edc9c22b2afed866ee6",
+      "bytes": 8549
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/download-authority.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/download-authority.md",
+      "sha256": "1dfe9eb52aa8ee4007a78fddb0e7089cad275065310554e74ac62fe46ea67fe3",
+      "bytes": 4368
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/helm-bootstrap.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/helm-bootstrap.md:80",
+      "sha256": "656851a532f259d5d9425b586b0e88ba5867e41baad0f7c183ef86cc134bb45c",
+      "bytes": 7542
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/implementation-slices.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/implementation-slices.md",
+      "sha256": "716b27184398f38ad1b1c0f0f4c17c6645e49b9b3189c09dd748097aa96fb192",
+      "bytes": 11315
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/implementation-slices.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/implementation-slices.md:9",
+      "sha256": "716b27184398f38ad1b1c0f0f4c17c6645e49b9b3189c09dd748097aa96fb192",
+      "bytes": 11315
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/local-key-service.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/local-key-service.md",
+      "sha256": "fedc7b58a5200bbfd857c780d8c12a2bd7fbd7209e79951384604f5db348f08c",
+      "bytes": 11153
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/mcp-runtime.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/mcp-runtime.md",
+      "sha256": "d383c750baa094052f6865a6a9a1e01fad58433bc3493215cdf92683ed6d2707",
+      "bytes": 9453
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/policy-automation.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/policy-automation.md",
+      "sha256": "fa24eb072c2046eacb3b8f17a390bcce7b8d39b701f7cfece1cf7ddfb7da3a48",
+      "bytes": 11890
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/architecture/retention-lifecycle.md",
+      "citation": "/home/phil/Projekte/asservat/docs/architecture/retention-lifecycle.md",
+      "sha256": "1d5fe08c2f6e76241b25d11bf1baa5ca87c6efeb3080c8e40a7f2fb774f43a76",
+      "bytes": 7977
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-plan.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-plan.md:203",
+      "sha256": "c924934755c07e431be033638643bd82cf039a4637f6b57f9d0b32df04021a17",
+      "bytes": 44124
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-plan.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-plan.md:218",
+      "sha256": "c924934755c07e431be033638643bd82cf039a4637f6b57f9d0b32df04021a17",
+      "bytes": 44124
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:129",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:1597",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:1992",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:2456",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:3",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:559",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:619",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:689",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:870",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/implementation-progress.md",
+      "citation": "/home/phil/Projekte/asservat/docs/implementation-progress.md:93",
+      "sha256": "39813ffb1d0b53db96027580bfe3f9533ac3a9b223345c136e90026d3bf5c42c",
+      "bytes": 420861
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/installation/helm.md",
+      "citation": "/home/phil/Projekte/asservat/docs/installation/helm.md",
+      "sha256": "52535f3e192e7879e11131846155fe4ebcaeb9bee4d0e391af2db38d569afe18",
+      "bytes": 15097
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/product.md",
+      "citation": "/home/phil/Projekte/asservat/docs/product.md:11",
+      "sha256": "497aaf9d50fe04a63501a3f28b1143d6630f8568d36e5fe25b1b9a404c04bd25",
+      "bytes": 14278
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/product.md",
+      "citation": "/home/phil/Projekte/asservat/docs/product.md:38",
+      "sha256": "497aaf9d50fe04a63501a3f28b1143d6630f8568d36e5fe25b1b9a404c04bd25",
+      "bytes": 14278
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/product.md",
+      "citation": "/home/phil/Projekte/asservat/docs/product.md:44",
+      "sha256": "497aaf9d50fe04a63501a3f28b1143d6630f8568d36e5fe25b1b9a404c04bd25",
+      "bytes": 14278
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/product.md",
+      "citation": "/home/phil/Projekte/asservat/docs/product.md:71",
+      "sha256": "497aaf9d50fe04a63501a3f28b1143d6630f8568d36e5fe25b1b9a404c04bd25",
+      "bytes": 14278
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/research/feasibility-control-crash.md",
+      "citation": "/home/phil/Projekte/asservat/docs/research/feasibility-control-crash.md",
+      "sha256": "a483490ad83fe5d31ef8d9c9dbe0881630cf1b28b87c815c4520f283f45b0076",
+      "bytes": 13866
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/research/feasibility-packet-downloads.md",
+      "citation": "/home/phil/Projekte/asservat/docs/research/feasibility-packet-downloads.md",
+      "sha256": "d304718eae7a037b68fdeb4c8ef649dc57c1c28b55300ab72723d91ee2591820",
+      "bytes": 12371
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/reviews/user-task-review.md",
+      "citation": "/home/phil/Projekte/asservat/docs/reviews/user-task-review.md:10",
+      "sha256": "de8c9d6be23a145f42694effb94452ad532e1d9b545fca3b172d59ade738eb5f",
+      "bytes": 22479
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/docs/validation.md",
+      "citation": "/home/phil/Projekte/asservat/docs/validation.md",
+      "sha256": "4c69aee4b34b59e16fee40ef055cc517558e19d40d90c5dd695467036850f53a",
+      "bytes": 60432
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/cursor.go",
+      "citation": "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/cursor.go",
+      "sha256": "a2684d4dc5d8da69214be2cda8dbeb071deab62a567c8f9df4efd3e65c8bc5ab",
+      "bytes": 8767
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/adapters/postgres/custody.go",
+      "citation": "/home/phil/Projekte/asservat/internal/adapters/postgres/custody.go:27",
+      "sha256": "881180330abcac4f926db93237144255e157eb11d02e9ffbc4f5b5f1bdea2c85",
+      "bytes": 16876
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/application/capture/context_case_navigation.go",
+      "citation": "/home/phil/Projekte/asservat/internal/application/capture/context_case_navigation.go",
+      "sha256": "e7c4a245ad0c3157ef9b52624bb820790dcf6dc27db01bc9e0243246192443fe",
+      "bytes": 1582
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/application/capture/context_investigation.go",
+      "citation": "/home/phil/Projekte/asservat/internal/application/capture/context_investigation.go",
+      "sha256": "1a0d90b90696b9e00e432c39ecee4f925b579430a04c889e8296fb38d669fb40",
+      "bytes": 19185
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/application/capture/policy.go",
+      "citation": "/home/phil/Projekte/asservat/internal/application/capture/policy.go",
+      "sha256": "34570e7a564cacc895d96fc95db747aafa9d5f82d2e2887294c8a120d3bacb51",
+      "bytes": 1510
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/bootstrap/public_context.go",
+      "citation": "/home/phil/Projekte/asservat/internal/bootstrap/public_context.go:17",
+      "sha256": "8af0f7fe46d29756b65b98dacbc850ab076effaba6c8d81fd0b4bbdcefbf5ca9",
+      "bytes": 4671
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/domain/artifact/context.go",
+      "citation": "/home/phil/Projekte/asservat/internal/domain/artifact/context.go:5",
+      "sha256": "a3466576abf2a494987bb40ed0bda4eb32321d273c55bc4616c80895fcd803d8",
+      "bytes": 4819
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/domain/artifact/framed_read_work.go",
+      "citation": "/home/phil/Projekte/asservat/internal/domain/artifact/framed_read_work.go",
+      "sha256": "7ff623325169262665c3ca9d8c05325b723a3d1b9f8f803079bb9280d025a8f4",
+      "bytes": 2030
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/domain/capture/preview.go",
+      "citation": "/home/phil/Projekte/asservat/internal/domain/capture/preview.go:21",
+      "sha256": "5f993176100806985fb2dd65d86d6eed8e55806c4e13a7c8061896e51be30f98",
+      "bytes": 8387
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/internal/transport/presentation/context_operations.go",
+      "citation": "/home/phil/Projekte/asservat/internal/transport/presentation/context_operations.go:39",
+      "sha256": "ace989876e80dd266f3ec6304baa4374972a94489e946243ea14d0b8483ea6c7",
+      "bytes": 19327
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/migrations/00052_capture_intent_lifecycle.sql",
+      "citation": "/home/phil/Projekte/asservat/migrations/00052_capture_intent_lifecycle.sql",
+      "sha256": "bfd9e13c113a852f5a1858865eccd5e86272a2573e85d36e531fb22d31debea3",
+      "bytes": 70418
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/artifact-downloads.md",
+      "citation": "/home/phil/Projekte/asservat/specs/artifact-downloads.md",
+      "sha256": "2943a5abd6ce804dfd0e43d9590c95f6cb794b2442533fb41bf84be56aa3d339",
+      "bytes": 24874
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/authorization.md",
+      "citation": "/home/phil/Projekte/asservat/specs/authorization.md",
+      "sha256": "602a4c6413fb0ec38e8095ae89117dbff1b74cc083b8561da083d106318c870a",
+      "bytes": 49847
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/capture-history.md",
+      "citation": "/home/phil/Projekte/asservat/specs/capture-history.md",
+      "sha256": "c4f7dfaf95e6796cc4a5260a6f8a87c6e70d2cf9d0181d3ae4461c4eb0dc41af",
+      "bytes": 18084
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/capture-profiles.md",
+      "citation": "/home/phil/Projekte/asservat/specs/capture-profiles.md",
+      "sha256": "abd66cb46abad3b7000d2856576637051c154cf39712b383ddc7b79701cf04d1",
+      "bytes": 19458
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/deployment-profiles.md",
+      "citation": "/home/phil/Projekte/asservat/specs/deployment-profiles.md",
+      "sha256": "8ddce865d8830a82a250b6849b5276c88699c3a733c80f60fe3e13dc6150f74a",
+      "bytes": 45451
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/guidance.md",
+      "citation": "/home/phil/Projekte/asservat/specs/guidance.md",
+      "sha256": "4790206da1e3b942a13a63e94ce8b84a1c94f0b08722563afdfb3504d8b33f6c",
+      "bytes": 24149
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/investigation-approval.md",
+      "citation": "/home/phil/Projekte/asservat/specs/investigation-approval.md",
+      "sha256": "28386a365064f8d260be0925c3661efb278410157af60c6c50e67634abce4f73",
+      "bytes": 8496
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/live-watch.md",
+      "citation": "/home/phil/Projekte/asservat/specs/live-watch.md",
+      "sha256": "79f1d7494ef1d8cf7ee132388e3cb036b3ad7c1bf1a67fd45f2473f6a48caac2",
+      "bytes": 16313
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/packets.md",
+      "citation": "/home/phil/Projekte/asservat/specs/packets.md",
+      "sha256": "94816453929625de3015e5a6229aa5018c6c8b99d8133db040222bd0f7cf457f",
+      "bytes": 19543
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/profiles.md",
+      "citation": "/home/phil/Projekte/asservat/specs/profiles.md",
+      "sha256": "f4d1f026cafb0b7385ba82fbdea151d4c6de07ecfef39cf6b7d67c0d27a5515a",
+      "bytes": 12651
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/recording-saves.md",
+      "citation": "/home/phil/Projekte/asservat/specs/recording-saves.md",
+      "sha256": "06368300d748fbf5985ed27cdcf3cbcc46d089bb81948f23a6478aec5fc57df9",
+      "bytes": 16015
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/syscalls.md",
+      "citation": "/home/phil/Projekte/asservat/specs/syscalls.md",
+      "sha256": "2a4a78da8cf9366db29fbbff62e277dc87c1b120fe552ed87ac436666a3133c3",
+      "bytes": 10858
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/specs/triggers.md",
+      "citation": "/home/phil/Projekte/asservat/specs/triggers.md",
+      "sha256": "09acebb959573753d3a52db705826ef2dee134ce981ec3daa1fe06af24df5f89",
+      "bytes": 18083
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/connector51-fast-first-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/connector51-fast-first-check.log",
+      "sha256": "63d8f69fbf08ea1dbf67e4c6d12a3fe744aa9486e5e5fbb7373031a651f23d55",
+      "bytes": 171
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/console-restart-integrated-browser-refresh.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/console-restart-integrated-browser-refresh.log",
+      "sha256": "788660edc96eb8bac2b0a7f9b92b24a5dea5bb6b125183ea16ebd7d5de33235e",
+      "bytes": 2919
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/context-api-runner-native-environment.json",
+      "citation": "/home/phil/Projekte/asservat/test/results/context-api-runner-native-environment.json",
+      "sha256": "05d3410c71392562aa9fc8c3ec4f150870ce99d5e656577f21c2df287bb001d7",
+      "bytes": 99916
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/current-request-provider.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/current-request-provider.log",
+      "sha256": "365946a1d4d403de482ab7c32ad1a462985ee82a9c8785b2126f5e72e75fe3c5",
+      "bytes": 2959
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/custody52-after-native-corrections-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/custody52-after-native-corrections-check.log",
+      "sha256": "5d8ad43ec811718baa9ea5ebeb141da37e8a487920c3a68cb985df4cd557bffb",
+      "bytes": 173
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/database-recovery52-after-native-corrections-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/database-recovery52-after-native-corrections-check.log",
+      "sha256": "2149621ec4642ba6608dff5cce019c9762266ce0252d544d2648d9f5623ee947",
+      "bytes": 181
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/framed-cursor-integrated-gates.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/framed-cursor-integrated-gates.log",
+      "sha256": "83929edd768e0b3d10cb2bfaf2a6e1c61fc4a45517dbbab84f80a685d45484a1",
+      "bytes": 5223
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/helm137-native-hook-diagnostic-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/helm137-native-hook-diagnostic-check.log",
+      "sha256": "8645e8e82f21ff0d73fd57af9d91840b58c95ab4bde6b0b7dadba325848036d4",
+      "bytes": 201
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/helm137-native-hook-diagnostic-environment.json",
+      "citation": "/home/phil/Projekte/asservat/test/results/helm137-native-hook-diagnostic-environment.json",
+      "sha256": "f263b75c6e3d8ee47e9d161761339ebee93ad0469718ac2e6ac00d811ad3653d",
+      "bytes": 184058
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/native-interrupted-phase-owned-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/native-interrupted-phase-owned-check.log",
+      "sha256": "23bacd32821a78683fed7412bf8d8af61927bb685fd8e159e1789a33adcfdf90",
+      "bytes": 171
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/native-interrupted-phase-owned.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/native-interrupted-phase-owned.log",
+      "sha256": "943875c632ee6b65f14f221b99ecf7d3fa5135b7dfe6f7dfcdf607e83db438db",
+      "bytes": 14693
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/native-range-retained-audit-profile-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/native-range-retained-audit-profile-check.log",
+      "sha256": "1f4879e6a3113b81c31ddb7698f9cbde650ba62f0ee4a665aab3647e0bb87f5a",
+      "bytes": 171
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/native-range-retained-audit-profile.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/native-range-retained-audit-profile.log",
+      "sha256": "6eaafe124466d55a2ac2ca9f65bd0e97eadf954023c73039623b4f02d9fb85b4",
+      "bytes": 304100
+    },
+    {
+      "path": "/home/phil/Projekte/asservat/test/results/regional139-owner-ledger-check.log",
+      "citation": "/home/phil/Projekte/asservat/test/results/regional139-owner-ledger-check.log",
+      "sha256": "ea117c8ef385a5d726ff6c0cbd991aeb2633435f9aa5a462f01d61afd3ecbb7f",
+      "bytes": 171
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/lifetime-1/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=180s",
+    "-v",
+    "-run",
+    "^TestOwnerProvider",
+    "./internal/adapters/kms"
+  ],
+  "exit": 0,
+  "seconds": 4.607,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

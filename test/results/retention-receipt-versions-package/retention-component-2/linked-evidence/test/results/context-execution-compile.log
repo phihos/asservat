@@ -1,0 +1,3 @@
+?   	asservat.local/asservat/internal/application/execution	[no test files]
+ok  	asservat.local/asservat/internal/adapters/objectstore	0.073s
+ok  	asservat.local/asservat/test/integration	0.012s

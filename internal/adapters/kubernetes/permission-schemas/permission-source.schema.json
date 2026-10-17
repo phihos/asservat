@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/permission-source.schema.json",
+  "title": "Asservat PermissionSource v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "PermissionSource"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "namespaceMetadata",
+            "workloadMetadata",
+            "kubernetesExec",
+            "kubernetesAccessReview"
+          ]
+        },
+        "namespaceSelector": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/selector"
+        },
+        "excludedNamespaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "role": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
+        },
+        "maxDecisionAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "maxNamespaces": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "protection": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/protection"
+        },
+        "metadataMapping": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/metadataMapping"
+        },
+        "workloadSelector": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/selector"
+        },
+        "identityMappingRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "admissionParity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "noAdditionalRestrictions",
+                "qualifiedAdapter"
+              ]
+            },
+            "reviewRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "adapterRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            }
+          },
+          "required": [
+            "mode",
+            "reviewRef"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "qualifiedAdapter"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "adapterRef"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "adapterRef"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "accessReview": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "check": {
+              "type": "string",
+              "enum": [
+                "namespaceCaptureCreate",
+                "workloadGet",
+                "workloadPatch",
+                "workloadUpdate"
+              ]
+            }
+          },
+          "required": [
+            "check"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "clusterID",
+        "type",
+        "namespaceSelector",
+        "excludedNamespaces",
+        "role",
+        "maxDecisionAgeSeconds",
+        "maxNamespaces"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "namespaceMetadata",
+                  "workloadMetadata"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "protection",
+              "metadataMapping"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "identityMappingRef"
+                  ]
+                },
+                {
+                  "required": [
+                    "admissionParity"
+                  ]
+                },
+                {
+                  "required": [
+                    "accessReview"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "identityMappingRef",
+              "admissionParity"
+            ],
+            "properties": {
+              "role": {
+                "type": "string",
+                "enum": [
+                  "evidence-reader",
+                  "workload-maintainer"
+                ]
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "protection"
+                  ]
+                },
+                {
+                  "required": [
+                    "metadataMapping"
+                  ]
+                },
+                {
+                  "required": [
+                    "workloadSelector"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "workloadMetadata"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "workloadSelector"
+            ],
+            "properties": {
+              "protection": {
+                "properties": {
+                  "mode": {
+                    "const": "admissionEnforced"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "workloadSelector"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "kubernetesExec"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "role": {
+                "const": "workload-maintainer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "kubernetesAccessReview"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "accessReview"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "accessReview"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/status"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

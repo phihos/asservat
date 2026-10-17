@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture-profile.schema.json",
+  "title": "Immutable capture profile definition with mutable availability",
+  "$defs": {
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "recipe": {
+          "$ref": "https://asservat.io/spec/v1/recipe.schema.json#/properties/spec"
+        },
+        "editableFields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "enum": [
+                  "packetPeers",
+                  "packetFilter",
+                  "packetBefore",
+                  "packetAfter",
+                  "packetRing",
+                  "processSelector",
+                  "processBatch",
+                  "profileDuration",
+                  "syscallFilter",
+                  "syscallMode",
+                  "syscallBefore",
+                  "syscallAfter",
+                  "syscallRing",
+                  "syscallArguments",
+                  "syscallMaxEvents",
+                  "syscallRate",
+                  "filePath",
+                  "commandArgv",
+                  "actionMaxBytes",
+                  "actionTimeout",
+                  "actionExecutionMode"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "label"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/resolvedProfile"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "displayName",
+        "description",
+        "recipe",
+        "editableFields"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "CaptureProfile"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[1-9][0-9]*$",
+          "maxLength": 32
+        },
+        "definition": {
+          "$ref": "https://asservat.io/spec/v1/capture-profile.schema.json#/$defs/definition"
+        },
+        "availability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "deprecated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled",
+            "deprecated"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "definition",
+        "availability"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

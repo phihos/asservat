@@ -1,0 +1,100 @@
+# Installed owner identity
+
+The original installer must start the owner service without handing it setup
+administration credentials or depending on its own running endpoint. The
+ADR-140/ADR-144 continuation fixes an owner-only credential projection and a
+one-use launch in the original resource journal. It supports REQ-DEP-003 and
+REQ-FED-001. Actual qualification is recorded in
+[implementation progress](../implementation-progress.md); a component check is
+not an installed service or public investigation workflow.
+
+## Original layout and credentials
+
+A fresh installation selects `asservat-owner-installed/v1` alongside the
+installed worker layout before any of the nineteen resource claims. The binding
+includes both layouts. Existing legacy and worker-only journals cannot be
+adopted. The generated Deployment remains Restricted and starts at zero replicas.
+It has the fixed identity ConfigMap, ten-key provider Secret, and separate
+optional observation/public projections. Optional volume presence does not
+select a runtime mode or authorize a listener.
+
+The owner identity SQL inventory has four fixed roles: enrollment, audit,
+activation and registry. Each retained process uses one connection per role;
+the global limit is four retained owner processes plus one serialized installer
+verifier. Names, direct privileges, role attributes, OIDs, provenance and actual
+SCRAM login are independently verified. These roles do not accept source
+configuration, modify fleet recovery or receive public investigation credentials.
+The private role journal retains only the original bounded creation attempts;
+uncertain results permit exact lookup, never password reset, privilege repair
+or adoption. Runtime has no permission to read that private role journal.
+
+The immutable identity projection contains public `owner-roles.json`, four SQL
+credential files, scoped audit storage and separate audit wrapping, opening,
+server-signing and client-signing credentials. The public journal digest covers
+only typed deployment input and public role provenance. Passwords, tokens and
+hashes of private credential payloads never enter that digest or public status.
+Provider issuance and role verification remain distinct operations.
+
+## Resuming interrupted installation
+
+The original public resource journal owns an immutable projection intent, then
+two ordered child attempts: credentials first, configuration second. Each child
+has a separate operation ID and at most five-second first-write interval. A
+positively acknowledged claim permits exactly its fixed CREATE. Any existing
+claim, including an expired claim or an ambiguous CREATE response, permits only
+independent exact lookup. A 404 cannot grant another CREATE.
+
+A positive first-object receipt allows the never-attempted second child to be
+claimed using fresh current authority, within the original resource setup end.
+This does not renew the first attempt or parent intent. Each object has both
+parent and child operation annotations. A joint receipt is written only after
+both positive receipts and must match their exact UIDs and resource versions.
+Sibling capacity/cleanup claims and objects cannot be reused as owner identity.
+Every journal CAS preserves unrelated sibling fields.
+
+Only that complete receipt can precede the separate zero-to-one Deployment
+launch. The launch binds its original UID, inert resource version, both exact
+spec digests and a new operation ID. Unknown launch results permit reconciliation
+of the exact inert or claimed running object, without another scale operation.
+Any launch claim permanently closes role/projection creation. Readiness and
+ongoing authorization are separate from successful launch acknowledgement.
+
+## Runtime startup and current observations
+
+Before SQL credential use, the concrete reader checks the original public
+journal UID, completed projection/launch receipts, actual immutable mounted
+objects, original account/Deployment templates, current native workload guard
+and online Pod-bound TokenReview. Pod, ReplicaSet and Deployment identities are
+checked around the token verification. The entire check retains its original
+at-most-five-second deadline. All four SQL credential checks consume the
+remaining interval; startup cannot reset it after blocking work.
+
+The observation startup branch consumes the complete original guard input and
+activation pin before composing identity services. Its identity-only listener
+exposes no public investigation, native evidence transfer or unconfigured
+observation backend. Backend/public promotion requires its own positive
+projection receipt and reviewed composition; there is no optional-file fallback.
+
+The original owner source body is installation provenance. Later compatible
+accepted source revisions may be used, with current revision and roots checked
+on every operation and unchanged through its response. Original source, pool,
+Service, account, Deployment, template and pinned issuer trust constraints still
+apply. Neither a source observation nor a historical receipt supplies current
+activation, recovery or request authority.
+
+C-20 owns the closed contracts; C-21 owns concrete Kubernetes/SQL adapters and
+fixed credential production; C-04 consumes current identity and observation
+facts. The bootstrap package composes them without manufacturing authority.
+The schema is structural validation; Go enforces cross-object identity, order,
+non-aliasing, original deadlines and current enforcement.
+
+## Independent installed capacity probes
+
+[ADR-145](../decisions/145-independent-capacity-probe.md) retains the original
+worker account/UID in the complete workload guard. Only the two explicit dry-run
+capacity-source CREATE operations pass that namespace policy; the distinct
+capacity administrator policy must deny. Fresh installed layouts also retain the
+fixed processing-source ConfigMap in their named dry-run UPDATE probes. Both are
+chosen before original guard receipts 17/18; no already-claimed journal is
+adopted. Activation and every private loader reconstruct the same complete plan.
+The native policy composition and the installed worker remain separate gates.

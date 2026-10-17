@@ -1,0 +1,9 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/hub_workload.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/source/internal/adapters/kubernetes/hub_workload.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_object_defaults_test.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/source/internal/adapters/kubernetes/initial_runtime_object_defaults_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/source/internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_resources.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/source/internal/adapters/kubernetes/initial_runtime_resources.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_workload.go": "/home/phil/.cache/asservat-build/planning/initial-runtime-object-defaults-20261012/checks/defaults-1/source/internal/adapters/kubernetes/owner_workload.go"
+  }
+}

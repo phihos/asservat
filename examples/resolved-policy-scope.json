@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "collection-scope/v1",
+  "source": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "resourceUID": "policy-ledger-memory-uid"
+  },
+  "executor": {
+    "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+    "subject": "policy:policy-ledger-memory-uid",
+    "clientID": "policy-executor",
+    "identityType": "workload"
+  },
+  "collection": {
+    "kind": "DebugPolicy",
+    "spec": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "StatefulSet",
+          "name": "ledger",
+          "uid": "workload-ledger-uid"
+        },
+        "maxPods": 1,
+        "selection": "triggeringPod",
+        "adoption": "pinUID",
+        "ordinals": [
+          0
+        ]
+      },
+      "detectors": [
+        {
+          "id": "memory-high",
+          "kind": "resource",
+          "options": {
+            "metric": "memoryLimitRatio",
+            "operator": "gte",
+            "threshold": 0.85,
+            "sampleInterval": "5s"
+          }
+        }
+      ],
+      "when": {
+        "for": {
+          "expression": {
+            "detector": "memory-high"
+          },
+          "duration": "20s"
+        }
+      },
+      "recipeRef": {
+        "name": "bounded-live-diagnostics",
+        "digest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43"
+      },
+      "budgets": {
+        "cooldown": "30m",
+        "burst": 1,
+        "maxOccurrencesPerHour": 2,
+        "maxConcurrentActions": 1
+      },
+      "retention": "72h",
+      "observation": {
+        "mode": "allAuthorized"
+      },
+      "evaluation": {
+        "scope": "pod",
+        "fireOnActivation": true,
+        "rearmFor": "10s"
+      }
+    }
+  },
+  "dependencies": [
+    {
+      "role": "collectionCeiling",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "role": "recipe",
+      "digest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43"
+    },
+    {
+      "role": "retention",
+      "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+    }
+  ],
+  "policyAuthority": {
+    "mode": "team",
+    "installationID": "00000000-0000-4000-8000-000000000098",
+    "delegation": {
+      "uid": "binding-payments-automation",
+      "generation": 1,
+      "digest": "ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676"
+    },
+    "ownerAssignments": [
+      {
+        "subject": {
+          "kind": "Group",
+          "issuer": "https://identity.example.invalid/realms/company",
+          "id": "team-payments"
+        },
+        "role": "workload-maintainer",
+        "basisKind": "AccessBinding",
+        "basisUID": "binding-payments-automation",
+        "basisDigest": "ac64b349471ddc2a142ef66c507dde8ec05005a91eb6dc43a55a553bf3a7f676",
+        "assignmentID": "00000000-0000-4000-8000-000000000097"
+      }
+    ],
+    "issuedAt": "2026-10-09T12:00:00Z",
+    "notAfter": "2026-11-08T12:00:00Z",
+    "limits": {
+      "maxExecutions": 100,
+      "maxBytes": 1099511627776,
+      "maxObservedBytes": 1099511627776
+    }
+  }
+}

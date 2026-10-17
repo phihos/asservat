@@ -1,0 +1,68 @@
+python3 scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+python3 scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+python3 scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.819s
+ok  	asservat.local/asservat/internal/adapters/kms	2.050s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	26.711s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.026s
+2026/10/11 02:58:59 http: TLS handshake error from 127.0.0.1:39540: signed control work rejected
+2026/10/11 02:58:59 http: TLS handshake error from 127.0.0.1:53490: remote error: tls: bad certificate
+2026/10/11 02:58:59 http: TLS handshake error from 127.0.0.1:44356: EOF
+--- FAIL: TestOwnerForwarderCancellationBeforeTransmission (0.06s)
+    --- FAIL: TestOwnerForwarderCancellationBeforeTransmission/client-after-lookup (0.01s)
+        owner_forwarder_test.go:177: signed control work rejected
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	7.562s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.745s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.089s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.399s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.213s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.022s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.042s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.209s
+ok  	asservat.local/asservat/internal/application/evidence	1.088s
+ok  	asservat.local/asservat/internal/application/execution	1.035s
+ok  	asservat.local/asservat/internal/application/fleet	2.063s
+ok  	asservat.local/asservat/internal/application/identity	1.032s
+ok  	asservat.local/asservat/internal/application/planning	1.057s
+ok  	asservat.local/asservat/internal/application/privacy	1.050s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	4.363s
+ok  	asservat.local/asservat/internal/contracts	1.009s
+ok  	asservat.local/asservat/internal/domain/artifact	1.009s
+ok  	asservat.local/asservat/internal/domain/audit	1.007s
+ok  	asservat.local/asservat/internal/domain/authorization	1.400s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.007s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.015s
+ok  	asservat.local/asservat/internal/domain/identity	1.007s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.024s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.450s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	2.082s
+FAIL
+make: *** [Makefile:39: go-check] Error 1

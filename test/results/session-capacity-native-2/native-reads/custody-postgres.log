@@ -1,0 +1,237 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-13 12:22:11.223 UTC [128] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 12:22:11.223 UTC [128] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 12:22:11.233 UTC [140] LOG:  database system was shut down at 2026-10-13 12:22:08 UTC
+2026-10-13 12:22:11.244 UTC [128] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-13 12:22:11.407 UTC [128] LOG:  received fast shutdown request
+.2026-10-13 12:22:11.410 UTC [128] LOG:  aborting any active transactions
+2026-10-13 12:22:11.412 UTC [128] LOG:  background worker "logical replication launcher" (PID 143) exited with exit code 1
+2026-10-13 12:22:11.412 UTC [138] LOG:  shutting down
+2026-10-13 12:22:11.417 UTC [138] LOG:  checkpoint starting: shutdown immediate
+2026-10-13 12:22:12.316 UTC [138] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.021 s, sync=0.862 s, total=0.905 s; sync files=303, longest=0.007 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-13 12:22:12.330 UTC [128] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-13 12:22:12.429 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 12:22:12.429 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-13 12:22:12.429 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-13 12:22:12.434 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 12:22:12.442 UTC [199] LOG:  database system was shut down at 2026-10-13 12:22:12 UTC
+2026-10-13 12:22:12.447 UTC [1] LOG:  database system is ready to accept connections
+2026-10-13 12:22:12.560 UTC [210] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-13 12:22:12.560 UTC [210] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-13 12:22:15.863 UTC [226] ERROR:  permission denied for table permission_stream
+2026-10-13 12:22:15.863 UTC [226] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-13 12:22:15.864 UTC [226] ERROR:  permission denied for table context_storage_binding
+2026-10-13 12:22:15.864 UTC [226] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-13 12:22:15.865 UTC [226] ERROR:  permission denied for table context_capture
+2026-10-13 12:22:15.865 UTC [226] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-13 12:22:15.865 UTC [226] ERROR:  permission denied for table context_capture
+2026-10-13 12:22:15.865 UTC [226] STATEMENT:  DELETE FROM context_capture
+2026-10-13 12:22:15.951 UTC [230] ERROR:  permission denied for table context_catalog
+2026-10-13 12:22:15.951 UTC [230] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-13 12:22:15.951 UTC [230] ERROR:  permission denied for table context_verification
+2026-10-13 12:22:15.951 UTC [230] STATEMENT:  UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:22:15.966 UTC [231] ERROR:  permission denied for table context_verification
+2026-10-13 12:22:15.966 UTC [231] STATEMENT:  UPDATE context_verification SET authority_digest=authority_digest
+2026-10-13 12:22:15.967 UTC [231] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:22:15.967 UTC [231] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-13 12:22:15.982 UTC [232] ERROR:  permission denied for table context_verification
+2026-10-13 12:22:15.982 UTC [232] STATEMENT:  UPDATE context_verification SET expectation_digest=expectation_digest
+2026-10-13 12:22:15.997 UTC [233] ERROR:  permission denied for table context_catalog
+2026-10-13 12:22:15.997 UTC [233] STATEMENT:  UPDATE context_catalog SET published_at=clock_timestamp()
+2026-10-13 12:22:16.016 UTC [234] ERROR:  permission denied for table artifact_download
+2026-10-13 12:22:16.016 UTC [234] STATEMENT:  UPDATE artifact_download SET deadline=deadline
+2026-10-13 12:22:16.016 UTC [234] ERROR:  permission denied for table fleet_trust
+2026-10-13 12:22:16.016 UTC [234] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 12:22:16.016 UTC [234] ERROR:  permission denied for table fleet_trust
+2026-10-13 12:22:16.016 UTC [234] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=issuer_epoch
+2026-10-13 12:22:16.016 UTC [234] ERROR:  permission denied for table fleet_trust
+2026-10-13 12:22:16.016 UTC [234] STATEMENT:  UPDATE fleet_trust SET fresh_until=clock_timestamp()
+2026-10-13 12:22:16.031 UTC [235] ERROR:  permission denied for table fleet_trust
+2026-10-13 12:22:16.031 UTC [235] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-13 12:22:16.032 UTC [234] ERROR:  permission denied for table download_batch
+2026-10-13 12:22:16.032 UTC [234] STATEMENT:  UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:22:16.032 UTC [234] ERROR:  permission denied for table download_allocation
+2026-10-13 12:22:16.032 UTC [234] STATEMENT:  UPDATE download_allocation SET output_limit=output_limit
+2026-10-13 12:22:16.048 UTC [236] ERROR:  permission denied for table artifact_download
+2026-10-13 12:22:16.048 UTC [236] STATEMENT:  UPDATE artifact_download SET charged_output=0
+2026-10-13 12:22:16.048 UTC [236] ERROR:  permission denied for table download_batch
+2026-10-13 12:22:16.048 UTC [236] STATEMENT:  UPDATE download_batch SET outcome_json=outcome_json
+2026-10-13 12:22:16.063 UTC [237] ERROR:  permission denied for table artifact_download
+2026-10-13 12:22:16.063 UTC [237] STATEMENT:  UPDATE artifact_download SET state='Ready'
+2026-10-13 12:22:17.647 UTC [258] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:17.647 UTC [258] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:22:17.647 UTC [260] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:17.647 UTC [260] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:22:32.001 UTC [276] ERROR:  permission denied for table download_allocation
+2026-10-13 12:22:32.001 UTC [276] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-13 12:22:32.002 UTC [276] ERROR:  permission denied for table download_native_backing
+2026-10-13 12:22:32.002 UTC [276] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-13 12:22:32.002 UTC [276] ERROR:  permission denied for table download_stop_backing
+2026-10-13 12:22:32.002 UTC [276] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-13 12:22:34.134 UTC [272] ERROR:  column reference "s.id" is ambiguous at character 371
+2026-10-13 12:22:34.134 UTC [272] DETAIL:  It could refer to either a PL/pgSQL variable or a table column.
+2026-10-13 12:22:34.134 UTC [272] QUERY:  o.closed OR o.retired_at IS NOT NULL OR o.root_id<>NEW.root_id OR o.allocation_id<>NEW.allocation_id OR o.operation_id<>NEW.operation_id OR o.fence<>NEW.operation_fence OR NEW.valid_until>o.lease_until OR n>=NEW.valid_until OR NOT EXISTS(SELECT 1 FROM public.download_window win JOIN public.download_response r ON r.id=win.response_id JOIN public.artifact_download s ON s.id=r.session_id WHERE win.id=NEW.window_id AND r.id=(o.operation_json->>'ParentID')::uuid AND r.generation=(o.operation_json->>'Generation')::bigint AND r.generation=s.generation AND r.active_window=win.id AND NOT r.closed AND r.lease_until>=NEW.valid_until AND win.intent_receipt IS NOT NULL AND win.intent_completion IS NOT NULL AND win.outcome_json IS NULL AND NEW.authority_json->'Scope'=s.scope_json)
+2026-10-13 12:22:34.134 UTC [272] CONTEXT:  PL/pgSQL function public.guard_download_native_key() line 20 at IF
+2026-10-13 12:22:34.134 UTC [272] STATEMENT:  -- name: InsertNativeKey :exec
+	INSERT INTO download_native_key(window_id,worker_id,root_id,allocation_id,operation_id,operation_fence,authority_json,proof_json,installation_id,key_id,peer_id,certificate_sha256,valid_until,created_at)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+	
+2026-10-13 12:22:35.231 UTC [287] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:35.231 UTC [287] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:22:35.232 UTC [289] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:35.232 UTC [289] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:22:49.237 UTC [306] ERROR:  permission denied for table download_allocation
+2026-10-13 12:22:49.237 UTC [306] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-13 12:22:49.238 UTC [306] ERROR:  permission denied for table download_native_backing
+2026-10-13 12:22:49.238 UTC [306] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-13 12:22:49.238 UTC [306] ERROR:  permission denied for table download_stop_backing
+2026-10-13 12:22:49.238 UTC [306] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-13 12:22:50.707 UTC [300] ERROR:  column reference "s.id" is ambiguous at character 371
+2026-10-13 12:22:50.707 UTC [300] DETAIL:  It could refer to either a PL/pgSQL variable or a table column.
+2026-10-13 12:22:50.707 UTC [300] QUERY:  o.closed OR o.retired_at IS NOT NULL OR o.root_id<>NEW.root_id OR o.allocation_id<>NEW.allocation_id OR o.operation_id<>NEW.operation_id OR o.fence<>NEW.operation_fence OR NEW.valid_until>o.lease_until OR n>=NEW.valid_until OR NOT EXISTS(SELECT 1 FROM public.download_window win JOIN public.download_response r ON r.id=win.response_id JOIN public.artifact_download s ON s.id=r.session_id WHERE win.id=NEW.window_id AND r.id=(o.operation_json->>'ParentID')::uuid AND r.generation=(o.operation_json->>'Generation')::bigint AND r.generation=s.generation AND r.active_window=win.id AND NOT r.closed AND r.lease_until>=NEW.valid_until AND win.intent_receipt IS NOT NULL AND win.intent_completion IS NOT NULL AND win.outcome_json IS NULL AND NEW.authority_json->'Scope'=s.scope_json)
+2026-10-13 12:22:50.707 UTC [300] CONTEXT:  PL/pgSQL function public.guard_download_native_key() line 20 at IF
+2026-10-13 12:22:50.707 UTC [300] STATEMENT:  -- name: InsertNativeKey :exec
+	INSERT INTO download_native_key(window_id,worker_id,root_id,allocation_id,operation_id,operation_fence,authority_json,proof_json,installation_id,key_id,peer_id,certificate_sha256,valid_until,created_at)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+	
+2026-10-13 12:22:51.829 UTC [317] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:51.829 UTC [317] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:22:51.830 UTC [319] ERROR:  permission denied for table download_worker
+2026-10-13 12:22:51.830 UTC [319] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:23:05.827 UTC [334] ERROR:  permission denied for table download_allocation
+2026-10-13 12:23:05.827 UTC [334] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-13 12:23:05.827 UTC [334] ERROR:  permission denied for table download_native_backing
+2026-10-13 12:23:05.827 UTC [334] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-13 12:23:05.827 UTC [334] ERROR:  permission denied for table download_stop_backing
+2026-10-13 12:23:05.827 UTC [334] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-13 12:23:07.251 UTC [330] ERROR:  column reference "s.id" is ambiguous at character 371
+2026-10-13 12:23:07.251 UTC [330] DETAIL:  It could refer to either a PL/pgSQL variable or a table column.
+2026-10-13 12:23:07.251 UTC [330] QUERY:  o.closed OR o.retired_at IS NOT NULL OR o.root_id<>NEW.root_id OR o.allocation_id<>NEW.allocation_id OR o.operation_id<>NEW.operation_id OR o.fence<>NEW.operation_fence OR NEW.valid_until>o.lease_until OR n>=NEW.valid_until OR NOT EXISTS(SELECT 1 FROM public.download_window win JOIN public.download_response r ON r.id=win.response_id JOIN public.artifact_download s ON s.id=r.session_id WHERE win.id=NEW.window_id AND r.id=(o.operation_json->>'ParentID')::uuid AND r.generation=(o.operation_json->>'Generation')::bigint AND r.generation=s.generation AND r.active_window=win.id AND NOT r.closed AND r.lease_until>=NEW.valid_until AND win.intent_receipt IS NOT NULL AND win.intent_completion IS NOT NULL AND win.outcome_json IS NULL AND NEW.authority_json->'Scope'=s.scope_json)
+2026-10-13 12:23:07.251 UTC [330] CONTEXT:  PL/pgSQL function public.guard_download_native_key() line 20 at IF
+2026-10-13 12:23:07.251 UTC [330] STATEMENT:  -- name: InsertNativeKey :exec
+	INSERT INTO download_native_key(window_id,worker_id,root_id,allocation_id,operation_id,operation_fence,authority_json,proof_json,installation_id,key_id,peer_id,certificate_sha256,valid_until,created_at)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+	
+2026-10-13 12:23:08.339 UTC [345] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:08.339 UTC [345] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:23:08.340 UTC [347] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:08.340 UTC [347] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:23:18.842 UTC [375] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:18.842 UTC [375] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:23:18.843 UTC [377] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:18.843 UTC [377] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:23:24.745 UTC [400] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:24.745 UTC [400] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-13 12:23:24.745 UTC [402] ERROR:  permission denied for table download_worker
+2026-10-13 12:23:24.745 UTC [402] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-13 12:23:33.037 UTC [412] ERROR:  column reference "s.id" is ambiguous at character 371
+2026-10-13 12:23:33.037 UTC [412] DETAIL:  It could refer to either a PL/pgSQL variable or a table column.
+2026-10-13 12:23:33.037 UTC [412] QUERY:  o.closed OR o.retired_at IS NOT NULL OR o.root_id<>NEW.root_id OR o.allocation_id<>NEW.allocation_id OR o.operation_id<>NEW.operation_id OR o.fence<>NEW.operation_fence OR NEW.valid_until>o.lease_until OR n>=NEW.valid_until OR NOT EXISTS(SELECT 1 FROM public.download_window win JOIN public.download_response r ON r.id=win.response_id JOIN public.artifact_download s ON s.id=r.session_id WHERE win.id=NEW.window_id AND r.id=(o.operation_json->>'ParentID')::uuid AND r.generation=(o.operation_json->>'Generation')::bigint AND r.generation=s.generation AND r.active_window=win.id AND NOT r.closed AND r.lease_until>=NEW.valid_until AND win.intent_receipt IS NOT NULL AND win.intent_completion IS NOT NULL AND win.outcome_json IS NULL AND NEW.authority_json->'Scope'=s.scope_json)
+2026-10-13 12:23:33.037 UTC [412] CONTEXT:  PL/pgSQL function public.guard_download_native_key() line 20 at IF
+2026-10-13 12:23:33.037 UTC [412] STATEMENT:  -- name: InsertNativeKey :exec
+	INSERT INTO download_native_key(window_id,worker_id,root_id,allocation_id,operation_id,operation_fence,authority_json,proof_json,installation_id,key_id,peer_id,certificate_sha256,valid_until,created_at)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+	
+2026-10-13 12:23:35.246 UTC [431] ERROR:  new row for relation "download_control_allocation" violates check constraint "download_control_allocation_check1"
+2026-10-13 12:23:35.246 UTC [431] DETAIL:  Failing row contains (10000000-0000-4000-8000-0000000001ff, 10000000-0000-4000-8000-0000000001d3, 10000000-0000-4000-8000-0000000001e5, 2, 2, 524288, 2, 3, 786432, 2026-10-13 12:24:33.95979+00, 2026-10-13 12:25:33.95979+00).
+2026-10-13 12:23:35.246 UTC [431] CONTEXT:  SQL statement "UPDATE public.download_control_allocation SET reserved_responses=reserved_responses+1,reserved_windows=reserved_windows+win,reserved_audit_bytes=reserved_audit_bytes+win*262144 WHERE id=c.id"
+	PL/pgSQL function public.guard_download_response() line 16 at SQL statement
+2026-10-13 12:23:35.246 UTC [431] STATEMENT:  -- name: InsertDownloadResponse :one
+	INSERT INTO download_response(id,root_id,session_id,owner_id,generation,plan_json,reserved_windows,started_at,until_at,lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, root_id, session_id, owner_id, generation, plan_json, reserved_windows, started_at, until_at, window_count, completed_windows, emitted_bytes, active_window, lease_sequence, lease_until, closed
+	
+2026-10-13 12:23:35.247 UTC [431] ERROR:  permission denied for table download_window
+2026-10-13 12:23:35.247 UTC [431] STATEMENT:  UPDATE download_window SET intent_receipt='{}'
+2026-10-13 12:23:35.247 UTC [428] ERROR:  permission denied for table download_window
+2026-10-13 12:23:35.247 UTC [428] STATEMENT:  UPDATE download_window SET outcome_json='{}'
+2026-10-13 12:23:35.247 UTC [428] ERROR:  permission denied for table download_response
+2026-10-13 12:23:35.247 UTC [428] STATEMENT:  UPDATE download_response SET lease_until=clock_timestamp()
+2026-10-13 12:23:35.248 UTC [429] ERROR:  permission denied for table download_control_allocation
+2026-10-13 12:23:35.248 UTC [429] STATEMENT:  UPDATE download_control_allocation SET reserved_windows=0
+2026-10-13 12:23:35.248 UTC [431] ERROR:  permission denied for table download_response
+2026-10-13 12:23:35.248 UTC [431] STATEMENT:  DELETE FROM download_response
+2026-10-13 12:23:35.248 UTC [428] ERROR:  immutable native response
+2026-10-13 12:23:35.248 UTC [428] CONTEXT:  PL/pgSQL function public.guard_download_response() line 18 at RAISE
+2026-10-13 12:23:35.248 UTC [428] STATEMENT:  UPDATE download_response SET id=$1 WHERE id=$2
+2026-10-13 12:23:35.265 UTC [432] ERROR:  permission denied for table retention_decision
+2026-10-13 12:23:35.265 UTC [432] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.266 UTC [432] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:23:35.266 UTC [432] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-13 12:23:35.281 UTC [433] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:23:35.281 UTC [433] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-13 12:23:35.281 UTC [433] ERROR:  permission denied for table retention_decision
+2026-10-13 12:23:35.281 UTC [433] STATEMENT:  UPDATE retention_decision SET decision_json=decision_json
+2026-10-13 12:23:35.296 UTC [434] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:23:35.296 UTC [434] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-13 12:23:35.313 UTC [435] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.313 UTC [435] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-13 12:23:35.313 UTC [435] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.313 UTC [435] STATEMENT:  UPDATE retention_source SET protection_digest=protection_digest
+2026-10-13 12:23:35.313 UTC [435] ERROR:  permission denied for table retention_checkpoint
+2026-10-13 12:23:35.313 UTC [435] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.313 UTC [435] ERROR:  permission denied for table retention_checkpoint
+2026-10-13 12:23:35.313 UTC [435] STATEMENT:  DELETE FROM retention_checkpoint
+2026-10-13 12:23:35.328 UTC [436] ERROR:  permission denied for table retention_checkpoint
+2026-10-13 12:23:35.328 UTC [436] STATEMENT:  UPDATE retention_checkpoint SET transition_json=transition_json
+2026-10-13 12:23:35.329 UTC [436] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.329 UTC [436] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-13 12:23:35.329 UTC [435] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:23:35.329 UTC [435] STATEMENT:  UPDATE custody_attempt SET effective_delete_by=delete_by
+2026-10-13 12:23:35.345 UTC [437] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.345 UTC [437] STATEMENT:  UPDATE retention_source SET fresh_until=clock_timestamp()
+2026-10-13 12:23:35.345 UTC [437] ERROR:  permission denied for table retention_catchup
+2026-10-13 12:23:35.345 UTC [437] STATEMENT:  UPDATE retention_catchup SET completed_at=clock_timestamp()
+2026-10-13 12:23:35.345 UTC [437] ERROR:  permission denied for table retention_checkpoint
+2026-10-13 12:23:35.345 UTC [437] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.345 UTC [437] ERROR:  permission denied for table retention_decision
+2026-10-13 12:23:35.345 UTC [437] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.362 UTC [438] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.362 UTC [438] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-13 12:23:35.362 UTC [438] ERROR:  permission denied for table retention_source
+2026-10-13 12:23:35.362 UTC [438] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-13 12:23:35.362 UTC [438] ERROR:  permission denied for table retention_checkpoint
+2026-10-13 12:23:35.362 UTC [438] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.362 UTC [438] ERROR:  permission denied for table retention_decision
+2026-10-13 12:23:35.362 UTC [438] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-13 12:23:35.363 UTC [438] ERROR:  permission denied for table custody_attempt
+2026-10-13 12:23:35.363 UTC [438] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-13 12:23:35.363 UTC [438] ERROR:  permission denied for table retention_catchup
+2026-10-13 12:23:35.363 UTC [438] STATEMENT:  DELETE FROM retention_catchup

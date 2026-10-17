@@ -1,0 +1,43 @@
+{
+  "scope": "One test expectation correction; full 15-path reviewed diagnostic closure retained unchanged otherwise",
+  "files": {
+    "cmd/asservat/main.go": "1c2cadef8a827b01b5bbb91777961cb8853eb398175ba8a4fa2dd9d25ab4345b",
+    "docs/architecture/owner-startup.md": "3a4a698d2e9b3c25af55610d8ccec2cae1b7f09bae0f4d9d519258614909e73b",
+    "internal/adapters/kubernetes/owner_identity_objects.go": "7c1371e5ce3a84941b22aa3841d35f13f121462494443d1a02aa5a02b5ed07a0",
+    "internal/adapters/kubernetes/owner_identity_objects_test.go": "91645bd6cf375e83ac4973f296cac34b9d11e96dee0e2bb35c4d52eb08b9493e",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic.go": "c164db93b17f6e9cf3e620cb22229f66c7988b1a15489a8ed09e6db53c884ca5",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic_test.go": "880f506ec2656785b3e7ec4a8f4d4815dff4b5c9a62f42b137b8d359df16fadf",
+    "internal/adapters/kubernetes/owner_identity_reader.go": "2c96b96f6b05979d04b945eb25d6ebda54db6b03d887bff472eefb5c8086cebd",
+    "internal/adapters/kubernetes/owner_identity_reader_test.go": "7613f1ef199d543323a1a815e63bd5c6f0deb7e78124e9e69ad14ebae3115094",
+    "internal/bootstrap/hub_api.go": "37eb68b5d361633d8f4a6998f525256aa6f34a2e1659a332c343d323e9cfe2d9",
+    "internal/bootstrap/owner_observation_deployment.go": "95086a93c5e851110dad1ef4b6cbe40059813be9489302e9925b3ef291ac9f9d",
+    "internal/bootstrap/owner_observation_runtime.go": "49e9defbc1e0816842163a367b2e1ac0f707a752ad401895b063b5da490b6e77",
+    "internal/bootstrap/owner_startup_diagnostic.go": "309461132f456b78817c4271be9b8b78b4ee33aa7a62f0938beacd12191ca280",
+    "internal/bootstrap/owner_startup_diagnostic_test.go": "d32b2683c45938701a94f4a040687a23d56842b29742c5c6e111dc74a1cc50cf",
+    "test/integration/initial_runtime_owner_identity_native_test.go": "88cdf756c1bf468ddcc365ab8fc8ca2bce39df17155a9ff8b249188395caa425",
+    "test/integration/initial_runtime_owner_startup_diagnostic_test.go": "67f4f4942d92ea302c0a6f915a9699a8c00d6b92824d014fc02900441499ef17"
+  },
+  "bases": {
+    "cmd/asservat/main.go": "1c2cadef8a827b01b5bbb91777961cb8853eb398175ba8a4fa2dd9d25ab4345b",
+    "docs/architecture/owner-startup.md": "3a4a698d2e9b3c25af55610d8ccec2cae1b7f09bae0f4d9d519258614909e73b",
+    "internal/adapters/kubernetes/owner_identity_objects.go": "7c1371e5ce3a84941b22aa3841d35f13f121462494443d1a02aa5a02b5ed07a0",
+    "internal/adapters/kubernetes/owner_identity_objects_test.go": "91645bd6cf375e83ac4973f296cac34b9d11e96dee0e2bb35c4d52eb08b9493e",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic.go": "c164db93b17f6e9cf3e620cb22229f66c7988b1a15489a8ed09e6db53c884ca5",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic_test.go": "880f506ec2656785b3e7ec4a8f4d4815dff4b5c9a62f42b137b8d359df16fadf",
+    "internal/adapters/kubernetes/owner_identity_reader.go": "2c96b96f6b05979d04b945eb25d6ebda54db6b03d887bff472eefb5c8086cebd",
+    "internal/adapters/kubernetes/owner_identity_reader_test.go": "cd7ba96820a9b14a00099505a208f43559c329aa90efd46a974d7f9c30ca108b",
+    "internal/bootstrap/hub_api.go": "37eb68b5d361633d8f4a6998f525256aa6f34a2e1659a332c343d323e9cfe2d9",
+    "internal/bootstrap/owner_observation_deployment.go": "95086a93c5e851110dad1ef4b6cbe40059813be9489302e9925b3ef291ac9f9d",
+    "internal/bootstrap/owner_observation_runtime.go": "49e9defbc1e0816842163a367b2e1ac0f707a752ad401895b063b5da490b6e77",
+    "internal/bootstrap/owner_startup_diagnostic.go": "309461132f456b78817c4271be9b8b78b4ee33aa7a62f0938beacd12191ca280",
+    "internal/bootstrap/owner_startup_diagnostic_test.go": "d32b2683c45938701a94f4a040687a23d56842b29742c5c6e111dc74a1cc50cf",
+    "test/integration/initial_runtime_owner_identity_native_test.go": "88cdf756c1bf468ddcc365ab8fc8ca2bce39df17155a9ff8b249188395caa425",
+    "test/integration/initial_runtime_owner_startup_diagnostic_test.go": "67f4f4942d92ea302c0a6f915a9699a8c00d6b92824d014fc02900441499ef17"
+  },
+  "changedPaths": [
+    "internal/adapters/kubernetes/owner_identity_reader_test.go"
+  ],
+  "qualification": "pending",
+  "priorComponentResultSHA256": "9aa05e0cf47cda647fd19a4d745cb7a20ad7e4d4fa4b5bdc86a79c33ff581bdc",
+  "patchSHA256": "308a39ff7aa1e4471f78c37b4dac93cf56b1ca2fd87a7c777408125b40acb5f5"
+}

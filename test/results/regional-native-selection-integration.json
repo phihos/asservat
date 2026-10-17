@@ -1,0 +1,13 @@
+{
+  "scope": "Explicit native fixture selection only; build/vet qualification, helper not executed",
+  "bases": {
+    "test/fixtures/observation-native/enrollment.go": "8777702ab6a6091d58012bd4a1f513f426121cfe02659dfbc9ce389cfd4fd860"
+  },
+  "payloads": {
+    "test/fixtures/observation-native/enrollment.go": "8441403ca79bd42c8127b1f1d96163bd9dc5c23e2405ef9b8426f9bcd3bd0a0a"
+  },
+  "handoffSHA256": "9e2be4cecfbd1d3bf4ae7a3331a896eaa00e9e6d1b817897d7255d2ccc3c99e9",
+  "qualificationSHA256": "b8c0913aa56943f9f95aef0d13393f8cad0c2633a9bc6eb905b9d15d27fa6a04",
+  "archive": "test/results/regional-native-selection-package",
+  "nativeQualification": false
+}

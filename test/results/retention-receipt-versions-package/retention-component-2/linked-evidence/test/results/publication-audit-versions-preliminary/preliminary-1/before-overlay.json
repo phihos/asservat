@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/domain/audit/context_receipt_versions_test.go": "/home/phil/.cache/asservat-build/planning/publication-audit-versions-20261013/checks/preliminary-1/files/internal/domain/audit/context_receipt_versions_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/context_receipt_before_test.go": "/home/phil/.cache/asservat-build/planning/publication-audit-versions-20261013/checks/preliminary-1/files/internal/adapters/postgres/context_receipt_before_test.go"
+  }
+}

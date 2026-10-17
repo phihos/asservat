@@ -1,0 +1,59 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 12 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.781s
+ok  	asservat.local/asservat/internal/adapters/kms	2.001s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	18.208s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.691s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.840s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.278s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.441s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.184s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.024s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.043s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.218s
+ok  	asservat.local/asservat/internal/application/evidence	1.083s
+ok  	asservat.local/asservat/internal/application/execution	1.034s
+ok  	asservat.local/asservat/internal/application/fleet	1.028s
+ok  	asservat.local/asservat/internal/application/identity	1.029s
+ok  	asservat.local/asservat/internal/application/planning	1.062s
+ok  	asservat.local/asservat/internal/application/privacy	1.027s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	2.047s
+?   	asservat.local/asservat/internal/contracts	[no test files]
+ok  	asservat.local/asservat/internal/domain/artifact	1.009s
+ok  	asservat.local/asservat/internal/domain/audit	1.009s
+ok  	asservat.local/asservat/internal/domain/authorization	1.428s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.008s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.008s
+ok  	asservat.local/asservat/internal/domain/identity	1.011s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.013s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.024s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	1.991s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 41 packages, 178 internal import edges; catalog ownership and layer/dependency rules checked

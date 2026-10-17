@@ -1,0 +1,118 @@
+{
+  "manifest_sha256": "e934be856f59e08058ac235b2ad7a63f79e257aaf54040cd4371afadb83ef85e",
+  "dependencies_sha256": "eeaa0e27459bb7b8ad8fd3040ca39e4b328edb9073c91c8b07d33295ceaa2869",
+  "runner_sha256": "e57c32423fc55c3d71dba14690650ebb8840a8ea9ec2f751de74b914b34b467f",
+  "paths": 8,
+  "dependencies": 1926,
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/contracts",
+        "./internal/adapters/kms",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 7.537,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "recipe-race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=60s",
+        "-run",
+        "^TestOwnerProvider",
+        "-v",
+        "./internal/contracts",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 7.365,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "composed-race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestOwnerIdentityComposedUnknownObjectsAndLaunchAreLookupOnly$",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 86.838,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/recipe-composed-1/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kms",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 3.982,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    }
+  ],
+  "terminal_exit": 0,
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

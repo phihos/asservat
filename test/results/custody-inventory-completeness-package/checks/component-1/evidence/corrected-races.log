@@ -1,0 +1,335 @@
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/original
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/substituted
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/exists
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/unknown
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/semantic-mismatch
+--- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion (0.04s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/original (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/substituted (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/exists (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/unknown (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/semantic-mismatch (0.01s)
+=== RUN   TestDownloadWindowReadUsesPositiveVersionAndFindStaysReadOnly
+--- PASS: TestDownloadWindowReadUsesPositiveVersionAndFindStaysReadOnly (0.01s)
+=== RUN   TestControlAuditRejectsOversizedInputBeforeWrite
+--- PASS: TestControlAuditRejectsOversizedInputBeforeWrite (0.00s)
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/latest-replaced
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-original
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/null-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-etag
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-length
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-body
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/canceled
+--- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback (0.07s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/latest-replaced (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-original (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/null-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-etag (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-length (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-body (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/canceled (0.01s)
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put
+--- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion (0.03s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original (0.01s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response (0.01s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put (0.01s)
+=== RUN   TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion
+    capture_operation_test.go:107: maximum completed capture pair: legacy expansion=36112 ciphertext total=24125 bytes
+--- PASS: TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion (0.02s)
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/0
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/1
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/2
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/3
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/4
+--- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt (0.27s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/0 (0.06s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/1 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/2 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/3 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/4 (0.06s)
+=== RUN   TestContextWriterCloseJoinsInFlightWrites
+--- PASS: TestContextWriterCloseJoinsInFlightWrites (0.08s)
+=== RUN   TestUnusedContextHandleCannotCertifyCompletion
+--- PASS: TestUnusedContextHandleCannotCertifyCompletion (0.04s)
+=== RUN   TestContextWriterUnknownFinalPutCannotCertifyCompletion
+--- PASS: TestContextWriterUnknownFinalPutCannotCertifyCompletion (0.06s)
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/versions
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/uploads
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/initial/current
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/versions
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/uploads
+=== RUN   TestPurgeRejectsOmittedInventoryCompleteness/final/current
+--- PASS: TestPurgeRejectsOmittedInventoryCompleteness (0.05s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/initial/versions (0.01s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/initial/uploads (0.01s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/initial/current (0.01s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/final/versions (0.01s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/final/uploads (0.01s)
+    --- PASS: TestPurgeRejectsOmittedInventoryCompleteness/final/current (0.01s)
+=== RUN   TestPurgeRequiresCompleteConfinedInventory
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/denied
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/delete-failed
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/retained-marker
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/foreign-key
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/truncated
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/oversized
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/null-version
+--- PASS: TestPurgeRequiresCompleteConfinedInventory (0.61s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/denied (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/delete-failed (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/retained-marker (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/foreign-key (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/truncated (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/oversized (0.56s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/null-version (0.01s)
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing
+--- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry (0.05s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing (0.01s)
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent
+=== RUN   TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/both-complete
+=== RUN   TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/versions-truncated
+=== RUN   TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/current-truncated
+=== RUN   TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/latest-marker
+--- PASS: TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent (0.04s)
+    --- PASS: TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/both-complete (0.01s)
+    --- PASS: TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/versions-truncated (0.01s)
+    --- PASS: TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/current-truncated (0.01s)
+    --- PASS: TestOwnerAuditInventoryCompleteLatestDataMissingFromCurrent/latest-marker (0.01s)
+=== RUN   TestOwnerAuditInventoryExpiredIssuerAndDeletedSourceAreHistoricalOnly
+--- PASS: TestOwnerAuditInventoryExpiredIssuerAndDeletedSourceAreHistoricalOnly (0.01s)
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/nil-store
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-store
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-store-id
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/empty-configuration
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-generation
+=== RUN   TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-original-root
+--- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/nil-store (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-store (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-store-id (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/empty-configuration (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/zero-generation (0.00s)
+    --- PASS: TestOwnerAuditInventoryRejectsInvalidPinsBeforeProviderIO/bad-original-root (0.00s)
+=== RUN   TestOwnerAuditInventoryPreservesOversizedPhysicalVersion
+--- PASS: TestOwnerAuditInventoryPreservesOversizedPhysicalVersion (0.01s)
+=== RUN   TestOwnerAuditInventoryPreservesPhysicalKindsAndHistoricalScope
+--- PASS: TestOwnerAuditInventoryPreservesPhysicalKindsAndHistoricalScope (0.01s)
+=== RUN   TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete
+=== RUN   TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/versions
+=== RUN   TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/uploads
+=== RUN   TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/current
+--- PASS: TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete (0.03s)
+    --- PASS: TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/versions (0.01s)
+    --- PASS: TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/uploads (0.01s)
+    --- PASS: TestOwnerAuditInventoryKeepsTruncatedNeighborPagesIncomplete/current (0.01s)
+=== RUN   TestOwnerAuditInventoryDoesNotInventVersionFromCurrentKey
+--- PASS: TestOwnerAuditInventoryDoesNotInventVersionFromCurrentKey (0.01s)
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-truncation
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/foreign-key
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-version
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/control-version
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/negative-size
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-version
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/marker-alias
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/two-latest
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-upload
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-current
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/over-page
+=== RUN   TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/denied
+--- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows (0.11s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-truncation (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/foreign-key (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/missing-version (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/control-version (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/negative-size (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-version (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/marker-alias (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/two-latest (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-upload (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/duplicate-current (0.01s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/over-page (0.02s)
+    --- PASS: TestOwnerAuditInventoryRejectsMalformedAndForeignProviderRows/denied (0.01s)
+=== RUN   TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead
+=== RUN   TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/false
+=== RUN   TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/true
+--- PASS: TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead (1.01s)
+    --- PASS: TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/false (0.01s)
+    --- PASS: TestOwnerAuditInventoryCancellationJoinsBlockedFinalRead/true (1.00s)
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/unavailable
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/missing-truncation
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/malformed-tail
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/unavailable
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/missing-truncation
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/malformed-tail
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/unavailable
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/missing-truncation
+=== RUN   TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/malformed-tail
+--- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure (0.08s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/unavailable (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/missing-truncation (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/versions/malformed-tail (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/unavailable (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/missing-truncation (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/uploads/malformed-tail (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/unavailable (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/missing-truncation (0.01s)
+    --- PASS: TestOwnerAuditInventoryRetainsFactsBeforeFailure/current/malformed-tail (0.01s)
+=== RUN   TestOwnerAuditInventoryLatestMarkerNeverInventsDataVersion
+--- PASS: TestOwnerAuditInventoryLatestMarkerNeverInventsDataVersion (0.01s)
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ok
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version
+--- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse (0.03s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ok (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version (0.01s)
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version
+--- PASS: TestVersionedAuditRejectsUnpinnedReceipts (0.06s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/ (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/null (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version (0.00s)
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/null
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00
+--- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement (0.03s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/null (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00 (0.01s)
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-""
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-"null"
+--- PASS: TestLegacyStoreRetainsVersionOptionalContract (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"" (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"null" (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore	4.131s

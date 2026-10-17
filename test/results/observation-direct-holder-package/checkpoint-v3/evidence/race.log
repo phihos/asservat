@@ -1,0 +1,220 @@
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/valid
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/parent-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/token-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-audience
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/unbound
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/duplicate-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/revoked-review
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-controller
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/two-controllers
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-template
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-after-read
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/scaled-down
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/deleted-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/lost-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/other-policy
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/late-final-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/original-expired
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/cancelled
+--- PASS: TestClusterObservationCallerExactNativeReadBoundary (3.26s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/valid (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/parent-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/token-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-audience (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/unbound (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-account (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/duplicate-group (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/revoked-review (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-account (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-pod (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-controller (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/two-controllers (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-template (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command (0.12s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-after-read (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/scaled-down (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/deleted-pod (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/lost-guard (0.12s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/other-policy (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/late-final-guard (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/original-expired (0.07s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/cancelled (0.07s)
+=== RUN   TestOwnerLocalObservationActualBoundariesAndCounts
+--- PASS: TestOwnerLocalObservationActualBoundariesAndCounts (1.70s)
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/wrong-token
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/wrong-pod
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/duplicate-claim
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/revoked-claim
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/changed-claim
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/revoked-final
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/changed-final
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/guard-final
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/expired-original
+=== RUN   TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/no-claim
+--- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry (5.62s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/wrong-token (0.20s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/wrong-pod (0.22s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/duplicate-claim (0.65s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/revoked-claim (0.31s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/changed-claim (0.49s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/revoked-final (1.19s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/changed-final (1.40s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/guard-final (0.79s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/expired-original (0.19s)
+    --- PASS: TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry/no-claim (0.19s)
+=== RUN   TestOwnerLocalObservationCloseJoinsClaimRead
+--- PASS: TestOwnerLocalObservationCloseJoinsClaimRead (0.29s)
+=== RUN   TestOwnerLocalObservationCannotAliasCallerAndOwner
+--- PASS: TestOwnerLocalObservationCannotAliasCallerAndOwner (0.15s)
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/one-ready-many-processes
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/retained-ceiling
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/dead-retained-pod
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/known-unready-other-pod
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/two-pages
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/empty-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/nil-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/inconsistent-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-list-version
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cycle
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-list
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-service
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-service
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/foreign-namespace
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-port
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-endpoint
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/missing-list-version
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/slice-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/endpoint-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cursor-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-original-sql
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-final-namespace
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/original-caller-bound
+--- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList (1.15s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/one-ready-many-processes (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/retained-ceiling (0.05s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/dead-retained-pod (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/known-unready-other-pod (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/two-pages (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/empty-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/nil-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/inconsistent-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-list-version (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cycle (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-list (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-service (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-service (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/foreign-namespace (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-port (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-endpoint (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/missing-list-version (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/slice-overflow (0.06s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/endpoint-overflow (0.11s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cursor-overflow (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-original-sql (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-final-namespace (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/original-caller-bound (0.13s)
+=== RUN   TestOwnerObservationDialCandidatesRetainCompleteMembership
+=== RUN   TestOwnerObservationDialCandidatesRetainCompleteMembership/complete
+=== RUN   TestOwnerObservationDialCandidatesRetainCompleteMembership/unknown-list
+=== RUN   TestOwnerObservationDialCandidatesRetainCompleteMembership/changed-final-service
+--- PASS: TestOwnerObservationDialCandidatesRetainCompleteMembership (0.13s)
+    --- PASS: TestOwnerObservationDialCandidatesRetainCompleteMembership/complete (0.04s)
+    --- PASS: TestOwnerObservationDialCandidatesRetainCompleteMembership/unknown-list (0.04s)
+    --- PASS: TestOwnerObservationDialCandidatesRetainCompleteMembership/changed-final-service (0.04s)
+=== RUN   TestOwnerObservationOperationRealBoundaries
+--- PASS: TestOwnerObservationOperationRealBoundaries (0.47s)
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/template
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/ready
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/account
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/replica
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/controller
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/unknown
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/deployment
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/expired
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/late-final
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/namespace
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service-port
+--- PASS: TestOwnerObservationOperationFinalChangeIsTerminal (3.46s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/template (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/ready (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint (0.12s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/account (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/replica (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/controller (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete (0.18s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/unknown (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service (0.11s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/deployment (0.11s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/expired (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/late-final (0.47s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/namespace (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service-port (0.11s)
+=== RUN   TestOwnerObservationOperationCloseJoinsRead
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/close
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/caller-cancel
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/original-cancel
+--- PASS: TestOwnerObservationOperationCloseJoinsRead (0.31s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/close (0.10s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/caller-cancel (0.11s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/original-cancel (0.10s)
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/no-deadline
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/cancelled
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-root
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/expired
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/overlong
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/duplicate
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/empty
+--- PASS: TestOwnerObservationOperationRejectsWrongOriginal (0.07s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/no-deadline (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/cancelled (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-root (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/expired (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/overlong (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/duplicate (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/empty (0.00s)
+=== RUN   TestOwnerObservationOperationIdenticalIDsAreIndependent
+--- PASS: TestOwnerObservationOperationIdenticalIDsAreIndependent (1.17s)
+=== RUN   TestOwnerObservationOperationTwoExactProcesses
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/different-pods
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process
+--- PASS: TestOwnerObservationOperationTwoExactProcesses (1.24s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/different-pods (0.77s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process (0.47s)
+=== RUN   TestOwnerObservationOperationInitialReadChangesDeny
+--- PASS: TestOwnerObservationOperationInitialReadChangesDeny (0.10s)
+=== RUN   TestOwnerObservationOperationConcurrentFinalCannotReuse
+--- PASS: TestOwnerObservationOperationConcurrentFinalCannotReuse (0.11s)
+=== RUN   TestOwnerObservationOperationFinalCallerOnlyShortens
+--- PASS: TestOwnerObservationOperationFinalCallerOnlyShortens (0.47s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	20.747s

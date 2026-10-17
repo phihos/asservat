@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestConnectorAPIProcessWithRealKubernetes$"
+  ],
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestConnectorAPIProcessWithRealKubernetes",
+    "TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial",
+    "TestConnectorAPIProcessWithRealKubernetes/actual-start-status-under-both-guards",
+    "TestConnectorAPIProcessWithRealKubernetes/changed-input-metadata"
+  ],
+  "result": "First native pass of the connector-Deployment executor's local start (ADR-173). Within one work observation's original 4.99997 s interval: cold complete process read 1.80 s (71 API calls), observed PrepareStart 0.30 s (9 calls incl. CREATE), observed ReadyStart 0.45 s (14 calls incl. Ready /status), ConsumeStart 16 ms (StartCommitted /status); whole sequence 2.57 s. About 1 ms per API round trip; elapsed time is limiter wait at the unchanged 20 QPS/burst 20.",
+  "scope": "Real Kubernetes guarded Deployment/ReplicaSet/Pod, TokenReview/SSR, named Secret grants and both local status transitions under both admission guards. Accepted connector source, CA/registry and the preparation grant are explicit fixture inputs; no SQL preparation, hub runner or product binary.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

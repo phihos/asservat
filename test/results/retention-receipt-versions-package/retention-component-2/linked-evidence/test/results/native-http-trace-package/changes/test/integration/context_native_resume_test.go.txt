@@ -1,0 +1,237 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
+)
+
+// Only the session store is synthetic. The observation timestamps expose when
+// real C02 batches re-resolve it; they do not confer authority or extend expiry.
+type nativeResumeSessions struct {
+	nativeContentSessions
+	mu              sync.Mutex
+	observed, until time.Time
+	diagnostic      *nativeHTTPTrace
+}
+
+func (s *nativeResumeSessions) Resolve(ctx context.Context, cookie string, refresh bool) (identities.SessionView, error) {
+	var done func(error, time.Time)
+	if s.diagnostic != nil {
+		done = s.diagnostic.begin(ctx, "http.session-resolve", time.Time{})
+	}
+	v, err := s.nativeContentSessions.Resolve(ctx, cookie, refresh)
+	if done != nil {
+		done(err, v.Identity.ValidUntil)
+	}
+	if err == nil {
+		s.mu.Lock()
+		s.observed, s.until = v.Identity.VerifiedAt, v.Identity.ValidUntil
+		s.mu.Unlock()
+	}
+	return v, err
+}
+func (s *nativeResumeSessions) interval() (time.Time, time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.observed, s.until
+}
+
+type nativeResumeAccounting struct {
+	Responses, Closed, Windows, Acknowledged                            int64
+	KeyRows, KeyRoles, NativeUpdates, PreparationRows, PreparationRoles int64
+	ReservedResponses, ReservedWindows, ReservedAuditBytes              int64
+}
+
+func readNativeResumeAccounting(t *testing.T, ctx context.Context, f nativeExchangeFixture, session artifact.DownloadSession) nativeResumeAccounting {
+	t.Helper()
+	var a nativeResumeAccounting
+	err := f.admin.QueryRow(ctx, `SELECT
+ (SELECT count(*) FROM download_response WHERE session_id=$1),
+ (SELECT count(*) FROM download_response WHERE session_id=$1 AND closed),
+ (SELECT count(*) FROM download_window WHERE session_id=$1),
+ (SELECT count(*) FROM download_window WHERE session_id=$1 AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL AND outcome_json->>'Success'='true' AND outcome_json->>'VerifiedFinal'='true'),
+ (SELECT count(*) FROM download_native_key WHERE worker_id=$2),
+ (SELECT COALESCE(sum(used_roles),0) FROM download_native_key WHERE worker_id=$2),
+ (SELECT updates FROM download_native_owner WHERE worker_id=$2),
+ (SELECT count(*) FROM download_key_binding WHERE session_id=$1),
+ (SELECT COALESCE(sum(used_roles),0) FROM download_key_binding WHERE session_id=$1),
+ reserved_responses,reserved_windows,reserved_audit_bytes
+ FROM download_control_allocation WHERE id=$3`, session.ID, f.worker.Intent.ID, session.AllocationID).Scan(&a.Responses, &a.Closed, &a.Windows, &a.Acknowledged, &a.KeyRows, &a.KeyRoles, &a.NativeUpdates, &a.PreparationRows, &a.PreparationRoles, &a.ReservedResponses, &a.ReservedWindows, &a.ReservedAuditBytes)
+	if err != nil {
+		t.Fatal("native resume accounting", err)
+	}
+	return a
+}
+func requireNativeResumeOriginal(t *testing.T, original, next artifact.DownloadSession) {
+	t.Helper()
+	if next.ID != original.ID || next.AllocationID != original.AllocationID || next.Scope != original.Scope || next.RequestDigest != original.RequestDigest || next.StopProtocol != original.StopProtocol || !next.CreatedAt.Equal(original.CreatedAt) || !next.Deadline.Equal(original.Deadline) || next.OutputLimit != original.OutputLimit || next.ReadLimit != original.ReadLimit || next.RequestLimit != original.RequestLimit || next.Requests != original.Requests {
+		t.Fatal("range resumed with a changed original session, artifact/version or budget")
+	}
+}
+
+// This first resume case qualifies two intentionally bounded, positively joined
+// HTTPS ranges. It does not claim that an uncertain transport interruption is
+// safe to retry, nor that server completion proves a browser saved a local file.
+func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExchangeFixture, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer, coordinator evidence.ContextDownloadCoordinator, original artifact.DownloadSession, m artifact.NativeDownloadMetadata, target value.WorkerCredentialTarget, joined <-chan nativeSQLWorkerOutcome) {
+	t.Helper()
+	if m.Size < 2 || m.Size > artifact.MaxContextBytes || original.ReadLimit != 12<<20 || original.ChargedRead != 4<<20 || original.OutputLimit != 8192 {
+		t.Fatal("original bounded resume fixture backing")
+	}
+	server := httptest.NewUnstartedServer(nil)
+	server.EnableHTTP2 = true
+	defer server.Close()
+	origin := "https://" + server.Listener.Addr().String()
+	operations, err := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: custodyID}, coordinator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inner, err := presentation.NewInvestigationOperations(nil, nil, operations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostic := newNativeHTTPTrace(t)
+	transfer = diagnostic.transfer(t, transfer)
+	shared := nativeContentAuditFixture(t, ctx, f, inner, diagnostic)
+	initial, err := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions := &nativeResumeSessions{nativeContentSessions: nativeContentSessions{workerBrowserSession{initial, original.Deadline, 5 * time.Second}}, diagnostic: diagnostic}
+	handler, err := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, shared, runtime, transfer)
+	if err != nil {
+		t.Fatal("native resume HTTP handler", err)
+	}
+	var completed <-chan struct{}
+	server.Config.Handler, completed = nativeContentJoinedHandler(handler)
+	server.StartTLS()
+	request := func(selection, match string) (*http.Response, []byte) {
+		t.Helper()
+		r, err := http.NewRequestWithContext(ctx, http.MethodGet, origin+browser.DownloadContentPrefix+original.ID+"/content", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		r.AddCookie(&http.Cookie{Name: browser.SessionCookie, Value: strings.Repeat("s", 43)})
+		if selection != "" {
+			r.Header.Set("Range", selection)
+		}
+		if match != "" {
+			r.Header.Set("If-Match", match)
+		}
+		response, err := server.Client().Do(r)
+		if err != nil {
+			t.Fatal("native range request", err)
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
+		response.Body.Close()
+		waitContextNativeHTTP(t, ctx, completed)
+		if err != nil || response.ProtoMajor != 2 {
+			clear(body)
+			t.Fatal("actual h2 range did not join", response.ProtoMajor, err)
+		}
+		return response, body
+	}
+	split := m.Size / 2
+	first, prefix := request(fmt.Sprintf("bytes=0-%d", split-1), m.ETag)
+	defer clear(prefix)
+	if first.StatusCode != http.StatusPartialContent || int64(len(prefix)) != split || first.Header.Get("ETag") != m.ETag || first.Header.Get("Content-Range") != fmt.Sprintf("bytes 0-%d/%d", split-1, m.Size) {
+		nativeHTTPFailureSnapshot(t, ctx, f, original)
+		t.Fatal("first exact native range", first.StatusCode, len(prefix))
+	}
+	// Drain the finite worker outcome channel before starting another exchange.
+	// These are preparation, metadata Observe and the first content conversation.
+	requireContextNativeJoined(t, joined, target, 3)
+	firstSession, err := f.runtime.LookupDownload(ctx, original.ID, original.Scope.Principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireNativeResumeOriginal(t, original, firstSession)
+	if firstSession.State != artifact.DownloadInterrupted || firstSession.Generation != 2 || firstSession.ChargedRead != 8<<20 || firstSession.ChargedOutput != split || firstSession.EmittedBytes != split {
+		t.Fatal("joined partial response did not preserve resumable state/charges")
+	}
+	firstAccounting := readNativeResumeAccounting(t, ctx, f, original)
+	expectedFirst := nativeResumeAccounting{Responses: 1, Closed: 1, Windows: 1, Acknowledged: 1, KeyRows: 1, KeyRoles: 7, NativeUpdates: 6, PreparationRows: 1, PreparationRoles: 7, ReservedResponses: 1, ReservedWindows: 1, ReservedAuditBytes: 2 * artifact.DownloadWindowAuditBytes}
+	if firstAccounting != expectedFirst {
+		t.Fatalf("first positively closed range accounting: got %+v want %+v", firstAccounting, expectedFirst)
+	}
+	_, oldUntil := sessions.interval()
+	if oldUntil.IsZero() {
+		t.Fatal("missing original identity observation")
+	}
+	// Cross the actual last observation deadline, not an assumed provider timing.
+	timer := time.NewTimer(time.Until(oldUntil.Add(50 * time.Millisecond)))
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		timer.Stop()
+		t.Fatal("original fixture deadline while awaiting new identity", ctx.Err())
+	}
+	mismatch, body := request(fmt.Sprintf("bytes=%d-", split), `"wrong-original-version"`)
+	clear(body)
+	if mismatch.StatusCode != http.StatusPreconditionFailed || readNativeResumeAccounting(t, ctx, f, original) != firstAccounting {
+		t.Fatal("mismatched If-Match admitted resume or consumed response/key work", mismatch.StatusCode)
+	}
+	second, suffix := request(fmt.Sprintf("bytes=%d-", split), m.ETag)
+	defer clear(suffix)
+	if second.StatusCode != http.StatusPartialContent || int64(len(suffix)) != m.Size-split || second.Header.Get("ETag") != m.ETag || second.Header.Get("Content-Range") != fmt.Sprintf("bytes %d-%d/%d", split, m.Size-1, m.Size) {
+		t.Fatal("resumed exact native range", second.StatusCode, len(suffix))
+	}
+	requireContextNativeJoined(t, joined, target, 1)
+	newObserved, _ := sessions.interval()
+	if !newObserved.After(oldUntil) {
+		t.Fatal("range resume reused expired original identity")
+	}
+	reconstructed := append(append(make([]byte, 0, m.Size), prefix...), suffix...)
+	defer clear(reconstructed)
+	if int64(len(reconstructed)) != m.Size || artifact.Digest(sha256.Sum256(reconstructed)) != m.SHA256 {
+		t.Fatal("range reconstruction differs from original native hash")
+	}
+	finalSession, err := f.runtime.LookupDownload(ctx, original.ID, original.Scope.Principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireNativeResumeOriginal(t, original, finalSession)
+	// Neither response was the whole file; only this client's hash comparison
+	// establishes reconstruction. The server correctly retains Interrupted.
+	if finalSession.State != artifact.DownloadInterrupted || finalSession.Generation != 3 || finalSession.ChargedRead != 12<<20 || finalSession.ChargedOutput != m.Size || finalSession.EmittedBytes != m.Size {
+		t.Fatal("two ranges falsely completed/refilled original session")
+	}
+	finalAccounting := readNativeResumeAccounting(t, ctx, f, original)
+	expectedFinal := nativeResumeAccounting{Responses: 2, Closed: 2, Windows: 2, Acknowledged: 2, KeyRows: 2, KeyRoles: 14, NativeUpdates: 8, PreparationRows: 1, PreparationRoles: 7, ReservedResponses: 2, ReservedWindows: 2, ReservedAuditBytes: 4 * artifact.DownloadWindowAuditBytes}
+	if finalAccounting != expectedFinal {
+		t.Fatalf("original two-response accounting: got %+v want %+v", finalAccounting, expectedFinal)
+	}
+	depleted, body := request("", m.ETag)
+	clear(body)
+	if depleted.StatusCode != http.StatusServiceUnavailable || readNativeResumeAccounting(t, ctx, f, original) != finalAccounting {
+		t.Fatal("depleted original backing refilled or admitted content", depleted.StatusCode)
+	}
+	unchanged, err := f.runtime.LookupDownload(ctx, original.ID, original.Scope.Principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireNativeResumeOriginal(t, original, unchanged)
+	if unchanged.Generation != finalSession.Generation || unchanged.ChargedRead != finalSession.ChargedRead || unchanged.ChargedOutput != finalSession.ChargedOutput || unchanged.EmittedBytes != finalSession.EmittedBytes {
+		t.Fatal("denied depleted request changed original spend")
+	}
+	var intents, outcomes int
+	if err = f.admin.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome_receipt IS NOT NULL) FROM operation_audit WHERE root_id=$1 AND intent->>'Name'='download_artifact_content'`, f.allocation.RootID).Scan(&intents, &outcomes); err != nil || intents != 4 || outcomes != 4 {
+		t.Fatal("range/conditional/depleted preflight audit pairs", intents, outcomes, err)
+	}
+	t.Logf("actual h2 ranges reconstructed %d original native bytes after expired observation; four Joined worker conversations, one original preparation and two content key bindings (nine individual unwrap slots), no budget refill", len(reconstructed))
+}

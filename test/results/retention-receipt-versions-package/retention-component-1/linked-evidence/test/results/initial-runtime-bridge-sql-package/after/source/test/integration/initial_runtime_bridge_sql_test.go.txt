@@ -1,0 +1,195 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/domain/audit"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Real TLS/SQL constructor, activation and lock checks. The initial witness and
+// source are explicitly synthetic in this fixture. The callback models native
+// I/O but cannot qualify Kubernetes enforcement or the composed guard bridge.
+func qualifyInitialRuntimeBridgeSQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, administrator, runtime *pgx.ConnConfig, record audit.InitialInstallation, receipt audit.Receipt, mode string) {
+	t.Helper()
+	original := record
+	config := administrator.Copy()
+	var head int64
+	if err := admin.QueryRow(ctx, "SELECT version_id FROM public.goose_db_version ORDER BY id DESC LIMIT 1").Scan(&head); err != nil {
+		t.Fatal("read original schema head", err)
+	}
+	schema := func(version int64, applied bool) {
+		t.Helper()
+		if _, err := admin.Exec(ctx, `UPDATE public.goose_db_version SET version_id=$1,is_applied=$2 WHERE id=(SELECT max(id) FROM public.goose_db_version)`, version, applied); err != nil {
+			t.Fatal("set dedicated schema fixture", err)
+		}
+	}
+	if mode == "schema-unapplied" || mode == "schema-head" || mode == "schema-after-construction" {
+		t.Cleanup(func() {
+			clean, end := context.WithTimeout(context.Background(), 5*time.Second)
+			defer end()
+			if _, err := admin.Exec(clean, `UPDATE public.goose_db_version SET version_id=$1,is_applied=true WHERE id=(SELECT max(id) FROM public.goose_db_version)`, head); err != nil {
+				t.Error("restore original schema fixture", err)
+			}
+		})
+	}
+	switch mode {
+	case "runtime-role":
+		config.User, config.Password = runtime.User, runtime.Password
+	case "schema-unapplied":
+		schema(head, false)
+	case "schema-head":
+		schema(head+1, true)
+	case "database":
+		record.Claim.Database.DatabaseOID++
+	case "postmaster":
+		record.Claim.Database.StartedAt = record.Claim.Database.StartedAt.Add(-time.Second)
+	case "recovery":
+		if _, err := admin.Exec(ctx, "UPDATE public.fleet_trust SET recovery_blocked=true WHERE installation_id=$1", record.Scope.InstallationID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	producer, err := postgres.NewInitialRuntimeBridgeSQL(ctx, config, record, receipt)
+	switch mode {
+	case "runtime-role", "schema-unapplied", "schema-head", "database", "postmaster", "recovery":
+		if producer != nil {
+			producer.Close()
+		}
+		if err == nil {
+			t.Fatal("ineligible bridge constructor accepted", mode)
+		}
+		if mode == "runtime-role" && !errors.Is(err, cfg.ErrDenied) {
+			t.Fatal("ordinary runtime login was not denied at administrator boundary", err)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatal("intended post-activation administrator bridge constructor", err)
+	}
+	defer producer.Close()
+	got, gotReceipt := producer.InitialRuntimeBridgeRecord()
+	if !got.Claim.Same(original.Claim) || gotReceipt != receipt {
+		t.Fatal("constructor changed original activation or receipt")
+	}
+	var calls atomic.Int32
+	effect := func(call context.Context) error {
+		calls.Add(1)
+		until, ok := call.Deadline()
+		if !ok || time.Until(until) <= 0 || time.Until(until) > 5*time.Second || call.Err() != nil {
+			return errors.New("effect did not receive its original bounded context")
+		}
+		return nil
+	}
+	switch mode {
+	case "administrator":
+		for range 2 {
+			if err = producer.WithInitialRuntimeBridge(ctx, effect); err != nil {
+				t.Fatal("actual administrator bridge effect unavailable", err)
+			}
+		}
+		if calls.Load() != 2 {
+			t.Fatal("unexpected number of exact effect calls", calls.Load())
+		}
+		// The administrator facet must not weaken or replace the runtime pool
+		// constructor's independent denial of the very same administrator.
+		poolConfig, e := pgxpool.ParseConfig("")
+		if e != nil {
+			t.Fatal(e)
+		}
+		poolConfig.ConnConfig, poolConfig.MaxConns = administrator.Copy(), 1
+		pool, e := pgxpool.NewWithConfig(ctx, poolConfig)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer pool.Close()
+		if _, e = postgres.New(ctx, pool); e == nil {
+			t.Fatal("runtime Ledger accepted installer administrator")
+		}
+	case "held-lock":
+		tx, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer tx.Rollback(context.Background())
+		if _, e = tx.Exec(ctx, "SELECT installation_id FROM public.fleet_trust WHERE installation_id=$1 FOR UPDATE", record.Scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		short, end := context.WithTimeout(ctx, 100*time.Millisecond)
+		err = producer.WithInitialRuntimeBridge(short, effect)
+		end()
+		if err == nil || calls.Load() != 0 {
+			t.Fatal("original deadline crossed held recovery lock", err, calls.Load())
+		}
+		if e = tx.Rollback(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if err = producer.WithInitialRuntimeBridge(ctx, effect); err != nil || calls.Load() != 1 {
+			t.Fatal("fresh independent operation unavailable after positive lock release", err)
+		}
+	case "recovery-after-lock":
+		tx, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer tx.Rollback(context.Background())
+		if _, e = tx.Exec(ctx, "UPDATE public.fleet_trust SET recovery_blocked=true WHERE installation_id=$1", record.Scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		call, end := context.WithTimeout(ctx, 3*time.Second)
+		defer end()
+		result := make(chan error, 1)
+		go func() { result <- producer.WithInitialRuntimeBridge(call, effect) }()
+		// Observe the actual SQL wait before releasing the contrary state.
+		waiting := false
+		for limit := time.Now().Add(800 * time.Millisecond); time.Now().Before(limit); {
+			if e = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='asservat-runtime-guard-bridge' AND wait_event_type='Lock')`).Scan(&waiting); e != nil || waiting {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if !waiting || e != nil {
+			end()
+			<-result
+			t.Fatal("bridge did not reach actual recovery lock", e)
+		}
+		if e = tx.Commit(ctx); e != nil {
+			end()
+			<-result
+			t.Fatal(e)
+		}
+		err = <-result
+		if err == nil || calls.Load() != 0 {
+			t.Fatal("post-lock recovery block allowed native effect", err, calls.Load())
+		}
+	case "late-callback":
+		short, end := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer end()
+		originalUntil, _ := short.Deadline()
+		err = producer.WithInitialRuntimeBridge(short, func(call context.Context) error {
+			calls.Add(1)
+			until, ok := call.Deadline()
+			if !ok || !until.Equal(originalUntil) {
+				return errors.New("caller deadline was changed")
+			}
+			<-call.Done()
+			return nil // Unknown native completion cannot be inferred from nil.
+		})
+		if err == nil || calls.Load() != 1 {
+			t.Fatal("late native reply accepted", err, calls.Load())
+		}
+	case "schema-after-construction":
+		schema(head, false)
+		if err = producer.WithInitialRuntimeBridge(ctx, effect); err == nil || calls.Load() != 0 {
+			t.Fatal("schema change after construction allowed native effect", err, calls.Load())
+		}
+	default:
+		t.Fatal("unknown bridge qualification mode", mode)
+	}
+}

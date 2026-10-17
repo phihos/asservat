@@ -1,0 +1,34 @@
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/no-pod
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/pending
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/scheduled
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/running
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/unknown
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/succeeded
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/failed
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/deleted-pod
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/deleted-job
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-failed
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-completed
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-active-overlap
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-condition
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/container-terminated
+=== RUN   TestWorkerStartupWaitExcludesKnownExecutionAndTermination/container-restarted
+--- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/no-pod (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/pending (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/scheduled (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/running (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/unknown (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/succeeded (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/failed (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/deleted-pod (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/deleted-job (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-failed (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-completed (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-active-overlap (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/job-condition (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/container-terminated (0.00s)
+    --- PASS: TestWorkerStartupWaitExcludesKnownExecutionAndTermination/container-restarted (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.042s

@@ -1,0 +1,8 @@
+--- FAIL: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts (0.01s)
+    --- FAIL: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/dispatch (0.00s)
+        worker_current_test.go:598: effect retained the older longer deadline write-worker-audit 2026-10-11 19:39:50.136341 +0000 UTC 2026-10-11 19:39:46.136341 +0000 UTC
+    --- FAIL: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/enrollment (0.01s)
+        worker_current_test.go:598: effect retained the older longer deadline claim-enrollment 2026-10-11 19:39:50.138707 +0000 UTC 2026-10-11 19:39:46.138707 +0000 UTC
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.013s
+FAIL

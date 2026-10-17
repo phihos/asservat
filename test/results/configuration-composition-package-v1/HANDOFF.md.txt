@@ -1,0 +1,80 @@
+# ADR140 generated-input/projection follow-up
+
+Seven-path additive integration candidate against the parent's integrated
+configuration-package-v1. That package remains unchanged. No live source,
+SQL schema, runtime listener or installed workload was changed here.
+
+## Concrete changes
+
+- Register only private `configuration-role-install`, with no arguments,
+  original finite bootstrap behavior, nonzero cancellation/error exit and safe
+  fixed phase/remedy output. The partial public-role installer is not registered.
+- Generate `ConfigurationRoleInstaller` from matching existing owner/reconciler
+  installation/cluster/namespace, source UID, provider roots/endpoints, native
+  guard, source-probe and scheduling Lease inputs. Retain actual original
+  Deployment/account refs and activation claim. Derive the compiled three-role
+  layout and one-connection administrator pool; no selected roles/grants/paths,
+  credentials or invented observation is accepted in this generator.
+- Generate an inert Restricted hub-worker workload using the existing builder,
+  unchanged command/security/RBAC, separate provider credentials and the exact
+  installation-derived immutable three-SQL-role/manifest projection. The
+  builder neither applies objects nor starts replicas. The current installed
+  hub-worker constructor switch is deliberately excluded until actual generated
+  manifest handoff is qualified.
+- Closed-input/provider-boundary and projection-separation regressions, plus
+  the architecture update. No contract/schema/type shape changes are made:
+  output uses the four configuration schemas already integrated in v1.
+
+## Evidence and extraction
+
+Immutable run65840, checks/configuration-composition-1, passed compile for
+cmd/contracts/Kubernetes/Postgres/bootstrap/integration, selected bootstrap and
+Kubernetes races (1.122s and1.046s), and cmd/bootstrap/Kubernetes vet. Its manifest
+is ea0bcfc20db0788b4d28a818d6ef2e40b6edf2362913dc0582978cc74ee856fd;
+dependency manifest98e4787ac7705e8d15f852c6fb498cdebd7da33303aa192d55726980d2de716f.
+All55 payload/base and1,455 dependency hashes remained unchanged. Exact logs,
+result, manifests and original runner are preserved in evidence/.
+
+The reduced package needs an integrated recheck: after run65840, main was
+reduced to the configuration command only (removing the unintegrated partial
+public installer command), and the new test fixture was changed to the existing
+live `newRuntimeFixture` CA instead of the unintegrated public TLS test helper.
+Production generator/projection logic is unchanged apart from gofmt. No second
+test was run or claimed. This extraction has no dependency on those omitted
+public implementation/test files.
+
+Required focused selection after integration:
+
+```text
+^(TestConfigurationRoleInstaller|TestConfigurationInstallerGenerated|TestProvisionedHubWorker)
+```
+
+Compile affected command/bootstrap/Kubernetes/integration and run narrow vet;
+normal repository gates remain required. These tests cover deterministic input
+and object generation, not native protection, actual role provisioning or
+installed continuation. The parent's native configuration matrix has priority.
+
+The v1 handoff's native command omitted fleet mode. Correct selection is owned
+fleet fixture plus ASSERVAT_INITIAL_INSTALLATION=1 and
+`^TestInitialInstallationWithRealServices$/^configuration-runtime-roles-`.
+That supplies the actual OpenBao endpoint. Do not combine --initial-installation
+with --run or weaken the fixture; keep this erratum alongside historical v1.
+
+## Bases, dependencies and remaining scope
+
+Check manifest.json before integration. The only existing replacements are
+cmd/asservat/main.go (4527f65c3a73efaad12b7fb7751dd2c72b4c812219ae1f144c663a6b9ab4dae2)
+and the integrated architecture page. New files require absence. No changes to
+hub_worker.go, initial_installation_test.go, public handler/spec wires, schema
+version, migration, generated SQL or runtime-role fixture grants are included.
+
+The shared source prerequisites are the integrated configuration-role DTO,
+SQL plan, callable installer and existing HubWorkerWorkload builder. The test
+uses existing owner/native fixtures only; none supplies production authority.
+
+ADR140 still owns actual protected continuation input/workload creation,
+immutable runtime manifest handoff and command switch, all-purpose aggregate
+connection backing, owner/native/provider/audit/effect service construction,
+current multi-cluster runtime selection, complete public HTTPS/session/browser/
+MCP/content startup and shutdown, and installed acceptance. This small follow-up
+does not make the public graph complete or authorize chart/runtime enablement.

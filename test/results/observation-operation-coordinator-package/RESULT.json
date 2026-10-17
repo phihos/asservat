@@ -1,0 +1,42 @@
+{
+  "handle": 36918,
+  "exit": 0,
+  "phases": [
+    {
+      "phase": "compile",
+      "exit": 0,
+      "seconds": 11.069
+    },
+    {
+      "phase": "race",
+      "exit": 0,
+      "seconds": 15.861
+    },
+    {
+      "phase": "vet",
+      "exit": 0,
+      "seconds": 1.891
+    },
+    {
+      "phase": "go-architecture",
+      "exit": 0,
+      "seconds": 1.94
+    }
+  ],
+  "topLevelPass": 35,
+  "namedPass": 154,
+  "dependencies": 1937,
+  "payloads": 7,
+  "architectureMirrorFiles": 1944,
+  "allBeforeAfterUnchanged": true,
+  "evidence": {
+    "evidence/compile.json": "9025646998e42b5f5fd7cfc9179311ecf29a4ac40dcd8dff071cc8991b4fc970",
+    "evidence/compile.log": "c1920a5edbe953c92a38354620445d04eb34025e73821d8cc095f9f95d9c9c1c",
+    "evidence/go-architecture.json": "67822a9c26d78dfc8e46967561e795482b23cae33427434211811066690d1483",
+    "evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+    "evidence/race.json": "4c7be61a54bf5e6b29f93a165ce23623933441d28cb55e4219ddf7057235e09b",
+    "evidence/race.log": "c655637092816604486bbe926366ae850d1c94175f13e7551af38e625194d730",
+    "evidence/vet.json": "26e0516bc754ac500c5f35b603bb7a1fe9930c0e7e6848cee72fbb1122383540",
+    "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

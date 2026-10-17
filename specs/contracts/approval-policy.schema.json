@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/approval-policy.schema.json",
+  "title": "Protected installation approval settings",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "approval-policy/v1"
+    },
+    "policyGrants": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "maxAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "renewalNoticeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        }
+      },
+      "required": [
+        "defaultAgeSeconds",
+        "maxAgeSeconds",
+        "renewalNoticeSeconds"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "policyGrants"
+  ]
+}

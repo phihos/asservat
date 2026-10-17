@@ -1,0 +1,8 @@
+{
+  "command": [
+    "make",
+    "audit-storage-integration"
+  ],
+  "exit": 2,
+  "seconds": 87.859
+}

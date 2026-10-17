@@ -1,0 +1,7 @@
+=== RUN   TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay
+    flow_test.go:61: connector serve terminal <nil>
+    terminal_handoff_test.go:203: worker Joined while old SQL operation remained routeable beyond one-second backoff
+--- FAIL: TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay (1.14s)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	1.163s
+FAIL

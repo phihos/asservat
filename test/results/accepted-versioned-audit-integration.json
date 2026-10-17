@@ -1,0 +1,21 @@
+{
+  "scope": "User accepted required versioned audit storage; does not enable runtime or qualify unfinished cleanup",
+  "paths": [
+    {
+      "path": "specs/evidence.md",
+      "base": "66de7fc512d77adf2e8ed5e296a35f77ef759123ca817e7bb2a8d632e89fd0d5",
+      "payload": "70158b69eafed84d9a7cc7d6b4d0249983b50b7651ee86e437a48ddb3c2eea46"
+    },
+    {
+      "path": "docs/research/audit-storage-qualification.md",
+      "base": "a3de2fdc0f960814c74f2630cf7478b3ec2899954942c14867a4b20bce4465c5",
+      "payload": "cb67718cd39ba5b8645a2505795776b6b8fc0ff0e3a5b0c4605f1affc43b796c"
+    }
+  ],
+  "sourceVerifiedBeforeIntegration": true,
+  "archiveHashes": {
+    "accepted-versioned-audit-package/manifest.json": "f107078a44757eb1131997faa9829d614a454f9f42eb97e0dac2fcd29a1a3845",
+    "accepted-versioned-audit-package/files/specs/evidence.md.txt": "70158b69eafed84d9a7cc7d6b4d0249983b50b7651ee86e437a48ddb3c2eea46",
+    "accepted-versioned-audit-package/files/docs/research/audit-storage-qualification.md.txt": "cb67718cd39ba5b8645a2505795776b6b8fc0ff0e3a5b0c4605f1affc43b796c"
+  }
+}

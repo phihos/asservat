@@ -1,0 +1,110 @@
+# Fixed installed resource handoff
+
+Source-only design for the remaining ADR140 producer. No existing initial
+manager, preparation root or activation attempt gains another effect. This is
+not implemented by the launch checkpoint.
+
+## Preserve the original target and fleet source
+
+The current initial producer creates the installer, witness and fleet source in
+the target namespace. It does not create an owner Deployment, Service, account,
+owner configuration or reconciler Deployment. The configuration-role input
+builder consumes those actual references but does not produce them.
+
+The fleet SQL root retains the original ConfigMap UID. Moving that source into
+a newly invented runtime namespace would replace its identity. Keep the original
+target namespace and fleet object. The original initial workload admission
+policy also remains namespace-wide after the installer exits. Its controller
+exceptions are intentionally limited to the initial Pod, so ordinary Deployment
+controllers and reconciler probes cannot run through it unchanged.
+
+## Separate post-activation journal
+
+Use one installation-derived private runtime-installation Secret, protected by
+the actual current namespace and source guards. Its immutable input is the
+original installation/activation claim, initial namespace UID, initial immutable
+public input/plan identity, fixed image and generated names, provider endpoints
+and public roots. It retains one original finite setup interval and a compiled,
+bounded object list. There is no caller-supplied kind/body/grant registry.
+
+Fresh setup requires actual Kubernetes administrator identity, current original
+initial namespace/continuity proof, and positive current SQL activation with the
+original acknowledged claim, issuer epoch and database/postmaster incarnation.
+Recovery or suspension denies. Historical success alone cannot authorize setup.
+Neither the retired initial manager nor initial provider tokens are reopened;
+post-activation administrator/provider material is a separate fixed compartment.
+
+Each fixed object has one server-generated operation ID, original interval and
+positive receipt with actual UID/resourceVersion. Only a positively acknowledged
+first claim permits CREATE. Unknown replies perform exact lookup of the original
+operation marker and generated contents; a missing object stays unavailable.
+Credentials and their hashes never enter public annotations or receipt records.
+Only positively verified actual object identities feed later generated documents.
+
+The compiled sequence creates inert owner/reconciler accounts and workloads,
+Service, exact RBAC, scheduling Lease and public configuration inputs before
+credentials or any replicas are enabled. The owner workload must be implemented
+as a concrete fixed Restricted builder; an arbitrary Deployment is not an input.
+Provider credentials are independently scoped and retained in private immutable
+projections, after the relevant guard proof. Both workloads remain at zero until
+their complete input and effect inventories have passed verification.
+
+## Exact namespace guard bridge
+
+1. Retain the original initial workload policy/binding UID, generation,
+   canonical value and original initial Pod/input facts in the new journal.
+   Create the fixed inert owner Deployment and obtain its actual UID while the
+   initial namespace policy still denies non-administrator workload effects.
+2. Install the existing owner namespace policy/binding for that exact Deployment,
+   complete administrator list, fixed configuration probes and scheduling Lease.
+   Structural installation is not yet independent enforcement proof.
+3. Under a separate one-use UID/resourceVersion CAS claim, advance the initial
+   workload policy to a fixed intermediate form. It retains every existing
+   restriction and admits only the exact nonpersistent dry-run probes needed to
+   independently verify the newly installed owner and source guards. No ordinary
+   controller, token, persistent source or lease operation gains access here.
+4. Independently prove current owner protection and every contributing source
+   guard. Recheck original activation/recovery and the original transition
+   interval after blocking work. Only then perform a second one-use CAS to the
+   fixed retained-initial form. That form keeps protection for original initial
+   identities/metadata and the old Pod's cleanup constraints, while the already
+   proven owner guard owns ordinary runtime namespace operations. It does not
+   erase old guard/root/claim identities or manufacture activation.
+5. Record independently verified final policy UID/generation/digest and original
+   owner guard pins. Every unknown CAS is exact read-only reconciliation against
+   its pre-recorded candidate; no new generation or effect attempt is selected.
+   A disagreement fails closed. No runtime is launched while the bridge is partial.
+
+The final form must be defined by explicit compiled resource names/operations,
+not a generic selector subtraction. Its exact retained initial resource inventory
+and source-probe exceptions require review against the existing continuity guard.
+No such policy change is authorized merely by writing this design.
+
+## Historical replay and later runtime
+
+Initial passive history currently checks the original complete workload policy.
+It needs a purpose-fixed read-only recognition of this exact acknowledged bridge,
+not a general acceptance of changed guards. That reader must retain every original
+namespace/input/claim/Pod identity, verify the retained initial policy and current
+owner guard independently, and cannot create, reactivate, renew setup or issue
+credentials. A missing, malformed or uncertain bridge must not silently select a
+weaker historical path. Original completed histories without a bridge keep their
+existing bytes and behavior.
+
+Once the guard bridge and actual source objects exist, the integrated three-role
+producer can issue its original fixed projection. The separate launch checkpoint
+then performs the exact zero-to-one CAS and retains read-only result provenance.
+It must not reinterpret the running spec as the original role claim. Complete
+public role/provider/backing/handler composition and aggregate connection budget
+are still required before public listener or chart enablement.
+
+## Required qualification
+
+Keep existing initial full-chain/replay tests unchanged. Add actual API tests for
+original source UID preservation, inert object CREATE/unknown-result behavior,
+each bridge CAS lost reply, changed generation/guard/enforcement, partial-bridge
+no-launch, old initial Pod/history protection, and completed passive reopen after
+handoff. Actual SQL current recovery/incarnation checks after held locks remain a
+separate matrix until composed with the native namespace/Secret producer. The
+final installed owner/reconciler commands must consume the generated projections;
+loopback or synthetic role receipts cannot stand in for that acceptance.

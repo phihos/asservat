@@ -1,0 +1,12 @@
+=== RUN   TestKeycloakProvider
+=== RUN   TestKeycloakProvider/product-browser-sessions
+    identity_provider_test.go:227: actual confidential OIDC/S256/nonce, opaque cookies, encrypted SQL credentials, current identity and single refresh across eight callers passed
+=== NAME  TestKeycloakProvider
+    browser_sessions_test.go:310: fixture HTTPS request failed
+=== NAME  TestKeycloakProvider/product-browser-sessions
+    testing.go:2064: test executed panic(nil) or runtime.Goexit: subtest may have called FailNow on a parent test
+--- FAIL: TestKeycloakProvider (7.01s)
+    --- FAIL: TestKeycloakProvider/product-browser-sessions (5.86s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	7.066s
+FAIL

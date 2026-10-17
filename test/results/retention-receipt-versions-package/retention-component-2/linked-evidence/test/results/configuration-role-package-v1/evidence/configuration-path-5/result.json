@@ -1,0 +1,27 @@
+{
+  "manifest_sha256": "5a74d4d45c2ad9bbdd49d2a1bd0336bd55b225e73d564b07b4ab01849c1d34c3",
+  "dependencies_sha256": "8f27aa1badd4e3d4694607abdaa378604531f452c5e7baf400ccc203a0abd48a",
+  "commands": [
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-path-5/overlay.json",
+        "-race",
+        "-count=1",
+        "-v",
+        "-timeout=90s",
+        "-run",
+        "^TestConfigurationRoleRootCompleteOriginalOperation$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 30.25498862400127
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 50,
+  "checked_dependencies": 2089
+}

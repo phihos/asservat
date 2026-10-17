@@ -1,0 +1,102 @@
+package postgres
+
+import (
+	"slices"
+	"strings"
+
+	"asservat.local/asservat/internal/contracts"
+	"testing"
+)
+
+func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
+	for _, purpose := range []string{"capacity", "capacity-capture"} {
+		grants, ok := publicRuntimeRoleGrants(purpose)
+		if !ok {
+			t.Fatal("missing capacity purpose", purpose)
+		}
+		calls := map[string]bool{}
+		for _, g := range grants {
+			switch g.kind {
+			case "schema":
+				if g.object != "public" || g.privilege != "USAGE" {
+					t.Fatal("extra namespace access")
+				}
+			case "table":
+				if purpose == "capacity" && slices.Contains(capacityExpectedOwnerReadGrants(), g) {
+					continue
+				}
+				if g.object != "goose_db_version" || g.privilege != "SELECT" || g.column != "" {
+					t.Fatal("capacity acquired direct state access", purpose, g.key())
+				}
+			case "function":
+				if g.privilege != "EXECUTE" || calls[g.object] || strings.Contains(g.object, "role_ok") || strings.Contains(g.object, "configure_capture") || strings.Contains(g.object, "_locked") {
+					t.Fatal("capacity acquired private/helper authority", purpose, g.key())
+				}
+				calls[g.object] = true
+			default:
+				t.Fatal("unrecognized privilege", g.key())
+			}
+		}
+		want := 16
+		if purpose == "capacity-capture" {
+			want = 5
+		}
+		if len(calls) != want || !calls["read_capacity_runtime_scope(uuid,jsonb,jsonb,timestamptz,timestamptz)"] {
+			t.Fatal("exported capacity RPC set changed", purpose, len(calls))
+		}
+		for name := range calls {
+			if purpose == "capacity-capture" && (strings.HasPrefix(name, "accept_") || strings.HasPrefix(name, "reserve_") || strings.HasPrefix(name, "publish_") || strings.Contains(name, "audit_profiles") || strings.Contains(name, "permission_scopes") || strings.Contains(name, "recovery")) {
+				t.Fatal("capture role acquired general capacity authority", name)
+			}
+			if purpose == "capacity" && (strings.HasPrefix(name, "back_") || strings.HasPrefix(name, "continue_capacity_capture(")) {
+				t.Fatal("general role acquired capture funding", name)
+			}
+		}
+	}
+	if _, ok := publicRuntimeCapacityGrants("capture-journal"); ok {
+		t.Fatal("journal inherited source RPCs")
+	}
+}
+
+// Independent test allowlist: neither an added table nor an effect column may
+// silently ride the prerequisite needed for current server authentication.
+func capacityExpectedOwnerReadGrants() []publicRuntimeGrant {
+	return []publicRuntimeGrant{
+		{"table", "fleet_current_trust", "", "SELECT"},
+		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
+		{"table", "hub_owner_configuration", "", "SELECT"},
+		{"table", "hub_owner_configuration", "source_uid", "UPDATE"},
+		{"table", "hub_owner_configuration_revision", "", "SELECT"},
+		{"table", "hub_owner_enrollment", "", "SELECT"},
+		{"table", "hub_owner_certificate", "", "SELECT"},
+	}
+}
+
+func TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects(t *testing.T) {
+	general, ok := publicRuntimeRoleGrants("capacity")
+	if !ok {
+		t.Fatal("missing fixed capacity role")
+	}
+	capture, ok := publicRuntimeRoleGrants("capacity-capture")
+	if !ok {
+		t.Fatal("missing fixed capture role")
+	}
+	for _, grant := range capacityExpectedOwnerReadGrants() {
+		if !slices.Contains(general, grant) {
+			t.Fatalf("current owner registry read unavailable: %s", grant.key())
+		}
+		if slices.Contains(capture, grant) {
+			t.Fatalf("capture funding inherited owner registry: %s", grant.key())
+		}
+	}
+	for _, grant := range general {
+		if grant.kind == "table" && grant.object != "goose_db_version" && !slices.Contains(capacityExpectedOwnerReadGrants(), grant) {
+			t.Fatalf("unapproved direct SQL authority: %s", grant.key())
+		}
+	}
+	for _, purpose := range []string{"capacity", "capacity-capture"} {
+		if limit, ok := contracts.PublicRuntimeRoleConnectionLimit(purpose); !ok || limit != 3 {
+			t.Fatalf("owner reads changed retained-process connection budget: %s", purpose)
+		}
+	}
+}

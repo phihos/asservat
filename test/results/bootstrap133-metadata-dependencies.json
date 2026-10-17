@@ -1,0 +1,25 @@
+{
+  "format": "asservat-staged-dependencies/v1",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_projection.go",
+      "sha256": "3da0c4bc36a51cb70e2cb9a81d95d3ef6ac8b8a1d93e5c16d111e0c835351dc2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_passive_test.go",
+      "sha256": "29bd3e709529f6df3f6b788ef38d79d6f8a0007fafab0684e4efb52b4fc6bdb9"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_state_test.go",
+      "sha256": "6371cd3f0f784568d2b7866592576fb05f307156c2d13cbf9d09eef96bc9697c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_state_test.go",
+      "sha256": "5cc59888666bc303b27281bf6d42a2a59ea5d84e6fa7ed3f7b90d7c71c02acb3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_namespace_creation.go",
+      "sha256": "5bd687f1a7c3efbbdc2b6f0adbb23e8000bd8f6df55b16cf146c7d40ff3d05ec"
+    }
+  ]
+}

@@ -1,0 +1,398 @@
+package clusterobservation
+
+import (
+	"context"
+	"crypto/tls"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// HubObservationOperationConversation is implemented by the concrete same-channel
+// coordinator. The installed bootstrap factory binds the exact original
+// profile, native owner proof and separately scoped SQL49 registry. A routing
+// hello and this transport interface cannot establish those authorities.
+type HubObservationOperationConversation interface {
+	ObserveCluster(context.Context, fleet.ClusterObservationRequest) (fleet.ClusterObservationResult, error)
+	Close()
+}
+
+// HubObservationOperationFactory belongs to bootstrap, never to a received request. The
+// stream and TLS state are the actual accepted connection; there is no address,
+// credential, principal, source callback or alternate protocol in the wire.
+type HubObservationOperationFactory func(context.Context, context.Context, *tls.ConnectionState, contracts.ClusterObservationHello, *HubObservationOperationStream) (HubObservationOperationConversation, error)
+
+// HubObservationOperationHolder counts setup, idle, claimed and closing streams against
+// the same finite process limit. One exact claim spends an entry irreversibly.
+// Removing routing eligibility never releases its slot before handler cleanup.
+type HubObservationOperationHolder struct {
+	root    context.Context
+	cancel  context.CancelFunc
+	now     func() time.Time
+	mu      sync.Mutex
+	closed  bool
+	maximum int
+	next    uint64
+	entries map[*hubObservationOperationEntry]struct{}
+	joined  sync.WaitGroup
+}
+
+type hubObservationOperationEntry struct {
+	holder                            *HubObservationOperationHolder
+	ctx                               context.Context
+	cancel                            context.CancelFunc
+	rootStop                          func() bool
+	rootDone                          chan struct{}
+	hello                             contracts.ClusterObservationHello
+	sequence                          uint64
+	stream                            *HubObservationOperationStream
+	conversation                      HubObservationOperationConversation
+	ready, claimed, detached, closing bool // protected by holder.mu
+	operationDone                     chan struct{}
+	resultDone                        chan struct{}
+	joined                            chan struct{}
+	closeOnce                         sync.Once
+	conversationClose                 sync.Once
+}
+
+func NewHubObservationOperationHolder(ctx context.Context, maximum int, now func() time.Time) (*HubObservationOperationHolder, error) {
+	if ctx == nil || ctx.Err() != nil || maximum < 1 || maximum > 16 || now == nil {
+		return nil, fleet.ErrInvalid
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &HubObservationOperationHolder{root: root, cancel: cancel, maximum: maximum, now: now, entries: make(map[*hubObservationOperationEntry]struct{})}, nil
+}
+
+// reserve precedes reading Hello and invoking the bootstrap factory. Failed or
+// unknown setup cannot temporarily exceed the admitted process/socket budget.
+func (h *HubObservationOperationHolder) reserve(ctx context.Context) (*hubObservationOperationEntry, error) {
+	if h == nil || ctx == nil || ctx.Err() != nil {
+		return nil, fleet.ErrUnavailable
+	}
+	end, finite := ctx.Deadline()
+	if !finite || !h.now().Before(end) || end.After(h.now().Add(30*time.Second)) {
+		return nil, fleet.ErrInvalid
+	}
+	if d, ok := h.root.Deadline(); ok {
+		end = identity.Earlier(end, d)
+	}
+	if !h.now().Before(end) {
+		return nil, fleet.ErrUnavailable
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.root.Err() != nil || len(h.entries) >= h.maximum || h.next == ^uint64(0) {
+		return nil, fleet.ErrUnavailable
+	}
+	h.next++
+	call, cancel := context.WithDeadline(ctx, end)
+	e := &hubObservationOperationEntry{holder: h, sequence: h.next, ctx: call, cancel: cancel, operationDone: make(chan struct{}), resultDone: make(chan struct{}), joined: make(chan struct{})}
+	e.rootDone = make(chan struct{})
+	e.rootStop = context.AfterFunc(h.root, func() { cancel(); close(e.rootDone) })
+	h.entries[e] = struct{}{}
+	h.joined.Add(1)
+	return e, nil
+}
+
+func (e *hubObservationOperationEntry) bind(hello contracts.ClusterObservationHello, stream *HubObservationOperationStream, conversation HubObservationOperationConversation) error {
+	if e == nil || stream == nil || conversation == nil || hello.Format != contracts.ClusterObservationOperationExchangeFormat || !authorization.UUID(hello.RootID) || !authorization.UUID(hello.ClusterID) || !authorization.UUID(hello.ExchangeID) {
+		return fleet.ErrInvalid
+	}
+	h := e.holder
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || e.closing || e.ctx.Err() != nil || e.conversation != nil {
+		return fleet.ErrUnavailable
+	}
+	for other := range h.entries {
+		if other != e && other.hello.ExchangeID == hello.ExchangeID {
+			return fleet.ErrUnavailable
+		}
+	}
+	e.hello, e.stream, e.conversation = hello, stream, conversation
+	stream.entry = e
+	return nil
+}
+
+// publish is called only after successful streaming response-header flush.
+// Claims cannot race header setup on the ResponseWriter.
+func (e *hubObservationOperationEntry) publish() error {
+	h := e.holder
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || e.closing || e.ctx.Err() != nil || e.conversation == nil || e.ready {
+		return fleet.ErrUnavailable
+	}
+	e.ready = true
+	return nil
+}
+
+func (h *HubObservationOperationHolder) Lookup(ctx context.Context, rootID, clusterID string) (HubObservationLocator, error) {
+	locator, found, err := h.LookupAvailable(ctx, rootID, clusterID)
+	if err != nil {
+		return HubObservationLocator{}, err
+	}
+	if !found {
+		return HubObservationLocator{}, fleet.ErrUnavailable
+	}
+	return locator, nil
+}
+
+// LookupAvailable distinguishes a positively observed absence from an unknown
+// or failed read. Absence means no currently claimable local standby under the
+// holder lock; it is never a cluster-wide result or authority to repeat a claim.
+func (h *HubObservationOperationHolder) LookupAvailable(ctx context.Context, rootID, clusterID string) (HubObservationLocator, bool, error) {
+	var zero HubObservationLocator
+	if h == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !authorization.UUID(clusterID) {
+		return zero, false, fleet.ErrUnavailable
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.root.Err() != nil || ctx.Err() != nil {
+		return zero, false, fleet.ErrUnavailable
+	}
+	var selected *hubObservationOperationEntry
+	for e := range h.entries {
+		if !e.ready || e.claimed || e.detached || e.closing || e.ctx.Err() != nil || e.hello.RootID != rootID || e.hello.ClusterID != clusterID {
+			continue
+		}
+		// Deterministic selection is not takeover: a later failed exact claim
+		// must not call Lookup again for this original request.
+		if selected == nil || e.hello.ExchangeID < selected.hello.ExchangeID {
+			selected = e
+		}
+	}
+	if selected == nil {
+		if end, ok := h.root.Deadline(); ok && !h.now().Before(end) {
+			return zero, false, fleet.ErrUnavailable
+		}
+		if ctx.Err() != nil || h.root.Err() != nil {
+			return zero, false, fleet.ErrUnavailable
+		}
+		if end, ok := ctx.Deadline(); ok && !h.now().Before(end) {
+			return zero, false, fleet.ErrUnavailable
+		}
+		return zero, false, nil
+	}
+	start := h.now()
+	end, _ := selected.ctx.Deadline()
+	end = identity.Earlier(end, start.Add(5*time.Second))
+	if d, ok := ctx.Deadline(); ok {
+		end = identity.Earlier(end, d)
+	}
+	l := HubObservationLocator{RootID: rootID, ClusterID: clusterID, ExchangeID: selected.hello.ExchangeID, Sequence: selected.sequence, ObservedAt: start, FreshUntil: end}
+	if ctx.Err() != nil || !l.valid(h.now()) {
+		return zero, false, fleet.ErrUnavailable
+	}
+	return l, true, nil
+}
+
+// Claim atomically spends one exact original routing entry. It returns the
+// already-installed conversation, never a native proof or source callback.
+// Bootstrap may bind its own concrete wrapper to the locator-owned operation
+// once; only then does Observe invoke that wrapper. Unknown delivery and a
+// failed bind leave this exact entry spent until joined cleanup.
+func (h *HubObservationOperationHolder) Claim(ctx context.Context, locator HubObservationLocator, request fleet.ClusterObservationRequest) (*HubObservationOperationClaim, error) {
+	if h == nil || ctx == nil || ctx.Err() != nil || !locator.valid(h.now()) || !request.Valid(h.now()) || request.RootID != locator.RootID || request.ClusterID != locator.ClusterID {
+		return nil, fleet.ErrUnavailable
+	}
+	callerEnd, finite := ctx.Deadline()
+	if !finite {
+		return nil, fleet.ErrUnavailable
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var selected *hubObservationOperationEntry
+	if !h.closed && h.root.Err() == nil && ctx.Err() == nil {
+		for e := range h.entries {
+			if e.sequence == locator.Sequence && e.hello.ExchangeID == locator.ExchangeID && e.hello.RootID == locator.RootID && e.hello.ClusterID == locator.ClusterID && e.ready && !e.claimed && !e.detached && !e.closing && e.ctx.Err() == nil {
+				selected = e
+				break
+			}
+		}
+	}
+	if selected == nil {
+		return nil, fleet.ErrUnavailable
+	}
+	end, _ := selected.ctx.Deadline()
+	end = identity.Earlier(end, identity.Earlier(callerEnd, identity.Earlier(locator.FreshUntil, request.NotAfter)))
+	if !h.now().Before(end) {
+		return nil, fleet.ErrUnavailable
+	}
+	selected.claimed = true
+	call, cancel := context.WithDeadline(ctx, end)
+	c := &HubObservationOperationClaim{entry: selected, parent: ctx, ctx: call, cancel: cancel, until: end, request: request.Clone(), conversation: selected.conversation, closedDone: make(chan struct{}), entryDone: make(chan struct{}), callbackDone: make(chan struct{})}
+	c.stopEntry = context.AfterFunc(selected.ctx, func() { cancel(); close(c.entryDone) })
+	// This callback performs restrictive shutdown only. It cannot invoke the
+	// conversation, claim a replacement, refresh authority or release early.
+	c.stop = context.AfterFunc(call, func() { c.shutdown(); close(c.callbackDone) })
+	return c, nil
+}
+
+// HubObservationOperationClaim owns one spent holder entry. A caller must Close
+// it on every path. Its original deadline also closes an abandoned unstarted
+// handle; an admitted Observe is cancelled and joined before slot release.
+type HubObservationOperationClaim struct {
+	entry                               *hubObservationOperationEntry
+	parent, ctx                         context.Context
+	cancel                              context.CancelFunc
+	until                               time.Time
+	request                             fleet.ClusterObservationRequest
+	conversation                        HubObservationOperationConversation
+	mu                                  sync.Mutex
+	started, closed                     bool
+	calls                               sync.WaitGroup
+	closeOnce                           sync.Once
+	closedDone, entryDone, callbackDone chan struct{}
+	stopEntry, stop                     func() bool
+}
+
+// Conversation returns only the bootstrap-owned value installed with this
+// exact socket. Returning it supplies no observation or activation authority.
+func (c *HubObservationOperationClaim) Conversation() HubObservationOperationConversation {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.started || c.ctx.Err() != nil {
+		return nil
+	}
+	return c.conversation
+}
+
+func (c *HubObservationOperationClaim) Observe() (fleet.ClusterObservationResult, error) {
+	var zero fleet.ClusterObservationResult
+	if c == nil {
+		return zero, fleet.ErrUnavailable
+	}
+	c.mu.Lock()
+	if c.closed || c.started || c.ctx.Err() != nil {
+		c.mu.Unlock()
+		return zero, fleet.ErrUnavailable
+	}
+	c.started = true
+	c.calls.Add(1)
+	c.mu.Unlock()
+	result, err := c.conversation.ObserveCluster(c.ctx, c.request.Clone())
+	if c.ctx.Err() != nil || c.entry.stream == nil || !c.entry.stream.completed() {
+		err = fleet.ErrUnavailable
+	}
+	c.calls.Done()
+	c.Close()
+	digest, digestErr := RequestDigest(c.request)
+	result = result.Restrict(c.request.RequestedAt, c.until)
+	if err != nil || digestErr != nil || c.parent.Err() != nil || c.entry.holder.root.Err() != nil || !result.Matches(c.request, digest, c.entry.holder.now()) {
+		return zero, fleet.ErrUnavailable
+	}
+	return result, nil
+}
+
+func (c *HubObservationOperationClaim) shutdown() {
+	c.closeOnce.Do(func() {
+		c.mu.Lock()
+		c.closed = true
+		c.cancel()
+		c.mu.Unlock()
+		c.entry.closeConversation()
+		c.calls.Wait()
+		if !c.stopEntry() {
+			<-c.entryDone
+		}
+		close(c.entry.operationDone)
+		close(c.entry.resultDone)
+		close(c.closedDone)
+	})
+}
+func (c *HubObservationOperationClaim) Close() {
+	if c == nil {
+		return
+	}
+	c.shutdown()
+	if !c.stop() {
+		<-c.callbackDone
+	}
+	<-c.closedDone
+	<-c.entry.joined
+}
+
+// detach is positive exact local routing removal, not a remote acknowledgement.
+// It must happen before Receipt is written and cannot release capacity.
+func (e *hubObservationOperationEntry) detach() error {
+	h := e.holder
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, ok := h.entries[e]; !ok || e.closing || !e.claimed || e.detached || e.ctx.Err() != nil {
+		return fleet.ErrUnavailable
+	}
+	e.detached = true
+	e.ready = false
+	return nil
+}
+
+// close is owned by the receiving handler, including setup failures. A stale
+// entry releases only its own pointer, never a later exchange or replacement.
+func (e *hubObservationOperationEntry) close() {
+	if e == nil {
+		return
+	}
+	e.closeOnce.Do(func() {
+		h := e.holder
+		h.mu.Lock()
+		e.closing = true
+		e.ready = false
+		e.detached = true
+		e.cancel()
+		stream, conversation, claimed := e.stream, e.conversation, e.claimed
+		h.mu.Unlock()
+		if stream != nil {
+			_ = stream.Close()
+		}
+		if conversation != nil {
+			e.closeConversation()
+		}
+		if claimed {
+			<-e.operationDone
+		}
+		if !e.rootStop() {
+			<-e.rootDone
+		}
+		h.mu.Lock()
+		delete(h.entries, e)
+		h.mu.Unlock()
+		close(e.joined)
+		h.joined.Done()
+	})
+}
+
+func (h *HubObservationOperationHolder) Close() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.closed = true
+	h.cancel()
+	entries := make([]*hubObservationOperationEntry, 0, len(h.entries))
+	for e := range h.entries {
+		entries = append(entries, e)
+	}
+	h.mu.Unlock()
+	// Each receiving handler retains ownership and joins closure. Cancellation
+	// wakes it without starting new transport/source work from this method.
+	for _, e := range entries {
+		e.cancel()
+	}
+	h.joined.Wait()
+}
+
+func (e *hubObservationOperationEntry) closeConversation() {
+	e.conversationClose.Do(func() {
+		if e.conversation != nil {
+			e.conversation.Close()
+		}
+	})
+}

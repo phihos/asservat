@@ -1,0 +1,110 @@
+{
+  "internal/adapters/kubernetes/connector_observation_attester.go": {
+    "before": null,
+    "after": "da3f19c05350cbc06a687facd7ed889ab4108857182cf5d56930ee1c24a0c16b"
+  },
+  "internal/adapters/kubernetes/connector_observation_workload.go": {
+    "before": null,
+    "after": "2312568a371f06a608c6102ff8129da6f261baf10e5a90984b0f303bfc260340"
+  },
+  "internal/adapters/kubernetes/connector_process.go": {
+    "before": "aee9d7bcab7e90eda884448745f07458f449f2e975a57b093e47ec9fe39d3730",
+    "after": "07864302052bdbd703e94f6f3eeb0a8499ab0ffcb461fbdab378a9dea34498a7"
+  },
+  "internal/adapters/kubernetes/connector_process_test.go": {
+    "before": "f2d31a4a43a45e12ede6feebeb8714b6ef8ef8e846f36a4c269ef0f69cd5df0d",
+    "after": "a2b8666c6f0dd21dfa691132e8a27dd4e93977d6ba3ca63f3e2929f3dbfc5fc4"
+  },
+  "internal/adapters/kubernetes/initial_runtime_bridge.go": {
+    "before": null,
+    "after": "70a3f0412fec66c5ff7670b74ae648c25eebcf23586c6ca5f6b6568d04eeded5"
+  },
+  "internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go": {
+    "before": null,
+    "after": "8cc5837211ad85c872d4f92115c1f88bde618eb2ec331235782ae183c46663f5"
+  },
+  "internal/adapters/kubernetes/owner_installed.go": {
+    "before": null,
+    "after": "1513cf73b6bf852d25c0a4cd9493ac9fc301af4aa3e0bf0c64088ed32684d5f9"
+  },
+  "internal/adapters/kubernetes/owner_installed_template_test.go": {
+    "before": null,
+    "after": "edc49b18310fcf147b643c6c79c304f5bd94d40d925768d98daff60d22ac91e3"
+  },
+  "internal/adapters/mtls/connector_observation_channel.go": {
+    "before": null,
+    "after": "898d3824063a08f46aeab8731b125f15a878aa69172c2c93c2f817c1925f77b0"
+  },
+  "internal/adapters/mtls/connector_observation_channel_test.go": {
+    "before": null,
+    "after": "acd639fbbd147ff1b345b66099f5b58cb0f52728fd8192094ac90ce816037b76"
+  },
+  "internal/adapters/mtls/connector_observation_keys.go": {
+    "before": null,
+    "after": "ba3c9594fb33ace39a3221d7a3ce3382d9c3ad2ea808631d9bd5c52a89a8b4ff"
+  },
+  "internal/adapters/mtls/connector_observation_producer.go": {
+    "before": null,
+    "after": "2cc9baf5bd8dd07b827b7ad2151229326418b9c178c03c46d5bdabe25eab0a27"
+  },
+  "internal/adapters/mtls/connector_observation_producer_test.go": {
+    "before": null,
+    "after": "ebb0acfd056ffcb04e837fe762998093506285f64a8626e61e34b333397888cf"
+  },
+  "internal/adapters/mtls/connector_observation_source.go": {
+    "before": null,
+    "after": "8fc970815b09d5626080fd2af35fa77db84b5ab626752b445039d5240da4b9e7"
+  },
+  "internal/adapters/mtls/connector_observation_source_test.go": {
+    "before": null,
+    "after": "eaa73d514d5270b815459fa6df0d63f35b5f21351a812733176d9b750d994399"
+  },
+  "internal/adapters/mtls/connector_observation_wire.go": {
+    "before": null,
+    "after": "75992fcae58f804c747cacbfc84dee237ac6286e38a2891911f5e8a06ac7d55a"
+  },
+  "internal/application/fleet/connector_observation.go": {
+    "before": null,
+    "after": "4a2fb5f4f95bdec616a33ee2bdd3ac57b331d8ae82e90478bc4c6b74c329578d"
+  },
+  "internal/contracts/cluster_observation_frames.go": {
+    "before": null,
+    "after": "e47fa3f9eb5a7b7ca29ae81151901cab4237c11c45cbd902be8ed70b8e7a3f18"
+  },
+  "internal/contracts/cluster_observation_frames_test.go": {
+    "before": null,
+    "after": "a140654c638374ca7b926c9f1c7742e78c580d82ace942f2c070035fcaff5090"
+  },
+  "internal/contracts/connector_observation.go": {
+    "before": null,
+    "after": "7f9687adf5394ca5912e38c681d797578b829ae36c31b2d7771b1bb30d7c7e97"
+  },
+  "internal/domain/fleet/cluster_observation_digest.go": {
+    "before": null,
+    "after": "51b87b46c104bfebb4b25b4bbcf16da72aa041d434e75935d4b23144aba7c7d5"
+  },
+  "internal/domain/fleet/connector_observation.go": {
+    "before": null,
+    "after": "2cbd1ec7be02727b3780875c401a75117a8f12674852e4f22ff7694ab2a1a927"
+  },
+  "internal/domain/fleet/connector_observation_test.go": {
+    "before": null,
+    "after": "20096972afc389e22fab91c8e69564b9e246193e22a75d847586b61714271d9f"
+  },
+  "internal/transport/clusterobservation/digest_parity_test.go": {
+    "before": null,
+    "after": "f9114ac8b5c054c61a8297a130f4f43a920b4527482b24b04c343cc2433ba432"
+  },
+  "internal/transport/clusterobservation/exchange_order.go": {
+    "before": null,
+    "after": "5cb7cbf9cfcfc3381f7f1cbf71496dfce7a8f2fd62d6996c3707186b57145a70"
+  },
+  "internal/transport/clusterobservation/exchange_order_test.go": {
+    "before": null,
+    "after": "3fbd307b20a50a9c6eff4a484b1c8fc4604f9030b9d8a67fb79f0791b9ad133b"
+  },
+  "internal/transport/clusterobservation/wire.go": {
+    "before": "723b93f70901b96d9279bb4dfab8639b87f5abe4a26ee627d0c683969740b401",
+    "after": "264a02923791d61b4c1e8331f7f5cf0643278b9fe38f7f84c9dc2c9974a3da4d"
+  }
+}

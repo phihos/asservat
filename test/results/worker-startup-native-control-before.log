@@ -1,0 +1,6 @@
+--- FAIL: TestNativeWorkerControlVersionAndBoundaries (0.00s)
+    --- FAIL: TestNativeWorkerControlVersionAndBoundaries/valid (0.00s)
+        worker_native_control_test.go:78: native worker has no supported startup contract invalid artifact storage descriptor
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.010s
+FAIL

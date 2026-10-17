@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/domain/authorization	1.417s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.234s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	15.557s
+ok  	asservat.local/asservat/test/integration	1.518s

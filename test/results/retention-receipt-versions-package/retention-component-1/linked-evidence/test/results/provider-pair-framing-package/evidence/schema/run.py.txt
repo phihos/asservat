@@ -1,0 +1,44 @@
+from pathlib import Path
+import hashlib, json, subprocess, time
+
+C = Path(__file__).resolve().parent
+L = Path('/home/phil/Projekte/asservat')
+F = C.parent/'owner-versioned-1'
+h = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+m = json.loads((C/'manifest.json').read_text())
+d = json.loads((C/'dependencies.json').read_text())
+foundation = json.loads((F/'manifest.json').read_text())
+expected = {**d, **{v['path']:v['payload_sha256'] for v in foundation}, **{v['path']:v['payload_sha256'] for v in m}}
+
+def check(after=False):
+    return {
+        'live_dependencies': [p for p,v in d.items() if h(L/p) != v],
+        'bases': [v['path'] for v in m if h(L/v['path']) != v['base_sha256']],
+        'payloads': [v['path'] for v in m if h(C/'files'/v['path']) != v['payload_sha256']],
+        'foundation': [v['path'] for v in foundation if h(F/'files'/v['path']) != v['payload_sha256']],
+        'tree': [p for p,v in expected.items() if not (after and p == 'docs/architecture/validation.json') and h(C/'tree'/p) != v],
+    }
+
+with (C/'evidence/started').open('x'): pass
+before = check()
+result = {'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'runner_sha256':h(C/'run.py'),'before':before,'runtime_executed':False}
+code = 1
+if not any(before.values()):
+    command = ['make','PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python','spec-check','architecture-check','design-check']
+    start = time.monotonic()
+    with (C/'evidence/contracts.log').open('x') as log:
+        process = subprocess.Popen(command,cwd=C/'tree',stdout=log,stderr=subprocess.STDOUT)
+        print(json.dumps({'pid':process.pid,'command':command}),flush=True)
+        try:
+            code = process.wait(timeout=180)
+        except subprocess.TimeoutExpired:
+            process.terminate()
+            process.wait()
+            code = 124
+    result.update(command=command,exit=code,seconds=round(time.monotonic()-start,3))
+after = check(True)
+result['after'] = after
+result['terminal_exit'] = 0 if code == 0 and not any(before.values()) and not any(after.values()) else 1
+with (C/'result.json').open('x') as f: json.dump(result,f,indent=2); f.write('\n')
+print(json.dumps(result),flush=True)
+raise SystemExit(result['terminal_exit'])

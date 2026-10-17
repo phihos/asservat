@@ -1,0 +1,81 @@
+package kubernetes
+
+import (
+	"context"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+)
+
+// readConfigurationWorkerCurrent is an actual twelve-request value comparison
+// for the worker-only post-lock boundary: namespace1, guards6, administrator1,
+// sources2, Deployment1, worker account1. Its caller additionally reads the
+// original owner account, role journal, SQL projection and audit material, for
+// sixteen observer requests. No native denial, observation start or authority
+// deadline is refreshed here. The complete initial and final native brackets
+// remain independently required by the owning advancement.
+func (s *ConfigurationRoleSource) readConfigurationWorkerCurrent(ctx context.Context, original configurationWorkerNative) (configurationWorkerNative, error) {
+	var zero configurationWorkerNative
+	p := original.proof.observation
+	if s == nil || ctx == nil || ctx.Err() != nil || original.proof.native == nil || !configurationRoleSourceMatches(s.input, p, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	call, stop := context.WithDeadline(ctx, p.FreshUntil)
+	defer stop()
+	ns, err := s.client.namespace(call, s.client.control)
+	if err != nil {
+		return zero, err
+	}
+	if ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	guards, err := s.configurationRoleGuardVersions(call)
+	if err != nil {
+		return zero, err
+	}
+	if guards != original.proof.guards {
+		return zero, cfg.ErrChanged
+	}
+	administrator, err := s.configurationWorkerAdministrator(call)
+	if err != nil {
+		return zero, err
+	}
+	if !equalJSON(administrator, original.administrator) {
+		return zero, cfg.ErrChanged
+	}
+	f, o, fr, or, rootsUntil, err := s.readConfigurationWorkerValues(call, p.ObservedAt)
+	if err != nil {
+		return zero, err
+	}
+	if f.Revision != original.fleet.Revision || !o.Equal(original.owner) || fr != original.fleetRef || or != original.ownerRef {
+		return zero, cfg.ErrChanged
+	}
+	reader := &OwnerEndpoints{client: s.client, pool: o.Pool}
+	d, err := ownerResource[apps.Deployment](reader, call, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
+	if err != nil {
+		return zero, err
+	}
+	if !configurationRoleDeploymentBound(d, s.input) || d.ResourceVersion != original.deployment.ResourceVersion || !equalJSON(d.Spec, original.deployment.Spec) {
+		return zero, cfg.ErrChanged
+	}
+	account, err := ownerResource[core.ServiceAccount](reader, call, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+	if err != nil {
+		return zero, err
+	}
+	if !ownerMetadata(account.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) || !equalJSON(account, original.account) {
+		return zero, cfg.ErrChanged
+	}
+	until := identity.Earlier(p.FreshUntil, rootsUntil)
+	if initialHandoverDeadline(call, s.client.now, until) != nil || !f.Valid(s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	// All dates and actual enforcement responses remain the first bracket's.
+	// This result can only narrow the end, never supply a new source grant.
+	out := original
+	out.proof.observation.FreshUntil = until
+	out.proof.observation.Fleet.FreshUntil = identity.Earlier(p.Fleet.FreshUntil, until)
+	out.proof.observation.Owner.FreshUntil = identity.Earlier(p.Owner.FreshUntil, until)
+	return out, nil
+}

@@ -1,0 +1,232 @@
+{
+  "name": "resolve_capture_request",
+  "description": "Resolve an uncertain own pod-status request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "preview_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "preview_id",
+      "idempotency_key"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "capture_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "phase": {
+                        "const": "Accepted"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "operation": {
+                        "const": "collect"
+                      },
+                      "state": {
+                        "const": "accepted"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "capture_id",
+                      "phase",
+                      "navigation_uri",
+                      "operation"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "state": {
+                        "const": "closed"
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  }
+                ]
+              },
+              "data_class": {
+                "const": "metadata"
+              },
+              "truncated": {
+                "const": false
+              },
+              "next_cursor": {
+                "type": "null"
+              },
+              "narrowing_hint": {
+                "type": "null"
+              },
+              "warnings": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "provenance": {
+                "type": "array",
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

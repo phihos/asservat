@@ -1,0 +1,15 @@
+ok  	asservat.local/asservat/internal/domain/artifact	1.006s
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.011s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.011s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.010s
+ok  	asservat.local/asservat/internal/domain/identity	1.010s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.012s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/adapters/postgres	1.010s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.687s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.304s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.341s

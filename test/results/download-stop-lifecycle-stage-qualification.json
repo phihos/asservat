@@ -1,0 +1,41 @@
+{
+  "external_fixtures_run": false,
+  "notes": "Exit1 logs are meaningful failing-before regressions; integration final check is compile-only. Logs retain actual results. No full repository gates claimed.",
+  "checks": [
+    {
+      "log": "pending-before.log",
+      "exit_code": 1,
+      "sha256": "d8559f909a388ffc8df6835af96261499d3c99bc758713d620e580f24270b07c"
+    },
+    {
+      "log": "verifier-before.log",
+      "exit_code": 1,
+      "sha256": "3b71fc35ce7339c7218506f0ed7d4a00210e6dd1b93ea7a40691f2f9f293f7e1"
+    },
+    {
+      "log": "regressions-after.log",
+      "exit_code": 0,
+      "sha256": "8bdf93bd2ac7766b63651f36f7ef6e6c8424e6d8444860f9f209963e4526f88f"
+    },
+    {
+      "log": "second-race.log",
+      "exit_code": 0,
+      "sha256": "aa143cf148bf046900758f3a9263283354997c268840ed861418a280cc5de5b5"
+    },
+    {
+      "log": "vet.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "integration-final-compile.log",
+      "exit_code": 0,
+      "sha256": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76"
+    },
+    {
+      "log": "sqlc-final.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

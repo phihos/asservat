@@ -1,0 +1,62 @@
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/valid
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/installation
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/cluster
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/namespace
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/source
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/api
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/database
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/roots
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/probe
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/lease
+=== RUN   TestConfigurationInstallerGeneratedInputKeepsExistingPins/activation
+--- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins (0.02s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/valid (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/installation (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/cluster (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/namespace (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/source (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/api (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/database (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/roots (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/probe (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/lease (0.00s)
+    --- PASS: TestConfigurationInstallerGeneratedInputKeepsExistingPins/activation (0.00s)
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/valid
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-grants
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-credential-path
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/public-layout
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-activation
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-native-pin
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-source
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-guard
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unbounded-connections
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-probes
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-root
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/plaintext-provider
+=== RUN   TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/symlink-escape
+--- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders (0.05s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/valid (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-grants (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unknown-credential-path (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/public-layout (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-activation (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-native-pin (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-source (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/same-guard (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/unbounded-connections (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-probes (0.01s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/missing-root (0.01s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/plaintext-provider (0.00s)
+    --- PASS: TestConfigurationRoleInstallerRejectsAuthoritySubstitutionBeforeProviders/symlink-escape (0.00s)
+=== RUN   TestConfigurationRoleInstallerRemedyDiscardsPrivateFailure
+--- PASS: TestConfigurationRoleInstallerRemedyDiscardsPrivateFailure (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.122s
+=== RUN   TestProvisionedHubWorkerKeepsSeparateCredentialProjections
+--- PASS: TestProvisionedHubWorkerKeepsSeparateCredentialProjections (0.00s)
+=== RUN   TestProvisionedHubWorkerRejectsSharedOrUnboundProjection
+--- PASS: TestProvisionedHubWorkerRejectsSharedOrUnboundProjection (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.046s

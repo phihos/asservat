@@ -1,0 +1,226 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	core "k8s.io/api/core/v1"
+)
+
+// Each call advances at most one fixed child attempt. No arbitrary object,
+// callback, path or replay policy enters this administrator-only producer.
+type OwnerIdentityProjection struct {
+	root                                                                           *OwnerIdentityRoleRoot
+	verification                                                                   OwnerIdentityRoleVerification
+	input                                                                          contracts.OwnerDeployment
+	provider                                                                       OwnerIdentityProviderMaterial
+	attemptedParent, attemptedCredentials, attemptedConfiguration, attemptedLaunch bool // root operation serialized
+}
+
+func NewOwnerIdentityProjection(root *OwnerIdentityRoleRoot, verification OwnerIdentityRoleVerification, input contracts.OwnerDeployment, provider OwnerIdentityProviderMaterial) (*OwnerIdentityProjection, error) {
+	if root == nil || root.resources == nil || verification == nil || input.Observation == nil || input.Native != nil || input.InstallationID != root.input.InstallationID || input.ClusterID != root.input.ClusterID || input.Namespace != root.input.Namespace || input.ConfigurationUID != root.input.OwnerConfigurationUID || !ownerIdentityProjectionInputBound(root, input, root.resources.now()) {
+		return nil, cfg.ErrInvalid
+	}
+	b, e := json.Marshal(input)
+	if e != nil || json.Unmarshal(b, &input) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	return &OwnerIdentityProjection{root: root, verification: verification, input: input, provider: provider}, nil
+}
+
+// Advance first persists immutable public intent, then credentials, then
+// configuration, then their joint receipt. An untouched child can be admitted
+// on a later call under fresh proof and the original resource end. A child
+// whose claim already exists is lookup-only, including after an unknown reply.
+func (s *OwnerIdentityProjection) Advance(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return out, cfg.ErrUnavailable
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	roles, err := s.verification.VerifyOwnerIdentityRoles(call)
+	if err != nil || roles.State.Input != s.root.input || !s.root.resources.now().Before(roles.ValidUntil) {
+		return out, cfg.ErrUnavailable
+	}
+	call, narrow := context.WithDeadline(call, roles.ValidUntil)
+	defer narrow()
+	err = s.root.operation(call, func(live context.Context) error {
+		actual, _, _, e := s.root.read(live)
+		if e != nil || actual.UID != roles.UID || !equalJSON(actual.State, roles.State) {
+			return cfg.ErrChanged
+		}
+		live, stop := context.WithDeadline(live, actual.ValidUntil)
+		defer stop()
+		snapshot, obj, e := s.root.readResources(live)
+		if e != nil {
+			return e
+		}
+		if e = s.originalInput(live, snapshot); e != nil {
+			return e
+		}
+		activation := contracts.OwnerIdentityActivation{Input: s.root.input, RoleRoot: contracts.WorkerObjectReference{Name: s.root.name(), UID: roles.UID}, RoleSetupID: roles.State.OperationID, ResourcesCreatedAt: snapshot.State.CreatedAt, ResourcesUntil: snapshot.State.Until}
+		input, _, data, digest, e := ownerIdentityProjectionMaterial(s.input, activation, roles, s.provider, s.root.resources.now())
+		if e != nil {
+			return e
+		}
+		defer clearRuntimeProjection(data)
+		p := snapshot.State.OwnerIdentity
+		if p == nil {
+			if snapshot.State.OwnerLaunch != nil || s.attemptedParent || !s.root.resources.now().Before(snapshot.State.Until) {
+				return cfg.ErrUnavailable
+			}
+			now := s.root.resources.now().UTC().Truncate(time.Microsecond)
+			until, _ := live.Deadline()
+			until = identity.Earlier(until, snapshot.State.Until).UTC().Truncate(time.Microsecond)
+			next := snapshot.State
+			next.OwnerIdentity = &contracts.OwnerIdentityProjectionClaim{OperationID: uuid.NewString(), PublicDigest: digest, RoleRoot: activation.RoleRoot, RoleSetupID: activation.RoleSetupID, ClaimedAt: now, Until: until}
+			current, launched, e := s.root.current(live)
+			if e != nil || launched {
+				return cfg.ErrUnavailable
+			}
+			s.attemptedParent = true
+			out, e = s.write(live, snapshot, obj, next, identity.Earlier(current, until))
+			return e
+		}
+		if p.PublicDigest != digest || p.RoleRoot != activation.RoleRoot || p.RoleSetupID != activation.RoleSetupID {
+			return cfg.ErrChanged
+		}
+		if p.Receipt != nil {
+			if _, e = s.readObject(live, p, "credentials", input, activation, data); e != nil {
+				return e
+			}
+			if _, e = s.readObject(live, p, "configuration", input, activation, data); e != nil {
+				return e
+			}
+			until, _, e := s.root.current(live)
+			if e != nil {
+				return e
+			}
+			snapshot.ValidUntil = identity.Earlier(snapshot.ValidUntil, until)
+			out = snapshot
+			return nil
+		}
+		if snapshot.State.OwnerLaunch != nil || !s.root.resources.now().Before(snapshot.State.Until) {
+			return cfg.ErrUnavailable
+		}
+		if p.Credentials == nil || p.Credentials.Receipt == nil {
+			return s.advanceObject(live, snapshot, obj, input, activation, data, "credentials", &out)
+		}
+		// The previous positive receipt is independently re-read before admitting
+		// the second object. Persisted receipt shape alone is not a CREATE grant.
+		if _, e = s.readObject(live, p, "credentials", input, activation, data); e != nil {
+			return e
+		}
+		if p.Configuration == nil || p.Configuration.Receipt == nil {
+			return s.advanceObject(live, snapshot, obj, input, activation, data, "configuration", &out)
+		}
+		if _, e = s.readObject(live, p, "configuration", input, activation, data); e != nil {
+			return e
+		}
+		next := snapshot.State
+		copy := *p
+		next.OwnerIdentity = &copy
+		copy.Receipt = &contracts.OwnerIdentityProjectionReceipt{Credentials: p.Credentials.Receipt.Object, CredentialsResourceVersion: p.Credentials.Receipt.ResourceVersion, Configuration: p.Configuration.Receipt.Object, ConfigurationResourceVersion: p.Configuration.Receipt.ResourceVersion, ObservedAt: s.root.resources.now().UTC().Truncate(time.Microsecond)}
+		current, launched, e := s.root.current(live)
+		if e != nil || launched {
+			return cfg.ErrUnavailable
+		}
+		out, e = s.write(live, snapshot, obj, next, identity.Earlier(current, snapshot.State.Until))
+		return e
+	})
+	if err != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, err
+	}
+	return out, nil
+}
+
+func (s *OwnerIdentityProjection) advanceObject(ctx context.Context, snapshot contracts.InitialRuntimeResourceSnapshot, obj *core.Secret, input contracts.OwnerDeployment, activation contracts.OwnerIdentityActivation, data map[string][]byte, purpose string, out *contracts.InitialRuntimeResourceSnapshot) error {
+	p := snapshot.State.OwnerIdentity
+	child := p.Credentials
+	attempted := &s.attemptedCredentials
+	if purpose == "configuration" {
+		child = p.Configuration
+		attempted = &s.attemptedConfiguration
+	} else if purpose != "credentials" {
+		return cfg.ErrInvalid
+	}
+	fresh := false
+	if child == nil {
+		if *attempted {
+			return cfg.ErrUnavailable
+		}
+		now := s.root.resources.now().UTC().Truncate(time.Microsecond)
+		until, _ := ctx.Deadline()
+		until = identity.Earlier(until, snapshot.State.Until).UTC().Truncate(time.Microsecond)
+		c := &contracts.OwnerIdentityObjectAttempt{OperationID: uuid.NewString(), ClaimedAt: now, Until: until}
+		next := snapshot.State
+		parent := *p
+		next.OwnerIdentity = &parent
+		if purpose == "credentials" {
+			parent.Credentials = c
+		} else {
+			parent.Configuration = c
+		}
+		current, launched, e := s.root.current(ctx)
+		if e != nil || launched {
+			return cfg.ErrUnavailable
+		}
+		*attempted = true
+		ack, e := s.write(ctx, snapshot, obj, next, identity.Earlier(current, until))
+		if e != nil {
+			return e
+		}
+		snapshot = ack
+		p = snapshot.State.OwnerIdentity
+		child = c
+		fresh = true
+	}
+	call := ctx
+	if fresh {
+		bounded, end := context.WithDeadline(ctx, child.Until)
+		defer end()
+		call = bounded
+		current, launched, e := s.root.current(call)
+		if e != nil || launched {
+			return cfg.ErrUnavailable
+		}
+		var narrow context.CancelFunc
+		call, narrow = context.WithDeadline(call, current)
+		defer narrow()
+		if e = s.createObject(call, p, purpose, input, activation, data); e != nil {
+			return e
+		}
+	}
+	receipt, e := s.readObject(call, p, purpose, input, activation, data)
+	if e != nil {
+		return e
+	}
+	// Re-read the exact original parent/child after object I/O. Concurrent sibling
+	// claims are retained byte-for-byte; they cannot substitute this child.
+	current, launched, e := s.root.current(call)
+	if e != nil || launched {
+		return cfg.ErrUnavailable
+	}
+	latest, object, e := s.root.readResources(call)
+	if e != nil || latest.State.OwnerLaunch != nil || !equalJSON(latest.State.OwnerIdentity, p) {
+		return cfg.ErrChanged
+	}
+	next := latest.State
+	parent := *p
+	next.OwnerIdentity = &parent
+	c := *child
+	c.Receipt = &receipt
+	if purpose == "credentials" {
+		parent.Credentials = &c
+	} else {
+		parent.Configuration = &c
+	}
+	*out, e = s.write(call, latest, object, next, identity.Earlier(current, latest.State.Until))
+	return e
+}

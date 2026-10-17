@@ -1,0 +1,21 @@
+=== RUN   TestContextCommitWithRealServices
+=== RUN   TestContextCommitWithRealServices/cluster-1
+    context_commit_test.go:228: native=353, full manifest=4651, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+=== RUN   TestContextCommitWithRealServices/cluster-2
+    context_commit_test.go:228: native=353, full manifest=4646, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+--- PASS: TestContextCommitWithRealServices (0.76s)
+    --- PASS: TestContextCommitWithRealServices/cluster-1 (0.45s)
+    --- PASS: TestContextCommitWithRealServices/cluster-2 (0.18s)
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:281: nativeBytes=353 dataBytes=326 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:281: nativeBytes=353 dataBytes=327 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.37s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.29s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.06s)
+=== RUN   TestCustodyWithRealServices
+    custody_test.go:111: run make custody-integration for owned real-service fixtures
+--- SKIP: TestCustodyWithRealServices (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.184s

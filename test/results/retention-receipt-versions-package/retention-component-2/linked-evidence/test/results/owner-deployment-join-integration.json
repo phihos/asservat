@@ -1,0 +1,203 @@
+{
+  "manifestSHA256": "cfdba935d1f844629074d78bc9093408d29ed6176710088f3066a1e4d1282f0d",
+  "dependenciesSHA256": "98d8969f04dbe25dd4ae42dfa7346ba8d6bcef6cedcdd0df5dc35d59d7bfdb28",
+  "files": [
+    {
+      "path": "internal/application/evidence/worker_owners.go",
+      "base_sha256": "62516eb4250568411934c71eed0645795ef41f70c27904c87b90d08190ff874d",
+      "payload_sha256": "98af2ee1057a7726fe237d497eeb5614d7006ac50b2602e51459a7fbd8d62f09"
+    },
+    {
+      "path": "internal/application/evidence/worker_owners_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "3f9580e5f8167e2d4e5d294c2c11f7406cabd792f9a6c361b781a816529f0a6d"
+    },
+    {
+      "path": "internal/application/evidence/worker_routes.go",
+      "base_sha256": "be3ebb03cc2575356d72c4bd08c6f62cc42ee212237779791dff565da16a4285",
+      "payload_sha256": "ee3213ae03ff311a7ae013a2dfa9018a8a46de72d6e54a1466fd8d0970c1e246"
+    },
+    {
+      "path": "internal/application/evidence/worker_routes_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "73ca8d8be7e81d234cc2985285b69689185b2b052461b6aa628629be457c8581"
+    },
+    {
+      "path": "internal/bootstrap/owner_deployment.go",
+      "base_sha256": "d2e6fcca4f2c3ff6d68cf4f015a5852fb5016170b61715c27face2a10d83fc98",
+      "payload_sha256": "c8dd4e113ca3632320f6921b9c6a9d2d086c60be453fb1447d38cbc2ce5707e7"
+    },
+    {
+      "path": "internal/bootstrap/owner_deployment_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b57addfe82b3f13aa9401050a41262adc026415859cf9f7f5b0edd50006be189"
+    }
+  ],
+  "verification": {
+    "manifest_sha256": "cfdba935d1f844629074d78bc9093408d29ed6176710088f3066a1e4d1282f0d",
+    "dependencies_sha256": "98d8969f04dbe25dd4ae42dfa7346ba8d6bcef6cedcdd0df5dc35d59d7bfdb28",
+    "runner_sha256": "7680e11a95a1bce8b0c007052afd857218c3aa2505861b14e34fa00ef99486c1",
+    "paths": 6,
+    "dependencies": 2091,
+    "native_executed": false,
+    "status": "Legacy owner deployment and existing router wrapper lifetime ownership only; no fresh profile/runtime enablement",
+    "commands": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/application/evidence",
+          "./internal/bootstrap"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "intended_before": true,
+        "seconds": 9.7,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        }
+      },
+      {
+        "phase": "before-deployment",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/before-deployment-overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "-run",
+          "^TestOwnerDeployment(ExternalClose|CloseBeforeRun)",
+          "./internal/bootstrap"
+        ],
+        "exit": 1,
+        "expected_exit": 1,
+        "intended_before": true,
+        "seconds": 29.021,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        }
+      },
+      {
+        "phase": "before-router",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/before-router-overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "-run",
+          "^TestWorker(RoutesCloseAndJoin|OwnerWrappersJoin)",
+          "./internal/application/evidence"
+        ],
+        "exit": 1,
+        "expected_exit": 1,
+        "intended_before": true,
+        "seconds": 3.024,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        }
+      },
+      {
+        "phase": "focused-races",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "-run",
+          "^Test(OwnerDeployment|OwnerRuntime|OwnerMounted|OwnerInput|OwnerTrust|WorkerRoutes|WorkerOwner|WorkerCurrent)",
+          "./internal/application/evidence",
+          "./internal/bootstrap"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "intended_before": true,
+        "seconds": 31.711,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+          "./internal/application/evidence",
+          "./internal/bootstrap"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "intended_before": true,
+        "seconds": 2.326,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "auxiliary": []
+        }
+      }
+    ],
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": [],
+      "auxiliary": []
+    },
+    "terminal_exit": 0
+  },
+  "integrationScope": "Exact reviewed component checkpoint. No installed runtime or full combined qualification."
+}

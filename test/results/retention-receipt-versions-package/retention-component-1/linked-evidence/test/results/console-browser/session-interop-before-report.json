@@ -1,0 +1,10 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "failure": "Error: expect(locator).toBeVisible() failed\n\nLocator: getByRole('heading', { name: 'Collect evidence' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" getByRole('heading', { name: 'Collect evidence' }) with timeout 5000ms\n  - waiting for getByRole('heading', { name: 'Collect evidence' })\n"
+}

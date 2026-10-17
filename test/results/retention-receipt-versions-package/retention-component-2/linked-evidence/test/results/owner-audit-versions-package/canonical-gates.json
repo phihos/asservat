@@ -1,0 +1,6 @@
+{
+  "command": "make spec-check architecture-check design-check go-architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+  "exit": 0,
+  "logSHA256": "ecbe479b67967434e551abfe34cfe7a6d041eff173bbd63137c2588635efa699",
+  "scope": "Actual live repository after exact18 integration; resolves only the missing-file mirror packaging failures, not native qualification."
+}

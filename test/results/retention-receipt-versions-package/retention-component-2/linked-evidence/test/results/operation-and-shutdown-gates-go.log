@@ -1,0 +1,73 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/investigation-schemas.py
+Investigation schemas OK: nine bounded implemented subsets; all references local
+go vet ./...
+# This bounds each aggregate package suite, not an operation or authority.
+# The Kubernetes suite includes real-rate proof/expiry cases and now exceeds 10m.
+go test -race -count=1 -timeout=15m ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.651s
+ok  	asservat.local/asservat/internal/adapters/kms	4.077s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	886.603s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.006s
+ok  	asservat.local/asservat/internal/adapters/mtls	16.447s
+ok  	asservat.local/asservat/internal/adapters/objectstore	2.560s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.602s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.414s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.780s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.452s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+ok  	asservat.local/asservat/internal/adapters/providerconfig	2.835s
+ok  	asservat.local/asservat/internal/application/audit	1.139s
+ok  	asservat.local/asservat/internal/application/authorization	1.022s
+ok  	asservat.local/asservat/internal/application/capacity	1.279s
+ok  	asservat.local/asservat/internal/application/capture	1.260s
+ok  	asservat.local/asservat/internal/application/catalog	1.013s
+ok  	asservat.local/asservat/internal/application/configuration	2.182s
+ok  	asservat.local/asservat/internal/application/evidence	1.998s
+ok  	asservat.local/asservat/internal/application/execution	1.127s
+ok  	asservat.local/asservat/internal/application/fleet	8.407s
+ok  	asservat.local/asservat/internal/application/identity	1.068s
+ok  	asservat.local/asservat/internal/application/planning	1.046s
+ok  	asservat.local/asservat/internal/application/privacy	1.034s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	14.269s
+ok  	asservat.local/asservat/internal/console	1.054s
+ok  	asservat.local/asservat/internal/contracts	2.179s
+ok  	asservat.local/asservat/internal/domain/artifact	3.596s
+ok  	asservat.local/asservat/internal/domain/audit	1.011s
+ok  	asservat.local/asservat/internal/domain/authorization	1.476s
+ok  	asservat.local/asservat/internal/domain/capture	1.006s
+ok  	asservat.local/asservat/internal/domain/catalog	1.005s
+ok  	asservat.local/asservat/internal/domain/configuration	1.007s
+ok  	asservat.local/asservat/internal/domain/execution	1.005s
+ok  	asservat.local/asservat/internal/domain/fleet	1.026s
+ok  	asservat.local/asservat/internal/domain/identity	1.006s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+ok  	asservat.local/asservat/internal/domain/targets	1.005s
+ok  	asservat.local/asservat/internal/transport/browser	5.316s
+ok  	asservat.local/asservat/internal/transport/clusterobservation	2.322s
+ok  	asservat.local/asservat/internal/transport/contextstart	1.149s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/mcp	9.632s
+ok  	asservat.local/asservat/internal/transport/native	27.269s
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.455s
+ok  	asservat.local/asservat/internal/transport/presentation	8.612s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+?   	asservat.local/asservat/migrations	[no test files]
+ok  	asservat.local/asservat/test/integration	5.022s

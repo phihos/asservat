@@ -1,0 +1,5 @@
+{
+  "source": "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.img",
+  "sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2",
+  "verification": "SHA256 list retrieved over upstream HTTPS; detached GPG signature not independently verified"
+}

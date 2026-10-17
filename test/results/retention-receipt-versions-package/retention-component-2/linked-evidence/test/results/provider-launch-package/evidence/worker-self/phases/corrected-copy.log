@@ -1,0 +1,16 @@
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/foreign_root
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/unbound_context
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/out_of_order
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/closed_owner
+=== RUN   TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/expired
+--- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny (0.00s)
+    --- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/foreign_root (0.00s)
+    --- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/unbound_context (0.00s)
+    --- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/out_of_order (0.00s)
+    --- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/closed_owner (0.00s)
+    --- PASS: TestConfigurationWorkerLaunchOpaqueZeroAndForeignPhaseDeny/expired (0.00s)
+=== RUN   TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper
+--- PASS: TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.047s

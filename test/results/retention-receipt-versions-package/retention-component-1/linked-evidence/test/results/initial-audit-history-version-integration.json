@@ -1,0 +1,33 @@
+{
+  "scope": "Initial audit acknowledgement, activation and historical bridge acceptance require original immutable version; no history rewrite",
+  "manifest": "405da9869d2cac57787f14587eeeb8ceb59cf11d050c10ec29f143978a26f93d",
+  "result": "6d85be008455af76645a5f36b06fb08010b3448b7c9c97b0acbe0abc9e391d0e",
+  "dependenciesVerified": 3025,
+  "integrated": [
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_root_pin_test.go",
+      "base": "873328ca343f08762debbf4121aabde02497df728ad36fc1cd8837c4a2620630",
+      "payload": "c08e785911b1d038ccc04a8cea75a1093188da06b15c96da0e056df3106b22d9"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_read_test.go",
+      "base": "b86fc53bbea01ba149cb35be21e9ae463c17870d39bac286c80a3cbd846296a6",
+      "payload": "462ea74ff4e1e34827d92ac88e1fc4fa22a6a164aa904443f4717a39bebb267a"
+    },
+    {
+      "path": "internal/domain/audit/initial_installation.go",
+      "base": "66f6a9d051cba6e6a8232d5c467e0469a8b1c0115632197824e6d98ec9217404",
+      "payload": "18e1cfae7a5972eff50b030c3a6744c71b89d49de421d57412ca1c3b56574e98"
+    },
+    {
+      "path": "internal/domain/audit/initial_installation_test.go",
+      "base": null,
+      "payload": "088a85e47d479bdd9a9bb78d9b46accc1f549a41bf45a865cf3710d75b5ed96f"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base": "8ea1f7175ebc4739ecb0104e3b464b4fc41100711cadeba94714d3b88756981a",
+      "payload": "c9724625796ea935137a5cbe624bdf2b5bdd60c8554c00e2d1a33cb07ca17e32"
+    }
+  ]
+}

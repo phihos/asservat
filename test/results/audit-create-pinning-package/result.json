@@ -1,0 +1,132 @@
+{
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 15.436,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/before-overlay.json",
+        "-vet=off",
+        "-count=1",
+        "-v",
+        "-run",
+        "^Test(OwnerAuditCreatePreservesAcknowledgedVersion|DownloadWindowReadUsesPositiveVersionAndFindStaysReadOnly)$",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 1.514,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 3,
+      "skips": 0,
+      "intendedMarkers": true
+    },
+    {
+      "name": "races",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/adapters/objectstore",
+        "./internal/adapters/objectstore/framed"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 20.143,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 60,
+      "namedPass": 185,
+      "skips": 0
+    },
+    {
+      "name": "audit-application",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/application/audit"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 1.866,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 34,
+      "namedPass": 75,
+      "skips": 0
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/audit-create-pinning-20261013/checks-1/overlay.json",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.412,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "native": false,
+  "sourceCount": 3023,
+  "scratch": "/tmp/asservat-audit-pinning-l42gn6e5",
+  "manifest": "075f07d9a80a189b7bcd62c021a13476da255e327e478c129b7083e95c4b8239",
+  "exit": 0,
+  "scratchRemoved": true,
+  "sourceChanged": [],
+  "files": {
+    "dependencies.json": "33a30730e6235c3edaf496cf34b6fd586ab606c5ecb4ac7861aad5a3685adf9f",
+    "manifest.json": "075f07d9a80a189b7bcd62c021a13476da255e327e478c129b7083e95c4b8239",
+    "overlay.json": "ef6e961559ac03a6c91c845dbe5189e345a26ecd6af0161fe4b7446197a0543c",
+    "before-overlay.json": "cc1280ca74b16f3dc1e7ad965e5a719bf92a15fad2314310cbc05ce12da85462",
+    "compile.log": "6a4bf918bfabb0ec18aefe70695acae8347f831bac21ceb2156b43657a5e3a62",
+    "before.log": "8c9d766cc4d96784d4b42226a6c9efd1a5dedf88cd2f97d5961c9aa114bbda64",
+    "races.log": "0c414414f16af6afa1ad2ebbb9105991dc44172a40083d9c1134941a3a438800",
+    "audit-application.log": "40b283ac837e0f4f58afc5265c338e557a2f20ef0f427817e38d7ee2f806093d",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "HANDOFF.md": "985fd700ec08bcf9afcda14ea6e9eff42c673205f5a822b1e1d152116a2921cc",
+  "changes/cmd/asservat/main.go": "b63b8a04297d9252fc08460e21c06be5fa49957756670d6d11bba914257def97",
+  "changes/docs/architecture/configuration-credential-provisioning.md": "008429e72fd0ea1904147a430821b3833e112f4675aabe9207ca0ac61163a29e",
+  "changes/internal/adapters/kubernetes/configuration_runtime_workload.go": "595ba4608c362eb47686b66d30ba1713411a572fb52d2357871096b259e1a246",
+  "changes/internal/adapters/kubernetes/configuration_runtime_workload_test.go": "cd5de1a55e64f2999041e65857c643ed2d537e16a2bd6644886fe5a630d33905",
+  "changes/internal/bootstrap/configuration_role_inputs.go": "51b06ddd852438f5760769bbf048debf7b1c5b5c7022a65f247c783b24d1e663",
+  "changes/internal/bootstrap/configuration_role_inputs_test.go": "8c818703675c3bbb2ce8f5f81a0459487d2320822ceed3f18a78b314877b3493",
+  "changes/internal/bootstrap/configuration_role_installer_test.go": "460066a4bf927406279d62cb6090fa0231631dc3533bcf82e81c246cbf5c2e7a",
+  "evidence/compile.log": "72c53feed612ae66f520638cc79e32d31933cc77eb35a4cfce237d0a233463e4",
+  "evidence/dependencies.json": "98e4787ac7705e8d15f852c6fb498cdebd7da33303aa192d55726980d2de716f",
+  "evidence/manifest.json": "ea0bcfc20db0788b4d28a818d6ef2e40b6edf2362913dc0582978cc74ee856fd",
+  "evidence/race.log": "b97f49ae474c9be6466fc2964b871bb954bcc134d98d4fa7a71dbce3da26d3de",
+  "evidence/result.json": "2a888fd42c0928c1501c3aa2ad841d48b64f8e7e03305bb0e24a6d580b7531f2",
+  "evidence/run.py": "cee89e2d2ad138582269a0f3f6abcce1d7aeb9283151a539ad1b05e98c036dbb",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "manifest.json": "0cab5a5c66aaa2d9bcab97de04e1973e78461de3eda47bde8e3351ece7acd46f",
+  "source.patch": "db070b03b35271b56ce814dc4813ecfe263c1b0333f26f56fa21b6ce84bc7e5f"
+}

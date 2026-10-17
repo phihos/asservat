@@ -1,0 +1,37 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_setup_native_test.go",
+    "base": "dfc334683e2facbfe0d85bbdf2c428dd4eed23f84d60b81372c68740c8935874",
+    "sha256": "4c9312149b95d73babf885b7ecc9c1d6490eca515f8e0f13204455d2a42b0978"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_artifact.go",
+    "base": "7aa9684e89c00c8534db926448db2a772962cfef1dea0a7ea4eeaca31db34109",
+    "sha256": "2ce9e5abdf7eb88ac888090998c0bcc6bc4e6b8cff6c4b2a96d46041e0f5a014"
+  },
+  {
+    "path": "internal/adapters/providerconfig/configuration_provider_artifact_test.go",
+    "base": "a34ee89de62fcf951e6d899f8b61ee6470630bf84877fe8dde6eda62d52bf265",
+    "sha256": "9a44f466a86878e58af41d992cd6ac4e552bb694bc2506ac73d994481a57cd30"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_setup.go",
+    "base": "b6ab1e1f46941c179be02a7e1b68c17a07f133445f426350aac965b0aff8e17f",
+    "sha256": "9ec1d0d2dafa3a193fae1905db8b7945b3dc68a57cccf5e5cce736083f4c3173"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_setup_test.go",
+    "base": "ff3b98639944189a9a261324ab026944da1a1727d183bce8e637dca9799df518",
+    "sha256": "f5f960bebfcca7f20d39a73fb5c2483565971cbe26a83056e1d6ac455f8625d7"
+  },
+  {
+    "path": "internal/adapters/providerconfig/setup_read_shapes_test.go",
+    "base": null,
+    "sha256": "a9cfd454b0cb0a02bd55586e7c6ae9f6a73b1d1cad353a8480b15b8e14c34e8b"
+  },
+  {
+    "path": "internal/adapters/providerconfig/setup_values.go",
+    "base": "3e11e9405f3893dc59a8b012aa2f1f9e9d28c923fd96cc71a9d2852ee7acd22b",
+    "sha256": "80e6ff4b931f2a91390c972889854610eb3368b7b0eab8fdce801ed78a0a9a37"
+  }
+]

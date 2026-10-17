@@ -1,0 +1,57 @@
+from pathlib import Path
+import hashlib,json,subprocess,os,time,signal,sys,shutil
+c=Path(__file__).parent;live=Path('/home/phil/Projekte/asservat')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert h(c/'manifest.json')=='a9a90281001b10224bff196f3e43557a1af70d6b2060bda6bf38341b7829c8c9'
+assert h(c/'dependencies.json')=='215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce'
+m=json.loads((c/'manifest.json').read_text());deps=json.loads((c/'dependencies.json').read_text());before=json.loads((c/'before-manifest.json').read_text())
+args=['api','cmd','internal','migrations','test/integration','scripts','specs','docs','Makefile','README.md','go.mod','go.sum','requirements-spec.txt']
+def verify():
+ inventory=set(subprocess.check_output(['rg','--files',*args],cwd=live,text=True).splitlines())
+ return {'payloads':[x['path'] for x in m if h(c/'files'/x['path'])!=x['payload_sha256']], 'bases':[x['path'] for x in m if h(live/x['path'])!=x['base_sha256']], 'dependencies':[p for p,v in deps.items() if h(live/p)!=v], 'inventory':sorted(inventory^set(deps)), 'before':[p for p,v in before.items() if h(c/p)!=v]}
+assert not (c/'result.json').exists()
+r={'manifest':h(c/'manifest.json'),'dependencies':h(c/'dependencies.json'),'runner':h(Path(__file__)),'started':time.time(),'before':verify(),'phases':[],'native':False}
+if any(r['before'].values()):
+ (c/'preflight-failure.json').write_text(json.dumps(r,indent=2)+'\n');raise SystemExit(2)
+scratch=Path('/tmp/asservat-worker-phase-6-59b5f5845fdb4cb7a23f722aeffbba9a')
+scratch.mkdir(mode=0o700)
+assert scratch.is_dir() and scratch.parent==Path('/tmp') and scratch.name.startswith('asservat-worker-phase-6-')
+assert shutil.disk_usage(scratch).free>=4*1024**3
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(scratch))
+for k in list(env):
+ if k.startswith('ASSERVAT_'): del env[k]
+packages=['./internal/contracts','./internal/adapters/providerconfig','./internal/adapters/kubernetes','./internal/adapters/kms','./internal/adapters/postgres','./internal/bootstrap']
+overlay=str(c/'overlay.json')
+phases=[
+ ('controlled-before',['go','test','-race','-vet=off','-overlay',str(c/'before-overlay.json'),'-count=1','-timeout=30s','-v','./internal/adapters/kubernetes','-run=^TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder$/^owner_marked_closed$'],600,1),
+ ('corrected-test',['go','test','-race','-vet=off','-overlay',overlay,'-count=1','-timeout=30s','-v','./internal/adapters/kubernetes','-run=^TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder$'],600,0)]
+
+
+code=1
+try:
+ probe=scratch/'fsync-probe'
+ with probe.open('xb') as f:f.write(bytes(1048576));f.flush();os.fsync(f.fileno())
+ probe.unlink()
+ for name,cmd,maximum,expected in phases:
+  check=verify()
+  if any(check.values()):r['phase_preflight']=check;code=2;break
+  started=time.time();timeout=False;log=c/'evidence'/(name+'.log')
+  with log.open('x') as f:
+   p=subprocess.Popen(cmd,cwd=live,env=env,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
+   print(json.dumps({'phase':name,'pid':p.pid,'started':started}),flush=True)
+   try:p.wait(timeout=maximum)
+   except subprocess.TimeoutExpired:
+    timeout=True;os.killpg(p.pid,signal.SIGTERM)
+    try:p.wait(timeout=10)
+    except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+  txt=log.read_text();entry={'name':name,'command':cmd,'exit':p.returncode,'expected_exit':expected,'timed_out':timeout,'seconds':time.time()-started,'log_sha256':h(log),'hashes':verify(),'pass_entries':sum(x.startswith('--- PASS:') or x.lstrip().startswith('--- PASS:') for x in txt.splitlines())}
+  if expected==1:entry['intended_assertion']='unowned or out-of-order native/SQL phase accepted' in txt and '[build failed]' not in txt and 'panic: test timed out' not in txt
+  r['phases'].append(entry);print(json.dumps(entry),flush=True)
+  code=0 if not timeout and p.returncode==expected and (expected!=1 or entry['intended_assertion']) and not any(entry['hashes'].values()) else (124 if timeout else p.returncode or 2)
+  if code:break
+finally:
+ shutil.rmtree(scratch)
+ r.update(exit=code,ended=time.time(),after=verify(),scratch=str(scratch),scratch_removed=not scratch.exists())
+ with (c/'result.json').open('x') as f:json.dump(r,f,indent=2);f.write('\n')
+ print(json.dumps(r,indent=2),flush=True)
+raise SystemExit(code if not any(r['after'].values()) else 2)

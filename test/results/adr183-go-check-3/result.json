@@ -1,0 +1,8 @@
+{
+  "name": "adr183-go-check-3",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": null,
+  "status": "aborted",
+  "results": "Stopped deliberately after launch: a targeted -race repetition showed the first test fix incomplete. Diagnosis: the forwarder returns at the original deadline when its own timer fires a moment before the caller context records expiry, so the ctx.Err() == nil check was stricter than the contract (one GET, at most one POST, interval neither shortened nor widened). The check now tests early return against the recorded caller end directly; 30 -race repetitions passed before adr183-go-check-4.",
+  "log": "go-check.log"
+}

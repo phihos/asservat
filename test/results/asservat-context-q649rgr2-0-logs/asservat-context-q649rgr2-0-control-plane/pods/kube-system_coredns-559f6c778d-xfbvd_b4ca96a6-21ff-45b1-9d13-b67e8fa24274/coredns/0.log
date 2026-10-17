@@ -1,0 +1,6 @@
+2026-10-15T14:53:57.576870201Z stdout F maxprocs: Leaving GOMAXPROCS=16: CPU quota undefined
+2026-10-15T14:53:57.594431646Z stdout F [INFO] plugin/ready: Plugins not ready: "kubernetes"
+2026-10-15T14:53:57.678528287Z stdout F .:53
+2026-10-15T14:53:57.678588528Z stdout F [INFO] plugin/reload: Running configuration SHA512 = 1b226df79860026c6a52e67daa10d7f0d57ec5b023288ec00c5e05f93523c894564e15b91770d3a07ae1cfbe861d15b37d4a0027e69c546ab112970993a3b03b
+2026-10-15T14:53:57.678592328Z stdout F CoreDNS-1.14.6
+2026-10-15T14:53:57.678594468Z stdout F linux/amd64, go1.26.5, 424d125

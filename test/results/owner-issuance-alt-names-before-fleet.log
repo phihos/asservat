@@ -1,0 +1,7 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:108: synthetic provider errors: [Field validation failed: error converting input for field "alt_names": '' expected type 'string', got unconvertible type '[]interface {}']
+    owner_pki_test.go:109: actual owner CSR signing server key service refused or unavailable
+--- FAIL: TestEnrollmentOwnerPKIWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.076s
+FAIL

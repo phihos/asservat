@@ -1,0 +1,34 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-routing-two-clusters
+=== RUN   TestContextAdmissionWithRealServices/download-worker-request-owners
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-channel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-current-request
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-replay
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-budget
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-parallel
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-change-key
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-roles
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+--- PASS: TestContextAdmissionWithRealServices (31.30s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-routing-two-clusters (1.99s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-request-owners (3.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-channel (2.45s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-current-request (2.99s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-replay (2.18s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-unaudited (1.75s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-budget (1.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-parallel (1.31s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-change-key (1.79s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-roles (1.77s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-reuse (2.10s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-expired-lock (1.38s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (1.91s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (2.10s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (1.77s)
+PASS
+ok  	asservat.local/asservat/test/integration	32.355s

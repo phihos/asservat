@@ -1,0 +1,670 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"slices"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/application/planning"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	executionvalue "asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
+	privacyvalue "asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
+	"github.com/jackc/pgx/v5/pgxpool"
+	apps "k8s.io/api/apps/v1"
+	authn "k8s.io/api/authentication/v1"
+	authz "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
+)
+
+type nativeAPIEnvironment struct {
+	admin                     kubernetes.Interface
+	garbageCollector          kubernetes.Interface
+	control                   cfg.NamespaceRef
+	plan                      cfg.APIExecutionAdministration
+	executor, capacity, probe *rest.Config
+	unboundExecutor           *rest.Config
+	process                   *kube.APIExecutionProcess
+	capacityGuard             *kube.APIExecutionProtection
+	protectionPin, startPin   kube.GuardPin
+	resolver                  *kube.PodTargets
+	target                    targets.WorkloadRequest
+	image                     artifact.Digest
+	pod                       *core.Pod
+	deployment                *apps.Deployment
+}
+
+// These components run in the fixture process with an actual API-server-issued
+// Pod-bound token. The native API proves that credential and current guarded
+// Pod/account/spec, not that the fixture process is physically inside the Pod.
+// This is deliberately not a deployed regional executable or installer test.
+func newNativeAPIEnvironment(t *testing.T, ctx context.Context, f fixture) *nativeAPIEnvironment {
+	t.Helper()
+	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[0].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nsName := "api-execution-native"
+	ns, err := admin.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: nsName, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &nativeAPIEnvironment{admin: admin, control: cfg.NamespaceRef{Name: nsName, UID: string(ns.UID)}}
+	gcConfig := rest.CopyConfig(config)
+	gcConfig.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:kube-system:generic-garbage-collector", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:kube-system", "system:authenticated"}}
+	n.garbageCollector, err = kubernetes.NewForConfig(gcConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accounts := map[string]*core.ServiceAccount{}
+	for _, name := range []string{"executor", "capacity", "probe"} {
+		sa, e := admin.CoreV1().ServiceAccounts(nsName).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: nsName}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		accounts[name] = sa
+	}
+	// Use the owned harness's exact compiled product/test-helper image. The helper
+	// remains idle; acquisition below is the real collector in this test process.
+	digest := strings.Split(f.WorkerImage, "@sha256:")
+	if len(digest) != 2 {
+		t.Fatal("owned image lacks exact digest")
+	}
+	raw, e := hex.DecodeString(digest[1])
+	if e != nil || len(raw) != 32 {
+		t.Fatal("owned image digest")
+	}
+	copy(n.image[:], raw)
+	pod := &core.Pod{ObjectMeta: meta.ObjectMeta{Name: "executor", Namespace: nsName}, Spec: core.PodSpec{ServiceAccountName: "executor", AutomountServiceAccountToken: ptr.To(false), RestartPolicy: core.RestartPolicyNever, TerminationGracePeriodSeconds: ptr.To(int64(3)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Containers: []core.Container{{Name: "executor", Image: f.WorkerImage, ImagePullPolicy: core.PullNever, Resources: core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}}, Command: []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}, SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}
+	pod, err = admin.CoreV1().Pods(nsName).Create(ctx, pod, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(c context.Context) (bool, error) {
+		pod, err = admin.CoreV1().Pods(nsName).Get(c, "executor", meta.GetOptions{})
+		return err == nil && pod.Spec.NodeName != "" && pod.Status.Phase == core.PodRunning, err
+	}); err != nil {
+		t.Fatal("native executor holder Pod", err)
+	}
+	n.pod = pod
+	adminWho, err := admin.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authn.SelfSubjectReview{}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.plan = cfg.APIExecutionAdministration{Name: "api-execution-native", ControlNamespace: n.control, ClusterID: custodyID(), PodName: pod.Name, PodUID: string(pod.UID), Account: "executor", AccountUID: string(accounts["executor"].UID), CapacityAccount: "capacity", CapacityAccountUID: string(accounts["capacity"].UID), ProbeAccount: "probe", ProbeAccountUID: string(accounts["probe"].UID), PodSpecDigest: kube.APIExecutionPodDigest(pod.Spec), ImageDigest: n.image, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: adminWho.Status.UserInfo.Username}}}
+	// Fixture-only administrator mints exact bound credentials. No production
+	// capture caller or execution account receives token-mint permission.
+	tokenConfig := func(name string, bound bool) *rest.Config {
+		spec := authn.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600))}
+		if bound {
+			spec.BoundObjectRef = &authn.BoundObjectReference{APIVersion: "v1", Kind: "Pod", Name: pod.Name, UID: pod.UID}
+		}
+		tok, e := admin.CoreV1().ServiceAccounts(nsName).CreateToken(ctx, name, &authn.TokenRequest{Spec: spec}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("fixture token mint failed")
+		}
+		c := rest.AnonymousClientConfig(config)
+		c.BearerToken = tok.Status.Token
+		return c
+	}
+	n.executor, n.capacity, n.probe, n.unboundExecutor = tokenConfig("executor", true), tokenConfig("capacity", false), tokenConfig("probe", false), tokenConfig("executor", false)
+	subject := func(name string) rbac.Subject {
+		return rbac.Subject{Kind: "ServiceAccount", Name: name, Namespace: nsName}
+	}
+	createRole := func(namespace, name string, rules []rbac.PolicyRule, subjects []rbac.Subject) {
+		_, e := admin.RbacV1().Roles(namespace).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Rules: rules}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		_, e = admin.RbacV1().RoleBindings(namespace).Create(ctx, &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Subjects: subjects, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name}}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	common := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod.Name}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{"executor", "capacity", "probe"}, Verbs: []string{"get"}}}
+	createRole(nsName, "api-proof-reader", common, []rbac.Subject{subject("executor"), subject("capacity")})
+	createRole(nsName, "api-independent-probe", []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod.Name}, Verbs: []string{"update"}}}, []rbac.Subject{subject("probe")})
+	createRole(nsName, "api-capacity", []rbac.PolicyRule{{APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations"}, Verbs: []string{"get", "create"}}, {APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations/status"}, Verbs: []string{"get", "update"}}}, []rbac.Subject{subject("capacity")})
+	createRole(nsName, "api-executor", []rbac.PolicyRule{{APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations"}, Verbs: []string{"get"}}, {APIGroups: []string{"asservat.io"}, Resources: []string{"capacityreservations/status"}, Verbs: []string{"get", "update"}}}, []rbac.Subject{subject("executor")})
+	createRole("synthetic", "api-execution-reader", []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}}, {APIGroups: []string{"apps"}, Resources: []string{"deployments", "replicasets", "statefulsets"}, Verbs: []string{"get"}}}, []rbac.Subject{subject("executor")})
+	rules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{nsName, "synthetic"}, Verbs: []string{"get"}}, {APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{"api-execution-native", "api-execution-start"}, Verbs: []string{"get"}}, {APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews"}, Verbs: []string{"create"}}}
+	_, err = admin.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: "api-execution-native"}, Rules: rules}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: "api-execution-native"}, Subjects: []rbac.Subject{subject("executor"), subject("capacity"), subject("probe")}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "api-execution-native"}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Install the shipped structural CRD unchanged. All local records are removed
+	// by the owned cluster teardown; no policy is disabled to force their deletion.
+	dc, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile("../../charts/asservat/crds/capacityreservations.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crd unstructured.Unstructured
+	if json.Unmarshal(data, &crd.Object) != nil {
+		t.Fatal("invalid shipped start CRD")
+	}
+	crds := dc.Resource(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"})
+	if _, err = crds.Create(ctx, &crd, meta.CreateOptions{}); err != nil {
+		t.Fatal("exact fixture CRD create", err)
+	}
+	if err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(c context.Context) (bool, error) {
+		v, e := crds.Get(c, crd.GetName(), meta.GetOptions{})
+		if e != nil {
+			return false, e
+		}
+		conds, _, _ := unstructured.NestedSlice(v.Object, "status", "conditions")
+		for _, r := range conds {
+			m, _ := r.(map[string]any)
+			if m["type"] == "Established" && m["status"] == "True" {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Own unscheduled target: publishing later must survive its actual deletion.
+	original, err := admin.AppsV1().Deployments("synthetic").Get(ctx, "fixture", meta.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := original.Spec.DeepCopy()
+	spec.Replicas = ptr.To(int32(1))
+	spec.Selector = &meta.LabelSelector{MatchLabels: map[string]string{"app": "api-execution-observed"}}
+	spec.Template.Labels = spec.Selector.MatchLabels
+	spec.Template.Spec.SchedulerName = "asservat-test-no-scheduler"
+	n.deployment, err = admin.AppsV1().Deployments("synthetic").Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "api-execution-observed", Namespace: "synthetic"}, Spec: *spec}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer, err := kube.NewPermissionClient(n.executor, n.plan.ClusterID, n.control, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.resolver, err = kube.NewAPIContextTargets(observer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.target = targets.WorkloadRequest{ClusterID: n.plan.ClusterID, Namespace: "synthetic", Kind: "Deployment", Name: n.deployment.Name}
+	if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 20*time.Second, true, func(c context.Context) (bool, error) {
+		r, e := n.resolver.ResolveWorkload(c, n.target)
+		return e == nil && r.Pin.NodeName == "", nil
+	}); err != nil {
+		t.Fatal("native unscheduled target unavailable", err)
+	}
+	return n
+}
+
+func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recovery artifact.RecoveryProof) {
+	t.Helper()
+	n.plan.InstallationID = recovery.InstallationID
+	n.plan.IssuerEpoch = recovery.IssuerEpoch
+	policy, binding, err := kube.APIExecutionAdmission(n.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, policy, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.protectionPin = kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
+	sp, sb, err := kube.StartAdmission(cfg.LocalStartAdministration{Name: "api-execution-start", ControlNamespace: n.control, CapacityUser: "system:serviceaccount:" + n.control.Name + ":capacity", ExecutionUser: "system:serviceaccount:" + n.control.Name + ":executor"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err = n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, sp, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, sb, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.startPin = kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
+	client := func(c *rest.Config) *kube.PermissionClient {
+		r, e := kube.NewPermissionClient(c, n.plan.ClusterID, n.control, time.Now)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return r
+	}
+	probe := client(n.probe)
+	guard, err := kube.NewAPIExecutionProtection(client(n.executor), probe, n.plan, n.protectionPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.capacityGuard, err = kube.NewAPIExecutionProtection(client(n.capacity), probe, n.plan, n.protectionPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.process, err = kube.NewAPIExecutionProcess(ctx, guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 20*time.Second, true, func(c context.Context) (bool, error) { _, e := n.process.ReadAPIProcess(c); return e == nil, nil }); err != nil {
+		t.Fatal("exact native API process guard unavailable", err)
+	}
+	for _, name := range []string{n.plan.Name, "api-execution-start"} {
+		e := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, 10*time.Second, true, func(c context.Context) (bool, error) {
+			p, e := n.admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(c, name, meta.GetOptions{})
+			if e != nil {
+				return false, e
+			}
+			if p.Status.TypeChecking != nil && len(p.Status.TypeChecking.ExpressionWarnings) != 0 {
+				return false, fmt.Errorf("native policy %s has CEL warnings", name)
+			}
+			return p.Status.ObservedGeneration == p.Generation && p.Status.TypeChecking != nil, nil
+		})
+		if e != nil {
+			t.Fatal("native policy not type checked", e)
+		}
+	}
+	unbound, err := kube.NewAPIExecutionProtection(client(n.unboundExecutor), probe, n.plan, n.protectionPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unboundProcess, err := kube.NewAPIExecutionProcess(ctx, unbound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = unboundProcess.ReadAPIProcess(ctx); err == nil {
+		t.Fatal("unbound executor token accepted")
+	}
+	// Actual API/RBAC, not an assertion about planned role YAML.
+	runtime, err := kubernetes.NewForConfig(n.executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []authz.ResourceAttributes{{Verb: "get", Resource: "nodes"}, {Verb: "create", Resource: "pods", Subresource: "exec", Namespace: "synthetic"}, {Verb: "get", Resource: "secrets", Namespace: n.control.Name}, {Verb: "create", Resource: "serviceaccounts", Subresource: "token", Namespace: n.control.Name, Name: "executor"}} {
+		r, e := runtime.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authz.SelfSubjectAccessReview{Spec: authz.SelfSubjectAccessReviewSpec{ResourceAttributes: &a}}, meta.CreateOptions{})
+		if e != nil || r.Status.Allowed {
+			t.Fatal("unnecessary execution privilege", a.Resource, a.Subresource, e)
+		}
+	}
+	// The GC identity receives no general metadata or workload update branch.
+	// Its finalization exception applies only after an authorized deletion.
+	for attempt := 0; attempt < 3; attempt++ {
+		pod, e := n.admin.CoreV1().Pods(n.control.Name).Get(ctx, n.pod.Name, meta.GetOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		pod.Annotations = map[string]string{"asservat.io/forbidden-gc-edit": "synthetic"}
+		_, e = n.garbageCollector.CoreV1().Pods(n.control.Name).Update(ctx, pod, meta.UpdateOptions{DryRun: []string{meta.DryRunAll}})
+		if apierrors.IsConflict(e) && attempt < 2 {
+			continue
+		}
+		var status apierrors.APIStatus
+		denied := false
+		if errors.As(e, &status) && status.Status().Details != nil {
+			want := "ValidatingAdmissionPolicy '" + n.plan.Name + "' with binding '" + n.plan.Name + "' denied request: Asservat regional API execution namespace requires its exact administrator or bounded role operation."
+			for _, cause := range status.Status().Details.Causes {
+				denied = denied || cause.Message == want
+			}
+		}
+		if !denied {
+			t.Fatal("GC live Pod edit did not reach exact namespace denial", e)
+		}
+		break
+	}
+}
+
+type nativeAPIIdentity struct{ value identity.Identity }
+
+func (s nativeAPIIdentity) Resolve(ctx context.Context, _ string) (identity.Identity, error) {
+	if ctx.Err() != nil {
+		return identity.Identity{}, ctx.Err()
+	}
+	return s.value, nil
+}
+
+type nativeAPICapability struct{ value planvalue.ContextCapability }
+
+func (s nativeAPICapability) ContextCapability(ctx context.Context, _ authorization.Target) (planvalue.ContextCapability, error) {
+	v := s.value
+	v.ObservedAt = time.Now().UTC()
+	v.FreshUntil = v.ObservedAt.Add(5 * time.Second)
+	return v, ctx.Err()
+}
+
+type nativeAPIRetention struct{ fixture *retentionEffectFixture }
+
+func (s nativeAPIRetention) Resolve(ctx context.Context, in privacyvalue.Input) (privacyvalue.Resolution, error) {
+	p, e := s.fixture.policies(ctx)
+	if e != nil {
+		return privacyvalue.Resolution{}, e
+	}
+	return privacyvalue.Resolve(p, in, time.Now())
+}
+
+type nativeAPICollector struct {
+	inner  executionapp.ContextCollector
+	calls  atomic.Int64
+	native []byte
+}
+
+func (s *nativeAPICollector) Capture(ctx context.Context, p artifact.PinnedPod) ([]byte, error) {
+	s.calls.Add(1)
+	b, e := s.inner.Capture(ctx, p)
+	s.native = append([]byte(nil), b...)
+	return b, e
+}
+
+func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64, func(context.Context) (targets.PodResolution, error), artifact.Digest) captureAdmissionScenario, regionalMode string) {
+	t.Helper()
+	n := newNativeAPIEnvironment(t, ctx, f)
+	source := func(c context.Context) (targets.PodResolution, error) { return n.resolver.ResolveWorkload(c, n.target) }
+	s := create(t, 1, source, n.image)
+	recovery, err := s.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.protect(t, ctx, recovery)
+	refreshPermissions := func() {
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		s.batch.Initial = nil
+		s.batch.ObservedAt = now
+		s.batch.FreshUntil = now.Add(5 * time.Second)
+		if e := s.p.RefreshPermissions(ctx, s.batch); e != nil {
+			t.Fatal(e)
+		}
+	}
+	// Guard establishment is outside the bounded human execution request.
+	refreshPermissions()
+	target, err := source(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.a.Plan.Input.Target = target
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	s.a.Eligibility.VerifiedIdentity.VerifiedAt = now
+	s.a.Eligibility.VerifiedIdentity.ValidUntil = now.Add(30 * time.Second)
+	projection, err := s.p.Permissions(ctx, target.Target())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.a.Eligibility = authorization.ContextEligibility(s.a.Eligibility.VerifiedIdentity, projection, target.Target(), now)
+	// Recompile facts after setup without changing authored scope or the original
+	// retention anchor; admission is still before any local reservation.
+	s.a.Plan.Input.Capability.ObservedAt = now
+	s.a.Plan.Input.Capability.FreshUntil = now.Add(5 * time.Second)
+	s.a.Plan.Input.Retention, err = (nativeAPIRetention{s.retention}).Resolve(ctx, privacyvalue.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: s.a.Plan.Input.Retention.RequestedSeconds, AnchorAt: s.a.Plan.Input.Retention.AnchorAt})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.a.Plan, err = planning.CompileContext(s.a.Plan.Input, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.a.Recovery, err = s.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// All fixture authority/backing is established before the human admission.
+	// Processing initialization only needs the installation storage placement;
+	// no capture acceptance, effect or authority is synthesized here.
+	initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, artifact.ContextExpectation{Registration: s.a.Registration})
+	p := func(user, password string) *pgxpool.Pool { return poolFor(user, password) }
+	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	x := func(user, password string) *postgres.APIContextExecutions {
+		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, guards)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return v
+	}
+	prepare, execute, read := x("api_execution_prepare_runtime", "synthetic-api-execution-prepare"), x("api_execution_runtime", "synthetic-api-execution"), x("api_execution_read_runtime", "synthetic-api-execution-read")
+	local, err := kube.NewAPIStartPreparer(n.capacityGuard, "api-execution-start", n.startPin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	journal, err := kube.NewStartJournal(n.executor, n.plan.ClusterID, n.control, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawCollector, err := kube.NewAPIContextClient(n.executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collector := &nativeAPICollector{inner: rawCollector}
+	defer func() { clear(collector.native) }()
+	bound, err := store.ForCustody(s.a.Registration.StoreID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer, err := objectstore.NewContextProducer(bound, keys, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Local: local, Starts: journal, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
+	var regional *regionalAPIStartFixture
+	if regionalMode != "" {
+		regional = newRegionalAPIStartFixture(t, ctx, f, n, s, admin, poolFor, store, keys, runner)
+	}
+	refreshPermissions()
+	start := &nativeContinuationStart{}
+	submission := nativeContinuationSubmission(t, ctx, n, s, admin, poolFor, store, keys, start)
+	freshCaller := func(owner context.Context) identities.CurrentIdentity {
+		t.Helper()
+		human := s.a.Eligibility.VerifiedIdentity
+		human.VerifiedAt = time.Now().UTC()
+		human.ValidUntil = human.VerifiedAt.Add(30 * time.Second)
+		current, _, err := identities.NewBearerRequest(owner, nativeAPIIdentity{human}, "fixture-human-credential", time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return current
+	}
+	preview, err := submission.Preview(ctx, freshCaller(ctx), capturevalue.ContextIntent{Target: n.target, Diagnostic: capturevalue.ContextDiagnosticName})
+	if err != nil {
+		t.Fatal("actual C09 preview", err)
+	}
+	if regionalMode == "first" {
+		start.regional = regional
+		regional.standby(t, ctx)
+	}
+	initialContext, stopInitial := context.WithCancel(ctx)
+	initialCaller := freshCaller(initialContext)
+	requestStarted := time.Now()
+	accepted, initialErr := submission.Request(initialContext, initialCaller, preview.Preview.ID, s.a.IdempotencyKey)
+	t.Logf("native continuation initial request elapsed=%s accepted=%t start-calls=%d error=%v", time.Since(requestStarted), accepted.CaptureID != "", start.calls, initialErr)
+	stopInitial()
+	if accepted.CaptureID != preview.Preview.CaptureID || start.calls != 1 || (regionalMode == "first") != (initialErr == nil) {
+		diagnoseNativeContinuation(t, ctx, admin, s.a.RootID, preview.Preview.ID)
+		t.Fatal("original request did not retain its expected admission/start disposition", initialErr, start.calls)
+	}
+	if regionalMode == "first" {
+		regional.joined(t, ctx)
+		if collector.calls.Load() != 1 {
+			t.Fatal("first live signed request did not collect exactly once")
+		}
+	}
+
+	if _, err = submission.Continue(ctx, initialCaller, preview.Preview.ID, s.a.IdempotencyKey); err == nil || start.calls != 1 {
+		t.Fatal("cancelled original caller resumed acquisition", err)
+	}
+
+	refreshPermissions()
+	requestContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	current := freshCaller(requestContext)
+	if regional != nil {
+		start.regional = regional
+	} else {
+		start.runner = &runner
+	}
+	priorCaptures := collector.calls.Load()
+	passive, err := submission.Request(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
+	if err != nil || passive.CaptureID != accepted.CaptureID || !passive.Replay || start.calls != 1 || collector.calls.Load() != priorCaptures {
+		t.Fatal("historical accepted request triggered acquisition", err)
+	}
+	if regionalMode != "first" {
+		if regional != nil {
+			regional.standby(t, ctx)
+		}
+		continued, e := submission.Continue(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
+		if e != nil || continued.CaptureID != accepted.CaptureID || continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || collector.calls.Load() != 1 {
+			t.Fatalf("explicit native continuation calls=%d error=%v", collector.calls.Load(), e)
+		}
+		if regional != nil {
+			regional.joined(t, ctx)
+		}
+	}
+	result := start.result
+	if regional != nil {
+		// The wire carries no object receipts. Read exactly the immutable SQL
+		// execution result using its ordinary independently verified query.
+		var raw []byte
+		if e := p("api_execution_read_runtime", "synthetic-api-execution-read").QueryRow(ctx, "SELECT copies_json FROM context_execution WHERE root_id=$1 AND capture_id=$2 AND phase='stored'", s.a.RootID, accepted.CaptureID).Scan(&raw); e != nil {
+			t.Fatal("exact stored regional result", e)
+		}
+		if json.Unmarshal(raw, &result.Copies) != nil {
+			t.Fatal("regional SQL copies encoding")
+		}
+		clear(raw)
+		result.State = "StoredPendingVerification"
+		t.Logf("actual regional signed H2 start elapsed=%s calls=%d", regional.lastDuration, regional.calls)
+	}
+	if result.State != "StoredPendingVerification" || collector.calls.Load() != 1 {
+		t.Fatal("completed result unavailable", result.State)
+	}
+
+	var originalBinding, originalProcess []byte
+	if err = admin.QueryRow(ctx, "SELECT binding_json,process_json FROM context_execution WHERE capture_id=$1", accepted.CaptureID).Scan(&originalBinding, &originalProcess); err != nil {
+		t.Fatal("original execution binding", err)
+	}
+	replay, replayErr := runner.Execute(requestContext, current, accepted.CaptureID)
+	if replayErr == nil && replay.State != "AlreadyStarted" || replayErr != nil && !errors.Is(replayErr, executionvalue.ErrExpired) && !errors.Is(replayErr, executionvalue.ErrDenied) {
+		t.Fatal("same execution replay", replay.State, replayErr)
+	}
+	if collector.calls.Load() != 1 {
+		t.Fatal("replay repeated actual Pod capture")
+	}
+	var replayBinding, replayProcess []byte
+	if err = admin.QueryRow(ctx, "SELECT binding_json,process_json FROM context_execution WHERE capture_id=$1", accepted.CaptureID).Scan(&replayBinding, &replayProcess); err != nil || !bytes.Equal(originalBinding, replayBinding) || !bytes.Equal(originalProcess, replayProcess) {
+		t.Fatal("replay changed the original process, attempt or start interval", err)
+	}
+	cancel()
+	// Destroy observed and executing Pods before publication: completed result
+	// history must not turn into a live target/process dependency.
+	observed, err := source(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = n.admin.AppsV1().Deployments("synthetic").Delete(ctx, n.deployment.Name, exactTargetDelete(n.deployment.UID)); err != nil {
+		t.Fatal(err)
+	}
+	if err = n.admin.CoreV1().Pods("synthetic").Delete(ctx, observed.Pin.Name, exactTargetDelete(types.UID(observed.Pin.UID))); err != nil && !apierrors.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	if err = n.admin.CoreV1().Pods(n.control.Name).Delete(ctx, n.pod.Name, exactTargetDelete(n.pod.UID)); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []struct{ namespace, name string }{{"synthetic", observed.Pin.Name}, {n.control.Name, n.pod.Name}} {
+		if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 15*time.Second, true, func(c context.Context) (bool, error) {
+			_, e := n.admin.CoreV1().Pods(gone.namespace).Get(c, gone.name, meta.GetOptions{})
+			return apierrors.IsNotFound(e), nonNotFound(e)
+		}); err != nil {
+			// Failure diagnostics are confined to this synthetic holder. Check the
+			// exact native GC operation without changing or force-removing it.
+			if gone.namespace == n.control.Name {
+				if remaining, getErr := n.admin.CoreV1().Pods(gone.namespace).Get(ctx, gone.name, meta.GetOptions{}); getErr == nil {
+					t.Logf("remaining synthetic holder phase=%s deleting=%t finalizers=%v", remaining.Status.Phase, remaining.DeletionTimestamp != nil, remaining.Finalizers)
+					remaining.Finalizers = slices.DeleteFunc(remaining.Finalizers, func(f string) bool { return f == meta.FinalizerDeleteDependents })
+					_, gcErr := n.garbageCollector.CoreV1().Pods(gone.namespace).Update(ctx, remaining, meta.UpdateOptions{DryRun: []string{meta.DryRunAll}})
+					t.Logf("exact GC foreground-finalizer dry-run: %v", gcErr)
+				}
+			}
+			t.Fatal("owned Pod did not finish normal deletion", gone.name, err)
+		}
+	}
+	if _, err = n.process.ReadAPIProcess(ctx); err == nil {
+		t.Fatal("deleted executor retained process authority")
+	}
+	refreshPermissions()
+	publication := func(user, password string) *postgres.ContextPublications {
+		r, e := postgres.NewContextPublications(ctx, p(user, password), s.a.RootID, guards)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return r
+	}
+	verify, audit, publish := publication("context_verify_runtime", "synthetic-context-verify"), publication("context_verification_audit_runtime", "synthetic-context-audit"), publication("context_publish_runtime", "synthetic-context-publish")
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, p("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := objectstore.NewContextVerifier(bound, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
+	if _, err = publisher.Publish(ctx, accepted.CaptureID, result.Copies); err != nil {
+		t.Fatal("historical completed API publication", err)
+	}
+	nativeReader, err := objectstore.NewContextNativeReader(bound, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	native, err := nativeReader.ReadContext(ctx, accepted.Expectation, result.Copies, time.Now().Add(5*time.Second))
+	if err != nil || !bytes.Equal(native, collector.native) {
+		t.Fatal("exact native bytes after Pod deletion", err)
+	}
+	clear(native)
+	var executions, catalog int
+	var objects int64
+	if err = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM context_execution WHERE capture_id=$1),(SELECT count(*) FROM context_catalog WHERE capture_id=$1),(SELECT charged_objects FROM custody_allocation WHERE id=$2)", accepted.CaptureID, accepted.Expectation.Registration.AllocationID).Scan(&executions, &catalog, &objects); err != nil || executions != 1 || catalog != 1 || objects != 4 {
+		t.Fatal("one effect/custody accounting", err, executions, catalog, objects)
+	}
+	t.Logf("regional-mode=%s; actual C09 preview/request, passive replay and explicit fresh-current same-key continuation; current52 acknowledged encrypted intent pair; actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; %d native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority", regionalMode, len(collector.native))
+}

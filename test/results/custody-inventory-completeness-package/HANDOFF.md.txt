@@ -1,0 +1,51 @@
+# Explicit completeness for shared deletion inventory
+
+Staged source only; no test or build has run, and no live workspace path changed.
+No new ADR or migration. Existing complete-inventory and conservative-charge
+requirements already require this behavior.
+
+Six paths are recorded in manifest.json with original base hashes and staged
+payload hashes. The production change adds nil-output/nil-IsTruncated checks
+before any rows of each LIST result are processed, returning artifact.ErrIntegrity.
+Existing batch size, truncation, exact prefix/version handling, writer-barrier
+precondition, retry and timing bounds are unchanged. Valid flags are dereferenced
+only after the guard. The three existing test fixture files explicitly return
+false for complete XML while retaining their explicit true-truncation negatives.
+The custody architecture contract describes both initial and final failure rules.
+
+New `TestPurgeRejectsOmittedInventoryCompleteness` invokes the real product Store,
+TLS transport and AWS decoder against a bounded synthetic server. Six cases omit
+IsTruncated from versions/uploads/current, either during initial acquisition or
+independent final verification. Initial pages contain one explicit version plus
+one pending upload, ensuring the original bug actually causes effects before
+incorrectly succeeding. Final cases first perform exactly one version DELETE and
+one upload abort, then encounter the malformed verification response. All cases
+require ErrIntegrity, exact bounded LIST counts, and zero initial-scan effects or
+exact prior final-scan effects as appropriate. No fake S3 interface replaces the
+AWS response decoder.
+
+Qualification plan after an explicit root build-slot allocation:
+
+1. Freeze complete dependency/file sets in a separate owned mirror. Keep original
+   custody.go while adding the new regression. Run only
+   `go test -race -count=1 -v -run '^TestPurgeRejectsOmittedInventoryCompleteness$' ./internal/adapters/objectstore`.
+   Require actual nonzero exit with all six child names failing at the explicit
+   `omitted IsTruncated certified absence or wrong failure` assertion. A compile,
+   TLS, fixture or constructor failure is not the required before evidence.
+2. Apply the exact six reviewed payloads in that mirror, then run the complete
+   `go test -race -count=1 -v ./internal/adapters/objectstore` package. Require the
+   six new child PASS entries plus existing positive purge/null-version and
+   retained-marker/foreign-key/true-truncation negatives, including both operation
+   and download-stop audit cleanup. Capture actual exit and selected names.
+3. Run affected-package vet and go-architecture-check; root canonical doc gates
+   after integration. Source sets and original bases must still match, all local
+   helper servers must be joined, and owned build scratch must be positively
+   removed or retained with an explicit failure.
+4. Integrate only after the root reviews the before/after evidence. The already
+   prepared full make go-check and full make custody-integration then qualify the
+   combined tree, including actual pinned Seaweed XML responses. Native owner
+   qualification may run first because this patch remains outside the live tree.
+
+The nil-output condition is defensive: the new wire tests specifically reproduce
+missing decoded flags. No claim of native backend qualification or successful
+cleanup/release follows from source review alone.

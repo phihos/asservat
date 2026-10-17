@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-identity-activation.schema.json",
+  "title": "Original owner projection and launch provenance",
+  "description": "Public original installation binding, not an activation permission. Application validation enforces ordered separate credentials/configuration CREATE claims, independently positive receipts, nonaliasing sibling operations, original time bounds and a single zero-to-one launch. This does not clear recovery or enable public investigation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input",
+    "roleRoot",
+    "roleSetupID",
+    "resourcesCreatedAt",
+    "resourcesUntil"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "https://asservat.io/spec/v1/owner-identity-roles.schema.json"
+    },
+    "roleRoot": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+    },
+    "roleSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "resourcesCreatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resourcesUntil": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "objectReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "object": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "objectAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt": {
+          "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/objectReceipt"
+        }
+      }
+    },
+    "projectionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration",
+        "credentials",
+        "configurationResourceVersion",
+        "credentialsResourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "configuration": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "credentials": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "configurationResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "credentialsResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "projectionClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "publicDigest",
+        "roleRoot",
+        "roleSetupID",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "publicDigest": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "roleRoot": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "roleSetupID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "credentials": {
+          "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/objectAttempt"
+        },
+        "configuration": {
+          "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/objectAttempt"
+        },
+        "receipt": {
+          "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/projectionReceipt"
+        }
+      }
+    },
+    "launchClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "projectionOperationID",
+        "inertResourceVersion",
+        "inertDigest",
+        "runningDigest",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "projectionOperationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "inertResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "inertDigest": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "runningDigest": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resourceVersion",
+            "generation",
+            "observedAt"
+          ],
+          "properties": {
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "generation": {
+              "const": 2
+            },
+            "observedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  }
+}

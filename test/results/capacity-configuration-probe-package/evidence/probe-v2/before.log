@@ -1,0 +1,13 @@
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/legacy-omission
+=== RUN   TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/installed-capacity-probe
+    initial_runtime_configuration_probe_test.go:75: generated configuration installer changed the complete original owner guard <nil>
+--- FAIL: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard (0.01s)
+    --- PASS: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/legacy-omission (0.01s)
+    --- FAIL: TestInitialConfigurationDocumentsPreserveCompleteOriginalOwnerGuard/installed-capacity-probe (0.00s)
+=== RUN   TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard
+    initial_runtime_configuration_probe_test.go:111: unsupported original start branch silently changed the generated guard <nil>
+--- FAIL: TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.067s
+FAIL

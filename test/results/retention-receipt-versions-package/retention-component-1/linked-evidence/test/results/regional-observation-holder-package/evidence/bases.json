@@ -1,0 +1,14 @@
+{
+  "docs/architecture/cluster-observations.md": "c73e2eebd39c9203e647d96df125882f5605308dbf51f30047339a723c9448a4",
+  "docs/decisions/144-cluster-local-observations.md": "637066361de565905adad32eb2301570f7d7b19a1e5ae3a16f57e59598be0ef4",
+  "internal/adapters/mtls/connector_observation_hub.go": null,
+  "internal/adapters/mtls/connector_observation_hub_test.go": null,
+  "internal/adapters/postgres/connector_observation_registry.go": null,
+  "internal/adapters/postgres/connector_observation_registry_test.go": null,
+  "internal/application/fleet/connector_observation_registry.go": null,
+  "internal/transport/clusterobservation/hub_handler.go": null,
+  "internal/transport/clusterobservation/hub_handler_test.go": null,
+  "internal/transport/clusterobservation/hub_holder.go": null,
+  "internal/transport/clusterobservation/hub_holder_test.go": null,
+  "internal/transport/clusterobservation/hub_stream.go": null
+}

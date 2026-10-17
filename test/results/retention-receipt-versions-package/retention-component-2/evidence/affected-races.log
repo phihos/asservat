@@ -1,0 +1,2018 @@
+=== RUN   TestExistingAuthorityAuditEncodingRemainsByteCompatible
+--- PASS: TestExistingAuthorityAuditEncodingRemainsByteCompatible (0.00s)
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/valid
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/normal-is-resolution
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/legacy-layout
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/other-root
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/unbacked
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/wrong-revision
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/not-verifier-backed
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-overdue
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/invalid-retention
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/earlier-policy
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/future-observation
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/expired
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/renewed-interval
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/submicro
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/wrong-store
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-plan
+=== RUN   TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-account
+--- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/valid (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/normal-is-resolution (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/legacy-layout (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/other-root (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/unbacked (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/wrong-revision (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/not-verifier-backed (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-overdue (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/invalid-retention (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/earlier-policy (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/future-observation (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/expired (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/renewed-interval (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/submicro (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/wrong-store (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-plan (0.00s)
+    --- PASS: TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval/no-account (0.00s)
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/unknown_private_name
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/unverified_certificate
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/fabricated_human
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/missing_peer
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/node_role
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/public_format
+=== RUN   TestConnectorOperationUsesExclusivePrivateActor/public_operation
+--- PASS: TestConnectorOperationUsesExclusivePrivateActor (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/unknown_private_name (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/unverified_certificate (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/fabricated_human (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/missing_peer (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/node_role (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/public_format (0.00s)
+    --- PASS: TestConnectorOperationUsesExclusivePrivateActor/public_operation (0.00s)
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/wrong_usage
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/wrong_operation
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/no_result
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/evidence_references
+=== RUN   TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/unknown_is_not_signed
+--- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence (0.00s)
+    --- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/wrong_usage (0.00s)
+    --- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/wrong_operation (0.00s)
+    --- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/no_result (0.00s)
+    --- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/evidence_references (0.00s)
+    --- PASS: TestConnectorOperationOutcomeCannotImpersonatePublicEvidence/unknown_is_not_signed (0.00s)
+=== RUN   TestConnectorExtensionPreservesHistoricalOperationBytes
+--- PASS: TestConnectorExtensionPreservesHistoricalOperationBytes (0.00s)
+=== RUN   TestPrivateOperationMaximumFactsRemainWithinExistingRecordLimits
+--- PASS: TestPrivateOperationMaximumFactsRemainWithinExistingRecordLimits (0.00s)
+=== RUN   TestConnectorProcessAuditDoesNotInventTLSOrHumanActor
+--- PASS: TestConnectorProcessAuditDoesNotInventTLSOrHumanActor (0.00s)
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/empty
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/null
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/valid
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/max
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/oversize
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/capture/newline
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/empty
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/null
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/valid
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/max
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/oversize
+=== RUN   TestContextEffectReceiptsRequireImmutableVersions/verification/newline
+--- PASS: TestContextEffectReceiptsRequireImmutableVersions (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/empty (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/null (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/valid (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/max (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/oversize (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/capture/newline (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/empty (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/null (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/valid (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/max (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/oversize (0.00s)
+    --- PASS: TestContextEffectReceiptsRequireImmutableVersions/verification/newline (0.00s)
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/recorded_time
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/emitted_bytes
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/success
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/session
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/generation
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/processing_deadline
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/retention_deadline
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/processing_sequence
+=== RUN   TestDownloadAuditEqualitySurvivesPersistence/lease
+--- PASS: TestDownloadAuditEqualitySurvivesPersistence (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/recorded_time (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/emitted_bytes (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/success (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/session (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/generation (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/processing_deadline (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/retention_deadline (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/processing_sequence (0.00s)
+    --- PASS: TestDownloadAuditEqualitySurvivesPersistence/lease (0.00s)
+=== RUN   TestDownloadStopLifecycleDatesAndQualifiedBacking
+--- PASS: TestDownloadStopLifecycleDatesAndQualifiedBacking (0.00s)
+=== RUN   TestDownloadStopCompletionCannotBeAReceiptOrDifferentPhase
+--- PASS: TestDownloadStopCompletionCannotBeAReceiptOrDifferentPhase (0.00s)
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/missing
+=== RUN   TestInitialInstallationReceiptRequiresImmutableVersion/null
+--- PASS: TestInitialInstallationReceiptRequiresImmutableVersion (0.00s)
+    --- PASS: TestInitialInstallationReceiptRequiresImmutableVersion/missing (0.00s)
+    --- PASS: TestInitialInstallationReceiptRequiresImmutableVersion/null (0.00s)
+=== RUN   TestOperationVerificationQualificationIsVersionedAndPrepaid
+--- PASS: TestOperationVerificationQualificationIsVersionedAndPrepaid (0.00s)
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/empty
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/null
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/oversize
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/empty
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/null
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/oversize
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/immutable
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/empty
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/null
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/maximum
+=== RUN   TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/oversize
+--- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/immutable (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/empty (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/configuration/oversize (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/immutable (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/empty (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/enrollment/oversize (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/immutable (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/empty (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/null (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/maximum (0.00s)
+    --- PASS: TestOwnerCurrentAuditReceiptsRequireImmutableVersions/certificate/oversize (0.00s)
+=== RUN   TestOwnerVersionRequirementDoesNotReinterpretOtherReceiptFormats
+--- PASS: TestOwnerVersionRequirementDoesNotReinterpretOtherReceiptFormats (0.00s)
+=== RUN   TestProcessingReleaseHistoryCannotBorrowPublicOrConnectorBacking
+--- PASS: TestProcessingReleaseHistoryCannotBorrowPublicOrConnectorBacking (0.00s)
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-intent/oversize
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/immutable
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/empty
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/null
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/maximum
+=== RUN   TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/oversize
+--- PASS: TestReachableAuditReceiptsRequireImmutableVersions (0.01s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-configuration/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-enrollment/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/worker-certificate/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-enrollment/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/connector-certificate/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/batch-outcome/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-intent/oversize (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/immutable (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/empty (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/null (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/maximum (0.00s)
+    --- PASS: TestReachableAuditReceiptsRequireImmutableVersions/window-outcome/oversize (0.00s)
+=== RUN   TestDownloadWindowCompletionCannotChangePurposeOrBackedStore
+--- PASS: TestDownloadWindowCompletionCannotChangePurposeOrBackedStore (0.00s)
+=== RUN   TestHistoricalDownloadReceiptsRemainParseableWithoutAuthority
+--- PASS: TestHistoricalDownloadReceiptsRemainParseableWithoutAuthority (0.00s)
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/original
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/empty
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/null
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/maximum
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/oversize
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/original
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/empty
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/null
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/maximum
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/oversize
+--- PASS: TestPermissionPolicyAuditRequiresImmutableVersions (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/original (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/empty (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/null (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/maximum (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/oversize (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/original (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/empty (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/null (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/maximum (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/oversize (0.00s)
+=== RUN   TestRetentionHistoricalReceiptPreservesRestrictiveReplay
+--- PASS: TestRetentionHistoricalReceiptPreservesRestrictiveReplay (0.00s)
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/original
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/empty
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/null
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/maximum
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/oversize
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-control
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-printable
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/original
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/empty
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/null
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/maximum
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/oversize
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-control
+=== RUN   TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-printable
+--- PASS: TestRetentionCurrentAuditRequiresImmutableVersions (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/original (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/empty (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/null (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/maximum (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/oversize (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-control (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/checkpoint/unicode-printable (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/original (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/empty (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/null (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/maximum (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/oversize (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-control (0.00s)
+    --- PASS: TestRetentionCurrentAuditRequiresImmutableVersions/lifecycle/unicode-printable (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/audit	1.029s
+=== RUN   TestBindingAcceptancePreservesAutomationEnvelope
+--- PASS: TestBindingAcceptancePreservesAutomationEnvelope (0.00s)
+=== RUN   TestAutomationEnvelopeCannotMutateAnObservedJournal
+--- PASS: TestAutomationEnvelopeCannotMutateAnObservedJournal (0.00s)
+=== RUN   TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted
+--- PASS: TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted (0.00s)
+=== RUN   TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList
+--- PASS: TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList (0.00s)
+=== RUN   TestBindingJournalKeepsPendingRequestForAmbiguousCommitAfterExpiry
+--- PASS: TestBindingJournalKeepsPendingRequestForAmbiguousCommitAfterExpiry (0.00s)
+=== RUN   TestBindingReconcilerDoesNotTrustPreexistingValuesWithoutReview
+--- PASS: TestBindingReconcilerDoesNotTrustPreexistingValuesWithoutReview (0.00s)
+=== RUN   TestBindingReconcilerRejectsGuardChangeDuringList
+--- PASS: TestBindingReconcilerRejectsGuardChangeDuringList (0.00s)
+=== RUN   TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner
+--- PASS: TestBindingReconcilerResumesCleanWatchAndCommitsEveryOwner (0.00s)
+=== RUN   TestBindingReconcilerListCannotSkipPendingOwner
+--- PASS: TestBindingReconcilerListCannotSkipPendingOwner (0.00s)
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/nil
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/values
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/replacement
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/cluster
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/namespace
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/guard
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/expired
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/future
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/stale
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/overlong
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/deleting
+=== RUN   TestInitialRetentionReviewBindsValuesSourceAndGuard/reviewer
+--- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/nil (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/values (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/replacement (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/cluster (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/namespace (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/guard (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/expired (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/future (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/stale (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/overlong (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/deleting (0.00s)
+    --- PASS: TestInitialRetentionReviewBindsValuesSourceAndGuard/reviewer (0.00s)
+=== RUN   TestRetentionJournalNeverCoalescesAnIntermediateShortening
+--- PASS: TestRetentionJournalNeverCoalescesAnIntermediateShortening (0.00s)
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/generation-gap
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/changed-same-generation
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/deleted-missing-update
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/unknown-type
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/replaced-name
+=== RUN   TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/revived-deleting
+--- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent (0.01s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/generation-gap (0.00s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/changed-same-generation (0.00s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/deleted-missing-update (0.00s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/unknown-type (0.00s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/replaced-name (0.00s)
+    --- PASS: TestRetentionJournalPoisonsGapsAndKeepsCallerBuffersIndependent/revived-deleting (0.00s)
+=== RUN   TestRetentionJournalEmptySnapshotsHaveStableDigest
+--- PASS: TestRetentionJournalEmptySnapshotsHaveStableDigest (0.00s)
+=== RUN   TestRetentionMaintenanceRejectsClockRollback
+--- PASS: TestRetentionMaintenanceRejectsClockRollback (0.00s)
+=== RUN   TestObservationWindowConfirmsFreshestCoveredOriginalList
+--- PASS: TestObservationWindowConfirmsFreshestCoveredOriginalList (0.00s)
+=== RUN   TestObsoleteObservationDoesNotStopNewerPendingWork
+--- PASS: TestObsoleteObservationDoesNotStopNewerPendingWork (0.00s)
+=== RUN   TestRetentionReconcilerRequiresInitialValuesAndStableGuard
+=== RUN   TestRetentionReconcilerRequiresInitialValuesAndStableGuard/review
+=== RUN   TestRetentionReconcilerRequiresInitialValuesAndStableGuard/guard
+=== RUN   TestRetentionReconcilerRequiresInitialValuesAndStableGuard/source
+--- PASS: TestRetentionReconcilerRequiresInitialValuesAndStableGuard (0.00s)
+    --- PASS: TestRetentionReconcilerRequiresInitialValuesAndStableGuard/review (0.00s)
+    --- PASS: TestRetentionReconcilerRequiresInitialValuesAndStableGuard/guard (0.00s)
+    --- PASS: TestRetentionReconcilerRequiresInitialValuesAndStableGuard/source (0.00s)
+=== RUN   TestRetentionReconcilerResumesDurableExpiredCursorWithoutReplacingHistory
+--- PASS: TestRetentionReconcilerResumesDurableExpiredCursorWithoutReplacingHistory (0.01s)
+=== RUN   TestRetentionReconcilerHistoryFailureCannotResetToList
+--- PASS: TestRetentionReconcilerHistoryFailureCannotResetToList (0.00s)
+=== RUN   TestRetentionReconcilerGuardLossStopsBeforeNextCommit
+--- PASS: TestRetentionReconcilerGuardLossStopsBeforeNextCommit (0.00s)
+=== RUN   TestRetentionRenewalDoesNotSkipCycleAfterGuardTimingShift
+--- PASS: TestRetentionRenewalDoesNotSkipCycleAfterGuardTimingShift (1.12s)
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/skip
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/relist
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/review
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/source
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/sequence
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/missing-event
+=== RUN   TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/lease
+--- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations (0.01s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/skip (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/relist (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/review (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/source (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/sequence (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/missing-event (0.00s)
+    --- PASS: TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations/lease (0.00s)
+=== RUN   TestRetentionCheckpointPreservesDeletionAcrossRestart
+--- PASS: TestRetentionCheckpointPreservesDeletionAcrossRestart (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/configuration	2.179s
+=== RUN   TestContextCleanupRetriesRecordedPurgeWithoutRepeatingRemoteDeletion
+--- PASS: TestContextCleanupRetriesRecordedPurgeWithoutRepeatingRemoteDeletion (0.00s)
+=== RUN   TestContextCleanupPurgeFailureDoesNotCreatePositiveFact
+--- PASS: TestContextCleanupPurgeFailureDoesNotCreatePositiveFact (0.00s)
+=== RUN   TestCleanupFailureNeverReleasesCharge
+=== RUN   TestCleanupFailureNeverReleasesCharge/barrier
+=== RUN   TestCleanupFailureNeverReleasesCharge/purge
+=== RUN   TestCleanupFailureNeverReleasesCharge/success
+--- PASS: TestCleanupFailureNeverReleasesCharge (0.00s)
+    --- PASS: TestCleanupFailureNeverReleasesCharge/barrier (0.00s)
+    --- PASS: TestCleanupFailureNeverReleasesCharge/purge (0.00s)
+    --- PASS: TestCleanupFailureNeverReleasesCharge/success (0.00s)
+=== RUN   TestShortenerKeepsOriginalAnchorRequestAndOverdueObligation
+--- PASS: TestShortenerKeepsOriginalAnchorRequestAndOverdueObligation (0.00s)
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/missing-local
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/not-ready
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-root
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-guard
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-hub
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-cluster
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/stale-source
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/unprotected-absence
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/topology-revision
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/topology-omitted-local
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-revision
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-epoch
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-snapshot
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-not-ready
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/delayed-selector
+=== RUN   TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-bound
+--- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources (0.02s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/missing-local (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/not-ready (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-root (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-guard (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-hub (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/wrong-cluster (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/stale-source (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/unprotected-absence (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/topology-revision (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/topology-omitted-local (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-revision (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-epoch (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-snapshot (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-not-ready (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/delayed-selector (0.00s)
+    --- PASS: TestAcceptedRetentionRequiresCompleteCurrentGuardedSources/source-bound (0.00s)
+=== RUN   TestAcceptedRetainedReaderKeepsOriginalPoliciesAndAvoidsUnneededMetadata
+--- PASS: TestAcceptedRetainedReaderKeepsOriginalPoliciesAndAvoidsUnneededMetadata (0.00s)
+=== RUN   TestProcessingDecisionAuditsPreparedUnknownBeforeCAS
+--- PASS: TestProcessingDecisionAuditsPreparedUnknownBeforeCAS (0.00s)
+=== RUN   TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend
+--- PASS: TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend (0.00s)
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/ordinary-owner
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/client
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-audit-revoke
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-audit-expire
+=== RUN   TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-SQL-revoke
+--- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait (0.00s)
+    --- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/ordinary-owner (0.00s)
+    --- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/client (0.00s)
+    --- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-audit-revoke (0.00s)
+    --- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-audit-expire (0.00s)
+    --- PASS: TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait/post-SQL-revoke (0.00s)
+=== RUN   TestProcessingReleaseUsesReservedLaneAndActualHuman
+--- PASS: TestProcessingReleaseUsesReservedLaneAndActualHuman (0.00s)
+=== RUN   TestProcessingReleaseRejectsPublicOrWrongPrivateQualification
+--- PASS: TestProcessingReleaseRejectsPublicOrWrongPrivateQualification (0.00s)
+=== RUN   TestRetentionReaderCannotFreshenAfterIO
+--- PASS: TestRetentionReaderCannotFreshenAfterIO (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/privacy	1.034s
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution/capture
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution/interval
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution/unstarted-result
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution/late-acquisition
+=== RUN   TestAPIExecutionStoredResultDecodingRejectsSubstitution/copies-digest
+--- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution (0.01s)
+    --- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution/capture (0.00s)
+    --- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution/interval (0.00s)
+    --- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution/unstarted-result (0.00s)
+    --- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution/late-acquisition (0.00s)
+    --- PASS: TestAPIExecutionStoredResultDecodingRejectsSubstitution/copies-digest (0.00s)
+=== RUN   TestAPIVerificationAuditRequiresExactCompletedResult
+--- PASS: TestAPIVerificationAuditRequiresExactCompletedResult (0.01s)
+=== RUN   TestAPIExecutionProgressUsesItsDurableOutcome
+=== RUN   TestAPIExecutionProgressUsesItsDurableOutcome/started
+=== RUN   TestAPIExecutionProgressUsesItsDurableOutcome/captureFailed
+=== RUN   TestAPIExecutionProgressUsesItsDurableOutcome/storeUnconfirmed
+=== RUN   TestAPIExecutionProgressUsesItsDurableOutcome/stored
+--- PASS: TestAPIExecutionProgressUsesItsDurableOutcome (0.01s)
+    --- PASS: TestAPIExecutionProgressUsesItsDurableOutcome/started (0.00s)
+    --- PASS: TestAPIExecutionProgressUsesItsDurableOutcome/captureFailed (0.00s)
+    --- PASS: TestAPIExecutionProgressUsesItsDurableOutcome/storeUnconfirmed (0.00s)
+    --- PASS: TestAPIExecutionProgressUsesItsDurableOutcome/stored (0.00s)
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/original
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/null-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/absent-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/maximum-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/oversized-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/control-version
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/unacknowledged
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-root
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-event
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-key
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/missing-key
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/missing-etag
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-etag
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/absent-bytes
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-bytes
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/excess-bytes
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/short-digest
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/long-digest
+=== RUN   TestCurrentAuthorityAuditRequiresExactImmutableReceipt/zero-digest
+--- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/original (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/null-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/absent-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/maximum-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/oversized-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/control-version (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/unacknowledged (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-root (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-event (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/different-key (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/missing-key (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/missing-etag (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-etag (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/absent-bytes (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/empty-bytes (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/excess-bytes (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/short-digest (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/long-digest (0.00s)
+    --- PASS: TestCurrentAuthorityAuditRequiresExactImmutableReceipt/zero-digest (0.00s)
+=== RUN   TestRefreshOwnerObservationPreservesOriginalInterval
+=== RUN   TestRefreshOwnerObservationPreservesOriginalInterval/nested_observation_starts_later
+=== RUN   TestRefreshOwnerObservationPreservesOriginalInterval/earlier_protected_deadline
+--- PASS: TestRefreshOwnerObservationPreservesOriginalInterval (0.00s)
+    --- PASS: TestRefreshOwnerObservationPreservesOriginalInterval/nested_observation_starts_later (0.00s)
+    --- PASS: TestRefreshOwnerObservationPreservesOriginalInterval/earlier_protected_deadline (0.00s)
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/valid
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/sql-zone
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/expired-after-read
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/null-profile
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/missing-zero
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/null-zero
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/case-alias
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/duplicate
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/unknown
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/trailing
+=== RUN   TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/oversized
+--- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback (0.03s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/valid (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/sql-zone (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/expired-after-read (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/null-profile (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/missing-zero (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/null-zero (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/case-alias (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/duplicate (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/unknown (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/trailing (0.00s)
+    --- PASS: TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback/oversized (0.00s)
+=== RUN   TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady
+=== RUN   TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/absent
+=== RUN   TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/reserved
+=== RUN   TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/capture-backed
+=== RUN   TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/ready
+--- PASS: TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/absent (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/reserved (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/capture-backed (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderDistinguishesAbsentPartialAndReady/ready (0.00s)
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/missing-row
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/missing-bound
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/case-key
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/extra
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/duplicate
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/zero-digest
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/ready-without-capture
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/capture-before-reserve
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/extended-initial
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/fractional-revision
+=== RUN   TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/future-precision
+--- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt (0.01s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/missing-row (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/missing-bound (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/case-key (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/extra (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/duplicate (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/zero-digest (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/ready-without-capture (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/capture-before-reserve (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/extended-initial (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/fractional-revision (0.00s)
+    --- PASS: TestCapacityEnrollmentDecoderRejectsOpenOrInconsistentReceipt/future-precision (0.00s)
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/exact
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/unknown
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/duplicate
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/missing
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/case
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/null
+=== RUN   TestCapacityRecoveryDecoderRetainsExactIndependentProof/trailing
+--- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/exact (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/unknown (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/duplicate (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/missing (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/case (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/null (0.00s)
+    --- PASS: TestCapacityRecoveryDecoderRetainsExactIndependentProof/trailing (0.00s)
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/original-expired-claims
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/namespace
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/swapped
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/hub-purpose
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/extra
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/missing
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/duplicate-oid
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/duplicate-claim
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/root
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/setup
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/initial
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/foreign-database
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/foreign-process
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/late-role
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/expanded-claim
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/unbounded-claim
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/layout
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/zero-input-digest
+=== RUN   TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/future
+--- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/original-expired-claims (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/namespace (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/swapped (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/hub-purpose (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/extra (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/missing (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/duplicate-oid (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/duplicate-claim (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/root (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/setup (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/initial (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/foreign-database (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/foreign-process (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/late-role (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/expanded-claim (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/unbounded-claim (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/layout (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/zero-input-digest (0.00s)
+    --- PASS: TestCapacityCredentialManifestRetainsOriginalCompartmentAndIncarnation/future (0.00s)
+=== RUN   TestCapacityManifestClosedDecoderRejectsUnknownAndDuplicateFields
+--- PASS: TestCapacityManifestClosedDecoderRejectsUnknownAndDuplicateFields (0.00s)
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/valid
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/sql-timezone
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/legacy
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-managed
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/unmanaged-snapshot
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-digest
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/unknown-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/case-alias
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/null-counter
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/duplicate-field
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-root
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-allocation
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/later-session
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-format
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/fractional-time
+=== RUN   TestCapacitySessionSnapshotClosedAndNeverFallsBack/oversize
+--- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack (0.02s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/valid (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/sql-timezone (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/legacy (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-managed (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/unmanaged-snapshot (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-digest (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/unknown-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/case-alias (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/missing-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/null-counter (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/duplicate-field (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-root (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-allocation (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/later-session (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/wrong-format (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/fractional-time (0.00s)
+    --- PASS: TestCapacitySessionSnapshotClosedAndNeverFallsBack/oversize (0.00s)
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/original
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/legacy
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/unknown-account
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/missing-snapshot
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/missing-digest
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/unmanaged-with-snapshot
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/later-session
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/changed-policy
+=== RUN   TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/zero-native-digest
+--- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking (0.01s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/original (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/legacy (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/unknown-account (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/missing-snapshot (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/missing-digest (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/unmanaged-with-snapshot (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/later-session (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/changed-policy (0.00s)
+    --- PASS: TestCapacityOrdinarySessionDecodeKeepsOriginalBacking/zero-native-digest (0.00s)
+=== RUN   TestSessionCapacityReadsRetainOriginalLimitsAndCurrentSpend
+--- PASS: TestSessionCapacityReadsRetainOriginalLimitsAndCurrentSpend (0.00s)
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/account
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/allocation
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/root
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing-deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/digest
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-body
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-digest
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/case-alias
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/session-deadline
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/invalid-session
+=== RUN   TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/changed-audit-store
+--- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots (0.01s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/account (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/allocation (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/root (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing-deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/digest (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/missing (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-body (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/unmanaged-digest (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/case-alias (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/session-deadline (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/invalid-session (0.00s)
+    --- PASS: TestSessionCapacityReadsRejectUnboundOrDamagedSnapshots/changed-audit-store (0.00s)
+=== RUN   TestSessionCapacityReadsKeepUnmanagedRowsUnchanged
+--- PASS: TestSessionCapacityReadsKeepUnmanagedRowsUnchanged (0.00s)
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/valid
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/underfunded-wal
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/wrong-native-history
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/wrong-root
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/zero-guard
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/unknown-top
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/unknown-nested
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/duplicate
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/missing
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/case
+=== RUN   TestCapacitySetupInputChecksCompleteBackingBeforeClaim/null
+--- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim (0.08s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/valid (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/underfunded-wal (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/wrong-native-history (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/wrong-root (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/zero-guard (0.00s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/unknown-top (0.00s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/unknown-nested (0.00s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/duplicate (0.00s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/missing (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/case (0.01s)
+    --- PASS: TestCapacitySetupInputChecksCompleteBackingBeforeClaim/null (0.00s)
+=== RUN   TestCapacitySourceAcknowledgementRejectsAmbiguousFields
+--- PASS: TestCapacitySourceAcknowledgementRejectsAmbiguousFields (0.00s)
+=== RUN   TestCapacitySQLPrecisionOnlyNarrowsOriginalInterval
+--- PASS: TestCapacitySQLPrecisionOnlyNarrowsOriginalInterval (0.00s)
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/acknowledged
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/pending
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/legacy
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/other-operation
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/wrong-key
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/wrong-digest
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/incomplete
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/truncated
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/false-state
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/pending-receipt
+=== RUN   TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/late-ack
+--- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol (0.01s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/acknowledged (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/pending (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/legacy (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/other-operation (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/wrong-key (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/wrong-digest (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/incomplete (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/truncated (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/false-state (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/pending-receipt (0.00s)
+    --- PASS: TestCaptureOperationRetainedReceiptRequiresExactNewProtocol/late-ack (0.00s)
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/original-expired-claims
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/empty-namespace
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/extra-role
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-role
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/swapped-roles
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/capacity-role
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/same-oid
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/same-operation
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/setup-operation
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-layout
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-root
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-installation
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-database
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-postmaster
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/late-role
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/long-role-claim
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/long-setup-claim
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/nanosecond-claim
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/unknown-worker-layout
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-worker-journal
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-worker-binding
+=== RUN   TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/future-setup
+--- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/original-expired-claims (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/empty-namespace (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/extra-role (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-role (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/swapped-roles (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/capacity-role (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/same-oid (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/same-operation (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/setup-operation (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-layout (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-root (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-installation (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-database (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/different-postmaster (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/late-role (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/long-role-claim (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/long-setup-claim (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/nanosecond-claim (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/unknown-worker-layout (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-worker-journal (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/missing-worker-binding (0.00s)
+    --- PASS: TestCaptureCleanupManifestKeepsOriginalThreeRoleCompartment/future-setup (0.00s)
+=== RUN   TestCaptureCleanupManifestDecoderRejectsAmbiguousInput
+--- PASS: TestCaptureCleanupManifestDecoderRejectsAmbiguousInput (0.00s)
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/acknowledged
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/pending
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/wrong-key
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/wrong-digest
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/incomplete-receipt
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/truncated-cipher-hash
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/false-state
+=== RUN   TestExactCaptureIntentReceiptRejectsSubstitution/pending-receipt
+--- PASS: TestExactCaptureIntentReceiptRejectsSubstitution (0.01s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/acknowledged (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/pending (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/wrong-key (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/wrong-digest (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/incomplete-receipt (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/truncated-cipher-hash (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/false-state (0.00s)
+    --- PASS: TestExactCaptureIntentReceiptRejectsSubstitution/pending-receipt (0.00s)
+=== RUN   TestCaptureCleanupScopePreservesOriginalCohorts
+--- PASS: TestCaptureCleanupScopePreservesOriginalCohorts (0.00s)
+=== RUN   TestCaptureCleanupFullPolicyConstructorRetainsValidation
+--- PASS: TestCaptureCleanupFullPolicyConstructorRetainsValidation (0.00s)
+=== RUN   TestConfigurationRuntimeRolePlanCannotCreatePublicAuthority
+--- PASS: TestConfigurationRuntimeRolePlanCannotCreatePublicAuthority (0.00s)
+=== RUN   TestConfigurationWorkerLaunchClaimsKeepOriginalRoleAuthority
+--- PASS: TestConfigurationWorkerLaunchClaimsKeepOriginalRoleAuthority (0.00s)
+=== RUN   TestConfigurationWorkerLaunchFinalSQLStateOnlyAddsOriginalReceipt
+--- PASS: TestConfigurationWorkerLaunchFinalSQLStateOnlyAddsOriginalReceipt (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryActualOrderedSourceCalls
+--- PASS: TestConnectorObservationOperationRegistryActualOrderedSourceCalls (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-error
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/bad-first
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-error
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revoked
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-leaf
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-process
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revision
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-expired
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-oversize
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-malformed
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-revision
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roles
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-backing
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roots
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-channel
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-bracket
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-process
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/early-final
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/missing-final
+--- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase (0.01s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-error (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/bad-first (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-error (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revoked (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-leaf (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-process (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revision (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-expired (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-oversize (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-malformed (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-revision (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roles (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-backing (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roots (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-channel (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-bracket (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-process (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/early-final (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/missing-final (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/sql-wait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/source-wait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/native
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/source
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/workload
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/sql
+--- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait (0.12s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/sql-wait (0.06s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/source-wait (0.06s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/native (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/source (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/workload (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/sql (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/missing-deadline
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/cancelled
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/root
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/leaf
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/server
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/ordinal
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/expired
+--- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/missing-deadline (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/cancelled (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/root (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/leaf (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/server (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/ordinal (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/expired (0.00s)
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching
+--- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching (0.00s)
+=== RUN   TestConnectorCredentialDecoderAcceptsOriginalOverlappingObservations
+--- PASS: TestConnectorCredentialDecoderAcceptsOriginalOverlappingObservations (0.01s)
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-empty
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-null
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-sql-null
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-hash-size
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-bytes
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/early-publication
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-empty
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-null
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-key
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-hash
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-etag
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-record
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-record
+=== RUN   TestCurrentCatalogRequiresBothOriginalAuditReceipts/capture
+--- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts (0.02s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-empty (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-null (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-sql-null (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-hash-size (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-bytes (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/early-publication (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-empty (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-null (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-key (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-hash (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-etag (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/verification-record (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/intent-record (0.00s)
+    --- PASS: TestCurrentCatalogRequiresBothOriginalAuditReceipts/capture (0.00s)
+=== RUN   TestUnversionedHistoryRemainsHistoricalProgress
+--- PASS: TestUnversionedHistoryRemainsHistoricalProgress (0.01s)
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/full_exhausted
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/replay_exhausted
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/unbacked_account
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/legacy_pool_is_not_current_capacity
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/legacy_account_is_not_current_capacity
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/different_workload_allocation
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/different_installation
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/expired_original_account
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/pool_paused
+=== RUN   TestControlCapacitySeparatesFullAndRetainedReplayBacking/account_paused
+--- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/full_exhausted (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/replay_exhausted (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/unbacked_account (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/legacy_pool_is_not_current_capacity (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/legacy_account_is_not_current_capacity (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/different_workload_allocation (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/different_installation (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/expired_original_account (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/pool_paused (0.00s)
+    --- PASS: TestControlCapacitySeparatesFullAndRetainedReplayBacking/account_paused (0.00s)
+=== RUN   TestControlConfigurationObservationCannotRenewAfterBlockingWork
+--- PASS: TestControlConfigurationObservationCannotRenewAfterBlockingWork (0.00s)
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/writer
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/trailing-json
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/unknown-field
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/database
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/postmaster
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/fence
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/record-digest
+--- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/writer (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/trailing-json (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/unknown-field (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/database (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/postmaster (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/fence (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/record-digest (0.00s)
+=== RUN   TestContextPlanRequiresExactFiniteNativeControlAndStopBacking
+--- PASS: TestContextPlanRequiresExactFiniteNativeControlAndStopBacking (0.00s)
+=== RUN   TestFirstContextPreparationDoesNotGrantASecondAttempt
+--- PASS: TestFirstContextPreparationDoesNotGrantASecondAttempt (0.00s)
+=== RUN   TestFirstContextObservePreservesContentAndRetirementHeadroom
+--- PASS: TestFirstContextObservePreservesContentAndRetirementHeadroom (0.00s)
+=== RUN   TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse
+--- PASS: TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse (0.00s)
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation
+=== RUN   TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range
+--- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/missing_outcome (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unknown_audit (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/failed_full_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/unverified_final (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/partial_write (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_response (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_owner (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_generation (0.00s)
+    --- PASS: TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome/different_range (0.00s)
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/digest
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/root
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/capture
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/actor
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/deadline
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/unknown-field
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/noncanonical
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/attempt
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/quota-principal
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/duplicate-field
+--- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption (0.01s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/digest (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/root (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/capture (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/actor (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/deadline (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/unknown-field (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/noncanonical (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/attempt (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/quota-principal (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/duplicate-field (0.00s)
+=== RUN   TestContextPreviewQuotaAndRequestKeysHaveDifferentClientScopes
+--- PASS: TestContextPreviewQuotaAndRequestKeysHaveDifferentClientScopes (0.00s)
+=== RUN   TestProgressProjectsOnlyDurableFacts
+=== RUN   TestProgressProjectsOnlyDurableFacts/pending
+=== RUN   TestProgressProjectsOnlyDurableFacts/audited
+=== RUN   TestProgressProjectsOnlyDurableFacts/stored
+=== RUN   TestProgressProjectsOnlyDurableFacts/verified
+=== RUN   TestProgressProjectsOnlyDurableFacts/verification-audited
+=== RUN   TestProgressProjectsOnlyDurableFacts/published
+--- PASS: TestProgressProjectsOnlyDurableFacts (0.03s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/pending (0.00s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/audited (0.00s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/stored (0.00s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/verified (0.01s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/verification-audited (0.01s)
+    --- PASS: TestProgressProjectsOnlyDurableFacts/published (0.01s)
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/scope
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/intent-audit
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/verification
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/outcome-audit
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/audit-digest
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/wrong-artifact
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/late-publication
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/revision-overflow
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/registration
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/copies
+=== RUN   TestProgressRejectsIncompletePublicationOrCorruptIdentity/early-publication
+--- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity (0.04s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/scope (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/intent-audit (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/verification (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/outcome-audit (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/audit-digest (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/wrong-artifact (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/late-publication (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/revision-overflow (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/registration (0.00s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/copies (0.01s)
+    --- PASS: TestProgressRejectsIncompletePublicationOrCorruptIdentity/early-publication (0.00s)
+=== RUN   TestContextMetadataDeadlineIsOriginalAndNotSerialized
+--- PASS: TestContextMetadataDeadlineIsOriginalAndNotSerialized (0.00s)
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/sql-null
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-key
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-protocol
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-hash
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/truncated-hash
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-bytes
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/empty
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/null
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/empty
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/null
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/sql-null
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-key
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-protocol
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-hash
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/truncated-hash
+=== RUN   TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-bytes
+--- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt (0.03s)
+    --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy (0.01s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/sql-null (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-key (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/wrong-protocol (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-hash (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/truncated-hash (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/zero-bytes (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/empty (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/legacy/null (0.00s)
+    --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation (0.01s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/empty (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/null (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/sql-null (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-key (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/wrong-protocol (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-hash (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/truncated-hash (0.00s)
+        --- PASS: TestAcceptedPublicationRequiresRetainedIntentReceipt/operation/zero-bytes (0.00s)
+=== RUN   TestContextResolutionShapePreservesSequentialObservationIntervals
+--- PASS: TestContextResolutionShapePreservesSequentialObservationIntervals (0.00s)
+=== RUN   TestContextStorageObservationRetainsOriginalBounds
+--- PASS: TestContextStorageObservationRetainsOriginalBounds (0.00s)
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-pool-unconfigured
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-account-unconfigured
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-full-exhausted
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-replay-exhausted
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-original-deadline
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/pool-paused
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/allocation-paused
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-class
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-root
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-workload
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/bad-digest
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/future-source
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/expired-source
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/overlong-source-even-if-clamped
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/missing-time
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/zero-revision
+--- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-pool-unconfigured (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-account-unconfigured (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-full-exhausted (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-replay-exhausted (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-original-deadline (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/pool-paused (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/allocation-paused (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-class (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-root (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-workload (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/bad-digest (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/future-source (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/expired-source (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/overlong-source-even-if-clamped (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/missing-time (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/zero-revision (0.00s)
+=== RUN   TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline
+=== RUN   TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/missing
+=== RUN   TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/incomplete
+=== RUN   TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/later-than-source
+--- PASS: TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline (0.00s)
+    --- PASS: TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/missing (0.00s)
+    --- PASS: TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/incomplete (0.00s)
+    --- PASS: TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline/later-than-source (0.00s)
+=== RUN   TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes
+=== RUN   TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/original
+=== RUN   TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/empty
+=== RUN   TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/null
+--- PASS: TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes (0.00s)
+    --- PASS: TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/original (0.00s)
+    --- PASS: TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/empty (0.00s)
+    --- PASS: TestCurrentBatchReceiptRequiresVersionButHistoryKeepsBytes/null (0.00s)
+=== RUN   TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes
+=== RUN   TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/intent-empty
+=== RUN   TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/intent-null
+=== RUN   TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/outcome-empty
+=== RUN   TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/outcome-null
+--- PASS: TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes (0.01s)
+    --- PASS: TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/intent-empty (0.00s)
+    --- PASS: TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/intent-null (0.00s)
+    --- PASS: TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/outcome-empty (0.00s)
+    --- PASS: TestCurrentWindowReceiptsRequireVersionsButHistoryKeepsBytes/outcome-null (0.00s)
+=== RUN   TestInitialSQLHistoryDiagnosticHidesValues
+--- PASS: TestInitialSQLHistoryDiagnosticHidesValues (0.00s)
+=== RUN   TestInitialHistoryLoginIsInstallationAndPurposeBound
+--- PASS: TestInitialHistoryLoginIsInstallationAndPurposeBound (0.00s)
+=== RUN   TestInitialHistoryManagerIsAnIndependentFinitePin
+--- PASS: TestInitialHistoryManagerIsAnIndependentFinitePin (0.00s)
+=== RUN   TestInitialInstallationHistoricalObservation
+=== RUN   TestInitialInstallationHistoricalObservation/prepared
+=== RUN   TestInitialInstallationHistoricalObservation/audited
+=== RUN   TestInitialInstallationHistoricalObservation/expired-claim-historical-success
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-audited-history
+=== RUN   TestInitialInstallationHistoricalObservation/unversioned-activated-history
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-audited-history
+=== RUN   TestInitialInstallationHistoricalObservation/null-version-activated-history
+=== RUN   TestInitialInstallationHistoricalObservation/activation-without-audit
+=== RUN   TestInitialInstallationHistoricalObservation/activation-at-expiry
+=== RUN   TestInitialInstallationHistoricalObservation/activation-before-claim
+=== RUN   TestInitialInstallationHistoricalObservation/unknown-record-field
+=== RUN   TestInitialInstallationHistoricalObservation/trailing-record
+=== RUN   TestInitialInstallationHistoricalObservation/foreign-audit
+--- PASS: TestInitialInstallationHistoricalObservation (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/prepared (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/audited (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/expired-claim-historical-success (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unversioned-audited-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unversioned-activated-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/null-version-audited-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/null-version-activated-history (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-without-audit (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-at-expiry (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/activation-before-claim (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/unknown-record-field (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/trailing-record (0.00s)
+    --- PASS: TestInitialInstallationHistoricalObservation/foreign-audit (0.00s)
+=== RUN   TestInitialInstallationInventoryMatchesCatalogOrdering
+--- PASS: TestInitialInstallationInventoryMatchesCatalogOrdering (0.00s)
+=== RUN   TestInitialBootstrapHistoryTransferPreservesMeasuredOwnerOrigins
+--- PASS: TestInitialBootstrapHistoryTransferPreservesMeasuredOwnerOrigins (0.00s)
+=== RUN   TestInitialSQLCredentialEntropyScopeAndRedaction
+--- PASS: TestInitialSQLCredentialEntropyScopeAndRedaction (0.05s)
+=== RUN   TestInitialSQLCredentialStateScopeAndClosedDecoding
+--- PASS: TestInitialSQLCredentialStateScopeAndClosedDecoding (0.00s)
+=== RUN   TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance
+=== RUN   TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/head
+=== RUN   TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/bundle
+=== RUN   TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/database
+=== RUN   TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/precision
+--- PASS: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance (0.03s)
+    --- PASS: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/head (0.00s)
+    --- PASS: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/bundle (0.00s)
+    --- PASS: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/database (0.00s)
+    --- PASS: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance/precision (0.00s)
+=== RUN   TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation
+=== RUN   TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/database
+=== RUN   TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/postmaster
+=== RUN   TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/head
+--- PASS: TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation (0.00s)
+    --- PASS: TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/database (0.00s)
+    --- PASS: TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/postmaster (0.00s)
+    --- PASS: TestInitialSchemaBindingAlsoRejectsHistoricalRecordFromOtherIncarnation/head (0.00s)
+=== RUN   TestInitialSchemaEmbeddedBundleAndClosedAnnotations
+    initial_schema_test.go:19: actual embedded schema head=57 digest=2ee32d916de83066cb0818c4172ac1f234d1e98a73a96aad41e8806f55dae380
+--- PASS: TestInitialSchemaEmbeddedBundleAndClosedAnnotations (0.01s)
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/missing-zero
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/out-of-order
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/down
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/foreign
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/duplicate
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/decreasing-id
+=== RUN   TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/decreasing-time
+--- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/missing-zero (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/out-of-order (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/down (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/foreign (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/duplicate (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/decreasing-id (0.00s)
+    --- PASS: TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix/decreasing-time (0.00s)
+=== RUN   TestInitialSchemaRetainsExpiredCurrentRootBeforeSQL
+--- PASS: TestInitialSchemaRetainsExpiredCurrentRootBeforeSQL (0.00s)
+=== RUN   TestInitialSchemaStoreCannotCreateOrDeleteViaGoose
+--- PASS: TestInitialSchemaStoreCannotCreateOrDeleteViaGoose (0.00s)
+=== RUN   TestInitialSchemaGrantUnionRemainsPurposeLimited
+--- PASS: TestInitialSchemaGrantUnionRemainsPurposeLimited (0.00s)
+=== RUN   TestInitialSchemaShorterObservationCancelsAlreadyPassedSQLContext
+--- PASS: TestInitialSchemaShorterObservationCancelsAlreadyPassedSQLContext (0.02s)
+=== RUN   TestInitialSchemaClaimAndCompletionBoundsCannotRenewLease
+--- PASS: TestInitialSchemaClaimAndCompletionBoundsCannotRenewLease (0.02s)
+=== RUN   TestInitialSQLMaterialReconstructsOriginalPrivateState
+--- PASS: TestInitialSQLMaterialReconstructsOriginalPrivateState (0.00s)
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/already-closed
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/retired
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/different-operation
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/replacement-fence
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/old-lease-sequence
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/shortened-row
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/expired-after-lock
+=== RUN   TestNativeCompletionRequiresCurrentExactOpenGeneration/different-parent
+--- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration (0.01s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/already-closed (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/retired (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/different-operation (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/replacement-fence (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/old-lease-sequence (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/shortened-row (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/expired-after-lock (0.00s)
+    --- PASS: TestNativeCompletionRequiresCurrentExactOpenGeneration/different-parent (0.00s)
+=== RUN   TestOperationLifecycleCannotTreatCurrentRestartActivationAsHistoricalReconciliation
+--- PASS: TestOperationLifecycleCannotTreatCurrentRestartActivationAsHistoricalReconciliation (0.00s)
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection
+--- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection (0.00s)
+=== RUN   TestOwnerIdentityRolesKeepSeparateAuthority
+--- PASS: TestOwnerIdentityRolesKeepSeparateAuthority (0.00s)
+=== RUN   TestPermissionContinuityRequiresExactVersionsOrVerifiedTransitions
+--- PASS: TestPermissionContinuityRequiresExactVersionsOrVerifiedTransitions (0.00s)
+=== RUN   TestScopeDigestNormalizationAndBasisIdentity
+--- PASS: TestScopeDigestNormalizationAndBasisIdentity (0.00s)
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/covered
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/exact-boundary
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/one-microsecond-too-long
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/expired
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/missing-initialization
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-installation
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-issuer
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-root
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/malformed-backing
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/zero-protection
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/full
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/negative-counter
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/overflow-rules
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/future-anchor
+--- PASS: TestProcessingCaptureCoverageOriginalRootBounds (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/covered (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/exact-boundary (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/one-microsecond-too-long (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/expired (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/missing-initialization (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-installation (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-issuer (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-root (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/malformed-backing (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/zero-protection (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/full (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/negative-counter (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/overflow-rules (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/future-anchor (0.00s)
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-workload
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-artifact
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/other-workload
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/other-artifact
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/acquisition-end-exclusive
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/released
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/exact-rule-boundary
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/expired-restriction
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/duplicate
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-unrelated
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-after-short-root
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/unknown-state
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/more-rules-than-accounted
+--- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-workload (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-artifact (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/other-workload (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/other-artifact (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/acquisition-end-exclusive (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/released (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/exact-rule-boundary (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/expired-restriction (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/duplicate (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-unrelated (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-after-short-root (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/unknown-state (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/more-rules-than-accounted (0.00s)
+=== RUN   TestProcessingCaptureCoveragePurposePrivileges
+--- PASS: TestProcessingCaptureCoveragePurposePrivileges (0.00s)
+=== RUN   TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads
+--- PASS: TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads (0.00s)
+=== RUN   TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects
+--- PASS: TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects (0.00s)
+=== RUN   TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation
+--- PASS: TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation (0.00s)
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option
+--- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option (0.00s)
+=== RUN   TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection
+--- PASS: TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection (0.00s)
+=== RUN   TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges
+--- PASS: TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges (0.00s)
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/valid
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/missing
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/empty
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/null
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/wrong-key
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/missing-digest
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/malformed
+=== RUN   TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/unclaimed
+--- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode (0.01s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/valid (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/missing (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/empty (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/null (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/wrong-key (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/missing-digest (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/malformed (0.00s)
+    --- PASS: TestCurrentWorkerChecksExactRetainedReceiptWithoutBlockingHistoricalDecode/unclaimed (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.755s
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/original
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/substituted
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/exists
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/unknown
+=== RUN   TestOwnerAuditCreatePreservesAcknowledgedVersion/semantic-mismatch
+--- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion (0.04s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/original (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/substituted (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/exists (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/unknown (0.01s)
+    --- PASS: TestOwnerAuditCreatePreservesAcknowledgedVersion/semantic-mismatch (0.01s)
+=== RUN   TestDownloadWindowReadUsesPositiveVersionAndFindStaysReadOnly
+--- PASS: TestDownloadWindowReadUsesPositiveVersionAndFindStaysReadOnly (0.01s)
+=== RUN   TestControlAuditRejectsOversizedInputBeforeWrite
+--- PASS: TestControlAuditRejectsOversizedInputBeforeWrite (0.00s)
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/latest-replaced
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-original
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/null-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-version
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-etag
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-length
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-body
+=== RUN   TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/canceled
+--- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback (0.06s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/latest-replaced (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-original (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/null-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/missing-version (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-etag (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-length (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/wrong-body (0.01s)
+    --- PASS: TestAcknowledgedAuditReadPinsOriginalVersionWithoutFallback/canceled (0.01s)
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put
+--- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion (0.03s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original (0.01s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response (0.01s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put (0.01s)
+=== RUN   TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion
+    capture_operation_test.go:107: maximum completed capture pair: legacy expansion=36126 ciphertext total=24165 bytes
+--- PASS: TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion (0.02s)
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/0
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/1
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/2
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/3
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/4
+--- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt (0.27s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/0 (0.06s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/1 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/2 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/3 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/4 (0.05s)
+=== RUN   TestContextWriterCloseJoinsInFlightWrites
+--- PASS: TestContextWriterCloseJoinsInFlightWrites (0.07s)
+=== RUN   TestUnusedContextHandleCannotCertifyCompletion
+--- PASS: TestUnusedContextHandleCannotCertifyCompletion (0.04s)
+=== RUN   TestContextWriterUnknownFinalPutCannotCertifyCompletion
+--- PASS: TestContextWriterUnknownFinalPutCannotCertifyCompletion (0.06s)
+=== RUN   TestPurgeRequiresCompleteConfinedInventory
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/denied
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/delete-failed
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/retained-marker
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/foreign-key
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/truncated
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/oversized
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/null-version
+--- PASS: TestPurgeRequiresCompleteConfinedInventory (0.59s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/denied (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/delete-failed (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/retained-marker (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/foreign-key (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/truncated (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/oversized (0.54s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/null-version (0.01s)
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing
+--- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry (0.06s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok (0.02s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing (0.01s)
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ok
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version
+--- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse (0.03s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ok (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version (0.01s)
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version
+--- PASS: TestVersionedAuditRejectsUnpinnedReceipts (0.06s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/ (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/null (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version (0.00s)
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/null
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00
+--- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement (0.03s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/null (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00 (0.01s)
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-""
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-"null"
+--- PASS: TestLegacyStoreRetainsVersionOptionalContract (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"" (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"null" (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore	2.728s
+=== RUN   TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose
+--- PASS: TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose (0.01s)
+=== RUN   TestCaptureAuditAuthenticatesPurposeAndFrozenRecord
+--- PASS: TestCaptureAuditAuthenticatesPurposeAndFrozenRecord (0.01s)
+=== RUN   TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope
+    capture_operation_test.go:90: actual Tink ciphertext under maximum opaque wrapping text: intent=36630 outcome=37119 prepaid=65536 bytes
+--- PASS: TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope (0.03s)
+=== RUN   TestCapturePrivateEnvelopeRejectsControlExpansion
+--- PASS: TestCapturePrivateEnvelopeRejectsControlExpansion (0.00s)
+=== RUN   TestContextDeletionRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestContextDeletionRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestContextVerificationAuditPinsCopiesScopeAndPurpose
+--- PASS: TestContextVerificationAuditPinsCopiesScopeAndPurpose (0.01s)
+=== RUN   TestCursorSequentialPullsKeepOneFrameAndOriginalKeys
+--- PASS: TestCursorSequentialPullsKeepOneFrameAndOriginalKeys (0.14s)
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/native
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/data
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/index
+--- PASS: TestCursorFinalIntegrityAndPartialRangeClaims (0.07s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/native (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/data (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/index (0.02s)
+=== RUN   TestCursorEmptyFileStillReturnsAuthenticatedFinal
+--- PASS: TestCursorEmptyFileStillReturnsAuthenticatedFinal (0.00s)
+=== RUN   TestCursorCloseCancelsAndJoinsPendingRead
+--- PASS: TestCursorCloseCancelsAndJoinsPendingRead (0.00s)
+=== RUN   TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead
+--- PASS: TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead (0.10s)
+=== RUN   TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO
+--- PASS: TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO (0.02s)
+=== RUN   TestCursorCanceledCallBeforeAdmissionDoesNotConsume
+--- PASS: TestCursorCanceledCallBeforeAdmissionDoesNotConsume (0.00s)
+=== RUN   TestCursorRangeCrossesAuthenticatedIndexPageBoundary
+--- PASS: TestCursorRangeCrossesAuthenticatedIndexPageBoundary (0.08s)
+=== RUN   TestCursorUncertainReadRetainsAttemptAndCannotRetry
+--- PASS: TestCursorUncertainReadRetainsAttemptAndCannotRetry (0.00s)
+=== RUN   TestDownloadAuditPinsRangeActorGenerationAndPurpose
+--- PASS: TestDownloadAuditPinsRangeActorGenerationAndPurpose (0.01s)
+=== RUN   TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestDownloadStopAuditExactDecisionAndOneWrap
+--- PASS: TestDownloadStopAuditExactDecisionAndOneWrap (0.00s)
+=== RUN   TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase
+--- PASS: TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase (0.01s)
+=== RUN   TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose
+--- PASS: TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose (0.00s)
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/0
+    framed_test.go:115: nativeBytes=0 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/4096
+    framed_test.go:115: nativeBytes=4096 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/16777295
+    framed_test.go:115: nativeBytes=16777295 wraps=3 unwraps=3 largestKeysetBytes=131
+--- PASS: TestArtifactKeyCallsIndependentOfPayloadSize (0.38s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/0 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/4096 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/16777295 (0.37s)
+=== RUN   TestRoundTripAndRanges
+=== RUN   TestRoundTripAndRanges/0
+=== RUN   TestRoundTripAndRanges/1
+=== RUN   TestRoundTripAndRanges/4000
+=== RUN   TestRoundTripAndRanges/8388608
+=== RUN   TestRoundTripAndRanges/8388635
+=== RUN   TestRoundTripAndRanges/16777295
+--- PASS: TestRoundTripAndRanges (0.92s)
+    --- PASS: TestRoundTripAndRanges/0 (0.00s)
+    --- PASS: TestRoundTripAndRanges/1 (0.01s)
+    --- PASS: TestRoundTripAndRanges/4000 (0.01s)
+    --- PASS: TestRoundTripAndRanges/8388608 (0.20s)
+    --- PASS: TestRoundTripAndRanges/8388635 (0.25s)
+    --- PASS: TestRoundTripAndRanges/16777295 (0.46s)
+=== RUN   TestCorruptionAndFinalBatch
+=== RUN   TestCorruptionAndFinalBatch/data
+=== RUN   TestCorruptionAndFinalBatch/index
+=== RUN   TestCorruptionAndFinalBatch/native-hash
+=== RUN   TestCorruptionAndFinalBatch/data-hash
+=== RUN   TestCorruptionAndFinalBatch/index-hash
+--- PASS: TestCorruptionAndFinalBatch (0.23s)
+    --- PASS: TestCorruptionAndFinalBatch/data (0.03s)
+    --- PASS: TestCorruptionAndFinalBatch/index (0.02s)
+    --- PASS: TestCorruptionAndFinalBatch/native-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/data-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/index-hash (0.06s)
+=== RUN   TestAttemptBindingAndSingleUse
+--- PASS: TestAttemptBindingAndSingleUse (0.01s)
+=== RUN   TestDeliveryRevocation
+--- PASS: TestDeliveryRevocation (0.04s)
+=== RUN   TestPagedRangeBeyondTwoGiB
+    framed_test.go:336: native=2147483721 data=244550 index=71288 tailDataRead=70 tailIndexRead=381
+--- PASS: TestPagedRangeBeyondTwoGiB (3.80s)
+=== RUN   TestLayoutRejectsMalformedBounds
+--- PASS: TestLayoutRejectsMalformedBounds (0.00s)
+=== RUN   TestPublishedContractFixture
+--- PASS: TestPublishedContractFixture (0.00s)
+=== RUN   TestIncompressibleFramesAndAuthenticatedCorruption
+--- PASS: TestIncompressibleFramesAndAuthenticatedCorruption (0.41s)
+=== RUN   TestRejectOtherTinkSuiteBeforeObjectRead
+--- PASS: TestRejectOtherTinkSuiteBeforeObjectRead (0.00s)
+=== RUN   TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution
+--- PASS: TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution (0.01s)
+=== RUN   TestLifecycleRequiresBothSignatureAndEncryptedRecord
+--- PASS: TestLifecycleRequiresBothSignatureAndEncryptedRecord (0.01s)
+=== RUN   TestOperationAuditExactRecordsAndProviderCallCount
+    operation_audit_test.go:33: local Tink audit only: wraps=2 unwraps=2 max_wrapped_key_bytes=131 intent_cipher_bytes=1413 outcome_cipher_bytes=1858 elapsed=2.644345ms; no network provider latency measured
+--- PASS: TestOperationAuditExactRecordsAndProviderCallCount (0.00s)
+=== RUN   TestOperationRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestOperationRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/root
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/source
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/format
+--- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot (0.01s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/root (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/source (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/format (0.00s)
+=== RUN   TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame
+--- PASS: TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame (0.14s)
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json
+--- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory (0.01s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json (0.00s)
+=== RUN   FuzzLayout
+=== RUN   FuzzLayout/seed#0
+=== RUN   FuzzLayout/seed#1
+=== RUN   FuzzLayout/seed#2
+--- PASS: FuzzLayout (0.00s)
+    --- PASS: FuzzLayout/seed#0 (0.00s)
+    --- PASS: FuzzLayout/seed#1 (0.00s)
+    --- PASS: FuzzLayout/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.553s
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/unknown_class
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/invented_node
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/invented_boot
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/raw_data
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/larger_payload
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/different_mechanism
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/different_action
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/missing_class
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_node
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_boot
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_raw
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_action
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_larger_ceiling
+--- PASS: TestAPIContextManifestBindsExplicitProjectionClass (0.09s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/unknown_class (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/invented_node (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/invented_boot (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/raw_data (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/larger_payload (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/different_mechanism (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/different_action (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/missing_class (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_node (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_boot (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_raw (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_action (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_larger_ceiling (0.00s)
+=== RUN   TestContextManifestRejectsChangedClaims
+=== RUN   TestContextManifestRejectsChangedClaims/layout_hash
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_artifact
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_namespace
+=== RUN   TestContextManifestRejectsChangedClaims/privacy_downgrade
+=== RUN   TestContextManifestRejectsChangedClaims/raw_filename
+=== RUN   TestContextManifestRejectsChangedClaims/index_identity
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_boot
+=== RUN   TestContextManifestRejectsChangedClaims/collector_identity
+=== RUN   TestContextManifestRejectsChangedClaims/invalid_time
+=== RUN   TestContextManifestRejectsChangedClaims/reversed_time
+=== RUN   TestContextManifestRejectsChangedClaims/unqualified_format
+=== RUN   TestContextManifestRejectsChangedClaims/target_container
+=== RUN   TestContextManifestRejectsChangedClaims/purpose
+=== RUN   TestContextManifestRejectsChangedClaims/changed_owner
+=== RUN   TestContextManifestRejectsChangedClaims/expiry_extension
+=== RUN   TestContextManifestRejectsChangedClaims/late_completion
+=== RUN   TestContextManifestRejectsChangedClaims/truncated_source
+=== RUN   TestContextManifestRejectsChangedClaims/null_scalar
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_pod
+=== RUN   TestContextManifestRejectsChangedClaims/retention_policy
+=== RUN   TestContextManifestRejectsChangedClaims/capture
+=== RUN   TestContextManifestRejectsChangedClaims/layout_size
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_occurrence
+=== RUN   TestContextManifestRejectsChangedClaims/scope_promotion
+=== RUN   TestContextManifestRejectsChangedClaims/deletion_extension
+=== RUN   TestContextManifestRejectsChangedClaims/action
+=== RUN   TestContextManifestRejectsChangedClaims/parent_laundering
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_cluster
+=== RUN   TestContextManifestRejectsChangedClaims/plan
+=== RUN   TestContextManifestRejectsChangedClaims/data_version
+=== RUN   TestContextManifestRejectsChangedClaims/manual_policy_invented
+=== RUN   TestContextManifestRejectsChangedClaims/projection
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_case
+=== RUN   TestContextManifestRejectsChangedClaims/grant_invented
+=== RUN   TestContextManifestRejectsChangedClaims/anchor_reset
+--- PASS: TestContextManifestRejectsChangedClaims (0.17s)
+    --- PASS: TestContextManifestRejectsChangedClaims/layout_hash (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_artifact (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_namespace (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/privacy_downgrade (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/raw_filename (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/index_identity (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_boot (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/collector_identity (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/invalid_time (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/reversed_time (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/unqualified_format (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/target_container (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/purpose (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/changed_owner (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/expiry_extension (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/late_completion (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/truncated_source (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/null_scalar (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_pod (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/retention_policy (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/capture (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/layout_size (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_occurrence (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/scope_promotion (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/deletion_extension (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/action (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/parent_laundering (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_cluster (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/plan (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/data_version (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/manual_policy_invented (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/projection (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_case (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/grant_invented (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/anchor_reset (0.00s)
+=== RUN   TestCommitStrictBinding
+--- PASS: TestCommitStrictBinding (0.04s)
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_pod
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_namespace
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/impossible_states
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/old_observation
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/null_count
+--- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData (0.05s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_pod (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_namespace (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/impossible_states (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/old_observation (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/null_count (0.00s)
+=== RUN   TestStrictJSONBoundsAndOfflineLoader
+--- PASS: TestStrictJSONBoundsAndOfflineLoader (0.00s)
+=== RUN   FuzzManifest
+=== RUN   FuzzManifest/seed#0
+=== RUN   FuzzManifest/seed#1
+=== RUN   FuzzManifest/seed#2
+--- PASS: FuzzManifest (0.04s)
+    --- PASS: FuzzManifest/seed#0 (0.00s)
+    --- PASS: FuzzManifest/seed#1 (0.00s)
+    --- PASS: FuzzManifest/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.418s

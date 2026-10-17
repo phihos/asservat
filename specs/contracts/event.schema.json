@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/event.schema.json",
+  "title": "Asservat event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "source": {
+      "type": "string",
+      "format": "uri"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^io\\.asservat\\.(case\\.(opened|recurred|analysis\\.completed)|capture\\.partial|grant\\.(requested|revoked)|share\\.(created|revoked)|evidence\\.expired)\\.v1$"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "dataref": {
+      "type": "string",
+      "pattern": "^asservat://(case|grant|share|capture)/[a-f0-9-]{36}$"
+    },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{2}-[a-f0-9]{32}-[a-f0-9]{16}-[a-f0-9]{2}$"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "caseID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurrenceID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "artifactIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxItems": 64,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "grantID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "shareID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurrenceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "dataClasses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "maxItems": 3,
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "subject",
+    "time",
+    "datacontenttype",
+    "dataref",
+    "data"
+  ]
+}

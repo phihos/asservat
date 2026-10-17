@@ -1,0 +1,8 @@
+{
+  "path": "internal/adapters/kubernetes/owner_projection_preflight_source.go",
+  "beforeSHA256": "9093158fe389e6c703843e27534210e9f7f82fbb96f6d67d2d490994aa49245e",
+  "afterSHA256": "b914f0521feac4a069b6b860556f9dceec9a5c94199d2ffab9d205122c3d4e2e",
+  "reason": "Remove unused meta import exposed by integration compilation. No behavior change.",
+  "runnerSHA256": "0eba814af0948556934c1278450e252f9f3589c7ac01e43d444da51adb68ee3f",
+  "archiveSHA256": "b914f0521feac4a069b6b860556f9dceec9a5c94199d2ffab9d205122c3d4e2e"
+}

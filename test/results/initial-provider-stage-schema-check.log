@@ -1,0 +1,6 @@
+PASS: four bounded private state shapes and fourteen invalid schema cases; original timing/order/current authority remains runtime checked.
+PASS: explicit SQL material reference clause and four rejected prerequisite/reference shapes.
+PASS: four finite provider progress shapes and eight rejected provider progress shapes.
+PASS: finite provider material and five rejected secret/date shapes, with FormatChecker.
+PASS: explicit bounded provider profile and three rejected profile shapes; distinct role/policy names additionally checked at runtime.
+PASS: provider selection requires services, original SQL material and private state.

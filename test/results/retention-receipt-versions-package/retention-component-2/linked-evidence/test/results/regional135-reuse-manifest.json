@@ -1,0 +1,45 @@
+{
+  "schema": "asservat-guarded-stage/v1",
+  "scope": "ADR135 measured connector API proof reuse; original deadlines and no public enablement",
+  "created_utc": "2026-10-12T10:30:57.356754+00:00",
+  "live_root": "/home/phil/Projekte/asservat",
+  "payload_root": "changes",
+  "base_root": "bases",
+  "files": [
+    {
+      "path": "docs/architecture/regional-context-start.md",
+      "action": "modify",
+      "base_sha256": "92068d5a4bfd390468308183f11106d52eac02c8459b4c2bfd84c6d3867059a9",
+      "payload_sha256": "d1772a0a6aad310d2482931d285f420d8ef3bbe5f99211c7131be67081682d3a",
+      "bytes": 11931
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_process.go",
+      "action": "modify",
+      "base_sha256": "fac67ae7898ee9c262cde024f7cb237591f27ab77b19887841968d717368b180",
+      "payload_sha256": "279437d19838985a7d72990fbb29d2cfc63dbd3291f9b6c4003d9af06c8d53f0",
+      "bytes": 16162
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_proof.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "e330a5d155c18db40b55ec67658ce8e23c0203eaf94365d297db601ba4b06762",
+      "bytes": 6328
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_api_proof_test.go",
+      "action": "add",
+      "base_sha256": null,
+      "payload_sha256": "e07481f51f5f4ef8faa9e1cbfaeb8be15f8052653fa901fc1cdbc0fb1063217a",
+      "bytes": 10113
+    },
+    {
+      "path": "test/integration/context_start_connector_test.go",
+      "action": "modify",
+      "base_sha256": "0493bab4db84fed08f2bf8083f4344e732c6dcf2031f45e62cfa41f400c73642",
+      "payload_sha256": "00836ae9e3c06cf74390bb48a51abf99970bd4a44bd0154b9a8f62c47011b1ce",
+      "bytes": 28983
+    }
+  ]
+}

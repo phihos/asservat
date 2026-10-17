@@ -1,0 +1,4 @@
+{
+  "internal/adapters/mtls/connector_operation_channel.go": "47d40268588fa87b28bff13f61674fd87da298316fa6f2a9b3d992296beacc84",
+  "internal/adapters/mtls/connector_operation_channel_bounds_test.go": "cd8f797f3787485a3d1d43168ea2cb1f46cc75c6ce8595c05ddaeafd617961a8"
+}

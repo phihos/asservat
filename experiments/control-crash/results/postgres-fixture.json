@@ -1,0 +1,10 @@
+{
+  "id": "27d43945bfbe62f6f1a770d755a32de10daa30b4c4bbd9994f9e5a8807765618",
+  "image": "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+  "state": "running",
+  "endpoint": "192.168.240.2",
+  "volumes": [
+    "8123b89e902a2732f9cf1a816be09ca6e070dd16742060cdd698cd89a4439e05"
+  ],
+  "network": "asservat-control-crash-20261009"
+}

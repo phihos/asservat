@@ -1,0 +1,12 @@
+ok  	asservat.local/asservat/internal/domain/audit	0.001s [no tests to run]
+# asservat.local/asservat/internal/adapters/postgres
+internal/adapters/postgres/context_audit_receipts.go:23:50: undefined: privacy.ErrFence
+internal/adapters/postgres/context_audit_receipts.go:28:50: undefined: privacy.ErrFence
+internal/adapters/postgres/context_audit_receipts.go:53:49: undefined: privacy.ErrFence
+internal/adapters/postgres/context_publication.go:236:23: row.ContextVerification undefined (type custodydb.ContextVerification has no field or method ContextVerification)
+FAIL	asservat.local/asservat/internal/adapters/postgres [build failed]
+ok  	asservat.local/asservat/internal/application/audit	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/application/evidence	0.002s [no tests to run]
+FAIL	asservat.local/asservat/internal/bootstrap [build failed]
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

@@ -1,0 +1,186 @@
+{
+  "manifestSHA256": "8fe5c7d08ece4a9b65c0e8841eadaf6660677150cc1bd4fe955ad13395389bae",
+  "dependenciesSHA256": "92b8a7ee551bbebaa7b1df3911f35f81d76c00cd5c37165519ae2064cd2aea69",
+  "dependencyCount": 1894,
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "base_sha256": "95364c8efd19f0b2dc0ef701de749377a7ad335d315e647c43bc0a888d069087",
+      "payload_sha256": "457e9d6be5edc1ab491393821787c4dca3d73df4704de158ae8c0cec5a1b8388"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "base_sha256": "a9d4b89e03fdbf35a83ac22d9549af8c0c5845c516c467dc4318ac209afd8776",
+      "payload_sha256": "e590ecfd834684ecd91d3366c498a1460f8879248eb70c278f6e7aa374fa8cdd"
+    },
+    {
+      "path": "internal/contracts/cluster_observation_routing.go",
+      "base_sha256": null,
+      "payload_sha256": "639056be799a21a6d8e0cb2d052286fdcf91a54c6e212ebf4bc3ccc8bc0e6c2c"
+    },
+    {
+      "path": "internal/contracts/cluster_observation_routing_test.go",
+      "base_sha256": null,
+      "payload_sha256": "d5ad9bdda497c9750671cb732d9ee89cc659addc10e29406bf3c942a90fdd7d5"
+    },
+    {
+      "path": "internal/domain/fleet/cluster_observation_routing.go",
+      "base_sha256": null,
+      "payload_sha256": "868e1d1f17c9a6bd968ae4c92aef4ff5379c9ca72e2d4e318dd78aa2b0c88a0d"
+    },
+    {
+      "path": "internal/domain/fleet/cluster_observation_routing_test.go",
+      "base_sha256": null,
+      "payload_sha256": "d66e50fa913940637249ac0f959d3274d3288aad7ca8b31026c8b48cf4b18967"
+    }
+  ],
+  "qualification": {
+    "session": 50090,
+    "exit": 0,
+    "passEntries": 154,
+    "newRoutingEntries": 108,
+    "retainedEntries": 46,
+    "phases": {
+      "compile": {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/overlay.json",
+          "-vet=off",
+          "-run",
+          "^$",
+          "./internal/domain/fleet",
+          "./internal/contracts",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 1.945,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      "race": {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=120s",
+          "-run",
+          "^TestClusterObservation(Routing|MaximumClosedWire|WireRejects|Frames|ApplicationDigest|Order|PreservesExact|RequestCannot)",
+          "-v",
+          "./internal/domain/fleet",
+          "./internal/contracts",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 5.901,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      "vet": {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/overlay.json",
+          "./internal/domain/fleet",
+          "./internal/contracts",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 0.394,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      "architecture": {
+        "phase": "architecture",
+        "command": [
+          "make",
+          "go-architecture-check"
+        ],
+        "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/mirror",
+        "exit": 0,
+        "seconds": 1.251,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      }
+    },
+    "scope": "Pure routing values and closed codecs; no receiving runtime, candidate SQL, v2 producer, native/multi-cluster authority or availability qualification"
+  },
+  "integratedAt": 1791855626.6766853,
+  "scope": "Closed routing values/codecs only; no receiving runtime, SQL candidate query or installed v2 selection."
+}

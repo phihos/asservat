@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+--- PASS: TestContextAdmissionWithRealServices (2.20s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (1.89s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.257s

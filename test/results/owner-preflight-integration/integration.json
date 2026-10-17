@@ -1,0 +1,154 @@
+{
+  "status": "component and native SQL qualified; original installed selection passes, later projection fails",
+  "stages": [
+    {
+      "path": "owner-preflight-critical-section-20261013",
+      "manifestSHA256": "0fe0dab8afa430c9e02326b90309adbaeb94ca5794e432c0c686373efcc1c9cc"
+    },
+    {
+      "path": "owner-bridge-seam-sql-20261013",
+      "manifestSHA256": "68629d53fc539c0961ca3604ad3b68af82a0f03c5eedce62549aa71683b0293b"
+    }
+  ],
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_root_pin_test.go",
+      "baseSHA256": "c08e785911b1d038ccc04a8cea75a1093188da06b15c96da0e056df3106b22d9",
+      "payloadSHA256": "1407156aab6080f1f79ed9a2790eed6eabe21043fa0f6080e0efe64595c0cea6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_selection.go",
+      "baseSHA256": "d58aca77eb0816b6d80c838a64c776a66e1058d6f751475032efcaa3ebc145d9",
+      "payloadSHA256": "5dcd762bd369c69d487cc4f7086d87295c3f917741c54a10b3f8b1192529077f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_selection_diagnostics_test.go",
+      "baseSHA256": "2565b92fda882d05f102df2567e24608080a993bc987dc55ce82ac7fa78d54b1",
+      "payloadSHA256": "55ab95a5fa3a02f5df51b4990f7e9424312e99f37fd8ec1e0af9a40df81c0c1b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller.go",
+      "baseSHA256": "e7b4cc27df7f4e45c25df018ce311f411e73e5418d85988fe59ae33c82fe0fee",
+      "payloadSHA256": "7ff49a453dc595efbcdd91f3dbb174a8defaf22c9f748203da7a07b8bc5d2c12"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation.go",
+      "baseSHA256": "6c49c80a6035907a6fce1bc556e7f799650abde9f6bda5a41d07229a9be25070",
+      "payloadSHA256": "17a0ef9873f3e58dde59981cd8f9f912067009ce87655c399e6f4493495cc080"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_current.go",
+      "baseSHA256": "b770071c6585a583612cfb9f06e5cb22868da2497cf9d89cfbf043b9a5a7f386",
+      "payloadSHA256": "c4750547693de1ff42008d48d09443c199e44393a449212e79ce20edb4e89341"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_native.go",
+      "baseSHA256": "dcce1788e8bc7692c2155f55e19a3362ffde07ac4ee746f6fb2a2c3ac847af8b",
+      "payloadSHA256": "03190a907bf36adcbc6d8d310a3e55d1da22c8b3d12f11195df723b38f02a5bf"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_open.go",
+      "baseSHA256": "88c4ae4ad59ab9f9efb6aa1ae47209e59b40884012b060f61664a2fe3c46cbef",
+      "payloadSHA256": "3cb84d74b301509b0ecc5f3d6b173e781be5bce1b246d4764eb53d5a7afdb360"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_preflight.go",
+      "baseSHA256": null,
+      "payloadSHA256": "d311d6ef104712516cf0f1ae0b2d18f491c074783ebf1bbd6627049c98250c68"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_preflight_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "d6dd4021594c3264fc484935e695cf9fbafa880a80c1d9b37e565f6a3207d36d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_roles.go",
+      "baseSHA256": "1c6244b7776599426737122c10fed4ee276ddd43707944fd1595b7a610a7b4c8",
+      "payloadSHA256": "7e1e52850c07131be6116fb35dbd3ec517a876b6d2db2824b667af760aec2a65"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_root.go",
+      "baseSHA256": "849767e93d3abbb6fb4a89d42c151b256869e1f303b4fcbfa286fc6365ed37f8",
+      "payloadSHA256": "212031d5c21590d997dbb8079a5609d55f5495f33310a360853920d2848a11ba"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_roles.go",
+      "baseSHA256": "709c841b36a905991960efcf003dc28ae7c7596b11b8a1f4c6f45b26226ef14f",
+      "payloadSHA256": "e9aba3227ed1362f18cfc85349213dd61741cc8137243c493d168e97763b107a"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation.go",
+      "baseSHA256": "b04bc7e54155ae4a0ddbbe0835cd72e4f324cbc6a0d23a2c5cb237deb26274f6",
+      "payloadSHA256": "b5052b8ef9f23b76779757e8143ab7f09700ee3c3b4c88b02dbf90ab4648aeea"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_runtime_bridge.go",
+      "baseSHA256": "0c2b70ffba308b373f939102f60d844ce315cf9a39e5c674a55456a8c2f1fb31",
+      "payloadSHA256": "764d96ff70ebdb9c1387a7e810265a85d26074e7aa3d5304461192b8e014f5f6"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_runtime_owner_bridge.go",
+      "baseSHA256": null,
+      "payloadSHA256": "67f2df9c1f4f3b73176466ee5a1f5d546a860a39d0b36c54cdd056d65920990a"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_runtime_owner_bridge_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "b8fe3ff886e28b937f95755ad0a1fbe50aafeca1c1060aa4354a6ffd4e63798d"
+    },
+    {
+      "path": "internal/application/fleet/initial_runtime_bridge.go",
+      "baseSHA256": "1209ce3a2c7a59909b8d3697098198aeb86bff0949d4812d904281831d2318a9",
+      "payloadSHA256": "e3bd10777759c218feb346c40f7ac66c3ee4880eaddf5268a95bd1f4a718aed9"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "baseSHA256": "9a7ae73816d37218f3a0164c71e52be9c341bc9ad322d46adaa4593d8c88e6c5",
+      "payloadSHA256": "340cdec228ea870935acdc0d6907ca49af893a678cb165fc2825782bc3d323aa"
+    },
+    {
+      "path": "test/integration/initial_runtime_bridge_sql_test.go",
+      "baseSHA256": "dfa55aabb0452413f4ca2bab009b08ae9ce201a7ecb1bd916cc0f8a0d9301e2d",
+      "payloadSHA256": "9e2ed3f8dedc065aa6a678a188f0b0e4351a0a3b13e0d35c84c6e6f1926aaf0d"
+    }
+  ],
+  "beforeEvidence": "test/results/runtime-provider-owner-native-4/result.json",
+  "baselineGoEvidence": "test/results/go-regression-20261013-1/result.json",
+  "qualification": [
+    {
+      "result": "test/results/owner-preflight-component-1/result.json",
+      "sha256": "0477e0c83a165a6cd8bca4921bced76e06ba2856525826a2341e8b68081d039e",
+      "exit": 0,
+      "verifiedSources": 2801,
+      "verifiedArchives": 6,
+      "topLevelRaceTests": 269,
+      "namedRacePasses": 1391,
+      "ownedProcessAndScratchAbsent": true
+    },
+    {
+      "result": "test/results/runtime-owner-bridge-sql-native-1/result.json",
+      "sha256": "338e4cb520ad01ef095f86544847a8872ce06567daf34cea212d51bd67ff55d2",
+      "exit": 0,
+      "verifiedSources": 2497,
+      "verifiedNativeSources": 2277,
+      "verifiedArchives": 5,
+      "selectedLeafPasses": 22,
+      "parentPassed": true,
+      "ownedDockerCleanupVerified": true,
+      "scratchAbsent": true
+    },
+    {
+      "result": "test/results/runtime-provider-owner-native-5/result.json",
+      "sha256": "c02818908eb00ad16eba01d8dd8064727234f991bf0b04337783f2c71a065041",
+      "exit": 1,
+      "verifiedSources": 2497,
+      "verifiedNativeSources": 2300,
+      "verifiedArchives": 7,
+      "ownerSelectionCompleted": true,
+      "fullOwnerStartupPassed": false,
+      "failure": "projection/original-result-unverified",
+      "ownedDockerKindCleanupVerified": true,
+      "scratchAbsent": true
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// publicProjectionOperation lives only inside one serialized Publish. Its first
+// independently denied enforcement observation is never renewed or reacquired.
+// Current complete pins and identities are still read at every effect boundary.
+type publicProjectionOperation struct {
+	root           *PublicRuntimeRoleRoot
+	ctx            context.Context
+	cancels        []context.CancelFunc
+	started, until time.Time
+	configuration  fleet.OwnerConfiguration
+	guardVersion   string
+	proved         bool
+	failed         error
+}
+
+func newPublicProjectionOperation(ctx context.Context, s *PublicRuntimeRoleRoot, verified contracts.PublicRuntimeRoleSnapshot) *publicProjectionOperation {
+	now := s.client.now()
+	o := &publicProjectionOperation{root: s, ctx: ctx, started: now, until: now.Add(5 * time.Second)}
+	if d, ok := ctx.Deadline(); ok && d.Before(o.until) {
+		o.until = d
+	}
+	o.restrict(verified.ValidUntil)
+	// ADR-186: inside a role operation the opening proof already proved the
+	// guard's enforcement; later boundaries still compare against it.
+	if op := publicRoleOperationOf(ctx); op != nil {
+		o.restrict(op.until)
+		o.configuration, o.guardVersion, o.proved = op.configuration.Clone(), op.guardVersion, true
+	}
+	return o
+}
+func (o *publicProjectionOperation) close() {
+	for _, cancel := range o.cancels {
+		cancel()
+	}
+}
+func (o *publicProjectionOperation) restrict(until time.Time) {
+	if until.Before(o.until) {
+		o.until = until
+	}
+	ctx, cancel := context.WithDeadline(o.ctx, o.until)
+	o.ctx = ctx
+	o.cancels = append(o.cancels, cancel)
+}
+func (o *publicProjectionOperation) live() error {
+	if o.failed != nil {
+		return o.failed
+	}
+	if o.ctx.Err() != nil || !o.root.client.now().Before(o.until) {
+		return o.fail(cfg.ErrUnavailable)
+	}
+	return nil
+}
+func (o *publicProjectionOperation) fail(err error) error {
+	if o.failed == nil {
+		// A failed or expired read is not evidence of a changed identity.
+		if o.ctx.Err() != nil || !o.root.client.now().Before(o.until) {
+			err = cfg.ErrUnavailable
+		}
+		if !errors.Is(err, cfg.ErrChanged) && !errors.Is(err, cfg.ErrDenied) {
+			err = cfg.ErrUnavailable
+		}
+		o.failed = err
+	}
+	return o.failed
+}
+func (o *publicProjectionOperation) current() (err error) {
+	if err = o.live(); err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			err = o.fail(err)
+		}
+	}()
+	s, g := o.root, o.root.protection
+	c, err := s.configurations.ReadOwnerConfiguration(o.ctx)
+	if err != nil || !c.Valid(s.client.now()) || c.Configuration.Suspended {
+		return cfg.ErrUnavailable
+	}
+	p := c.Configuration.Pool
+	if c.Configuration.Revision.UID != s.input.OwnerConfigurationUID || p.InstallationID != s.input.InstallationID || p.ClusterID != s.input.ClusterID || p.Namespace != s.input.Namespace.Name || p.NamespaceUID != s.input.Namespace.UID || p.Deployment != g.plan.Deployment || p.DeploymentUID != g.plan.DeploymentUID || o.proved && !o.configuration.Equal(c.Configuration) {
+		return cfg.ErrChanged
+	}
+	o.restrict(c.FreshUntil)
+	if err = o.live(); err != nil {
+		return err
+	}
+	ns, err := g.observer.namespace(o.ctx, g.plan.ControlNamespace)
+	if err != nil {
+		return err
+	}
+	if ns.Deleting {
+		return cfg.ErrChanged
+	}
+	if !o.proved {
+		before, e := checkAdmissionGuard(o.ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
+		if e != nil {
+			return e
+		}
+		if e = g.prove(o.ctx, o.started); e != nil {
+			return e
+		}
+		o.guardVersion = before
+	}
+	if err = o.administrator(); err != nil {
+		return err
+	}
+	d, err := ownerResource[apps.Deployment](&OwnerEndpoints{client: s.client, pool: p}, o.ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/deployments/"+p.Deployment, "apps/v1", "Deployment")
+	if err != nil {
+		return err
+	}
+	if !publicRoleDeploymentBound(d, p) {
+		return cfg.ErrChanged
+	}
+	if s.input.Worker != (contracts.PublicRuntimeWorkerBinding{}) {
+		if err = s.currentWorker(o.ctx); err != nil {
+			return err
+		}
+	}
+	// The first check brackets the actual denial; later checks compare the full
+	// current compiled policy/binding to that same observed version.
+	after, err := checkAdmissionGuard(o.ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
+	if err != nil {
+		return err
+	}
+	if after != o.guardVersion {
+		return cfg.ErrChanged
+	}
+	if !o.proved {
+		ns, err = g.observer.namespace(o.ctx, g.plan.ControlNamespace)
+		if err != nil {
+			return err
+		}
+		if ns.Deleting {
+			return cfg.ErrChanged
+		}
+	}
+	last, err := s.configurations.ReadOwnerConfiguration(o.ctx)
+	if err != nil || !last.Valid(s.client.now()) {
+		return cfg.ErrUnavailable
+	}
+	if !c.Configuration.Equal(last.Configuration) {
+		return cfg.ErrChanged
+	}
+	o.restrict(last.FreshUntil)
+	if err = o.live(); err != nil {
+		return err
+	}
+	if !o.proved {
+		o.configuration = c.Configuration.Clone()
+		o.proved = true
+	}
+	return nil
+}
+func (o *publicProjectionOperation) administrator() error {
+	s := o.root
+	raw, err := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/selfsubjectreviews").Body(&auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}).MaxRetries(0).DoRaw(o.ctx)
+	var who auth.SelfSubjectReview
+	if err != nil || permissionJSON(raw, permissionPageBytes, 131072) != nil || strictGuardJSON(raw, &who) != nil {
+		return cfg.ErrUnavailable
+	}
+	for _, a := range s.protection.plan.Administrators {
+		if actorMatches(a, who.Status.UserInfo) {
+			return o.live()
+		}
+	}
+	return cfg.ErrDenied
+}

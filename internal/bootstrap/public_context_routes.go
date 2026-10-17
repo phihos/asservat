@@ -1,0 +1,104 @@
+package bootstrap
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"asservat.local/asservat/internal/transport/browser"
+)
+
+// publicContextRoutes is a composition detail. Its handlers are constructed by
+// NewPublicContextHandler; callers cannot install a replacement authorization
+// implementation through routing configuration. It deliberately does not use
+// ServeMux, whose path cleaning redirects would change the original request.
+type publicContextRoutes struct {
+	host                                                 string
+	sessions, investigations, mcp, content, console      http.Handler // content nil without a configured worker
+	fleet                                                http.Handler // nil without issuance
+	mcpPath, mcpMetadata, contentPrefix, contentMetadata string
+}
+
+func publicContextProblem(w http.ResponseWriter, status int) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", "no-store, private")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(struct {
+		Type   string `json:"type"`
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+	}{"about:blank", http.StatusText(status), status})
+}
+
+// originalPublicTarget accepts only the actual origin-form target. Query
+// values may be escaped; the fixed product paths themselves are literal ASCII.
+// Neither TLS identity nor the public host is inferred from forwarding headers.
+func originalPublicTarget(r *http.Request, host string) bool {
+	if r == nil || r.URL == nil || r.TLS == nil || host == "" || r.Host != host || len(r.RequestURI) > 8192 {
+		return false
+	}
+	u := r.URL
+	if u.Scheme != "" || u.Host != "" || u.User != nil || u.Opaque != "" || u.RawPath != "" || u.Fragment != "" || u.RawFragment != "" || u.ForceQuery || !strings.HasPrefix(u.Path, "/") || strings.ContainsAny(u.Path, "\\%\r\n\t") || strings.Contains(u.Path, "//") {
+		return false
+	}
+	for _, part := range strings.Split(u.Path, "/") {
+		if part == "." || part == ".." {
+			return false
+		}
+	}
+	target := u.Path
+	if u.RawQuery != "" {
+		target += "?" + u.RawQuery
+	}
+	return r.RequestURI == target
+}
+
+func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h == nil || !originalPublicTarget(r, h.host) {
+		publicContextProblem(w, http.StatusBadRequest)
+		return
+	}
+	path := r.URL.Path
+	switch path {
+	case "/auth/login", "/auth/callback", "/auth/backchannel-logout", "/auth/csrf", "/auth/refresh", "/auth/logout", "/api/v1/session":
+		// SessionHandler owns OAuth callback, query, cookie and CSRF semantics.
+		// In particular a cross-site provider callback is not a browser mutation.
+		h.sessions.ServeHTTP(w, r)
+		return
+	}
+	if r.URL.RawQuery != "" {
+		publicContextProblem(w, http.StatusBadRequest)
+		return
+	}
+	switch {
+	case path == h.mcpPath || path == h.mcpMetadata:
+		h.mcp.ServeHTTP(w, r)
+	case (path == h.contentMetadata || strings.HasPrefix(path, h.contentPrefix)) && h.content == nil:
+		publicContextProblem(w, http.StatusServiceUnavailable)
+	case path == h.contentMetadata || strings.HasPrefix(path, h.contentPrefix):
+		h.content.ServeHTTP(w, r)
+	case strings.HasPrefix(path, "/api/v1/operations/"):
+		h.investigations.ServeHTTP(w, r)
+	case path == browser.FleetBootstrapPath && h.fleet != nil:
+		h.fleet.ServeHTTP(w, r)
+	case path == "/" || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
+		// The bounded console handler validates its exact asset/UUID route set.
+		h.console.ServeHTTP(w, r)
+	default:
+		publicContextProblem(w, http.StatusNotFound)
+	}
+}
+
+func publicContextHost(origin string) (string, bool) {
+	u, e := url.Parse(origin)
+	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawFragment != "" || u.Opaque != "" || u.String() != origin {
+		return "", false
+	}
+	// The console constructor applies its stricter canonical origin check too.
+	return u.Host, true
+}

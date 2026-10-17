@@ -1,0 +1,24 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-matrix
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-missing-role
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-ambient
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-changed-source
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-held-lock
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== RUN   TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-recovery-after-lock
+    initial_installation_test.go:541: actual SQL launched inventory checked original role OIDs/provenance/current recovery/ACL; protected Kubernetes launch proof and Secret root remain synthetic in this matrix
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:545: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (2.76s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-matrix (0.70s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-missing-role (0.31s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-ambient (0.32s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-changed-source (0.38s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-held-lock (0.58s)
+    --- PASS: TestInitialInstallationWithRealServices/configuration-runtime-roles-launched-recovery-after-lock (0.41s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.812s

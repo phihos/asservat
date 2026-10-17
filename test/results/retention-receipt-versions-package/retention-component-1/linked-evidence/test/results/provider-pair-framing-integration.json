@@ -1,0 +1,25 @@
+{
+  "scope": "Provider-pair foundations, private v2 framed component, schemas/ADR and native fixture integration. Native test pending; no runtime selection.",
+  "paths": 164,
+  "sets": {
+    "worker": 139,
+    "decision": 3,
+    "framed": 17,
+    "native": 5
+  },
+  "dependenciesVerifiedBeforeIntegration": {
+    "worker": 2448,
+    "framed": 1944
+  },
+  "manifest": "test/results/provider-pair-framing-package/manifest.json",
+  "manifestSHA256": "f83a09927766108b2e76b4207b325c641da245e2f5933bbdc920cc4c4b9e71aa",
+  "archive": "test/results/provider-pair-framing-package",
+  "overrides": [
+    {
+      "path": "specs/contracts/owner-provider-selection.schema.json",
+      "original": "4d51afcc25cbf765e98a10dd1bbe491a3aaafd28fe45218db9100654a0cb19c7",
+      "selected": "561c513f4a38df765a90c3c4effa4d7f6580e63648468a3ca856c0ba610f56ea",
+      "reason": "Console schema-join-1 qualified complete-string and exact fixed audit Secret scope"
+    }
+  ]
+}

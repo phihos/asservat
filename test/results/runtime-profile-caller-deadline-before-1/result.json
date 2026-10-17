@@ -1,0 +1,110 @@
+{
+  "runnerSHA256": "338b15006f521173b216436f686c6e46b039e27727d6a3760804c55332e4c841",
+  "manifestSHA256": "ecc7d11e15f84a56448fa5e9e825f0187bed8ae08454e54a287c1c71491fdf12",
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "sourceCount": 3095,
+  "reviewedPayloads": {
+    "docs/architecture/runtime-profiles.md": "5b89bdf27881c93c023fa1bf2a2e2d4e349af3a65941734a21fdb62be419f944",
+    "internal/adapters/diagnostics/go_profile.go": "3ff90e8361d59908b1eda60687895db60d432cc4f09e430e26be8e1957f3eac8",
+    "internal/adapters/diagnostics/go_profile_test.go": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "internal/application/execution/go_profile.go": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "internal/domain/execution/go_profile.go": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "internal/domain/execution/go_profile_test.go": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+  },
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=15m",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "pid": 1728363,
+      "processGroup": 1728363,
+      "exit": 0,
+      "seconds": 27.923,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "race-caller-deadline",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestGoProfileShortCallerCannotStartUnfinishableRecording)$",
+        "./internal/adapters/diagnostics"
+      ],
+      "pid": 1729678,
+      "processGroup": 1729678,
+      "exit": 1,
+      "seconds": 1.001,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/diagnostics",
+          "TestGoProfileShortCallerCannotStartUnfinishableRecording"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": false,
+      "allRunChildrenPassed": false,
+      "passedNamedTests": [],
+      "missingPackagePasses": [
+        "asservat.local/asservat/internal/adapters/diagnostics"
+      ],
+      "failuresOrSkips": [
+        {
+          "Time": "2026-10-14T06:24:33.888591188+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/diagnostics",
+          "Test": "TestGoProfileShortCallerCannotStartUnfinishableRecording",
+          "Elapsed": 0
+        },
+        {
+          "Time": "2026-10-14T06:24:33.889365748+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/diagnostics",
+          "Elapsed": 0.012
+        }
+      ]
+    }
+  ],
+  "status": "failed",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "payloadsUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "f5d3e0a6762eb21620cb910e942e5264759297bb49596412c1e45dc22a1dd868",
+    "runner.py": "338b15006f521173b216436f686c6e46b039e27727d6a3760804c55332e4c841",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "manifest.json": "ecc7d11e15f84a56448fa5e9e825f0187bed8ae08454e54a287c1c71491fdf12",
+    "review.patch": "e9b734d7e07be14a278993bb2420e14dc6254bb8aec2b5dac6226d36369147e5",
+    "compile.log": "6bbfa07cab0d495b3ea38356138d4d3a939797ead2330b6bb8c8e0fdae7fb073",
+    "race-caller-deadline.log": "d2dfd5311a92e8358d764ded2488a593d62ad148d9f7ac231b20740cd9b0027e",
+    "payloads/specs/profiles.md.txt": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56",
+    "payloads/internal/domain/execution/go_profile.go.txt": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "payloads/internal/domain/execution/go_profile_test.go.txt": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "payloads/internal/application/execution/go_profile.go.txt": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "payloads/internal/adapters/diagnostics/go_profile.go.txt": "3ff90e8361d59908b1eda60687895db60d432cc4f09e430e26be8e1957f3eac8",
+    "payloads/internal/adapters/diagnostics/go_profile_test.go.txt": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "payloads/docs/architecture/runtime-profiles.md.txt": "5b89bdf27881c93c023fa1bf2a2e2d4e349af3a65941734a21fdb62be419f944"
+  }
+}

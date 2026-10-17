@@ -1,0 +1,92 @@
+{
+  "schema_version": "live-watch-fixture/v1",
+  "watch": {
+    "watch_id": "00000000-0000-4000-8000-000000000701",
+    "revision": 1,
+    "state": "Active",
+    "source_session_ids": [
+      "00000000-0000-4000-8000-000000000702"
+    ],
+    "projection": "syscallMetadata",
+    "accepted_at": "2026-10-09T12:05:00Z",
+    "expires_at": "2026-10-09T12:15:00Z",
+    "idle_expires_at": "2026-10-09T12:05:30Z",
+    "limits": {
+      "duration_seconds": 600,
+      "max_output_bytes": 16777216,
+      "bytes_per_second": 65536,
+      "max_rows_per_batch": 100,
+      "max_buffer_bytes": 1048576,
+      "row_max_age_seconds": 30,
+      "replay_seconds": 5
+    },
+    "cursor": "opaque-live-cursor-1",
+    "handling": {
+      "transient": true,
+      "may_contain_user_data": true,
+      "managed_row_max_age_seconds": 30,
+      "raw_available_live": false,
+      "external_copies_recallable": false,
+      "save_semantics": "freshCurrentWindow"
+    }
+  },
+  "batch": {
+    "watch_id": "00000000-0000-4000-8000-000000000701",
+    "revision": 1,
+    "batch_id": "00000000-0000-4000-8000-000000000703",
+    "state": "Active",
+    "rows": [
+      {
+        "row_id": "00000000-0000-4000-8000-000000000702:41",
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "source_sequence": 41,
+        "observed_at": "2026-10-09T12:05:01Z",
+        "received_at": "2026-10-09T12:05:02Z",
+        "expires_at": "2026-10-09T12:05:31Z",
+        "clock_uncertainty_ms": 1,
+        "filter_generation": 7,
+        "projection": "syscallMetadata",
+        "pod_uid": "pod-checkout-8k2p",
+        "fields": {
+          "pid": 420,
+          "syscall": "connect",
+          "error": true,
+          "errno": 111,
+          "duration_ns": 34000,
+          "paired": true
+        }
+      }
+    ],
+    "sources": [
+      {
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "state": "Ready",
+        "filter_generation": 7,
+        "last_observed_at": "2026-10-09T12:05:01Z",
+        "coverage": "partial"
+      }
+    ],
+    "gaps": [
+      {
+        "reason": "subscriberOverflow",
+        "source_session_id": "00000000-0000-4000-8000-000000000702",
+        "count": null,
+        "from": "2026-10-09T12:05:00Z",
+        "until": "2026-10-09T12:05:01Z"
+      }
+    ],
+    "interval_from": "2026-10-09T12:05:00Z",
+    "interval_until": "2026-10-09T12:05:02Z",
+    "received_at": "2026-10-09T12:05:02Z",
+    "output_bytes_spent": 1024,
+    "retry_after_ms": 1000,
+    "handling": {
+      "transient": true,
+      "may_contain_user_data": true,
+      "managed_row_max_age_seconds": 30,
+      "raw_available_live": false,
+      "external_copies_recallable": false,
+      "save_semantics": "freshCurrentWindow"
+    }
+  }
+}

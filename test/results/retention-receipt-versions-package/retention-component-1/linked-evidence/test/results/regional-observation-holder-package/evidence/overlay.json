@@ -1,0 +1,14 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_hub.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_observation_hub.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_observation_hub_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_observation_hub_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/connector_observation_registry.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/adapters/postgres/connector_observation_registry.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/connector_observation_registry_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/adapters/postgres/connector_observation_registry_test.go",
+    "/home/phil/Projekte/asservat/internal/application/fleet/connector_observation_registry.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/application/fleet/connector_observation_registry.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/hub_handler.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/hub_handler.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/hub_handler_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/hub_handler_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/hub_holder.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/hub_holder.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/hub_holder_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/hub_holder_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/hub_stream.go": "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/hub_stream.go"
+  }
+}

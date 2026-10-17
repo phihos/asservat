@@ -1,0 +1,15 @@
+{
+  "status": "immutable candidate; qualification not run",
+  "files": [
+    {
+      "path": "internal/bootstrap/initial_runtime_configuration.go",
+      "base_sha256": "4857c79b1ddede4e8b4b81ab90d5b42d3a2ea9ce7327d7025fde1aee042f632a",
+      "payload_sha256": "b5f9c5732a9dc3f95e20f5be2dc5cc0816f2d09b6282e777e6d4571cc9352bde"
+    },
+    {
+      "path": "internal/bootstrap/initial_runtime_configuration_probe_test.go",
+      "base_sha256": null,
+      "payload_sha256": "85fe655fe15381afb8b9749bd1a2453fe55414e8a69c5fae3b9b4658fa232646"
+    }
+  ]
+}

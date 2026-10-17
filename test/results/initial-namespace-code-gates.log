@@ -1,0 +1,61 @@
+python3 scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+python3 scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+python3 scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+python3 scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.795s
+ok  	asservat.local/asservat/internal/adapters/kms	2.192s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	27.716s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.014s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.712s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.913s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.254s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.457s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.207s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.077s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.029s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.196s
+ok  	asservat.local/asservat/internal/application/evidence	1.074s
+ok  	asservat.local/asservat/internal/application/execution	1.020s
+ok  	asservat.local/asservat/internal/application/fleet	2.053s
+ok  	asservat.local/asservat/internal/application/identity	1.018s
+ok  	asservat.local/asservat/internal/application/planning	1.044s
+ok  	asservat.local/asservat/internal/application/privacy	1.036s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	4.408s
+ok  	asservat.local/asservat/internal/contracts	1.008s
+ok  	asservat.local/asservat/internal/domain/artifact	1.007s
+ok  	asservat.local/asservat/internal/domain/audit	1.007s
+ok  	asservat.local/asservat/internal/domain/authorization	1.400s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.007s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+ok  	asservat.local/asservat/internal/domain/identity	1.008s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.013s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.022s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.439s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	2.015s
+python3 scripts/check-go-architecture.py
+Go architecture OK: 43 packages, 190 internal import edges; catalog ownership and layer/dependency rules checked

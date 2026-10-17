@@ -1,0 +1,17 @@
+{
+  "bases.json": "10eb691f4c5363db164e5c02e8965c738309a4dc51f9a8a8c9f4084a8a725d85",
+  "dependencies.json": "92b8a7ee551bbebaa7b1df3911f35f81d76c00cd5c37165519ae2064cd2aea69",
+  "files/docs/architecture/cluster-observations.md": "457e9d6be5edc1ab491393821787c4dca3d73df4704de158ae8c0cec5a1b8388",
+  "files/docs/decisions/144-cluster-local-observations.md": "e590ecfd834684ecd91d3366c498a1460f8879248eb70c278f6e7aa374fa8cdd",
+  "files/internal/contracts/cluster_observation_routing.go": "639056be799a21a6d8e0cb2d052286fdcf91a54c6e212ebf4bc3ccc8bc0e6c2c",
+  "files/internal/contracts/cluster_observation_routing_test.go": "d5ad9bdda497c9750671cb732d9ee89cc659addc10e29406bf3c942a90fdd7d5",
+  "files/internal/domain/fleet/cluster_observation_routing.go": "868e1d1f17c9a6bd968ae4c92aef4ff5379c9ca72e2d4e318dd78aa2b0c88a0d",
+  "files/internal/domain/fleet/cluster_observation_routing_test.go": "d66e50fa913940637249ac0f959d3274d3288aad7ca8b31026c8b48cf4b18967",
+  "manifest.json": "8fe5c7d08ece4a9b65c0e8841eadaf6660677150cc1bd4fe955ad13395389bae",
+  "mirror.json": "f043540b73bb795a5d33a9a05b96911f36447a2bab888b3846bf3feba70a438c",
+  "originals/docs/architecture/cluster-observations.md": "95364c8efd19f0b2dc0ef701de749377a7ad335d315e647c43bc0a888d069087",
+  "originals/docs/decisions/144-cluster-local-observations.md": "a9d4b89e03fdbf35a83ac22d9549af8c0c5845c516c467dc4318ac209afd8776",
+  "overlay.json": "14e3cf2fd64faae4b2fb1ba18a7da811112a3109f464080230cefb0f0e9b9bc8",
+  "payload.json": "87a161c2aea5a5cad41f3ce4e13ee74479096269758c85464e24424e2f58313d",
+  "run.py": "55e5a4bd8c61236b4274ea81213a524f96a144d71bb9eb9e12c6aaa77f1b0f0a"
+}

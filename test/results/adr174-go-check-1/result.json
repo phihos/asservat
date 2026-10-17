@@ -1,0 +1,10 @@
+{
+  "name": "adr174-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "scope": "Full Go gate after ADR-172 federation owner reads, ADR-173 work-scoped process observation, ADR-174 regional context-start composition and the delegated recovery purpose",
+  "results": "55 full packages and 543 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (TestInitialRuntimeObjectRoundTripWithRealKubernetes, group 4)",
+  "sourceHashBefore": "65d3172d8875b5df54034e756898555d743db5dfb2f0106e64b5502b947f95ae",
+  "sourceHashAfter": "65d3172d8875b5df54034e756898555d743db5dfb2f0106e64b5502b947f95ae",
+  "log": "go-check.log"
+}

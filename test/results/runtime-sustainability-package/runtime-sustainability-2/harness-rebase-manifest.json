@@ -1,0 +1,10 @@
+[
+  {
+    "path": "scripts/test-context-storage.py",
+    "base_sha256": "c6ff03a5e077cd8c88b7659e0c3f9dbac61d9db98c08a63efd0a288a7a09bc2e",
+    "payload_sha256": "453a4949a6c6079b2805e2acfa0e0c52efac895c9c1e0308824963ea6871351f",
+    "original_base_sha256": "bd5bee6927bda363287e8cbcd636dba4cf88b16654f00932b4497c91162659ae",
+    "original_payload_sha256": "e968ae1ff0dde6317ab2a2fb8f81e19fe73e2df0fefcd7fc875c568dfacb56d8",
+    "source_only": true
+  }
+]

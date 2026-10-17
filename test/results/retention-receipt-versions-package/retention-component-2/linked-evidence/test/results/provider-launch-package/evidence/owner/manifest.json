@@ -1,0 +1,212 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_conflicts_test.go",
+    "base_sha256": "628181f6021cf1f0bb9400c6c1e087dbdf7da069beeba8db54e1d58fec417e43",
+    "payload_sha256": "deceaa6f91f1c1005a523b06b95e0ee8689528f75347bc2dba0d1093e7bedaf4",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/files/internal/adapters/kubernetes/initial_preparer_conflicts_test.go",
+    "prior_payload_sha256": "deceaa6f91f1c1005a523b06b95e0ee8689528f75347bc2dba0d1093e7bedaf4"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "fe8e1ae854654952ed6eea17ae309b3137832947a7a921c71c4d823a5f6b4f6f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/files/internal/adapters/kubernetes/initial_preparer_provider_fixture_test.go",
+    "prior_payload_sha256": "fe8e1ae854654952ed6eea17ae309b3137832947a7a921c71c4d823a5f6b4f6f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "6c49c80a6035907a6fce1bc556e7f799650abde9f6bda5a41d07229a9be25070",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation.go",
+    "prior_payload_sha256": "6c49c80a6035907a6fce1bc556e7f799650abde9f6bda5a41d07229a9be25070"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_composed_test.go",
+    "base_sha256": null,
+    "payload_sha256": "0c8f6ce9b99d0212fddb67206320f27a2011a32d11ac0350dd74805f5794a07e",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_composed_test.go",
+    "prior_payload_sha256": "0c8f6ce9b99d0212fddb67206320f27a2011a32d11ac0350dd74805f5794a07e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_current.go",
+    "base_sha256": null,
+    "payload_sha256": "b770071c6585a583612cfb9f06e5cb22868da2497cf9d89cfbf043b9a5a7f386",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_current.go",
+    "prior_payload_sha256": "b770071c6585a583612cfb9f06e5cb22868da2497cf9d89cfbf043b9a5a7f386"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "7aba46b25f16a9573da41074911163f67dc4efd1ae9e7e916276f0cf260ef12f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_fixture_test.go",
+    "prior_payload_sha256": "27e2b24c5589dab335b74a32cb9645c77cab927b913bd468a772c77fe23b1dd9"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_material.go",
+    "base_sha256": null,
+    "payload_sha256": "2ff442abca9efa7156a93aa44d893ca11560b4aff03fcd7b476cb3f839f5ee52",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_material.go",
+    "prior_payload_sha256": "2ff442abca9efa7156a93aa44d893ca11560b4aff03fcd7b476cb3f839f5ee52"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_native.go",
+    "base_sha256": null,
+    "payload_sha256": "d97dcadcef35ee88e5569636269b314c34674054b18681eb9f54d9a831a1c70a",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_native.go",
+    "prior_payload_sha256": "d97dcadcef35ee88e5569636269b314c34674054b18681eb9f54d9a831a1c70a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_open.go",
+    "base_sha256": null,
+    "payload_sha256": "88c4ae4ad59ab9f9efb6aa1ae47209e59b40884012b060f61664a2fe3c46cbef",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_open.go",
+    "prior_payload_sha256": "88c4ae4ad59ab9f9efb6aa1ae47209e59b40884012b060f61664a2fe3c46cbef"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_retry_test.go",
+    "base_sha256": null,
+    "payload_sha256": "331c6a01b502bb105ac723d09d912b868691f327c2a46302bb4630e2fb90a13a",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_retry_test.go",
+    "prior_payload_sha256": "331c6a01b502bb105ac723d09d912b868691f327c2a46302bb4630e2fb90a13a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_roles.go",
+    "base_sha256": null,
+    "payload_sha256": "1c6244b7776599426737122c10fed4ee276ddd43707944fd1595b7a610a7b4c8",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_roles.go",
+    "prior_payload_sha256": "1c6244b7776599426737122c10fed4ee276ddd43707944fd1595b7a610a7b4c8"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_root.go",
+    "base_sha256": null,
+    "payload_sha256": "f4ade5e107f6d34ecc4f3923020a1fcb75bbdfd67205ac543e7dbedf24791000",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_root.go",
+    "prior_payload_sha256": "f4ade5e107f6d34ecc4f3923020a1fcb75bbdfd67205ac543e7dbedf24791000"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_operation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "4b742bb772c269bd722c37847db7cd7e09b4dc90e622aab0afb7384a5ffed66a",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_operation_test.go",
+    "prior_payload_sha256": "4b742bb772c269bd722c37847db7cd7e09b4dc90e622aab0afb7384a5ffed66a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_roles.go",
+    "base_sha256": "da14cb9110cf59e89be6bc0bbb9280191ee653d9467c3dcb18c8084b0fb4fd6b",
+    "payload_sha256": "709c841b36a905991960efcf003dc28ae7c7596b11b8a1f4c6f45b26226ef14f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_identity_roles.go",
+    "prior_payload_sha256": "709c841b36a905991960efcf003dc28ae7c7596b11b8a1f4c6f45b26226ef14f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_installation_driver.go",
+    "base_sha256": null,
+    "payload_sha256": "94148231d673e1805cb0594590e7d35aece44cfd39255343a06f311633941380",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_installation_driver.go",
+    "prior_payload_sha256": "94148231d673e1805cb0594590e7d35aece44cfd39255343a06f311633941380"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_installation_driver_test.go",
+    "base_sha256": null,
+    "payload_sha256": "b22c86009c780b3cfe5d5670297d1a5c5bf9bf4840516548c9a82a900f56cd18",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_installation_driver_test.go",
+    "prior_payload_sha256": "b22c86009c780b3cfe5d5670297d1a5c5bf9bf4840516548c9a82a900f56cd18"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_installation_outcome.go",
+    "base_sha256": null,
+    "payload_sha256": "d549aaf6d6e0c418352fce9af676f5cb678965f54f2bd0a391a7432781ea71fe",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_installation_outcome.go",
+    "prior_payload_sha256": "d549aaf6d6e0c418352fce9af676f5cb678965f54f2bd0a391a7432781ea71fe"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "364bd645180a3672e92d0780c7b93140d503f0d058ccaff4c94cd5381938665f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation.go",
+    "prior_payload_sha256": "364bd645180a3672e92d0780c7b93140d503f0d058ccaff4c94cd5381938665f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_composed_test.go",
+    "base_sha256": null,
+    "payload_sha256": "0393039cc69e09aeaa42a1f9ec282df97b9076e1c5400e893266e69abae8af36",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_composed_test.go",
+    "prior_payload_sha256": "0393039cc69e09aeaa42a1f9ec282df97b9076e1c5400e893266e69abae8af36"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_effects.go",
+    "base_sha256": null,
+    "payload_sha256": "c7f0304dba08eb6bf68b24c73dd2d14fb54d9619ffa7cc73dc05b32842a62784",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_effects.go",
+    "prior_payload_sha256": "c7f0304dba08eb6bf68b24c73dd2d14fb54d9619ffa7cc73dc05b32842a62784"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "a8f1f44dc26b9d61e0896fe5310dab88eb4aa94b6b6b50204e391f027d1519ca",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_fixture_test.go",
+    "prior_payload_sha256": "a8f1f44dc26b9d61e0896fe5310dab88eb4aa94b6b6b50204e391f027d1519ca"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_inspect.go",
+    "base_sha256": null,
+    "payload_sha256": "b2a19e116f27c2b54f079521bd47b548a3b22bff111a0d39ee6ef493cd61650c",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_inspect.go",
+    "prior_payload_sha256": "b2a19e116f27c2b54f079521bd47b548a3b22bff111a0d39ee6ef493cd61650c"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_native.go",
+    "base_sha256": null,
+    "payload_sha256": "5c377755116524959e28b45bdbc32f0a1b4be1f162bd7eb454139628503c753a",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_native.go",
+    "prior_payload_sha256": "5c377755116524959e28b45bdbc32f0a1b4be1f162bd7eb454139628503c753a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_plan.go",
+    "base_sha256": null,
+    "payload_sha256": "bff5748038a099f4bebe98ee54f990a42880347029d0e3b02b6d66a669d90c75",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_plan.go",
+    "prior_payload_sha256": "bff5748038a099f4bebe98ee54f990a42880347029d0e3b02b6d66a669d90c75"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_provider_test.go",
+    "base_sha256": null,
+    "payload_sha256": "09844fe0c4f5808584392cf6dd09743d9f5a1068bcf68394e08b03f75e8a98d4",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_provider_test.go",
+    "prior_payload_sha256": "95e808f199431d661025f16b65fedb2f1fc5110ad54dfdd15594bd97b25469d9"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_projection_operation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "191334a23f4e648253650ea80dff0b797b872507df943b87fe6ca977a69ffbc0",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/kubernetes/owner_projection_operation_test.go",
+    "prior_payload_sha256": "191334a23f4e648253650ea80dff0b797b872507df943b87fe6ca977a69ffbc0"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "3f3ddf1793c5a2cd4f58d08bdc295facfe12c579cffc0491c6a8455d9f96addb",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/postgres/owner_identity_operation.go",
+    "prior_payload_sha256": "3f3ddf1793c5a2cd4f58d08bdc295facfe12c579cffc0491c6a8455d9f96addb"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_operation_roles.go",
+    "base_sha256": null,
+    "payload_sha256": "94e0baf8e1439475ab394f1b606332781f95837801ee6c400e574e6957fc0b4c",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/postgres/owner_identity_operation_roles.go",
+    "prior_payload_sha256": "94e0baf8e1439475ab394f1b606332781f95837801ee6c400e574e6957fc0b4c"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_operation_test.go",
+    "base_sha256": null,
+    "payload_sha256": "813b79be1c4fcd08d8572a62c2d7a0b3dcc97cc9e2f7f91eb6a18bf095c3e310",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/postgres/owner_identity_operation_test.go",
+    "prior_payload_sha256": "813b79be1c4fcd08d8572a62c2d7a0b3dcc97cc9e2f7f91eb6a18bf095c3e310"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_projection_operation.go",
+    "base_sha256": null,
+    "payload_sha256": "1b86b143fc9920efaa52da3af7d9a3a36db116d80c5823c4b7d1ec722a75d48e",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/operation-changes/internal/adapters/postgres/owner_projection_operation.go",
+    "prior_payload_sha256": "1b86b143fc9920efaa52da3af7d9a3a36db116d80c5823c4b7d1ec722a75d48e"
+  }
+]

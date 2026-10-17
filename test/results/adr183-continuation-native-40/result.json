@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-40",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure, located: 'service stopped at capacity/open/deployment/control (unavailable)'. The continuation's capacity deployment listed the hub-worker account as a capacity guard status user, but EnsureCapacitySources created the guard with none; the hub-worker rebuilt a different admission plan, which did not match the guard pin. The deployment now carries the installed guard's empty status users, and the namespace keys are sorted once for the guard, its proof, the qualification and the runtime pins.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,234 @@
+{"phase": "before", "command": ["go", "test", "-overlay", "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/overlay-before.json", "-race", "./internal/application/evidence", "-run", "^TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim$", "-count=1", "-timeout=60s", "-v"], "exit": 1, "seconds": 2.89, "before": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "after": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "payload": {"docs/architecture/context-native-content.md": "c9ce1777d8c58d7cc5b21324e618f52d7b88d8347969aa3236da0a3ec8cd9f6d", "internal/application/evidence/context_native_active_enrollment_test.go": "a5475b4321b51897ccb2b11e3cc3f27cc35499f92e3eac9dba0e413da635c01d", "internal/application/evidence/context_native_runtime.go": "ac39f90ec35237acd5f3efc7bee4b4acc1ba8c08f541ed412581d656806e2f59"}, "dependencies_count": 1254, "environment": {"GOMAXPROCS": "2", "GOFLAGS": "-p=2", "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/tmp"}}
+=== RUN   TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim
+    context_native_active_enrollment_test.go:89: already active preparation used enrollment or missed original first batch false 1 0 synthetic enrollment owner must not be used
+--- FAIL: TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.009s
+FAIL
+
+{"phase": "after", "command": ["go", "test", "-overlay", "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/overlay-after.json", "-race", "./internal/application/evidence", "-run", "^Test(ContextRuntime|ActiveContextEnrollment|WorkerCurrent|WorkerPending|WorkerOwner|NativePreparation)", "-count=1", "-timeout=90s", "-v"], "exit": 0, "seconds": 3.891, "before": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "after": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "payload": {"docs/architecture/context-native-content.md": "c9ce1777d8c58d7cc5b21324e618f52d7b88d8347969aa3236da0a3ec8cd9f6d", "internal/application/evidence/context_native_active_enrollment_test.go": "a5475b4321b51897ccb2b11e3cc3f27cc35499f92e3eac9dba0e413da635c01d", "internal/application/evidence/context_native_runtime.go": "ac39f90ec35237acd5f3efc7bee4b4acc1ba8c08f541ed412581d656806e2f59"}, "dependencies_count": 1254, "environment": {"GOMAXPROCS": "2", "GOFLAGS": "-p=2", "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/tmp"}}
+=== RUN   TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim
+--- PASS: TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-during-pod
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-during-sql
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled
+--- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState (0.03s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-during-pod (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-during-sql (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled (0.00s)
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-enrollment
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-peer
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/short-peer
+--- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute (0.01s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-enrollment (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-peer (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/short-peer (0.00s)
+=== RUN   TestActiveContextEnrollmentPreservesOriginalRenewalBoundary
+--- PASS: TestActiveContextEnrollmentPreservesOriginalRenewalBoundary (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay
+--- PASS: TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-during-pod
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-during-sql
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql
+--- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations (0.03s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-during-pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-during-sql (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql
+--- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql (0.00s)
+=== RUN   TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery
+--- PASS: TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery (0.00s)
+=== RUN   TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL
+--- PASS: TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL (0.02s)
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream
+--- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady (0.01s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream (0.00s)
+=== RUN   TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath
+--- PASS: TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath (0.00s)
+=== RUN   TestWorkerPendingContinuationRetainsOneOriginalCreateAndAudit
+--- PASS: TestWorkerPendingContinuationRetainsOneOriginalCreateAndAudit (0.00s)
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/unknown
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/intent
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/job
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/expired
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/revoked
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/shortened
+--- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority (0.01s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/unknown (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/intent (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/job (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/expired (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/revoked (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/shortened (0.00s)
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/success
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit
+--- PASS: TestNativePreparationPreservesOutcomeAndFinalGate (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/success (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit (0.00s)
+=== RUN   TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader
+--- PASS: TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader (0.00s)
+=== RUN   TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer
+--- PASS: TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer (0.01s)
+=== RUN   TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery
+--- PASS: TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery (0.01s)
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/expiry
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/groups
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/scopes
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/policy
+=== RUN   TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/expiry
+--- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls (0.02s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker-audit/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/claim-worker/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/observe-job/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls/read-worker/expiry (0.00s)
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/proof
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/prepare-certificate
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/sign
+=== RUN   TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/activate
+--- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery (0.01s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/proof (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/prepare-certificate (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/sign (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery/activate (0.01s)
+=== RUN   TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate
+--- PASS: TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate (0.00s)
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/expiry
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/groups
+=== RUN   TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/shorter
+--- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/expiry (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/groups (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner/shorter (0.00s)
+=== RUN   TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound
+--- PASS: TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound (0.00s)
+=== RUN   TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck
+--- PASS: TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck (0.00s)
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/groups
+=== RUN   TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/scopes
+--- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation (0.00s)
+    --- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/groups (0.00s)
+    --- PASS: TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation/scopes (0.00s)
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/dispatch
+=== RUN   TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/enrollment
+--- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts (0.01s)
+    --- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/dispatch (0.00s)
+    --- PASS: TestWorkerCurrentShorterObservationBoundsLaterEffectContexts/enrollment (0.01s)
+=== RUN   TestWorkerCurrentCheckCannotStartOverAfterBlockingProof
+--- PASS: TestWorkerCurrentCheckCannotStartOverAfterBlockingProof (0.00s)
+=== RUN   TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery
+--- PASS: TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery (0.01s)
+=== RUN   TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound
+--- PASS: TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound (0.00s)
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return
+--- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return (0.00s)
+=== RUN   TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement
+--- PASS: TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.216s
+
+{"phase": "vet", "command": ["go", "vet", "-overlay", "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/overlay-after.json", "./internal/application/evidence"], "exit": 0, "seconds": 0.286, "before": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "after": {"bases": [], "dependencies": [], "payload": [], "check_inputs": []}, "payload": {"docs/architecture/context-native-content.md": "c9ce1777d8c58d7cc5b21324e618f52d7b88d8347969aa3236da0a3ec8cd9f6d", "internal/application/evidence/context_native_active_enrollment_test.go": "a5475b4321b51897ccb2b11e3cc3f27cc35499f92e3eac9dba0e413da635c01d", "internal/application/evidence/context_native_runtime.go": "ac39f90ec35237acd5f3efc7bee4b4acc1ba8c08f541ed412581d656806e2f59"}, "dependencies_count": 1254, "environment": {"GOMAXPROCS": "2", "GOFLAGS": "-p=2", "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/tmp"}}
+

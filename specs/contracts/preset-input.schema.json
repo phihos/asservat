@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/preset-input.schema.json",
+  "title": "Asservat preset-input v1",
+  "$defs": {
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "presetRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "const": "workload-failure"
+            },
+            "version": {
+              "const": "v1"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workloadRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "Deployment",
+                    "StatefulSet"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "maxPods": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "workloadRef"
+          ]
+        },
+        "logPattern": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "match": {
+              "type": "string",
+              "enum": [
+                "literal",
+                "regexp"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "match",
+            "value"
+          ]
+        },
+        "retention": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        },
+        "suspended": {
+          "type": "boolean"
+        },
+        "sharing": {
+          "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/policy"
+        },
+        "recordingSaves": {
+          "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/policyOptIn"
+        }
+      },
+      "required": [
+        "presetRef",
+        "target"
+      ]
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "presetRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "enum": [
+                "incident-context",
+                "pod-status"
+              ]
+            },
+            "version": {
+              "const": "v1"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workloadRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "Deployment",
+                    "StatefulSet",
+                    "Pod"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                }
+              },
+              "required": [
+                "kind",
+                "name"
+              ]
+            },
+            "maxPods": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "workloadRef"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "retention": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        },
+        "sharing": {
+          "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
+        },
+        "resultAccess": {
+          "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/request"
+        }
+      },
+      "required": [
+        "presetRef",
+        "target"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "presetRef": {
+                "properties": {
+                  "name": {
+                    "const": "pod-status"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "required": [
+              "presetRef"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "properties": {
+                  "maxPods": {
+                    "const": 1
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "target": {
+                "properties": {
+                  "workloadRef": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "Deployment",
+                          "StatefulSet"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,327 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	admission "k8s.io/api/admissionregistration/v1"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	authz "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
+)
+
+type configurationSourcePathFixture struct {
+	source          *ConfigurationRoleSource
+	extraHandler    func(http.ResponseWriter, *http.Request) bool
+	requests        atomic.Int32
+	probes          atomic.Int32
+	purposeProbes   [3]atomic.Int32
+	secretWrites    atomic.Int32
+	guardVersion    atomic.Int32
+	flipGuard       atomic.Bool
+	fault           atomic.Int32 // 1: changed RBAC; 2: changed admission with identical objects
+	replicas        atomic.Int32
+	workloadVersion atomic.Int32
+	mu              sync.Mutex
+	secret          *core.Secret
+	projection      *core.Secret
+}
+
+// This loopback server simulates Kubernetes enforcement only. Production
+// constructors, bounded HTTP clients, original real clock, JSON parsing and
+// all current negative proof calls remain intact; no accepted SQL callback.
+func newConfigurationSourcePathFixture(t *testing.T) *configurationSourcePathFixture {
+	t.Helper()
+	in, _ := configurationRoleProofExample(time.Now())
+	f := &configurationSourcePathFixture{}
+	f.guardVersion.Store(1)
+	f.replicas.Store(1)
+	f.workloadVersion.Store(1)
+	ns := cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}
+	administrator := []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}
+	workload := cfg.OwnerWorkloadAdministration{Name: "cfg-workload", ControlNamespace: ns, Deployment: "hub", DeploymentUID: ownerID(20), Administrators: administrator, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: in.FleetSource.Name, ServiceAccount: "probe"}, {ConfigMap: in.OwnerSource.Name, ServiceAccount: "probe"}}, SchedulingLeases: []cfg.OwnerSchedulingLease{}}
+	fleetPlan := cfg.ConfigMapAdministration{Name: "cfg-fleet", ControlNamespace: ns, SourceName: in.FleetSource.Name, Administrators: administrator}
+	ownerPlan := cfg.ConfigMapAdministration{Name: "cfg-owner", ControlNamespace: ns, SourceName: in.OwnerSource.Name, Administrators: administrator}
+	policies := make(map[string]*admission.ValidatingAdmissionPolicy)
+	bindings := make(map[string]*admission.ValidatingAdmissionPolicyBinding)
+	pins := make(map[string]GuardPin)
+	add := func(p *admission.ValidatingAdmissionPolicy, b *admission.ValidatingAdmissionPolicyBinding, e error) {
+		t.Helper()
+		if e != nil {
+			t.Fatal(e)
+		}
+		n := len(policies)*2 + 30
+		pin := GuardPin{PolicyUID: ownerID(n), PolicyGeneration: 1, BindingUID: ownerID(n + 1), BindingResourceVersion: "1"}
+		p.UID, p.Generation, p.ResourceVersion = types.UID(pin.PolicyUID), 1, "1"
+		p.Status.ObservedGeneration, p.Status.TypeChecking = 1, &admission.TypeChecking{}
+		b.UID, b.ResourceVersion = types.UID(pin.BindingUID), "1"
+		policies[p.Name], bindings[p.Name], pins[p.Name] = p, b, pin
+	}
+	add(OwnerWorkloadAdmission(workload))
+	add(FleetConfigurationAdmission(fleetPlan))
+	add(OwnerConfigurationAdmission(ownerPlan))
+	fleetRaw, e := json.Marshal(contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: in.InstallationID, IssuerEpoch: ownerID(9), Issuer: "https://id.example.test", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ownerRaw, e := json.Marshal(contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: in.InstallationID, ClusterID: in.ClusterID, IssuerEpoch: ownerID(9), Revision: 1, Namespace: in.Namespace, Service: contracts.WorkerObjectReference{Name: "hub", UID: ownerID(21)}, Deployment: contracts.WorkerObjectReference{Name: workload.Deployment, UID: workload.DeploymentUID}, ServiceAccount: contracts.WorkerObjectReference{Name: "hub", UID: ownerID(22)}, Port: 8443, IssuerRoots: [][]byte{ownerConfigurationTestRoot(t, time.Now())}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	maps := map[string]*core.ConfigMap{}
+	for name, data := range map[string]map[string]string{in.FleetSource.Name: {"fleet.json": string(fleetRaw)}, in.OwnerSource.Name: {"owner-pool.json": string(ownerRaw)}} {
+		uid := in.FleetSource.UID
+		if name == in.OwnerSource.Name {
+			uid = in.OwnerSource.UID
+		}
+		maps[name] = &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: "1"}, Data: data}
+	}
+	deployment := func(name string) apps.Deployment {
+		uid, account := workload.DeploymentUID, "hub"
+		replicas, version := int32(1), "1"
+		if name == in.Deployment.Name {
+			uid, account = in.Deployment.UID, in.ServiceAccount.Name
+			replicas, version = f.replicas.Load(), strconv.Itoa(int(f.workloadVersion.Load()))
+		}
+		return apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: version}, Spec: apps.DeploymentSpec{Replicas: ptr.To(replicas), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: account}}, Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: ptr.To(intstr.FromInt(1))}}}}
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.requests.Add(1)
+		if f.extraHandler != nil && f.extraHandler(w, r) {
+			return
+		}
+		name := r.URL.Path[strings.LastIndexByte(r.URL.Path, '/')+1:]
+		switch {
+		case r.URL.Path == "/api/v1/namespaces/"+ns.Name:
+			permissionReply(w, permissionNamespace(ns.Name, ns.UID))
+		case strings.Contains(r.URL.Path, "/validatingadmissionpolicies/"):
+			p := policies[name].DeepCopy()
+			p.ResourceVersion = strconv.Itoa(int(f.guardVersion.Load()))
+			permissionReply(w, p)
+		case strings.Contains(r.URL.Path, "/validatingadmissionpolicybindings/"):
+			permissionReply(w, bindings[name])
+		case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
+			who := "system:serviceaccount:" + ns.Name + ":probe"
+			if r.Header.Get("Authorization") == "Bearer administrator" {
+				who = "installer"
+				if f.fault.Load() == 8 {
+					who = "former-installer"
+				}
+			} else if f.fault.Load() == 9 {
+				who = "installer"
+			}
+			permissionReply(w, auth.SelfSubjectReview{Status: auth.SelfSubjectReviewStatus{UserInfo: auth.UserInfo{Username: who, Groups: []string{"system:authenticated"}}}})
+		case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
+			permissionReply(w, authz.SelfSubjectAccessReview{Status: authz.SubjectAccessReviewStatus{Allowed: f.fault.Load() != 1}})
+		case strings.Contains(r.URL.Path, "/deployments/") || strings.Contains(r.URL.Path, "/configmaps/"):
+			var object any
+			policy, denial, group, kind := workload.Name, ownerWorkloadDenial, "apps", "deployments"
+			if strings.Contains(r.URL.Path, "/configmaps/") {
+				cm := maps[name].DeepCopy()
+				if f.fault.Load() == 3 && name == in.FleetSource.Name {
+					var v contracts.FleetSettings
+					_ = json.Unmarshal([]byte(cm.Data["fleet.json"]), &v)
+					v.Suspended = true
+					b, _ := json.Marshal(v)
+					cm.Data["fleet.json"] = string(b)
+				}
+				if f.fault.Load() == 4 && name == in.OwnerSource.Name {
+					var v contracts.OwnerConfiguration
+					_ = json.Unmarshal([]byte(cm.Data["owner-pool.json"]), &v)
+					v.Port++
+					b, _ := json.Marshal(v)
+					cm.Data["owner-pool.json"] = string(b)
+				}
+				object, group, kind = cm, "", "configmaps"
+				policy, denial = fleetPlan.Name, fleetConfigurationDenial
+				if name == in.OwnerSource.Name {
+					policy, denial = ownerPlan.Name, ownerConfigurationDenial
+				}
+			} else {
+				d := deployment(name)
+				if f.fault.Load() == 5 && name == in.Deployment.Name {
+					d.ResourceVersion = "2"
+				}
+				object = d
+			}
+			if r.Method == http.MethodGet {
+				permissionReply(w, object)
+				return
+			}
+			if r.Method != http.MethodPut || r.URL.Query().Get("dryRun") != "All" || r.URL.Query().Get("fieldValidation") != "Strict" {
+				t.Error("non-probe protected write")
+				http.Error(w, "forbidden", 403)
+				return
+			}
+			f.probes.Add(1)
+			n := 0
+			if policy == fleetPlan.Name {
+				n = 1
+			} else if policy == ownerPlan.Name {
+				n = 2
+			}
+			f.purposeProbes[n].Add(1)
+			if f.flipGuard.Swap(false) {
+				f.guardVersion.Add(1)
+			}
+			if f.fault.Load() == 2 {
+				permissionReply(w, object)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: group, Kind: kind, Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + policy + "' with binding '" + policy + "' denied request: " + denial}}}})
+		case strings.Contains(r.URL.Path, "/serviceaccounts/"):
+			rv := "1"
+			if f.fault.Load() == 7 {
+				rv = "2"
+			}
+			permissionReply(w, core.ServiceAccount{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"}, ObjectMeta: meta.ObjectMeta{Name: in.ServiceAccount.Name, Namespace: ns.Name, UID: types.UID(in.ServiceAccount.UID), ResourceVersion: rv}})
+		case strings.Contains(r.URL.Path, "/secrets"):
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if r.Method == http.MethodGet {
+				stored := f.secret
+				if strings.HasPrefix(name, "asservat-configuration-runtime-") {
+					stored = f.projection
+				}
+				if stored == nil {
+					w.WriteHeader(404)
+					permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonNotFound, Code: 404})
+					return
+				}
+				permissionReply(w, stored)
+				return
+			}
+			var secret core.Secret
+			if json.NewDecoder(r.Body).Decode(&secret) != nil {
+				t.Error("invalid Secret request")
+				w.WriteHeader(400)
+				return
+			}
+			stored, uid := f.secret, ownerID(50)
+			projection := strings.HasPrefix(secret.Name, "asservat-configuration-runtime-")
+			if projection {
+				stored, uid = f.projection, ownerID(51)
+			}
+			if r.Method == http.MethodPost && stored == nil {
+				secret.UID, secret.ResourceVersion = types.UID(uid), "1"
+			} else if r.Method == http.MethodPut && stored != nil && !projection && secret.UID == stored.UID && secret.ResourceVersion == stored.ResourceVersion {
+				n, _ := strconv.Atoi(secret.ResourceVersion)
+				secret.ResourceVersion = strconv.Itoa(n + 1)
+			} else {
+				w.WriteHeader(409)
+				permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonConflict, Code: 409})
+				return
+			}
+			secret.TypeMeta = meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}
+			f.secretWrites.Add(1)
+			if projection {
+				f.projection = secret.DeepCopy()
+			} else {
+				f.secret = secret.DeepCopy()
+			}
+			permissionReply(w, &secret)
+		default:
+			t.Errorf("unexpected configuration path %s", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client := func(token string) *PermissionClient {
+		t.Helper()
+		c, e := NewPermissionClient(&rest.Config{Host: server.URL, BearerToken: token, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}, in.ClusterID, ns, time.Now)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return c
+	}
+	observer, probe := client("administrator"), client("probe")
+	w, e := NewOwnerWorkloadProtection(observer, probe, workload, pins[workload.Name])
+	if e != nil {
+		t.Fatal(e)
+	}
+	fp, e := NewFleetConfigurationProtection(observer, probe, fleetPlan, pins[fleetPlan.Name])
+	if e != nil {
+		t.Fatal(e)
+	}
+	fs, e := NewProtectedFleetSettings(observer, fp, in.FleetSource.Name, in.FleetSource.UID, in.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	op, e := NewOwnerConfigurationProtection(observer, probe, ownerPlan, pins[ownerPlan.Name])
+	if e != nil {
+		t.Fatal(e)
+	}
+	os, e := NewOwnerConfigurationSource(observer, op, in.OwnerSource.Name, in.OwnerSource.UID, in.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.source, e = NewConfigurationRoleSource(observer, w, fs, os, in)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return f
+}
+
+func TestConfigurationRoleSourceOriginalFiveSecondPath(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	start := time.Now()
+	ctx, end := context.WithDeadline(context.Background(), start.Add(5*time.Second))
+	defer end()
+	p, e := f.source.ReadConfigurationRoleSource(ctx)
+	t.Logf("complete source observation: elapsed=%s requests=%d negative_probes=%d", time.Since(start), f.requests.Load(), f.probes.Load())
+	if e != nil || !configurationRoleSourceMatches(f.source.input, p, time.Now()) {
+		t.Fatal("original five-second source graph unavailable", e)
+	}
+	if p.FreshUntil.After(start.Add(5*time.Second)) || f.purposeProbes[0].Load() == 0 || f.purposeProbes[1].Load() == 0 || f.purposeProbes[2].Load() == 0 {
+		t.Fatal("original interval or current negative proof omitted")
+	}
+}
+
+func TestConfigurationRoleSourceUnchangedObjectsStillRequireEnforcement(t *testing.T) {
+	for name, fault := range map[string]int32{"rbac": 1, "admission": 2} {
+		t.Run(name, func(t *testing.T) {
+			f := newConfigurationSourcePathFixture(t)
+			if _, e := f.source.ReadConfigurationRoleSource(context.Background()); e != nil {
+				t.Fatal("initial protected observation", e)
+			}
+			f.fault.Store(fault)
+			if _, e := f.source.ReadConfigurationRoleSource(context.Background()); e == nil {
+				t.Fatal("unchanged source identities hid changed enforcement")
+			}
+		})
+	}
+}
+
+func TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	root, e := NewConfigurationRuntimeRoleRoot(context.Background(), f.source, f.source.input)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer root.Close()
+	start := time.Now()
+	_, e = root.OpenConfigurationRuntimeRoles(context.Background())
+	t.Logf("complete source plus initial root: elapsed=%s requests=%d negative_probes=%d", time.Since(start), f.requests.Load(), f.probes.Load())
+	if e != nil {
+		t.Fatal("original root interval exhausted by actual bounded API graph", e)
+	}
+}

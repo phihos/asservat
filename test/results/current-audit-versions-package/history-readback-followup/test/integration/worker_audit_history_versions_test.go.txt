@@ -1,0 +1,259 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Historical corruption uses only the fixture administrator after genuine
+// SQL/S3 acknowledgements. Runtime grants stay unchanged. The exact original
+// receipt is restored even after an uncertain fixture write; no product path
+// rewrites history or turns an old acknowledgement into new authority.
+func withHistoricalAuditReceipt(t *testing.T, ctx context.Context, admin *pgxpool.Pool, read, update string, args []any, mutate func(*audit.Receipt), deny func()) {
+	t.Helper()
+	var original []byte
+	if err := admin.QueryRow(ctx, read, args...).Scan(&original); err != nil {
+		t.Fatal(err)
+	}
+	var receipt audit.Receipt
+	if json.Unmarshal(original, &receipt) != nil || receipt.Version == "" || receipt.Version == "null" {
+		t.Fatal("original acknowledged receipt lacks an immutable version")
+	}
+	mutate(&receipt)
+	historical, err := json.Marshal(receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := func(call context.Context, raw []byte) error {
+		tx, err := admin.Begin(call)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(context.Background())
+		if _, err = tx.Exec(call, "SET LOCAL session_replication_role=replica"); err != nil {
+			return err
+		}
+		values := append(append([]any(nil), args...), raw)
+		changed, err := tx.Exec(call, update, values...)
+		if err != nil {
+			return err
+		}
+		if changed.RowsAffected() != 1 {
+			return errors.New("historical fixture row mismatch")
+		}
+		return tx.Commit(call)
+	}
+	// Deferred restore also runs on Fatal/Goexit; it completes before the caller
+	// rechecks its positive baseline, unlike a cleanup owned by the outer suite.
+	defer func() {
+		call, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		if err := set(call, original); err != nil {
+			t.Error("restore exact fixture receipt", err)
+			return
+		}
+		var restored []byte
+		if err := admin.QueryRow(call, read, args...).Scan(&restored); err != nil || !bytes.Equal(restored, original) {
+			t.Error("restored fixture receipt differs from original stored bytes", err)
+		}
+	}()
+	if err = set(ctx, historical); err != nil {
+		t.Fatal(err)
+	}
+	// Both bytea and jsonb receipt columns use this helper. Retain the actual
+	// stored representation after checking every intended receipt field, so
+	// JSONB normalization cannot be mistaken for a product history rewrite.
+	var stored []byte
+	if err = admin.QueryRow(ctx, read, args...).Scan(&stored); err != nil {
+		t.Fatal("read stored historical fixture receipt", err)
+	}
+	var decoded audit.Receipt
+	if err = json.Unmarshal(stored, &decoded); err != nil || decoded != receipt {
+		t.Fatal("stored historical fixture receipt differs from intended content", err)
+	}
+	deny()
+	var after []byte
+	if err = admin.QueryRow(ctx, read, args...).Scan(&after); err != nil || !bytes.Equal(after, stored) {
+		t.Fatal("denial rewrote historical receipt", err)
+	}
+}
+
+func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f nativeExchangeFixture, configuration *postgres.WorkerConfigurations, refresh func() error) {
+	t.Helper()
+	w := f.worker
+	cert, err := f.enrollment.enroll(ctx, w)
+	if err != nil {
+		t.Fatal("original enrolled certificate", err)
+	}
+	key, err := mtls.EnrollmentKey(f.enrollment.csr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proof := func() value.WorkerEnrollmentProof {
+		p, err := f.enrollment.service.Proofs.ReadWorkerEnrollmentProof(ctx, w.Intent.SessionID, w.Intent.ID, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	progress, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, proof(), f.authority())
+	if err != nil || progress.Signed == nil {
+		t.Fatal("original signed attempt", err)
+	}
+	nativeSQLRoles(t, ctx, f.admin)
+	pool := f.poolFor("native_metadata_runtime", "synthetic-native-metadata")
+	defer pool.Close()
+	readers, err := postgres.NewNativeReaders(ctx, pool, w.Intent.Authority.Scope.RootID, w.Binding.InstallationID, f.guards)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerPool := f.poolFor("worker_owner_runtime", "synthetic-worker-owner")
+	defer ownerPool.Close()
+	owners, err := postgres.NewWorkerOwners(ctx, ownerPool, w.Intent.Authority.Scope.RootID, w.Intent.Profile, f.guards)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routingPool := f.poolFor("worker_owner_read_runtime", "synthetic-worker-owner-read")
+	defer routingPool.Close()
+	routing, err := postgres.NewWorkerRouting(ctx, routingPool, w.Intent.Authority.Scope.RootID, w.Binding.InstallationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := value.WorkerOwnerRequest{ID: custodyID(), InstallationID: w.Binding.InstallationID, SessionID: w.Intent.SessionID, WorkerID: w.Intent.ID, PodUID: custodyID(), ProcessEpoch: custodyID(), Until: time.Now().UTC().Add(20 * time.Second).Truncate(time.Microsecond)}
+	lease, err := owners.ClaimWorkerOwner(ctx, w, f.authority(), request)
+	if err != nil {
+		t.Fatal("original owner", err)
+	}
+	defer owners.ReleaseWorkerOwner(ctx, lease)
+	positive := func(t *testing.T) {
+		t.Helper()
+		if err := refresh(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, proof(), progress.Attempt, f.authority()); err != nil {
+			t.Fatal("current activation baseline", err)
+		}
+		if _, err := f.enrollment.bindings.ReadDownloadWorkerIdentity(ctx, w.Intent.SessionID, cert.Peer); err != nil {
+			t.Fatal("current worker baseline", err)
+		}
+		if _, err := readers.ReadNativeWorkerCertificate(ctx, w.Intent.SessionID, w.Intent.ID, cert.DER); err != nil {
+			t.Fatal("native certificate baseline", err)
+		}
+		if _, err := routing.ReadWorkerOwner(ctx, w.Intent.SessionID, w.Intent.ID); err != nil {
+			t.Fatal("owner locator baseline", err)
+		}
+	}
+	positive(t)
+	for _, kind := range []string{"configuration", "worker", "enrollment", "certificate"} {
+		for _, version := range []string{"", "null"} {
+			label := version
+			if label == "" {
+				label = "empty"
+			}
+			t.Run("retained-"+kind+"-"+label, func(t *testing.T) {
+				positive(t)
+				authority, p := f.authority(), proof()
+				var read, update string
+				var args []any
+				switch kind {
+				case "configuration":
+					read = "SELECT audit_receipt_json FROM download_worker_configuration_revision WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4"
+					update = "UPDATE download_worker_configuration_revision SET audit_receipt_json=$5 WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 AND generation=$4"
+					args = []any{w.Intent.Profile.InstallationID, w.Intent.Profile.ClusterID, w.Intent.Profile.Configuration.UID, w.Intent.Profile.Configuration.Generation}
+				case "worker":
+					read = "SELECT audit_receipt_json FROM download_worker WHERE id=$1"
+					update = "UPDATE download_worker SET audit_receipt_json=$2 WHERE id=$1"
+					args = []any{w.Intent.ID}
+				case "enrollment":
+					read = "SELECT audit_receipt_json FROM download_worker_enrollment WHERE worker_id=$1"
+					update = "UPDATE download_worker_enrollment SET audit_receipt_json=$2 WHERE worker_id=$1"
+					args = []any{w.Intent.ID}
+				case "certificate":
+					read = "SELECT audit_receipt_json FROM download_worker_certificate WHERE id=$1"
+					update = "UPDATE download_worker_certificate SET audit_receipt_json=$2 WHERE id=$1"
+					args = []any{progress.Attempt.ID}
+				}
+				withHistoricalAuditReceipt(t, ctx, f.admin, read, update, args, func(r *audit.Receipt) { r.Version = version }, func() {
+					if kind == "configuration" {
+						if _, err := configuration.CurrentWorkerConfiguration(ctx, w.Intent.Profile); err == nil {
+							t.Fatal("historical configuration became current")
+						}
+					}
+					if kind == "worker" || kind == "configuration" {
+						if _, err := f.enrollment.bindings.ReadDownloadWorkerEnrollment(ctx, w.Intent.SessionID, w.Intent.ID); err == nil {
+							t.Fatal("historical worker became routing identity")
+						}
+					}
+					if kind == "worker" {
+						if _, err := routing.ReadWorkerOwner(ctx, w.Intent.SessionID, w.Intent.ID); err == nil {
+							t.Fatal("historical worker became owner locator")
+						}
+						if _, err := owners.ClaimWorkerOwner(ctx, w, authority, request); err == nil {
+							t.Fatal("historical worker acknowledged owner replay")
+						}
+					}
+					if kind != "certificate" {
+						if _, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, p, authority); err == nil {
+							t.Fatal("historical audit authorized signing preparation")
+						}
+					}
+					if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, p, progress.Attempt, authority); err == nil {
+						t.Fatal("historical audit authorized certificate activation")
+					}
+					if _, err := f.enrollment.bindings.ReadDownloadWorkerIdentity(ctx, w.Intent.SessionID, cert.Peer); err == nil {
+						t.Fatal("historical audit authorized worker identity")
+					}
+					if _, err := readers.ReadNativeWorkerCertificate(ctx, w.Intent.SessionID, w.Intent.ID, cert.DER); err == nil {
+						t.Fatal("historical audit authorized native certificate")
+					}
+					if !authority.Valid(time.Now()) || !p.Valid(time.Now()) {
+						t.Fatal("historical denial crossed original authority deadline")
+					}
+				})
+				positive(t)
+			})
+		}
+	}
+	// A nonempty JSON body and version are insufficient: key/digest must bind
+	// the exact acknowledged original worker intent, including through SQL lookup.
+	for _, corruption := range []string{"wrong-key", "zero-digest"} {
+		t.Run(corruption, func(t *testing.T) {
+			positive(t)
+			withHistoricalAuditReceipt(t, ctx, f.admin, "SELECT audit_receipt_json FROM download_worker WHERE id=$1", "UPDATE download_worker SET audit_receipt_json=$2 WHERE id=$1", []any{w.Intent.ID}, func(r *audit.Receipt) {
+				if corruption == "wrong-key" {
+					r.Key += "-other"
+				} else {
+					r.SHA256 = artifact.Digest{}
+				}
+			}, func() {
+				if _, err := f.enrollment.bindings.ReadDownloadWorkerEnrollment(ctx, w.Intent.SessionID, w.Intent.ID); err == nil {
+					t.Fatal("nonmatching worker receipt became current identity")
+				}
+				if _, err := routing.ReadWorkerOwner(ctx, w.Intent.SessionID, w.Intent.ID); err == nil {
+					t.Fatal("nonmatching worker receipt became locator")
+				}
+			})
+			positive(t)
+		})
+	}
+	if f.enrollment.issuer.calls.Load() != 1 {
+		t.Fatal("historical denial repeated signing")
+	}
+	for _, p := range []*pgxpool.Pool{pool, ownerPool, routingPool} {
+		if _, err := p.Exec(ctx, "SET session_replication_role=replica"); err == nil {
+			t.Fatal("runtime role can bypass historical immutability")
+		}
+	}
+	qualifyNativeParentHistoricalVersions(t, ctx, f, progress.Attempt.Enrollment, refresh)
+}

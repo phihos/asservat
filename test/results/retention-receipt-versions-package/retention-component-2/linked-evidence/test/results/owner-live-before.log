@@ -1,0 +1,5 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/owner_delivery_test.go:13:43: cannot use (*OwnerForwarder)(nil) (value of type *OwnerForwarder) as evidence.WorkerEnrollmentExchange value in variable declaration: *OwnerForwarder does not implement evidence.WorkerEnrollmentExchange (missing method BeginWorkerEnrollment)
+internal/adapters/mtls/owner_delivery_test.go:21:33: f.forwarder.BeginWorkerEnrollment undefined (type *OwnerForwarder has no field or method BeginWorkerEnrollment)
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL

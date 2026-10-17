@@ -1,0 +1,9 @@
+# Direct holder checkpoint v3 (pre-execution freeze)
+
+Only the Kubernetes cancellation fixture differs from v2. It joins the actual client read and Close while an independently owned fake API handler retains its response, then explicitly joins that server handler. The v2 180-second timeout is preserved; no product predicate, operation deadline, package timeout or source behavior changes.
+
+The scoped corrected run excludes unrelated OwnerBootstrap producer tests. Existing four passing package race results and meaningful first-error BEFORE remain in the immutable v2 evidence, with hashes in reused-evidence.json. Root global dependency changes are separately recorded and not silently treated as retested by v2.
+
+All three canonical documentation payloads and their bases are unchanged; root will run combined spec/design gates after integration. New compile/Kubernetes races, five-package vet and Go architecture remain unrun at this freeze. Actual results will be appended outside this frozen metadata.
+
+The direct route remains unselected. Complete native HWORK→holder→regional availability, including sustained same-client/background load under original five seconds, is still required.

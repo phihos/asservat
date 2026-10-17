@@ -1,0 +1,9 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-identity.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-identity.py", line 130, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/phil/Projekte/asservat/scripts/test-identity.py", line 98, in main
+    raise RuntimeError('owned Keycloak did not bind exclusively to loopback')
+RuntimeError: owned Keycloak did not bind exclusively to loopback
+make: *** [Makefile:100: identity-integration] Error 1

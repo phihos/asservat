@@ -1,0 +1,6 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: current original fleet source custody unavailable; retain the original attempt and charge
+--- FAIL: TestCapacityProducerWithRealPostgres (0.52s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.571s
+FAIL

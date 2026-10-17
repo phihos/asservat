@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_projection_timing_test.go": "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/files/internal/adapters/kubernetes/public_runtime_projection_timing_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_worker_test.go": "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/files/internal/adapters/kubernetes/public_runtime_worker_test.go"
+  }
+}

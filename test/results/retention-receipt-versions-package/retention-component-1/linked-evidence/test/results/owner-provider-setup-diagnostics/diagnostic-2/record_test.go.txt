@@ -1,0 +1,9 @@
+package providerconfig
+import ("encoding/json"; "os"; "testing"; "time")
+func TestRecordSyntheticProviderSetupProbe(t *testing.T) {
+ f:=newSetupFixture(t)
+ recipe,e:=OwnerSetupRecipeFor(f.in,f.profile,f.pool,f.roots,time.Now());if e!=nil {t.Fatal(e)}
+ file,e:=os.OpenFile(os.Getenv("ASSERVAT_SETUP_PROBE_OUTPUT"),os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600);if e!=nil {t.Fatal(e)}
+ defer file.Close()
+ if e=json.NewEncoder(file).Encode(recipe);e!=nil {t.Fatal(e)}
+}

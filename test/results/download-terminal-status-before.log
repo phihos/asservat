@@ -1,0 +1,32 @@
+--- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime (0.01s)
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Completed (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Cancelled (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Expired (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Denied (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Failed (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Preparing (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Ready (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Streaming (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+    --- FAIL: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Interrupted (0.00s)
+        context_download_control_test.go:377: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+--- FAIL: TestContextDownloadContinuationHonorsOriginalTransferDeadline (0.00s)
+    context_download_control_test.go:433: continuation extended original transfer deadline {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} 2026-10-11 18:48:49.989736 +0000 UTC download unavailable
+--- FAIL: TestContextDownloadReadyReplayDoesNotRequireStartupCheck (0.00s)
+    context_download_control_test.go:446: {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.017s
+--- FAIL: TestDownloadStatusObservationDoesNotExtendTransferAuthority (0.00s)
+    download_test.go:175: fresh authorized terminal status was tied to expired transfer deadline
+FAIL
+FAIL	asservat.local/asservat/internal/domain/artifact	0.006s
+FAIL
+
+EXIT=1

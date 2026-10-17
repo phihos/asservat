@@ -1,0 +1,38 @@
+{
+  "commands": [
+    {
+      "test": "test-owner-provider-selection.py",
+      "exit": 0,
+      "seconds": 0.516
+    },
+    {
+      "test": "test-runtime-object-selection.py",
+      "exit": 0,
+      "seconds": 0.598
+    },
+    {
+      "test": "test-regional-context-selection.py",
+      "exit": 0,
+      "seconds": 0.861
+    },
+    {
+      "test": "test-helm-bootstrap-selection.py",
+      "exit": 0,
+      "seconds": 1.875
+    },
+    {
+      "test": "test-initial-bootstrap-selection.py",
+      "exit": 0,
+      "seconds": 0.678
+    }
+  ],
+  "sourceBefore": {
+    "test-context-storage.py": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311",
+    "test-owner-provider-selection.py": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+  },
+  "sourceAfter": {
+    "test-context-storage.py": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311",
+    "test-owner-provider-selection.py": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+  },
+  "scope": "Pure fixture selector and existing fixture utility checks; no provider or Kubernetes execution."
+}

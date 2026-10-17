@@ -1,0 +1,48 @@
+# Exact native completion handoff
+
+Frozen 2026-10-12 outside the repository. Parent owns integration and external fixtures. No live source was edited.
+
+## Result and contract
+
+The current worker can finish its successful conversation while the original SQL owner is still routeable. The previous immediate-reconnect experiment exposed this in a real native run; restoring one second of delay made that workflow pass but did not prove closure.
+
+This package retains the existing wire and worker scheduling. The hub sends successful final Done only after a fresh ordinary frame check and an acknowledged exact open-to-closed SQL transition under the original operation, fence, lease sequence and deadline. Existing restrictive cleanup cannot certify completion. Missing, replaced, closed, expired or unknown completion denies Done. A request-owned callback, retained in the original process, supplies the SQL transition; no wire callback or reconstructed credential is added.
+
+After closure, a private transport capability permits only that original zero-byte marker using the last complete gate's unextended bound. Every other frame keeps its current checks. The relay already has a terminal-only path; the final h2 regression now makes ordinary relay checks deny immediately on simulated SQL closure. Final-marker loss remains uncertain, even if the SQL close committed.
+
+Router and handler slots remain held until actual joined Close. A concurrent same-worker registration is denied before SQL admission. Old close handles cannot remove replacements. PrepareCurrent's final C03/metadata checks, Observe final authority and content outcome checks remain independent and unchanged. They do not require the native owner to remain open. No migration, grant, refill, replay, authority cache or deadline increase is added. SQL completion uses the existing exact row lock and close query, checks time again after the trigger's backing lock and commit, and charges the same original close transition.
+
+## Payload and evidence
+
+`manifest.json` lists 18 payload paths and their exact live bases. `files/` is the payload. `dependencies.json` pins 1,497 current live dependencies; all matched before and after every reported Go job. `changes.patch` is for review. JSON evidence records exact commands, exits, durations and source hashes. The before-only API compatibility helper is archived as `evidence/before-api-compat.go.txt`; it uses the original registrar API and preserves the original post-Commit cleanup. It does not modify baseline production code.
+
+| Handle / evidence | Actual result |
+|---|---|
+| 20135 / `before.log` | Expected exit 1: worker Joined while old SQL operation stayed routeable beyond the 1.1-second held-close interval. |
+| 20135 / `after.log` | Exit 1 preserved: newly exercised cancellation exposed an existing test HTTP handler logging after subtest cleanup. Production handoff cases passed; the overall race run did not. |
+| 17776 / `after-second.log` | Exit 0: affected native/evidence/Postgres race selection, including existing terminal, cancellation, preparation and first-context regressions. Test HTTP server cleanup now joins admitted handlers and retains logging. |
+| 99442 / `final-compile.log`, `final-vet.log` | Both exit 0: bootstrap and integration source compilation; affected native/evidence/Postgres/bootstrap/integration vet. New SQL fixture helper compiled; no real services were run. |
+| 25837 / `static.log` | Exit 0: isolated `make spec-check architecture-check`; 100 schemas, 9,952 assertions; design gate 1,206 checks/120 rejection cases. |
+| 69170 / `before-current-relay.log` | Expected exit 1 with the final stricter relay fixture and unchanged baseline production; same premature-Joined assertion. |
+| 69170 / `after-current-relay.log` | Exit 0: delayed close, failed/unknown close, original deadline/cancellation, occupied registration, lost final marker, known revocation and known shortening. |
+
+The final edit after 99442 changes only the h2 test's relay callback; 69170 compiled and raced that exact final test. Production source and the compiled SQL helper are unchanged from 99442. Earlier manifest snapshots are retained beside their reports rather than relabeled as final-source runs. Every Go command used `GOMAXPROCS=2`, `GOFLAGS=-p=2` and the stage's dedicated `TMPDIR`.
+
+The h2 tests use actual two-hop mTLS/HTTP2, product router/worker/conversation code and explicit synthetic authority/SQL-completion ports. They do not qualify PostgreSQL behavior, installed source authority or external delivery durability.
+
+## Native qualification still required
+
+The current live control-races function is in `test/integration/context_native_content_test.go`, not a separate control-races file. Two exact new calls invoke `native_completion_test.go`. They reuse the existing just-completed Prepare and admitted no-I/O Observe, without another charged operation or larger pool:
+
+- Already-closed rejection requires that original Prepare lease and processing proof remain current both before and after the denied completion. Failure to meet that condition is a fixture failure, not claimed closed-state coverage.
+- Wrong operation fence and lease sequence must deny while the original Observe remains current.
+- A held exact native row must cause the original 150ms caller interval to expire; the test observes the actual SQL lock wait and joins the call before releasing the lock.
+- Owner state, update count, reserved response/window counts and native key spend remain unchanged. The existing expiry-is-not-closure and no-refund assertions then continue.
+
+Parent should run the owned fixture, with frozen sources and verified terminal cleanup, for:
+
+```sh
+python scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^download-worker-native-(control-races|content|content-resume|content-interrupted|exchange)$'
+```
+
+The script must use the repository's qualified Python environment and normal fixture setup. The selected control-races case is required for the new SQL negative assertions; normal Prepare/Observe/content exercise positive completion through the concrete SQL adapter. Real-service and combined repository gates remain pending for this payload. The earlier passing native workflow used the original scheduling and is not evidence for these changed terminal semantics.

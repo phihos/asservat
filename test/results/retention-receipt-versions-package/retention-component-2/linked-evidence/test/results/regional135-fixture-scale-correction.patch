@@ -1,0 +1,50 @@
+--- test/integration/context_start_connector_test.go
++++ test/integration/context_start_connector_test.go
+@@ -4,8 +4,10 @@
+ 	"context"
+ 	"encoding/hex"
+ 	"encoding/json"
++	"errors"
+ 	"net/http"
+ 	"os"
++	"reflect"
+ 	"strings"
+ 	"sync"
+ 	"testing"
+@@ -35,6 +37,7 @@
+ 	"k8s.io/client-go/kubernetes"
+ 	"k8s.io/client-go/rest"
+ 	"k8s.io/client-go/tools/clientcmd"
++	"k8s.io/client-go/util/retry"
+ 	"k8s.io/utils/ptr"
+ )
+ 
+@@ -249,9 +252,25 @@
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
+-	dep.Spec.Replicas = ptr.To(int32(1))
+-	dep, e = admin.AppsV1().Deployments(name).Update(ctx, dep, meta.UpdateOptions{})
+-	if e != nil {
++	// Controller status updates may advance resourceVersion while the installer
++	// creates the guards/settings. Retry only a definite conflict on this same
++	// original spec and UID; a replacement or changed workload is never adopted.
++	originalDeployment := dep.DeepCopy()
++	if e = retry.RetryOnConflict(retry.DefaultRetry, func() error {
++		current, err := admin.AppsV1().Deployments(name).Get(ctx, originalDeployment.Name, meta.GetOptions{})
++		if err != nil {
++			return err
++		}
++		if current.UID != originalDeployment.UID || !reflect.DeepEqual(current.Spec, originalDeployment.Spec) {
++			return errors.New("fixture original Deployment changed before activation")
++		}
++		current.Spec.Replicas = ptr.To(int32(1))
++		updated, err := admin.AppsV1().Deployments(name).Update(ctx, current, meta.UpdateOptions{})
++		if err == nil {
++			dep = updated
++		}
++		return err
++	}); e != nil {
+ 		t.Fatal(e)
+ 	}
+ 	var pod *core.Pod

@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/adapters/postgres	0.002s
+ok  	asservat.local/asservat/internal/application/fleet	0.002s
+ok  	asservat.local/asservat/internal/adapters/objectstore	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	(cached)

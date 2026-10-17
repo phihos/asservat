@@ -1,0 +1,695 @@
+--- a/internal/adapters/postgres/owner_configuration.go
++++ b/internal/adapters/postgres/owner_configuration.go
+@@ -230,43 +230,83 @@
+ 	if s == nil || ctx == nil {
+ 		return out, value.ErrInvalid
+ 	}
++	var diagnostic ownerConfigurationReadDiagnostic
+ 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+-		trust, e := q.ShareFleetTrust(ctx, id(s.installation))
+-		if e != nil {
+-			return e
+-		}
+-		h, e := q.ShareOwnerConfiguration(ctx, custodydb.ShareOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster)})
+-		if e != nil {
+-			return e
+-		}
+-		if uid(h.SourceUid) != s.source || h.Generation == 0 {
+-			return value.ErrUnavailable
+-		}
+-		v, e := q.ReadOwnerConfigurationRevision(ctx, custodydb.ReadOwnerConfigurationRevisionParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, Generation: h.Generation})
+-		if e != nil {
+-			return e
+-		}
+-		var c value.OwnerConfiguration
+-		var r audit.Receipt
+-		if json.Unmarshal(v.SnapshotJson, &c) != nil || !s.matches(c) || c.Suspended || c.Revision.Generation != h.Generation || c.Pool.IssuerEpoch != uid(trust.IssuerEpoch) || json.Unmarshal(v.AuditReceiptJson, &r) != nil || !r.ValidOwnerConfiguration(c) {
+-			return value.ErrUnavailable
+-		}
+-		n, e := q.CurrentTime(ctx)
+-		if e != nil {
+-			return e
+-		}
+-		recovery, e := recoveryState(trust, h.ObservedAt.Time, n.Time)
+-		if e != nil {
+-			return e
+-		}
+-		out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: h.ObservedAt.Time, FreshUntil: identity.Earlier(h.FreshUntil.Time, recovery.FreshUntil)}
+-		if !out.Valid(n.Time) {
+-			return value.ErrUnavailable
+-		}
+-		return nil
++		var e error
++		out, e = s.readOwnerConfiguration(ctx, q, &diagnostic)
++		return e
+ 	})
+ 	if err != nil {
+-		return value.OwnerConfigurationObservation{}, err
++		return value.OwnerConfigurationObservation{}, diagnostic.failure(err)
+ 	}
+ 	return out, nil
+ }
++
++// This is the original transaction body. Diagnostics use only the already-read
++// rows, the original query errors and its one database clock sample. The caller
++// still owns the same transaction, lock order, retries and sanitized sentinel.
++func (s *OwnerConfigurations) readOwnerConfiguration(ctx context.Context, q *custodydb.Queries, diagnostic *ownerConfigurationReadDiagnostic) (value.OwnerConfigurationObservation, error) {
++	var out value.OwnerConfigurationObservation
++	diagnostic.reset()
++	trust, e := q.ShareFleetTrust(ctx, id(s.installation))
++	if e != nil {
++		return out, diagnostic.query(ownerReadFleet, e)
++	}
++	h, e := q.ShareOwnerConfiguration(ctx, custodydb.ShareOwnerConfigurationParams{InstallationID: id(s.installation), ClusterID: id(s.cluster)})
++	if e != nil {
++		return out, diagnostic.query(ownerReadHead, e)
++	}
++	if uid(h.SourceUid) != s.source {
++		return out, diagnostic.reject(ownerReadHeadSource)
++	}
++	if h.Generation == 0 {
++		return out, diagnostic.reject(ownerReadHeadGeneration)
++	}
++	v, e := q.ReadOwnerConfigurationRevision(ctx, custodydb.ReadOwnerConfigurationRevisionParams{InstallationID: h.InstallationID, ClusterID: h.ClusterID, SourceUid: h.SourceUid, Generation: h.Generation})
++	if e != nil {
++		return out, diagnostic.query(ownerReadRevision, e)
++	}
++	var c value.OwnerConfiguration
++	var r audit.Receipt
++	// Preserve the original conjunction's exact short-circuit order.
++	if json.Unmarshal(v.SnapshotJson, &c) != nil {
++		return out, diagnostic.reject(ownerReadSnapshotDecode)
++	}
++	if !s.matches(c) {
++		return out, diagnostic.reject(ownerReadSnapshotBinding)
++	}
++	if c.Suspended {
++		return out, diagnostic.reject(ownerReadSnapshotSuspended)
++	}
++	if c.Revision.Generation != h.Generation {
++		return out, diagnostic.reject(ownerReadSnapshotGeneration)
++	}
++	if c.Pool.IssuerEpoch != uid(trust.IssuerEpoch) {
++		return out, diagnostic.reject(ownerReadSnapshotIssuer)
++	}
++	if json.Unmarshal(v.AuditReceiptJson, &r) != nil {
++		return out, diagnostic.reject(ownerReadAuditDecode)
++	}
++	if !r.ValidOwnerConfiguration(c) {
++		return out, diagnostic.reject(ownerReadAuditBinding)
++	}
++	n, e := q.CurrentTime(ctx)
++	if e != nil {
++		return out, diagnostic.query(ownerReadClock, e)
++	}
++	recovery, e := recoveryState(trust, h.ObservedAt.Time, n.Time)
++	if e != nil {
++		*diagnostic = ownerReadRecoveryFailure(trust, h.ObservedAt.Time, n.Time)
++		return out, e
++	}
++	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: h.ObservedAt.Time, FreshUntil: identity.Earlier(h.FreshUntil.Time, recovery.FreshUntil)}
++	if !out.Valid(n.Time) {
++		*diagnostic = ownerReadObservationFailure(out, n.Time)
++		return out, value.ErrUnavailable
++	}
++	// A later COMMIT error must not be attributed to a previous callback or
++	// predicate. Begin/SET failures and exhausted serialization/deadlock retries
++	// deliberately retain only the generic transaction classification.
++	diagnostic.reset()
++	return out, nil
++}
+--- /dev/null
++++ b/internal/adapters/postgres/owner_configuration_read_diagnostic.go
+@@ -0,0 +1,203 @@
++package postgres
++
++import (
++	"context"
++	"errors"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	"asservat.local/asservat/internal/domain/authorization"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgconn"
++)
++
++// OwnerConfigurationReadCheck names a fixed local statement or predicate. It
++// contains no row values, query text, identities, credentials or error strings.
++type OwnerConfigurationReadCheck uint8
++
++const (
++	ownerReadTransaction OwnerConfigurationReadCheck = iota
++	ownerReadFleet
++	ownerReadHead
++	ownerReadHeadSource
++	ownerReadHeadGeneration
++	ownerReadRevision
++	ownerReadSnapshotDecode
++	ownerReadSnapshotBinding
++	ownerReadSnapshotSuspended
++	ownerReadSnapshotGeneration
++	ownerReadSnapshotIssuer
++	ownerReadAuditDecode
++	ownerReadAuditBinding
++	ownerReadClock
++	ownerReadRecoverySuspended
++	ownerReadRecoveryBlocked
++	ownerReadRecoveryFleetInterval
++	ownerReadRecoveryIdentity
++	ownerReadRecoveryProofInterval
++	ownerReadRecoveryOther
++	ownerReadObservationConfiguration
++	ownerReadObservationInterval
++)
++
++func (c OwnerConfigurationReadCheck) String() string {
++	names := [...]string{
++		"transaction", "share-fleet", "share-owner", "head-source", "head-generation",
++		"revision", "snapshot-decode", "snapshot-binding", "snapshot-suspended",
++		"snapshot-generation", "snapshot-issuer", "audit-decode", "audit-binding",
++		"database-time", "recovery-suspended", "recovery-blocked", "fleet-interval",
++		"recovery-identity", "recovery-proof-interval", "recovery-other",
++		"owner-configuration", "owner-interval",
++	}
++	if int(c) >= len(names) {
++		return "unknown"
++	}
++	return names[c]
++}
++
++// OwnerConfigurationReadReason reports only a fixed error/interval class. Even
++// a PostgreSQL error code is mapped to this closed vocabulary before storage.
++type OwnerConfigurationReadReason uint8
++
++const (
++	ownerReadUnspecified OwnerConfigurationReadReason = iota
++	ownerReadPredicate
++	ownerReadNoRows
++	ownerReadLockTimeout
++	ownerReadQueryCancelled
++	ownerReadPermission
++	ownerReadCancelled
++	ownerReadDeadline
++	ownerReadDriver
++	ownerReadMissingStart
++	ownerReadFutureStart
++	ownerReadClosedInterval
++	ownerReadLongInterval
++	ownerReadExpiredInterval
++)
++
++func (r OwnerConfigurationReadReason) String() string {
++	names := [...]string{
++		"unspecified", "predicate", "no-rows", "lock-timeout", "query-cancelled",
++		"permission", "cancelled", "deadline", "driver", "missing-start",
++		"future-start", "closed-interval", "overlong-interval", "expired-interval",
++	}
++	if int(r) >= len(names) {
++		return "unknown"
++	}
++	return names[r]
++}
++
++// OwnerConfigurationReadFailure wraps only Ledger.transaction's existing
++// sanitized result. The diagnostic never retains the raw query error; errors.Is
++// remains identical to the former public reader return. Native consumers may
++// continue normalizing it without exposing diagnostics to public interfaces.
++type OwnerConfigurationReadFailure struct {
++	check  OwnerConfigurationReadCheck
++	reason OwnerConfigurationReadReason
++	cause  error
++}
++
++func (e *OwnerConfigurationReadFailure) Error() string {
++	return "owner configuration read: " + e.check.String() + ": " + e.reason.String()
++}
++func (e *OwnerConfigurationReadFailure) Unwrap() error                        { return e.cause }
++func (e *OwnerConfigurationReadFailure) Check() OwnerConfigurationReadCheck   { return e.check }
++func (e *OwnerConfigurationReadFailure) Reason() OwnerConfigurationReadReason { return e.reason }
++
++type ownerConfigurationReadDiagnostic struct {
++	check  OwnerConfigurationReadCheck
++	reason OwnerConfigurationReadReason
++}
++
++func (d *ownerConfigurationReadDiagnostic) reset() { *d = ownerConfigurationReadDiagnostic{} }
++func (d ownerConfigurationReadDiagnostic) failure(sanitized error) error {
++	if sanitized == nil {
++		return nil
++	}
++	return &OwnerConfigurationReadFailure{check: d.check, reason: d.reason, cause: sanitized}
++}
++func (d *ownerConfigurationReadDiagnostic) reject(check OwnerConfigurationReadCheck) error {
++	*d = ownerConfigurationReadDiagnostic{check, ownerReadPredicate}
++	return value.ErrUnavailable
++}
++func (d *ownerConfigurationReadDiagnostic) query(check OwnerConfigurationReadCheck, err error) error {
++	d.reset()
++	var p *pgconn.PgError
++	if errors.As(err, &p) && (p.Code == "40001" || p.Code == "40P01") {
++		// Ledger may retry, then fail before reentering the callback. Do not keep
++		// a previous attempt's statement or error class in that final result.
++		// Exhausted retryable failures deliberately use transaction/unspecified.
++		return err
++	}
++	d.check, d.reason = check, ownerReadDriver
++	switch {
++	case errors.Is(err, pgx.ErrNoRows):
++		d.reason = ownerReadNoRows
++	case errors.Is(err, context.Canceled):
++		d.reason = ownerReadCancelled
++	case errors.Is(err, context.DeadlineExceeded):
++		d.reason = ownerReadDeadline
++	case p != nil:
++		switch p.Code {
++		case "55P03":
++			d.reason = ownerReadLockTimeout
++		case "57014":
++			d.reason = ownerReadQueryCancelled
++		case "42501":
++			d.reason = ownerReadPermission
++		}
++	}
++	return err
++}
++
++// Called only after the unchanged recoveryState rejects these same inputs.
++// Preserve its ordered predicates and the original SQL clock, without reading
++// the view again or trying to infer the components of its derived recovery bit.
++func ownerReadRecoveryFailure(row custodydb.FleetCurrentTrust, started, now time.Time) ownerConfigurationReadDiagnostic {
++	if row.Suspended {
++		return ownerConfigurationReadDiagnostic{ownerReadRecoverySuspended, ownerReadPredicate}
++	}
++	if row.RecoveryBlocked {
++		return ownerConfigurationReadDiagnostic{ownerReadRecoveryBlocked, ownerReadPredicate}
++	}
++	if !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {
++		return ownerConfigurationReadDiagnostic{ownerReadRecoveryFleetInterval, ownerReadIntervalFailure(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)}
++	}
++	if !authorization.UUID(uid(row.InstallationID)) || !authorization.UUID(uid(row.IssuerEpoch)) || !trustRevision(row).Valid() {
++		return ownerConfigurationReadDiagnostic{ownerReadRecoveryIdentity, ownerReadPredicate}
++	}
++	until := identity.Earlier(started.Add(5*time.Second), row.FreshUntil.Time)
++	if !identity.Fresh(started, until, now, 5*time.Second) {
++		return ownerConfigurationReadDiagnostic{ownerReadRecoveryProofInterval, ownerReadIntervalFailure(started, until, now, 5*time.Second)}
++	}
++	return ownerConfigurationReadDiagnostic{ownerReadRecoveryOther, ownerReadUnspecified}
++}
++
++func ownerReadObservationFailure(out value.OwnerConfigurationObservation, now time.Time) ownerConfigurationReadDiagnostic {
++	if !out.Configuration.Valid() {
++		return ownerConfigurationReadDiagnostic{ownerReadObservationConfiguration, ownerReadPredicate}
++	}
++	return ownerConfigurationReadDiagnostic{ownerReadObservationInterval, ownerReadIntervalFailure(out.ObservedAt, out.FreshUntil, now, 5*time.Second)}
++}
++
++// Ordered like identity.Fresh. This is diagnostic classification only, never a
++// second authority decision, replacement clock or new observation interval.
++func ownerReadIntervalFailure(started, until, now time.Time, maximum time.Duration) OwnerConfigurationReadReason {
++	switch {
++	case started.IsZero():
++		return ownerReadMissingStart
++	case started.After(now):
++		return ownerReadFutureStart
++	case !until.After(started):
++		return ownerReadClosedInterval
++	case until.After(started.Add(maximum)):
++		return ownerReadLongInterval
++	case !now.Before(until):
++		return ownerReadExpiredInterval
++	default:
++		return ownerReadUnspecified
++	}
++}
+--- /dev/null
++++ b/internal/adapters/postgres/owner_configuration_read_diagnostic_test.go
+@@ -0,0 +1,314 @@
++package postgres
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"reflect"
++	"slices"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	"asservat.local/asservat/internal/application/privacy"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/audit"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgconn"
++	"github.com/jackc/pgx/v5/pgtype"
++)
++
++type ownerReadDiagnosticQuery struct {
++	trust    custodydb.FleetCurrentTrust
++	head     custodydb.HubOwnerConfiguration
++	revision custodydb.HubOwnerConfigurationRevision
++	now      pgtype.Timestamptz
++	calls    []string
++	fail     string
++	err      error
++}
++
++type ownerReadDiagnosticRow struct {
++	values []any
++	err    error
++}
++
++func (r ownerReadDiagnosticRow) Scan(dst ...any) error {
++	if r.err != nil {
++		return r.err
++	}
++	if len(dst) != len(r.values) {
++		return errors.New("unexpected scan width")
++	}
++	for i, v := range r.values {
++		reflect.ValueOf(dst[i]).Elem().Set(reflect.ValueOf(v))
++	}
++	return nil
++}
++func (q *ownerReadDiagnosticQuery) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
++	return pgconn.CommandTag{}, errors.New("unexpected diagnostic effect")
++}
++func (q *ownerReadDiagnosticQuery) Query(context.Context, string, ...any) (pgx.Rows, error) {
++	return nil, errors.New("unexpected diagnostic query")
++}
++func (q *ownerReadDiagnosticQuery) QueryRow(_ context.Context, sql string, args ...any) pgx.Row {
++	name := strings.Fields(sql)[2]
++	q.calls = append(q.calls, name)
++	if name == q.fail {
++		return ownerReadDiagnosticRow{err: q.err}
++	}
++	var values, wantArgs []any
++	switch name {
++	case "ShareFleetTrust":
++		v := q.trust
++		values = []any{v.InstallationID, v.IssuerEpoch, v.SourceUid, v.SourceGeneration, v.SourceDigest, v.Suspended, v.RecoveryBlocked, v.ObservedAt, v.FreshUntil}
++		wantArgs = []any{q.head.InstallationID}
++	case "ShareOwnerConfiguration":
++		v := q.head
++		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.ObservedAt, v.FreshUntil}
++		wantArgs = []any{q.head.InstallationID, q.head.ClusterID}
++	case "ReadOwnerConfigurationRevision":
++		v := q.revision
++		values = []any{v.InstallationID, v.ClusterID, v.SourceUid, v.Generation, v.SnapshotJson, v.AuditReceiptJson}
++		wantArgs = []any{q.head.InstallationID, q.head.ClusterID, q.head.SourceUid, q.head.Generation}
++	case "CurrentTime":
++		values = []any{q.now}
++	default:
++		return ownerReadDiagnosticRow{err: errors.New("extra query")}
++	}
++	if !reflect.DeepEqual(args, wantArgs) {
++		return ownerReadDiagnosticRow{err: errors.New("changed query binding")}
++	}
++	return ownerReadDiagnosticRow{values: values}
++}
++
++func ownerReadDiagnosticFixture(t *testing.T) (*OwnerConfigurations, *ownerReadDiagnosticQuery, value.OwnerConfiguration) {
++	t.Helper()
++	uid := func(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }
++	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
++	c := value.OwnerConfiguration{
++		Pool:             value.OwnerPool{InstallationID: uid(1), ClusterID: uid(2), IssuerEpoch: uid(3), Namespace: "private", NamespaceUID: uid(4), Service: "owner", ServiceUID: uid(5), Deployment: "owner", DeploymentUID: uid(6), ServiceAccount: "owner", AccountUID: uid(7), Port: 9443},
++		Revision:         identity.Revision{UID: uid(8), Generation: 1, Digest: [32]byte{1}},
++		ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{{3}},
++	}
++	r := audit.Receipt{Key: audit.OwnerConfigurationAuditKey(c), Version: "synthetic-version", ETag: "synthetic-etag", Bytes: 1, SHA256: artifact.Digest{4}}
++	if !c.Valid() || !r.ValidOwnerConfiguration(c) {
++		t.Fatal("invalid synthetic read fixture")
++	}
++	b, _ := json.Marshal(c)
++	a, _ := json.Marshal(r)
++	s := &OwnerConfigurations{installation: uid(1), cluster: uid(2), namespace: uid(4), source: uid(8)}
++	q := &ownerReadDiagnosticQuery{
++		trust:    custodydb.FleetCurrentTrust{InstallationID: id(uid(1)), IssuerEpoch: id(uid(3)), SourceUid: uid(9), SourceGeneration: 1, SourceDigest: []byte{1}, ObservedAt: ts(at.Add(-time.Second)), FreshUntil: ts(at.Add(4 * time.Second))},
++		head:     custodydb.HubOwnerConfiguration{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, ObservedAt: ts(at.Add(-time.Second)), FreshUntil: ts(at.Add(3 * time.Second))},
++		revision: custodydb.HubOwnerConfigurationRevision{InstallationID: id(uid(1)), ClusterID: id(uid(2)), SourceUid: id(uid(8)), Generation: 1, SnapshotJson: b, AuditReceiptJson: a}, now: ts(at),
++	}
++	return s, q, c
++}
++
++func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) {
++	for _, tc := range []struct {
++		name, check, reason string
++		queries             int
++		change              func(*ownerReadDiagnosticQuery, *value.OwnerConfiguration)
++	}{
++		{"valid", "transaction", "unspecified", 4, func(*ownerReadDiagnosticQuery, *value.OwnerConfiguration) {}},
++		{"head-source-before-generation", "head-source", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.head.SourceUid = pgtype.UUID{}
++			q.head.Generation = 0
++		}},
++		{"head-generation", "head-generation", "predicate", 2, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.Generation = 0 }},
++		{"decode-before-audit", "snapshot-decode", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.revision.SnapshotJson = []byte("{")
++			q.revision.AuditReceiptJson = nil
++		}},
++		{"binding-before-suspension", "snapshot-binding", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { c.Pool.Port = 0; c.Suspended = true }},
++		{"suspension-before-generation", "snapshot-suspended", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			c.Suspended = true
++			c.Revision.Generation = 2
++		}},
++		{"generation-before-issuer", "snapshot-generation", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			c.Revision.Generation = 2
++			q.trust.IssuerEpoch = id(c.Pool.ClusterID)
++		}},
++		{"issuer-before-audit", "snapshot-issuer", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.IssuerEpoch = id(c.Pool.ClusterID)
++			q.revision.AuditReceiptJson = nil
++		}},
++		{"audit-decode-before-recovery", "audit-decode", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.revision.AuditReceiptJson = nil
++			q.trust.RecoveryBlocked = true
++		}},
++		{"audit-binding-before-recovery", "audit-binding", "predicate", 3, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.revision.AuditReceiptJson = []byte("{}")
++			q.trust.Suspended = true
++		}},
++		{"suspended-before-blocked", "recovery-suspended", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.Suspended = true
++			q.trust.RecoveryBlocked = true
++			q.trust.FreshUntil = q.now
++		}},
++		{"blocked-before-expiry", "recovery-blocked", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.RecoveryBlocked = true
++			q.trust.FreshUntil = q.now
++		}},
++		{"fleet-future-before-closed", "fleet-interval", "future-start", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.ObservedAt = ts(q.now.Time.Add(time.Second))
++			q.trust.FreshUntil = q.now
++		}},
++		{"fleet-closed-before-expired", "fleet-interval", "closed-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.FreshUntil = q.trust.ObservedAt
++		}},
++		{"fleet-overlong", "fleet-interval", "overlong-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.FreshUntil = ts(q.trust.ObservedAt.Time.Add(31 * time.Second))
++		}},
++		{"fleet-expired-at-equality", "fleet-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.trust.FreshUntil = q.now }},
++		{"recovery-identity-before-owner-expiry", "recovery-identity", "predicate", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.trust.SourceUid = ""
++			q.head.ObservedAt = ts(q.now.Time.Add(-6 * time.Second))
++		}},
++		{"owner-start-expired-in-recovery", "recovery-proof-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.head.ObservedAt = ts(q.now.Time.Add(-5 * time.Second))
++			q.head.FreshUntil = q.now
++		}},
++		{"owner-start-future-in-recovery", "recovery-proof-interval", "future-start", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) {
++			q.head.ObservedAt = ts(q.now.Time.Add(time.Second))
++		}},
++		{"owner-cutoff-expired-at-equality", "owner-interval", "expired-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.now }},
++		{"owner-cutoff-fenced", "owner-interval", "closed-interval", 4, func(q *ownerReadDiagnosticQuery, c *value.OwnerConfiguration) { q.head.FreshUntil = q.head.ObservedAt }},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			s, q, c := ownerReadDiagnosticFixture(t)
++			originalJSON := slices.Clone(q.revision.SnapshotJson)
++			tc.change(q, &c)
++			if slices.Equal(originalJSON, q.revision.SnapshotJson) {
++				q.revision.SnapshotJson, _ = json.Marshal(c)
++			}
++			var d ownerConfigurationReadDiagnostic
++			out, err := s.readOwnerConfiguration(context.Background(), custodydb.New(q), &d)
++			want := []string{"ShareFleetTrust", "ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"}[:tc.queries]
++			if !slices.Equal(q.calls, want) || d.check.String() != tc.check || d.reason.String() != tc.reason {
++				t.Fatalf("changed query/diagnostic sequence calls=%v check=%s reason=%s", q.calls, d.check, d.reason)
++			}
++			if tc.name == "valid" {
++				if err != nil || !out.Valid(q.now.Time) || !out.ObservedAt.Equal(q.head.ObservedAt.Time) || !out.FreshUntil.Equal(q.head.FreshUntil.Time) {
++					t.Fatal("positive observation changed", err)
++				}
++				return
++			}
++			if !errors.Is(err, value.ErrUnavailable) {
++				t.Fatal("predicate changed error identity", err)
++			}
++		})
++	}
++}
++
++func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T) {
++	for _, statement := range []string{"ShareFleetTrust", "ShareOwnerConfiguration", "ReadOwnerConfigurationRevision", "CurrentTime"} {
++		for _, tc := range []struct {
++			name, reason string
++			err          error
++		}{
++			{"missing", "no-rows", pgx.ErrNoRows},
++			{"lock", "lock-timeout", &pgconn.PgError{Code: "55P03", Message: "private-lock-detail"}},
++			{"permission", "permission", &pgconn.PgError{Code: "42501", Detail: "private-role-detail"}},
++			{"query-cancel", "query-cancelled", &pgconn.PgError{Code: "57014", Message: "private-query-detail"}},
++			{"context", "cancelled", context.Canceled},
++			{"deadline", "deadline", context.DeadlineExceeded},
++			{"driver", "driver", errors.New("private-token-password")},
++			{"serialize", "unspecified", &pgconn.PgError{Code: "40001", Message: "private-query"}},
++			{"deadlock", "unspecified", &pgconn.PgError{Code: "40P01", Message: "private-query"}},
++		} {
++			t.Run(statement+"/"+tc.name, func(t *testing.T) {
++				s, q, _ := ownerReadDiagnosticFixture(t)
++				q.fail, q.err = statement, tc.err
++				d := ownerConfigurationReadDiagnostic{ownerReadAuditBinding, ownerReadPredicate}
++				_, err := s.readOwnerConfiguration(context.Background(), custodydb.New(q), &d)
++				if err != tc.err || d.reason.String() != tc.reason {
++					t.Fatal("raw callback result or diagnostic changed", d.check, d.reason)
++				}
++				checks := map[string]OwnerConfigurationReadCheck{"ShareFleetTrust": ownerReadFleet, "ShareOwnerConfiguration": ownerReadHead, "ReadOwnerConfigurationRevision": ownerReadRevision, "CurrentTime": ownerReadClock}
++				want := checks[statement]
++				if tc.reason == "unspecified" {
++					want = ownerReadTransaction
++				}
++				if d.check != want {
++					t.Fatal("stale/incorrect query detail", d.check)
++				}
++				// Model Ledger's existing sanitization. It must be the only error
++				// retained; query details cannot escape even with %+v formatting.
++				wrapped := d.failure(privacy.ErrUnavailable)
++				if !errors.Is(wrapped, privacy.ErrUnavailable) || errors.Is(wrapped, tc.err) {
++					t.Fatal("query error escaped sanitized transaction boundary")
++				}
++				if strings.Contains(fmt.Sprintf("%+v", wrapped), "private-") {
++					t.Fatal("driver values rendered")
++				}
++				if tc.reason == "unspecified" {
++					// A retry that fails at Begin/SET never reenters the callback.
++					var failure *OwnerConfigurationReadFailure
++					if !errors.As(wrapped, &failure) || failure.Check() != ownerReadTransaction || failure.Reason() != ownerReadUnspecified {
++						t.Fatal("previous attempt mislabeled later transaction failure")
++					}
++					// A subsequent successful callback clears every previous detail;
++					// a following COMMIT failure must also stay generic.
++					q.fail = ""
++					q.calls = nil
++					if _, e := s.readOwnerConfiguration(context.Background(), custodydb.New(q), &d); e != nil || d.check != ownerReadTransaction || d.reason != ownerReadUnspecified {
++						t.Fatal("successful retry retained prior diagnostic", e)
++					}
++				}
++			})
++		}
++	}
++}
++
++func TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity(t *testing.T) {
++	_, q, _ := ownerReadDiagnosticFixture(t)
++	now := q.now.Time
++	for _, start := range []time.Time{{}, now.Add(-6 * time.Second), now.Add(-5 * time.Second), now.Add(-time.Second), now, now.Add(time.Second)} {
++		for _, until := range []time.Time{{}, now.Add(-time.Second), now, now.Add(time.Nanosecond), now.Add(30 * time.Second), now.Add(31 * time.Second)} {
++			for _, maximum := range []time.Duration{5 * time.Second, 30 * time.Second} {
++				valid := identity.Fresh(start, until, now, maximum)
++				if (ownerReadIntervalFailure(start, until, now, maximum) == ownerReadUnspecified) != valid {
++					t.Fatal("interval classification diverged from original predicate")
++				}
++			}
++		}
++		for mask := 0; mask < 8; mask++ {
++			row := q.trust
++			row.Suspended = mask&1 != 0
++			row.RecoveryBlocked = mask&2 != 0
++			if mask&4 != 0 {
++				row.SourceUid = ""
++			}
++			_, err := recoveryState(row, start, now)
++			d := ownerReadRecoveryFailure(row, start, now)
++			if (err == nil) != (d.check == ownerReadRecoveryOther) {
++				t.Fatal("recovery diagnostic diverged from original helper", mask, d.check)
++			}
++		}
++	}
++	for _, cause := range []error{value.ErrUnavailable, value.ErrInvalid, value.ErrConflict, privacy.ErrUnavailable, privacy.ErrConflict} {
++		d := ownerConfigurationReadDiagnostic{ownerReadAuditBinding, ownerReadPredicate}
++		err := d.failure(cause)
++		if !errors.Is(err, cause) || errors.Unwrap(err) != cause {
++			t.Fatal("sanitized sentinel changed")
++		}
++		for _, format := range []string{"%s", "%v", "%+v"} {
++			if fmt.Sprintf(format, err) != "owner configuration read: audit-binding: predicate" {
++				t.Fatal("diagnostic rendered non-enumerated text")
++			}
++		}
++	}
++	if (ownerConfigurationReadDiagnostic{}).failure(nil) != nil {
++		t.Fatal("nil result became an error")
++	}
++	if OwnerConfigurationReadCheck(255).String() != "unknown" || OwnerConfigurationReadReason(255).String() != "unknown" {
++		t.Fatal("unknown enum rendered uncontrolled value")
++	}
++}
+--- a/test/integration/initial_runtime_owner_pair_native_test.go
++++ b/test/integration/initial_runtime_owner_pair_native_test.go
+@@ -4,6 +4,7 @@
+ 	"bytes"
+ 	"context"
+ 	"encoding/json"
++	"errors"
+ 	"net/http"
+ 	"testing"
+ 	"time"
+@@ -12,6 +13,7 @@
+ 	"asservat.local/asservat/internal/adapters/postgres"
+ 	"asservat.local/asservat/internal/adapters/providerconfig"
+ 	"asservat.local/asservat/internal/contracts"
++	fleet "asservat.local/asservat/internal/domain/fleet"
+ 	"github.com/jackc/pgx/v5"
+ 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/client-go/kubernetes"
+@@ -37,7 +39,7 @@
+ 		t.Fatal("actual original worker/provider predecessors are required")
+ 	}
+ 	end := providers.trace.phase(t, "actual-owner-root-constructor")
+-	root, err := kube.NewProviderOwnerIdentityRoleRoot(ctx, bridge, resources, accepted, postgres.OwnerIdentityRoleLayoutDigest())
++	root, err := kube.NewProviderOwnerIdentityRoleRoot(ctx, bridge, resources, providerOwnerDiagnosticReader{t: t, reader: accepted}, postgres.OwnerIdentityRoleLayoutDigest())
+ 	end()
+ 	if err != nil {
+ 		t.Fatal("actual accepted worker source cannot construct original owner root", err)
+@@ -75,6 +77,24 @@
+ 	return out
+ }
+ 
++// This fixture observes only the concrete accepted reader's already-returned
++// fixed diagnostic. It delegates exactly once with the original context and
++// returns the observation/error unchanged; no extra query, clock or authority.
++// Product native normalization remains unchanged and still exposes unavailable.
++type providerOwnerDiagnosticReader struct {
++	t      *testing.T
++	reader *postgres.OwnerConfigurations
++}
++
++func (r providerOwnerDiagnosticReader) ReadOwnerConfiguration(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
++	out, err := r.reader.ReadOwnerConfiguration(ctx)
++	var failure *postgres.OwnerConfigurationReadFailure
++	if errors.As(err, &failure) {
++		r.t.Logf("actual accepted owner SQL read refused check=%s reason=%s; original statements and database clock only", failure.Check(), failure.Reason())
++	}
++	return out, err
++}
++
+ // Close runs after the fixed installation driver joins and before the caller
+ // closes the accepted reader's pool, original worker, bridge or resource root.
+ func (o *initialRuntimeNativeOwner) Close() {

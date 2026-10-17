@@ -1,0 +1,316 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"slices"
+	"testing"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+func TestDirectNativeFixtureWireParity(t *testing.T) {
+	// Standalone fixture binaries use ignored source files, as required by the
+	// architecture gate. Their DTOs are not an importable product package.
+	// Keep the test-only copy exact instead of silently drifting either codec.
+	helper, err := os.ReadFile("../fixtures/observation-native/data.go")
+	if err != nil {
+		t.Fatal("native helper wire source unavailable", err)
+	}
+	local, err := os.ReadFile("direct_observation_native_data_test.go")
+	if err != nil {
+		t.Fatal("native test wire source unavailable", err)
+	}
+	helper = bytes.TrimPrefix(helper, []byte("//go:build ignore\n\n"))
+	helper = bytes.Replace(helper, []byte("package main\n"), []byte("package integration\n"), 1)
+	if !bytes.Equal(helper, local) {
+		t.Fatal("native fixture input/output copy drifted")
+	}
+}
+
+// This is a reference H/A/R composition with actual product v2 listener and
+// separate original Pods in two clusters. Initial issuer/accepted owner-source,
+// recovery and storage-qualification roots remain explicit fixture authority.
+// It does not select the installed runtime or run full installed HWORK load.
+func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+	if path == "" {
+		t.Skip("owned direct H/A/R context fixture required")
+	}
+	raw, e := os.ReadFile(path)
+	var f fixture
+	var selection struct {
+		DirectObservation struct {
+			HelperSHA256                 string
+			RuntimeSelection             bool
+			FullInstalledHWORKBackground bool
+		}
+	}
+	if e != nil || json.Unmarshal(raw, &f) != nil || json.Unmarshal(raw, &selection) != nil || len(f.Clusters) != 2 || len(selection.DirectObservation.HelperSHA256) != 64 || selection.DirectObservation.RuntimeSelection || selection.DirectObservation.FullInstalledHWORKBackground {
+		t.Fatal("exact native helper selection unavailable")
+	}
+	clear(raw)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	setup := time.Now()
+	installation, epoch, root := custodyID(), custodyID(), custodyID()
+	ownerCA, clientCA, serverCA := directNativeCA(t), directNativeCA(t), directNativeCA(t)
+	a := newDirectNativeCluster(t, ctx, f, 0, installation)
+	r := newDirectNativeCluster(t, ctx, f, 1, installation)
+	pool := value.OwnerPool{InstallationID: installation, ClusterID: a.id, IssuerEpoch: epoch, Namespace: a.namespace.Name, NamespaceUID: string(a.namespace.UID), Service: a.service.Name, ServiceUID: string(a.service.UID), Deployment: "owner", DeploymentUID: string(a.deployments["owner"].UID), ServiceAccount: "owner", AccountUID: string(a.accounts["owner"].UID), Port: 9443, NativePort: 9444, NativeBootstrap: value.OwnerBootstrapProfile, NativeCandidateLimit: value.OwnerRegistrationsPerPool}
+	owner := value.OwnerObservationPin{RootID: root, SourceUID: custodyID(), Pool: pool, TemplateDigest: a.template(t, "owner"), ImageDigest: a.image, ProtectionDigest: a.protection}
+	caller := value.ClusterObservationCallerPin{RootID: root, InstallationID: installation, ClusterID: a.id, Namespace: a.plan.ControlNamespace, Account: "hwork", AccountUID: string(a.accounts["hwork"].UID), Deployment: "hwork", DeploymentUID: string(a.deployments["hwork"].UID), TemplateDigest: a.template(t, "hwork"), ImageDigest: a.image, ProtectionDigest: a.protection}
+	if !owner.Valid() || !caller.Valid() {
+		t.Fatal("native original owner/caller pins invalid")
+	}
+	accepted := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: owner.SourceUID, Generation: 1, Digest: artifact.Digest{41}}, ProtectionDigest: owner.ProtectionDigest, IssuerRoots: [][]byte{ownerCA.DER}}
+	sql := newDirectNativeSQL(t, ctx, f, accepted, root)
+	sql.startSources(t, ctx, cancel, accepted)
+	source := r.regionalSource(t, ctx, sql, root, installation, epoch, clientCA, serverCA)
+	end, _ := ctx.Deadline()
+	// Register cleanup before the first input can start credential work. A later
+	// setup failure must still join every helper whose immutable input create
+	// was attempted; an unknown create/control reply cannot certify completion.
+	mounted := map[string]bool{}
+	t.Cleanup(func() {
+		for _, role := range []struct {
+			x    *directNativeCluster
+			mode string
+		}{{r, "regional"}, {a, "owner"}, {a, "hwork"}} {
+			if mounted[role.mode] {
+				role.x.shutdown(t, role.mode)
+			}
+		}
+	})
+	for _, mode := range []string{"owner", "hwork", "regional"} {
+		x := a
+		if mode == "regional" {
+			x = r
+		}
+		in := directNativePopulate(x.baseInput(t, mode, end), owner, caller, source, ownerCA, clientCA, serverCA, sql, a.dial)
+		switch mode {
+		case "owner":
+			in.SQL = directNativeSQLSet(t, sql, "owner-read", "owner-write", "owner-ack", "owner-activate", "connector-read")
+		case "hwork":
+			in.SQL = directNativeSQLSet(t, sql, "owner-read")
+		case "regional":
+			in.SQL = directNativeSQLSet(t, sql, "owner-read", "connector-journal", "connector-ack", "connector-read", "recovery-read")
+		}
+		mounted[mode] = true
+		x.installInput(t, ctx, mode, in)
+	}
+	// Wait only for setup. Any actual process failure/restart is terminal; there
+	// is no enrollment, operation or uncertain POST retry in this wait.
+	for _, role := range []struct {
+		x    *directNativeCluster
+		mode string
+	}{{a, "owner"}, {a, "hwork"}, {r, "regional"}} {
+		role.x.waitControl(t, ctx, role.mode)
+	}
+	t.Logf("native direct setup elapsed=%s source-refreshes=%d synthetic-initial-roots=true installed-runtime=false full-HWORK-background=false", time.Since(setup), sql.refreshes.Load())
+	modes := []value.ClusterObservationPurpose{value.ObserveCapacityNamespaces, value.ObserveCapacityWorkloads, value.ObserveCapacityWorkload, value.ObserveCapacityNamespaceGuard}
+	// No new clients, token buckets or SQL pools between these independent
+	// operations. Standby setup belongs to its own original socket interval.
+	for _, purpose := range modes {
+		t.Run(string(purpose), func(t *testing.T) {
+			before := directNativeSnapshots(t, ctx, a, r)
+			opened := time.Now()
+			call, stop := context.WithTimeout(ctx, 5*time.Second)
+			open, err := r.control(call, "regional", ControlRequest{Command: "open", ExchangeID: custodyID()})
+			stop()
+			if err != nil || !open.OK {
+				t.Fatal("native original regional standby", err, open.Category)
+			}
+			a.waitAvailable(t, ctx, true)
+			standby := directNativeSnapshots(t, ctx, a, r)
+			ownerAt, fleetAt := time.Unix(0, sql.ownerObserved.Load()), time.Unix(0, sql.fleetObserved.Load())
+			started := time.Now()
+			n := started.UTC()
+			ownerAge, fleetAge := n.Sub(ownerAt), n.Sub(fleetAt)
+			request := value.ClusterObservationRequest{ID: custodyID(), Challenge: custodyID(), RootID: root, ClusterID: r.id, Purpose: purpose, RequestedAt: n, NotAfter: n.Add(5 * time.Second)}
+			switch purpose {
+			case value.ObserveCapacityWorkloads:
+				request.Namespace = r.plan.ControlNamespace
+				request.Kind = "Deployment"
+			case value.ObserveCapacityWorkload:
+				request.Namespace = r.plan.ControlNamespace
+				request.Workload = cfg.WorkloadRef{Kind: "Deployment", Name: "regional", UID: string(r.deployments["regional"].UID)}
+				request.Keys = []string{"native-team"}
+			}
+			call, stop = context.WithDeadline(ctx, request.NotAfter)
+			result, err := a.control(call, "hwork", ControlRequest{Command: "observe", Request: request})
+			stop()
+			receivedAt := time.Now().UTC()
+			elapsed := time.Since(started)
+			// Preserve the transfer verdict before later diagnostic I/O. A status
+			// transport failure cannot replace this earlier outcome.
+			t.Logf("native direct terminal purpose=%s success=%t transport-failed=%t category=%s elapsed=%s remaining=%s", purpose, err == nil && result.OK, err != nil, result.Category, elapsed, request.NotAfter.Sub(receivedAt))
+			// Status reads only local process counters/last closed error categories;
+			// they neither execute SQL nor manufacture a new source/request interval.
+			after := directNativeSnapshots(t, ctx, a, r)
+			report := map[string]any{"purpose": purpose, "success": err == nil && result.OK, "wholeNanos": elapsed.Nanoseconds(), "remainingNanos": request.NotAfter.Sub(receivedAt).Nanoseconds(), "standbyAgeNanos": n.Sub(opened).Nanoseconds(), "setupH": directNativeMetricsDelta(before[0].Metrics, standby[0].Metrics), "setupA": directNativeMetricsDelta(before[1].Metrics, standby[1].Metrics), "setupR": directNativeMetricsDelta(before[2].Metrics, standby[2].Metrics), "H": directNativeMetricsDelta(standby[0].Metrics, after[0].Metrics), "A": directNativeMetricsDelta(standby[1].Metrics, after[1].Metrics), "R": directNativeMetricsDelta(standby[2].Metrics, after[2].Metrics), "lastH": after[0].LastCategory, "sourceRefreshes": sql.refreshes.Load(), "originalOwnerSourceAgeNanos": ownerAge.Nanoseconds(), "originalFleetSourceAgeNanos": fleetAge.Nanoseconds()}
+			report["regionalFinished"] = after[2].RegionalFinished
+			report["regionalCategory"] = after[2].RegionalCategory
+			encoded, _ := json.Marshal(report)
+			t.Logf("native direct metrics %s", encoded)
+			if err != nil || !result.OK || result.Result == nil {
+				t.Fatal("native original direct request", err, result.Category)
+			}
+			digest, de := app.ClusterObservationRequestDigest(request)
+			// Preserve both actual helper completion and host receipt instants before
+			// diagnostic reads. A late result is never made usable by relabeling dates.
+			if de != nil || result.CompletedAt.IsZero() || !result.CompletedAt.Before(request.NotAfter) || !result.Result.Matches(request, digest, result.CompletedAt) || !result.Result.Matches(request, digest, receivedAt) || elapsed >= 5*time.Second {
+				t.Fatal("native exact original result/bound")
+			}
+			switch purpose {
+			case value.ObserveCapacityNamespaces:
+				if !slices.Contains(result.Result.Namespaces.Items, r.plan.ControlNamespace) {
+					t.Fatal("native original namespace missing")
+				}
+			case value.ObserveCapacityWorkloads:
+				if !slices.Contains(result.Result.Workloads.Items, cfg.WorkloadRef{Kind: "Deployment", Name: "regional", UID: string(r.deployments["regional"].UID)}) {
+					t.Fatal("native original workload missing")
+				}
+			case value.ObserveCapacityWorkload:
+				if result.Result.Workload.Labels["native-team"] != "test" {
+					t.Fatal("native selected original label missing")
+				}
+			case value.ObserveCapacityNamespaceGuard:
+				if !slices.Equal(result.Result.Guard.Keys, []string{"native-team"}) {
+					t.Fatal("native exact protected keys changed")
+				}
+			}
+			call, stop = context.WithTimeout(ctx, 5*time.Second)
+			joined, err := r.control(call, "regional", ControlRequest{Command: "join"})
+			stop()
+			if err != nil || !joined.OK {
+				t.Fatal("native actual regional terminal join", err, joined.Category)
+			}
+			a.waitAvailable(t, ctx, false)
+			call, stop = context.WithTimeout(ctx, 5*time.Second)
+			closed, err := r.control(call, "regional", ControlRequest{Command: "close"})
+			stop()
+			if err != nil || !closed.OK {
+				t.Fatal("native joined close", err, closed.Category)
+			}
+		})
+		if t.Failed() {
+			return
+		}
+	}
+	t.Run("changed-original-regional-template-denies", func(t *testing.T) {
+		call, stop := context.WithTimeout(ctx, 5*time.Second)
+		opened, err := r.control(call, "regional", ControlRequest{Command: "open", ExchangeID: custodyID()})
+		stop()
+		if err != nil || !opened.OK {
+			t.Fatal("native mutation standby", err, opened.Category)
+		}
+		a.waitAvailable(t, ctx, true)
+		// Privileged fixture administrator mutates the original actual Pod only;
+		// no replacement profile, result or socket can adopt that change.
+		if _, err = r.api.CoreV1().Pods(r.namespace.Name).Patch(ctx, r.pods["regional"].Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"asservat.io/native-original-mutation":"changed"}}}`), meta.PatchOptions{}); err != nil {
+			t.Fatal("native original Pod mutation", err)
+		}
+		n := time.Now().UTC()
+		q := value.ClusterObservationRequest{ID: custodyID(), Challenge: custodyID(), RootID: root, ClusterID: r.id, Purpose: value.ObserveCapacityNamespaces, RequestedAt: n, NotAfter: n.Add(5 * time.Second)}
+		call, stop = context.WithDeadline(ctx, q.NotAfter)
+		result, err := a.control(call, "hwork", ControlRequest{Command: "observe", Request: q})
+		stop()
+		if err == nil && (result.OK || result.Result != nil) {
+			t.Fatal("changed original regional Pod disclosed metadata")
+		}
+		call, stop = context.WithTimeout(ctx, 5*time.Second)
+		closed, closeErr := r.control(call, "regional", ControlRequest{Command: "close"})
+		stop()
+		if closeErr != nil || !closed.OK {
+			t.Fatal("native mutation joined close", closeErr, closed.Category)
+		}
+		a.waitAvailable(t, ctx, false)
+	})
+	if sql.sourceFailure.Load() || sql.refreshes.Load() < 2 {
+		t.Fatal("native background source lifetime failed")
+	}
+}
+
+func (x *directNativeCluster) waitControl(t *testing.T, ctx context.Context, mode string) {
+	t.Helper()
+	end := time.Now().Add(60 * time.Second)
+	for time.Now().Before(end) && ctx.Err() == nil {
+		pod, e := x.api.CoreV1().Pods(x.namespace.Name).Get(ctx, x.pods[mode].Name, meta.GetOptions{})
+		if e != nil || pod.UID != x.pods[mode].UID || pod.DeletionTimestamp != nil {
+			t.Fatal("native original helper lost")
+		}
+		for _, s := range pod.Status.ContainerStatuses {
+			if s.RestartCount != 0 || s.State.Terminated != nil {
+				t.Fatal("native helper setup failed; inspect closed fixture phase logs")
+			}
+		}
+		call, stop := context.WithTimeout(ctx, time.Second)
+		result, e := x.control(call, mode, ControlRequest{Command: "status"})
+		stop()
+		if e == nil && result.OK {
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	t.Fatal("native original helper not ready")
+}
+func (x *directNativeCluster) waitAvailable(t *testing.T, ctx context.Context, want bool) {
+	t.Helper()
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	for call.Err() == nil {
+		got, e := x.control(call, "owner", ControlRequest{Command: "status"})
+		if e != nil || !got.OK {
+			t.Fatal("native local holder routing observation unavailable", e, got.Category)
+		}
+		if got.Available == want {
+			return
+		}
+		select {
+		case <-call.Done():
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	t.Fatal("native exact holder availability did not settle")
+}
+func directNativeSnapshots(t *testing.T, ctx context.Context, a, r *directNativeCluster) [3]ControlResult {
+	t.Helper()
+	var out [3]ControlResult
+	for i, role := range []struct {
+		x    *directNativeCluster
+		mode string
+	}{{a, "hwork"}, {a, "owner"}, {r, "regional"}} {
+		call, stop := context.WithTimeout(ctx, 3*time.Second)
+		v, e := role.x.control(call, role.mode, ControlRequest{Command: "status"})
+		stop()
+		if e != nil || !v.OK {
+			t.Fatal("native bounded counters unavailable", e, v.Category)
+		}
+		out[i] = v
+	}
+	return out
+}
+func directNativeMetricsDelta(a, b MetricsSnapshot) MetricsSnapshot {
+	sub := func(x, y APISnapshot) APISnapshot {
+		return APISnapshot{Requests: y.Requests - x.Requests, Denied: y.Denied - x.Denied, Errors: y.Errors - x.Errors, HeaderNanos: y.HeaderNanos - x.HeaderNanos}
+	}
+	out := MetricsSnapshot{Observer: sub(a.Observer, b.Observer), Probe: sub(a.Probe, b.Probe), SQL: map[string]PoolSnapshot{}}
+	for k, y := range b.SQL {
+		x := a.SQL[k]
+		out.SQL[k] = PoolSnapshot{Acquires: y.Acquires - x.Acquires, AcquireNanos: y.AcquireNanos - x.AcquireNanos, EmptyAcquires: y.EmptyAcquires - x.EmptyAcquires, CancelledAcquires: y.CancelledAcquires - x.CancelledAcquires}
+	}
+	return out
+}

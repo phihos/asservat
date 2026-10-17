@@ -1,0 +1,6 @@
+--- FAIL: TestRefreshOwnerObservationPreservesOriginalInterval (0.00s)
+    --- FAIL: TestRefreshOwnerObservationPreservesOriginalInterval/nested_observation_starts_later (0.00s)
+        browser_refresh_test.go:31: original observation interval lost: observed=2026-10-12 00:00:00 +0000 UTC validUntil=2026-10-12 00:00:05.000001 +0000 UTC want=2026-10-12 00:00:05 +0000 UTC
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.024s
+FAIL

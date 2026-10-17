@@ -1,0 +1,11 @@
+npm notice run @asservat/console@0.0.0 npx
+npm notice run 'vite' build --outDir /home/phil/.cache/asservat-build/context-ul78sreo/worker-image/console --emptyOutDir --logLevel warn
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Component test exit: 0
+exit=0

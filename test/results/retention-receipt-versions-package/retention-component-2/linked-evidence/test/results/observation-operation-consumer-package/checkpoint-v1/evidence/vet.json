@@ -1,0 +1,36 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/overlay.json",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/postgres",
+    "./internal/adapters/mtls",
+    "./internal/bootstrap"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "expectedExit": 0,
+  "expectedFailureOccurrences": null,
+  "seconds": 5.426,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "freeze": []
+  }
+}

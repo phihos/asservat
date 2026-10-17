@@ -1,0 +1,191 @@
+{
+  "manifestSHA256": "893012be940cf76b2c67bdd954f4f9b00dbbfe2d414cbc7ea0eec393337fdf82",
+  "dependencySHA256": "21651ab4cfab3dea7e95543e83f32398ab7d8ac7545daf86aeb5d9e0a3d31ac0",
+  "dependencyCount": 1866,
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "base_sha256": "c73e2eebd39c9203e647d96df125882f5605308dbf51f30047339a723c9448a4",
+      "payload_sha256": "6436ef0fdadd9a0e6d63eeb88f37c84a0d569d1ed588a034e6c66715580a117d"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "base_sha256": "637066361de565905adad32eb2301570f7d7b19a1e5ae3a16f57e59598be0ef4",
+      "payload_sha256": "4eb168a4e30ac182e33df022cda85211de81c7ca05cab9f6aa3235b032dae835"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_hub.go",
+      "base_sha256": null,
+      "payload_sha256": "dbe9ecc1f2b6bdd25e94db71a97de2ed4d23491c51b214ea8872f254bb423b36"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_hub_test.go",
+      "base_sha256": null,
+      "payload_sha256": "bc3b84eec3867661d3a33e577dcb0aa216d89934e44b29a87a49d00c80f6e7d8"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_registry.go",
+      "base_sha256": null,
+      "payload_sha256": "32769e8099a449b896cc82212c68037f494a3a5d026d23c7650dfe065cf7436a"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_registry_test.go",
+      "base_sha256": null,
+      "payload_sha256": "24a037652167f6ed42901b51c0f7cfd735c7ebadd8e8899481b5014a44675b81"
+    },
+    {
+      "path": "internal/application/fleet/connector_observation_registry.go",
+      "base_sha256": null,
+      "payload_sha256": "b6fc35f8faccc919e9044b37358798156c0dc05f0e72bd88f385e20f1c1b80cd"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_handler.go",
+      "base_sha256": null,
+      "payload_sha256": "86563cbbf13646f3cb7b3a02e06f59d903e388f25400ecd8ae2418ec468a5d5e"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_handler_test.go",
+      "base_sha256": null,
+      "payload_sha256": "2d723fd046959fbd50471bf1a27f16b2211ff22a4e7e9771ef044b428c60606c"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_holder.go",
+      "base_sha256": null,
+      "payload_sha256": "9fea78d1020ec126d067bc5d18558c7c67b950d342a66fb0d7529aae88284bf2"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_holder_test.go",
+      "base_sha256": null,
+      "payload_sha256": "18a200ccc675b24c45d90c3e79bdc186886cfc196cb10194bbae1fe72cf184cf"
+    },
+    {
+      "path": "internal/transport/clusterobservation/hub_stream.go",
+      "base_sha256": null,
+      "payload_sha256": "138ec56fabd34aaa4cb7134b89012502721be1eb25dc517bf590140bf9ddf8a7"
+    }
+  ],
+  "qualification": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 4.371,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-run",
+        "^Test(Hub(ConnectorObservation|Observation)|ConnectorObservation(Registry|Stream|Hello|Channel)|RegionalObservationExchange|ClusterObservationOrder)",
+        "-v",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 13.681,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-holder-20261013/checkpoint-v1/overlay.json",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 0.761,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "architecture",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 1.212,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    }
+  ],
+  "integratedAt": 1791853106.4801595,
+  "scope": "Component checks only. Full Go gate, real provider authentication and installed runtime composition remain separate. Controlled provider TLS reversal is not a prior live vulnerability."
+}

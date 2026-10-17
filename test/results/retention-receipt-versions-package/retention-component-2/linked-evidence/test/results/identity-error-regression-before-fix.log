@@ -1,0 +1,5 @@
+--- FAIL: TestInvalidTokenDoesNotReadPolicyOrLeakErrors (0.00s)
+    service_test.go:15: unsafe failure: private-token-value reads=0
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.002s
+FAIL

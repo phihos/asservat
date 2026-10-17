@@ -1,0 +1,30 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-run",
+    "^Test(InstalledCapacity|OwnerCapacity|InstalledOwner|OwnerIdentity|InitialRuntime|InstalledWorker|InstalledHubWorker)",
+    "-v",
+    "./internal/contracts",
+    "./internal/domain/configuration",
+    "./internal/adapters/kubernetes",
+    "./internal/bootstrap"
+  ],
+  "exit": 0,
+  "seconds": 28.842,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": []
+  }
+}

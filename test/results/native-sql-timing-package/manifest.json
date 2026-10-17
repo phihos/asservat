@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "base_sha256": "15ca662972e4a4b1bca68081ddc4b81618c278c8f318609f2b59d560c8a97ebc",
+    "sha256": "97d07d65703d28d9afdc2b78eb6c4b3908c03f059bed7ab531134f9e07009f07"
+  },
+  {
+    "path": "test/integration/native_sql_timing_test.go",
+    "base_sha256": null,
+    "sha256": "1dced5d383d0f4d75af943b28833f766502ecce0149fc267e10788416d2aaeda"
+  }
+]

@@ -1,0 +1,34 @@
+schemaVersion: share/v1
+id: 00000000-0000-4000-8000-000000000032
+kind: EvidenceShare
+spec:
+  caseID: 00000000-0000-4000-8000-000000000002
+  artifacts:
+  - artifactID: 00000000-0000-4000-8000-000000000003
+    digest: '3333333333333333333333333333333333333333333333333333333333333333'
+  recipients:
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: group-incident-reviewers-789
+  dataClasses:
+  - metadata
+  - extract
+  operations:
+  - get_case
+  - list_artifacts
+  - get_backtrace
+  - get_timeline
+  reason: Review the selected stack extract without granting workload access.
+  notAfter: '2026-10-09T17:55:00Z'
+  includeFutureArtifacts: false
+  allowReshare: false
+  createdBy:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  management:
+    mode: creator
+status:
+  phase: Active
+  revision: 1

@@ -1,0 +1,87 @@
+[
+  {
+    "path": "internal/adapters/mtls/connector_operation_channel.go",
+    "base": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "payload": "8b2d38209e433c1e9359c9ccf96188af095be17663355dbbf2b8f8b3a55be752"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_client.go",
+    "base": null,
+    "payload": "9110d59cfab8fa3ace533b721594d86fea1f39eb3b89ceb721da7c569e6c9b60"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_connection.go",
+    "base": null,
+    "payload": "1e77d0f168fb84a26badd54fbd9e92ca96e5089910465241cd6400ee14b8871a"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_connection_test.go",
+    "base": null,
+    "payload": "3da8d4278d5fbac5a8a311483c88b7a257e59206e046c565508a0d4244eae177"
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_hub.go",
+    "base": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "payload": "b25d412835a7f6229a7dd2609a7292301f3be5a33ffd1c706806f6487152dd7a"
+  },
+  {
+    "path": "internal/adapters/mtls/observation_operation_wire.go",
+    "base": "3798ea0f15245bf4748bab342d003386e1a5df22f1e28907cc5ca789127c563c",
+    "payload": "0b9dbb03e386bc43d03cd7c1fde49f0a44a1ff3162cb4a9e3fa75d6230b27cda"
+  },
+  {
+    "path": "internal/adapters/mtls/owner_operation_wire.go",
+    "base": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333",
+    "payload": "f7a46377500e982c5f17b028da7e9abd768caf286356c4349682eedb01cd285e"
+  },
+  {
+    "path": "internal/bootstrap/regional_observation_operation_framed_test.go",
+    "base": null,
+    "payload": "a528fde400e57a383e623c137c65f10cd4704e509f63c287b6b5e6e304b8e52b"
+  },
+  {
+    "path": "internal/bootstrap/regional_observation_operation_holder.go",
+    "base": null,
+    "payload": "04bdb4331c5747a2fc91dc20a928fb51c4fe3a36b0644bb04d936a364f6dbcd5"
+  },
+  {
+    "path": "internal/contracts/observation_operation_exchange.go",
+    "base": null,
+    "payload": "e0817f2de3f121f8ec38b2c5c088fdb9db4fe33e2fcf4c7a2a2a614697ee44bb"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_handler.go",
+    "base": null,
+    "payload": "4334914c0e03c4146acee552431b90d02ea989d132f4876726637ab1444df44f"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_handler_test.go",
+    "base": null,
+    "payload": "500de10fb77f67d112fa850d26a930aaac33fcc05976b73250196cb00a6ef600"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_holder.go",
+    "base": null,
+    "payload": "865d618c59e9a00cff9a1b59c6e528b6fed1fc21baacee8361481b9801006c27"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_holder_test.go",
+    "base": null,
+    "payload": "2a352a66a26a3e53610da606f8eba45bc831edd43f77000dfa684fc6021afbf6"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_stream.go",
+    "base": null,
+    "payload": "599831754fe122b406468300ef0d62a681f7e0cce3ab978a0ba522bc93addba0"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_operation_exchange.go",
+    "base": null,
+    "payload": "b3d21e4454300ba1c688357ad0ed64720f90a826ca336ae3f3c428efc17f84ed"
+  },
+  {
+    "path": "internal/transport/clusterobservation/regional_operation_exchange_test.go",
+    "base": null,
+    "payload": "38443006843d6b87a3d6a6e3a03cb825657365832f26c0aad9b22299af6c20a0"
+  }
+]

@@ -1,0 +1,10 @@
+--- FAIL: TestCaptureOperationMaximumCanonicalIdentityFitsPrivateBounds (0.00s)
+    capture_operation_test.go:270: maximum bounded text: capture=7035 intent=14689 outcome=15061 bytes
+    capture_operation_test.go:268: maximum private record lost positive completion digest
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.003s
+--- FAIL: TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion (0.00s)
+    capture_operation_test.go:85: max valid intent lost positive joined completion durable audit unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/objectstore	0.012s
+FAIL

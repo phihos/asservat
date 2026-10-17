@@ -1,0 +1,107 @@
+=== RUN   TestDirectHolderObservationWithRealKubernetes
+    direct_observation_native_test.go:258: native original helper Pod mode=regional original=true phase=Running status-count=1
+    direct_observation_native_test.go:258: native original helper state mode=regional original=true phase=Running ready=false restarts=0 waiting=none terminated=true exit=1
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=inputs event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=inputs event=end elapsed=458.871µs category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=composition event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-owner-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-owner-read event=end elapsed=11.161965ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-recovery-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-recovery-read event=end elapsed=3.729875ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-ack event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-ack event=end elapsed=3.791145ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-journal event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-journal event=end elapsed=3.836205ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=sql-connector-read event=end elapsed=3.636135ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=native-clients event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=native-clients event=end elapsed=13.429543ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=owner-read-constructor event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=owner-read-constructor event=end elapsed=1.533677ms category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=regional-source event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=regional-source event=end elapsed=32µs category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=regional-enrollment event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=regional-enrollment event=end elapsed=8.915844673s category=denied previous=false
+    direct_observation_native_test.go:258: native helper closed failure mode=regional phase=regional-enrollment category=denied previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=failed-composition-join event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=shutdown event=begin elapsed=0s category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=shutdown event=end elapsed=347.561µs category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=failed-composition-join event=end elapsed=357.051µs category=none previous=false
+    direct_observation_native_test.go:258: native helper setup mode=regional phase=composition event=end elapsed=8.95750756s category=denied previous=false
+    direct_observation_native_test.go:258: native helper closed failure mode=regional phase=regional-enrollment category=denied previous=false
+    direct_observation_native_test.go:258: native helper setup failed; inspect closed fixture phase logs regional
+    direct_observation_native_test.go:229: native original helper did not positively join regional
+    direct_observation_native_fixture_test.go:178: native original helper Pod mode=regional original=true phase=Running status-count=1
+    direct_observation_native_fixture_test.go:178: native original helper state mode=regional original=true phase=Running ready=false restarts=1 waiting=none terminated=true exit=1
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=inputs event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=inputs event=end elapsed=456.642µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=composition event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-journal event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-journal event=end elapsed=4.633318ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-read event=end elapsed=3.505174ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-owner-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-owner-read event=end elapsed=3.671725ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-recovery-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-recovery-read event=end elapsed=4.298307ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-ack event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=sql-connector-ack event=end elapsed=3.806255ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=native-clients event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=native-clients event=end elapsed=14.430148ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=owner-read-constructor event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=owner-read-constructor event=end elapsed=1.718157ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=regional-source event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=regional-source event=end elapsed=29.45µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=regional-enrollment event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=regional-enrollment event=end elapsed=4.608477042s category=unavailable previous=false
+    direct_observation_native_fixture_test.go:178: native helper closed failure mode=regional phase=regional-enrollment category=unavailable previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=failed-composition-join event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=shutdown event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=shutdown event=end elapsed=255.161µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=failed-composition-join event=end elapsed=263.801µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=regional phase=composition event=end elapsed=4.644978477s category=unavailable previous=false
+    direct_observation_native_fixture_test.go:178: native helper closed failure mode=regional phase=regional-enrollment category=unavailable previous=false
+    direct_observation_native_fixture_test.go:178: native original helper Pod mode=owner original=true phase=Running status-count=1
+    direct_observation_native_fixture_test.go:178: native original helper state mode=owner original=true phase=Running ready=true restarts=0 waiting=none terminated=false exit=0
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=inputs event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=inputs event=end elapsed=996.214µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=composition event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-connector-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-connector-read event=end elapsed=4.97765ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-ack event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-ack event=end elapsed=3.480114ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-activate event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-activate event=end elapsed=3.592444ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-read event=end elapsed=3.572775ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-write event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=sql-owner-write event=end elapsed=3.553134ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=native-clients event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=native-clients event=end elapsed=13.313823ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-read-constructor event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-read-constructor event=end elapsed=1.379305ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-enrollment event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-enrollment event=end elapsed=2.930588678s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-backend event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=owner-backend event=end elapsed=2.302599ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=composition event=end elapsed=2.966857833s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=shutdown event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=owner phase=shutdown event=end elapsed=254.271µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native original helper Pod mode=hwork original=true phase=Running status-count=1
+    direct_observation_native_fixture_test.go:178: native original helper state mode=hwork original=true phase=Running ready=true restarts=0 waiting=none terminated=false exit=0
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=inputs event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=inputs event=end elapsed=444.792µs category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=composition event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=sql-owner-read event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=sql-owner-read event=end elapsed=5.496252ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=native-clients event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=native-clients event=end elapsed=12.983862ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=owner-read-constructor event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=owner-read-constructor event=end elapsed=1.598197ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=composition event=end elapsed=20.200431ms category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=shutdown event=begin elapsed=0s category=none previous=false
+    direct_observation_native_fixture_test.go:178: native helper setup mode=hwork phase=shutdown event=end elapsed=120.92µs category=none previous=false
+--- FAIL: TestDirectHolderObservationWithRealKubernetes (26.44s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	26.496s
+FAIL

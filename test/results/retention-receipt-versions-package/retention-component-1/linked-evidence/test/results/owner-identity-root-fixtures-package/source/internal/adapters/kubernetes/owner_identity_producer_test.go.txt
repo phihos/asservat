@@ -1,0 +1,144 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs(t *testing.T) {
+	f := newOwnerIdentityProducerFixture(t)
+	original, e := f.root.OpenOwnerIdentityRoles(context.Background())
+	if e != nil {
+		t.Fatal("first private root", e)
+	}
+	if original.State.Until != f.root.resourceUntil || original.UID == "" {
+		t.Fatal("private root changed original end")
+	}
+	for i, purpose := range contracts.OwnerIdentityRolePurposes() {
+		ctx, end := context.WithTimeout(context.Background(), 5*time.Second)
+		current, fresh, e := f.root.ClaimOwnerIdentityRole(ctx, purpose, 42, time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond))
+		if e != nil || !fresh {
+			end()
+			t.Fatalf("first claim %s: fresh=%v error=%v", purpose, fresh, e)
+		}
+		claim := *current.State.Roles[i].Claim
+		replay, fresh, e := f.root.ClaimOwnerIdentityRole(ctx, purpose, 42, claim.PostmasterAt)
+		if e != nil || fresh || !ownerIdentityFixtureTimeClaimEqual(*replay.State.Roles[i].Claim, claim) {
+			end()
+			t.Fatal("claim replay became another effect", purpose, e)
+		}
+		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(i), RoleOID: uint32(6000 + i), LayoutDigest: f.root.input.LayoutDigest}
+		if e = f.root.CompleteOwnerIdentityRole(ctx, current, purpose, receipt); e != nil {
+			end()
+			t.Fatal("exact synthetic SQL receipt", purpose, e)
+		}
+		end()
+	}
+	read, e := f.root.ReadOwnerIdentityRoles(context.Background())
+	if e != nil || read.UID != original.UID || len(read.State.Roles) != 4 {
+		t.Fatal("completed root", e)
+	}
+	f.api.mu.Lock()
+	posts := f.api.posts[f.root.path()+"/"+f.root.name()]
+	f.api.mu.Unlock()
+	if posts != 1 {
+		t.Fatal("root replay repeated CREATE")
+	}
+	for _, fault := range []int32{1, 2, 3, 4, 5} {
+		f.fault.Store(fault)
+		if _, e := f.root.ReadOwnerIdentityRoles(context.Background()); e == nil {
+			t.Fatal("changed RBAC/admission/service or wrong response type survived retained identity", fault)
+		}
+		f.fault.Store(0)
+	}
+	if _, e = f.root.ReadOwnerIdentityRoles(context.Background()); e != nil {
+		t.Fatal("unchanged original after fault removal", e)
+	}
+}
+
+func ownerIdentityFixtureTimeClaimEqual(a, b contracts.PublicRuntimeRoleClaim) bool {
+	return a.OperationID == b.OperationID && a.DatabaseOID == b.DatabaseOID && a.PostmasterAt.Equal(b.PostmasterAt) && a.ClaimedAt.Equal(b.ClaimedAt) && a.Until.Equal(b.Until)
+}
+
+func TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement(t *testing.T) {
+	for _, committed := range []bool{false, true} {
+		name := "before-commit"
+		if committed {
+			name = "after-commit"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newOwnerIdentityProducerFixture(t)
+			if _, e := f.root.OpenOwnerIdentityRoles(context.Background()); e != nil {
+				t.Fatal(e)
+			}
+			f.api.mu.Lock()
+			previous := f.api.extra
+			puts := 0
+			f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
+				if r.Method == http.MethodPut && r.URL.Path == f.root.path()+"/"+f.root.name() {
+					puts++
+					if committed {
+						raw, e := io.ReadAll(r.Body)
+						if e != nil {
+							t.Error(e)
+							return true
+						}
+						var next map[string]any
+						if json.Unmarshal(raw, &next) != nil {
+							t.Error("root CAS body")
+							return true
+						}
+						old := f.api.objects[r.URL.Path]
+						m := next["metadata"].(map[string]any)
+						om := old["metadata"].(map[string]any)
+						if m["uid"] != om["uid"] || m["resourceVersion"] != om["resourceVersion"] {
+							t.Error("non-CAS root write")
+						}
+						f.api.serial++
+						m["resourceVersion"] = strconv.Itoa(f.api.serial)
+						// The committed native Secret has the versioned response shape,
+						// independently of the deliberately lost CAS reply below.
+						next["apiVersion"], next["kind"] = "v1", "Secret"
+						f.api.objects[r.URL.Path] = next
+					}
+					f.api.status(w, 503, meta.StatusReasonServiceUnavailable, "secrets", "synthetic unknown reply")
+					return true
+				}
+				return previous(w, r)
+			}
+			f.api.mu.Unlock()
+			postmaster := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
+			if _, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "enrollment", 42, postmaster); e == nil || fresh {
+				t.Fatal("unknown claim returned CREATE permission")
+			}
+			got, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "enrollment", 42, postmaster)
+			if fresh || committed && e != nil || !committed && e == nil {
+				t.Fatal("unknown CAS replay disposition", fresh, e)
+			}
+			if committed && got.State.Roles[0].Claim == nil {
+				t.Fatal("lost committed claim erased")
+			}
+			f.api.mu.Lock()
+			n := puts
+			f.api.mu.Unlock()
+			if n != 1 {
+				t.Fatal("unknown claim repeated CAS")
+			}
+			// Error types remain purpose-fixed; no provider or credential effect is
+			// attempted by this fixture, and absence never grants a replacement.
+			if !committed && e != cfg.ErrUnavailable {
+				t.Fatal("unexpected uncertainty", e)
+			}
+		})
+	}
+}

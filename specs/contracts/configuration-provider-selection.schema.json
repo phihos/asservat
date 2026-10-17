@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json",
+  "title": "Original configuration provider selection",
+  "description": "Pre-resource original auth mount/accessor and dedicated audit Secret identity. Empty protected Secret identity can be allocated before source UID exists; no content readiness, credential, provider authority or current observation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authMount",
+    "authMountAccessor",
+    "auditCredentials"
+  ],
+  "properties": {
+    "authMount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])",
+      "not": {
+        "const": "token"
+      }
+    },
+    "authMountAccessor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])"
+    },
+    "auditCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^asservat-[0-9a-f]{32}-worker-providers(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  }
+}

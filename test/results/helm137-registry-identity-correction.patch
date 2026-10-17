@@ -1,0 +1,162 @@
+--- a/scripts/helm_registry.py
++++ b/scripts/helm_registry.py
+@@ -20,6 +20,60 @@
+ # Official docker-library/repo-info registry:3 / Distribution 3.1.2, 2026-10-12.
+ # Published provenance is distinct from qualification of this fixture.
+ REGISTRY = "registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
++
++
++def exported_image_identity(content, expected_image, config):
++    """Bind exported configuration to the exact Docker image, on both stores.
++
++    The classic store reports a config digest as Id. The containerd store may
++    report an index/manifest digest instead. Follow its hash-verified descriptor
++    chain to the one matching platform; never accept a different archive entry.
++    """
++    config_digest = "sha256:" + hashlib.sha256(config).hexdigest()
++    configuration = json.loads(config)
++    if expected_image == config_digest:
++        return {"dockerImageID": expected_image, "configDigest": config_digest,
++                "identityKind": "config"}
++    platform = {key: configuration.get(key) for key in ("os", "architecture")}
++    if not all(isinstance(value, str) and value for value in platform.values()):
++        raise RuntimeError("exported image platform unavailable")
++    variant = configuration.get("variant")
++    if variant:
++        platform["variant"] = variant
++    current, seen = expected_image, set()
++    for _ in range(3):
++        if not isinstance(current, str) or not current.startswith("sha256:") or len(current) != 71 or any(c not in "0123456789abcdef" for c in current[7:]) or current in seen:
++            raise RuntimeError("invalid or recursive exported image identity")
++        seen.add(current)
++        raw = content("blobs/sha256/" + current[7:], 64 << 10)
++        if "sha256:" + hashlib.sha256(raw).hexdigest() != current:
++            raise RuntimeError("exported image descriptor digest differs")
++        value = json.loads(raw)
++        if value.get("schemaVersion") != 2:
++            raise RuntimeError("unsupported exported image schema")
++        media = value.get("mediaType")
++        if media in ("application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json"):
++            descriptor = value.get("config", {})
++            if descriptor.get("digest") != config_digest or descriptor.get("size") != len(config):
++                raise RuntimeError("exported image differs from compiled configuration")
++            return {"dockerImageID": expected_image, "configDigest": config_digest,
++                    "selectedManifestDigest": current, "identityKind": "descriptor-chain"}
++        if media not in ("application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json"):
++            raise RuntimeError("unsupported exported image descriptor")
++        manifests = value.get("manifests")
++        if not isinstance(manifests, list) or not 1 <= len(manifests) <= 8:
++            raise RuntimeError("unbounded exported image index")
++        selected = [item for item in manifests if isinstance(item, dict) and item.get("platform") == platform]
++        if len(selected) != 1:
++            raise RuntimeError("exported image platform is missing or ambiguous")
++        descriptor = selected[0]
++        current = descriptor.get("digest")
++        if not isinstance(current, str) or not current.startswith("sha256:") or len(current) != 71 or any(c not in "0123456789abcdef" for c in current[7:]):
++            raise RuntimeError("invalid exported image child identity")
++        child = content("blobs/sha256/" + current[7:], 64 << 10)
++        if descriptor.get("size") != len(child) or json.loads(child).get("mediaType") != descriptor.get("mediaType"):
++            raise RuntimeError("exported image descriptor metadata differs")
++    raise RuntimeError("exported image identity exceeds descriptor depth")
+ 
+ 
+ class NoRedirect(urllib.request.HTTPRedirectHandler):
+@@ -88,7 +142,7 @@
+         request = urllib.request.Request(self.endpoint+path, data=data, headers=headers, method=method)
+         return self.client.open(request, timeout=60)
+ 
+-    def upload(self, worker_tag, expected_config):
++    def upload(self, worker_tag, expected_image):
+         archive = self.work/"image.tar"
+         self.run(["docker", "image", "save", "-o", str(archive), worker_tag])
+         archive.chmod(0o600)
+@@ -105,8 +159,7 @@
+                 raise RuntimeError("fixture image archive must contain one bounded image")
+             entry = entries[0]
+             config = content(entry["Config"], 64 << 10)
+-            if "sha256:"+hashlib.sha256(config).hexdigest() != expected_config:
+-                raise RuntimeError("registry image changed original compiled configuration")
++            self.export_identity = exported_image_identity(content, expected_image, config)
+             configuration = json.loads(config)
+             diff_ids = configuration["rootfs"]["diff_ids"]
+             if len(diff_ids) != len(entry["Layers"]):
+--- a/scripts/test-context-storage.py
++++ b/scripts/test-context-storage.py
+@@ -118,6 +118,7 @@
+             if helm_bootstrap:
+                 registry = HelmRegistry(work, network, run_id, containers, run)
+                 registry.upload(worker_tag, worker_info["Id"])
++                report["registryImageIdentity"] = registry.export_identity
+                 chart_dir = work/"chart"
+                 chart_dir.mkdir()
+                 run(["helm", "package", str(ROOT/"charts/asservat"), "--destination", str(chart_dir)])
+@@ -341,6 +342,12 @@
+                 try: report["registryCleanup"] = verify_registry_cleanup(run, work, network)
+                 except Exception: failures.append(network+"-registry-cleanup-verification")
+             report["cleanupFailures"] = failures
++            # Setup failures still need an actual source comparison. This is
++            # provenance only and never turns an unexecuted test into a pass.
++            if "sourceHashes" in report:
++                report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
++                if not report["sourceUnchangedDuringTest"]:
++                    exit_code = 1
+             (ROOT/"test/results/context-storage-environment.json").write_text(json.dumps(report, indent=2)+"\n")
+             if failures: raise RuntimeError("Owned fixtures need cleanup: "+", ".join(failures))
+         return exit_code
+--- a/scripts/test-helm-bootstrap-selection.py
++++ b/scripts/test-helm-bootstrap-selection.py
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ """Pure Helm fixture selection/evidence regressions; no external services."""
+ import importlib.util
++import hashlib
+ import json
+ from pathlib import Path
+ from types import SimpleNamespace
+@@ -8,7 +9,7 @@
+ import tempfile
+ from unittest.mock import patch
+ 
+-from helm_registry import HelmRegistry, verify_registry_cleanup
++from helm_registry import HelmRegistry, exported_image_identity, verify_registry_cleanup
+ 
+ spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
+ fixture = importlib.util.module_from_spec(spec)
+@@ -16,6 +17,37 @@
+ 
+ 
+ class HelmSelection(unittest.TestCase):
++    def test_exact_docker_config_or_containerd_descriptor_identity(self):
++        blobs = {}
++        def blob(value):
++            raw = json.dumps(value, separators=(",", ":")).encode()
++            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
++            blobs["blobs/sha256/"+digest[7:]] = raw
++            return {"digest": digest, "size": len(raw), "mediaType": value.get("mediaType")}
++        config = json.dumps({"os": "linux", "architecture": "amd64", "rootfs": {"diff_ids": []}}).encode()
++        digest = "sha256:" + hashlib.sha256(config).hexdigest()
++        manifest = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json", "config": {"digest": digest, "size": len(config)}, "layers": []})
++        descriptor = dict(manifest, platform={"os": "linux", "architecture": "amd64"})
++        index = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [descriptor]})
++        def read(path, maximum):
++            raw = blobs[path]
++            self.assertLessEqual(len(raw), maximum)
++            return raw
++        self.assertEqual(exported_image_identity(read, digest, config)["identityKind"], "config")
++        self.assertEqual(exported_image_identity(read, index["digest"], config)["selectedManifestDigest"], manifest["digest"])
++        self.assertEqual(exported_image_identity(read, manifest["digest"], config)["configDigest"], digest)
++        wrong = config.replace(b"amd64", b"arm64")
++        with self.assertRaisesRegex(RuntimeError, "missing or ambiguous"):
++            exported_image_identity(read, index["digest"], wrong)
++        ambiguous = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [descriptor, descriptor]})
++        with self.assertRaisesRegex(RuntimeError, "missing or ambiguous"):
++            exported_image_identity(read, ambiguous["digest"], config)
++        with self.assertRaisesRegex(RuntimeError, "differs from compiled"):
++            exported_image_identity(read, manifest["digest"], config+b" ")
++        blobs["blobs/sha256/"+manifest["digest"][7:]] += b" "
++        with self.assertRaisesRegex(RuntimeError, "digest differs"):
++            exported_image_identity(read, manifest["digest"], config)
++
+     def test_exact_empty_database_and_no_stale_native_flags(self):
+         self.assertEqual(fixture.qualification_selection(None, False, False, False, True), ("^TestHelmBootstrapWithRealServices$", 1))
+         for args in [("TestOther", False, False, False, True), (None, True, False, False, True), (None, False, True, False, True), (None, False, False, True, True)]:

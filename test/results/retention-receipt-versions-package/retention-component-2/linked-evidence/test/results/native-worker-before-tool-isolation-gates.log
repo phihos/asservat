@@ -1,0 +1,66 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 12 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.679s
+ok  	asservat.local/asservat/internal/adapters/kms	2.017s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	25.824s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.012s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.694s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.810s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.194s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.422s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.015s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.025s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.042s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.212s
+ok  	asservat.local/asservat/internal/application/evidence	1.085s
+ok  	asservat.local/asservat/internal/application/execution	1.030s
+ok  	asservat.local/asservat/internal/application/fleet	2.046s
+ok  	asservat.local/asservat/internal/application/identity	1.012s
+ok  	asservat.local/asservat/internal/application/planning	1.034s
+ok  	asservat.local/asservat/internal/application/privacy	1.029s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	4.355s
+ok  	asservat.local/asservat/internal/contracts	1.008s
+ok  	asservat.local/asservat/internal/domain/artifact	1.008s
+ok  	asservat.local/asservat/internal/domain/audit	1.006s
+ok  	asservat.local/asservat/internal/domain/authorization	1.404s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.007s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.010s
+ok  	asservat.local/asservat/internal/domain/identity	1.008s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.012s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.024s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.452s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+?   	asservat.local/asservat/test/fixtures/provider-proxy	[no test files]
+ok  	asservat.local/asservat/test/integration	2.084s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 50, in <module>
+    raise ValueError("Test infrastructure must not become a product package")
+ValueError: Test infrastructure must not become a product package
+make: *** [Makefile:42: go-architecture-check] Error 1

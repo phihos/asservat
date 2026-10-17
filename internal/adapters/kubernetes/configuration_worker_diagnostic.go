@@ -1,0 +1,328 @@
+package kubernetes
+
+import "errors"
+
+// These private diagnostics name only fixed source statements and predicates.
+// They never sample a new clock or inspect a response/error string for a reason.
+type configurationSourceCheck uint8
+
+const (
+	configurationSourceUnknown configurationSourceCheck = iota
+	configurationSourceEntry
+	configurationSourceNamespaceFirstRead
+	configurationSourceNamespaceFirstDeleting
+	configurationSourceNamespaceFinalDeleting
+	configurationSourceGuardsFirst
+	configurationSourceProbeWorkload
+	configurationSourceProbeFleet
+	configurationSourceProbeOwner
+	configurationSourceAdministrator
+	configurationSourceFleetInitial
+	configurationSourceOwnerInitial
+	configurationSourceDeploymentFirstRead
+	configurationSourceAccountFirstRead
+	configurationSourceGuardsFinal
+	configurationSourceValuesFinal
+	configurationSourceDeploymentFinalRead
+	configurationSourceAccountFinalRead
+	configurationSourceNamespaceFinalRead
+	configurationSourceSourcePair
+	configurationSourceDeploymentFirstBound
+	configurationSourceAccountFirstBound
+	configurationSourceGuardsChanged
+	configurationSourceSourcesChanged
+	configurationSourceDeploymentFinalBound
+	configurationSourceAccountFinalBound
+	configurationSourceFinalDeadline
+	configurationSourceInitialFleetValid
+	configurationSourceFinalFleetValid
+	configurationSourceDeploymentEncode
+	configurationSourceGuardDigest
+	configurationSourceObservationMatch
+	configurationSourceAdministratorRead
+	configurationSourceAdministratorBody
+	configurationSourceAdministratorDecode
+	configurationSourceAdministratorMembership
+	configurationSourceFleetEncode
+	configurationSourceFleetConfigmap
+	configurationSourceFleetDecode
+	configurationSourceFleetSuspended
+	configurationSourceFleetValid
+	configurationSourceOwnerEncode
+	configurationSourceOwnerConfigmap
+	configurationSourceOwnerDecode
+	configurationSourceOwnerSuspended
+	configurationSourceOwnerValid
+	configurationSourceOwnerRootsDeadline
+	configurationSourceValuesFleetDecode
+	configurationSourceValuesFleetRead
+	configurationSourceValuesOwnerDecode
+	configurationSourceValuesOwnerRead
+	configurationSourceValuesPair
+	configurationSourceGuardWorkload
+	configurationSourceGuardFleet
+	configurationSourceGuardOwner
+	configurationSourceGuardPolicyRead
+	configurationSourceGuardPolicyDecode
+	configurationSourceGuardPolicyIdentity
+	configurationSourceGuardPolicySpec
+	configurationSourceGuardBindingRead
+	configurationSourceGuardBindingDecode
+	configurationSourceGuardBindingIdentity
+	configurationSourceProbeIdentityRead
+	configurationSourceProbeIdentityShape
+	configurationSourceProbeAdministrator
+	configurationSourceProbeAccessRead
+	configurationSourceProbeAccessVerdict
+	configurationSourceProbeObjectRead
+	configurationSourceProbeObjectShape
+	configurationSourceProbeDenialBody
+	configurationSourceProbeDenialStatus
+	configurationSourceProbeDenialDetails
+	configurationSourceProbeDenialCause
+	configurationSourceProbeControlIdentity
+	configurationSourceProbeControllerIdentity
+	configurationSourceProbeOriginalInterval
+	configurationSourceProbeStatusDecode
+	configurationSourceProbeConflictsExhausted
+	// The worker-current recheck (ADR-193 diagnostics of the owner launch).
+	configurationSourceCurrentEntry
+	configurationSourceCurrentNamespace
+	configurationSourceCurrentGuards
+	configurationSourceCurrentAdministrator
+	configurationSourceCurrentValues
+	configurationSourceCurrentSources
+	configurationSourceCurrentDeploymentRead
+	configurationSourceCurrentDeployment
+	configurationSourceCurrentAccountRead
+	configurationSourceCurrentAccount
+	configurationSourceCurrentDeadline
+	// Entry of the projection preflight's tail and finish: an expired
+	// original window versus a cancelled caller.
+	configurationSourceTailExpired
+	configurationSourceTailCancelled
+	configurationSourceFinishExpired
+	configurationSourceFinishCancelled
+)
+
+func (c configurationSourceCheck) String() string {
+	switch c {
+	case configurationSourceEntry:
+		return "source.entry"
+	case configurationSourceNamespaceFirstRead:
+		return "source.namespace-first-read"
+	case configurationSourceNamespaceFirstDeleting:
+		return "source.namespace-first-deleting"
+	case configurationSourceNamespaceFinalDeleting:
+		return "source.namespace-final-deleting"
+	case configurationSourceGuardsFirst:
+		return "source.guards-first"
+	case configurationSourceProbeWorkload:
+		return "source.probe-workload"
+	case configurationSourceProbeFleet:
+		return "source.probe-fleet"
+	case configurationSourceProbeOwner:
+		return "source.probe-owner"
+	case configurationSourceAdministrator:
+		return "source.administrator"
+	case configurationSourceFleetInitial:
+		return "source.fleet-initial"
+	case configurationSourceOwnerInitial:
+		return "source.owner-initial"
+	case configurationSourceDeploymentFirstRead:
+		return "source.deployment-first-read"
+	case configurationSourceAccountFirstRead:
+		return "source.account-first-read"
+	case configurationSourceGuardsFinal:
+		return "source.guards-final"
+	case configurationSourceValuesFinal:
+		return "source.values-final"
+	case configurationSourceDeploymentFinalRead:
+		return "source.deployment-final-read"
+	case configurationSourceAccountFinalRead:
+		return "source.account-final-read"
+	case configurationSourceNamespaceFinalRead:
+		return "source.namespace-final-read"
+	case configurationSourceSourcePair:
+		return "source.source-pair"
+	case configurationSourceDeploymentFirstBound:
+		return "source.deployment-first-bound"
+	case configurationSourceAccountFirstBound:
+		return "source.account-first-bound"
+	case configurationSourceGuardsChanged:
+		return "source.guards-changed"
+	case configurationSourceSourcesChanged:
+		return "source.sources-changed"
+	case configurationSourceDeploymentFinalBound:
+		return "source.deployment-final-bound"
+	case configurationSourceAccountFinalBound:
+		return "source.account-final-bound"
+	case configurationSourceFinalDeadline:
+		return "source.final-deadline"
+	case configurationSourceInitialFleetValid:
+		return "source.initial-fleet-valid"
+	case configurationSourceFinalFleetValid:
+		return "source.final-fleet-valid"
+	case configurationSourceDeploymentEncode:
+		return "source.deployment-encode"
+	case configurationSourceGuardDigest:
+		return "source.guard-digest"
+	case configurationSourceObservationMatch:
+		return "source.observation-match"
+	case configurationSourceAdministratorRead:
+		return "source.administrator-read"
+	case configurationSourceAdministratorBody:
+		return "source.administrator-body"
+	case configurationSourceAdministratorDecode:
+		return "source.administrator-decode"
+	case configurationSourceAdministratorMembership:
+		return "source.administrator-membership"
+	case configurationSourceFleetEncode:
+		return "source.fleet-encode"
+	case configurationSourceFleetConfigmap:
+		return "source.fleet-configmap"
+	case configurationSourceFleetDecode:
+		return "source.fleet-decode"
+	case configurationSourceFleetSuspended:
+		return "source.fleet-suspended"
+	case configurationSourceFleetValid:
+		return "source.fleet-valid"
+	case configurationSourceOwnerEncode:
+		return "source.owner-encode"
+	case configurationSourceOwnerConfigmap:
+		return "source.owner-configmap"
+	case configurationSourceOwnerDecode:
+		return "source.owner-decode"
+	case configurationSourceOwnerSuspended:
+		return "source.owner-suspended"
+	case configurationSourceOwnerValid:
+		return "source.owner-valid"
+	case configurationSourceOwnerRootsDeadline:
+		return "source.owner-roots-deadline"
+	case configurationSourceValuesFleetDecode:
+		return "source.values-fleet-decode"
+	case configurationSourceValuesFleetRead:
+		return "source.values-fleet-read"
+	case configurationSourceValuesOwnerDecode:
+		return "source.values-owner-decode"
+	case configurationSourceValuesOwnerRead:
+		return "source.values-owner-read"
+	case configurationSourceValuesPair:
+		return "source.values-pair"
+	case configurationSourceGuardWorkload:
+		return "source.guard-workload"
+	case configurationSourceGuardFleet:
+		return "source.guard-fleet"
+	case configurationSourceGuardOwner:
+		return "source.guard-owner"
+	case configurationSourceGuardPolicyRead:
+		return "source.guard-policy-read"
+	case configurationSourceGuardPolicyDecode:
+		return "source.guard-policy-decode"
+	case configurationSourceGuardPolicyIdentity:
+		return "source.guard-policy-identity"
+	case configurationSourceGuardPolicySpec:
+		return "source.guard-policy-spec"
+	case configurationSourceGuardBindingRead:
+		return "source.guard-binding-read"
+	case configurationSourceGuardBindingDecode:
+		return "source.guard-binding-decode"
+	case configurationSourceGuardBindingIdentity:
+		return "source.guard-binding-identity"
+	case configurationSourceProbeIdentityRead:
+		return "source.probe-identity-read"
+	case configurationSourceProbeIdentityShape:
+		return "source.probe-identity-shape"
+	case configurationSourceProbeAdministrator:
+		return "source.probe-administrator"
+	case configurationSourceProbeAccessRead:
+		return "source.probe-access-read"
+	case configurationSourceProbeAccessVerdict:
+		return "source.probe-access-verdict"
+	case configurationSourceProbeObjectRead:
+		return "source.probe-object-read"
+	case configurationSourceProbeObjectShape:
+		return "source.probe-object-shape"
+	case configurationSourceProbeDenialBody:
+		return "source.probe-denial-body"
+	case configurationSourceProbeDenialStatus:
+		return "source.probe-denial-status"
+	case configurationSourceProbeDenialDetails:
+		return "source.probe-denial-details"
+	case configurationSourceProbeDenialCause:
+		return "source.probe-denial-cause"
+	case configurationSourceProbeControlIdentity:
+		return "source.probe-control-identity"
+	case configurationSourceProbeControllerIdentity:
+		return "source.probe-controller-identity"
+	case configurationSourceProbeOriginalInterval:
+		return "source.probe-original-interval"
+	case configurationSourceProbeStatusDecode:
+		return "source.probe-status-decode"
+	case configurationSourceProbeConflictsExhausted:
+		return "source.probe-conflicts-exhausted"
+	case configurationSourceCurrentEntry:
+		return "source.current-entry"
+	case configurationSourceCurrentNamespace:
+		return "source.current-namespace"
+	case configurationSourceCurrentGuards:
+		return "source.current-guards"
+	case configurationSourceCurrentAdministrator:
+		return "source.current-administrator"
+	case configurationSourceCurrentValues:
+		return "source.current-values"
+	case configurationSourceCurrentSources:
+		return "source.current-sources"
+	case configurationSourceCurrentDeploymentRead:
+		return "source.current-deployment-read"
+	case configurationSourceCurrentDeployment:
+		return "source.current-deployment"
+	case configurationSourceCurrentAccountRead:
+		return "source.current-account-read"
+	case configurationSourceCurrentAccount:
+		return "source.current-account"
+	case configurationSourceCurrentDeadline:
+		return "source.current-deadline"
+	case configurationSourceTailExpired:
+		return "source.tail-expired"
+	case configurationSourceTailCancelled:
+		return "source.tail-cancelled"
+	case configurationSourceFinishExpired:
+		return "source.finish-expired"
+	case configurationSourceFinishCancelled:
+		return "source.finish-cancelled"
+	default:
+		return "source.unknown"
+	}
+}
+
+type configurationWorkerDiagnostic struct {
+	check  configurationSourceCheck
+	cause  error
+	detail *configurationWorkerDiagnostic
+}
+
+func (e *configurationWorkerDiagnostic) Error() string {
+	text := e.check.String()
+	for d := e.detail; d != nil; d = d.detail {
+		text += ": " + d.check.String()
+	}
+	return text
+}
+func (e *configurationWorkerDiagnostic) Unwrap() error { return e.cause }
+
+// FixedStep exposes only the fixed check codes to operator stop messages.
+func (e *configurationWorkerDiagnostic) FixedStep() string { return e.Error() }
+func configurationSourceError(check configurationSourceCheck, cause error) error {
+	return &configurationWorkerDiagnostic{check: check, cause: cause, detail: configurationSourceCodes(cause)}
+}
+
+// Rendering across a normalizing owner/projection boundary retains only codes.
+// Original causes remain solely on each original error's unchanged Unwrap path.
+func configurationSourceCodes(err error) *configurationWorkerDiagnostic {
+	var e *configurationWorkerDiagnostic
+	if !errors.As(err, &e) || e == nil {
+		return nil
+	}
+	return &configurationWorkerDiagnostic{check: e.check, detail: configurationSourceCodes(e.detail)}
+}

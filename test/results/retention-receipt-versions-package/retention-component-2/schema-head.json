@@ -1,0 +1,7 @@
+{
+  "permission": "parent message permits staging 56->57; root owns integration",
+  "path": "internal/adapters/postgres/custody.go",
+  "base": "0e18cb59d8ef232790adf4faed7b88305b17d674ec4a92c867fb24244ce8ea03",
+  "payload": "d0232903e062a23aa0b21308bd5704fca1991af8da22c2b026949e08cfb0d383",
+  "exact_change": "const currentSchemaVersion = 56 -> const currentSchemaVersion = 57"
+}

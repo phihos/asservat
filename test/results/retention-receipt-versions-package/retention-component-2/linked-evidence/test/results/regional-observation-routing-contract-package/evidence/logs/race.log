@@ -1,0 +1,318 @@
+=== RUN   TestClusterObservationRoutingOriginalSelection
+--- PASS: TestClusterObservationRoutingOriginalSelection (0.00s)
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-installation
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-pod
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/challenge
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-issuer
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/old-locator
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/expired-locator
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/future-locator
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/expired-request
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/future-request
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/unknown-purpose
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/request
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/root
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-cluster
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-process
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/later-locator
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/empty-locator-interval
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/overlong-request
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/wrong-purpose-shape
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/region
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/exchange
+=== RUN   TestClusterObservationRoutingRejectsChangedTupleOrInterval/zero-sequence
+--- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-installation (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-pod (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/challenge (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-issuer (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/old-locator (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/expired-locator (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/future-locator (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/expired-request (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/future-request (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/unknown-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/request (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/root (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-cluster (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/holder-process (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/later-locator (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/empty-locator-interval (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/overlong-request (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/wrong-purpose-shape (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/region (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/exchange (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsChangedTupleOrInterval/zero-sequence (0.00s)
+=== RUN   TestClusterObservationRoutingClaimCloneAndClosedPurposes
+--- PASS: TestClusterObservationRoutingClaimCloneAndClosedPurposes (0.00s)
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/union
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/request
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/future
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge
+--- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/union (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/request (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/future (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge (0.00s)
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind
+--- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+=== RUN   TestClusterObservationFramesRejectOversizedBeforeReadingBody
+--- PASS: TestClusterObservationFramesRejectOversizedBeforeReadingBody (0.00s)
+=== RUN   TestClusterObservationFramesHaveNoCaptureOrCredentialFallback
+--- PASS: TestClusterObservationFramesHaveNoCaptureOrCredentialFallback (0.00s)
+=== RUN   TestClusterObservationRoutingCanonicalTarget
+=== RUN   TestClusterObservationRoutingCanonicalTarget/lowercase-escape
+=== RUN   TestClusterObservationRoutingCanonicalTarget/semicolon
+=== RUN   TestClusterObservationRoutingCanonicalTarget/over-bound
+=== RUN   TestClusterObservationRoutingCanonicalTarget/claim-path
+=== RUN   TestClusterObservationRoutingCanonicalTarget/fragment
+=== RUN   TestClusterObservationRoutingCanonicalTarget/unknown
+=== RUN   TestClusterObservationRoutingCanonicalTarget/order
+=== RUN   TestClusterObservationRoutingCanonicalTarget/unescaped-time
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty
+=== RUN   TestClusterObservationRoutingCanonicalTarget/userinfo
+=== RUN   TestClusterObservationRoutingCanonicalTarget/encoded-path
+=== RUN   TestClusterObservationRoutingCanonicalTarget/relative
+=== RUN   TestClusterObservationRoutingCanonicalTarget/double-slash
+=== RUN   TestClusterObservationRoutingCanonicalTarget/missing
+=== RUN   TestClusterObservationRoutingCanonicalTarget/alias
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty-key
+=== RUN   TestClusterObservationRoutingCanonicalTarget/absolute
+=== RUN   TestClusterObservationRoutingCanonicalTarget/escape-unreserved
+=== RUN   TestClusterObservationRoutingCanonicalTarget/bad-escape
+=== RUN   TestClusterObservationRoutingCanonicalTarget/wrong-format
+=== RUN   TestClusterObservationRoutingCanonicalTarget/duplicate
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty-duplicate
+--- PASS: TestClusterObservationRoutingCanonicalTarget (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/lowercase-escape (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/semicolon (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/over-bound (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/claim-path (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/fragment (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/order (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/unescaped-time (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/userinfo (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/encoded-path (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/relative (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/double-slash (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/missing (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/alias (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty-key (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/absolute (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/escape-unreserved (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/bad-escape (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/wrong-format (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty-duplicate (0.00s)
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/comma
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/empty-interval
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/missing-id
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/zero-id
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/fraction-zero
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/backwards
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/over-five-seconds
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/uppercase-id
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/purpose
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/zero
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/invalid
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/offset
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/excess-precision
+--- PASS: TestClusterObservationRoutingRejectsDatesAndIDs (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/comma (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/empty-interval (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/missing-id (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/zero-id (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/fraction-zero (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/backwards (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/over-five-seconds (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/uppercase-id (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/zero (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/invalid (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/offset (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/excess-precision (0.00s)
+=== RUN   TestClusterObservationRoutingExactUint64
+=== RUN   TestClusterObservationRoutingExactUint64/1
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740991
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740992
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740993
+=== RUN   TestClusterObservationRoutingExactUint64/18446744073709551614
+=== RUN   TestClusterObservationRoutingExactUint64/18446744073709551615
+=== RUN   TestClusterObservationRoutingExactUint64/reject-0
+=== RUN   TestClusterObservationRoutingExactUint64/reject--0
+=== RUN   TestClusterObservationRoutingExactUint64/reject--1
+=== RUN   TestClusterObservationRoutingExactUint64/reject-18446744073709551616
+=== RUN   TestClusterObservationRoutingExactUint64/reject-9007199254740993.0
+=== RUN   TestClusterObservationRoutingExactUint64/reject-1e0
+=== RUN   TestClusterObservationRoutingExactUint64/reject-"1"
+=== RUN   TestClusterObservationRoutingExactUint64/reject-null
+=== RUN   TestClusterObservationRoutingExactUint64/reject-true
+=== RUN   TestClusterObservationRoutingExactUint64/reject-01
+--- PASS: TestClusterObservationRoutingExactUint64 (0.01s)
+    --- PASS: TestClusterObservationRoutingExactUint64/1 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740991 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740992 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740993 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/18446744073709551614 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/18446744073709551615 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject--0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject--1 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-18446744073709551616 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-9007199254740993.0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-1e0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-"1" (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-null (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-true (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-01 (0.00s)
+=== RUN   TestClusterObservationRoutingClosedJSON
+=== RUN   TestClusterObservationRoutingClosedJSON/trailing
+=== RUN   TestClusterObservationRoutingClosedJSON/duplicate
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-duplicate
+=== RUN   TestClusterObservationRoutingClosedJSON/request-unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/request-null
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-envelope-purpose
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-locator-purpose
+=== RUN   TestClusterObservationRoutingClosedJSON/over-bound
+=== RUN   TestClusterObservationRoutingClosedJSON/unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-alias
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-missing
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-null
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-request-purpose
+--- PASS: TestClusterObservationRoutingClosedJSON (0.01s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/trailing (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/request-unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/request-null (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-envelope-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-locator-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/over-bound (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-alias (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-missing (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-null (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-request-purpose (0.00s)
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/root
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/cluster
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/holder
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/prior-observation
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/extended-observation
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/request-format
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/request
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/challenge
+--- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/root (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/cluster (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/holder (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/prior-observation (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/extended-observation (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/request-format (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/request (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/challenge (0.00s)
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-guard
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-candidates
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload-candidates
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload
+--- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings (0.01s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-guard (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-candidates (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload-candidates (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload (0.00s)
+=== RUN   TestClusterObservationRoutingMaximumRequest
+--- PASS: TestClusterObservationRoutingMaximumRequest (0.06s)
+=== RUN   TestClusterObservationMaximumClosedWire
+=== RUN   TestClusterObservationMaximumClosedWire/char-22
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-5c
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-3c
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-26
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+--- PASS: TestClusterObservationMaximumClosedWire (0.43s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-22 (0.12s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-5c (0.12s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-3c (0.09s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-26 (0.09s)
+=== RUN   TestClusterObservationWireRejectsSmuggledFields
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/missing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/trailing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/too-large
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/token
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/url
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/duplicate
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/alias
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/null
+--- PASS: TestClusterObservationWireRejectsSmuggledFields (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/missing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/trailing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/too-large (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/token (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/url (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/duplicate (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/alias (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/null (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.559s
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates
+=== RUN   TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload
+--- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose (0.01s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates (0.00s)
+    --- PASS: TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose/capacity-workload (0.00s)
+=== RUN   TestClusterObservationApplicationDigestPreservesEmptyAndOrderingSemantics
+--- PASS: TestClusterObservationApplicationDigestPreservesEmptyAndOrderingSemantics (0.00s)
+=== RUN   TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource
+--- PASS: TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource (0.00s)
+=== RUN   TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection
+--- PASS: TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	1.037s

@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/privacy	1.011s
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+ok  	asservat.local/asservat/internal/application/configuration	1.011s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.007s

@@ -1,0 +1,11 @@
+{
+  "name": "adr184-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-184 steps 1-4 and 6: routing/native-read owner identity purposes and grants, observation catalog writer, inert-owner public role precondition, projected public volume, provider-installed Native/Public admission",
+  "results": "55 full packages and 547 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (group 4)",
+  "sourceHashBefore": "708a307528cab8a112bb3fc6d8c6e710d9b9e6d8c9acb1eda0bdd86d8ca6c080",
+  "sourceHashAfter": "708a307528cab8a112bb3fc6d8c6e710d9b9e6d8c9acb1eda0bdd86d8ca6c080",
+  "log": "go-check.log"
+}

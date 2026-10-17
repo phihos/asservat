@@ -1,0 +1,420 @@
+package kms
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// InstalledOwnerProviderEffects owns only the fixed four provider lifetimes.
+// The authority path is composed here from concrete installed adapters; neither
+// a public callback, caller timestamp nor arbitrary transport can replace it.
+// The caller retains files and SQL/native adapters until Close succeeds or
+// CloseAndJoin returns after actual completion, including on a bounded error.
+type InstalledOwnerProviderEffects struct {
+	input           contracts.OwnerDeployment
+	files           *os.Root
+	reader          *kubernetes.InstalledOwnerIdentityReader
+	configuration   *postgres.OwnerConfigurations
+	original        fleet.OwnerConfiguration
+	effects         *ownerProviderEffects
+	root            context.Context
+	cancel          context.CancelFunc
+	mu              sync.Mutex
+	started, closed bool
+	joined          sync.WaitGroup
+	closeWait       sync.Once
+	closeDone       chan struct{}
+}
+
+func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, reader *kubernetes.InstalledOwnerIdentityReader, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || reader == nil || configuration == nil || input.Observation == nil || input.Observation.Activation == nil || input.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || input.ProviderAuthentication == nil || !reader.MatchesProviderInput(input) || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool || ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
+		return nil, ErrKeyService
+	}
+	raw, err := json.Marshal(input)
+	var cloned contracts.OwnerDeployment
+	if err != nil || json.Unmarshal(raw, &cloned) != nil {
+		return nil, ErrKeyService
+	}
+	input = cloned
+	roots, _, err := mtls.OwnerTrustRoots(accepted.IssuerRoots, time.Now())
+	if err != nil {
+		return nil, ErrKeyService
+	}
+	root, cancel := context.WithCancel(ctx)
+	s := &InstalledOwnerProviderEffects{input: input, files: files, reader: reader, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}
+	// The private control constructor discards ambient/custom transport hooks
+	// and pins this endpoint's roots. No installed caller supplies a client.
+	base := &http.Client{Transport: (&http.Transport{}), Timeout: 5 * time.Second}
+	s.effects, err = newOwnerProviderEffects(root, input, *input.ProviderAuthentication, accepted.Pool, roots, s.projectedJWT, s.current, base, input.Concurrency, time.Now)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	return s, nil
+}
+
+// BootstrapChannel is the ADR-193 issuance credential channel; nil without
+// a pinned fleet recipe.
+func (s *InstalledOwnerProviderEffects) BootstrapChannel() *BootstrapChannel {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.channel
+}
+
+func (s *InstalledOwnerProviderEffects) Sealer() *Sealer {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.seal
+}
+func (s *InstalledOwnerProviderEffects) Opener() *Opener {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.open
+}
+func (s *InstalledOwnerProviderEffects) ServerIssuer() *OwnerCertificateIssuer {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.server
+}
+
+// The ADR-182 public purposes; nil without a pinned public recipe.
+func (s *InstalledOwnerProviderEffects) BrowserSealer() *Sealer {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.browserSeal
+}
+func (s *InstalledOwnerProviderEffects) BrowserOpener() *Opener {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.browserOpen
+}
+func (s *InstalledOwnerProviderEffects) WorkSigner() *SigningKey {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.work
+}
+func (s *InstalledOwnerProviderEffects) WorkerIssuer() *WorkerCertificateIssuer {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.worker
+}
+func (s *InstalledOwnerProviderEffects) ClientIssuer() *OwnerCertificateIssuer {
+	if s == nil || s.effects == nil {
+		return nil
+	}
+	return s.effects.client
+}
+
+// Track credential/source reads as well as provider control/body ownership.
+// Canceling the deployment cannot let a later SQL pool close race a native read.
+func (s *InstalledOwnerProviderEffects) borrow(ctx context.Context, bound time.Duration) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, ErrKeyService
+	}
+	s.mu.Lock()
+	if s.closed || s.root.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, ErrKeyService
+	}
+	s.joined.Add(1)
+	s.mu.Unlock()
+	call, cancel := context.WithTimeout(ctx, bound)
+	done := make(chan struct{})
+	stop := context.AfterFunc(s.root, func() { cancel(); close(done) })
+	return call, func() {
+		cancel()
+		if !stop() {
+			<-done
+		}
+		s.joined.Done()
+	}, nil
+}
+
+func (s *InstalledOwnerProviderEffects) projectedJWT(ctx context.Context) ([]byte, error) {
+	b, err := mounts.Read(ctx, s.files, contracts.OwnerProviderTokenFile, 16<<10)
+	if err != nil || !contracts.ValidWorkerToken(b) {
+		clear(b)
+		return nil, ErrKeyService
+	}
+	return b, nil
+}
+
+func (s *InstalledOwnerProviderEffects) mounted(ctx context.Context) (contracts.OwnerIdentityCredentialManifest, map[string][]byte, error) {
+	var zero contracts.OwnerIdentityCredentialManifest
+	raw, err := mounts.Read(ctx, s.files, "deployment.json", contracts.OwnerDeploymentMaxBytes)
+	if err != nil {
+		return zero, nil, ErrKeyService
+	}
+	defer clear(raw)
+	in, err := contracts.DecodeOwnerDeployment(bytes.NewReader(raw))
+	if err != nil || !s.reader.MatchesProviderInput(in) {
+		return zero, nil, ErrKeyService
+	}
+	out := map[string][]byte{}
+	ok := false
+	defer func() {
+		if !ok {
+			for _, b := range out {
+				clear(b)
+			}
+		}
+	}()
+	for _, name := range contracts.OwnerIdentityProjectionFiles() {
+		b, e := mounts.Read(ctx, s.files, name, contracts.OwnerIdentityRoleMaxBytes)
+		if e != nil || len(b) == 0 {
+			clear(b)
+			return zero, nil, ErrKeyService
+		}
+		out[name] = b
+	}
+	m, err := contracts.DecodeOwnerIdentityCredentialManifest(bytes.NewReader(out[contracts.OwnerIdentityRoleManifestFile]))
+	if err != nil || ctx.Err() != nil {
+		return zero, nil, ErrKeyService
+	}
+	ok = true
+	return m, out, nil
+}
+
+// Every control operation repeats current native proof and current SQL recovery
+// checks, while retaining its first interval and exact accepted revision through
+// all blocking work. Revision changes do not adopt replacement roots or pools.
+func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
+		return time.Time{}, ErrKeyService
+	}
+	first, err := s.configuration.ReadOwnerConfiguration(ctx)
+	if err != nil || !s.currentConfiguration(first) {
+		return time.Time{}, ErrKeyService
+	}
+	call, end := context.WithDeadline(ctx, first.FreshUntil)
+	defer end()
+	manifest, mounted, err := s.mounted(call)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer func() {
+		for _, b := range mounted {
+			clear(b)
+		}
+	}()
+	until, err := s.reader.Verify(call, manifest, mounted)
+	until = identity.Earlier(first.FreshUntil, until)
+	if err != nil {
+		// Keep the reader's fixed check for the startup diagnostic.
+		return time.Time{}, errors.Join(ErrKeyService, err)
+	}
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	last, err := s.configuration.ReadOwnerConfiguration(call)
+	until = identity.Earlier(until, last.FreshUntil)
+	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
+		return time.Time{}, ErrKeyService
+	}
+	return until, nil
+}
+func (s *InstalledOwnerProviderEffects) currentConfiguration(v fleet.OwnerConfigurationObservation) bool {
+	if !v.Valid(time.Now()) || v.Configuration.Suspended || v.Configuration.Pool != s.original.Pool || v.Configuration.Revision.UID != s.original.Revision.UID || v.Configuration.ProtectionDigest != s.original.ProtectionDigest || len(v.Configuration.IssuerRoots) != len(s.original.IssuerRoots) {
+		return false
+	}
+	for i, r := range s.original.IssuerRoots {
+		if !bytes.Equal(r, v.Configuration.IssuerRoots[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Current runs the provider's native, source and recovery proof once. Startup
+// calls it before Prime so its fixed failure is reported apart from login.
+func (s *InstalledOwnerProviderEffects) Current(ctx context.Context) (time.Time, error) {
+	return s.current(ctx)
+}
+
+// Prime is a finite startup step before owner enrollment begins. Each purpose
+// still owns its own original at-most-five-second proof/control interval.
+func (s *InstalledOwnerProviderEffects) Prime(ctx context.Context) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
+		return ErrKeyService
+	}
+	call, release, err := s.borrow(ctx, 30*time.Second)
+	if err != nil {
+		return err
+	}
+	defer release()
+	for _, slot := range s.slots() {
+		// A failed provider or proof attempt sets the slot's own backoff
+		// (1 s, 2 s, 4 s, ...). Wait for it inside the original bound rather
+		// than ending the process on one transient failure. A refusal without
+		// new backoff (closed, already active) is final.
+		for slot.refresh(call) != nil {
+			retry, now := slot.retryAt()
+			if !retry.After(now) || !waitUntil(call, retry) {
+				return ErrKeyService
+			}
+		}
+	}
+	return nil
+}
+
+// waitUntil sleeps until at, or reports false if ctx ends first or its
+// deadline falls before at.
+func waitUntil(ctx context.Context, at time.Time) bool {
+	if d, ok := ctx.Deadline(); ok && d.Before(at) {
+		return false
+	}
+	t := time.NewTimer(time.Until(at))
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+func (s *InstalledOwnerProviderEffects) slots() []*ownerProviderLifetime {
+	return s.effects.lifetimes.all()
+}
+
+// Run owns one finite-rate control loop. Slot-local scheduling/backoff/lease
+// checks decide whether a tick admits work; crypto effects never trigger login.
+func (s *InstalledOwnerProviderEffects) Run(ctx context.Context) error {
+	if s == nil || ctx == nil {
+		return ErrKeyService
+	}
+	s.mu.Lock()
+	if s.started || s.closed || s.root.Err() != nil {
+		s.mu.Unlock()
+		return ErrKeyService
+	}
+	s.started = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	defer s.joined.Done()
+	call, end := context.WithCancel(ctx)
+	defer end()
+	stop := context.AfterFunc(s.root, end)
+	defer stop()
+	timer := time.NewTicker(time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case <-call.Done():
+			return ErrKeyService
+		case <-timer.C:
+			for _, slot := range s.slots() {
+				if call.Err() != nil {
+					return ErrKeyService
+				}
+				_ = slot.refresh(call)
+			}
+		}
+	}
+}
+
+func (s *InstalledOwnerProviderEffects) Close(ctx context.Context) error {
+	if s == nil || ctx == nil {
+		return ErrKeyService
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	call, end := context.WithTimeout(ctx, 10*time.Second)
+	defer end()
+	// One retained waiter per instance, even if callers retry a timed-out Close.
+	s.closeWait.Do(func() { go func() { s.joined.Wait(); close(s.closeDone) }() })
+	if err := s.effects.close(call); err != nil {
+		return err
+	}
+	select {
+	case <-s.closeDone:
+		return nil
+	case <-call.Done():
+		return ErrKeyService
+	}
+}
+
+// CloseAndJoin preserves Close's original bounded result, but never hands
+// dependency ownership back while a cancelled native read or provider body is
+// still admitted. After Close's interval, finalization is local only: no new
+// provider request, retry, revocation claim or effect deadline is introduced.
+func (s *InstalledOwnerProviderEffects) CloseAndJoin(ctx context.Context) error {
+	if s == nil || ctx == nil {
+		return ErrKeyService
+	}
+	result := s.Close(ctx)
+	<-s.closeDone
+	s.effects.joinClosed()
+	return result
+}
+
+// ReadAuditCredentials returns only the original protected storage material,
+// independently re-observed after kubelet rotation. No provider auth token or
+// SQL/admin credential enters the object-store client.
+func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context) (contracts.OwnerStorageCredential, time.Time, error) {
+	var zero contracts.OwnerStorageCredential
+	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
+		return zero, time.Time{}, ErrKeyService
+	}
+	bounded, release, e := s.borrow(ctx, 5*time.Second)
+	if e != nil {
+		return zero, time.Time{}, e
+	}
+	defer release()
+	ctx = bounded
+	first, err := s.configuration.ReadOwnerConfiguration(ctx)
+	if err != nil || !s.currentConfiguration(first) {
+		return zero, time.Time{}, ErrKeyService
+	}
+	call, end := context.WithDeadline(ctx, first.FreshUntil)
+	defer end()
+	manifest, mounted, err := s.mounted(call)
+	if err != nil {
+		return zero, time.Time{}, err
+	}
+	defer func() {
+		for _, b := range mounted {
+			clear(b)
+		}
+	}()
+	raw, err := mounts.Read(call, s.files, contracts.OwnerProviderAuditCredentialFile, 32<<10)
+	defer clear(raw)
+	if err != nil {
+		return zero, time.Time{}, ErrKeyService
+	}
+	credential, until, err := s.reader.ReadProviderAuditCredential(call, manifest, mounted, raw)
+	until = identity.Earlier(until, first.FreshUntil)
+	if err != nil {
+		return zero, time.Time{}, ErrKeyService
+	}
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	last, err := s.configuration.ReadOwnerConfiguration(call)
+	until = identity.Earlier(until, last.FreshUntil)
+	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
+		return zero, time.Time{}, ErrKeyService
+	}
+	return credential, until, nil
+}

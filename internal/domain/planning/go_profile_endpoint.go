@@ -1,0 +1,257 @@
+package planning
+
+import (
+	"errors"
+	"net/netip"
+	"strconv"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
+)
+
+const GoEndpointPathPolicy = "go-pprof/v1"
+
+var (
+	ErrProfileEndpointInvalid     = errors.New("invalid profile endpoint configuration")
+	ErrProfileEndpointAmbiguous   = errors.New("profile endpoint ambiguous")
+	ErrProfileEndpointUnavailable = errors.New("profile endpoint unavailable")
+	ErrProfileEndpointDenied      = errors.New("profile endpoint outside configured scope")
+	ErrProfileHostNetwork         = errors.New("profile endpoints for host-network pods require separate qualification")
+)
+
+// GoEndpointBinding is the existing recipe endpointBindings shape. It has no
+// numeric port, address, path, header, credential or container override.
+// Names retain the public schema's length-only semantics, with the internal
+// control-free UTF-8/63-byte narrowing described by GoEndpointReference.
+type GoEndpointBinding struct {
+	Name, TemplateRef, AddressMode, PortName string
+}
+
+func (b GoEndpointBinding) Valid() bool {
+	return GoEndpointReference(b.Name) && GoEndpointReference(b.TemplateRef) && endpointAddressMode(b.AddressMode) && targets.ProfilePortName(b.PortName)
+}
+
+// GoEndpointReference intentionally adds no DNS-label pattern: canonical recipe
+// name/templateRef and action source.profileRef schemas require 1..63 characters.
+// This internal mechanism is narrower: valid UTF-8, no control characters and
+// at most 63 bytes, consistent with GoProfileRequest.SourceRef. It is not a
+// wire decoder or a claim to accept every schema-valid Unicode reference.
+func GoEndpointReference(s string) bool { return identity.Text(s, 63) }
+
+// GoEndpointSource identifies a public protected catalog entry or public trust/
+// credential policy, not a Secret. Digest covers its public definition; it must
+// never be a secret-payload hash. NamespaceUID identifies the source object's
+// namespace (empty for a cluster-scoped object), not its applicability.
+// The loader must independently establish protection, acceptance and freshness.
+type GoEndpointSource struct {
+	ClusterID, NamespaceUID, ResourceUID, Name string
+	Digest                                     artifact.Digest
+}
+
+func (s GoEndpointSource) Valid() bool {
+	return authorization.UUID(s.ClusterID) && (s.NamespaceUID == "" || authorization.UUID(s.NamespaceUID)) && authorization.UUID(s.ResourceUID) && GoEndpointReference(s.Name) && s.Digest != (artifact.Digest{})
+}
+
+func (s GoEndpointSource) InCluster(r targets.Request) bool {
+	return s.Valid() && s.ClusterID == r.ClusterID
+}
+
+type GoEndpointTLS struct {
+	Trust      GoEndpointSource
+	ServerName string
+}
+
+// GoEndpointAudience binds an independently resolved workload root. Neither
+// pod labels, declared ports, a service-account name nor the binding author is
+// a credential audience. Bare Pods use the unowned Pod UID as workload root.
+type GoEndpointAudience struct {
+	ClusterID, NamespaceUID, WorkloadKind, WorkloadUID string
+}
+
+func (a GoEndpointAudience) Valid() bool {
+	return authorization.UUID(a.ClusterID) && authorization.UUID(a.NamespaceUID) && authorization.UUID(a.WorkloadUID) && (a.WorkloadKind == "Deployment" || a.WorkloadKind == "StatefulSet" || a.WorkloadKind == "Pod")
+}
+
+func (a GoEndpointAudience) Matches(r targets.Request) bool {
+	return a.Valid() && a.ClusterID == r.ClusterID && a.NamespaceUID == r.Namespace.UID && a.WorkloadKind == r.Workload.Kind && a.WorkloadUID == r.Workload.UID
+}
+
+type GoEndpointCredential struct {
+	Policy    GoEndpointSource
+	Audiences []GoEndpointAudience
+}
+
+// GoEndpointDefinition is a typed accepted-input contract, not proof that the
+// source was protected or accepted. Fixed path policy and named dependencies
+// are resolved without opening a connection or retrieving credential material.
+type GoEndpointDefinition struct {
+	// Empty permits any authorized namespace in the enrolled cluster. This
+	// scope is separate from the protected source object's namespace.
+	ScopeNamespaceUID        string
+	Source                   GoEndpointSource
+	PathPolicy, Host         string
+	AddressModes             []string
+	MinimumPort, MaximumPort uint16
+	LoopbackFamily           string // ipv4 or ipv6, required iff loopback is permitted
+	TLS                      *GoEndpointTLS
+	Credential               *GoEndpointCredential
+}
+
+func (d GoEndpointDefinition) Valid() bool {
+	if !d.Source.Valid() || (d.ScopeNamespaceUID != "" && !authorization.UUID(d.ScopeNamespaceUID)) || d.PathPolicy != GoEndpointPathPolicy || !validEndpointHost(d.Host) || d.MinimumPort == 0 || d.MaximumPort < d.MinimumPort || len(d.AddressModes) < 1 || len(d.AddressModes) > 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, mode := range d.AddressModes {
+		if !endpointAddressMode(mode) || seen[mode] {
+			return false
+		}
+		seen[mode] = true
+	}
+	if seen["targetLoopback"] {
+		if d.LoopbackFamily != "ipv4" && d.LoopbackFamily != "ipv6" {
+			return false
+		}
+	} else if d.LoopbackFamily != "" {
+		return false
+	}
+	if d.TLS != nil && (!d.TLS.Trust.Valid() || !validEndpointServerName(d.TLS.ServerName)) {
+		return false
+	}
+	if d.Credential != nil {
+		if d.TLS == nil || !d.Credential.Policy.Valid() || len(d.Credential.Audiences) < 1 || len(d.Credential.Audiences) > 64 {
+			return false
+		}
+		seen := map[GoEndpointAudience]bool{}
+		for _, a := range d.Credential.Audiences {
+			if !a.Valid() || seen[a] {
+				return false
+			}
+			seen[a] = true
+		}
+	}
+	return true
+}
+
+type GoEndpointProfile struct {
+	Definition  GoEndpointDefinition
+	AddressMode string
+	Port        uint16
+}
+
+type GoEndpointCatalog struct {
+	Templates              []GoEndpointDefinition
+	Profiles               []GoEndpointProfile
+	ObservedAt, FreshUntil time.Time
+}
+
+// GoEndpointInput is private planning input. The original caller deadline and
+// complete catalog observation must already include their own earlier bounds.
+type GoEndpointInput struct {
+	SourceRef   string
+	Bindings    []GoEndpointBinding
+	Catalog     GoEndpointCatalog
+	Network     targets.ProfileNetwork
+	Parameters  execution.GoProfileParameters
+	NativeLimit int64
+	Deadline    time.Time
+}
+
+// GoEndpointPlan preserves the resolved route separately from a network socket
+// and the target network namespace. RouteIP alone must never authorize dialing.
+// The exact Pod/node/boot must be independently rechecked by a qualified dialer.
+type GoEndpointPlan struct {
+	SourceRef, SourceKind  string
+	Definition             GoEndpointDefinition
+	DefinitionDigest       artifact.Digest
+	EndpointDigest         artifact.Digest
+	Target                 targets.Request
+	Pin                    artifact.PinnedPod
+	NodeUID, NodeBootID    string
+	AddressMode            string
+	RouteIP                netip.Addr
+	Port                   uint16
+	DeclaredPortName       string
+	Parameters             execution.GoProfileParameters
+	NativeLimit            int64
+	ObservedAt, ValidUntil time.Time
+}
+
+// MatchesAcquisition compares immutable input only. It grants neither a start
+// nor current authority, and never changes the action's original lifetime.
+func (p GoEndpointPlan) MatchesAcquisition(r execution.GoProfileRequest) bool {
+	return p.EndpointDigest != (artifact.Digest{}) && r.Binding.ClusterID == p.Target.ClusterID && r.Pin == p.Pin && r.NodeUID == p.NodeUID && r.NodeBootID == p.NodeBootID && r.SourceRef == p.SourceRef && r.EndpointDigest == p.EndpointDigest && r.Parameters == p.Parameters && r.NativeLimit == p.NativeLimit
+}
+
+func endpointAddressMode(s string) bool { return s == "targetLoopback" || s == "podIP" }
+
+func validEndpointServerName(s string) bool {
+	if len(s) == 0 || len(s) > 253 {
+		return false
+	}
+	if ip, err := netip.ParseAddr(s); err == nil {
+		return ip.Zone() == "" && !ip.Is4In6() && !ip.IsUnspecified() && !ip.IsMulticast()
+	}
+	for _, label := range strings.Split(s, ".") {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+		for i := 0; i < len(label); i++ {
+			c := label[i]
+			if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+				continue
+			}
+			if c != '-' || i == 0 || i == len(label)-1 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Parse only the fixed HTTP Host syntax. This pure value check neither resolves
+// DNS nor opens sockets; bare IPv6 is deliberately unavailable without brackets.
+func validEndpointHost(s string) bool {
+	if len(s) == 0 || len(s) > 253 || strings.ContainsAny(s, "/\\?#@%\r\n\t ") {
+		return false
+	}
+	var port string
+	if s[0] == '[' {
+		end := strings.IndexByte(s, ']')
+		if end < 0 {
+			return false
+		}
+		host := s[1:end]
+		ip, err := netip.ParseAddr(host)
+		if err != nil || !ip.Is6() || !validEndpointServerName(host) {
+			return false
+		}
+		tail := s[end+1:]
+		if tail == "" {
+			return true
+		}
+		if tail[0] != ':' {
+			return false
+		}
+		port = tail[1:]
+	} else {
+		if strings.ContainsAny(s, "[]") {
+			return false
+		}
+		host, value, hasPort := strings.Cut(s, ":")
+		if !validEndpointServerName(host) {
+			return false
+		}
+		if !hasPort {
+			return true
+		}
+		port = value
+	}
+	n, err := strconv.ParseUint(port, 10, 16)
+	return err == nil && n > 0 && strconv.FormatUint(n, 10) == port
+}

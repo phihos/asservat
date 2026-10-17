@@ -1,0 +1,2 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-openapi.py
+PASS: OpenAPI 3.1.1 specification validation with all canonical references bundled locally.

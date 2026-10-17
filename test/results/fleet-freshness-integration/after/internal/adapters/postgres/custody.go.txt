@@ -1,0 +1,445 @@
+// Package postgres implements short, purpose-specific custody transactions.
+package postgres
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/artifact"
+	capturevalue "asservat.local/asservat/internal/domain/capture"
+	configuration "asservat.local/asservat/internal/domain/configuration"
+	fleetvalue "asservat.local/asservat/internal/domain/fleet"
+	identityvalue "asservat.local/asservat/internal/domain/identity"
+	privacyvalue "asservat.local/asservat/internal/domain/privacy"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const currentSchemaVersion = 59
+
+type Ledger struct{ pool *pgxpool.Pool }
+
+var _ privacy.CopyLedger = (*Ledger)(nil)
+
+// New accepts an explicitly wired runtime pool, never an environment DSN or a
+// migration connection. Bootstrap owns credentials and primary/restore fencing.
+func New(ctx context.Context, pool *pgxpool.Pool) (*Ledger, error) {
+	if pool == nil {
+		return nil, artifact.ErrInvalid
+	}
+	c := pool.Config()
+	t := c.ConnConfig.TLSConfig
+	if c.MaxConns > 32 || t == nil || t.InsecureSkipVerify || t.ServerName == "" || t.MinVersion < tls.VersionTLS12 || len(c.ConnConfig.Fallbacks) != 0 || c.ConnConfig.Tracer != nil {
+		return nil, artifact.ErrInvalid
+	}
+	check, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var version int64
+	var applied, unsafeRole, replica bool
+	if err := pool.QueryRow(check, "SELECT version_id,is_applied FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version, &applied); err != nil || version != currentSchemaVersion || !applied {
+		return nil, privacy.ErrUnavailable
+	}
+	if err := pool.QueryRow(check, "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR has_schema_privilege(current_user,'public','CREATE'),pg_is_in_recovery() FROM pg_roles WHERE rolname=current_user").Scan(&unsafeRole, &replica); err != nil || unsafeRole || replica {
+		return nil, privacy.ErrUnavailable
+	}
+	return &Ledger{pool}, nil
+}
+
+func id(s string) pgtype.UUID { var u pgtype.UUID; _ = u.Scan(s); return u }
+func uid(u pgtype.UUID) string {
+	s, _ := u.Value()
+	if s == nil {
+		return ""
+	}
+	return s.(string)
+}
+func ts(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func digest(v any) []byte               { b, _ := json.Marshal(v); h := sha256.Sum256(b); return h[:] }
+func normalized(r artifact.Registration) artifact.Registration {
+	r.AnchorAt = r.AnchorAt.UTC()
+	r.WriteUntil = r.WriteUntil.UTC()
+	r.ExpiresAt = r.ExpiresAt.UTC()
+	r.DeleteBy = r.DeleteBy.UTC()
+	return r
+}
+
+// No callback may perform remote I/O. Only definitely aborted SQL transactions
+// retry. Unknown COMMIT outcomes return unavailable for original-key replay.
+func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) error) error {
+	// Include waiting for a pooled connection and all retries in the same bound.
+	// SQL statement/lock timeouts alone do not limit pool acquisition.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	for attempt := 0; attempt < 3; attempt++ {
+		tx, err := l.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+		if err != nil {
+			return privacy.ErrUnavailable
+		}
+		_, err = tx.Exec(ctx, "SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='1s'; SET LOCAL idle_in_transaction_session_timeout='5s'; SET LOCAL synchronous_commit=on")
+		if err == nil {
+			err = f(custodydb.New(tx))
+		}
+		if err == nil {
+			err = tx.Commit(ctx)
+		}
+		// Rollback does not turn an ambiguous COMMIT into permission to refund.
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		_ = tx.Rollback(rollbackCtx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		for _, sentinel := range []error{identityvalue.ErrDenied, identityvalue.ErrInvalid, identityvalue.ErrSessionBusy, identityvalue.ErrSessionCapacity} {
+			if errors.Is(err, sentinel) {
+				return sentinel
+			}
+		}
+		var pe *pgconn.PgError
+		if errors.As(err, &pe) {
+			if (pe.Code == "40001" || pe.Code == "40P01") && attempt < 2 {
+				delay := time.Duration(10+time.Now().UnixNano()%20) * time.Millisecond
+				select {
+				case <-ctx.Done():
+					return privacy.ErrUnavailable
+				case <-time.After(delay):
+					continue
+				}
+			}
+			if pe.Code == "23505" {
+				return privacy.ErrConflict
+			}
+		}
+		for _, sentinel := range []error{fleetvalue.ErrCapacity, fleetvalue.ErrConflict, fleetvalue.ErrPending, fleetvalue.ErrInvalid, fleetvalue.ErrDenied, fleetvalue.ErrUnavailable, capturevalue.ErrInvalid, capturevalue.ErrDenied, capturevalue.ErrChanged, capturevalue.ErrUnavailable, capturevalue.ErrCapacity, capturevalue.ErrProcessingCoverage, capturevalue.ErrConflict, artifact.ErrInvalid, artifact.ErrDownloadConflict, artifact.ErrDownloadUnavailable, artifact.ErrDownloadCapacity, artifact.ErrDownloadExpired, privacy.ErrConflict, privacy.ErrCapacity, privacy.ErrExpired, privacy.ErrFence, privacy.ErrNotDue, configuration.ErrInvalid, configuration.ErrChanged, configuration.ErrLimit, configuration.ErrDenied, configuration.ErrUnavailable, configuration.ErrRetentionHistoryBehind, configuration.ErrRetentionObservationObsolete} {
+			if errors.Is(err, sentinel) {
+				return sentinel
+			}
+		}
+		return privacy.ErrUnavailable // never leak SQL, identities or connection details
+	}
+	return privacy.ErrUnavailable
+}
+
+// Lock root, allocation, then attempt. The unlocked root lookup is only a hint;
+// allocation moves are forbidden and are checked again under its row lock.
+func lockAllocation(ctx context.Context, q *custodydb.Queries, allocation string) (custodydb.CustodyPool, custodydb.CustodyAllocation, error) {
+	root, err := q.FindPool(ctx, id(allocation))
+	if err != nil {
+		return custodydb.CustodyPool{}, custodydb.CustodyAllocation{}, err
+	}
+	p, err := q.LockPool(ctx, root)
+	if err != nil {
+		return p, custodydb.CustodyAllocation{}, err
+	}
+	a, err := q.LockAllocation(ctx, id(allocation))
+	if err == nil && a.PoolID != root {
+		err = privacy.ErrFence
+	}
+	return p, a, err
+}
+
+func current(ctx context.Context, q *custodydb.Queries, p custodydb.CustodyPool, a custodydb.CustodyAllocation, r artifact.Registration, effective time.Time) error {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	if p.StoreID != id(r.StoreID) || p.Revision != r.PoolRevision || a.Revision != r.AllocationRevision {
+		return privacy.ErrFence
+	}
+	if p.Paused || a.Paused || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(a.ValidUntil.Time) || n.Time.Before(r.AnchorAt) || !n.Time.Before(r.WriteUntil) || !n.Time.Before(r.ExpiresAt) || !n.Time.Before(effective) {
+		return privacy.ErrExpired
+	}
+	return nil
+}
+
+func record(ctx context.Context, q *custodydb.Queries, row custodydb.CustodyAttempt, store string) (privacy.Record, error) {
+	r := privacy.Record{State: row.State, Effective: privacyvalue.Deadlines{AnchorAt: row.AnchorAt.Time, ExpiresAt: row.EffectiveExpiresAt.Time, DeleteBy: row.EffectiveDeleteBy.Time}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: uid(row.ClusterID), ArtifactID: uid(row.ArtifactID), AttemptID: uid(row.ID)}, StoreID: store, AllocationID: uid(row.AllocationID), PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, NativeLimit: row.NativeLimit, AnchorAt: row.AnchorAt.Time, WriteUntil: row.WriteUntil.Time, ExpiresAt: row.ExpiresAt.Time, DeleteBy: row.DeleteBy.Time}}
+	copies, err := q.ReadCopies(ctx, row.ID)
+	if err != nil {
+		return r, err
+	}
+	if len(copies) != 4 {
+		return r, privacy.ErrUnavailable
+	}
+	for i, c := range copies {
+		if int(c.Role) != i {
+			return r, privacy.ErrUnavailable
+		}
+		r.Copies[i] = artifact.CopyReceipt{VersionID: c.VersionID.String, ETag: c.Etag.String, Bytes: c.CiphertextBytes.Int64}
+		copy(r.Copies[i].SHA256[:], c.CiphertextSha256)
+	}
+	return r, nil
+}
+
+func (l *Ledger) Register(ctx context.Context, r artifact.Registration) (privacy.Record, error) {
+	var result privacy.Record
+	if r.Validate() != nil {
+		return result, artifact.ErrInvalid
+	}
+	r = normalized(r)
+	err := l.transaction(ctx, func(q *custodydb.Queries) error {
+		p, a, err := lockAllocation(ctx, q, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		result, err = registerLocked(ctx, q, p, a, r)
+		return err
+	})
+	return result, err
+}
+
+// Lookup is internal control metadata only, not a catalog or access check.
+func (l *Ledger) Lookup(ctx context.Context, loc artifact.Location) (privacy.Record, error) {
+	var result privacy.Record
+	if loc.Validate() != nil {
+		return result, artifact.ErrInvalid
+	}
+	err := l.transaction(ctx, func(q *custodydb.Queries) error {
+		hint, err := q.ReadAttempt(ctx, id(loc.AttemptID))
+		if err != nil {
+			return err
+		}
+		p, _, err := lockAllocation(ctx, q, uid(hint.AllocationID))
+		if err != nil {
+			return err
+		}
+		row, err := q.LockAttempt(ctx, id(loc.AttemptID))
+		if err != nil {
+			return err
+		}
+		if row.ClusterID != id(loc.ClusterID) || row.ArtifactID != id(loc.ArtifactID) {
+			return privacy.ErrConflict
+		}
+		result, err = record(ctx, q, row, uid(p.StoreID))
+		return err
+	})
+	return result, err
+}
+
+func (l *Ledger) CheckVerification(ctx context.Context, r artifact.Registration) error {
+	if r.Validate() != nil {
+		return artifact.ErrInvalid
+	}
+	r = normalized(r)
+	return l.transaction(ctx, func(q *custodydb.Queries) error {
+		p, a, err := lockAllocation(ctx, q, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		row, err := q.LockAttempt(ctx, id(r.Location.AttemptID))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(row.RequestDigest, digest(r)) {
+			return privacy.ErrConflict
+		}
+		if row.State != artifact.Reserved && row.State != artifact.StoredUnpublished {
+			return privacy.ErrExpired
+		}
+		return current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time)
+	})
+}
+
+func (l *Ledger) StoreCopies(ctx context.Context, r artifact.Registration, copies artifact.Copies) error {
+	if r.Validate() != nil || copies.Validate(r) != nil {
+		return artifact.ErrInvalid
+	}
+	r = normalized(r)
+	return l.transaction(ctx, func(q *custodydb.Queries) error {
+		p, a, err := lockAllocation(ctx, q, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		row, err := q.LockAttempt(ctx, id(r.Location.AttemptID))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(row.RequestDigest, digest(r)) {
+			return privacy.ErrConflict
+		}
+		if err = current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time); err != nil {
+			return err
+		}
+		if row.State == artifact.StoredUnpublished {
+			if bytes.Equal(row.CopiesDigest, digest(copies)) {
+				return nil
+			}
+			return privacy.ErrConflict
+		}
+		if row.State != artifact.Reserved {
+			return privacy.ErrExpired
+		}
+		for i, c := range copies {
+			err = q.StoreCopy(ctx, custodydb.StoreCopyParams{AttemptID: row.ID, Role: int16(i), CiphertextBytes: pgtype.Int8{Int64: c.Bytes, Valid: true}, CiphertextSha256: c.SHA256[:], Etag: pgtype.Text{String: c.ETag, Valid: true}, VersionID: pgtype.Text{String: c.VersionID, Valid: c.VersionID != ""}})
+			if err != nil {
+				return err
+			}
+		}
+		if err = q.MarkStored(ctx, custodydb.MarkStoredParams{ID: row.ID, CopiesDigest: digest(copies)}); err != nil {
+			return err
+		}
+		if err = q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: row.ID, Phase: "stored"}); err != nil {
+			return err
+		}
+		return current(ctx, q, p, a, r, row.EffectiveExpiresAt.Time)
+	})
+}
+
+func (l *Ledger) ClaimDeletion(ctx context.Context, loc artifact.Location) (privacy.Deletion, error) {
+	var result privacy.Deletion
+	if loc.Validate() != nil {
+		return result, artifact.ErrInvalid
+	}
+	err := l.transaction(ctx, func(q *custodydb.Queries) error {
+		hint, err := q.ReadAttempt(ctx, id(loc.AttemptID))
+		if err != nil {
+			return err
+		}
+		p, _, err := lockAllocation(ctx, q, uid(hint.AllocationID))
+		if err != nil {
+			return err
+		}
+		row, err := q.LockAttempt(ctx, id(loc.AttemptID))
+		if err != nil {
+			return err
+		}
+		if row.ClusterID != id(loc.ClusterID) || row.ArtifactID != id(loc.ArtifactID) {
+			return privacy.ErrConflict
+		}
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if row.State == artifact.Deleted || n.Time.Before(row.EffectiveExpiresAt.Time) {
+			return privacy.ErrNotDue
+		}
+		if row.LeaseUntil.Valid && n.Time.Before(row.LeaseUntil.Time) {
+			return privacy.ErrFence
+		}
+		rec, err := record(ctx, q, row, uid(p.StoreID))
+		if err != nil {
+			return err
+		}
+		until := n.Time.Add(30 * time.Second)
+		f, err := q.ClaimDeletion(ctx, custodydb.ClaimDeletionParams{ID: row.ID, LeaseUntil: ts(until)})
+		if err != nil {
+			return err
+		}
+		result = privacy.Deletion{Registration: rec.Registration, Effective: rec.Effective, Fence: f, LeaseUntil: until}
+		return nil
+	})
+	return result, err
+}
+
+func (l *Ledger) FinishDeletion(ctx context.Context, d privacy.Deletion) error {
+	r := normalized(d.Registration)
+	if r.Validate() != nil || d.Fence < 1 {
+		return artifact.ErrInvalid
+	}
+	return l.transaction(ctx, func(q *custodydb.Queries) error {
+		pinned, err := q.ContextRequiresPositiveDeletion(ctx, id(r.Location.AttemptID))
+		if err != nil {
+			return err
+		}
+		if pinned {
+			return privacy.ErrFence
+		}
+		_, a, err := lockAllocation(ctx, q, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		row, err := q.LockAttempt(ctx, id(r.Location.AttemptID))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(row.RequestDigest, digest(r)) || row.DeletionFence != d.Fence {
+			return privacy.ErrFence
+		}
+		if row.State == artifact.Deleted {
+			return nil
+		}
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if row.State != artifact.Deleting || !row.LeaseUntil.Valid || !row.LeaseUntil.Time.Equal(d.LeaseUntil) || !n.Time.Before(row.LeaseUntil.Time) {
+			return privacy.ErrFence
+		}
+		changed, err := q.ReleaseCharge(ctx, custodydb.ReleaseChargeParams{ID: a.ID, ChargedBytes: row.ReservedBytes})
+		if err != nil {
+			return err
+		}
+		if changed != 1 {
+			return privacy.ErrUnavailable
+		}
+		if err = q.ClearReceipts(ctx, row.ID); err != nil {
+			return err
+		}
+		if err = q.MarkDeleted(ctx, custodydb.MarkDeletedParams{ID: row.ID, DeletedAt: n}); err != nil {
+			return err
+		}
+		return q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: row.ID, Phase: "deleted"})
+	})
+}
+
+// registerLocked participates in larger named transactions. The caller holds
+// pool then allocation locks; it acquires the attempt lock and never remote I/O.
+func registerLocked(ctx context.Context, q *custodydb.Queries, p custodydb.CustodyPool, a custodydb.CustodyAllocation, r artifact.Registration) (privacy.Record, error) {
+	row, err := q.LockAttempt(ctx, id(r.Location.AttemptID))
+	if err == nil {
+		if !bytes.Equal(row.RequestDigest, digest(r)) {
+			return privacy.Record{}, privacy.ErrConflict
+		}
+		// Replay reports custody only, even after expiry; never starts work.
+		return record(ctx, q, row, uid(p.StoreID))
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return privacy.Record{}, err
+	}
+	if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+		return privacy.Record{}, err
+	}
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return privacy.Record{}, err
+	}
+	overdue, err := q.Overdue(ctx, custodydb.OverdueParams{AllocationID: a.ID, EffectiveDeleteBy: n})
+	if err != nil {
+		return privacy.Record{}, err
+	}
+	if overdue {
+		return privacy.Record{}, privacy.ErrCapacity
+	}
+	changed, err := q.Charge(ctx, custodydb.ChargeParams{ID: a.ID, ChargedBytes: r.ReservedBytes()})
+	if err != nil {
+		return privacy.Record{}, err
+	}
+	if changed != 1 {
+		return privacy.Record{}, privacy.ErrCapacity
+	}
+	err = q.InsertAttempt(ctx, custodydb.InsertAttemptParams{ID: id(r.Location.AttemptID), ClusterID: id(r.Location.ClusterID), ArtifactID: id(r.Location.ArtifactID), AllocationID: a.ID, RequestDigest: digest(r), PoolRevision: r.PoolRevision, AllocationRevision: r.AllocationRevision, NativeLimit: r.NativeLimit, ReservedBytes: r.ReservedBytes(), AnchorAt: ts(r.AnchorAt), WriteUntil: ts(r.WriteUntil), ExpiresAt: ts(r.ExpiresAt), DeleteBy: ts(r.DeleteBy)})
+	if err != nil {
+		return privacy.Record{}, err
+	}
+	for i, n := range r.Limits() {
+		if err = q.InsertCopy(ctx, custodydb.InsertCopyParams{AttemptID: id(r.Location.AttemptID), Role: int16(i), ByteLimit: n}); err != nil {
+			return privacy.Record{}, err
+		}
+	}
+	// Unique insert contention can block after earlier locks. Recheck time.
+	if err = current(ctx, q, p, a, r, r.ExpiresAt); err != nil {
+		return privacy.Record{}, err
+	}
+	if err = q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: id(r.Location.AttemptID), Phase: "registered"}); err != nil {
+		return privacy.Record{}, err
+	}
+	return privacy.Record{Registration: r, Effective: privacyvalue.Deadlines{AnchorAt: r.AnchorAt, ExpiresAt: r.ExpiresAt, DeleteBy: r.DeleteBy}, State: artifact.Reserved}, nil
+}

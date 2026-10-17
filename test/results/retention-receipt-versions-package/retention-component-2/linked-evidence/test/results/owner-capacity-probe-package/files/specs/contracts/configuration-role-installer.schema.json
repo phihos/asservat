@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-role-installer.schema.json",
+  "title": "Protected configuration-reconciler credential installer",
+  "description": "Separate post-activation credential continuation. Consumes actual current source/enforcement rather than an accepted SQL projection that the reconciler itself must produce. Fixed privileged input files, no arbitrary roles or credential paths; never activation or runtime enablement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "roles",
+    "workloadGuard",
+    "configurationProbes",
+    "schedulingLeases",
+    "kubernetes",
+    "postgres",
+    "ownerDeployment",
+    "fleetGuard",
+    "ownerGuard"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-configuration-role-installer/v1"
+    },
+    "roles": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json"
+    },
+    "workloadGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "configurationProbes": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/configurationProbes"
+    },
+    "schedulingLeases": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/schedulingLeases"
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/postgres",
+      "properties": {
+        "maxConnections": {
+          "const": 1
+        }
+      }
+    },
+    "ownerDeployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "fleetGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "ownerGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "launch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration",
+        "providers"
+      ],
+      "properties": {
+        "configuration": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "providers": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        }
+      }
+    },
+    "initialHistoryProbe": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/initialHistoryProbe"
+    },
+    "capacityProbe": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/capacityProbe"
+    }
+  }
+}

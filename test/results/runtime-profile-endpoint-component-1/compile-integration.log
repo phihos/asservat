@@ -1,0 +1,5 @@
+{"Time":"2026-10-14T07:37:26.806731551+02:00","Action":"start","Package":"asservat.local/asservat/test/integration"}
+{"Time":"2026-10-14T07:37:26.819699489+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:26.819745799+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:26.820410393+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"ok  \tasservat.local/asservat/test/integration\t0.013s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:26.820424103+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Elapsed":0.014}

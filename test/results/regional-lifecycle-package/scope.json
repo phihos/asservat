@@ -1,0 +1,14 @@
+{
+  "reviewManifest": "d44316b4ec41cc1989678da9cba1dc4587884bbaf5df9d8dfd06c83afac09c34",
+  "reviewPathsUnchanged": 13,
+  "docLayer": [
+    "docs/decisions/README.md",
+    "docs/architecture/connector-renewal.md"
+  ],
+  "payloadPaths": 15,
+  "beforePaths": 1,
+  "liveEdits": false,
+  "runtimeSelection": false,
+  "nativeQualification": false,
+  "progressLiveHashExemption": "docs/implementation-progress.md; exact snapshot copied and hashed independently"
+}

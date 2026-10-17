@@ -1,0 +1,10 @@
+test_conflicting_or_unknown_selection_is_refused (__main__.RegionalContextSelection.test_conflicting_or_unknown_selection_is_refused) ... ok
+test_exact_first_continuation_and_journey_selection (__main__.RegionalContextSelection.test_exact_first_continuation_and_journey_selection) ... ok
+test_inherited_flags_cannot_change_ordinary_or_selected_run (__main__.RegionalContextSelection.test_inherited_flags_cannot_change_ordinary_or_selected_run) ... ok
+test_ordinary_runner_selection_is_unchanged (__main__.RegionalContextSelection.test_ordinary_runner_selection_is_unchanged) ... ok
+test_server_diagnostics_only_affect_journey (__main__.RegionalContextSelection.test_server_diagnostics_only_affect_journey) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.000s
+
+OK

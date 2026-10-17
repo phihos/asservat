@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/adapters/mtls	8.328s
+ok  	asservat.local/asservat/internal/bootstrap	3.092s
+ok  	asservat.local/asservat/internal/application/evidence	1.009s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	1.009s [no tests to run]
+ok  	asservat.local/asservat/test/integration	1.055s

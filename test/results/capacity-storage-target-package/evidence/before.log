@@ -1,0 +1,6 @@
+=== RUN   TestCapacityNativeStorageTarget
+    capacity_storage_target_test.go:23: native storage assertion does not reach its SQL fence with a complete original target
+--- FAIL: TestCapacityNativeStorageTarget (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.012s
+FAIL

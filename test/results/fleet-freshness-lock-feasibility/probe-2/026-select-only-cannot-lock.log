@@ -1,0 +1,2 @@
+ERROR:  42501: permission denied for view fleet_current_trust
+LOCATION:  aclcheck_error, aclchk.c:2793

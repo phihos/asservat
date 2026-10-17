@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestConnectorAPIProcessWithRealKubernetes$"
+  ],
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestConnectorAPIProcessWithRealKubernetes",
+    "named-whole-secret-and-foreign-denial",
+    "actual-start-status-under-both-guards",
+    "capacity-token-admission",
+    "changed-input-metadata"
+  ],
+  "result": "ADR-175 qualified on a real API server: the connector Pod-bound credential minted the unbound 600-second capacity token (exact audience) and that token performed the CapacityReservation CREATE and Ready under both guards; the ADR-173 start path took 2.57 s of 5.0 s. Denied: 3600-second lifetime, other audience, Secret-bound, a non-Pod-bound connector requester and a token for another account.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log"
+}

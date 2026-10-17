@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/initial_provider_issuer_test.go",
+    "base_sha256": null,
+    "sha256": "83a6509a36aba0d1cb84692c64fc2db57d5f3241d945d51cc8a413966b44b9b6"
+  },
+  {
+    "path": "scripts/test-custody.py",
+    "base_sha256": "f8e1b5bf4dc93d1701ec55c3a5168969720ac81fa949d8dab4bebdbdca30dfcf",
+    "sha256": "dc920ab87516e952e2e25e155f1d5b9f7cee222b3e4fe80e1610d0a4324b9313"
+  }
+]

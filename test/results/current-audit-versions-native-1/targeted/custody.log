@@ -1,0 +1,27 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty
+=== NAME  TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions
+    download_sessions_test.go:173: download unavailable
+=== NAME  TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty
+    testing.go:2064: test executed panic(nil) or runtime.Goexit: subtest may have called FailNow on a parent test
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01
+--- FAIL: TestContextAdmissionWithRealServices (8.78s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions (5.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-empty (0.37s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-configuration-null (0.40s)
+        --- FAIL: TestContextAdmissionWithRealServices/download-worker-enrollment-audit-versions/retained-worker-empty (0.17s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (3.22s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty (0.08s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01 (0.08s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01 (0.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	8.860s
+FAIL

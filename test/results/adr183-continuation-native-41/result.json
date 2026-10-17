@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-41",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure: 'installer continuation stopped at owner/installation/launch/original-result-unverified/projection.final-native (unavailable)'. Launch finalization failed once (as in run 35); a new projection controller cannot continue an already-claimed launch, so the attempt is terminal by design. The final-native code now carries the failure class and elapsed time. The run-40 guard plan fix was not reached.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

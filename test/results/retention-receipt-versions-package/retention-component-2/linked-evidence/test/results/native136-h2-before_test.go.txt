@@ -1,0 +1,103 @@
+package browser
+
+import (
+ "context"
+ "errors"
+ "io"
+ "net/http"
+ "net/http/httptest"
+ "testing"
+ "time"
+
+ "asservat.local/asservat/internal/domain/artifact"
+)
+
+// Actual TLS/HTTP2 transport and product factory/sink; the manually supplied
+// metadata/response/leases are synthetic authority, not native worker proof.
+// The structural assertion intentionally compiles before the new phase method
+// exists, reproducing the original socket timeout rather than a compile error.
+func TestNativeContentHTTP2BodySetupSurvivesOriginalPreflightDeadline(t *testing.T) {
+ done := make(chan error, 1)
+ server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+  run := func() error {
+   if req.ProtoMajor != 2 { return errors.New("HTTP2 was not negotiated") }
+   preflightUntil := time.Now().Add(150*time.Millisecond)
+   if e := http.NewResponseController(w).SetWriteDeadline(preflightUntil); e != nil { return e }
+   owner, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+   defer cancel()
+   f := &contentResponseFactory{writer:w, request:req.WithContext(owner)}
+   f.DownloadContentPreflightComplete(preflightUntil)
+   originalEnd, _ := owner.Deadline()
+   if receiver, ok := any(f).(interface { BeginDownloadContentBody(context.Context,time.Time) error }); ok {
+    if e := receiver.BeginDownloadContentBody(owner,originalEnd); e != nil { return e }
+   }
+   // Fresh authority setup has no output. It completes after the old metadata
+   // deadline, while the original whole response and new byte lease remain live.
+   wait := time.NewTimer(time.Until(preflightUntil.Add(100*time.Millisecond)))
+   defer wait.Stop()
+   select { case <-wait.C: case <-owner.Done(): return owner.Err() }
+   response, lease := responseDeliveryFixture(3, artifact.DownloadSelection{Length:3})
+   response.Until = originalEnd
+   metadata := artifact.NativeDownloadMetadata{Filename:"context.json",ETag:`"original"`,Size:3}
+   sink, e := f.OpenDownloadResponse(owner,metadata,response)
+   if e != nil { return e }
+   defer sink.Close()
+   piece, stop := context.WithDeadline(owner,lease.Until)
+   defer stop()
+   n,e := sink.WriteChunk(piece,lease,0,[]byte("abc"))
+   if e != nil { return e }
+   if n != 3 { return errors.New("incomplete native bytes") }
+   return sink.Finish(owner)
+  }
+  done <- run()
+ }))
+ server.EnableHTTP2 = true
+ server.StartTLS()
+ defer server.Close()
+ response,e := server.Client().Get(server.URL)
+ if e != nil {
+  <-done
+  t.Fatalf("valid fresh content phase failed after old preflight deadline: %v",e)
+ }
+ defer response.Body.Close()
+ body,e := io.ReadAll(response.Body)
+ if e != nil || response.ProtoMajor != 2 || response.StatusCode != 200 || string(body)!="abc" { t.Fatalf("content: status=%d h2=%d bytes=%q error=%v",response.StatusCode,response.ProtoMajor,body,e) }
+ if e=<-done; e!=nil { t.Fatal(e) }
+}
+
+func TestNativeHTTP2ResponseIdleBetweenFreshByteLeases(t *testing.T) {
+ done:=make(chan error,1)
+ server:=httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter,req *http.Request) {
+  run:=func() error {
+   if req.ProtoMajor!=2 { return errors.New("HTTP2 was not negotiated") }
+   response,first:=responseDeliveryFixture(6,artifact.DownloadSelection{Length:6})
+   response.Until=time.Now().Add(3*time.Second)
+   first.Until=time.Now().Add(150*time.Millisecond)
+   first.Authority.ValidUntil=first.Until
+   sink,e:=NewHTTPDownloadResponse(w,req,artifact.NativeDownloadMetadata{Filename:"context.json",ETag:`"original"`,Size:6},response)
+   if e!=nil{return e};defer sink.Close()
+   piece,stop:=context.WithDeadline(req.Context(),first.Until)
+   _,e=sink.WriteChunk(piece,first,0,[]byte("abc"));stop()
+   if e!=nil{return e}
+   wait:=time.NewTimer(time.Until(first.Until.Add(100*time.Millisecond)));defer wait.Stop()
+   select{case <-wait.C:case <-req.Context().Done():return req.Context().Err()}
+   // A new current lease, rather than an extension of the old handle.
+   _,next:=responseDeliveryFixture(6,artifact.DownloadSelection{Length:6})
+   next.Sequence=2
+   next.Until=response.Until
+   next.Authority.ValidUntil=next.Until
+   piece,stop=context.WithDeadline(req.Context(),next.Until);defer stop()
+   _,e=sink.WriteChunk(piece,next,3,[]byte("def"))
+   if e!=nil{return e}
+   return sink.Finish(req.Context())
+  }
+  done<-run()
+ }))
+ server.EnableHTTP2=true;server.StartTLS();defer server.Close()
+ response,e:=server.Client().Get(server.URL)
+ if e!=nil{<-done;t.Fatal(e)};defer response.Body.Close()
+ body,e:=io.ReadAll(response.Body)
+ if e!=nil || string(body)!="abcdef" || response.ProtoMajor!=2 {t.Fatalf("idle renewal: %q %v",body,e)}
+ if e=<-done;e!=nil{t.Fatal(e)}
+}
+

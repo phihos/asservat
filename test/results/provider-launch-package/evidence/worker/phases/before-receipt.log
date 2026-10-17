@@ -1,0 +1,10 @@
+=== RUN   TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun
+=== RUN   TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun/pending
+    configuration_worker_launch_cas_test.go:327: unknown receipt selected another CAS
+=== RUN   TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun/committed
+--- FAIL: TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun (0.40s)
+    --- FAIL: TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun/pending (0.20s)
+    --- PASS: TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun/committed (0.20s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.481s
+FAIL

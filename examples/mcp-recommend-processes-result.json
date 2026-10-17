@@ -1,0 +1,73 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "diagnosticRecommendations",
+    "target_handle": "target-checkout",
+    "goal": "hang",
+    "catalog_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "expires_at": "2026-10-09T12:05:10Z",
+    "source_capture_ids": [
+      "00000000-0000-4000-8000-000000000090"
+    ],
+    "missing_observations": [],
+    "recommendations": [
+      {
+        "diagnostic_handle": "recommendation-worker-batch",
+        "title": "Dump both matching workers sequentially",
+        "explanation": "Two qualified worker identities match the executable selector. A bounded batch can inspect native thread state after cheaper context is inconclusive.",
+        "answers": [
+          "Native thread stacks and memory state for both matching workers."
+        ],
+        "limitations": [
+          "Sequential captures are not simultaneous; replacement processes are resolved only under the accepted selector.",
+          "The default one-process episode ceiling must be raised by an administrator or the plan narrowed."
+        ],
+        "basis": {
+          "confidence": "observed",
+          "reason": "Complete synthetic inventory contains two matching /app/worker processes."
+        },
+        "evidence_kinds": [
+          "liveCore"
+        ],
+        "impact": "intrusive",
+        "max_bytes": 536870912,
+        "max_process_starts": 2,
+        "retention_seconds": 900,
+        "approval_required": true,
+        "blockers": [
+          {
+            "code": "BudgetExceeded",
+            "message": "This example uses the default one-process episode ceiling; the proposed batch needs two.",
+            "responsible_role": "administrator",
+            "retryable": false
+          }
+        ],
+        "process_selector": {
+          "match": {
+            "executablePath": "/app/worker"
+          },
+          "includeDescendants": true,
+          "maxDepth": 2,
+          "resolve": "atDispatch"
+        },
+        "process_batch": {
+          "maxProcesses": 2,
+          "maxBytesPerProcess": 268435456,
+          "maxStopPerProcess": "10s",
+          "maxTotalStop": "20s",
+          "consistency": "sequential"
+        },
+        "process_match_count": 2,
+        "process_inventory_complete": true
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

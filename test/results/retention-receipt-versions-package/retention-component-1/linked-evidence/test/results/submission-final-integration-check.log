@@ -1,0 +1,6 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-identity.py
+Owned TLS Keycloak ready; running provider qualification
+Provider test exit: 0
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py
+Custody integration exit: 1
+make: *** [Makefile:64: custody-integration] Error 1

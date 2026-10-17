@@ -1,0 +1,3 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py --fleet
+Fleet integration exit: 1
+make: *** [Makefile:92: fleet-integration] Error 1

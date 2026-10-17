@@ -1,0 +1,8 @@
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database
+    fleet_observation_test.go:99: restored enabled flags plus current configuration reactivated the database
+--- FAIL: TestEnrollmentFleetObservationWithRealPostgres (0.05s)
+    --- FAIL: TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.100s
+FAIL

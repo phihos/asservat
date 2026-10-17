@@ -1,0 +1,32 @@
+# Worker identity fixture read privilege repair
+
+Source-only proposal. No live workspace file was changed; no build or test was run. The existing full regression is the actual failure reproduction, not a claimed new result.
+
+## Cause and scope
+
+Five positive identity cases fail in `test/results/custody-regression-20261013-1/custody.log:639–658`: configuration-identity-expired, coordinator-recovery, fresh-audit, binding-replacement and cancelled-parent. The original assertion is `test/integration/download_sessions_test.go:745`.
+
+The identity pool authenticates as fixture login `download_worker_identity_runtime`. The actual call chain is `ReadDownloadWorkerIdentity` → `activeWorkerCertificate` → `currentAuditedWorkerEnrollment` → generated `ReadWorkerEnrollment`. PostgreSQL records SQLSTATE 42501 for `SELECT worker_id,enrollment_json,audit_receipt_json FROM download_worker_enrollment WHERE worker_id=$1`. Representative positive failures are PostgreSQL log lines 1488–1490, 1505–1507, 1517–1519, 1536–1538 and 1556–1558. The earlier negative peer checks accept any error and therefore concealed this same missing read permission.
+
+The strengthened production check is required: it verifies the immutable original enrollment receipt version under the original identity deadline, then checks exact equality with the activated certificate's retained enrollment and verifies the certificate receipt. Removing that query or accepting certificate-only authority would regress current-audit-version protection.
+
+The fixture role has SELECT on `download_worker_certificate` but no read grant on `download_worker_enrollment`. This proposal adds only SELECT on that one three-column enrollment table. No INSERT, UPDATE, DELETE, ownership, role membership, activation or signing authority is added. No migration is needed. Schema 58 remains reserved for the parent-owned audit-retirement validator fix.
+
+Searching every production role plan/contracts/bootstrap role source found no installed acquisition worker identity role that names either table. The production public inventory has only `worker-config-read`; owner identity role plans cover hub owner enrollment, not acquisition workers. The production `NewDownloadWorkers` constructor has adapter callers in WorkerEnrollments, WorkerOwners and NativeExchanges; no installed acquisition identity role composition is selected by this repair. The fixture is therefore the immediate omission; this is not a claim that the unfinished installed acquisition graph is fully provisioned.
+
+## Proposed changes
+
+1. `test/fixtures/sql/runtime-roles.sql`: extend the existing certificate SELECT grant to include `download_worker_enrollment` for the exact fixture identity login.
+2. `test/integration/download_sessions_test.go`: the pre-enrollment unregistered-peer check now requires `pgx.ErrNoRows`, so missing SQL privileges, expiry or unrelated transport errors cannot pass as correct peer rejection. In fresh-audit, effective `has_any_column_privilege` checks require no INSERT or UPDATE permission on any column of either enrollment/certificate table, including inherited grants; this catches partial grants that a combined-column write could otherwise conceal. Six no-op INSERT/UPDATE/DELETE statements additionally require exact SQLSTATE 42501, protecting the read-only fixture boundary. The existing positive identity assertion and subsequent deadline, revocation, binding and cleanup cases remain unchanged.
+
+No product authority check, original interval, retry, role layout or schema changes.
+
+## Pending verification
+
+After parent review/integration and exclusive allocation, run the existing owned custody harness with all download-worker cases, not merely the five positives:
+
+```sh
+GOMAXPROCS=2 GOFLAGS=-p=2 TMPDIR=/home/phil/.cache/asservat-build/tmp python3 scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^download-worker-'
+```
+
+Use the parent-selected finite build/temp and result locations; inspect actual selected PASS names, terminal exit, source hashes and cleanup. The recorded full-regression failure is already sufficient before evidence for the grant defect. A tests-only run before applying the SQL grant would additionally demonstrate the tightened semantic assertion failing at the missing privilege, if useful within the parent-owned combined gate. Run full custody regression after the separate schema58 repair and this fixture repair are both integrated. No new production migration is proposed here.

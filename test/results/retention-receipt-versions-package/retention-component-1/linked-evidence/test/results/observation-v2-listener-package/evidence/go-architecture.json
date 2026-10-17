@@ -1,0 +1,35 @@
+{
+  "phase": "go-architecture",
+  "command": [
+    "python3",
+    "/tmp/asservat-direct-native-3lri4vcg/mirror/scripts/check-go-architecture.py"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 1.019,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0,
+  "failureMarker": null,
+  "markerOccurrences": null
+}

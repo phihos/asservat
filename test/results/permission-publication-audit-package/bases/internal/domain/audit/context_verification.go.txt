@@ -1,0 +1,55 @@
+package audit
+
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"time"
+)
+
+// ContextVerification records full verification, not successful disclosure or
+// publication. It remains true if later authorization/publication fails.
+// APIOutcome is historical, minimized completion provenance. It grants no new
+// start or current evidence access and contains no Pod payload or credentials.
+type APIOutcome struct {
+	InstallationID, ClusterID, IssuerEpoch, ExecutorNamespaceUID, ExecutorAccountUID, ExecutorPodUID, ProcessEpoch, StartObjectUID string
+	ExecutionDigest, BindingDigest, StartupDigest                                                                                  artifact.Digest
+	StartedAt, AcquiredAt, CompletedAt                                                                                             time.Time
+}
+
+func (a APIOutcome) Valid() bool {
+	for _, id := range []string{a.InstallationID, a.ClusterID, a.IssuerEpoch, a.ExecutorNamespaceUID, a.ExecutorAccountUID, a.ExecutorPodUID, a.ProcessEpoch, a.StartObjectUID} {
+		if !authorization.UUID(id) {
+			return false
+		}
+	}
+	return a.ExecutionDigest != (artifact.Digest{}) && a.BindingDigest != (artifact.Digest{}) && a.StartupDigest != (artifact.Digest{}) && !a.StartedAt.IsZero() && !a.AcquiredAt.Before(a.StartedAt) && !a.CompletedAt.Before(a.AcquiredAt)
+}
+
+type ContextVerification struct {
+	APIOutcome                                                                  *APIOutcome `json:",omitempty"`
+	RootID, CaptureID, ArtifactID, AttemptID, PermissionEpoch                   string
+	PermissionSequence                                                          int64
+	ScopeDigest, ExpectationDigest, CopiesDigest, IntentDigest, AuthorityDigest artifact.Digest
+	VerifiedAt, WriteUntil, ExpiresAt, DeleteBy                                 time.Time
+}
+
+func (r ContextVerification) Valid() bool {
+	for _, id := range []string{r.RootID, r.CaptureID, r.ArtifactID, r.AttemptID, r.PermissionEpoch} {
+		if !authorization.UUID(id) {
+			return false
+		}
+	}
+	for _, d := range []artifact.Digest{r.ScopeDigest, r.ExpectationDigest, r.CopiesDigest, r.IntentDigest, r.AuthorityDigest} {
+		if d == (artifact.Digest{}) {
+			return false
+		}
+	}
+	return (r.APIOutcome == nil || r.APIOutcome.Valid() && r.APIOutcome.ExecutionDigest == r.AuthorityDigest && !r.APIOutcome.CompletedAt.After(r.VerifiedAt)) && r.PermissionSequence > 0 && !r.VerifiedAt.IsZero() && r.VerifiedAt.Before(r.WriteUntil) && !r.WriteUntil.After(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy)
+}
+func ContextVerificationKey(root, capture string) string {
+	return "context-verification/v1/" + root + "/" + capture + "/record"
+}
+func (r Receipt) ValidContextVerification(root, capture string) bool {
+	return authorization.UUID(root) && authorization.UUID(capture) && r.Key == ContextVerificationKey(root, capture) && (r.Version == "" || identity.Text(r.Version, 1024)) && identity.Text(r.ETag, 256) && r.Bytes > 0 && r.Bytes <= 128<<10 && r.SHA256 != (artifact.Digest{})
+}

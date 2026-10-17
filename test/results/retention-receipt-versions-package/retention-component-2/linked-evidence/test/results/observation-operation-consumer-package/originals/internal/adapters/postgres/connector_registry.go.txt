@@ -1,0 +1,94 @@
+package postgres
+
+import (
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"context"
+	"encoding/json"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
+)
+
+// ConnectorRegistry uses an EXECUTE-only fixed SQL read and an independent
+// protected source observation. It has no signing, source-write or audit role.
+type ConnectorRegistry struct {
+	ledger  *Ledger
+	source  app.ConnectorIdentitySourceReader
+	profile value.ConnectorCredentialProfile
+}
+
+func NewConnectorRegistry(ctx context.Context, pool *pgxpool.Pool, source app.ConnectorIdentitySourceReader, profile value.ConnectorCredentialProfile) (*ConnectorRegistry, error) {
+	if source == nil || !profile.Valid() || profile.Suspended {
+		return nil, value.ErrUnavailable
+	}
+	l, e := New(ctx, pool)
+	if e != nil {
+		return nil, e
+	}
+	return &ConnectorRegistry{l, source, profile.Clone()}, nil
+}
+func (s *ConnectorRegistry) read(ctx context.Context, binding value.PeerBinding, usage string, digest artifact.Digest) (app.ConnectorLeafRegistration, error) {
+	var out app.ConnectorLeafRegistration
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || binding != s.profile.Binding || (usage != "client" && usage != "server") || digest == (artifact.Digest{}) {
+		return out, value.ErrUnavailable
+	}
+	started := time.Now()
+	live, end := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer end()
+	source, e := s.source.ReadConnectorIdentitySource(live)
+	if e != nil || !source.Valid(time.Now()) || source.Observation.Profile.Binding != binding || source.Observation.Profile.RootID != s.profile.RootID || source.Observation.Profile.Revision.UID != s.profile.Revision.UID || source.Observation.Profile.ServerName != s.profile.ServerName {
+		return out, value.ErrUnavailable
+	}
+	until := identity.Earlier(started.Add(5*time.Second), source.Observation.FreshUntil)
+	bounded, cancel := context.WithDeadline(live, until)
+	defer cancel()
+	raw, e := json.Marshal(source.Observation)
+	if e != nil {
+		return out, value.ErrUnavailable
+	}
+	row, e := custodydb.New(s.ledger.pool).ReadConnectorActivatedLeaf(bounded, custodydb.ReadConnectorActivatedLeafParams{RootID: id(s.profile.RootID), PeerID: id(binding.PeerID), UsageValue: usage, DigestValue: digest[:], SourceValue: raw})
+	if e != nil || len(row) > 8192 || json.Unmarshal(row, &out) != nil || !out.Valid(time.Now()) || out.Certificate.Binding != binding || out.Certificate.Usage != usage || out.Certificate.Digest != digest || out.Revision != source.Observation.Profile.Revision || bounded.Err() != nil || !time.Now().Before(until) {
+		return app.ConnectorLeafRegistration{}, value.ErrUnavailable
+	}
+	final, e := s.source.ReadConnectorIdentitySource(bounded)
+	if e != nil || !final.Valid(time.Now()) || !final.Observation.SameSource(source.Observation) || final.Roles != source.Roles || bounded.Err() != nil {
+		return app.ConnectorLeafRegistration{}, value.ErrUnavailable
+	}
+	out.FreshUntil = identity.Earlier(out.FreshUntil, identity.Earlier(until, final.Observation.FreshUntil))
+	if !out.Valid(time.Now()) {
+		return app.ConnectorLeafRegistration{}, value.ErrUnavailable
+	}
+	return out, nil
+}
+func (s *ConnectorRegistry) ConnectorLeafRegistration(ctx context.Context, c value.ConnectorCredentialCertificate) (app.ConnectorLeafRegistration, error) {
+	if !c.Valid(time.Now()) {
+		return app.ConnectorLeafRegistration{}, value.ErrUnavailable
+	}
+	r, e := s.read(ctx, c.Binding, c.Usage, c.Digest)
+	if e != nil || r.Certificate != c {
+		return app.ConnectorLeafRegistration{}, value.ErrUnavailable
+	}
+	return r, nil
+}
+
+// Binding-only lookup deliberately cannot select a leaf or a replacement process.
+func (s *ConnectorRegistry) PeerRegistration(context.Context, value.PeerBinding) (value.PeerRegistration, error) {
+	return value.PeerRegistration{}, value.ErrUnavailable
+}
+func (s *ConnectorRegistry) PeerCertificateRegistration(ctx context.Context, c value.PeerCertificate) (value.PeerRegistration, error) {
+	if !c.Valid(time.Now()) {
+		return value.PeerRegistration{}, value.ErrUnavailable
+	}
+	r, e := s.read(ctx, c.Binding, "client", c.Digest)
+	if e != nil || !r.Certificate.NotBefore.Equal(c.NotBefore) || !r.Certificate.NotAfter.Equal(c.NotAfter) {
+		return value.PeerRegistration{}, value.ErrUnavailable
+	}
+	return value.PeerRegistration{Binding: c.Binding, Revision: r.Revision, Enabled: true, Certificates: []value.PeerCertificate{c}, ObservedAt: r.ObservedAt, FreshUntil: r.FreshUntil}, nil
+}
+
+var _ app.PeerRegistry = (*ConnectorRegistry)(nil)
+var _ app.ExactPeerRegistry = (*ConnectorRegistry)(nil)
+var _ app.ConnectorLeafRegistry = (*ConnectorRegistry)(nil)

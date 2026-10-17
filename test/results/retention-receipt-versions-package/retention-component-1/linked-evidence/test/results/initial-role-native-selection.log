@@ -1,0 +1,5 @@
+=== RUN   TestInitialInstallationWithRealServices
+    initial_installation_test.go:82: run make initial-installation-integration on its own fresh fixtures
+--- SKIP: TestInitialInstallationWithRealServices (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.053s

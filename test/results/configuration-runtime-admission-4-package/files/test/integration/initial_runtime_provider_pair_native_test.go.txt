@@ -1,0 +1,503 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/bootstrap"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+	"github.com/jackc/pgx/v5"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
+)
+
+// Upstream provider administration belongs to the owned fixture. The original
+// product bootstrap and all subsequent native/SQL effects remain real; neither
+// these provider credentials nor the fixture administrator enter runtime pods.
+type initialRuntimeNativeProviders struct {
+	trace                 *initialRuntimeNativeTrace
+	issuerRoots           [][]byte
+	installation, cluster string
+	worker                contracts.ConfigurationProviderSelection
+	owner                 contracts.OwnerProviderSelection
+	client                *http.Client
+	endpoint              string
+	fixture               fixture
+	desired               contracts.InitialBootstrap
+}
+
+func initialRuntimeProviderSelections(t *testing.T, ctx context.Context, api kubernetes.Interface, connection *rest.Config, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer) *initialRuntimeNativeProviders {
+	t.Helper()
+	root, err := x509.ParseCertificate(f.NativeProviders.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}}
+	p := &initialRuntimeNativeProviders{client: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, endpoint: f.NativeProviders.KMS, fixture: f, desired: desired, installation: original.Plan.InstallationID, cluster: original.Plan.ClusterID}
+	t.Cleanup(transport.CloseIdleConnections)
+	// The existing original namespace guard must already protect these empty
+	// selected objects. A UID is not readiness and no dummy payload is supplied.
+	prefix := "asservat-" + strings.ReplaceAll(original.Plan.InstallationID, "-", "")
+	refs := make([]contracts.WorkerObjectReference, 2)
+	for i, name := range []string{prefix + "-worker-providers", contracts.OwnerProviderAuditSecretName(original.Plan.InstallationID)} {
+		secret, e := api.CoreV1().Secrets(desired.TargetNamespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}, Type: core.SecretTypeOpaque}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal("create original empty selected provider Secret", e)
+		}
+		refs[i] = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
+	}
+	// A separate upstream reviewer is owned by this lab, outside the runtime
+	// namespace. It receives only TokenReview creation, never administrator RBAC.
+	reviewer, e := api.CoreV1().ServiceAccounts(desired.BootstrapNamespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "provider-reviewer"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal("owned upstream reviewer", e)
+	}
+	role, e := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: prefix + "-provider-reviewer"}, Rules: []rbac.PolicyRule{{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"tokenreviews"}, Verbs: []string{"create"}}}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		c, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		if e := api.RbacV1().ClusterRoles().Delete(c, role.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &role.UID}}); e != nil {
+			t.Error("owned reviewer role cleanup", e)
+		}
+	})
+	binding, e := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: reviewer.Namespace, Name: reviewer.Name}}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		c, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		if e := api.RbacV1().ClusterRoleBindings().Delete(c, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); e != nil {
+			t.Error("owned reviewer binding cleanup", e)
+		}
+	})
+	token, e := api.CoreV1().ServiceAccounts(reviewer.Namespace).CreateToken(ctx, reviewer.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600))}}, meta.CreateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	var ca bytes.Buffer
+	for _, der := range original.Kubernetes.Roots {
+		if e := pem.Encode(&ca, &pem.Block{Type: "CERTIFICATE", Bytes: der}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	mounts := []string{"configuration-auth", "owner-auth"}
+	accessors := make([]string, 2)
+	for i, mount := range mounts {
+		p.admin(t, ctx, http.MethodPost, "sys/auth/"+mount, map[string]any{"type": "kubernetes"}, 204)
+		data := p.admin(t, ctx, http.MethodGet, "sys/mounts/auth/"+mount, nil, 200)
+		var body struct {
+			Data struct {
+				Accessor string `json:"accessor"`
+				Type     string `json:"type"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(data, &body) != nil || body.Data.Accessor == "" || body.Data.Type != "kubernetes" {
+			t.Fatal("actual auth mount identity unavailable")
+		}
+		accessors[i] = body.Data.Accessor
+		p.admin(t, ctx, http.MethodPost, "auth/"+mount+"/config", map[string]any{"kubernetes_host": original.Kubernetes.Endpoint, "kubernetes_ca_cert": ca.String(), "token_reviewer_jwt": token.Status.Token, "disable_local_ca_jwt": true, "disable_iss_validation": true}, 204)
+	}
+	p.worker = contracts.ConfigurationProviderSelection{AuthMount: mounts[0], AuthMountAccessor: accessors[0], AuditCredentials: refs[0]}
+	p.owner = contracts.OwnerProviderSelection{AuthMount: mounts[1], AuthMountAccessor: accessors[1], AuditCredentials: refs[1]}
+	// Owner issuer trust is generated independently of provider HTTPS trust and
+	// selected before the first resource claim. Later owner setup must use this
+	// exact mount/root; a new CA cannot be substituted into the original source.
+	p.admin(t, ctx, http.MethodPost, "sys/mounts/owner-pki", map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": 3600}}, 204)
+	certificate := p.admin(t, ctx, http.MethodPost, "owner-pki/root/generate/internal", map[string]any{"common_name": "synthetic original owner issuer", "ttl": "1h", "key_type": "ec", "key_bits": 256}, 200)
+	var issued struct {
+		Data struct {
+			Certificate string `json:"certificate"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(certificate, &issued) != nil {
+		clear(certificate)
+		t.Fatal("actual owner root response unavailable")
+	}
+	clear(certificate)
+	block, rest := pem.Decode([]byte(issued.Data.Certificate))
+	if block == nil || block.Type != "CERTIFICATE" || len(bytes.TrimSpace(rest)) != 0 {
+		t.Fatal("actual owner root PEM unavailable")
+	}
+	cert, e := x509.ParseCertificate(block.Bytes)
+	if e != nil || !cert.IsCA || cert.CheckSignatureFrom(cert) != nil {
+		t.Fatal("actual independent owner root invalid", e)
+	}
+	p.issuerRoots = [][]byte{bytes.Clone(block.Bytes)}
+	return p
+}
+
+func (p *initialRuntimeNativeProviders) admin(t *testing.T, ctx context.Context, method, path string, body any, want int) []byte {
+	t.Helper()
+	raw, e := json.Marshal(body)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer clear(raw)
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	request, e := http.NewRequestWithContext(call, method, p.endpoint+"/v1/"+path, bytes.NewReader(raw))
+	if e != nil {
+		t.Fatal(e)
+	}
+	request.GetBody = nil
+	request.Header.Set("X-Vault-Token", "synthetic-root")
+	request.Header.Set("Content-Type", "application/json")
+	response, e := p.client.Do(request)
+	if e != nil {
+		t.Fatal("owned provider request unavailable", path, e)
+	}
+	defer response.Body.Close()
+	result, e := io.ReadAll(io.LimitReader(response.Body, 256<<10))
+	if e != nil || response.StatusCode != want {
+		clear(result)
+		t.Fatalf("owned provider %s status=%d want=%d read=%v", path, response.StatusCode, want, e)
+	}
+	return result
+}
+
+func qualifyProviderPairWorkerInputs(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, record audit.InitialInstallation, original contracts.InitialPreparer, resources *kube.InitialRuntimeResources, originalResources contracts.InitialRuntimeResourceSnapshot, inventory kube.InitialRuntimeResourceInventory, source *kube.ConfigurationRoleSource, bridge *kube.InitialRuntimeBridge, providers *initialRuntimeNativeProviders, runtimeWorker bool) {
+	t.Helper()
+	configuration, e := api.CoreV1().ConfigMaps(inventory.Namespace.Name).Get(ctx, original.Plan.Workload.Configuration, meta.GetOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	initial, e := contracts.DecodeInitialInstaller(strings.NewReader(configuration.Data["deployment.json"]))
+	if e != nil || initial.InstallationID != record.Scope.InstallationID || initial.Namespace != inventory.Namespace {
+		t.Fatal("original immutable installer unavailable", e)
+	}
+	docs, e := bootstrap.BuildInitialConfigurationDocuments(initial, inventory, record.Claim.ID)
+	if e != nil {
+		t.Fatal("generate original configuration documents", e)
+	}
+	worker, e := contracts.DecodeHubWorkerDeployment(bytes.NewReader(docs.Worker))
+	if e != nil {
+		t.Fatal(e)
+	}
+	installer, e := contracts.DecodeConfigurationRoleInstaller(bytes.NewReader(docs.Roles))
+	if e != nil {
+		t.Fatal(e)
+	}
+	recipe, e := providerconfig.ConfigurationProviderRecipeFor(worker, providers.worker, inventory.WorkerAccount, time.Now())
+	if e != nil {
+		t.Fatal("exact original worker provider recipe", e)
+	}
+	inspector := providers.configureWorker(t, ctx, recipe, worker)
+	defer func() {
+		if e := inspector.Close(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
+	providers.provisionAudit(t, ctx, api, inventory)
+	root, e := kube.NewConfigurationRuntimeRoleRoot(ctx, source, installer.Roles)
+	if e != nil {
+		t.Fatal("actual original configuration role root", e)
+	}
+	defer root.Close()
+	producer, e := postgres.NewConfigurationRuntimeSQLRoles(ctx, config, root, installer.Roles)
+	if e != nil {
+		t.Fatal("actual configuration SQL producer", e)
+	}
+	defer producer.Close()
+	started := time.Now()
+	provisionEnd := providers.trace.phase(t, "actual-three-role-provision")
+	if _, e = producer.Provision(ctx); e != nil {
+		t.Fatal("actual original three-role provisioning", e)
+	}
+	provisionEnd()
+	t.Logf("actual configuration role provisioning elapsed=%s", time.Since(started))
+	e = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
+		verified, e := producer.VerifyConfigurationRuntimeRoles(call)
+		if e != nil {
+			return e
+		}
+		_, e = root.PublishConfigurationRuntimeProjection(call, verified)
+		return e
+	})
+	if e != nil {
+		t.Fatal("actual exact SQL credential projection", e)
+	}
+	// Pin the actual original completed resource receipts. The pre-handover
+	// reader cannot be reused after the retained bridge; each input phase makes
+	// its own current phase2 reads and derives no freshness from this history.
+	inputs, e := kube.NewConfigurationWorkerInputs(ctx, bridge, resources, root, producer, inspector, originalResources)
+	if e != nil {
+		t.Fatal("concrete worker input producer", e)
+	}
+	defer inputs.Close()
+	// One automatic finite driver; it owns all original per-phase bounds. There
+	// is no caller sleep, recreated client, write-on-read source or test retry.
+	started = time.Now()
+	completeEnd := providers.trace.phase(t, "actual-provider-pair-complete-inputs")
+	result, e := inputs.CompleteInputs(ctx)
+	completeEnd()
+	t.Logf("actual provider/bridge/SQL worker input driver elapsed=%s progress=%d", time.Since(started), result.Progress)
+	if e != nil || result.Progress != kube.ConfigurationWorkerInputAcknowledged || result.Snapshot.State.WorkerInputs == nil || result.Snapshot.State.WorkerInputs.Receipt == nil {
+		t.Fatal("actual original input phases did not acknowledge", e)
+	}
+	receipt := result.Snapshot.State.WorkerInputs.Receipt
+	object, e := api.CoreV1().ConfigMaps(inventory.Namespace.Name).Get(ctx, receipt.Configuration.Name, meta.GetOptions{})
+	if e != nil || string(object.UID) != receipt.Configuration.UID {
+		t.Fatal("read exact generated original input", e)
+	}
+	complete, e := contracts.DecodeHubWorkerDeployment(strings.NewReader(object.Data["deployment.json"]))
+	if e != nil || complete.ProviderAuthentication == nil || *complete.ProviderAuthentication != recipe.Profile || complete.ProviderInputs == nil || complete.Activation == nil {
+		t.Fatal("generated provider inputs lost original identities", e)
+	}
+	for _, ref := range []contracts.WorkerObjectReference{inventory.OwnerDeployment, inventory.WorkerDeployment} {
+		d, e := api.AppsV1().Deployments(inventory.Namespace.Name).Get(ctx, ref.Name, meta.GetOptions{})
+		if e != nil || string(d.UID) != ref.UID || d.Spec.Replicas == nil || *d.Spec.Replicas != 0 {
+			t.Fatal("input qualification unexpectedly launched/replaced workload", e)
+		}
+	}
+	if runtimeWorker {
+		qualifyProviderWorkerRuntime(t, ctx, api, config, inputs, inventory, complete, providers)
+		return
+	}
+	t.Log("fresh original bootstrap/19-resource retained bridge, actual scoped versioned backend and eight-read provider inspection, original three-role SQL projection and finite worker2 inputs; no owner signing, runtime launch, accepted source availability, accounting or public workflow qualification")
+}
+
+func (p *initialRuntimeNativeProviders) configureWorker(t *testing.T, ctx context.Context, recipe providerconfig.ConfigurationProviderRecipe, worker contracts.HubWorkerDeployment) *providerconfig.SetupReader {
+	t.Helper()
+	paths := []string{"sys/mounts/auth/" + recipe.Profile.AuthMount, "auth/" + recipe.Profile.AuthMount + "/config", "sys/mounts/" + worker.KeyService.AuditMount, worker.KeyService.AuditMount + "/keys/" + worker.KeyService.AuditKey}
+	for _, role := range recipe.Roles {
+		p.admin(t, ctx, http.MethodPost, "sys/policies/acl/"+role.Name, map[string]string{"policy": string(role.Policy)}, 204)
+		p.admin(t, ctx, http.MethodPost, "auth/"+recipe.Profile.AuthMount+"/role/"+role.Name, json.RawMessage(role.Role), 204)
+		paths = append(paths, "sys/policies/acl/"+role.Name, "auth/"+recipe.Profile.AuthMount+"/role/"+role.Name)
+	}
+	acl := map[string]any{}
+	for _, path := range paths {
+		acl[path] = map[string]any{"capabilities": []string{"read"}}
+	}
+	raw, e := json.Marshal(map[string]any{"path": acl})
+	if e != nil {
+		t.Fatal(e)
+	}
+	p.admin(t, ctx, http.MethodPost, "sys/policies/acl/configuration-setup-inspection", map[string]string{"policy": string(raw)}, 204)
+	reply := p.admin(t, ctx, http.MethodPost, "auth/token/create", map[string]any{"policies": []string{"configuration-setup-inspection"}, "no_default_policy": true, "renewable": false, "ttl": "5m", "explicit_max_ttl": "5m"}, 200)
+	var token struct {
+		Auth struct {
+			Token string `json:"client_token"`
+		} `json:"auth"`
+	}
+	if json.Unmarshal(reply, &token) != nil || token.Auth.Token == "" {
+		clear(reply)
+		t.Fatal("actual inspector credential unavailable")
+	}
+	clear(reply)
+	t.Cleanup(func() {
+		c, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		p.admin(t, c, http.MethodPost, "auth/token/revoke", map[string]string{"token": token.Auth.Token}, 204)
+	})
+	reader, e := providerconfig.NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: worker.KeyService.Endpoint, Roots: worker.KeyService.Roots}, []byte(token.Auth.Token))
+	if e != nil {
+		t.Fatal(e)
+	}
+	return reader
+}
+
+// Dynamic provider administration is an external fixture operation performed
+// after actual source14 exists. The pinned Seaweed shell stores exact scoped
+// identities; independent actual S3 behavior, not its exit code, proves access.
+func (p *initialRuntimeNativeProviders) provisionAudit(t *testing.T, ctx context.Context, api kubernetes.Interface, inventory kube.InitialRuntimeResourceInventory) {
+	t.Helper()
+	var fixtureScope struct {
+		Container string `json:"runtimeProviderPairS3Container"`
+	}
+	raw, e := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if json.Unmarshal(raw, &fixtureScope) != nil || !strings.HasPrefix(fixtureScope.Container, "asservat-context-") || !strings.HasSuffix(fixtureScope.Container, "-s3") {
+		clear(raw)
+		t.Fatal("owned fixture S3 identity missing")
+	}
+	clear(raw)
+	runID := strings.TrimSuffix(strings.TrimPrefix(fixtureScope.Container, "asservat-"), "-s3")
+	inspect := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", fixtureScope.Container)
+	label, e := inspect.Output()
+	if e != nil || strings.TrimSpace(string(label)) != runID {
+		t.Fatal("refuse non-owned S3 administration", e)
+	}
+	prefix := "hub-owner-configuration/v1/" + p.installation + "/" + p.cluster + "/" + inventory.OwnerSource.UID + "/"
+	bucket := p.desired.AuditStore.Bucket
+	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
+		"s3.configure -user=configuration -access_key=configuration-synthetic -secret_key=configuration-synthetic-secret -actions=Read:" + bucket + "/" + prefix + "*,Write:" + bucket + "/" + prefix + "* -apply\n"
+	command := exec.CommandContext(ctx, "docker", "exec", "-i", fixtureScope.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command.Stdin = strings.NewReader(shell)
+	output, e := command.CombinedOutput()
+	clear(output)
+	if e != nil {
+		t.Fatal("owned exact IAM provisioning command unavailable", e)
+	}
+	client := func(key, secret string) *s3.Client {
+		return s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: &p.desired.AuditStore.Endpoint, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(key, secret, ""), HTTPClient: p.client, RetryMaxAttempts: 1})
+	}
+	admin, runtime := client("synthetic-only", "synthetic-only-secret"), client("configuration-synthetic", "configuration-synthetic-secret")
+	if _, e = admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); e != nil {
+		t.Fatal("actual required versioning", e)
+	}
+	policy, _ := json.Marshal(map[string]any{"Version": "2012-10-17", "Statement": []any{map[string]any{"Sid": "DenyRuntimeDeletion", "Effect": "Deny", "Principal": map[string]any{"AWS": "arn:aws:iam::000000000000:user/configuration"}, "Action": []string{"s3:DeleteObject", "s3:DeleteObjectVersion"}, "Resource": "arn:aws:s3:::" + bucket + "/*"}}})
+	if _, e = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: ptr.To(string(policy))}); e != nil {
+		t.Fatal("actual runtime deletion denial", e)
+	}
+	key := prefix + "qualification/" + custodyID()
+	body := []byte("synthetic provider permission probe, not evidence")
+	seed, e := admin.PutObject(ctx, &s3.PutObjectInput{Bucket: &bucket, Key: &key, Body: bytes.NewReader(body)})
+	if e != nil || aws.ToString(seed.VersionId) == "" || aws.ToString(seed.VersionId) == "null" {
+		t.Fatal("actual immutable probe version", e)
+	}
+	defer func() {
+		_, e := admin.DeleteObject(context.Background(), &s3.DeleteObjectInput{Bucket: &bucket, Key: &key, VersionId: seed.VersionId})
+		if e != nil {
+			t.Error("owned permission probe cleanup", e)
+		}
+	}()
+	// Provider subscription convergence is external setup. Only named reads may
+	// wait; no CREATE is replayed and no product operation has started yet.
+	setup, end := context.WithTimeout(ctx, 10*time.Second)
+	defer end()
+	for {
+		got, readErr := runtime.GetObject(setup, &s3.GetObjectInput{Bucket: &bucket, Key: &key, VersionId: seed.VersionId})
+		if readErr == nil {
+			b, e := io.ReadAll(io.LimitReader(got.Body, 1024))
+			_ = got.Body.Close()
+			if e != nil || aws.ToString(got.VersionId) != aws.ToString(seed.VersionId) || !bytes.Equal(b, body) {
+				t.Fatal("exact version read unavailable", e)
+			}
+			break
+		}
+		var failure smithy.APIError
+		if !errors.As(readErr, &failure) || (failure.ErrorCode() != "InvalidAccessKeyId" && failure.ErrorCode() != "AccessDenied") {
+			t.Fatal("actual scoped credential unavailable", readErr)
+		}
+		select {
+		case <-setup.Done():
+			t.Fatal("bounded provider subscription did not become ready", setup.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	denied := func(e error) {
+		t.Helper()
+		var failure smithy.APIError
+		if !errors.As(e, &failure) || failure.ErrorCode() != "AccessDenied" {
+			t.Fatal("actual scoped S3 denial missing", e)
+		}
+	}
+	_, e = runtime.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucket, Key: &key, VersionId: seed.VersionId})
+	denied(e)
+	other := "outside-original-source/" + custodyID()
+	_, e = runtime.PutObject(ctx, &s3.PutObjectInput{Bucket: &bucket, Key: &other, Body: bytes.NewReader(body)})
+	denied(e)
+	_, e = runtime.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusSuspended}})
+	denied(e)
+	replacement := append(bytes.Clone(body), []byte("; distinct later version")...)
+	own, e := runtime.PutObject(ctx, &s3.PutObjectInput{Bucket: &bucket, Key: &key, Body: bytes.NewReader(replacement)})
+	if e != nil || aws.ToString(own.VersionId) == "" || aws.ToString(own.VersionId) == "null" || aws.ToString(own.VersionId) == aws.ToString(seed.VersionId) {
+		t.Fatal("actual exact-prefix write needs fresh immutable version", e)
+	}
+	defer func() {
+		_, e := admin.DeleteObject(context.Background(), &s3.DeleteObjectInput{Bucket: &bucket, Key: &key, VersionId: own.VersionId})
+		if e != nil {
+			t.Error("owned runtime probe version cleanup", e)
+		}
+	}()
+	originalRead, e := runtime.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &key, VersionId: seed.VersionId})
+	if e != nil {
+		t.Fatal("original pinned version lost after later write", e)
+	}
+	originalBytes, e := io.ReadAll(io.LimitReader(originalRead.Body, 1024))
+	_ = originalRead.Body.Close()
+	if e != nil || aws.ToString(originalRead.VersionId) != aws.ToString(seed.VersionId) || !bytes.Equal(originalBytes, body) {
+		t.Fatal("backend substituted later version for original receipt", e)
+	}
+	_, e = runtime.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucket, Key: &key})
+	denied(e)
+	_, e = runtime.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: ptr.To(string(policy))})
+	denied(e)
+	secret, e := api.CoreV1().Secrets(inventory.Namespace.Name).Get(ctx, p.worker.AuditCredentials.Name, meta.GetOptions{})
+	if e != nil || string(secret.UID) != p.worker.AuditCredentials.UID || len(secret.Data) != 0 {
+		t.Fatal("original empty audit selection changed", e)
+	}
+	payload, e := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: "configuration-synthetic", SecretAccessKey: "configuration-synthetic-secret"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer clear(payload)
+	secret.Data = map[string][]byte{contracts.ConfigurationProviderAuditCredentialFile: payload}
+	if _, e = api.CoreV1().Secrets(inventory.Namespace.Name).Update(ctx, secret, meta.UpdateOptions{}); e != nil {
+		t.Fatal("fill exact original scoped provider selection", e)
+	}
+	t.Logf("actual source-bound IAM, version-pinned read/write and delete/cross-prefix/versioning denial for original source %s; complete runtime copy accounting remains unqualified", inventory.OwnerSource.UID)
+}
+
+// These counters wrap the original six clients once at construction. They do
+// not replace or fill any limiter and are never recreated between phases.
+type initialRuntimeNativeTrace struct{ calls [6]atomic.Int64 }
+
+func newInitialRuntimeNativeTrace(enabled bool) *initialRuntimeNativeTrace {
+	if !enabled {
+		return nil
+	}
+	return &initialRuntimeNativeTrace{}
+}
+func (x *initialRuntimeNativeTrace) config(original *rest.Config, i int) *rest.Config {
+	if x == nil {
+		return original
+	}
+	copy := rest.CopyConfig(original)
+	copy.Wrap(func(next http.RoundTripper) http.RoundTripper {
+		return ownerProbeRoundTripper(func(r *http.Request) (*http.Response, error) { x.calls[i].Add(1); return next.RoundTrip(r) })
+	})
+	return copy
+}
+func (x *initialRuntimeNativeTrace) phase(t *testing.T, name string) func() {
+	if x == nil {
+		return func() {}
+	}
+	start := time.Now()
+	before := [6]int64{}
+	for i := range before {
+		before[i] = x.calls[i].Load()
+	}
+	return func() {
+		var used [6]int64
+		for i := range used {
+			used[i] = x.calls[i].Load() - before[i]
+		}
+		t.Logf("native phase=%s elapsed=%s calls[C B H S W T]=%v original 20QPS/burst20 clients retained", name, time.Since(start), used)
+	}
+}

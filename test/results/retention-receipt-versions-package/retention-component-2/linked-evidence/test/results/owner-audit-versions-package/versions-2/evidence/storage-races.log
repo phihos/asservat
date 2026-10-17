@@ -1,0 +1,38 @@
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version
+--- PASS: TestVersionedAuditRejectsUnpinnedReceipts (0.07s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/ (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/null (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version (0.00s)
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/null
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00
+--- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement (0.03s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/null (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00 (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.147s

@@ -1,0 +1,239 @@
+--- a/internal/adapters/kms/configuration_provider_effects.go
++++ b/internal/adapters/kms/configuration_provider_effects.go
+@@ -86,3 +86,23 @@
+ 	}
+ 	return nil
+ }
++
++// joinClosed uses the shared purpose-owned lifetime finalizer. It joins local
++// control/body ownership without issuing another provider revocation request.
++func (s *configurationProviderEffects) joinClosed() {
++	if s == nil {
++		return
++	}
++	s.cancel()
++	for _, slot := range []*ownerProviderLifetime{s.wrap, s.unwrap} {
++		if slot != nil {
++			slot.joinClosed()
++		}
++	}
++	if s.seal != nil {
++		s.seal.Close()
++	}
++	if s.open != nil {
++		s.open.Close()
++	}
++}
+--- a/internal/adapters/kms/configuration_provider_installed.go
++++ b/internal/adapters/kms/configuration_provider_installed.go
+@@ -19,7 +19,7 @@
+ 
+ // InstalledConfigurationProviderEffects owns the worker's two fixed finite
+ // provider credentials. Files, SQL pool and native readers remain owned by the
+-// enclosing worker until successful joined Close. This does not select an audit
++// enclosing worker until CloseAndJoin returns after actual local completion. This does not select an audit
+ // backend, launch a workload or change the installed command.
+ type InstalledConfigurationProviderEffects struct {
+ 	input           contracts.HubWorkerDeployment
+@@ -238,8 +238,8 @@
+ 	}
+ }
+ 
+-// A deadline/error retains all ownership. The enclosing worker must keep its
+-// files/pool/native transports alive until a later Close positively joins.
++// A deadline/error retains all ownership. The enclosing worker uses
++// CloseAndJoin to preserve this result while joining without new provider I/O.
+ func (s *InstalledConfigurationProviderEffects) Close(ctx context.Context) error {
+ 	if s == nil || ctx == nil {
+ 		return ErrKeyService
+@@ -261,3 +261,15 @@
+ 		return ErrKeyService
+ 	}
+ }
++
++// CloseAndJoin preserves the one bounded close result. Waiting after that
++// interval is local ownership finalization, never another provider operation.
++func (s *InstalledConfigurationProviderEffects) CloseAndJoin(ctx context.Context) error {
++	if s == nil || ctx == nil {
++		return ErrKeyService
++	}
++	result := s.Close(ctx)
++	<-s.closeDone
++	s.effects.joinClosed()
++	return result
++}
+--- a/internal/adapters/kms/owner_provider_lifetime.go
++++ b/internal/adapters/kms/owner_provider_lifetime.go
+@@ -254,3 +254,40 @@
+ 	s.signalLocked()
+ 	return nil
+ }
++
++// joinClosed relinquishes local ownership only after already admitted work
++// finishes. It is shutdown, not a longer effect or revocation interval. Unlike
++// retrying close with a fresh context, this finalizer performs no provider I/O.
++func (s *ownerProviderLifetime) joinClosed() {
++	if s == nil {
++		return
++	}
++	s.mu.Lock()
++	s.closed = true
++	s.cancel()
++	s.signalLocked()
++	for s.closing || s.active || s.borrows != 0 {
++		wait := s.changed
++		s.mu.Unlock()
++		<-wait
++		s.mu.Lock()
++	}
++	if s.finished {
++		s.mu.Unlock()
++		return
++	}
++	s.closing = true
++	current, draining := s.current, s.draining
++	s.mu.Unlock()
++	for _, v := range []*ownerProviderHeldCredential{current, draining} {
++		if v != nil {
++			v.value.destroy()
++		}
++	}
++	s.control.close()
++	s.mu.Lock()
++	s.current, s.draining = nil, nil
++	s.finished, s.closing = true, false
++	s.signalLocked()
++	s.mu.Unlock()
++}
+--- a/internal/adapters/kubernetes/configuration_worker_advance_contract.go
++++ b/internal/adapters/kubernetes/configuration_worker_advance_contract.go
+@@ -128,6 +128,15 @@
+ 	}
+ 	valid := owned && p.owner.roles == root && root != nil && p.ctx != nil && p.ctx.Err() == nil && ctx.Err() == nil &&
+ 		p.phase == from && !p.busy && p.changed != nil && p.cancel != nil && ctx.Value(configurationWorkerContextKey{}) == p && !p.until.IsZero() && p.owner.resources != nil && p.owner.resources.now().Before(p.until)
++	if valid {
++		// Admission after either ownership mutex may only shorten the original
++		// operation. A later phase using the original longer context cannot
++		// recover time surrendered by this actual SQL/native caller.
++		if until, ok := ctx.Deadline(); ok && until.Before(p.until) {
++			p.until = until
++		}
++		valid = ctx.Err() == nil && p.ctx.Err() == nil && p.owner.resources.now().Before(p.until)
++	}
+ 	if !valid {
+ 		p.phase = configurationWorkerPhaseFailed
+ 		if p.cancel != nil {
+@@ -138,8 +147,8 @@
+ 	}
+ 	p.busy = true
+ 	p.mu.Unlock()
+-	// Caller cancellation can shorten this operation. The independently owned
+-	// original context is also joined; a detached caller cannot keep it alive.
++	// The caller's earlier end now belongs to the entire operation. Original
++	// cancellation is also joined; a detached caller cannot keep it alive.
+ 	call, cancel := context.WithDeadline(ctx, p.until)
+ 	joined := make(chan struct{})
+ 	stop := context.AfterFunc(p.ctx, func() { cancel(); close(joined) })
+--- a/internal/adapters/kubernetes/configuration_worker_inputs.go
++++ b/internal/adapters/kubernetes/configuration_worker_inputs.go
+@@ -34,6 +34,7 @@
+ 	cancel                  context.CancelFunc
+ 	mu                      sync.Mutex
+ 	closed, busy, attempted bool
++	launchAttempted         bool
+ 	joined                  sync.WaitGroup
+ }
+ 
+--- a/internal/adapters/kubernetes/configuration_worker_operation_test.go
++++ b/internal/adapters/kubernetes/configuration_worker_operation_test.go
+@@ -92,12 +92,71 @@
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if until, _ := call.Deadline(); !until.Equal(original.Add(-time.Second)) || !p.until.Equal(original) {
++	if until, _ := call.Deadline(); !until.Equal(original.Add(-time.Second)) || !p.until.Equal(original.Add(-time.Second)) {
+ 		t.Fatal("child cancellation renewed original operation")
+ 	}
+ 	finish(nil)
+ 	if p.phase != configurationWorkerPhaseIntent {
+ 		t.Fatal("positive joined phase lost")
++	}
++}
++
++func TestConfigurationWorkerOpaqueLaterPhaseCannotReextendAdmittedDeadline(t *testing.T) {
++	owner, p := configurationWorkerOperationFixture(t)
++	short, stop := context.WithTimeout(p.ctx, 80*time.Millisecond)
++	defer stop()
++	expected, _ := short.Deadline()
++	_, finish, err := p.enterPhase(short, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial)
++	if err != nil {
++		t.Fatal(err)
++	}
++	finish(nil)
++	// Use the original context deliberately. It still has nearly five seconds,
++	// but cannot replace the shorter end admitted by the preceding phase.
++	call, finish, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseInitial, configurationWorkerPhaseIntent)
++	if err != nil {
++		t.Fatal(err)
++	}
++	until, _ := call.Deadline()
++	if !until.Equal(expected) || !p.until.Equal(expected) {
++		finish(context.Canceled)
++		t.Fatal("later phase reextended an earlier admitted deadline")
++	}
++	finish(nil)
++	<-short.Done()
++	if _, done, err := p.enterPhase(p.ctx, owner.roles, configurationWorkerPhaseIntent, configurationWorkerPhasePostLock); err == nil || done != nil {
++		if done != nil {
++			done(context.Canceled)
++		}
++		t.Fatal("expired shorter phase acquired a fresh effect interval")
++	}
++}
++
++func TestConfigurationWorkerOpaqueRechecksCancellationAfterPhaseMutex(t *testing.T) {
++	owner, p := configurationWorkerOperationFixture(t)
++	call, cancel := context.WithCancel(p.ctx)
++	defer cancel()
++	p.mu.Lock()
++	started, returned := make(chan struct{}), make(chan bool, 1)
++	go func() {
++		close(started)
++		_, done, err := p.enterPhase(call, owner.roles, configurationWorkerPhaseUninitialized, configurationWorkerPhaseInitial)
++		admitted := err == nil || done != nil
++		if done != nil {
++			done(context.Canceled)
++		}
++		returned <- admitted
++	}()
++	<-started
++	cancel()
++	p.mu.Unlock()
++	select {
++	case admitted := <-returned:
++		if admitted {
++			t.Fatal("phase lock wait ignored original cancellation")
++		}
++	case <-time.After(time.Second):
++		t.Fatal("cancelled phase did not join")
+ 	}
+ }
+ 
+--- a/internal/bootstrap/hub_worker.go
++++ b/internal/bootstrap/hub_worker.go
+@@ -281,11 +281,10 @@
+ 		d.mu.Unlock()
+ 		d.owners.Wait()
+ 		if d.providers != nil {
+-			// Each failed bounded close retains ownership. Do not release SQL,
+-			// projected files or native transports while a provider callback or
+-			// body is still alive. This loop retries closure only, never work.
+-			for d.providers.Close(context.Background()) != nil {
+-			}
++			// The provider close interval is used once. A bounded failure still
++			// joins cancelled work locally before dependencies can be released;
++			// no later shutdown iteration gets another revocation window.
++			_ = d.providers.CloseAndJoin(context.Background())
+ 		}
+ 		for i := len(d.closers) - 1; i >= 0; i-- {
+ 			d.closers[i]()

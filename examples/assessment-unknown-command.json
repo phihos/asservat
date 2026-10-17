@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "capture-assessment/v1",
+  "assessmentID": "00000000-0000-4000-8000-000000000161",
+  "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generatedAt": "2026-10-09T12:00:00Z",
+  "validUntil": "2026-10-09T12:05:00Z",
+  "basis": {
+    "rulesDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "capabilityDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "metrics": {
+      "state": "unavailable"
+    }
+  },
+  "scope": {
+    "observationPods": 0,
+    "incidentPods": 1
+  },
+  "combinedImpact": {
+    "level": "unknown",
+    "hasUnknowns": true,
+    "effects": [
+      "applicationAllocation",
+      "applicationCPU",
+      "applicationMutation",
+      "nodeCPU"
+    ],
+    "explanation": "Known mechanism effects are a minimum; workload headroom, combined overhead and placement are unmeasured. Limits are not predictions."
+  },
+  "actions": [
+    {
+      "actionID": "custom",
+      "executionMode": "onTrigger",
+      "impact": {
+        "level": "unknown",
+        "hasUnknowns": true,
+        "effects": [
+          "nodeCPU",
+          "applicationMutation",
+          "applicationCPU",
+          "applicationAllocation"
+        ],
+        "explanation": "Output may contain application data/secrets; no content scan is performed by this assessment."
+      },
+      "data": {
+        "classification": "potentialPersonalData",
+        "basis": "conservativeMechanism",
+        "retainedPossible": [
+          "userContent",
+          "credentials",
+          "unknownApplicationData"
+        ],
+        "transientOnly": [],
+        "unknownContent": true
+      },
+      "retention": {
+        "anchorRule": "firstAcquisitionOrEarlierSource",
+        "accessAgeSeconds": 21300,
+        "maximumAgeSeconds": 21600,
+        "deletionBudgetSeconds": 300,
+        "policyDigests": [
+          "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        ],
+        "automaticDeletion": true,
+        "managedCopiesOnly": true,
+        "preservationException": "none",
+        "deleteAgeSeconds": 21600
+      },
+      "quantities": [
+        {
+          "dimension": "outputBytes",
+          "phase": "perIncident",
+          "scope": "perIncidentPod",
+          "basis": "configuredLimit",
+          "lower": 0,
+          "upper": 4194304,
+          "sourceRef": "action:custom:maxBytes",
+          "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+        }
+      ]
+    }
+  ],
+  "combinedQuantities": [
+    {
+      "dimension": "outputBytes",
+      "phase": "perIncident",
+      "scope": "wholePlan",
+      "basis": "configuredLimit",
+      "lower": 0,
+      "upper": 4194304,
+      "sourceRef": "sum-of-compatible-declared-limits",
+      "coverage": "Configured acquired output bytes; excludes encryption/object overhead, replication and temporary copies; not expected size."
+    }
+  ],
+  "interactions": [],
+  "alternatives": [],
+  "handlingCodes": [
+    "minimizeCapture",
+    "restrictAccess",
+    "preferApprovedExtracts",
+    "reviewBeforeSharing",
+    "approvedClientsOnly",
+    "externalCopiesNotRecalled"
+  ],
+  "handlingPolicyRef": "company-debug-evidence/v1"
+}

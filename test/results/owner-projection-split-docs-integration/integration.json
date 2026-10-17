@@ -1,0 +1,55 @@
+{
+  "integratedAt": "2026-10-13T23:52:03.505686+00:00",
+  "files": [
+    {
+      "path": "docs/decisions/159-owner-projection-split-preflight.md",
+      "baseSHA256": null,
+      "payloadSHA256": "c1bbde7e3527047605912f0fc1256e0b8d119920410b3aa5dc55f15688153e30",
+      "new": true
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "baseSHA256": "a4f834061f198cf5661e086d216566b97ae7ce2cc6fc06be49813efbe879e381",
+      "payloadSHA256": "7ef4e75730d2814278d87bd806da54e01f3ac2efea302679ee70cee07680b442",
+      "new": false
+    },
+    {
+      "path": "docs/decisions/158-owner-startup-critical-sections.md",
+      "baseSHA256": "b0a76d7676e11a97cfb43640523e1b81d90046c00e53ca15c7d20b42200cb5c3",
+      "payloadSHA256": "885983d64d30aa3814850c07005820c43a5bd3b937fd63b445c3707c34cf8457",
+      "new": false
+    },
+    {
+      "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+      "baseSHA256": "9ef420b86a37b539dda2d236782fd00cf2c6dbd9d4136b3c15fa026d9f80d54c",
+      "payloadSHA256": "657ffb530ba0d9a5223716b7412d86c82009737c44031a29196a276c86aab7b1",
+      "new": false
+    },
+    {
+      "path": "docs/architecture/installed-owner-identity.md",
+      "baseSHA256": "cf3d75bb04d4e66148cb7949515d094ed9aa0224e220a52a6ea86baf3d9a7c10",
+      "payloadSHA256": "899a20cd7330351db6e8d3ccfd04feb2d01c8365e153a769bbb0187c5e4dc4b1",
+      "new": false
+    },
+    {
+      "path": "specs/federation.md",
+      "baseSHA256": "027671851573ea26147001684e73288b66b5829afd13952612b95ec5f82d8000",
+      "payloadSHA256": "d4d2ec2fa206a90f1efd1303f64d43a2d76cfee304aba7f4033dece885fc690a",
+      "new": false
+    }
+  ],
+  "qualification": "pending",
+  "archiveHashes": {
+    "before/specs/federation.md.txt": "027671851573ea26147001684e73288b66b5829afd13952612b95ec5f82d8000",
+    "before/docs/decisions/README.md.txt": "a4f834061f198cf5661e086d216566b97ae7ce2cc6fc06be49813efbe879e381",
+    "before/docs/decisions/158-owner-startup-critical-sections.md.txt": "b0a76d7676e11a97cfb43640523e1b81d90046c00e53ca15c7d20b42200cb5c3",
+    "before/docs/decisions/149-fresh-provider-installed-pair.md.txt": "9ef420b86a37b539dda2d236782fd00cf2c6dbd9d4136b3c15fa026d9f80d54c",
+    "before/docs/architecture/installed-owner-identity.md.txt": "cf3d75bb04d4e66148cb7949515d094ed9aa0224e220a52a6ea86baf3d9a7c10",
+    "payload/specs/federation.md.txt": "d4d2ec2fa206a90f1efd1303f64d43a2d76cfee304aba7f4033dece885fc690a",
+    "payload/docs/decisions/159-owner-projection-split-preflight.md.txt": "c1bbde7e3527047605912f0fc1256e0b8d119920410b3aa5dc55f15688153e30",
+    "payload/docs/decisions/README.md.txt": "7ef4e75730d2814278d87bd806da54e01f3ac2efea302679ee70cee07680b442",
+    "payload/docs/decisions/158-owner-startup-critical-sections.md.txt": "885983d64d30aa3814850c07005820c43a5bd3b937fd63b445c3707c34cf8457",
+    "payload/docs/decisions/149-fresh-provider-installed-pair.md.txt": "657ffb530ba0d9a5223716b7412d86c82009737c44031a29196a276c86aab7b1",
+    "payload/docs/architecture/installed-owner-identity.md.txt": "899a20cd7330351db6e8d3ccfd04feb2d01c8365e153a769bbb0187c5e4dc4b1"
+  }
+}

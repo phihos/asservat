@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-regional-api-journey
+    capture_admission_test.go:302: custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (5.16s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-regional-api-journey (5.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.217s
+FAIL

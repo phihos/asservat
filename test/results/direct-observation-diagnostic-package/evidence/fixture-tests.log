@@ -1,0 +1,29 @@
+=== RUN   TestDirectNativeFixtureWireParity
+--- PASS: TestDirectNativeFixtureWireParity (0.00s)
+=== RUN   TestDirectNativeFixtureDiagnosticLabels
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/phase
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/projection-wait
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/legacy-failure
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/legacy-extra-payload-discarded
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/unknown-phase
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/unknown-category
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/unknown-event
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/unknown-format
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/negative-duration
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/overlong-duration
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/overflow-duration
+=== RUN   TestDirectNativeFixtureDiagnosticLabels/non-json
+--- PASS: TestDirectNativeFixtureDiagnosticLabels (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/phase (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/projection-wait (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/legacy-failure (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/legacy-extra-payload-discarded (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/unknown-phase (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/unknown-category (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/unknown-event (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/unknown-format (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/negative-duration (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/overlong-duration (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/overflow-duration (0.00s)
+    --- PASS: TestDirectNativeFixtureDiagnosticLabels/non-json (0.00s)
+PASS

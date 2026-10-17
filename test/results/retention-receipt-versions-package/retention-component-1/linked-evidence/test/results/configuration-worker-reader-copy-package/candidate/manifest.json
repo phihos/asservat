@@ -1,0 +1,15 @@
+{
+  "scope": "fresh zero-value original input copy only; no verification run yet",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_reader.go",
+      "base_sha256": "f2a0a1f42e827c24e8853f7dfababea097df3b9cd6576b7b617b9fc9949ba661",
+      "payload_sha256": "53a699ac90d3b58289d154bdf5d8cefbc1591bae5dfa28c6cf22dc7bcf6295e6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection_reader_copy_test.go",
+      "base_sha256": null,
+      "payload_sha256": "d3d0111b8037abf3777de2d0016ecd43128c279ace8f8abad2762080d7e5e7fd"
+    }
+  ]
+}

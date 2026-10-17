@@ -1,0 +1,616 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+)
+
+// This fixture-only trace forwards the original calls without new contexts,
+// checks, retries, goroutines or authority. It retains only fixed phase labels,
+// timing and closed result classifications, never input/result bodies or errors.
+// Synchronous test output is deferred until the owning fixture has joined.
+const nativePreparationTraceLimit = 512
+
+type nativePreparationTraceEvent struct {
+	phase                    string
+	started, ended, deadline time.Time
+	inputUntil, resultUntil  time.Time
+	result, contextResult    string
+}
+
+type nativePreparationTrace struct {
+	mu         sync.Mutex
+	paused     bool
+	start      time.Time
+	events     [nativePreparationTraceLimit]nativePreparationTraceEvent
+	used       int
+	omitted    uint64
+	firstError *nativePreparationTraceEvent
+}
+
+func nativePreparationResult(err error) string {
+	switch {
+	case err == nil:
+		return "ok"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "context-deadline"
+	case errors.Is(err, context.Canceled):
+		return "context-canceled"
+	case errors.Is(err, artifact.ErrDownloadExpired):
+		return "download-expired"
+	case errors.Is(err, artifact.ErrDownloadUnavailable):
+		return "download-unavailable"
+	case errors.Is(err, artifact.ErrDownloadConflict):
+		return "download-conflict"
+	case errors.Is(err, artifact.ErrDownloadCapacity):
+		return "download-capacity"
+	case errors.Is(err, artifact.ErrInvalid):
+		return "invalid"
+	case errors.Is(err, artifact.ErrIntegrity):
+		return "integrity"
+	case errors.Is(err, identity.ErrDenied):
+		return "identity-denied"
+	case errors.Is(err, identity.ErrUnavailable):
+		return "identity-unavailable"
+	default:
+		return "other-error"
+	}
+}
+
+func (s *nativePreparationTrace) startCapture() {
+	s.mu.Lock()
+	s.start = time.Now()
+	s.paused = false
+	s.mu.Unlock()
+}
+func (s *nativePreparationTrace) stopCapture() {
+	s.mu.Lock()
+	s.paused = true
+	s.mu.Unlock()
+}
+func (s *nativePreparationTrace) begin(ctx context.Context, phase string, inputUntil time.Time) func(error, time.Time) {
+	s.mu.Lock()
+	paused := s.paused
+	s.mu.Unlock()
+	if paused {
+		return func(error, time.Time) {}
+	}
+
+	e := nativePreparationTraceEvent{phase: phase, started: time.Now(), inputUntil: inputUntil}
+	if ctx != nil {
+		e.deadline, _ = ctx.Deadline()
+	}
+	s.mu.Lock()
+	index := -1
+	if s.used < len(s.events) {
+		index = s.used
+		s.used++
+		s.events[index] = e
+	} else {
+		s.omitted++
+	}
+	s.mu.Unlock()
+	return func(err error, until time.Time) {
+		e.ended, e.resultUntil, e.result = time.Now(), until, nativePreparationResult(err)
+		e.contextResult = "none"
+		if ctx != nil {
+			e.contextResult = nativePreparationResult(ctx.Err())
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if index >= 0 {
+			s.events[index] = e
+		}
+		if err != nil && s.firstError == nil {
+			copy := e
+			s.firstError = &copy
+		}
+	}
+}
+
+func nativePreparationRemaining(until, at time.Time) time.Duration {
+	if until.IsZero() {
+		return 0
+	}
+	return until.Sub(at)
+}
+
+func (s *nativePreparationTrace) log(t *testing.T) {
+	t.Helper()
+	s.mu.Lock()
+	events := append([]nativePreparationTraceEvent(nil), s.events[:s.used]...)
+	omitted, first := s.omitted, s.firstError
+	s.mu.Unlock()
+	for i, e := range events {
+		if e.ended.IsZero() {
+			t.Logf("native preparation trace phase=%s seq=%d start=%s result=not-joined", e.phase, i, e.started.Sub(s.start))
+			continue
+		}
+		t.Logf("native preparation trace phase=%s seq=%d start=%s elapsed=%s deadline=%s remaining-start=%s remaining-end=%s input-until=%s input-remaining-end=%s result-until=%s result-remaining-end=%s result=%s context=%s",
+			e.phase, i, e.started.Sub(s.start), e.ended.Sub(e.started), e.deadline.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.deadline, e.started), nativePreparationRemaining(e.deadline, e.ended), e.inputUntil.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.inputUntil, e.ended), e.resultUntil.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.resultUntil, e.ended), e.result, e.contextResult)
+	}
+	if first != nil {
+		t.Logf("native preparation trace first-error phase=%s elapsed=%s result=%s context=%s", first.phase, first.ended.Sub(first.started), first.result, first.contextResult)
+	}
+	t.Logf("native preparation trace retained=%d omitted=%d", len(events), omitted)
+}
+
+func traceNativePreparation(t *testing.T, c evidence.ContextNativeRuntimeConfig) (evidence.ContextNativeRuntimeConfig, *nativePreparationTrace) {
+	t.Helper()
+	s := &nativePreparationTrace{start: time.Now(), paused: true}
+	t.Cleanup(func() { s.log(t) })
+	// Copy the actual composed authority; wrappers never substitute fixture facts.
+	a, ok := c.Authority.(authapp.ContextDownloadAuthority)
+	if !ok {
+		t.Fatal("native preparation trace requires the actual current authority")
+	}
+	a.Permissions = nativeTracePermissions{a.Permissions, s}
+	a.Catalog = nativeTraceCatalog{a.Catalog, s}
+	a.Retention = nativeTraceRetention{a.Retention, s}
+	a.Environment = nativeTraceEnvironment{a.Environment, s}
+	c.Authority = nativeTraceAuthority{a, s}
+	c.Workers = nativeTraceAttachments{c.Workers, s}
+	c.Sources = nativeTraceSources{c.Sources, s}
+	c.Preparation = nativeTracePreparation{c.Preparation, s}
+	c.Audit = nativeTraceAudit{c.Audit, s}
+	c.Acknowledgements = nativeTraceAcknowledgements{c.Acknowledgements, s}
+	d := *c.Dispatcher
+	d.Ledger = nativeTraceWorkerLedger{d.Ledger, s}
+	d.Jobs = nativeTraceJobs{d.Jobs, s}
+	c.Dispatcher = &d
+	r := *c.Requests
+	r.Store = nativeTraceWorkerOwners{r.Store, s}
+	c.Requests = &r
+	c.Native.Fences = nativeTraceFences{c.Native.Fences, s}
+	owners, ok := c.Native.Owners.(nativeTraceFirstOperations)
+	if !ok {
+		t.Fatal("native preparation trace requires the original first-context owner facet")
+	}
+	c.Native.Owners = nativeTraceOperations{owners, s}
+	c.Native.Origins.Operations = nativeTraceOperationReader{c.Native.Origins.Operations, s}
+	c.Native.PreparationKeys = nativeTracePreparationKeys{c.Native.PreparationKeys, s}
+	c.Native.Registrar = nativeTraceRegistrar{c.Native.Registrar, s}
+	return c, s
+}
+
+type nativeTraceAuthority struct {
+	evidence.CurrentDownloadAuthority
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceAuthority) CheckDownloadCurrent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	done := s.trace.begin(ctx, "authority.current", time.Time{})
+	v, e := s.CurrentDownloadAuthority.CheckDownloadCurrent(ctx, current, scope)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeTracePermissions struct {
+	authapp.ProjectionReader
+	trace *nativePreparationTrace
+}
+
+func (s nativeTracePermissions) Permissions(ctx context.Context, target value.Target) (value.Projection, error) {
+	done := s.trace.begin(ctx, "authority.permissions", time.Time{})
+	v, e := s.ProjectionReader.Permissions(ctx, target)
+	done(e, identity.Earlier(v.FreshUntil, v.DeniesFreshUntil))
+	return v, e
+}
+
+type nativeTraceCatalog struct {
+	authapp.ContextDownloadCatalog
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceCatalog) ContextDownloadEvidence(ctx context.Context, id string) (authapp.ContextDownloadEvidence, error) {
+	done := s.trace.begin(ctx, "authority.catalog", time.Time{})
+	v, e := s.ContextDownloadCatalog.ContextDownloadEvidence(ctx, id)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeTraceRetention struct {
+	authapp.DownloadRetentionResolver
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceRetention) ResolveRetained(ctx context.Context, in privacy.Input, dates privacy.Deadlines, rules []artifact.RetentionRule) (privacy.RetainedResolution, error) {
+	done := s.trace.begin(ctx, "authority.retention", dates.ExpiresAt)
+	v, e := s.DownloadRetentionResolver.ResolveRetained(ctx, in, dates, rules)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeTraceEnvironment struct {
+	authapp.DownloadEnvironmentReader
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceEnvironment) DownloadEnvironment(ctx context.Context, in authapp.ContextDownloadEvidence, principal identity.Principal) (artifact.DownloadEnvironment, error) {
+	done := s.trace.begin(ctx, "authority.environment", in.ValidUntil)
+	v, e := s.DownloadEnvironmentReader.DownloadEnvironment(ctx, in, principal)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeTraceAttachments struct {
+	evidence.ContextDownloadAttachments
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceAttachments) ReadContextDownloadAttachment(ctx context.Context, id string, a artifact.DownloadAuthority) (evidence.ContextDownloadAttachment, error) {
+	done := s.trace.begin(ctx, "worker.attachment", a.ValidUntil)
+	v, e := s.ContextDownloadAttachments.ReadContextDownloadAttachment(ctx, id, a)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeTraceWorkerLedger struct {
+	evidence.DownloadWorkerLedger
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceWorkerLedger) ReserveDownloadWorker(ctx context.Context, session, id string, a artifact.DownloadAuthority, profile value.DownloadWorkerProfile) (value.DownloadWorkerIntent, error) {
+	done := s.trace.begin(ctx, "dispatch.reserve", a.ValidUntil)
+	v, e := s.DownloadWorkerLedger.ReserveDownloadWorker(ctx, session, id, a, profile)
+	done(e, v.RunUntil)
+	return v, e
+}
+func (s nativeTraceWorkerLedger) ReadDownloadWorkerIntentReceipt(ctx context.Context, in value.DownloadWorkerIntent) (audit.Receipt, bool, error) {
+	done := s.trace.begin(ctx, "dispatch.intent-receipt", in.RunUntil)
+	v, ok, e := s.DownloadWorkerLedger.ReadDownloadWorkerIntentReceipt(ctx, in)
+	done(e, time.Time{})
+	return v, ok, e
+}
+func (s nativeTraceWorkerLedger) ClaimDownloadWorker(ctx context.Context, in value.DownloadWorkerIntent, a artifact.DownloadAuthority) (value.DownloadWorkerLaunch, error) {
+	done := s.trace.begin(ctx, "dispatch.claim", a.ValidUntil)
+	v, e := s.DownloadWorkerLedger.ClaimDownloadWorker(ctx, in, a)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeTraceWorkerLedger) RecordDownloadWorkerJob(ctx context.Context, in value.DownloadWorkerIntent, job value.DownloadWorkerJob) error {
+	done := s.trace.begin(ctx, "dispatch.record-job", in.RunUntil)
+	e := s.DownloadWorkerLedger.RecordDownloadWorkerJob(ctx, in, job)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeTraceWorkerLedger) BindDownloadWorker(ctx context.Context, worker value.DownloadWorker, a artifact.DownloadAuthority) error {
+	done := s.trace.begin(ctx, "dispatch.bind", a.ValidUntil)
+	e := s.DownloadWorkerLedger.BindDownloadWorker(ctx, worker, a)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeTraceWorkerLedger) ReadDownloadWorker(ctx context.Context, id string, a artifact.DownloadAuthority) (value.DownloadWorker, error) {
+	done := s.trace.begin(ctx, "dispatch.read-worker", a.ValidUntil)
+	v, e := s.DownloadWorkerLedger.ReadDownloadWorker(ctx, id, a)
+	done(e, v.Intent.RunUntil)
+	return v, e
+}
+
+type nativeTraceJobs struct {
+	evidence.DownloadWorkerJobs
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceJobs) CreateDownloadWorker(ctx context.Context, in value.DownloadWorkerLaunch) (value.DownloadWorkerJob, error) {
+	done := s.trace.begin(ctx, "dispatch.create-job", time.Time{})
+	v, e := s.DownloadWorkerJobs.CreateDownloadWorker(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeTraceJobs) FindDownloadWorkerJob(ctx context.Context, in value.DownloadWorkerIntent) (value.DownloadWorkerJob, error) {
+	done := s.trace.begin(ctx, "dispatch.find-job", in.RunUntil)
+	v, e := s.DownloadWorkerJobs.FindDownloadWorkerJob(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeTraceJobs) ObserveDownloadWorker(ctx context.Context, in value.DownloadWorkerIntent, job value.DownloadWorkerJob) (value.DownloadWorker, error) {
+	done := s.trace.begin(ctx, "dispatch.observe-job", in.RunUntil)
+	v, e := s.DownloadWorkerJobs.ObserveDownloadWorker(ctx, in, job)
+	done(e, v.Intent.RunUntil)
+	return v, e
+}
+
+type nativeTraceWorkerOwners struct {
+	evidence.WorkerOwnerStore
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceWorkerOwners) ClaimWorkerOwner(ctx context.Context, worker value.DownloadWorker, a artifact.DownloadAuthority, request value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
+	done := s.trace.begin(ctx, "enrollment.owner-claim", a.ValidUntil)
+	v, e := s.WorkerOwnerStore.ClaimWorkerOwner(ctx, worker, a, request)
+	done(e, v.Request.Until)
+	return v, e
+}
+func (s nativeTraceWorkerOwners) ReleaseWorkerOwner(ctx context.Context, lease value.WorkerOwnerLease) error {
+	done := s.trace.begin(ctx, "enrollment.owner-release", lease.Request.Until)
+	e := s.WorkerOwnerStore.ReleaseWorkerOwner(ctx, lease)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeTracePreparation struct {
+	evidence.FirstContextPreparationSessions
+	trace *nativePreparationTrace
+}
+
+func (s nativeTracePreparation) BeginDownloadBatch(ctx context.Context, id string, a artifact.DownloadAuthority, batch artifact.DownloadBatch) (audit.DownloadIntent, error) {
+	done := s.trace.begin(ctx, "preparation.begin-batch", a.ValidUntil)
+	v, e := s.FirstContextPreparationSessions.BeginDownloadBatch(ctx, id, a, batch)
+	done(e, v.Batch.LeaseUntil)
+	return v, e
+}
+func (s nativeTracePreparation) PermitDownloadBatch(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64) error {
+	done := s.trace.begin(ctx, "preparation.permit-batch", a.ValidUntil)
+	e := s.FirstContextPreparationSessions.PermitDownloadBatch(ctx, id, a, batch, generation)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeTracePreparation) PermitDownloadMetadata(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64) error {
+	done := s.trace.begin(ctx, "preparation.permit-metadata", a.ValidUntil)
+	e := s.FirstContextPreparationSessions.PermitDownloadMetadata(ctx, id, a, batch, generation)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeTracePreparation) FinishDownloadBatch(ctx context.Context, id, batch string, generation, emitted int64, complete, interrupted bool) (audit.DownloadOutcome, error) {
+	done := s.trace.begin(ctx, "preparation.finish-batch", time.Time{})
+	v, e := s.FirstContextPreparationSessions.FinishDownloadBatch(ctx, id, batch, generation, emitted, complete, interrupted)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeTraceAudit struct {
+	auditapp.DownloadWriter
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceAudit) WriteDownloadIntent(ctx context.Context, in audit.DownloadIntent) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "preparation.intent-write", in.Batch.LeaseUntil)
+	v, e := s.DownloadWriter.WriteDownloadIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeTraceAudit) WriteDownloadOutcome(ctx context.Context, in audit.DownloadOutcome) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "preparation.outcome-write", time.Time{})
+	v, e := s.DownloadWriter.WriteDownloadOutcome(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeTraceAcknowledgements struct {
+	evidence.DownloadAuditAcknowledger
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceAcknowledgements) AcknowledgeDownloadIntent(ctx context.Context, in audit.DownloadIntent, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, "preparation.intent-ack", in.Batch.LeaseUntil)
+	e := s.DownloadAuditAcknowledger.AcknowledgeDownloadIntent(ctx, in, receipt)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeTraceAcknowledgements) AcknowledgeDownloadOutcome(ctx context.Context, in audit.DownloadOutcome, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, "preparation.outcome-ack", time.Time{})
+	e := s.DownloadAuditAcknowledger.AcknowledgeDownloadOutcome(ctx, in, receipt)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeTraceFences struct {
+	evidence.NativeFenceReader
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceFences) NextNativeFence(ctx context.Context, id string) (int64, error) {
+	done := s.trace.begin(ctx, "native.next-fence", time.Time{})
+	v, e := s.NativeFenceReader.NextNativeFence(ctx, id)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeTraceFirstOperations interface {
+	evidence.NativeOperations
+	FirstContextObservationsOnly()
+}
+type nativeTraceOperations struct {
+	nativeTraceFirstOperations
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceOperations) ClaimNativeOperation(ctx context.Context, en value.WorkerEnrollment, a artifact.DownloadAuthority, op value.NativeOperation) (value.NativeOperation, error) {
+	done := s.trace.begin(ctx, "native.claim", identity.Earlier(a.ValidUntil, op.Until))
+	v, e := s.nativeTraceFirstOperations.ClaimNativeOperation(ctx, en, a, op)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativeTraceOperations) ReleaseNativeOperation(ctx context.Context, op value.NativeOperation) error {
+	done := s.trace.begin(ctx, "native.release", op.Until)
+	e := s.nativeTraceFirstOperations.ReleaseNativeOperation(ctx, op)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeTraceOperationReader struct {
+	evidence.NativeOperationReader
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceOperationReader) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, peer value.KeyPeer) (value.NativeLease, error) {
+	done := s.trace.begin(ctx, "native.origin-sql", time.Time{})
+	v, e := s.NativeOperationReader.ObserveNativeOperation(ctx, ref, peer)
+	done(e, v.Until)
+	return v, e
+}
+
+type nativeTracePreparationKeys struct {
+	evidence.DownloadKeyBindingLedger
+	trace *nativePreparationTrace
+}
+
+func (s nativeTracePreparationKeys) BindAttestedDownloadKeys(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64, scope value.KeyScope, peer value.KeyPeer, proof value.KeyWorkerProof) error {
+	done := s.trace.begin(ctx, "native.bind-keys", identity.Earlier(a.ValidUntil, proof.FreshUntil))
+	e := s.DownloadKeyBindingLedger.BindAttestedDownloadKeys(ctx, id, a, batch, generation, scope, peer, proof)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeTraceRegistrar struct {
+	evidence.NativeExchangeRegistrar
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceRegistrar) RegisterNativeExchange(ctx context.Context, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+	done := s.trace.begin(ctx, "native.register", in.Operation.Until)
+	v, e := s.NativeExchangeRegistrar.RegisterNativeExchange(ctx, in, func(call context.Context, origin evidence.NativeOrigin) error {
+		finished := s.trace.begin(call, "native.before-command", origin.Lease.Until)
+		err := before(call, origin)
+		finished(err, time.Time{})
+		return err
+	}, func(call context.Context, origin evidence.NativeOrigin) (value.NativeLease, error) {
+		finished := s.trace.begin(call, "native.current-frame", origin.Lease.Until)
+		lease, err := check(call, origin)
+		finished(err, lease.Until)
+		return lease, err
+	})
+	done(e, time.Time{})
+	if v != nil {
+		v = nativeTracePending{v, s.trace}
+	}
+	return v, e
+}
+
+type nativeTracePending struct {
+	evidence.NativePendingExchange
+	trace *nativePreparationTrace
+}
+
+func (s nativeTracePending) Wait(ctx context.Context) (evidence.NativeExchange, error) {
+	done := s.trace.begin(ctx, "native.wait", time.Time{})
+	v, e := s.NativePendingExchange.Wait(ctx)
+	done(e, time.Time{})
+	if v != nil {
+		v = nativeTraceExchange{v, s.trace}
+	}
+	return v, e
+}
+func (s nativeTracePending) Close() {
+	done := s.trace.begin(nil, "native.close-pending", time.Time{})
+	s.NativePendingExchange.Close()
+	done(nil, time.Time{})
+}
+
+type nativeTraceExchange struct {
+	evidence.NativeExchange
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceExchange) Prepared(ctx context.Context) (artifact.NativeDownloadMetadata, error) {
+	done := s.trace.begin(ctx, "native.prepared", time.Time{})
+	v, e := s.NativeExchange.Prepared(ctx)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeTraceExchange) Commit(ctx context.Context) error {
+	done := s.trace.begin(ctx, "native.commit", time.Time{})
+	e := s.NativeExchange.Commit(ctx)
+	done(e, time.Time{})
+	return e
+}
+
+// These tests only verify that diagnostics do not alter calls or log raw errors.
+// They do not replace the actual SQL/S3/native preparation qualification.
+func TestNativePreparationTraceForwardsOriginalCall(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+	defer cancel()
+	err := errors.New("sensitive error text must never enter trace")
+	until := time.Now().Add(500 * time.Millisecond)
+	underlying := &nativeTraceTestAuthority{context: ctx, result: artifact.DownloadAuthority{ValidUntil: until}, err: err}
+	trace := &nativePreparationTrace{start: time.Now()}
+	wrapper := nativeTraceAuthority{underlying, trace}
+	got, gotErr := wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{})
+	if got != underlying.result || gotErr != err || underlying.calls != 1 || !underlying.sameContext {
+		t.Fatal("trace changed original call, result, error or invocation count")
+	}
+	e := trace.events[0]
+	deadline, _ := ctx.Deadline()
+	if trace.used != 1 || e.deadline != deadline || e.resultUntil != until || e.result != "other-error" || e.contextResult != "ok" {
+		t.Fatal("trace changed deadline or retained non-closed diagnostics")
+	}
+	cancel()
+	_, gotErr = wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{})
+	if gotErr != err || underlying.calls != 2 || trace.events[1].contextResult != "context-canceled" {
+		t.Fatal("trace intercepted canceled call or changed original error")
+	}
+}
+
+type nativeTraceTestAuthority struct {
+	context     context.Context
+	result      artifact.DownloadAuthority
+	err         error
+	calls       int
+	sameContext bool
+}
+
+func (s *nativeTraceTestAuthority) CheckDownloadCurrent(ctx context.Context, _ identities.CurrentIdentity, _ artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	s.calls++
+	s.sameContext = ctx == s.context
+	return s.result, s.err
+}
+
+func TestNativePreparationTraceRetainsBoundedEventsAndFirstError(t *testing.T) {
+	trace := &nativePreparationTrace{start: time.Now()}
+	for n := 0; n < nativePreparationTraceLimit+2; n++ {
+		err := error(nil)
+		if n == nativePreparationTraceLimit {
+			err = artifact.ErrDownloadUnavailable
+		}
+		trace.begin(context.Background(), "authority.current", time.Time{})(err, time.Time{})
+	}
+	if trace.used != nativePreparationTraceLimit || trace.omitted != 2 || trace.firstError == nil || trace.firstError.result != "download-unavailable" {
+		t.Fatal("trace must stay bounded and preserve first error after overflow")
+	}
+}
+
+// Only the explicitly selected cold metadata operation is retained. Calls made
+// while paused still reach the original port with the original context.
+type nativeTraceSources struct {
+	evidence.ContextDownloadSources
+	trace *nativePreparationTrace
+}
+
+func (s nativeTraceSources) ReadContextDownloadSource(ctx context.Context, authority artifact.DownloadAuthority) (evidence.ContextDownloadSource, error) {
+	done := s.trace.begin(ctx, "source.read", authority.ValidUntil)
+	v, e := s.ContextDownloadSources.ReadContextDownloadSource(ctx, authority)
+	done(e, v.ValidUntil)
+	return v, e
+}
+func TestNativePreparationTracePausedStillForwards(t *testing.T) {
+	ctx := context.Background()
+	expected := errors.New("private original error")
+	underlying := &nativeTraceTestAuthority{context: ctx, err: expected}
+	trace := &nativePreparationTrace{paused: true}
+	wrapper := nativeTraceAuthority{underlying, trace}
+	if _, e := wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{}); e != expected || trace.used != 0 || underlying.calls != 1 || !underlying.sameContext {
+		t.Fatal("paused trace changed original call")
+	}
+	trace.startCapture()
+	if _, e := wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{}); e != expected || trace.used != 1 || underlying.calls != 2 {
+		t.Fatal("active trace changed original call")
+	}
+	trace.stopCapture()
+	if _, e := wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{}); e != expected || trace.used != 1 || underlying.calls != 3 {
+		t.Fatal("stopped trace changed original call")
+	}
+}

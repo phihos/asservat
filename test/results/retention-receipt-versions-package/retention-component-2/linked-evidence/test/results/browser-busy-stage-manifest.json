@@ -1,0 +1,47 @@
+[
+  {
+    "path": "internal/application/identity/browser_session.go",
+    "base_sha256": "b4843eb2a38718d71dca3ac596622572fac2b7fc5c0f6878eee31207a6637b49",
+    "sha256": "301f66f22f011985c1e57b05fb7a6f9c2894a99e6a46854bcdccb55e80078e60"
+  },
+  {
+    "path": "internal/application/identity/browser_csrf_rotation_test.go",
+    "base_sha256": null,
+    "sha256": "01797b3e7f6006b834183ef95d21e0e74af2bdc05d7903966160e11cec01e7b2"
+  },
+  {
+    "path": "internal/transport/browser/session.go",
+    "base_sha256": "6515f1772835c24cd5186ac96d66b874f181480d8f7c217aa8b6f0bd04b22825",
+    "sha256": "aeff8a74d6f6ed974974c8c64b6c0ed81df3186dde83ea188270688675e9ab41"
+  },
+  {
+    "path": "internal/transport/browser/session_busy_test.go",
+    "base_sha256": null,
+    "sha256": "abe99d613555e99049feab1a717437c1ae23cdc70e5241190c7b9c27b7f6d5d7"
+  },
+  {
+    "path": "web/src/auth/http.ts",
+    "base_sha256": "1fd41e85c3f987e92b6a89474dc2bfe24209f8ee729594390d3b11ca4dc776b2",
+    "sha256": "271779027feb32d7a3955b5441de59a8b06a5cdb2bbb85324214a908e9edbcd4"
+  },
+  {
+    "path": "web/src/auth/session.ts",
+    "base_sha256": "15a70aafdd5d235bf9290df9f68083fdd419bc0719e7d583a9d545e268bb9560",
+    "sha256": "fc17329cd607ec1b03eccb1574e4416d1e582540bf2fdda1ccc64667c5e7057c"
+  },
+  {
+    "path": "web/src/auth/session.test.ts",
+    "base_sha256": "bfe234938c27a5e518cbe8d5ceed91b6c9b9fc5d03fc3a790d8758311fb96691",
+    "sha256": "6259a8e84ec0af9cc7e955d1f9f3ad41f9e090cec57a95f82d5ec0ba23920e29"
+  },
+  {
+    "path": "docs/interfaces/browser-auth-openapi.yaml",
+    "base_sha256": "75cfedd5f987095fabc73aab49cbffde83aa86a2b1014f17d480459e61a4ad89",
+    "sha256": "ce16783f858d4464f6bd56d6fe1146b13770696ed297a193362efee63d887425"
+  },
+  {
+    "path": "web/src/generated/auth.d.ts",
+    "base_sha256": "712a1b9ffff749e3fc55deea17893c3db6c19e765384bdf588dbde7d3c193328",
+    "sha256": "51e67063b6d58854d48079a286a2ade7a3655aa2b57c01ba2f306771e5b8ae2a"
+  }
+]

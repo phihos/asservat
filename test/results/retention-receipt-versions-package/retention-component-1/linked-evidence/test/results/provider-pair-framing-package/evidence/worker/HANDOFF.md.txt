@@ -1,0 +1,11 @@
+# Worker input final SQL bound correction
+
+Use this immutable checkpoint's `files/` and `bases/` for the complete 140-path integration. Manifest SHA256 `f457449a2a69a4787f34d412c14976bbcc392a3c33e47c4bd9bb690bb71ee917`; all 2,448 live dependencies SHA256 `215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce`. The sole change from `../worker-phase-6` is recorded in `delta.json`: PostgreSQL `configuration_worker_operation.go` now narrows the existing bounded context immediately after accepting the final native snapshot's shorter ValidUntil. The subsequent current incarnation, current sources and commit cannot use the earlier longer context. No original interval is extended.
+
+Session 63385 ended 0: PostgreSQL and native integration compile-only 11.381 seconds; PostgreSQL vet 0.665 seconds. No tests or native lab ran in this minimal follow-up. Every payload/base/dependency/inventory check before, between and after phases was unchanged; dedicated tmpfs scratch was removed after terminal. GOMAXPROCS=2, GOFLAGS=-p=2; the 600-second wrapper bounds build time only.
+
+Full checkpoint scope, ownership and earlier actual qualification remain in `../worker-phase-6/HANDOFF.md` (SHA256 `005e01fdfcd3fa94cf881a6a70a7692d84df6a6b42590ba2fd385e52b4e36c3c`). That package's 140 paths are superseded only by this one PostgreSQL delta. Prior compiler, wrapper-timeout and controlled-before cleanup failures remain preserved. The corrected selected phase/driver/CAS races and clean intended before result are not repeated here.
+
+This closes the reviewed final-context propagation defect. It does not establish complete actual Kubernetes/PostgreSQL/provider input advancement, sustained timing, installed launch or runtime readiness. Parent owns the actual original-root CompleteInputs native qualification using the 140 paths plus its five fixture/harness paths. No Launch or installed command switch is enabled. New Launch operation source and the required joined provider CloseAndJoin follow-up remain separate, uncompiled source and outside this checkpoint.
+
+Result SHA256 `e58a79fad6c73198fee4935a76defeca624bf4c825b007636e3ccbdb02f12e02`; runner SHA256 `9f47f2bb610e9e57aba615ee323655e32a6193e81d08cd78fde317faea666aa6`.

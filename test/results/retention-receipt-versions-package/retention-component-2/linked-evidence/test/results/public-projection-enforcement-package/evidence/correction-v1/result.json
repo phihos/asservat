@@ -1,0 +1,87 @@
+{
+  "manifest": "b0698de844ed18b24bb95d908d21ec47321bf58156462298cf1767ed8dd17abe",
+  "dependencies": "5292bc3cf938c5c761365aa701d9b57a470997f94d861fc55e6e820b3fe597d6",
+  "runner": "4d11ad71a8e9c104cd08e7fcd2fc1484e71fef2b5b574ec2aef3c531a1c34122",
+  "before": {
+    "payload": [],
+    "base": [],
+    "dependencies": []
+  },
+  "started": 1791854134.60597,
+  "phases": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/before.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^TestPublicRuntimeProjectionTimingDiagnostic$",
+        "-count=1",
+        "-timeout=45s",
+        "-v"
+      ],
+      "exit": 1,
+      "seconds": 9.64042329788208,
+      "log_sha256": "9860106a7792ce826459bf44e83ebbaca9a906d9e827186460a67f9542ecf529"
+    },
+    {
+      "name": "after",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "-run",
+        "^(TestPublicRuntimeProjection|TestPublicProjection)",
+        "-count=1",
+        "-timeout=4m",
+        "-v"
+      ],
+      "exit": 0,
+      "seconds": 150.03212428092957,
+      "log_sha256": "7f0ad85ec4073e14e7c69427488c79decc5591fd43709c84a46ce103cc18443e"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/public-projection-proof-20261013/candidate-v1/overlay.json",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 1.0901994705200195,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 2,
+      "seconds": 3.8132541179656982,
+      "log_sha256": "6ead9df126c1107fb7deff12127a9ece6604fe6787d7c7d766af507e0a63d99e"
+    }
+  ],
+  "intended_before": true,
+  "exit": 2,
+  "ended": 1791854300.2856007,
+  "after": {
+    "payload": [],
+    "base": [],
+    "dependencies": []
+  }
+}

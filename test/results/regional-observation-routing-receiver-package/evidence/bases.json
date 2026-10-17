@@ -1,0 +1,12 @@
+{
+  "docs/architecture/cluster-observations.md": "e711b7bae76af3dbff265de004c846ccf9d4935584a32a8c20d9643535911e81",
+  "docs/decisions/144-cluster-local-observations.md": "c259ef050dca4738ecb62f186c2340ad83455910c6e3b602c2c117b713ea115a",
+  "internal/adapters/mtls/owner_observation_routing.go": null,
+  "internal/adapters/mtls/owner_observation_routing_test.go": null,
+  "internal/domain/fleet/cluster_observation_routing_peers.go": null,
+  "internal/domain/fleet/cluster_observation_routing_peers_test.go": null,
+  "internal/domain/fleet/owner.go": "5a9cffec76cb05a53dfbae1a612c58854e8239feffead2479a92fd180d8f16ea",
+  "internal/transport/clusterobservation/routing_handler.go": null,
+  "internal/transport/clusterobservation/routing_handler_test.go": null,
+  "internal/transport/clusterobservation/routing_wire.go": null
+}

@@ -1,0 +1,76 @@
+# Closed observation routing receiver checkpoint
+
+Scope: ten isolated paths; no live source mutation. This adds the purpose-fixed
+common-SNI locator GET / exact-SNI claim POST handler and its concrete existing
+owner-registry/Ready/native-workload checker. No listener, loader, SQL query,
+forwarding runtime or public installed-v2 carrier selects these routes yet.
+
+## Contracts
+
+The original permission root remains distinct from installation identity. Both
+actual mTLS owners must match one explicitly installed source/pool/template/image/
+guard pin. The checker independently traverses current registration, Ready route
+and guard for each owner, observes both exact native workloads, and rechecks the
+actual peer and private serving key after blocking work. The handler repeats
+that check before returning, requiring unchanged identities and current revision
+without replacing the first proof's original deadline.
+
+Locator GET requires common SNI and matching authority; claim POST requires the
+exact local process SNI and matching authority. Browser credentials, HWORK tokens,
+idempotency headers, alternate request representations and wrong purposes deny
+before proof/holder work. An exact holder claim is irreversible; the result is
+returned only after the existing four regional proofs, metadata, Receipt/EOF and
+admitted handler cleanup join. A failed final proof or reply does not refund or
+replay that claim. Original request/caller/proof/socket bounds only shorten.
+
+OwnerPool.NativeCandidateLimit is an optional domain value: zero preserves old
+omitted bytes, and nonzero requires the opted bootstrap profile plus1..1024.
+Its identical isolated domain-field-v1 copy was provided to console for the one
+coordinated fresh installed-v2 carrier. This package adds no public configuration
+field, SQL query or installed selection. The old context-start query remains
+LIMIT17 with explicit >16 denial. A separate complete observation candidate
+reader and all v2 consumers remain prerequisites.
+
+## Evidence
+
+Receiver-v1 was never run. Preflight detected the parent's reviewed pure provider
+recipe move before launch. V2 preserves all ten payload/base hashes and pins the
+new current dependency set; BASELINE.md records the exact distinction.
+
+Handle93067 ended0. The frozen run.py executes sequentially with GOMAXPROCS2,
+GOFLAGS=-p=2 and task TMPDIR,120s test/240s phase caps:
+
+- affected domain/fleet, adapters/mtls and transport/clusterobservation compile:
+  exit0,3.399s;
+- selected routing and retained HubObservation race cases: exit0,8.908s;
+- affected vet: exit0,.694s;
+- unchanged repository Go architecture checker over the exact isolated source
+  mirror: exit0,1.450s,53packages/297edges.
+
+There are90 named PASS entries including subtests:65 new routing and25 retained
+holder/stream cases. The test cases use real process-owned keys, strict TLS
+profiles and actual mutual TLS; HTTP handler cases use real h2 and the real
+holder's six-frame outbound/four-proof conversation plus terminal EOF. Native
+Kubernetes/SQL/activation inputs remain explicit test ports, not product authority.
+Cases include wrong actual SNI, missing client certificate, tuple/header denial,
+no claim on GET, one selected claim, terminal joining before output, spent replay,
+revocation on a reused connection, changed pool/source/guard/template/Pod/RS,
+first-proof shortening and joined Close retaining capacity while authority blocks.
+
+All1,904 dependency hashes, owned bases, payloads, live Go file set, isolated
+mirror file set and freeze hashes match before/after every phase. No spec/design
+or external native gate is attributed to this runner. manifest.json lists all
+owned bases/payloads; dependencies.json/overlay.json/freeze.json and phase reports
+are the exact qualification inputs. RESULT.json and result-files.json bind the
+actual results. No failed job was overwritten.
+
+## Next boundary and gaps
+
+Continue the separate source-only configured candidate reader + overflow tests,
+then bounded per-Pod locator selection and one exact-SNI forwarding attempt.
+There is no SQL routing table, token relay, automatic POST replay or inferred
+latest process. Console owns the shared fresh-v2 layout/carrier/producer selection.
+Actual complete four-proof plus locator/claim availability within the original
+five seconds requires measured multi-owner/two-cluster native qualification.
+The component result does not qualify installed startup, backend activation,
+listener route selection, cross-cluster reachability or sustained availability.

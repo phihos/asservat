@@ -1,0 +1,87 @@
+[
+  {
+    "path": "docs/architecture/native-download-retry.md",
+    "base_sha256": null,
+    "sha256": "75bfc6b5cdb3ff5481ff5f3e56e793aca79e5a66236eb56545bdb2d9d9601d0b"
+  },
+  {
+    "path": "internal/adapters/postgres/context_native_control.go",
+    "base_sha256": "3677a6daa3ccaf886be83f50d595b1c4e56e7aee6c2ee10eeae5fc2a9ca1f296",
+    "sha256": "e668ad770f7a1ddaa00f5a14481e3d7867a9f2d153b152702d68a3398cc0ec88"
+  },
+  {
+    "path": "internal/adapters/postgres/context_native_uncertain_test.go",
+    "base_sha256": null,
+    "sha256": "1cdd5099b9fbc300959797a4bec905c89a292013bd223382f2139c66235da2a8"
+  },
+  {
+    "path": "internal/adapters/postgres/custodydb/context_download_attachment.sql.go",
+    "base_sha256": "0c985baeeb4514c3c875b1ecef38d8317ceb7b4c014ec78b879fea77824ed24c",
+    "sha256": "455dcbcb32a7d8c38130cc629adb6eb2883e7e5833f63c366ffa82cb5e6c1d76"
+  },
+  {
+    "path": "internal/adapters/postgres/download_response.go",
+    "base_sha256": "66216820a5466ae47ca9eb0fb5a450c743e3a1818ef99acd58906e887f1aa220",
+    "sha256": "cb8ce302e4df32978cfb648c4f888c0a2bc7c7d44fc2a212cbe4861fc5f21ad0"
+  },
+  {
+    "path": "internal/transport/native/content_uncertainty_test.go",
+    "base_sha256": null,
+    "sha256": "b28548254990b3e37f99c438c86f1fc136b0fd47d738b6e3cba97eb1085e3524"
+  },
+  {
+    "path": "migrations/queries/context_download_attachment.sql",
+    "base_sha256": "41a165672ff7dd37a97e4c6eb16ab91c1476a0acf0921803eb26b48f50b09335",
+    "sha256": "43dc134208dc414c8c3d766b7d95062c5dae5829c89b15d98328c30fab5413ad"
+  },
+  {
+    "path": "specs/artifact-downloads.md",
+    "base_sha256": "fac03cc5c6adbf6f33862ec2cb06fdab6148305dd8ecd9140143ed4a76b6592f",
+    "sha256": "2943a5abd6ce804dfd0e43d9590c95f6cb794b2442533fb41bf84be56aa3d339"
+  },
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "base_sha256": "49e4278be6b1fcbef5cdbe9d6a3f52c82e297c261d82412a834e37b9ac297afc",
+    "sha256": "0aad055183482e9981ffea557410c01febddd7adcbcc89e2e1550da9c15ac60d"
+  },
+  {
+    "path": "test/integration/context_native_interrupted_test.go",
+    "base_sha256": null,
+    "sha256": "2a3f5eefe20a66dd74ec9c3f681f983e9a9c66ee0a088a8ae95600c3ab690d96"
+  },
+  {
+    "path": "test/integration/context_native_resume_test.go",
+    "base_sha256": null,
+    "sha256": "4fdab4f32d897319b03464c9885262ee75acd8197dc31b9661b87efb5c9d3379"
+  },
+  {
+    "path": "test/integration/download_sessions_test.go",
+    "base_sha256": "60dfedfd955cf0ece38062e7f3deb9faf9b7fdae661bb7aabdc6dc7598e35122",
+    "sha256": "ce32fc556a46f6941bb1db5ee114e65b32e99c891b41ccae3a6ab1eab4e814af"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base_sha256": "8593f4cd31ffbe299bf41af21f9d3ab7af2b1b34f614c7f172f4afbe13596112",
+    "sha256": "428e42a0bfd62662d1fcfbc3912e8b2db186946edd12120f99ab8372be3667cc"
+  },
+  {
+    "path": "web/src/evidence/EvidenceWorkspace.test.tsx",
+    "base_sha256": "696ab6f857d3f5b4b627c41fcceffad50965a198f09f7eac4e79ddad4f9282e2",
+    "sha256": "718a0bb06918b717076154dc338ef0b86b2622583f596d1502fb917429dbb2be"
+  },
+  {
+    "path": "web/src/evidence/EvidenceWorkspace.tsx",
+    "base_sha256": "e54838b089337ddc10c9ab15a2c5bee656b3987e721beebf82c92e6a3e50b152",
+    "sha256": "f7ff8366cfbfd6a80cdfdd74a733b1c9611fe3a13561b1467a0511b52f421a02"
+  },
+  {
+    "path": "web/src/evidence/evidence.test.ts",
+    "base_sha256": "869541816bc91fcbb805da10f172bf6ff6e1fed2d4f15cbb2c6eccc9e5ff15a7",
+    "sha256": "cb4f4b2fb82d449b1e7e290a18d22c9a5d23afa742958c0f6f208d91e294aa53"
+  },
+  {
+    "path": "web/src/evidence/evidence.ts",
+    "base_sha256": "07102894aed7a88fa04184086541150b3ce0c8a50b5fdb1d4ebccea727fda500",
+    "sha256": "6f3384adefcd3d610ed67d63f413f41b7bd0711b1b07a7820e5d92b60aa8f33e"
+  }
+]

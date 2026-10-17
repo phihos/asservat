@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/kms/initial_provider.go",
+    "base_sha256": "2ba5a2eea74eeaf3479309eb25d952ce11ecf10a8c43f07a77238c60bb081db8",
+    "sha256": "71dec1a6481ecbfa41e4c7f7829017cad2e46522cbf38696e30ad9bde627fb01"
+  },
+  {
+    "path": "internal/adapters/kms/initial_provider_test.go",
+    "base_sha256": "259bd67b4285a76bb4844020b381d0db865cb2dafbc27f0529513e859656fbc7",
+    "sha256": "1135f5addf44a3aa3c47659b5752f686b560c490c733ba93f5f3f3b2ece4497d"
+  },
+  {
+    "path": "internal/adapters/kms/initial_provider_role_cap_test.go",
+    "base_sha256": null,
+    "sha256": "fd787862e037a14825c16ea8d83518ff080c80505a38132da4fbc5e02d41ff40"
+  },
+  {
+    "path": "docs/architecture/initial-provider-provisioning.md",
+    "base_sha256": "444d29544d3c5c940ab10f074f298a18f2b23d54dd5b3eaca7217f37ee41cce0",
+    "sha256": "b10fc927c4c7816013828de1d9fb2e94238361c6d452fb46985b7091eee808e2"
+  }
+]

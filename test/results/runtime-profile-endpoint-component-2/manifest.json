@@ -1,0 +1,267 @@
+{
+  "scope": "Corrected passive runtime-profile endpoint component; original endpoint-v2 plus four-file pure-domain syntax correction and reviewed five-path fixture overlay",
+  "origin": "/home/phil/.cache/asservat-build/planning/runtime-profiles-20261014/endpoint-resolution-v2",
+  "originManifestSHA256": "777fcdd9e0a6b6f3fb7cbc76bb71f18a96abe8adfae0a617909e2f5bae1ef4c4",
+  "originPatchSHA256": "7c055d88544f7d36e560ec22d325566595719823f204df60eda35b27b3c06fe7",
+  "files": {
+    "internal/domain/planning/go_profile_endpoint.go": "04f2c4e1b236e61d4afc5e82f9ca9b999fc6489ebf352892a0d1e8d266ba8b77",
+    "internal/domain/planning/go_profile_endpoint_test.go": "fb9de82a478050624a9abda9da71159130a046e42d98234548f13e773dbf694c",
+    "internal/domain/targets/profile_network.go": "c0361f267c3c245b1269ea887315b8181d81abd18987886e5c57849625b2e2a9",
+    "internal/domain/targets/profile_network_test.go": "94b53c3687e584f6f234cfa3b3ac3525ee9e324f508fff2c05183fa0767ab1fd",
+    "internal/application/planning/go_profile_endpoint.go": "c5ed08a53ba98c76d9054e8826207348ceb2e3992d04c664bd75ce06ca7a5061",
+    "internal/application/planning/go_profile_endpoint_test.go": "9baee9f277f349832745fee0525bfdfe4c6aed9771c7b75a95f38f739c2575b7",
+    "internal/application/targets/profile_network.go": "f40d84028d1248c670a1474980c0fe4abf09c60f3b180cfb6f81f43e7602e1a6",
+    "internal/adapters/kubernetes/profile_network.go": "02ef9dc624ddbaa7dcd4c5b640f88a677a98183294ee7f6b4d6ae3ce0066e004",
+    "internal/adapters/kubernetes/profile_network_test.go": "61720a001706e41391fd6d9036a549e55e261efefc86df7f7dc28ffbdb9f7336",
+    "docs/architecture/runtime-profiles.md": "fe281d8810b3b14808b7880843e379450ab117ef930b3f390ca7ecb73f51d3ed",
+    "specs/profiles.md": "6757175460b7cff42d81e3027d27fdd7de80f3edb2624059069967f6ade6fda1",
+    "scripts/test-context-storage.py": "db90d1a7123f79b8e74547f0a1b664d0f1b27b593866b6a2fc0d139ba9aac82d",
+    "scripts/test-regional-context-selection.py": "c9483b1b88f04798acb872549683483f88d027b4bfaaa9a15d0f8ee5efab74e9",
+    "test/integration/capture_admission_test.go": "3833db17490c92ab795590fc3600bf4e93295cdd4f3f401c66188d265a0d6174",
+    "test/integration/public_context_download_diagnostics_checks_test.go": "fa340a7566f7ad65e9ca1d3a24439eb16cbf4477b4f453b7aed17504f041bda2",
+    "test/integration/public_context_download_diagnostics_test.go": "2ffa4691fd938e8f0ad1acc37cb6d5cf1263ae6fe02fbb1b845ea785d9a375ae"
+  },
+  "baseFiles": {
+    "internal/domain/planning/go_profile_endpoint.go": null,
+    "internal/domain/planning/go_profile_endpoint_test.go": null,
+    "internal/domain/targets/profile_network.go": null,
+    "internal/domain/targets/profile_network_test.go": null,
+    "internal/application/planning/go_profile_endpoint.go": null,
+    "internal/application/planning/go_profile_endpoint_test.go": null,
+    "internal/application/targets/profile_network.go": null,
+    "internal/adapters/kubernetes/profile_network.go": null,
+    "internal/adapters/kubernetes/profile_network_test.go": null,
+    "docs/architecture/runtime-profiles.md": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56",
+    "scripts/test-context-storage.py": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+    "scripts/test-regional-context-selection.py": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+    "test/integration/capture_admission_test.go": "86de509cb8ae77939ede3df758783a9ffdf594d55e223720ce21e97ddce67e3a",
+    "test/integration/public_context_download_diagnostics_checks_test.go": "d1058dc4a88883bca3e07fd691168ee4383535d2f43198f8b4b56295784110ae",
+    "test/integration/public_context_download_diagnostics_test.go": "e24877094a715f045d21fb77c3627ce74d29af220bb1485be71e79ee9e12cd55"
+  },
+  "dependencyPins": {
+    "/home/phil/go/pkg/mod/k8s.io/apimachinery@v0.37.0/pkg/util/validation/ip.go": "a0194f918ba71da23ca670f2cd51ef2c9a9781a35e34cef5bbe78c2b4c4e1941",
+    "go.mod": "693025c52045be6507972e5bc0849812a0838371572bac62e9c77fc996119b56",
+    "go.sum": "3f7f26175604f4e8bcddafaab5854257767787d7ac1915783b4c188c3a160641",
+    "internal/adapters/diagnostics/go_profile.go": "7f639d8f3961cfc75c04045cb96daac11fb498fd529089987d0f89ec76d8f0b5",
+    "internal/adapters/kubernetes/target_api_context.go": "c299a556c10eb72972a4eafeaab502df8ce5308e679c0ebb7e56aa0e176ef576",
+    "internal/adapters/kubernetes/target_api_context_test.go": "9b7ba43747c38d35adf50427d37fd04248f8edbcab3c4be202082cb49efdd7e6",
+    "internal/adapters/kubernetes/target_pod.go": "d40ccf806675b26d1757a01930e58734a69735adc9564f80c18e5c239d820229",
+    "internal/adapters/kubernetes/target_pod_test.go": "2f08ddd67a4b9bd0e192383c4e5abf0e6ae2dc53dcec6181388d66be0e8aa03a",
+    "internal/adapters/kubernetes/workload_targets.go": "60c5902441b5f01500a9b364fc98b984a7cec1797c2691d4c11652159280cc87",
+    "internal/adapters/kubernetes/workload_targets_test.go": "a5996f05bc3944ce84739ba0f02e6dc744ed21830a27f858f22e12ca28c2a0f5",
+    "internal/application/execution/go_profile.go": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "internal/application/planning/context.go": "7645494b13d3a510eda5e357ffcb0e04d6333ff86978490735fe591905ab7de3",
+    "internal/application/planning/context_assessment.go": "6feedf172f61bc27792f2d9c336a97f3b4dc5e1434df65a28a68047b23e9e186",
+    "internal/application/planning/context_assessment_test.go": "09d809deef8fdeb5a7dce80a6d9803474901767f502a17555b0352b4ad8c0ab8",
+    "internal/application/planning/context_scope.go": "b00468d9197eab66a8c37f4fa126d6610d22b5925c19d85f80bb821496b5d171",
+    "internal/application/planning/context_scope_test.go": "34c644ffb3ae55b65ea4293564a071c7a99b312303480d2e8e7ade04d9e7a791",
+    "internal/application/planning/context_test.go": "898dddfb92f7c6237f1563bac1b51f9213fdd616ed53331b75e0e4fec6943879",
+    "internal/application/targets/pod.go": "83410afb174331e28e10de2378588fd16d645e99916ffb55e52bab3eac4e9d72",
+    "internal/domain/execution/go_profile.go": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "internal/domain/execution/go_profile_test.go": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "internal/domain/planning/context.go": "f41772dc2dc0bcae67aea3089cc2d690c4300a525b22833089fd2a3976e4ec30",
+    "internal/domain/planning/context_assessment.go": "3416b1cd547896252ffe4426a38d20c469103478763848d4e0c68618c527d67f",
+    "internal/domain/targets/pod.go": "10a4a5fa8a8aabe2f3cb97e497c0b00587e4726e60e405174a4a3313d6a46f73",
+    "internal/domain/targets/workload.go": "e11bec5b281986bbf2da131ab4e8cec7513a7e225e60fc39d4d7b05c841e4afe",
+    "internal/domain/targets/workload_test.go": "fe77fc56c7bc544d04ae638f9d2515c12928d2e75c72033782954fffb524ba13",
+    "specs/contracts/action.schema.json": "d11434144490f04ff3862ca2c5187dff4c2e3a96d8deb3bbcb365a0e12fd72fb",
+    "specs/contracts/recipe.schema.json": "5358df9cc9139a32c524ed437e81fb54fe1304941b1f5fdfef2570d929714800"
+  },
+  "selections": {
+    "race-domain-planning": {
+      "package": "./internal/domain/planning",
+      "names": [
+        "TestGoEndpointBindingsKeepExistingRecipeShape",
+        "TestGoEndpointDefinitionRejectsUnsafeConfiguration",
+        "TestGoEndpointHostSyntax",
+        "TestGoEndpointReferenceUsesDocumentedInternalStringBounds"
+      ],
+      "completePackageTestSelection": true
+    },
+    "race-domain-targets": {
+      "package": "./internal/domain/targets",
+      "names": [
+        "TestProfileNetworkRetainsPodWideRoutingFacts",
+        "TestProfilePortNameMatchesPublicSyntax",
+        "TestWorkloadRequestContainsOnlyNamedPublicScope"
+      ],
+      "completePackageTestSelection": true
+    },
+    "race-application-planning": {
+      "package": "./internal/application/planning",
+      "names": [
+        "TestAPIContextAssessmentLocatesWorkOutsideObservedNode",
+        "TestAPIContextScopeRequiresExplicitQualifiedClass",
+        "TestContextAssessmentClampedLifetimeAndDuplicatePolicyDefinitions",
+        "TestContextAssessmentExplainsActualRetentionAndUnknownCost",
+        "TestContextRetentionAnchorChangeInvalidatesOldRulesForBothClasses",
+        "TestContextScopeBindsConsequentialChanges",
+        "TestContextScopeCrossLanguageFixture",
+        "TestContextScopeRejectsUnsafeInputs",
+        "TestGoEndpointDigestBindsResolvedRouteAndPolicyWithoutFreshnessRenewal",
+        "TestGoEndpointMixedCatalogDoesNotDisableSelectedScope",
+        "TestGoEndpointPlanMatchesExistingAcquisitionContractOnly",
+        "TestGoEndpointRejectsAmbiguityAndCredentialRedirection",
+        "TestGoEndpointResolvesExistingRecipeAndAdministratorProfiles",
+        "TestHistoricalContextScopeIdentityRequiresExactCanonicalCompilerShape",
+        "TestRecipeHasOnlyQualifiedAction",
+        "TestRetentionRuntimeFenceDoesNotChangeApprovalIdentity"
+      ],
+      "completePackageTestSelection": true
+    },
+    "race-kubernetes": {
+      "package": "./internal/adapters/kubernetes",
+      "names": [
+        "TestAPIContextResolvesUnscheduledPodWithoutNodeAuthority",
+        "TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner",
+        "TestPodTargetsPinEntireOwnershipAndNodeChain",
+        "TestProfileNetworkExactWholePodObservation",
+        "TestProfileNetworkNormalizesEquivalentIPAddresses",
+        "TestProfileNetworkPreservesCallerCancellationAndDeadline",
+        "TestProfileNetworkRejectsMalformedAndUnboundedFields"
+      ],
+      "completePackageTestSelection": false
+    }
+  },
+  "newParentCount": 15,
+  "selectedParentCount": 30,
+  "fullPackageScopes": [
+    "internal/domain/planning",
+    "internal/domain/targets",
+    "internal/application/planning"
+  ],
+  "qualification": "compile integration and all packages without running integration tests; four sequential targeted race groups; full vet; canonical spec/architecture/go-architecture/design checks",
+  "nativeQualification": false,
+  "runStatus": "not executed; parent sole global slot required",
+  "stageBaseCheckSHA256": "24903ab545a138098ea3a07968e66b42737113963e561e00886eb0207f5f9c6f",
+  "layers": [
+    {
+      "name": "endpoint-v2",
+      "directory": "/home/phil/.cache/asservat-build/planning/runtime-profiles-20261014/endpoint-resolution-v2",
+      "manifestSHA256": "777fcdd9e0a6b6f3fb7cbc76bb71f18a96abe8adfae0a617909e2f5bae1ef4c4",
+      "patchSHA256": "7c055d88544f7d36e560ec22d325566595719823f204df60eda35b27b3c06fe7",
+      "files": [
+        {
+          "path": "internal/domain/planning/go_profile_endpoint.go",
+          "baseSHA256": null,
+          "payloadSHA256": "e613a3ff37dda2d17973901fac7be1ef3dcf175fd85915e9f5587228ed54b8be"
+        },
+        {
+          "path": "internal/domain/planning/go_profile_endpoint_test.go",
+          "baseSHA256": null,
+          "payloadSHA256": "79f95f52b5604dfaf1b562fe508676ad5e440721f1eaff858febd2399fad98be"
+        },
+        {
+          "path": "internal/domain/targets/profile_network.go",
+          "baseSHA256": null,
+          "payloadSHA256": "1a404a8242adcf2df44b46c6f1651aa5502f332c93b828927c45db1afe624813"
+        },
+        {
+          "path": "internal/domain/targets/profile_network_test.go",
+          "baseSHA256": null,
+          "payloadSHA256": "053d126dbbc083e47f7144d792a8ffd5e1e91172358d51b02949435b2bdfa870"
+        },
+        {
+          "path": "internal/application/planning/go_profile_endpoint.go",
+          "baseSHA256": null,
+          "payloadSHA256": "c5ed08a53ba98c76d9054e8826207348ceb2e3992d04c664bd75ce06ca7a5061"
+        },
+        {
+          "path": "internal/application/planning/go_profile_endpoint_test.go",
+          "baseSHA256": null,
+          "payloadSHA256": "9baee9f277f349832745fee0525bfdfe4c6aed9771c7b75a95f38f739c2575b7"
+        },
+        {
+          "path": "internal/application/targets/profile_network.go",
+          "baseSHA256": null,
+          "payloadSHA256": "f40d84028d1248c670a1474980c0fe4abf09c60f3b180cfb6f81f43e7602e1a6"
+        },
+        {
+          "path": "internal/adapters/kubernetes/profile_network.go",
+          "baseSHA256": null,
+          "payloadSHA256": "02ef9dc624ddbaa7dcd4c5b640f88a677a98183294ee7f6b4d6ae3ce0066e004"
+        },
+        {
+          "path": "internal/adapters/kubernetes/profile_network_test.go",
+          "baseSHA256": null,
+          "payloadSHA256": "61720a001706e41391fd6d9036a549e55e261efefc86df7f7dc28ffbdb9f7336"
+        },
+        {
+          "path": "docs/architecture/runtime-profiles.md",
+          "baseSHA256": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+          "payloadSHA256": "fe281d8810b3b14808b7880843e379450ab117ef930b3f390ca7ecb73f51d3ed"
+        },
+        {
+          "path": "specs/profiles.md",
+          "baseSHA256": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56",
+          "payloadSHA256": "6757175460b7cff42d81e3027d27fdd7de80f3edb2624059069967f6ade6fda1"
+        }
+      ]
+    },
+    {
+      "name": "domain-syntax",
+      "directory": "/home/phil/.cache/asservat-build/planning/runtime-profiles-20261014/endpoint-domain-syntax-v1",
+      "manifestSHA256": "4dbe8ef064451ab6c8bb2cb11581421b626ce82674d9dbd8d4e1cb4646341ec1",
+      "patchSHA256": "9ae3357054f79d757047cec9099166c3f5173fdb2e43fbc2d6ce2d90ff98b6d9",
+      "files": [
+        {
+          "path": "internal/domain/planning/go_profile_endpoint.go",
+          "baseSHA256": "e613a3ff37dda2d17973901fac7be1ef3dcf175fd85915e9f5587228ed54b8be",
+          "payloadSHA256": "04f2c4e1b236e61d4afc5e82f9ca9b999fc6489ebf352892a0d1e8d266ba8b77"
+        },
+        {
+          "path": "internal/domain/planning/go_profile_endpoint_test.go",
+          "baseSHA256": "79f95f52b5604dfaf1b562fe508676ad5e440721f1eaff858febd2399fad98be",
+          "payloadSHA256": "fb9de82a478050624a9abda9da71159130a046e42d98234548f13e773dbf694c"
+        },
+        {
+          "path": "internal/domain/targets/profile_network.go",
+          "baseSHA256": "1a404a8242adcf2df44b46c6f1651aa5502f332c93b828927c45db1afe624813",
+          "payloadSHA256": "c0361f267c3c245b1269ea887315b8181d81abd18987886e5c57849625b2e2a9"
+        },
+        {
+          "path": "internal/domain/targets/profile_network_test.go",
+          "baseSHA256": "053d126dbbc083e47f7144d792a8ffd5e1e91172358d51b02949435b2bdfa870",
+          "payloadSHA256": "94b53c3687e584f6f234cfa3b3ac3525ee9e324f508fff2c05183fa0767ab1fd"
+        }
+      ]
+    },
+    {
+      "name": "download-log-prefix",
+      "directory": "/home/phil/.cache/asservat-build/planning/public-context-download-log-prefix-20261014",
+      "manifestSHA256": "e7f3bb76884c26fa0b4f1eb0d3dfaa7ccf5c6b9d2f57a18baa0e80417ec3b020",
+      "patchSHA256": "1d9f97b9086d8f2527afdaa636b3a9e257d879ab30441d667096af7e31eecebf",
+      "files": [
+        {
+          "path": "scripts/test-context-storage.py",
+          "baseSHA256": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+          "payloadSHA256": "db90d1a7123f79b8e74547f0a1b664d0f1b27b593866b6a2fc0d139ba9aac82d"
+        },
+        {
+          "path": "scripts/test-regional-context-selection.py",
+          "baseSHA256": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+          "payloadSHA256": "c9483b1b88f04798acb872549683483f88d027b4bfaaa9a15d0f8ee5efab74e9"
+        },
+        {
+          "path": "test/integration/capture_admission_test.go",
+          "baseSHA256": "86de509cb8ae77939ede3df758783a9ffdf594d55e223720ce21e97ddce67e3a",
+          "payloadSHA256": "3833db17490c92ab795590fc3600bf4e93295cdd4f3f401c66188d265a0d6174"
+        },
+        {
+          "path": "test/integration/public_context_download_diagnostics_checks_test.go",
+          "baseSHA256": "d1058dc4a88883bca3e07fd691168ee4383535d2f43198f8b4b56295784110ae",
+          "payloadSHA256": "fa340a7566f7ad65e9ca1d3a24439eb16cbf4477b4f453b7aed17504f041bda2"
+        },
+        {
+          "path": "test/integration/public_context_download_diagnostics_test.go",
+          "baseSHA256": "e24877094a715f045d21fb77c3627ce74d29af220bb1485be71e79ee9e12cd55",
+          "payloadSHA256": "2ffa4691fd938e8f0ad1acc37cb6d5cf1263ae6fe02fbb1b845ea785d9a375ae"
+        }
+      ]
+    }
+  ],
+  "precedingManifestSHA256": "8a56e533f7955e7c2a5efb9d100aa323a9b3cd9c3a96bbe9439955a0556cc0b9",
+  "precedingFailedResultSHA256": "65987978004328490d58af449b0bbfccdd596fffe8b6b344a2c18a071182dfad",
+  "fixtureOverlayQualification": "Five reviewed fixture/script paths are pinned and integration/all compiled; dedicated fixture tests/native journey remain the separate download runner responsibility."
+}

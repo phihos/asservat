@@ -1,0 +1,29 @@
+{
+  "manifest": "b0698de844ed18b24bb95d908d21ec47321bf58156462298cf1767ed8dd17abe",
+  "dependencies": "5292bc3cf938c5c761365aa701d9b57a470997f94d861fc55e6e820b3fe597d6",
+  "mirror_dependencies": "35a1646214495d9feb64b4678d01ad4b0d5c840d1352427bfe05450b152a3056",
+  "runner": "18e6d89dd372379f1b0f3050f8e376f7ba4838ce424461448a59eb0fcac00a2d",
+  "before": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "mirror_dependencies": []
+  },
+  "started": 1791854386.76695,
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "go-architecture-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 2,
+  "ended": 1791854391.5993977,
+  "after": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "mirror_dependencies": []
+  },
+  "log_sha256": "baba7413b90c9eaa33a7d712825b9d1dec6b08764c1b3b8c5138848371ca11ee"
+}

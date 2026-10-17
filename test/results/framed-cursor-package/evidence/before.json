@@ -1,0 +1,11 @@
+{
+  "before_handle": 33082,
+  "before_exit": 1,
+  "selector": "TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame",
+  "log": "evidence/boundary-before.log",
+  "expected_failure": "data=2 before denial at final delivery of first frame",
+  "changed_live_source_since_stage": [
+    "test/integration/download_sessions_test.go"
+  ],
+  "native_run": false
+}

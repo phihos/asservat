@@ -1,0 +1,63 @@
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed
+    configuration_worker_operation_test.go:61: unowned or out-of-order native/SQL phase accepted
+panic: test timed out after 30s
+	running tests:
+		TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder (30s)
+		TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed (30s)
+
+goroutine 25 [running]:
+testing.(*M).startAlarm.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2961 +0x605
+created by time.goFunc
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/time/sleep.go:182 +0x45
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc000289688, {0x256e113, 0x42}, 0x3853738)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2268 +0xb3e
+testing.runTests.func1(0xc000289688)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2744 +0x85
+testing.tRunner(0xc000289688, 0xc00049fa40)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+testing.runTests({0x2513737, 0x17}, {0x254ec39, 0x34}, 0xc000016d08, {0x38f84f0, 0x170, 0x170}, {0xc2ab92cf4453218e, 0x6fe724056, ...})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2742 +0x9ea
+testing.(*M).Run(0xc0002da5a0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2602 +0xf45
+main.main()
+	_testmain.go:782 +0x165
+
+goroutine 4 [chan receive]:
+testing.(*T).Run(0xc0002898c8, {0x250bd68, 0x13}, 0xc000016e28)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2268 +0xb3e
+asservat.local/asservat/internal/adapters/kubernetes.TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder(0xc0002898c8)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_worker_operation_test.go:30 +0x1bb
+testing.tRunner(0xc0002898c8, 0x3853738)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+
+goroutine 5 [chan receive]:
+asservat.local/asservat/internal/adapters/kubernetes.(*ConfigurationWorkerOperation).close(0xc0003fc008)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_worker_advance_contract.go:179 +0xe7
+asservat.local/asservat/internal/adapters/kubernetes.configurationWorkerOperationFixture.func1()
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_worker_operation_test.go:24 +0x3d
+testing.(*common).Cleanup.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1462 +0x169
+testing.(*common).runCleanup(0xc000382d88, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1822 +0x226
+testing.tRunner.func2()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2189 +0x4d
+runtime.Goexit()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/panic.go:694 +0x54
+testing.(*common).FailNow(0xc000382d88)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1106 +0x7b
+testing.(*common).Fatal(0xc000382d88, {0xc000085ec0, 0x1, 0x1})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:1366 +0x86
+asservat.local/asservat/internal/adapters/kubernetes.TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder.func1(0xc000382d88)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/configuration_worker_operation_test.go:61 +0x5e5
+testing.tRunner(0xc000382d88, 0xc000016e28)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+created by testing.(*T).Run in goroutine 4
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	30.093s
+FAIL

@@ -1,0 +1,9 @@
+{
+  "internal/adapters/mtls/connector_operation_channel.go": null,
+  "internal/adapters/mtls/connector_operation_coordinator_test.go": null,
+  "internal/adapters/mtls/connector_operation_hub.go": null,
+  "internal/adapters/mtls/owner_operation.go": null,
+  "internal/adapters/mtls/owner_operation_wire.go": null,
+  "internal/contracts/owner_observation_operation.go": null,
+  "internal/contracts/owner_observation_operation_test.go": null
+}

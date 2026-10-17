@@ -1,0 +1,49 @@
+{
+  "format": "asservat-staged-dependencies/v1",
+  "files": [
+    {
+      "path": "cmd/asservat/main.go",
+      "sha256": "d08931bd0830c27ebb671c4281ec7b832a630a43ff054e471a7841addfbc09c7"
+    },
+    {
+      "path": "go.mod",
+      "sha256": "693025c52045be6507972e5bc0849812a0838371572bac62e9c77fc996119b56"
+    },
+    {
+      "path": "go.sum",
+      "sha256": "3f7f26175604f4e8bcddafaab5854257767787d7ac1915783b4c188c3a160641"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_observation.go",
+      "sha256": "df1a2675603567cdd17e8b197dce51790f4a392907d953da8ee0e1cf0ad90460"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_handover.go",
+      "sha256": "51c41576e9d07b0ca71e35a1d901feca48cccb728ea30dfc3687f8a70cf0d5b0"
+    },
+    {
+      "path": "internal/adapters/postgres/initial_manager.go",
+      "sha256": "bc18bd1058929749f365678e44404f2e817ff63487f52fb7a478b75a19eb4eca"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_files.go",
+      "sha256": "47067525e05f76061d24e14b56a4d8a8e3df86f0aa23ecfb6184fa170b62c94e"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_schema.go",
+      "sha256": "c1e611f1cc3919291e8ba833ce276ebd3ee0439de18b47f4a5bab806207a8db2"
+    },
+    {
+      "path": "internal/contracts/initial_preparer.go",
+      "sha256": "60192108d90ae7bb2ec737db52406cac1a3719a5593d762908f4823d5b44992b"
+    },
+    {
+      "path": "scripts/test-context-storage.py",
+      "sha256": "78fb2f3e713339a57df748028b6bedcb883583320fb3ffee74836328ca058e53"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_guard_test.go",
+      "sha256": "8902575507d747286e9f3ddc41a900ef106dbb587552cb91c74f9e81b7b9c713"
+    }
+  ]
+}

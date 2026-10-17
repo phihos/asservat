@@ -1,0 +1,25 @@
+W1009 18:34:36.775013 mini.go:736 mini: failed to persist dev secret to /data/.mini_kek_passphrase: open /data/.mini_kek_passphrase: permission denied (skipping; SSE-S3/IAM stay disabled this run to avoid orphaning data on next restart)
+W1009 18:34:36.775181 mini.go:736 mini: failed to persist dev secret to /data/.mini_sse_kek: open /data/.mini_sse_kek: permission denied (skipping; SSE-S3/IAM stay disabled this run to avoid orphaning data on next restart)
+
+  Starting SeaweedFS Mini ...
+  Master       starting
+F1009 18:34:36.776689 master.go:244 please verify /data is writable, see https://github.com/seaweedfs/seaweedfs/issues/717: mkdir /data/m9333: permission denied
+goroutine 137 [running]:
+github.com/seaweedfs/seaweedfs/weed/glog.stacks(0x0)
+	/go/src/github.com/seaweedfs/seaweedfs/weed/glog/glog.go:832 +0x85
+github.com/seaweedfs/seaweedfs/weed/glog.(*loggingT).output(0x9a2e600, 0x3, 0x280ae3b3be30, {0x6fc78aa?, 0x280ae3e41d60?}, 0x2?, 0x0)
+	/go/src/github.com/seaweedfs/seaweedfs/weed/glog/glog.go:783 +0x43d
+github.com/seaweedfs/seaweedfs/weed/glog.(*loggingT).printf(0x9a2e600, 0x3, {0x591802e, 0x57}, {0x280ae3e41d60, 0x2, 0x2})
+	/go/src/github.com/seaweedfs/seaweedfs/weed/glog/glog.go:680 +0x12a
+github.com/seaweedfs/seaweedfs/weed/glog.Fatalf(...)
+	/go/src/github.com/seaweedfs/seaweedfs/weed/glog/glog.go:1242
+github.com/seaweedfs/seaweedfs/weed/command.startMaster({0x280ae47f41c8, 0x280ae47f4320, 0x280ae473a340, 0x280ae473a360, 0x280ae473b360, 0x280ae473b370, 0x0, 0x280ae3d38a08, 0x280ae48a85e0, 0x280ae47f45c3, ...}, ...)
+	/go/src/github.com/seaweedfs/seaweedfs/weed/command/master.go:244 +0x75e
+github.com/seaweedfs/seaweedfs/weed/command.startMiniServices.func1.1()
+	/go/src/github.com/seaweedfs/seaweedfs/weed/command/mini.go:1437 +0x6b
+github.com/seaweedfs/seaweedfs/weed/command.startMiniService({0x577aa22?, 0x280ae48d1320?}, 0x280ae34b8fa8?, 0x280ae48d13e0?)
+	/go/src/github.com/seaweedfs/seaweedfs/weed/command/mini.go:1532 +0x4c
+github.com/seaweedfs/seaweedfs/weed/command.startMiniServices.func1()
+	/go/src/github.com/seaweedfs/seaweedfs/weed/command/mini.go:1436 +0x76
+created by github.com/seaweedfs/seaweedfs/weed/command.startMiniServices in goroutine 1
+	/go/src/github.com/seaweedfs/seaweedfs/weed/command/mini.go:1434 +0xa5

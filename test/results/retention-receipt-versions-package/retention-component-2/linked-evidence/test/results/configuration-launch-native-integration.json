@@ -1,0 +1,27 @@
+{
+  "integratedAt": "2026-10-12T18:08:26.577085+00:00",
+  "dependencies": 1505,
+  "manifest": [
+    {
+      "path": "test/integration/configuration_launch_kube_test.go",
+      "base_sha256": null,
+      "payload_sha256": "afe6f23838dc4cff71bb3aad68658eceace3195401d28f5eeb1b2090e992cad6"
+    },
+    {
+      "path": "test/integration/configuration_launched_inventory_test.go",
+      "base_sha256": null,
+      "payload_sha256": "560431d86063aaaaa8362527267377cff6637a3d8c9b2a4841ca5b3bd5112323"
+    },
+    {
+      "path": "test/integration/configuration_runtime_roles_test.go",
+      "base_sha256": "84cc9d129767a03cb5bd7ac3d2165936223379b68c447ffc7b67f7df0277fa75",
+      "payload_sha256": "231b759938d7ee28fc2c965ea5653d2c0c733bb227ed98fbef28fafcf708d141"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base_sha256": "04566bdb0e564f7b15574669a4b034ea78afcb9b6903002b91b35a5b58828252",
+      "payload_sha256": "dd9efa9bd3f76d7bddb3c256c58edda01c0fca8c3f0a09b9043fca81f0fa50d9"
+    }
+  ],
+  "allMatched": true
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/identity-settings.schema.json",
+  "title": "Protected Asservat installation identity settings v1",
+  "description": "Content of identity.json in an enrolled administrator-protected ConfigMap. Qualification flags require actual provider validation and cannot come from tokens. Not a CRD or public API.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "identity-settings/v1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "issuer": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "clients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "kind": {
+            "enum": [
+              "human",
+              "workload"
+            ]
+          },
+          "classQualified": {
+            "const": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "classQualified"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "eligibleSubjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "kind": {
+            "enum": [
+              "human",
+              "workload"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ]
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "eligibleGroups": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "groupsAtIssueQualified": {
+      "const": true
+    },
+    "groupMaxAgeSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "issuer",
+    "clients",
+    "eligibleSubjects",
+    "eligibleGroups",
+    "groupsAtIssueQualified",
+    "groupMaxAgeSeconds"
+  ],
+  "anyOf": [
+    {
+      "properties": {
+        "eligibleSubjects": {
+          "minItems": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "eligibleGroups": {
+          "minItems": 1
+        }
+      }
+    }
+  ]
+}

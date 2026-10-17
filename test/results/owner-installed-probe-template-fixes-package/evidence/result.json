@@ -1,0 +1,125 @@
+{
+  "manifest_sha256": "1fb53e4d938636ba93afb95600aec33862da725f639e8b1df2721acc0510ab50",
+  "dependencies_sha256": "a93e689eb6b984632bf2844ac1f6b628d0d8b2013c03c9a24de60f1dd642d927",
+  "paths": 8,
+  "dependencies": 1882,
+  "commands": [
+    {
+      "phase": "bridge-before",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/before-overlay.json",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestInitialRuntimeBridgeInstalledOriginalSourceProbes$",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "expected_before_failure": true,
+      "seconds": 6.408,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/providerconfig",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_before_failure": false,
+      "seconds": 13.47,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(InitialRuntime|InstalledOwner|OwnerIdentity)",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "expected_before_failure": false,
+      "seconds": 31.743,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/overlay.json",
+        "./internal/adapters/providerconfig",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_before_failure": false,
+      "seconds": 1.85,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    }
+  ],
+  "terminal_exit": 1,
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

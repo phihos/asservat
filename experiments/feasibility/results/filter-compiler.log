@@ -1,0 +1,5 @@
+=== RUN   TestFilterCompilerComparison
+    packets_test.go:124: 11 corpus cases; libpcap matches reference expectations; 1 Gadget compiler differences/errors (measurement, not a parity pass)
+--- PASS: TestFilterCompilerComparison (0.00s)
+PASS
+ok  	asservat.local/experiments/feasibility	0.004s

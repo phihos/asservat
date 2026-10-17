@@ -1,0 +1,25 @@
+{
+  "expected": 2,
+  "meaningfulBefore": true,
+  "phase": "before-architecture",
+  "command": [
+    "make",
+    "go-architecture-check"
+  ],
+  "exit": 2,
+  "seconds": 3.636,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

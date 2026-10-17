@@ -1,0 +1,52 @@
+[
+  {
+    "path": "docs/architecture/capacity-production.md",
+    "baseSHA256": "d0d14a60420acfd196225eb675e92190299cf98887f42334c5ed9a4cae37e9e7",
+    "payloadSHA256": "c40dfd7a596570a3b4b85eb4b987d7f5678126d6e4244f9f93ee2856bda4bc16"
+  },
+  {
+    "path": "internal/adapters/postgres/capacity_session_reads.go",
+    "baseSHA256": null,
+    "payloadSHA256": "76a08b678f6878280665eb76b2468dab67967e2ba8e26d333b8c283771404aa7"
+  },
+  {
+    "path": "internal/adapters/postgres/capacity_session_reads_test.go",
+    "baseSHA256": null,
+    "payloadSHA256": "5dacafb00f42e070baca8ff1df48601bf2f22e05aff7c6a82f3ba0e3d563a7e4"
+  },
+  {
+    "path": "internal/adapters/postgres/context_native_control.go",
+    "baseSHA256": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+    "payloadSHA256": "b001e4165894b48e87156d01a6523d1d6c5fc1fa16e34fbefb89a00a1795b9bc"
+  },
+  {
+    "path": "internal/adapters/postgres/custodydb/download_response.sql.go",
+    "baseSHA256": "1618f1f7a02f275ad6aba7d7ae8d302d4bdd32cc2942de399e08a183bc76e807",
+    "payloadSHA256": "7e6dfe9fb39d41ce7ce1f329cd29f0d834d90144befcfbb7a8518d633c848598"
+  },
+  {
+    "path": "internal/adapters/postgres/custodydb/native_exchange.sql.go",
+    "baseSHA256": "2f2c89b9d1129797bcf76b928f2dbd934b9e7caafe2c74d30841931b1bc216e6",
+    "payloadSHA256": "9b39a2e15acb9dd84bec1cfb3cea29407426511ce1c4a387eec2728c44373dd9"
+  },
+  {
+    "path": "internal/adapters/postgres/download_response_window.go",
+    "baseSHA256": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+    "payloadSHA256": "63c37d20916a79c0d25bfe70a638fc8d0774ff8ca3567a35a037d5dd788d9498"
+  },
+  {
+    "path": "migrations/queries/download_response.sql",
+    "baseSHA256": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+    "payloadSHA256": "f4141ba1bc187be44e680802ccddfb6ccb860c9814a53813984d4ef64faac0ed"
+  },
+  {
+    "path": "migrations/queries/native_exchange.sql",
+    "baseSHA256": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+    "payloadSHA256": "776c6af5d0fe52083f257f065bc536a5eb7591cf19dc8ae69d304fe52f5ff431"
+  },
+  {
+    "path": "test/integration/capacity_session_test.go",
+    "baseSHA256": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054",
+    "payloadSHA256": "4d80820e6071a460eefc41199366cdf85d5344f0acff79c3b16e3a9e42ffb9a4"
+  }
+]

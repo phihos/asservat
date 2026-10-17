@@ -1,0 +1,36 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py
+Custody integration exit: 0
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 4 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/kms	1.041s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.678s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.714s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.345s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.386s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.605s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.022s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.020s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.021s
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+ok  	asservat.local/asservat/internal/application/identity	1.024s
+ok  	asservat.local/asservat/internal/application/privacy	1.024s
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.027s
+ok  	asservat.local/asservat/internal/domain/configuration	1.025s
+ok  	asservat.local/asservat/internal/domain/identity	1.026s
+ok  	asservat.local/asservat/test/integration	1.054s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 22 packages, 52 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 4 files match sqlc v1.31.1

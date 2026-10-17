@@ -1,0 +1,12 @@
+{
+  "HANDOFF.md": "95fd9afcb73664a0712b1ed7b22d27b26de7fd0c163b78bd77367bad4b5a3ded",
+  "bases.json": "ce223de370d801915c481a69c582edf7d3705d0e67580d0c6327d32ed025c6e9",
+  "changes/test/integration/context_native_content_test.go": "9c756b43fe6a75e4d953ca46a3bc0a4455a01f8a3c1ca31b9ca9cda6d624a49c",
+  "changes/test/integration/context_native_resume_test.go": "31aa1a06ea6ba102f55f21c442bc4b2da1d8bd0e9e65d85198bd7acdf3a75f56",
+  "changes/test/integration/native_http_trace_test.go": "3a1c4901a76203a3185b8e9f3ee1abf3e89604caf228a8eae0a80f018b569309",
+  "dependencies.json": "fd609fa031637d5bdc30aa9b709e3b76aa0736efe2eccca5bda087a394db20a1",
+  "evidence/http-trace-focused.json": "44568d7a2d23705df852db9b5636583d86638dd3eecffe9e86610b94f4b15f46",
+  "evidence/http-trace-focused.log": "c000cdd8613c66a3afe34bf16ab0d64be5609b2b9dbadbf44f04a566a5d34e30",
+  "manifest.json": "07a577b783708d363be30a0baba5da51fb4e86f6a3db9025c79ef415a38e0e48",
+  "overlay.json": "fcad2e45c27a93898a58d7aa05358d0146aeca7663a6620ad4c1789ddb3b65b9"
+}

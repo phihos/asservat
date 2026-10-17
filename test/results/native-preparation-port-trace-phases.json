@@ -1,0 +1,965 @@
+[
+  {
+    "phase": "worker.attachment",
+    "seq": "12",
+    "start": "97.974252ms",
+    "elapsed": "30.508322ms",
+    "remaining": "3.891514215s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "worker.attachment",
+    "seq": "25",
+    "start": "274.645605ms",
+    "elapsed": "24.390515ms",
+    "remaining": "4.720482658s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.reserve",
+    "seq": "32",
+    "start": "340.876973ms",
+    "elapsed": "17.578827ms",
+    "remaining": "4.661062979s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.intent-receipt",
+    "seq": "33",
+    "start": "358.50558ms",
+    "elapsed": "836.932\u00b5s",
+    "remaining": "4.660176267s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.claim",
+    "seq": "40",
+    "start": "401.415925ms",
+    "elapsed": "17.842878ms",
+    "remaining": "4.600259986s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.find-job",
+    "seq": "47",
+    "start": "461.538636ms",
+    "elapsed": "51.76\u00b5s",
+    "remaining": "4.557928383s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.record-job",
+    "seq": "54",
+    "start": "503.599219ms",
+    "elapsed": "3.994191ms",
+    "remaining": "4.511925379s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.observe-job",
+    "seq": "55",
+    "start": "507.59621ms",
+    "elapsed": "4.38\u00b5s",
+    "remaining": "4.511918199s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.bind",
+    "seq": "62",
+    "start": "549.869133ms",
+    "elapsed": "16.879015ms",
+    "remaining": "4.452770631s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "dispatch.read-worker",
+    "seq": "63",
+    "start": "566.752368ms",
+    "elapsed": "17.204886ms",
+    "remaining": "4.435561535s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "enrollment.owner-claim",
+    "seq": "100",
+    "start": "866.323861ms",
+    "elapsed": "28.635847ms",
+    "remaining": "4.124559071s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "worker.attachment",
+    "seq": "113",
+    "start": "978.988463ms",
+    "elapsed": "24.792517ms",
+    "remaining": "4.015737799s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.begin-batch",
+    "seq": "120",
+    "start": "1.064452812s",
+    "elapsed": "19.791743ms",
+    "remaining": "3.935274224s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.intent-write",
+    "seq": "121",
+    "start": "1.084285275s",
+    "elapsed": "7.38914ms",
+    "remaining": "3.927844364s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.intent-ack",
+    "seq": "122",
+    "start": "1.091678465s",
+    "elapsed": "7.093939ms",
+    "remaining": "3.920746375s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.permit-batch",
+    "seq": "129",
+    "start": "1.141006947s",
+    "elapsed": "10.744319ms",
+    "remaining": "3.867767513s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.next-fence",
+    "seq": "136",
+    "start": "1.193878609s",
+    "elapsed": "884.272\u00b5s",
+    "remaining": "3.824755898s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.register",
+    "seq": "137",
+    "start": "1.194777902s",
+    "elapsed": "755.191\u00b5s",
+    "remaining": "3.823985685s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.claim",
+    "seq": "138",
+    "start": "1.195537674s",
+    "elapsed": "37.890381ms",
+    "remaining": "3.786090724s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.wait",
+    "seq": "139",
+    "start": "1.233445745s",
+    "elapsed": "1.532558758s",
+    "remaining": "2.253514286s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "140",
+    "start": "2.145835395s",
+    "elapsed": "79.981075ms",
+    "remaining": "2.793702319s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "147",
+    "start": "2.190082364s",
+    "elapsed": "35.689466ms",
+    "remaining": "2.793746959s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.before-command",
+    "seq": "148",
+    "start": "2.22585171s",
+    "elapsed": "230.889041ms",
+    "remaining": "2.562778028s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "155",
+    "start": "2.267470142s",
+    "elapsed": "33.780101ms",
+    "remaining": "2.718268536s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.bind-keys",
+    "seq": "162",
+    "start": "2.3449543s",
+    "elapsed": "26.538482ms",
+    "remaining": "2.648026017s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "169",
+    "start": "2.422603029s",
+    "elapsed": "34.088092ms",
+    "remaining": "2.562827658s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "170",
+    "start": "2.456760891s",
+    "elapsed": "76.944047ms",
+    "remaining": "2.485813841s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "177",
+    "start": "2.498728164s",
+    "elapsed": "34.930274ms",
+    "remaining": "2.485860351s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "178",
+    "start": "2.533974079s",
+    "elapsed": "76.334465ms",
+    "remaining": "2.409210235s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "185",
+    "start": "2.576955724s",
+    "elapsed": "33.30748ms",
+    "remaining": "2.409255575s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "186",
+    "start": "2.611807378s",
+    "elapsed": "76.488966ms",
+    "remaining": "2.331222435s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "193",
+    "start": "2.654119172s",
+    "elapsed": "34.139862ms",
+    "remaining": "2.331259745s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "194",
+    "start": "2.688360204s",
+    "elapsed": "77.518039ms",
+    "remaining": "2.253640537s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "201",
+    "start": "2.732775853s",
+    "elapsed": "33.05688ms",
+    "remaining": "2.253686047s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "202",
+    "start": "2.766007653s",
+    "elapsed": "78.886622ms",
+    "remaining": "2.174624514s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.prepared",
+    "seq": "203",
+    "start": "2.766018863s",
+    "elapsed": "1.029536532s",
+    "remaining": "1.223963394s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "210",
+    "start": "2.811352865s",
+    "elapsed": "33.4994ms",
+    "remaining": "2.174666514s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "211",
+    "start": "2.845480147s",
+    "elapsed": "141.831861ms",
+    "remaining": "2.032206781s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "218",
+    "start": "2.925691112s",
+    "elapsed": "61.577666ms",
+    "remaining": "2.032250011s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "219",
+    "start": "2.987469999s",
+    "elapsed": "148.540329ms",
+    "remaining": "1.883508461s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "226",
+    "start": "3.077925522s",
+    "elapsed": "58.042236ms",
+    "remaining": "1.883551021s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "227",
+    "start": "3.136068888s",
+    "elapsed": "428.070584ms",
+    "remaining": "1.455379308s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "234",
+    "start": "3.529647369s",
+    "elapsed": "34.443392ms",
+    "remaining": "1.455428028s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "235",
+    "start": "3.621768667s",
+    "elapsed": "98.269305ms",
+    "remaining": "1.299480817s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "242",
+    "start": "3.687212793s",
+    "elapsed": "32.773899ms",
+    "remaining": "1.299532097s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "243",
+    "start": "3.720879124s",
+    "elapsed": "74.635561ms",
+    "remaining": "1.224004094s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "250",
+    "start": "3.762631406s",
+    "elapsed": "32.828709ms",
+    "remaining": "1.224058664s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.permit-batch",
+    "seq": "257",
+    "start": "3.836188075s",
+    "elapsed": "11.04633ms",
+    "remaining": "1.172284385s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.finish-batch",
+    "seq": "258",
+    "start": "3.847239984s",
+    "elapsed": "8.171103ms",
+    "remaining": "4.991826087s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.outcome-write",
+    "seq": "259",
+    "start": "3.855474817s",
+    "elapsed": "7.755221ms",
+    "remaining": "4.984007136s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.outcome-ack",
+    "seq": "260",
+    "start": "3.863233768s",
+    "elapsed": "7.68394ms",
+    "remaining": "4.976319466s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.commit",
+    "seq": "261",
+    "start": "3.870922888s",
+    "elapsed": "597.0086ms",
+    "remaining": "551.587291ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "262",
+    "start": "3.870945948s",
+    "elapsed": "73.284118ms",
+    "remaining": "1.075288713s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "269",
+    "start": "3.911585068s",
+    "elapsed": "32.598728ms",
+    "remaining": "1.075334993s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "270",
+    "start": "3.944379366s",
+    "elapsed": "74.02905ms",
+    "remaining": "1.001110363s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "277",
+    "start": "3.985325487s",
+    "elapsed": "33.041399ms",
+    "remaining": "1.001151903s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "278",
+    "start": "4.018527086s",
+    "elapsed": "142.305074ms",
+    "remaining": "858.686629ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "285",
+    "start": "4.107827997s",
+    "elapsed": "52.954883ms",
+    "remaining": "858.7359ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "286",
+    "start": "4.16088882s",
+    "elapsed": "156.264941ms",
+    "remaining": "702.365028ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "293",
+    "start": "4.263511656s",
+    "elapsed": "53.595665ms",
+    "remaining": "702.411468ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "294",
+    "start": "4.317248942s",
+    "elapsed": "73.894389ms",
+    "remaining": "628.375458ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "301",
+    "start": "4.358550333s",
+    "elapsed": "32.551128ms",
+    "remaining": "628.417318ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "302",
+    "start": "4.391481582s",
+    "elapsed": "76.153665ms",
+    "remaining": "551.883531ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "309",
+    "start": "4.431880891s",
+    "elapsed": "35.708206ms",
+    "remaining": "551.929692ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "preparation.permit-metadata",
+    "seq": "316",
+    "start": "4.509734131s",
+    "elapsed": "14.59376ms",
+    "remaining": "495.190898ms",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.close-pending",
+    "seq": "317",
+    "start": "4.524337491s",
+    "elapsed": "30.19\u00b5s",
+    "remaining": "0s",
+    "result": "ok",
+    "context": "none"
+  },
+  {
+    "phase": "native.release",
+    "seq": "318",
+    "start": "4.524372761s",
+    "elapsed": "5.052513ms",
+    "remaining": "4.994943667s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "enrollment.owner-release",
+    "seq": "319",
+    "start": "4.529493645s",
+    "elapsed": "3.421819ms",
+    "remaining": "4.996574531s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "worker.attachment",
+    "seq": "332",
+    "start": "4.675343428s",
+    "elapsed": "31.516545ms",
+    "remaining": "4.312526816s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "worker.attachment",
+    "seq": "345",
+    "start": "4.795847044s",
+    "elapsed": "30.315301ms",
+    "remaining": "4.193224433s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.next-fence",
+    "seq": "358",
+    "start": "4.926372806s",
+    "elapsed": "465.051\u00b5s",
+    "remaining": "4.092548922s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.register",
+    "seq": "359",
+    "start": "4.926854027s",
+    "elapsed": "741.232\u00b5s",
+    "remaining": "4.091791519s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.claim",
+    "seq": "360",
+    "start": "4.927599569s",
+    "elapsed": "31.131284ms",
+    "remaining": "4.060655936s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.wait",
+    "seq": "361",
+    "start": "4.958756524s",
+    "elapsed": "1.171775507s",
+    "remaining": "2.888854748s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "362",
+    "start": "5.562606355s",
+    "elapsed": "73.221858ms",
+    "remaining": "3.383558565s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "369",
+    "start": "5.603366286s",
+    "elapsed": "32.424347ms",
+    "remaining": "3.383596146s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.before-command",
+    "seq": "370",
+    "start": "5.635860093s",
+    "elapsed": "192.12094ms",
+    "remaining": "3.191405756s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "377",
+    "start": "5.677780007s",
+    "elapsed": "32.720158ms",
+    "remaining": "3.308886624s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "390",
+    "start": "5.794467543s",
+    "elapsed": "33.46221ms",
+    "remaining": "3.191457036s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "391",
+    "start": "5.828002023s",
+    "elapsed": "74.833093ms",
+    "remaining": "3.116551664s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "398",
+    "start": "5.868653043s",
+    "elapsed": "34.143972ms",
+    "remaining": "3.116589763s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "399",
+    "start": "5.902998726s",
+    "elapsed": "74.328181ms",
+    "remaining": "3.042059882s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "406",
+    "start": "5.944854779s",
+    "elapsed": "32.428588ms",
+    "remaining": "3.042103422s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "407",
+    "start": "5.978729291s",
+    "elapsed": "72.808837ms",
+    "remaining": "2.967848651s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "414",
+    "start": "6.018773269s",
+    "elapsed": "32.721369ms",
+    "remaining": "2.967892151s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "415",
+    "start": "6.051607248s",
+    "elapsed": "78.857183ms",
+    "remaining": "2.888922358s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "422",
+    "start": "6.093805992s",
+    "elapsed": "36.609439ms",
+    "remaining": "2.888971358s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.prepared",
+    "seq": "423",
+    "start": "6.130560991s",
+    "elapsed": "843.188545ms",
+    "remaining": "2.045637243s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "424",
+    "start": "6.130617482s",
+    "elapsed": "96.965752ms",
+    "remaining": "2.791803555s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "431",
+    "start": "6.18536602s",
+    "elapsed": "42.166774ms",
+    "remaining": "2.791853995s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "432",
+    "start": "6.227955435s",
+    "elapsed": "131.492626ms",
+    "remaining": "2.659938718s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "439",
+    "start": "6.305208284s",
+    "elapsed": "54.200247ms",
+    "remaining": "2.659978258s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "440",
+    "start": "6.359561531s",
+    "elapsed": "131.499867ms",
+    "remaining": "2.528325381s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "447",
+    "start": "6.436218749s",
+    "elapsed": "54.799589ms",
+    "remaining": "2.528368441s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "448",
+    "start": "6.491115488s",
+    "elapsed": "158.056778ms",
+    "remaining": "2.370214513s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "455",
+    "start": "6.59521709s",
+    "elapsed": "53.914136ms",
+    "remaining": "2.370255593s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "456",
+    "start": "6.673491512s",
+    "elapsed": "75.268804ms",
+    "remaining": "2.270626473s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "463",
+    "start": "6.714230812s",
+    "elapsed": "34.484704ms",
+    "remaining": "2.270671263s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "464",
+    "start": "6.749572758s",
+    "elapsed": "73.80298ms",
+    "remaining": "2.196011051s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "471",
+    "start": "6.789530366s",
+    "elapsed": "33.796802ms",
+    "remaining": "2.196059611s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "472",
+    "start": "6.823420858s",
+    "elapsed": "76.620648ms",
+    "remaining": "2.119345283s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "479",
+    "start": "6.865866223s",
+    "elapsed": "34.134243ms",
+    "remaining": "2.119386323s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.current-frame",
+    "seq": "480",
+    "start": "6.900131486s",
+    "elapsed": "73.355949ms",
+    "remaining": "2.045899344s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.origin-sql",
+    "seq": "487",
+    "start": "6.940872397s",
+    "elapsed": "32.572298ms",
+    "remaining": "2.045942084s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "native.close-pending",
+    "seq": "494",
+    "start": "7.015587879s",
+    "elapsed": "29.57\u00b5s",
+    "remaining": "0s",
+    "result": "ok",
+    "context": "none"
+  },
+  {
+    "phase": "native.release",
+    "seq": "495",
+    "start": "7.015622299s",
+    "elapsed": "3.65541ms",
+    "remaining": "4.99634091s",
+    "result": "ok",
+    "context": "ok"
+  },
+  {
+    "phase": "worker.attachment",
+    "seq": "502",
+    "start": "7.062613286s",
+    "elapsed": "30.420463ms",
+    "remaining": "1.92635304s",
+    "result": "ok",
+    "context": "ok"
+  }
+]

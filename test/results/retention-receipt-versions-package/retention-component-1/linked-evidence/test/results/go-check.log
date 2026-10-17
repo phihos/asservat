@@ -1,0 +1,21 @@
+go vet ./...
+go test -race -count=1 ./...
+ok  	asservat.local/asservat/internal/adapters/kms	1.042s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.116s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.055s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.547s
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+ok  	asservat.local/asservat/test/integration	1.032s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 7 packages, 8 internal import edges; catalog ownership and layer/dependency rules checked
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+=== Symbol Results ===
+
+No vulnerabilities found.
+
+Your code is affected by 0 vulnerabilities.
+This scan also found 0 vulnerabilities in packages you import and 1
+vulnerability in modules you require, but your code doesn't appear to call these
+vulnerabilities.
+Use '-show verbose' for more details.

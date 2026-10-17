@@ -1,0 +1,6 @@
+=== RUN   TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects
+    public_runtime_capacity_role_plan_test.go:86: current owner registry read unavailable: table:fleet_current_trust::SELECT
+--- FAIL: TestCapacityRoleCanAuthenticateOwnerWithoutPeerEffects (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.024s
+FAIL

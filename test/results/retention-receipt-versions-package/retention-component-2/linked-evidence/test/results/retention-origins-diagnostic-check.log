@@ -1,0 +1,3 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py
+Custody integration exit: 1
+make: *** [Makefile:64: custody-integration] Error 1

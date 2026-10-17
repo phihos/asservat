@@ -1,0 +1,15 @@
+{
+  "content_sha256": "b9c66c1ce4c863881ce9ac30996f12826b692df00d0dbf1dbfe3fda6ce983e21",
+  "resume_restored_sha256": "4fdab4f32d897319b03464c9885262ee75acd8197dc31b9661b87efb5c9d3379",
+  "removed": [
+    {
+      "path": "test/integration/native_http_trace_test.go",
+      "removed_sha256": "3a1c4901a76203a3185b8e9f3ee1abf3e89604caf228a8eae0a80f018b569309"
+    },
+    {
+      "path": "test/integration/native_preparation_trace_test.go",
+      "removed_sha256": "be048bb9beccb35f2a538460bcedb40e38757fc39c54ce80b1756f614d50a3a3"
+    }
+  ],
+  "retained_change": "Exact original acknowledged audit lifecycle identity with provisioned larger revision/capacity only"
+}

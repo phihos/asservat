@@ -1,0 +1,187 @@
+{
+  "integratedAt": 1791859329.3841817,
+  "manifestSHA256": "b224067740beb484f1114822d392b85d60dac8dc92c72c6f0b398899e4fc3604",
+  "dependenciesSHA256": "ceb1c23e8f891d1ba898f6d29ae68ff149de0d0a87058e237922e37dd325d2ad",
+  "dependencyCount": 1904,
+  "files": [
+    {
+      "path": "internal/adapters/kms/owner_provider_setup_native_test.go",
+      "base": "dfc334683e2facbfe0d85bbdf2c428dd4eed23f84d60b81372c68740c8935874",
+      "sha256": "4c9312149b95d73babf885b7ecc9c1d6490eca515f8e0f13204455d2a42b0978"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_artifact.go",
+      "base": "7aa9684e89c00c8534db926448db2a772962cfef1dea0a7ea4eeaca31db34109",
+      "sha256": "2ce9e5abdf7eb88ac888090998c0bcc6bc4e6b8cff6c4b2a96d46041e0f5a014"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_artifact_test.go",
+      "base": "a34ee89de62fcf951e6d899f8b61ee6470630bf84877fe8dde6eda62d52bf265",
+      "sha256": "9a44f466a86878e58af41d992cd6ac4e552bb694bc2506ac73d994481a57cd30"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_setup.go",
+      "base": "b6ab1e1f46941c179be02a7e1b68c17a07f133445f426350aac965b0aff8e17f",
+      "sha256": "9f451a6ac314e555c13c15296dd5c3def39981db99ff60abb5df245930b12160"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_setup_test.go",
+      "base": "ff3b98639944189a9a261324ab026944da1a1727d183bce8e637dca9799df518",
+      "sha256": "b6407c70720640f56836af1354f205ed8fd85ee63fd44906de4b1f3c00b5f4ef"
+    },
+    {
+      "path": "internal/adapters/providerconfig/setup_read_shapes_test.go",
+      "base": null,
+      "sha256": "a9cfd454b0cb0a02bd55586e7c6ae9f6a73b1d1cad353a8480b15b8e14c34e8b"
+    },
+    {
+      "path": "internal/adapters/providerconfig/setup_values.go",
+      "base": "3e11e9405f3893dc59a8b012aa2f1f9e9d28c923fd96cc71a9d2852ee7acd22b",
+      "sha256": "80e6ff4b931f2a91390c972889854610eb3368b7b0eab8fdce801ed78a0a9a37"
+    }
+  ],
+  "qualification": {
+    "freeze": {
+      "manifest.json": "b224067740beb484f1114822d392b85d60dac8dc92c72c6f0b398899e4fc3604",
+      "dependencies.json": "ceb1c23e8f891d1ba898f6d29ae68ff149de0d0a87058e237922e37dd325d2ad",
+      "overlay.json": "5b77c43662290b163bd6ff96bca8ef96f152b78a58f27e6edc56823c7d1b5221",
+      "run.py": "f340a22ee0324ae70180a78d3d6f1b22be1d5d69fb6763e250f1faa8815b4bb8"
+    },
+    "dependencies": 1904,
+    "paths": 7,
+    "phases": [
+      {
+        "name": "compile",
+        "command": [
+          "go",
+          "test",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-4/overlay.json",
+          "-run=^$",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 2.108,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "09035f98fe046f4b2f1b93b3b84a0b6302f877102537f9f40dafb308993613cb"
+      },
+      {
+        "name": "race",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-4/overlay.json",
+          "-count=1",
+          "-timeout=2m",
+          "-v",
+          "./internal/adapters/providerconfig"
+        ],
+        "exit": 0,
+        "seconds": 3.659,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "8b5dcb25beb29d78c7eb5215a2b9245fcd1a0d5146ce91f2e812387e6abb7dbe"
+      },
+      {
+        "name": "kms-race",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-4/overlay.json",
+          "-count=1",
+          "-timeout=2m",
+          "-v",
+          "-run=^TestOwnerProvider",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 4.962,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "551449476b2951a5bb0fdf6e1eae4805bac87036657b854d49dd9ae9135f708b"
+      },
+      {
+        "name": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-4/overlay.json",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 0.556,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "exit": 0,
+    "after": {
+      "dependencies": [],
+      "bases": [],
+      "payload": [],
+      "inventory": [],
+      "freeze": []
+    }
+  },
+  "scope": "Qualified component only; installed/runtime and native qualification remain separate."
+}

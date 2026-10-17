@@ -1,0 +1,23 @@
+apiVersion: asservat.io/v1alpha1
+kind: AccessBinding
+metadata:
+  name: payments-evidence-owners
+  namespace: asservat-system
+spec:
+  effect: Allow
+  subjects:
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: group-payments-123
+  - kind: Group
+    issuer: https://identity.example.invalid/realms/company
+    id: group-payments-sre-456
+  roles:
+  - evidence-owner
+  scope:
+    clusterID: 00000000-0000-4000-8000-000000000001
+    namespaceRef:
+      name: payments
+      uid: namespace-payments-uid
+  reason: Two teams can manage payments evidence sharing; ordinary readership is configured
+    separately.

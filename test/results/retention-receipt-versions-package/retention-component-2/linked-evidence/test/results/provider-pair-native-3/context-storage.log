@@ -1,0 +1,21 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:257: original activation cbcd6742-2a3c-43fa-935d-50558b40077a image docker.io/library/asservat-context-worker@sha256:5731035b66fe38d94c04a6bc2c6c74d0a511a7180c5ff3675f75d44a754bd905 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/runtime-provider-pair-worker-inputs
+    initial_bootstrap_chain_test.go:330: actual source-bound IAM, version-pinned read/write and delete/cross-prefix/versioning denial for original source 69088859-cd2c-48e1-af4d-11d23ea18e74; complete runtime copy accounting remains unqualified
+    initial_runtime_provider_pair_native_test.go:497: native phase=actual-three-role-provision elapsed=16.806014766s calls[C B H S W T]=[0 0 0 345 33 66] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:330: actual configuration role provisioning elapsed=16.806099016s
+    initial_runtime_provider_pair_native_test.go:497: native phase=actual-provider-pair-complete-inputs elapsed=7.689371876s calls[C B H S W T]=[54 52 28 153 12 24] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:330: actual provider/bridge/SQL worker input driver elapsed=7.689442916s progress=2
+    initial_bootstrap_chain_test.go:330: fresh original bootstrap/19-resource retained bridge, actual scoped versioned backend and eight-read provider inspection, original three-role SQL projection and finite worker2 inputs; no owner signing, runtime launch, accepted source availability, accounting or public workflow qualification
+    initial_bootstrap_chain_test.go:330: actual original bootstrap activation/retirement, 19 fixed inert resources (installed-owner=true), lost CREATE lookup, two lost guard-CAS replies with exact receipts and SELECT-only history during recovery, actual zero-replica controller/GC and missing-owner denial; owner/runtime/provider projection remains unqualified
+    initial_runtime_provider_pair_native_test.go:497: native phase=complete-native-provider-pair elapsed=1m56.050188467s calls[C B H S W T]=[1369 1644 882 963 97 201] original 20QPS/burst20 clients retained
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:348: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- PASS: TestInitialBootstrapChainWithRealServices (410.60s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (20.60s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/runtime-provider-pair-worker-inputs (117.73s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+PASS
+ok  	asservat.local/asservat/test/integration	411.662s

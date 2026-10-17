@@ -1,0 +1,156 @@
+=== RUN   TestCaptureAccountCompartmentMatchesAdmissionAndOwnsItsKey
+--- PASS: TestCaptureAccountCompartmentMatchesAdmissionAndOwnsItsKey (0.00s)
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/valid
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/pending
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-root
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-capture
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-key
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/expired-after-read
+=== RUN   TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/cancelled-after-read
+--- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/valid (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/pending (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-root (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-capture (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/wrong-key (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/expired-after-read (0.00s)
+    --- PASS: TestExactCaptureIntentReusesOnlyAcknowledgedOriginal/cancelled-after-read (0.00s)
+=== RUN   TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown
+=== RUN   TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/1.000000001s
+=== RUN   TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/4.999999999s
+=== RUN   TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/5s
+=== RUN   TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/5.000000001s
+--- PASS: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown (0.00s)
+    --- PASS: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/1.000000001s (0.00s)
+    --- PASS: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/4.999999999s (0.00s)
+    --- PASS: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/5s (0.00s)
+    --- PASS: TestCaptureOperationAdmissionRoundsOnlyLiveRequestBoundDown/5.000000001s (0.00s)
+=== RUN   TestCaptureOperationAdmissionRejectsCollapsedOrInvalidOriginalDates
+--- PASS: TestCaptureOperationAdmissionRejectsCollapsedOrInvalidOriginalDates (0.00s)
+=== RUN   TestCaptureOperationClosedPrivatePayload
+--- PASS: TestCaptureOperationClosedPrivatePayload (0.00s)
+=== RUN   TestCaptureOperationUnknownWriteReceiptNeverManufacturesClosure
+--- PASS: TestCaptureOperationUnknownWriteReceiptNeverManufacturesClosure (0.00s)
+=== RUN   TestCaptureOperationReconciliationIsFiniteAndKeepsUnknownSpend
+--- PASS: TestCaptureOperationReconciliationIsFiniteAndKeepsUnknownSpend (0.00s)
+=== RUN   TestCaptureOperationPreservesOriginalDeadlineAfterRead
+--- PASS: TestCaptureOperationPreservesOriginalDeadlineAfterRead (0.00s)
+=== RUN   TestCaptureOperationCancellationDoesNotDetachWrites
+--- PASS: TestCaptureOperationCancellationDoesNotDetachWrites (0.00s)
+=== RUN   TestCaptureOperationMaximumCanonicalIdentityFitsPrivateBounds
+    capture_operation_test.go:292: maximum bounded text: capture=7035 intent=14689 outcome=15061 bytes
+    capture_operation_test.go:292: maximum bounded text: capture=4219 intent=9185 outcome=9557 bytes
+    capture_operation_test.go:292: maximum bounded text: capture=4219 intent=9185 outcome=9557 bytes
+    capture_operation_test.go:292: maximum bounded text: capture=7027 intent=14675 outcome=15047 bytes
+--- PASS: TestCaptureOperationMaximumCanonicalIdentityFitsPrivateBounds (0.03s)
+=== RUN   TestCaptureOperationWriteClaimKeepsShorterRecoveryDeadline
+--- PASS: TestCaptureOperationWriteClaimKeepsShorterRecoveryDeadline (0.00s)
+=== RUN   TestCaptureOperationReadClaimDoesNotRenewDuringAcknowledgement
+--- PASS: TestCaptureOperationReadClaimDoesNotRenewDuringAcknowledgement (0.00s)
+=== RUN   TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline
+--- PASS: TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline (0.00s)
+=== RUN   TestCaptureCompletionDigestCanonicalVersionAndLegacyCompatibility
+--- PASS: TestCaptureCompletionDigestCanonicalVersionAndLegacyCompatibility (0.00s)
+=== RUN   TestCaptureOperationCompletedReadOutlivesWriteCutoffWithoutEffects
+--- PASS: TestCaptureOperationCompletedReadOutlivesWriteCutoffWithoutEffects (0.00s)
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-protocol
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-root
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-id
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/legacy-key
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/read-error
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/expired-read
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/cancelled-read
+=== RUN   TestCaptureOperationCompletedReadFailureNeverFallsThrough/pending-expired
+--- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-protocol (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-root (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-id (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/legacy-key (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/read-error (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/expired-read (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/cancelled-read (0.00s)
+    --- PASS: TestCaptureOperationCompletedReadFailureNeverFallsThrough/pending-expired (0.00s)
+=== RUN   TestConnectorAuditAccountKeepsPeerSpendAcrossRotation
+--- PASS: TestConnectorAuditAccountKeepsPeerSpendAcrossRotation (0.00s)
+=== RUN   TestHealthyAuditFindNeverManufacturesClosure
+=== RUN   TestHealthyAuditFindNeverManufacturesClosure/unknown-put
+=== RUN   TestHealthyAuditFindNeverManufacturesClosure/unknown-completion-commit
+=== RUN   TestHealthyAuditFindNeverManufacturesClosure/unknown-claim
+--- PASS: TestHealthyAuditFindNeverManufacturesClosure (0.00s)
+    --- PASS: TestHealthyAuditFindNeverManufacturesClosure/unknown-put (0.00s)
+    --- PASS: TestHealthyAuditFindNeverManufacturesClosure/unknown-completion-commit (0.00s)
+    --- PASS: TestHealthyAuditFindNeverManufacturesClosure/unknown-claim (0.00s)
+=== RUN   TestHealthyAuditBindingDoesNotReanchorFinish
+--- PASS: TestHealthyAuditBindingDoesNotReanchorFinish (0.00s)
+=== RUN   TestHealthyAuditDatesIncludeBackupsAndLegacyJSONIsUnchanged
+--- PASS: TestHealthyAuditDatesIncludeBackupsAndLegacyJSONIsUnchanged (0.00s)
+=== RUN   TestHealthyAuditQualificationIsConcreteAndFrozen
+--- PASS: TestHealthyAuditQualificationIsConcreteAndFrozen (0.00s)
+=== RUN   TestHealthyAuditorZeroValueIsUnavailable
+--- PASS: TestHealthyAuditorZeroValueIsUnavailable (0.00s)
+=== RUN   TestHealthyAdmissionRejectsHistoricalVerifierAllowances
+--- PASS: TestHealthyAdmissionRejectsHistoricalVerifierAllowances (0.00s)
+=== RUN   TestOverdueCapabilityIsExplicitFrozenAndSeparatelyQualified
+--- PASS: TestOverdueCapabilityIsExplicitFrozenAndSeparatelyQualified (0.00s)
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/fence
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/purge
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/persist
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/independent
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/ack
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/retire
+=== RUN   TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/#00
+--- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/fence (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/purge (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/persist (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/independent (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/ack (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/retire (0.00s)
+    --- PASS: TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown/#00 (0.00s)
+=== RUN   TestOperationAuditorUnknownRepliesNeverRecreate
+=== RUN   TestOperationAuditorUnknownRepliesNeverRecreate/lost-create
+=== RUN   TestOperationAuditorUnknownRepliesNeverRecreate/lost-claim
+=== RUN   TestOperationAuditorUnknownRepliesNeverRecreate/lost-ack
+--- PASS: TestOperationAuditorUnknownRepliesNeverRecreate (0.00s)
+    --- PASS: TestOperationAuditorUnknownRepliesNeverRecreate/lost-create (0.00s)
+    --- PASS: TestOperationAuditorUnknownRepliesNeverRecreate/lost-claim (0.00s)
+    --- PASS: TestOperationAuditorUnknownRepliesNeverRecreate/lost-ack (0.00s)
+=== RUN   TestOperationAuditorPreservesOriginalDeadlineAfterAcknowledgement
+--- PASS: TestOperationAuditorPreservesOriginalDeadlineAfterAcknowledgement (0.00s)
+=== RUN   TestOperationAuditDoesNotAssertDelivery
+--- PASS: TestOperationAuditDoesNotAssertDelivery (0.00s)
+=== RUN   TestOperationMACRotationKeepsAccountSpendIdentity
+--- PASS: TestOperationMACRotationKeepsAccountSpendIdentity (0.00s)
+=== RUN   TestOperationCertificateAcknowledgementFailureCannotRepeatUnboundedVerification
+--- PASS: TestOperationCertificateAcknowledgementFailureCannotRepeatUnboundedVerification (0.00s)
+=== RUN   TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent
+=== RUN   TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent/unknown-claim
+=== RUN   TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent/provider-failure
+--- PASS: TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent (0.00s)
+    --- PASS: TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent/unknown-claim (0.00s)
+    --- PASS: TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent/provider-failure (0.00s)
+=== RUN   TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider
+=== RUN   TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/claim-wait
+=== RUN   TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/claim-extension
+=== RUN   TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/provider-wait
+=== RUN   TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/provider-cancel
+--- PASS: TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider (0.08s)
+    --- PASS: TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/claim-wait (0.04s)
+    --- PASS: TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/claim-extension (0.00s)
+    --- PASS: TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/provider-wait (0.04s)
+    --- PASS: TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider/provider-cancel (0.00s)
+=== RUN   TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork
+=== RUN   TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-original-purge
+=== RUN   TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-certificate
+=== RUN   TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/acknowledged
+--- PASS: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork (0.00s)
+    --- PASS: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-original-purge (0.00s)
+    --- PASS: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/before-certificate (0.00s)
+    --- PASS: TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork/acknowledged (0.00s)
+=== RUN   TestProcessingAccountSurvivesInputRotationAndSeparatesRules
+--- PASS: TestProcessingAccountSurvivesInputRotationAndSeparatesRules (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/audit	1.138s

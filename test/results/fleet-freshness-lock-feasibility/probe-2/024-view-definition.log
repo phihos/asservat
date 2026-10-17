@@ -1,0 +1,26 @@
+ WITH observations AS MATERIALIZED (
+         SELECT fleet_observation.installation_id,
+            fleet_observation.semantic_version,
+            fleet_observation.issuer_epoch,
+            fleet_observation.source_uid,
+            fleet_observation.source_generation,
+            fleet_observation.source_digest,
+            fleet_observation.activated_postmaster_at,
+            fleet_observation.activated_database_oid,
+            fleet_observation.observed_at,
+            fleet_observation.fresh_until
+           FROM fleet_observation
+        )
+ SELECT t.installation_id,
+    t.issuer_epoch,
+    t.source_uid,
+    t.source_generation,
+    t.source_digest,
+    t.suspended,
+    t.recovery_blocked OR t.activated_postmaster_at IS DISTINCT FROM pg_postmaster_start_time() OR t.activated_database_oid IS DISTINCT FROM (( SELECT pg_database.oid
+           FROM pg_database
+          WHERE pg_database.datname = current_database())) OR pg_is_in_recovery() OR o.installation_id IS NULL AS recovery_blocked,
+    COALESCE(o.observed_at, '1970-01-01 00:00:00+00'::timestamp with time zone) AS observed_at,
+    COALESCE(o.fresh_until, '1970-01-01 00:00:00+00'::timestamp with time zone) AS fresh_until
+   FROM fleet_trust t
+     LEFT JOIN observations o ON o.installation_id = t.installation_id AND o.semantic_version = t.semantic_version AND o.issuer_epoch = t.issuer_epoch AND o.source_uid = t.source_uid AND o.source_generation = t.source_generation AND o.source_digest = t.source_digest AND NOT o.activated_postmaster_at IS DISTINCT FROM t.activated_postmaster_at AND NOT o.activated_database_oid IS DISTINCT FROM t.activated_database_oid;

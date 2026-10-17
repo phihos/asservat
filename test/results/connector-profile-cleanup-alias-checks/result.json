@@ -1,0 +1,68 @@
+{
+  "scope": "SQL56 alias-only correction: embedded schema, deterministic SQL generation, canonical gates, real original cleanup-role live-reference denial and existing fast connector retirement; synthetic protected roots, not full lifetime cleanup or installed workflow",
+  "phases": [
+    {
+      "name": "sql",
+      "command": [
+        "make",
+        "sql-check"
+      ],
+      "exit": 0,
+      "seconds": 0.357
+    },
+    {
+      "name": "schema-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^TestInitialSchema",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "seconds": 8.064
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 9.644
+    },
+    {
+      "name": "native",
+      "command": [
+        "python3",
+        "scripts/test-custody.py",
+        "--run",
+        "^TestContextAdmissionWithRealServices$/^connector-(identity-fast|retirement-prepaid-fast)$"
+      ],
+      "exit": 0,
+      "seconds": 62.439,
+      "sourceUnchanged": true,
+      "sourceCount": 2160,
+      "cleanupFailures": [],
+      "passedTests": [
+        "TestContextAdmissionWithRealServices/connector-identity-fast",
+        "TestContextAdmissionWithRealServices/connector-identity-fast/live-profile-cleanup-trigger-denies-with-original-row",
+        "TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close",
+        "TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote",
+        "TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast",
+        "TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/successor-keeps-original-cohort-and-closes-unused",
+        "TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/explicit-retiring-source-keeps-last-accepted-cohort",
+        "TestContextAdmissionWithRealServices/connector-retirement-prepaid-fast/dead-actor-original-expiry-and-role-isolation"
+      ]
+    }
+  ],
+  "boot": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "exit": 0,
+  "scratchRemoved": true
+}

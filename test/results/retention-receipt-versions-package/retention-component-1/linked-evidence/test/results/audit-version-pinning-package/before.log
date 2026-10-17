@@ -1,0 +1,13 @@
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original
+    audit_receipt_test.go:134: INITIAL_PUT_RECEIPT_WAS_NOT_PRESERVED <nil> replacement
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response
+    audit_receipt_test.go:137: INITIAL_PUT_VERSION_SUBSTITUTED replacement
+=== RUN   TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put
+--- FAIL: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion (0.01s)
+    --- FAIL: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/original (0.00s)
+    --- FAIL: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/substituted-response (0.00s)
+    --- PASS: TestInitialAuditAcknowledgesTheSuccessfulPUTVersion/unknown-put (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/objectstore	0.021s
+FAIL

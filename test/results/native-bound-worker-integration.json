@@ -1,0 +1,24 @@
+{
+  "integratedAt": "2026-10-12T13:34:20.713564+00:00",
+  "packageHashes": {
+    "manifest.json": "b5e586bd358528bfaf857fd17f1b326377a1e06622f4b57e8dd2e47fd908ff8a",
+    "HANDOFF.md": "56b3e6edb24545cee49a26214aeace1d5f0ca0e9b7a3bffb57551fd5ef41df0a",
+    "dependencies.json": "abf96da826ff11c331ccf83777f2b7451357e5d9b4bd3baff6418ca56383f518",
+    "package-hashes.json": "5ac0ea04ae6135fb00c8d26f98464c2c712c6057c75c0bd41126880f0fed9d92"
+  },
+  "dependencyCount": 1210,
+  "dependenciesMatched": true,
+  "files": [
+    {
+      "path": "internal/application/evidence/context_native_runtime.go",
+      "base_sha256": "a70bf8f323addb38b09099cb4a10e1a04c2ba52718b7aca2b6e8de90121442b3",
+      "sha256": "9fc3c38bb7bea8cdd3b4165c686a147dc9382fdd6271915d9ffd2e758008a187"
+    },
+    {
+      "path": "internal/application/evidence/context_native_bound_worker_test.go",
+      "base_sha256": null,
+      "sha256": "7b501106979ec231e6c63c147669ff5c98eab6ca807117f0af31517063a85934"
+    }
+  ],
+  "qualification": "Corrected focused race and vet pass; integrated native qualification pending."
+}

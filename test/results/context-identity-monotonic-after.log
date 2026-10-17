@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/identity	1.013s
+ok  	asservat.local/asservat/internal/transport/browser	1.496s
+ok  	asservat.local/asservat/internal/transport/mcp	1.674s
+ok  	asservat.local/asservat/internal/transport/presentation	1.481s

@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.737s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.715s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.374s
+ok  	asservat.local/asservat/internal/application/evidence	1.020s
+ok  	asservat.local/asservat/test/integration	1.053s

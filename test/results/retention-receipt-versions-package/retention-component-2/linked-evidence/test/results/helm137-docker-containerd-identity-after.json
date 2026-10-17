@@ -1,0 +1,8 @@
+{
+  "dockerImageID": "sha256:b71848fc803ec6f18ad4edc8c9d76391e329326c0d0f25fcb31777f3fc452f77",
+  "configDigest": "sha256:32b7ce6b4b577769ccc22cd9604f1967144837aa23caed79d69a0ecdde92b6b7",
+  "selectedManifestDigest": "sha256:ab032bb1617cc64a574dcfaf3475e659ac1c40bcfd1d401c6cbf6f0a215ec958",
+  "identityKind": "descriptor-chain",
+  "verified": true,
+  "ownedImageCleanupExit": 0
+}

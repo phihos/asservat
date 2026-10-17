@@ -1,0 +1,5 @@
+--- FAIL: TestNativeWorkerProfileHasSeparateMemoryFloor (0.00s)
+    native_worker_profile_test.go:19: native memory=16777216 accepted=true
+FAIL
+FAIL	asservat.local/asservat/internal/domain/authorization	0.005s
+FAIL

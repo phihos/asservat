@@ -1,0 +1,92 @@
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/same
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/missing
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/new-uid
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/generation
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/digest
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/long-digest
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/epoch
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/installation
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/source-suspended
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/stored-suspended
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/recovery
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/stored-expired
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/source-expired
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/future
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/older
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/equal-time-extension
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/missing-date
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/infinite-date
+=== RUN   TestFleetObservationContentionRequiresCurrentExactPositiveSource/long-interval
+--- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/same (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/missing (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/new-uid (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/generation (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/digest (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/long-digest (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/epoch (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/installation (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/source-suspended (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/stored-suspended (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/recovery (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/stored-expired (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/source-expired (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/future (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/older (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/equal-time-extension (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/missing-date (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/infinite-date (0.00s)
+    --- PASS: TestFleetObservationContentionRequiresCurrentExactPositiveSource/long-interval (0.00s)
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/same-instant
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/observation
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/expiry
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/suspension
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/recovery
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/source
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/digest
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/generation
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/epoch
+=== RUN   TestFleetObservationContentionFinalRowCannotRefreshOrReplace/installation
+--- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/same-instant (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/observation (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/expiry (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/suspension (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/recovery (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/source (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/digest (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/generation (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/epoch (0.00s)
+    --- PASS: TestFleetObservationContentionFinalRowCannotRefreshOrReplace/installation (0.00s)
+=== RUN   TestFleetObservationContentionOnlyExactServerLockAbort
+--- PASS: TestFleetObservationContentionOnlyExactServerLockAbort (0.00s)
+=== RUN   TestFleetObservationContentionRejectsIndependentlyReactivatedIncarnation
+--- PASS: TestFleetObservationContentionRejectsIndependentlyReactivatedIncarnation (0.00s)
+=== RUN   TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery
+--- PASS: TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery (0.00s)
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator
+--- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.050s

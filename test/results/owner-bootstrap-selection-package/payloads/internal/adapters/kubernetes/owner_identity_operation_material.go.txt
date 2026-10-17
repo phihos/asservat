@@ -1,0 +1,62 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/hex"
+	"strings"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	core "k8s.io/api/core/v1"
+)
+
+// The owner Deployment is the actual object from this operation's independent
+// native bracket (or its actual post-lock GET), never a cached legacy read.
+func (s *OwnerIdentityProjection) originalOperationInput(ctx context.Context, current ownerIdentityOperationNative) error {
+	state := current.retained.resources.State
+	if !ownerIdentityProjectionInputBound(s.root, s.input, s.root.resources.now()) || len(state.Objects) != contracts.InitialRuntimeResourceCount || state.Objects[17].Receipt == nil || state.Objects[18].Receipt == nil {
+		return cfg.ErrChanged
+	}
+	policy, binding := state.Objects[17].Receipt, state.Objects[18].Receipt
+	guard := s.input.WorkloadGuard
+	if policy.UID != guard.PolicyUID || policy.Generation != guard.PolicyGeneration || binding.UID != guard.BindingUID || binding.ResourceVersion != guard.BindingResourceVersion {
+		return cfg.ErrChanged
+	}
+	deployment := current.source.ownerDeployment
+	if err := s.root.ownerIdentityOperationDeployment(ctx, deployment, state, s.root.input); err != nil {
+		return err
+	}
+	digest, err := ConnectorAPITemplateDigest(deployment.Spec.Template)
+	if err != nil || hex.EncodeToString(digest[:]) != s.input.Observation.TemplateDigest || len(deployment.Spec.Template.Spec.Containers) != 1 || !strings.HasSuffix(deployment.Spec.Template.Spec.Containers[0].Image, "@sha256:"+s.input.Observation.ImageDigest) {
+		return cfg.ErrChanged
+	}
+	if err = s.originalBootstrapSelection(ctx, current.retained.resources, current.until); err != nil {
+		return err
+	}
+	return initialHandoverDeadline(ctx, s.root.resources.now, current.until)
+}
+
+// Exactly one selected audit-material GET under the independently established
+// native bracket. It checks the original selection and current provider result;
+// no nested root.current or provider HTTP is hidden in this read.
+func (s *OwnerIdentityProjection) operationProviderMaterial(ctx context.Context, current ownerIdentityOperationNative, proof ownerIdentityProviderObservation) error {
+	state := current.retained.resources.State
+	if s.setup == nil || s.input.ProviderAuthentication == nil || !current.accepted.Configuration.Equal(proof.configuration) || !ownerProviderJournalBound(s.input, contracts.OwnerIdentityActivation{Input: s.root.input, ResourcesCreatedAt: state.CreatedAt, ResourcesUntil: state.Until}, state) || !ownerIdentityOriginalConfiguration(s.root.resources, state, proof.configuration) || !s.providerCheckValid(ctx, proof) {
+		return cfg.ErrChanged
+	}
+	selected := s.input.ProviderAuthentication.AuditCredentials
+	raw, err := s.root.bridge.source.client.api.Get().AbsPath("/api/v1/namespaces/" + s.input.Namespace.Name + "/secrets/" + selected.Name).MaxRetries(0).DoRaw(ctx)
+	defer clear(raw)
+	if err != nil {
+		return cfg.ErrUnavailable
+	}
+	var object core.Secret
+	if permissionJSON(raw, 64<<10, 4096) != nil || strictGuardJSON(raw, &object) != nil {
+		return cfg.ErrChanged
+	}
+	defer clearRuntimeProjection(object.Data)
+	if !initialProviderSecretIdentity(object, s.input.Namespace.Name, selected, contracts.OwnerProviderAuditCredentialFile) || !ownerProviderAuditMaterial(object.Data[contracts.OwnerProviderAuditCredentialFile]) || !s.providerCheckValid(ctx, proof) || initialHandoverDeadline(ctx, s.root.resources.now, current.until) != nil {
+		return cfg.ErrChanged
+	}
+	return nil
+}

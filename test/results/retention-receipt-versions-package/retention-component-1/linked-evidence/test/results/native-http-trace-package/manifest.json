@@ -1,0 +1,17 @@
+[
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "base_sha256": "cb1e9345df613560c56b7fcaf8c3c63a2aae5fe13aa39636446b24e9b130acc0",
+    "sha256": "9c756b43fe6a75e4d953ca46a3bc0a4455a01f8a3c1ca31b9ca9cda6d624a49c"
+  },
+  {
+    "path": "test/integration/context_native_resume_test.go",
+    "base_sha256": "4fdab4f32d897319b03464c9885262ee75acd8197dc31b9661b87efb5c9d3379",
+    "sha256": "31aa1a06ea6ba102f55f21c442bc4b2da1d8bd0e9e65d85198bd7acdf3a75f56"
+  },
+  {
+    "path": "test/integration/native_http_trace_test.go",
+    "base_sha256": null,
+    "sha256": "3a1c4901a76203a3185b8e9f3ee1abf3e89604caf228a8eae0a80f018b569309"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "docs/architecture/connector-renewal.md": "d11d9c747b63cce99dee8ac14e0a2951b827ea522843176d5b937fb52b5d7921",
+  "docs/decisions/126-connector-process-identity-and-renewal.md": "895e442a97ba62d9f60782ae315db0050bd24dafd1dcc77565ce41c332eb77ea",
+  "docs/decisions/150-operation-owned-native-observation-proof.md": "adef4253a7eba41fb3e870cc16965a086c9d60d28a8966889605d375606b98c4",
+  "internal/adapters/kubernetes/configmap_protection.go": "47e7d4a539cab99113cfc597452846326e5b9a8bc3fb5a76acd6012551bce834",
+  "internal/adapters/kubernetes/connector_identity.go": "6373c4b1f2c97aee82770bf78ffef0d07be10b90d675ebc316aa5f40b5913e98",
+  "internal/adapters/kubernetes/connector_observation_operation_native.go": "75932fd8a16c200f0ef89c95841abe1f966a0fb36d982bddc079949d228069d1",
+  "internal/adapters/kubernetes/connector_observation_operation_test.go": "2b583765628848993bd2a478480824d3025999d5c50fe925f866bca1d82c6eac",
+  "internal/adapters/kubernetes/connector_process.go": "07864302052bdbd703e94f6f3eeb0a8499ab0ffcb461fbdab378a9dea34498a7",
+  "internal/adapters/kubernetes/installation_config.go": "26bb42d49c63c3e5bbc5c35ed2f18c992219625b3cc12cc7257058b9d99d7986",
+  "internal/adapters/kubernetes/owner_workload_guard.go": "56998ec98bf56c08b54208487655e81fd09e04112ba6cc90cf7f4f4cff109680",
+  "internal/adapters/kubernetes/permissions.go": "dd56b869a7a2d9a1b710455e9c86c9ea47559b7bb1bdc460111d18f4e20118e4",
+  "internal/adapters/mtls/connector_process_credentials.go": "21c9570ace4feef266512fabbbc7550e826d09394dcb3cd2def8fdbe184e5774",
+  "internal/adapters/postgres/connector_registry.go": "570dc43845b8b32821c1094998f8837d0048a333663f611ae89dbe56676b4785",
+  "internal/application/fleet/connector_process.go": "a151db7c0c5c23d9f5d299c895d0f84c64a566fabc08cff2f951e595a053d7d8",
+  "internal/application/fleet/connector_renewal.go": "244c893cfaa027a06107ead85177e0d01e4f313c94bd9117246a38a291696dde",
+  "specs/federation.md": "885a79348101622be23500dd060ad58d513d678d4fdf93d8fd3aa3a0b3c8e75c",
+  "test/fixtures/observation-native/enrollment.go": "8777702ab6a6091d58012bd4a1f513f426121cfe02659dfbc9ce389cfd4fd860",
+  "test/fixtures/observation-native/main.go": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82",
+  "test/fixtures/observation-native/runtime.go": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427",
+  "test/results/direct-observation-native-3/direct/context-storage.log": "72923888a47f99ba6561d6a31b504f2cc181665e240a93f8311664f6f2396d83",
+  "test/results/direct-observation-native-3/result.json": "b757f3df22bdc96c109156f2403f973ebd518581ee79902c2f584576b9bf9caf"
+}

@@ -1,0 +1,181 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-12 18:31:07.686 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 18:31:07.686 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 18:31:07.702 UTC [43] LOG:  database system was shut down at 2026-10-12 18:31:07 UTC
+2026-10-12 18:31:07.716 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-12 18:31:07.889 UTC [37] LOG:  received fast shutdown request
+.2026-10-12 18:31:07.892 UTC [37] LOG:  aborting any active transactions
+2026-10-12 18:31:07.893 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-12 18:31:07.893 UTC [41] LOG:  shutting down
+2026-10-12 18:31:07.896 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-12 18:31:08.288 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.031 s, sync=0.348 s, total=0.396 s; sync files=303, longest=0.210 s, average=0.002 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-12 18:31:08.303 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-12 18:31:08.411 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 18:31:08.411 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-12 18:31:08.411 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-12 18:31:08.414 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 18:31:08.421 UTC [89] LOG:  database system was shut down at 2026-10-12 18:31:08 UTC
+2026-10-12 18:31:08.425 UTC [1] LOG:  database system is ready to accept connections
+2026-10-12 18:31:08.743 UTC [94] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-12 18:31:08.743 UTC [94] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-12 18:31:29.393 UTC [110] ERROR:  permission denied for table permission_stream
+2026-10-12 18:31:29.393 UTC [110] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-12 18:31:29.394 UTC [110] ERROR:  permission denied for table context_storage_binding
+2026-10-12 18:31:29.394 UTC [110] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-12 18:31:29.394 UTC [110] ERROR:  permission denied for table context_capture
+2026-10-12 18:31:29.394 UTC [110] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-12 18:31:29.394 UTC [110] ERROR:  permission denied for table context_capture
+2026-10-12 18:31:29.394 UTC [110] STATEMENT:  DELETE FROM context_capture
+2026-10-12 18:31:29.480 UTC [114] ERROR:  permission denied for table context_catalog
+2026-10-12 18:31:29.480 UTC [114] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-12 18:31:29.481 UTC [114] ERROR:  permission denied for table context_verification
+2026-10-12 18:31:29.481 UTC [114] STATEMENT:  UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:31:29.496 UTC [115] ERROR:  permission denied for table context_verification
+2026-10-12 18:31:29.496 UTC [115] STATEMENT:  UPDATE context_verification SET authority_digest=authority_digest
+2026-10-12 18:31:29.497 UTC [115] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:31:29.497 UTC [115] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 18:31:29.512 UTC [116] ERROR:  permission denied for table context_verification
+2026-10-12 18:31:29.512 UTC [116] STATEMENT:  UPDATE context_verification SET expectation_digest=expectation_digest
+2026-10-12 18:31:29.526 UTC [117] ERROR:  permission denied for table context_catalog
+2026-10-12 18:31:29.526 UTC [117] STATEMENT:  UPDATE context_catalog SET published_at=clock_timestamp()
+2026-10-12 18:31:29.545 UTC [118] ERROR:  permission denied for table artifact_download
+2026-10-12 18:31:29.545 UTC [118] STATEMENT:  UPDATE artifact_download SET deadline=deadline
+2026-10-12 18:31:29.545 UTC [118] ERROR:  permission denied for table fleet_trust
+2026-10-12 18:31:29.545 UTC [118] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-12 18:31:29.545 UTC [118] ERROR:  permission denied for table fleet_trust
+2026-10-12 18:31:29.545 UTC [118] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=issuer_epoch
+2026-10-12 18:31:29.545 UTC [118] ERROR:  permission denied for table fleet_trust
+2026-10-12 18:31:29.545 UTC [118] STATEMENT:  UPDATE fleet_trust SET fresh_until=clock_timestamp()
+2026-10-12 18:31:29.560 UTC [119] ERROR:  permission denied for table fleet_trust
+2026-10-12 18:31:29.560 UTC [119] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-12 18:31:29.560 UTC [118] ERROR:  permission denied for table download_batch
+2026-10-12 18:31:29.560 UTC [118] STATEMENT:  UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:31:29.561 UTC [118] ERROR:  permission denied for table download_allocation
+2026-10-12 18:31:29.561 UTC [118] STATEMENT:  UPDATE download_allocation SET output_limit=output_limit
+2026-10-12 18:31:29.576 UTC [120] ERROR:  permission denied for table artifact_download
+2026-10-12 18:31:29.576 UTC [120] STATEMENT:  UPDATE artifact_download SET charged_output=0
+2026-10-12 18:31:29.576 UTC [120] ERROR:  permission denied for table download_batch
+2026-10-12 18:31:29.576 UTC [120] STATEMENT:  UPDATE download_batch SET outcome_json=outcome_json
+2026-10-12 18:31:29.592 UTC [121] ERROR:  permission denied for table artifact_download
+2026-10-12 18:31:29.592 UTC [121] STATEMENT:  UPDATE artifact_download SET state='Ready'
+2026-10-12 18:31:31.182 UTC [142] ERROR:  permission denied for table download_worker
+2026-10-12 18:31:31.182 UTC [142] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-12 18:31:31.183 UTC [144] ERROR:  permission denied for table download_worker
+2026-10-12 18:31:31.183 UTC [144] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-12 18:31:46.274 UTC [161] ERROR:  permission denied for table download_allocation
+2026-10-12 18:31:46.274 UTC [161] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-12 18:31:46.274 UTC [161] ERROR:  permission denied for table download_native_backing
+2026-10-12 18:31:46.274 UTC [161] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-12 18:31:46.275 UTC [161] ERROR:  permission denied for table download_stop_backing
+2026-10-12 18:31:46.275 UTC [161] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-12 18:31:50.797 UTC [172] ERROR:  permission denied for table download_worker
+2026-10-12 18:31:50.797 UTC [172] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-12 18:31:50.798 UTC [174] ERROR:  permission denied for table download_worker
+2026-10-12 18:31:50.798 UTC [174] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-12 18:32:11.455 UTC [190] ERROR:  permission denied for table download_allocation
+2026-10-12 18:32:11.455 UTC [190] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-12 18:32:11.456 UTC [190] ERROR:  permission denied for table download_native_backing
+2026-10-12 18:32:11.456 UTC [190] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-12 18:32:11.456 UTC [190] ERROR:  permission denied for table download_stop_backing
+2026-10-12 18:32:11.456 UTC [190] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-12 18:32:28.727 UTC [201] ERROR:  permission denied for table download_worker
+2026-10-12 18:32:28.727 UTC [201] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-12 18:32:28.727 UTC [203] ERROR:  permission denied for table download_worker
+2026-10-12 18:32:28.727 UTC [203] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-12 18:33:12.534 UTC [220] ERROR:  permission denied for table download_allocation
+2026-10-12 18:33:12.534 UTC [220] STATEMENT:  UPDATE download_allocation SET reserved_sessions=0 WHERE id=$1
+2026-10-12 18:33:12.538 UTC [220] ERROR:  permission denied for table download_native_backing
+2026-10-12 18:33:12.538 UTC [220] STATEMENT:  UPDATE download_native_backing SET charged_rows=0 WHERE allocation_id=$1
+2026-10-12 18:33:12.540 UTC [220] ERROR:  permission denied for table download_stop_backing
+2026-10-12 18:33:12.540 UTC [220] STATEMENT:  DELETE FROM download_stop_backing WHERE allocation_id=$1
+2026-10-12 18:33:26.309 UTC [235] ERROR:  permission denied for table download_worker
+2026-10-12 18:33:26.309 UTC [235] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-12 18:33:26.311 UTC [237] ERROR:  permission denied for table download_worker
+2026-10-12 18:33:26.311 UTC [237] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-12 18:33:39.464 UTC [261] ERROR:  permission denied for table download_worker
+2026-10-12 18:33:39.464 UTC [261] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-12 18:33:39.465 UTC [263] ERROR:  permission denied for table download_worker
+2026-10-12 18:33:39.465 UTC [263] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-12 18:34:04.533 UTC [291] ERROR:  permission denied for table retention_decision
+2026-10-12 18:34:04.533 UTC [291] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.534 UTC [291] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:34:04.534 UTC [291] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 18:34:04.559 UTC [292] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:34:04.559 UTC [292] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-12 18:34:04.560 UTC [292] ERROR:  permission denied for table retention_decision
+2026-10-12 18:34:04.560 UTC [292] STATEMENT:  UPDATE retention_decision SET decision_json=decision_json
+2026-10-12 18:34:04.592 UTC [293] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:34:04.592 UTC [293] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-12 18:34:04.621 UTC [294] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.621 UTC [294] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-12 18:34:04.621 UTC [294] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.621 UTC [294] STATEMENT:  UPDATE retention_source SET protection_digest=protection_digest
+2026-10-12 18:34:04.622 UTC [294] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 18:34:04.622 UTC [294] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.622 UTC [294] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 18:34:04.622 UTC [294] STATEMENT:  DELETE FROM retention_checkpoint
+2026-10-12 18:34:04.644 UTC [295] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 18:34:04.644 UTC [295] STATEMENT:  UPDATE retention_checkpoint SET transition_json=transition_json
+2026-10-12 18:34:04.644 UTC [295] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.644 UTC [295] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-12 18:34:04.645 UTC [294] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:34:04.645 UTC [294] STATEMENT:  UPDATE custody_attempt SET effective_delete_by=delete_by
+2026-10-12 18:34:04.665 UTC [296] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.665 UTC [296] STATEMENT:  UPDATE retention_source SET fresh_until=clock_timestamp()
+2026-10-12 18:34:04.666 UTC [296] ERROR:  permission denied for table retention_catchup
+2026-10-12 18:34:04.666 UTC [296] STATEMENT:  UPDATE retention_catchup SET completed_at=clock_timestamp()
+2026-10-12 18:34:04.666 UTC [296] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 18:34:04.666 UTC [296] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.666 UTC [296] ERROR:  permission denied for table retention_decision
+2026-10-12 18:34:04.666 UTC [296] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.688 UTC [297] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.688 UTC [297] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-12 18:34:04.688 UTC [297] ERROR:  permission denied for table retention_source
+2026-10-12 18:34:04.688 UTC [297] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-12 18:34:04.689 UTC [297] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 18:34:04.689 UTC [297] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.689 UTC [297] ERROR:  permission denied for table retention_decision
+2026-10-12 18:34:04.689 UTC [297] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 18:34:04.690 UTC [297] ERROR:  permission denied for table custody_attempt
+2026-10-12 18:34:04.690 UTC [297] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 18:34:04.690 UTC [297] ERROR:  permission denied for table retention_catchup
+2026-10-12 18:34:04.690 UTC [297] STATEMENT:  DELETE FROM retention_catchup

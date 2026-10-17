@@ -1,0 +1,8 @@
+=== RUN   TestNativePreparationTraceForwardsOriginalCall
+--- PASS: TestNativePreparationTraceForwardsOriginalCall (0.00s)
+=== RUN   TestNativePreparationTraceRetainsBoundedEventsAndFirstError
+--- PASS: TestNativePreparationTraceRetainsBoundedEventsAndFirstError (0.00s)
+=== RUN   TestNativePreparationTracePausedStillForwards
+--- PASS: TestNativePreparationTracePausedStillForwards (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.054s

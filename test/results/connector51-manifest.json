@@ -1,0 +1,185 @@
+{
+  "scope": "SQL51 prepaid connector retirement; native qualification pending",
+  "paths": [
+    {
+      "path": "docs/architecture/connector-retirement.md",
+      "base_sha256": null,
+      "new_sha256": "bc1d0f59405e1f19162c131ed7c342c96220277b66c1a362579c455a46aa65d3",
+      "bytes": 5755
+    },
+    {
+      "path": "internal/adapters/postgres/connector_audit.go",
+      "base_sha256": "87e3dfa51eb2d1f193e2d611c8fee626de8d27219e9b88b671b3ad8fc194d803",
+      "new_sha256": "852e8be5a6eb5a34a62303395cc91c064cc41cce6f622f0fefd7440500418990",
+      "bytes": 8300
+    },
+    {
+      "path": "internal/adapters/postgres/connector_backing.go",
+      "base_sha256": "c9be82370c718350a1898727f23c4dcad36691cf4499d7fb437cb314cb16e7f1",
+      "new_sha256": "4fa5ede3cc6d9bab517801a90455e82fddd9f4423ba1341345e992223cc8fb70",
+      "bytes": 11837
+    },
+    {
+      "path": "internal/adapters/postgres/connector_process.go",
+      "base_sha256": "3afeae9dfa4d30bf31a121af47d9189e9823da5034f0f1eb24e525e7a495e109",
+      "new_sha256": "d24b32de8ff60f5804684c342bf9b1876109129377c91bc8341be71ffe353cb8",
+      "bytes": 11098
+    },
+    {
+      "path": "internal/adapters/postgres/connector_retirement.go",
+      "base_sha256": null,
+      "new_sha256": "1376bcdfe520f6ff78b822887e3de0e7d7b5cde2b1cb9eaecf26afa151de7875",
+      "bytes": 8102
+    },
+    {
+      "path": "internal/adapters/postgres/connector_retirement_cleanup.go",
+      "base_sha256": null,
+      "new_sha256": "df7c63ce7dab61a2ff4cacfefd5a9f9346b9a6c8a0eb2efb7b39f61df4ca1cac",
+      "bytes": 3908
+    },
+    {
+      "path": "internal/application/audit/operation_lifecycle.go",
+      "base_sha256": "c57ae60c4145b05c90f71081e3afe22cdb6e7fcb9aa3506380ea9375c21bb180",
+      "new_sha256": "2fe4ed780f88fce7d224370baea4203c4371a01446e00175311fb4311e861ac9",
+      "bytes": 12941
+    },
+    {
+      "path": "internal/application/audit/operation_mac.go",
+      "base_sha256": "fb2b34720ba93149deb10b63a13e6e21d9e2fe5b95e01ac4b7a0fe92189b5480",
+      "new_sha256": "e7f7ab2d0acc3d1d0e8c54d08c8ba89328f1568030fb94d5d8b437098df2df4b",
+      "bytes": 4670
+    },
+    {
+      "path": "internal/application/fleet/connector_backing.go",
+      "base_sha256": "a0272ad18c4f6e026cd81670ccb5fc28f32079e17a00ca6f67308ab0bf8c1d1f",
+      "new_sha256": "9e4659f18fd220c2bd1040c5b1de30d435affd91da60e17a8f6b42109df85999",
+      "bytes": 10244
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_acceptance.go",
+      "base_sha256": null,
+      "new_sha256": "9b51284b0719af4bcbbb24c911cb5eb62d713f49c35a7d436a109e2153966ff9",
+      "bytes": 2433
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_digest.go",
+      "base_sha256": null,
+      "new_sha256": "5a01c1898c823a8f8289d0ae6cfd05056415849c59f914a935b879674ae1eee9",
+      "bytes": 4020
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_digest_test.go",
+      "base_sha256": null,
+      "new_sha256": "435e6688bf05d582c4fd7a2870bcf6a7f1672f06c225d8c33ba890fef04ba19b",
+      "bytes": 3442
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_intent.go",
+      "base_sha256": null,
+      "new_sha256": "e1672f3aa008f9f22daa39ec26ada2feeb4fd02f7915b0047d7ea318dd63f5b5",
+      "bytes": 2302
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_intent_test.go",
+      "base_sha256": null,
+      "new_sha256": "8a95185aca83e38d97fca1f94e75d1f6f36340c68961b45fed6630f0c4116b40",
+      "bytes": 9908
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_proposal.go",
+      "base_sha256": null,
+      "new_sha256": "5ceddf48c5fa1cc8e58924f88aefd1e0d1ae880d5c5c582560baccd3b8ed0d22",
+      "bytes": 2589
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_service.go",
+      "base_sha256": null,
+      "new_sha256": "16d2f30d51dc4ab7fa2faf574508b6d6ed5de27610dd638c516fc9140aacf072",
+      "bytes": 11271
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_service_test.go",
+      "base_sha256": null,
+      "new_sha256": "65d332fe4ef35286e6527e29369f80e959f4208b4ea9949a353e989edcea8bdd",
+      "bytes": 12102
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_ticket.go",
+      "base_sha256": null,
+      "new_sha256": "c86d7ae5ff0827fe5311df067e4fbd3188491b90ce1a362dca92f0582dd5f8c9",
+      "bytes": 6037
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_ticket_test.go",
+      "base_sha256": null,
+      "new_sha256": "cc6c4792b06c6db3af31e82071d8c66e5d152893df82b5e569fc2099580e4ae1",
+      "bytes": 12088
+    },
+    {
+      "path": "internal/domain/audit/connector_operation.go",
+      "base_sha256": "0305d635c4f54aca265169be08a75b695265d96d8d2402bf19a6ce72adc3a886",
+      "new_sha256": "78a8081aa4cd9284c36c832138b344825ed7409af0bcde5640ff813c8051c3da",
+      "bytes": 5491
+    },
+    {
+      "path": "internal/domain/audit/connector_retirement.go",
+      "base_sha256": null,
+      "new_sha256": "6ce0ea3b3e39b7d7a64b33eb1329fd7e567d19742e3934875967b85cbda106c9",
+      "bytes": 5021
+    },
+    {
+      "path": "internal/domain/audit/connector_retirement_origin.go",
+      "base_sha256": null,
+      "new_sha256": "595ea588f96f8f42d9aea95e8a661b534cec72695219a961034e0e54fca61c49",
+      "bytes": 3736
+    },
+    {
+      "path": "internal/domain/audit/operation.go",
+      "base_sha256": "404c0e880a21232ddd858a70d8685821d05675972ce4e5932dcc40bf044f39e7",
+      "new_sha256": "38ae473b662aed2d7bb602ef24a02c5ce8bd0ba4444a148e9c924f2cffa25091",
+      "bytes": 5840
+    },
+    {
+      "path": "internal/domain/audit/operation_lifecycle.go",
+      "base_sha256": "bb3d28a0ace08737d4438088f53d24ec856f3b42a41f2726561d75e3772c28c7",
+      "new_sha256": "bdc79d5bc3fac8f484592698a304f9c85fcb99d959a5ddf0f2d980ac47c5f000",
+      "bytes": 15674
+    },
+    {
+      "path": "migrations/00051_connector_retirement.sql",
+      "base_sha256": null,
+      "new_sha256": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+      "bytes": 142865
+    },
+    {
+      "path": "migrations/queries/connector_retirement.sql",
+      "base_sha256": null,
+      "new_sha256": "425848b82350a1d8bd2857626c9e81e3ef70048917326e2cf5382da0c19177dd",
+      "bytes": 2205
+    },
+    {
+      "path": "specs/contracts/connector-identity.schema.json",
+      "base_sha256": "88dfba840cc15f13d1f68c2fba81a3e4a025fb7fe7f852ac39207fbdfddfc310",
+      "new_sha256": "3392ea86c23abcfce9bcd5d1bdb18590490e313374eb46aaead05a6f8adb2a33",
+      "bytes": 12226
+    },
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "base_sha256": "66e456c24afb2685228f9bc839409658e41c315fc516b10abd109d987b8aa181",
+      "new_sha256": "4f75f4e0d4a5ed79bc62faa5665b3406b653e4bf900dd9f51b84f54248bd92fc",
+      "bytes": 28644
+    },
+    {
+      "path": "test/integration/connector_identity_test.go",
+      "base_sha256": "9a7fbba817f3d23c4ca6e784eb25b63e357afb887d13f44dd1f97cfab22fb263",
+      "new_sha256": "d0d5b1fcf45c175dd32a07eba036124a4686ffa07064c9c268dc9269cb310967",
+      "bytes": 32039
+    },
+    {
+      "path": "test/integration/connector_retirement_test.go",
+      "base_sha256": null,
+      "new_sha256": "0a059931d8a601cfe229658050ac9f851ddfd7f98ec0a12efab58106b2548ff6",
+      "bytes": 23422
+    }
+  ]
+}

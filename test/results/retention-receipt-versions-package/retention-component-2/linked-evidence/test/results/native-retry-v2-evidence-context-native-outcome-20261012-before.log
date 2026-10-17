@@ -1,0 +1,5 @@
+--- FAIL: TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse (0.00s)
+    context_native_uncertain_test.go:10: closed local owners admitted another native observation despite retained failed/unknown output
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.006s
+FAIL

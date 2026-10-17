@@ -1,0 +1,42 @@
+{
+  "accepted": true,
+  "after": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "afterMirror": [],
+    "afterMirrorFileSet": [],
+    "authoredFileSet": [],
+    "bases": [],
+    "beforeFileSet": [],
+    "beforeMirror": [],
+    "beforeMirrorFileSet": [],
+    "dependencies": [],
+    "frozenFiles": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "command": [
+    "python3",
+    "scripts/test-direct-helper-regression.py",
+    "-v"
+  ],
+  "exit": 0,
+  "expectedTests": [],
+  "failedTop": [],
+  "namedPass": 0,
+  "passedTop": [],
+  "phase": "helper-gate-regressions",
+  "seconds": 0.829,
+  "skips": []
+}

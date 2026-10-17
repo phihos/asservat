@@ -1,0 +1,12 @@
+{
+  "scope": "Concrete v2 pending locator/claim receiver; actual h2/framed component, synthetic SQL/native authority; no installed service",
+  "paths": 10,
+  "dependenciesVerified": 2082,
+  "manifestSHA256": "4c70a7ab8a651b2c20aa2fb9f5d5912401dd8330fc31b6b094ba455747695024",
+  "resultSHA256": "5e44967fb7a33559078a08a6e0fba7ebcbfebe3b3ddf636d9c66ba052223cf85",
+  "terminal": 0,
+  "topLevelPass": 81,
+  "namedPass": 295,
+  "skips": 0,
+  "nativeQualification": false
+}

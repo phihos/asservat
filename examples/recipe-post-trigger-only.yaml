@@ -1,0 +1,68 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: post-trigger-only
+  namespace: payments
+spec:
+  description: Explicit next-interval packet and syscall collection, with no continuously
+    armed Asservat source.
+  actions:
+  - id: traffic
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: networkHeaders
+      before: 0s
+      after: 10s
+      ring:
+        maxAge: 30s
+        maxBytes: 4194304
+        segmentBytes: 1048576
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - cidrs:
+          - 0.0.0.0/0
+          - ::/0
+        protocol: any
+        resolution: frozen
+        maxEndpoints: 1
+        maxStaleness: 5s
+      maxFrozenBytes: 4194304
+      maxConcurrentSnapshots: 1
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 4194304
+      timeout: 15s
+    executionMode: onTrigger
+  - id: syscalls
+    kind: syscallTrace
+    parameters:
+      processes: allPodProcesses
+      mode: metadata
+      before: 0s
+      after: 10s
+      syscalls:
+        mode: all
+      result: all
+      ring:
+        maxAge: 30s
+        maxBytes: 8388608
+        segmentBytes: 2097152
+        maxSegments: 4
+        medium: memory
+      maxFrozenBytes: 16777216
+      maxConcurrentSnapshots: 1
+      maxEvents: 100000
+      maxEventsPerSecond: 10000
+      maxTrackedThreads: 4096
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 16777216
+      timeout: 20s
+    executionMode: onTrigger
+  maxTotalBytes: 20971520
+  maxDuration: 45s

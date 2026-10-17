@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/public-runtime-roles.schema.json",
+  "title": "Protected post-activation public SQL role input",
+  "description": "Generated protected installation input for the closed 31-purpose credential inventory. Separate hub and A-HWORK projections retain original setup/provenance; worker purposes require the original resource and positive configuration launch binding. No runtime DDL, source acceptance, recovery authority or installed enablement is conferred by this input.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "initialClaimID",
+    "clusterID",
+    "namespace",
+    "layoutDigest",
+    "ownerConfigurationUID"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-public-runtime-roles/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "initialClaimID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "layoutDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ownerConfigurationUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resources",
+        "resourceSetupID",
+        "fleetGuardName",
+        "resourceBinding",
+        "deployment",
+        "account",
+        "lease",
+        "configurationRoot",
+        "configurationSetupID",
+        "configuration",
+        "workerLayout"
+      ],
+      "properties": {
+        "resources": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "resourceSetupID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "fleetGuardName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "resourceBinding": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference",
+            "operationID",
+            "templateDigest"
+          ],
+          "properties": {
+            "reference": {
+              "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+            },
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "templateDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "account": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference",
+            "operationID",
+            "templateDigest"
+          ],
+          "properties": {
+            "reference": {
+              "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+            },
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "templateDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "lease": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reference",
+            "operationID",
+            "templateDigest"
+          ],
+          "properties": {
+            "reference": {
+              "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+            },
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "templateDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "configurationRoot": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+        },
+        "configurationSetupID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "configuration": {
+          "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json"
+        },
+        "workerLayout": {
+          "const": "asservat-hub-worker-installed/v1"
+        }
+      }
+    }
+  }
+}

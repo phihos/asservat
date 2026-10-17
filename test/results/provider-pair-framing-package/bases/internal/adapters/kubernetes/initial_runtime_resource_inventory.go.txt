@@ -1,0 +1,74 @@
+package kubernetes
+
+import (
+	"context"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+// InitialRuntimeResourceInventory is original CREATE provenance for the fixed
+// input generators. It is not a current-source observation. Every consumer must
+// construct the native guard/source reader and check its actual current values.
+// A journal receipt can never stand in for that reader or SQL acceptance.
+type InitialRuntimeResourceInventory struct {
+	Namespace, FleetSource, OwnerSource                        contracts.WorkerObjectReference
+	OwnerDeployment, OwnerAccount, OwnerService                contracts.WorkerObjectReference
+	WorkerDeployment, WorkerAccount, LeaderLease               contracts.WorkerObjectReference
+	OwnerInputs, WorkerInputs, OwnerProviders, WorkerProviders string
+	FleetGuard, OwnerSourceGuard, WorkloadGuard                contracts.OwnerDeploymentGuard
+	BridgeAdministration                                       cfg.InitialRuntimeBridgeAdministration
+}
+
+func (s *InitialRuntimeResources) ReadInventory(ctx context.Context) (InitialRuntimeResourceInventory, error) {
+	v, e := s.Read(ctx)
+	if e != nil {
+		return InitialRuntimeResourceInventory{}, e
+	}
+	return s.inventory(v.State)
+}
+
+func (s *InitialRuntimeResources) inventory(v contracts.InitialRuntimeResourceState) (InitialRuntimeResourceInventory, error) {
+	var zero InitialRuntimeResourceInventory
+	if !s.valid(v) || len(v.Objects) != contracts.InitialRuntimeResourceCount || v.Objects[len(v.Objects)-1].Receipt == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	n := s.names
+	c := s.initial
+	ref := func(i int, name string) contracts.WorkerObjectReference {
+		return contracts.WorkerObjectReference{Name: name, UID: v.Objects[i].Receipt.UID}
+	}
+	guard := func(i int, name string) contracts.OwnerDeploymentGuard {
+		p, b := v.Objects[i].Receipt, v.Objects[i+1].Receipt
+		return contracts.OwnerDeploymentGuard{Name: name, PolicyUID: p.UID, PolicyGeneration: p.Generation, BindingUID: b.UID, BindingResourceVersion: b.ResourceVersion, Administrators: append([]contracts.OwnerDeploymentActor(nil), s.preparer.plan.Administrators...)}
+	}
+	out := InitialRuntimeResourceInventory{Namespace: c.Namespace, FleetSource: c.FleetSource, OwnerSource: ref(14, n.OwnerSource), OwnerDeployment: ref(10, n.Owner), OwnerAccount: ref(0, n.Owner), OwnerService: ref(12, n.Owner), WorkerDeployment: ref(11, n.Worker), WorkerAccount: ref(1, n.Worker), LeaderLease: ref(13, n.Lease), OwnerInputs: n.OwnerInputs, WorkerInputs: n.WorkerInputs, OwnerProviders: n.OwnerProviders, WorkerProviders: n.WorkerProviders, FleetGuard: c.FleetGuard, OwnerSourceGuard: guard(15, n.OwnerSourceGuard), WorkloadGuard: guard(17, n.WorkloadGuard)}
+	digest, e := initialPreparationDigest(c.PodSpecDigest)
+	if e != nil {
+		return zero, e
+	}
+	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	admins := preparerAdministration(s.preparer.plan).Administrators
+	h := s.preparer.plan.HistoryProbe
+	if h == nil {
+		return zero, cfg.ErrChanged
+	}
+	owner := cfg.OwnerWorkloadAdministration{Name: n.WorkloadGuard, Deployment: n.Owner, DeploymentUID: out.OwnerDeployment.UID, ControlNamespace: control, Administrators: admins, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: c.FleetSource.Name, ServiceAccount: n.Worker}, {ConfigMap: n.OwnerSource, ServiceAccount: n.Worker}}, SchedulingLeases: []cfg.OwnerSchedulingLease{{Lease: n.Lease, ServiceAccount: n.Worker}}, InitialHistoryProbe: &cfg.OwnerInitialHistoryProbe{Namespace: cfg.NamespaceRef{Name: s.preparer.plan.BootstrapNamespace.Name, UID: s.preparer.plan.BootstrapNamespace.UID}, ServiceAccount: h.Name, ServiceAccountUID: h.UID, Configuration: c.Configuration}}
+	if s.ownerLayout == contracts.OwnerInstalledLayout {
+		owner.CapacityProbe = &cfg.OwnerCapacityProbe{ServiceAccount: out.WorkerAccount.Name, ServiceAccountUID: out.WorkerAccount.UID}
+		owner.ConfigurationProbes = append(owner.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: installedProcessingSource(c.InstallationID), ServiceAccount: out.WorkerAccount.Name})
+	}
+	out.BridgeAdministration = cfg.InitialRuntimeBridgeAdministration{
+		Initial: cfg.InitialWorkloadAdministration{Handover: true, Name: c.WorkloadGuard.Name, Configuration: c.Configuration, Witness: c.Witness.Name, FleetSource: c.FleetSource.Name, ControlNamespace: control, PodName: c.Pod.Name, PodUID: c.Pod.UID, WriterAccount: c.WriterAccount.Name, WriterAccountUID: c.WriterAccount.UID, ProbeAccount: c.ProbeAccount.Name, ProbeAccountUID: c.ProbeAccount.UID, PodSpecDigest: digest, Administrators: append([]cfg.KubernetesActor(nil), admins...)},
+		Owner:   owner, Credentials: s.preparer.plan.Workload.Credentials,
+		OwnerProbe:   cfg.InitialRuntimeProbe{ServiceAccount: n.Owner, ServiceAccountUID: out.OwnerAccount.UID},
+		SourceProbes: []cfg.InitialRuntimeSourceProbe{{ConfigMap: c.FleetSource.Name, ServiceAccount: n.Worker, ServiceAccountUID: out.WorkerAccount.UID}, {ConfigMap: n.OwnerSource, ServiceAccount: n.Worker, ServiceAccountUID: out.WorkerAccount.UID}},
+	}
+	if owner.CapacityProbe != nil {
+		out.BridgeAdministration.SourceProbes = append(out.BridgeAdministration.SourceProbes, cfg.InitialRuntimeSourceProbe{ConfigMap: installedProcessingSource(c.InstallationID), ServiceAccount: out.WorkerAccount.Name, ServiceAccountUID: out.WorkerAccount.UID})
+	}
+	if !out.BridgeAdministration.Valid() {
+		return zero, cfg.ErrChanged
+	}
+	return out, nil
+}

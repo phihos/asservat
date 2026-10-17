@@ -1,0 +1,31 @@
+{
+  "expected": 0,
+  "meaningfulBefore": true,
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/overlay.json",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation"
+  ],
+  "exit": 0,
+  "seconds": 3.551,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

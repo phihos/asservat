@@ -1,0 +1,24 @@
+{
+  "scope": "Source-only staged PostgreSQL 18 view-lock feasibility; no migration or producer implementation",
+  "payloads": {
+    "README.md": "ce47b3fd2401c61fb55ab5f2478b78221d09940146793df64fa9519b012f5259",
+    "producer-review.md": "e7714c45a272c23216a232955f10d8dc96b41cf14f61ef23b714faafcff219e0",
+    "schema.sql": "4f2f424cb29d407e8b5ec5d2e68ebbe6572e3423877fab66c45a1f03bec80f2c",
+    "probe.py": "05e45ead4a5aece6fabfc46836a1e232705f389f427bdd6b52d30eba14d0c073"
+  },
+  "sources": {
+    "migrations/00006_peer_identity.sql": "e4ac24e80ecf7332d3be31197d256f0931ca466776caa838d5dcfdb0b0ed0455",
+    "migrations/00031_database_activation.sql": "0053d5a4f1f10936c17512286207b9fcec70a2dd557ca82a8a15a091c7700887",
+    "migrations/00051_connector_retirement.sql": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+    "migrations/00052_capture_intent_lifecycle.sql": "bfd9e13c113a852f5a1858865eccd5e86272a2573e85d36e531fb22d31debea3",
+    "migrations/00054_protected_capacity.sql": "2431fb290d2613cbc6d96877c047813c54d9af85496c89c86b184d8ea7bd1b11",
+    "migrations/queries/fleet.sql": "494ec19ef4e939ed4af9149e5d9c723bac5bf05997cdcb1019761f4e0cf38752",
+    "internal/adapters/postgres/fleet_observation.go": "2d1d8d3327191f637b0dd68576a9bb2cc0609a321d7f93efcd99788b81bf4653",
+    "internal/adapters/postgres/fleet_observation_contention.go": "2b5c2215199002ff72635e43e86e76e92aae2c00ae400a1557d80814fba28e36",
+    "internal/adapters/postgres/initial_installation.go": "9a3969c6b47609ad2c408ddeb1620caea3b24c81c0655860fb735252cfa02334",
+    "internal/adapters/postgres/initial_roles.go": "f2e8d8ff296ab7ac8f15e2f3706b6817cfd26c26e7bab1e5afe854c220a59ad6",
+    "internal/adapters/postgres/configuration_runtime_role_plan.go": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938",
+    "scripts/test-context-storage.py": "2d24adc21f84e950e531d09c1325d6442823fbe9800b96e7a215b60c3e0275f5",
+    "scripts/test-custody.py": "a4cad1993b7059e3fd75b0517a445e57e4abb0b80b1bfc7e609413710c40c462"
+  }
+}

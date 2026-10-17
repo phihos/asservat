@@ -1,0 +1,49 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: bounded-live-diagnostics
+  namespace: payments
+spec:
+  description: Explicit intrusive actions; requires a reviewed policy or individual
+    grant. Tools must already be available.
+  actions:
+  - id: threads
+    kind: runtimeDiagnostic
+    parameters:
+      runtime: dotnet
+      operation: stacks
+      profileRef: dotnet-stacks
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 4194304
+      timeout: 10s
+  - id: custom
+    kind: command
+    parameters:
+      argv:
+      - /app/bin/diagnostic
+      - --summary
+      workingDirectory: /app
+      environmentNames: []
+      adapter: podsExec
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 4194304
+      timeout: 10s
+  - id: core
+    kind: liveCore
+    parameters:
+      profileRef: native-small
+      process: podMainProcesses
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 2147483648
+      timeout: 30s
+    dependsOn:
+    - threads
+    - custom
+  maxTotalBytes: 2155872256
+  maxDuration: 60s

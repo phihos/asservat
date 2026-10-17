@@ -1,0 +1,16 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 67 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 2437 local links, 608 rejected invalid examples (9086 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1149, "rejectedInvalidCases": 120}
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 49 domain entities, 73 browser operations, 49 MCP schema pairs, 336 resolved references.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 modes, 4 canonical CRDs, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06

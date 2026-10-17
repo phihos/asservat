@@ -1,0 +1,95 @@
+{
+  "integratedAt": "2026-10-13T17:17:20.659886+00:00",
+  "payload": [
+    {
+      "path": "docs/architecture/configuration-reconciliation.md",
+      "base": "55defabb7479b807a8cc78ce72976daf46e54adc229f115969b18ad75a41a03b",
+      "sha256": "efc012909d644833f59430044d3e69ba901769a4a36e104453a56e327dd946d2"
+    },
+    {
+      "path": "docs/architecture/fleet-observation.md",
+      "base": "2e42ce286a7617c16ab17d4539de5e3348a5aedf5de9806155a2d94089715833",
+      "sha256": "c64a13efd24f4de11df17a0027417c8a27dabe80401e63f4e89fbed49c572830"
+    },
+    {
+      "path": "docs/decisions/155-unchanged-fleet-persistence-contention.md",
+      "base": null,
+      "sha256": "e7f3f62206c6932d093af7bd571593823cbf3c745bb1368a6b252d7fba8977c4"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base": "082279ba3d0325388b50fdac3e26abd87e4f8b62840778d80471760f12181846",
+      "sha256": "9fa13385f39ccc6d7ea30632f35ffa4ba1637a2c95de2935e661346f87f2ec36"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation.go",
+      "base": "e9e7fe72871dbe9d135be2a40bfac7746f37fab927411693c6347cd55440ab54",
+      "sha256": "2d1d8d3327191f637b0dd68576a9bb2cc0609a321d7f93efcd99788b81bf4653"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation_contention.go",
+      "base": null,
+      "sha256": "2b5c2215199002ff72635e43e86e76e92aae2c00ae400a1557d80814fba28e36"
+    },
+    {
+      "path": "internal/adapters/postgres/fleet_observation_contention_test.go",
+      "base": null,
+      "sha256": "f9bbd8914789efdcf4a43280509171ad6cb6bfa1ce00bf663cab6fa5dfacb20b"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer.go",
+      "base": "830c297058a7d6a81a6fd2587c241f2de88e309e2524b117a69a9c4c21caf1f4",
+      "sha256": "eac2caf3f540351d58c1c7dc24d242378fd90345ab2364cb3d3e696eea5e28cf"
+    },
+    {
+      "path": "internal/application/fleet/trust_observer_contention_test.go",
+      "base": null,
+      "sha256": "06779de06f3600dcbbfb916df1987fd2a2958b899bf5c87abd2b1225f8b87ac2"
+    },
+    {
+      "path": "internal/bootstrap/configuration_runtime_source_notice.go",
+      "base": "81ca8ec4a2c8aff988fde6e40ff8d509c6df63cc84b890f0d77755257b3880ca",
+      "sha256": "03595b562d8d40ae6320fd17f174760236a08f4982a06adad6a3ea11a6a45e25"
+    },
+    {
+      "path": "internal/bootstrap/configuration_runtime_source_notice_test.go",
+      "base": null,
+      "sha256": "9351d97714f6998130d4915b0141eaf3637e19c9de9b576c332c0fa496c9f2a2"
+    },
+    {
+      "path": "internal/domain/fleet/observation_persistence.go",
+      "base": null,
+      "sha256": "fdaa2a15ca01da643139e93e3f4392793787c186e2b9f066e6f5bae987223b0e"
+    },
+    {
+      "path": "specs/federation.md",
+      "base": "885a79348101622be23500dd060ad58d513d678d4fdf93d8fd3aa3a0b3c8e75c",
+      "sha256": "eb746f62168c2202ddd1a05c71c25f65b7576681fc558035b3be8a4464e8f237"
+    },
+    {
+      "path": "test/integration/fleet_observation_commit_reply_test.go",
+      "base": null,
+      "sha256": "1b076f2d1232cd1f3da5256de1d43bf5d015cae4ce25079f0e0365d6629c71a1"
+    },
+    {
+      "path": "test/integration/fleet_observation_contention_test.go",
+      "base": null,
+      "sha256": "0c105eded110eed457ea46a5cdfa84cf3f34fd2a2dcdc6e95f9985d43773ea62"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base": "53b79ed93a63e849b94f03e3c77c355ec879c85039da8aebbba165246af39ab1",
+      "sha256": "9a7ae73816d37218f3a0164c71e52be9c341bc9ad322d46adaa4593d8c88e6c5"
+    },
+    {
+      "path": "test/integration/owner_identity_roles_test.go",
+      "base": "26954b12048830893d73b35c184ff992bb048fe3da107f98a746d5907999cd6c",
+      "sha256": "525db7a382b8a4bd710255f504ce903d7ef4b6b78040182f8b26c4728c84ea8f"
+    }
+  ],
+  "componentResultSHA256": "c98fd4a738b4c8c6019a81919b042dc34016e46f4628a59e8953d4f13918931a",
+  "nativeResultSHA256": "4a50a5a80af480cc3863956c922dc028643b403ca8b4140a565a17cc51c8d749",
+  "independentlyVerified": true,
+  "nativeAndComponentExit": 0,
+  "scope": "Scoped component/native qualification only; no full-suite or installed public-runtime qualification."
+}

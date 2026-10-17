@@ -1,0 +1,104 @@
+# Worker2 B+A component handoff
+
+Final integration payload: `files/` plus exact `manifest.json` in this checkpoint.
+Nothing was written to the live workspace. Native continuation remains unrun.
+The private runtime command candidate must not be treated as installed enablement
+before the original generated-input native transition and active actor gates.
+
+## Exact payload and provenance
+
+* 59 paths: 49 MCP-owned Go files, 7 console-owned native fixture/harness paths,
+  and 3 guarded additive documentation updates (ADR148, ADR149, reconciliation).
+* 32 new paths; 27 guarded existing-file replacements.
+* Manifest SHA256 `1ad63d3d45aa00f3410eeaba9637ab97ada8f11c43995a4202bfdba585cffc64`.
+* 4,197 actual authored/link-closure dependencies, SHA256 `1535516585f63bc91fff33880dd6feb8fa6fa37723711370ccb5f7e3559e2d42`.
+* Runner SHA256 `eef6def07511d6c68f25a902c269a42b4d3baba04ca882b20eb54a8ffc780bbb`.
+* `qualification-chain.json` preserves the real exits/log hashes from all three
+  component runs. The first unrun source checkpoint and failed 20-QPS baseline
+  were not edited. Final changes from component2 are exactly one fixture-clock
+  correction and one repeated nil-conjunction removal, listed in
+  `final-delta-from-component2.json`.
+* The harness uses console's exact harness-rebase-2 payload453a4949 on live
+  basec6ff03a5. Its H/A/R selector/build/log branches remain intact. Six other
+  native fixture payloads are unchanged. All six selector tests passed.
+* Between component2 and3, the actual live dependency delta is recorded by
+  `../runtime-sustainability-3/delta-v2-v3.json`: five H/A/R diagnostic sources,
+  root's acknowledged permission/publication integration, progress and actual
+  linked reports. All final59 live bases still match. Components3 and4 have
+  byte-identical dependencies.
+
+## Behavior and contract
+
+The fresh worker2 constructor fixes exactly its existing observer bucket at
+40QPS/burst20; its probe and four other existing clients retain20/20. It rejects
+an injected replacement limiter. There are no new clients or buckets. The worker
+resource envelope is140QPS/burst120 per retained process,280/burst240 for both
+retained/closing worker processes; other installation actors require their own
+budget. Generic and legacy clients retain20/20.
+
+Five fixed FIFO purposes have one total active-or-pending ticket per purpose,
+five total and one globally active. The two concrete source observers remain
+independent at actual-call-plus-one-second cadence. Only the actual fleet SQL
+observer can forward scheduling notices after its acknowledged still-current
+observation; changed/unavailable sources cancel admitted work before negative
+SQL may block. A notice neither returns RecoveryProof nor renews authority.
+
+Wrap/unwrap maintenance waits before proof selection; owner audit waits before
+selecting its immutable mailbox candidate. Queue plus notice wait has one finite
+original five-second scheduling end, bounded by the caller. A notice read must
+have begun after FIFO grant, and its original end caps the subsequent call.
+Later notices cannot extend a selected call. Actual recovery/native/material
+reads and provider effects retain original bounds. Owner audit consumes the same
+ticket once through final readback/acknowledgement, with no nested queue. Capacity
+and cleanup preserve their existing caller, native-final-before-accept and
+uncertain-spend semantics. No expired waiter is reported successful.
+
+The earlier original20QPS runtime-admission-4 failure remains the baseline. The
+new rate is the parent's explicitly reviewed architectural candidate, not an
+implicit tuning change or a new user option. Versioned audit storage is the
+user's accepted requirement.
+
+## Actual qualification chain
+
+| Checkpoint / phase | Actual result | Scope |
+| --- | --- | --- |
+| component2 session58940 | terminal1 | Six selectors and seven-package compile passed; intended early-selection counterexample failed with its expected assertion; full fleet/capacity races126top/508named passed; Kube32top/79named passed including all three shared-client contention cases. KMS40top/66named passed but the healthy-hint fixture failed. |
+| component3 session8290 | terminal1 | Corrected healthy-hint KMS race passed; full bootstrap135top/581named passed. Vet then found a repeated probe nil check. Architecture/canonical phases were unrun. |
+| component4 session61231 | terminal0 | Four actual client/token/foreign-reader/account races passed; seven-package vet passed; Go architecture53packages/303edges passed; spec121schemas/10,627assertions/716negative examples, architecture1219positive/120negative and design gates passed. |
+
+The component2 KMS failure was inside the original one-second successful-refresh
+anti-spin interval. Its test now controls only its own clock, explicitly proves
+immediate backoff denial/no provider I/O, then checks the healthy hint at the
+original next instant while FIFO is held. Original credential dates and
+production scheduling remain unchanged. The component3 vet fix removes only the
+second identical `probe != nil` condition. The earlier probe check, nonnull
+worker client, exact observer equality and all identity/token checks remain.
+No complete passing matrix was needlessly repeated.
+
+All recorded payload/base/dependency/auxiliary checks passed before and after
+every phase; mirrors were unchanged; all three owned /tmp trees were removed.
+No native process, SQL generation or live write ran in these component jobs.
+Exact phase commands/times/log hashes are in qualification-chain.json.
+
+## Remaining qualification and next action
+
+The local contention checks use real concrete source/native readers, the actual
+fixed client/limiter aliases, both independent loops, drained buckets and original
+persisted source ends. Their SQL/audit sinks are explicitly synthetic; they omit
+provider HTTP and four real recovery reads. They are a lower-bound pass, not
+full graph availability. The prior failed20QPS result is not reclassified.
+
+Parent review should preflight the59 exact bases/payloads and dependency changes,
+then qualify the original runtime-provider-worker native selector with the exact
+candidate. It must run CompleteLaunch once from original protected generated
+inputs, observe the actual compiled Pod and three independently advancing SQL29
+accepts plus independent exact-version decrypted audit. No host Pod token or
+fixture acceptance writer is permitted. Source-guard loss/history stability and
+actual process/Lease exit ordering remain explicit. The input-only native case
+stays a separate zero-replica milestone.
+
+Actual first owner audit, provider maintenance overlap, four real recovery reads,
+current scoped IAM, both retained processes under configured cluster load,
+capacity-ready continuity and nonempty cleanup progress remain required. This
+component result does not qualify those actors or authorize Helm/public
+collection. No new build or native job is active after session61231.

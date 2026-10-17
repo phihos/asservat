@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/contracts	(cached) [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.009s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached) [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	(cached) [no tests to run]

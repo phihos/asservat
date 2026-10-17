@@ -1,0 +1,33 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/overlay.json",
+    "./internal/contracts",
+    "./internal/adapters/providerconfig",
+    "./internal/adapters/kubernetes",
+    "./internal/bootstrap",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 1.282,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "markerCount": null,
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0
+}

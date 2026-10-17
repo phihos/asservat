@@ -1,0 +1,21 @@
+# ADR155 component and focused native qualification
+
+Exact 17-path manifest `b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60` remains staged outside the live repository. Nine original bases and eight new files. This is the same source-v1 payload that passed component-1 and native-1; no post-test source edit.
+
+Component session 44166 ended 0: six-package compile; meaningful original-app behavioral failure on both unchanged-persistence forms; corrected full fleet application/domain races plus focused PostgreSQL/bootstrap races (119 top-level / 605 named PASS entries); vet; Go architecture; spec/architecture/design. Canonical gate: 121 schemas / 10,665 assertions. Full details and exact commands are in component-1/HANDOFF.md and result.json.
+
+Focused native session 27636 ended 0: all ten required child cases passed, actual Go package 17.808s, harness 54.209s. Real SQL activation/audit/row locking used the existing owned PostgreSQL/S3/OpenBao fleet fixture; source, witness and private owner root remain explicitly synthetic. No role claims or receipts were consumed. Exact native closure had 2,253 files, independently frozen and matched against both the harness map and the final mirror. All 4,336 live dependencies, 17 payloads, nine bases, runner metadata and complete mirror file sets remained unchanged. Owned fixture cleanup[] and scratch removal are confirmed.
+
+Native behavior established:
+
+- Actual bridge FOR SHARE plus unchanged observer LockFleetTrust abort returns typed unavailable without an extra suspension; stored row remains byte-identical. The actual owner SQL constructor works only until that original stored expiry, then refuses.
+- Changed source or selected-source expiry retains the existing failure-fence attempt and later exact fence once the original competing operation releases.
+- Actual UPDATE plus successful server COMMIT with its reply dropped still invokes the failure fence. The test witnesses that committed row before fencing; an unknown outcome never selects the contention classification.
+- A source/recovery mutation after the actual server lock abort but before confirmation rejects classification and fences. An independently newer observation also rejects classification, while the original failure CAS preserves its stored row. Expiry of the original two-second stored interval before confirmation rejects classification.
+- The two preserved expiry/bridge-constructor diagnostic cases pass unchanged.
+
+The actual PostgreSQL incarnation replacement test is a pure comparison negative with identical effective positive row state; the fixture does not restart PostgreSQL between the two reads. Current postmaster/database OID/primary facts are read in the real SQL path, and any mismatch denies the classification. No recovery lock, timeout, QPS/burst, pool, cadence, original proof lifetime or retry count changed. This is failure classification, not authority or a scheduling-success signal; the concrete bootstrap wrapper still invalidates active/pending notices.
+
+Native runner `d0c6fb5cf05844c6319ae9955e87c353771d0afc4a2d3e14ca8880eb0d99e839`; result `4a50a5a80af480cc3863956c922dc028643b403ca8b4140a565a17cc51c8d749`; fleet environment `ee3c4db404ec8b43d5a7fad5999d14fca40bf7fa3cf3e40dc3fbcad72b562157`; fleet log `31ddee9e88aefd4f8b46de0cfece09843f72f1a54fec427652b6cf07b4d9bf8b`. `qualification-chain.json` records all component/native evidence and control metadata hashes. Native source manifest `dd8ebe254a08a74fd529c46e77f3cd88f758241107af7b4b764706a048a0be19`.
+
+Required next work: parent independent review/integration, broad affected fleet regression if selected, then the original fresh worker/owner native installation. The original native93479 constructor refusal's exact predicate remains historically unidentified; this separately reproduced contention chain and its correction do not establish full in-Pod owner readiness or settle the remaining owner phase timing budget/backend producer.

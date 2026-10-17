@@ -1,0 +1,11 @@
+{
+  "name": "adr185-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 2,
+  "status": "failed",
+  "scope": "Full Go gate after ADR-185 steps 1-4 (cluster catalog source, hub-api catalog composition, zero-cluster router, fixed names, owner-account probes and provider-installed RBAC, public sources step)",
+  "results": "One failure in an untouched package: internal/adapters/kms TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue at the fixture's first credential refresh (client rejected the fixture server certificate; fixture CA valid +/- 1 hour). Not reproduced in 30 isolated -race repetitions; recorded as an unreproduced load failure. All other packages passed before the gate stopped.",
+  "sourceHashBefore": "550768ff5239a73fa28a8233c32dab159aa50c0ed07c3d5887f086a5e572b6ea",
+  "sourceHashAfter": "550768ff5239a73fa28a8233c32dab159aa50c0ed07c3d5887f086a5e572b6ea",
+  "log": "go-check.log"
+}

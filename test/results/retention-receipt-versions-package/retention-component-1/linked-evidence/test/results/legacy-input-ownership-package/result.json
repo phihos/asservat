@@ -1,0 +1,124 @@
+{
+  "manifest_sha256": "0470e48ca6138de6c3a38032ac08ac210d2e69771b11b9c18f7162ee9dd04016",
+  "dependencies_sha256": "de152848abef4ec6e27915fae9a8af4693f19c106c8d91448ffae8e20f6dcc3c",
+  "runner_sha256": "4dc6f9acbe754d4d06601e3e7996172af7473607c58fe38aa1facc4200b003f0",
+  "paths": 7,
+  "dependencies": 2078,
+  "native_executed": false,
+  "status": "legacy constructor input ownership only; no runtime selector or authority change",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 7.112,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      }
+    },
+    {
+      "phase": "before-alias",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/before-overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=90s",
+        "-v",
+        "-run",
+        "^Test(LegacyInputOwnership|InitialRuntimeBridgeInstalledOriginalSourceProbes)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "seconds": 14.081,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      }
+    },
+    {
+      "phase": "focused-races",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "-run",
+        "^Test(LegacyInputOwnership|InitialBootstrap|InitialRuntimeBridge|CaptureCleanupProjection)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 56.991,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/overlay.json",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "seconds": 1.805,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "before_payloads": []
+      }
+    }
+  ],
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  },
+  "terminal_exit": 0
+}

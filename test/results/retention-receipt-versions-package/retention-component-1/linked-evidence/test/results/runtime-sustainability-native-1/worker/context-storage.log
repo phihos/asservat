@@ -1,0 +1,26 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:254: original activation f2644e87-b62d-4953-8413-fe613c96c923 image docker.io/library/asservat-context-worker@sha256:3dd5d40eb172eee323c1017ed5ab6b6ac52f7fe0fab1f9dae3d5fadf9bf4b30b exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/runtime-provider-worker-source
+    initial_bootstrap_chain_test.go:330: actual source-bound IAM, version-pinned read/write and delete/cross-prefix/versioning denial for original source d382162e-12da-40a0-af02-d99da5080700; complete runtime copy accounting remains unqualified
+    initial_runtime_provider_pair_native_test.go:501: native phase=actual-three-role-provision elapsed=16.952515091s calls[C B H S W T]=[0 0 0 345 33 66] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:330: actual configuration role provisioning elapsed=16.952609042s
+    initial_runtime_provider_pair_native_test.go:501: native phase=actual-provider-pair-complete-inputs elapsed=7.642040301s calls[C B H S W T]=[54 52 28 153 12 24] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:330: actual provider/bridge/SQL worker input driver elapsed=7.642105032s progress=2
+    initial_runtime_provider_pair_native_test.go:501: native phase=actual-provider-worker-complete-launch elapsed=7.675308781s calls[C B H S W T]=[54 52 28 155 12 24] original 20QPS/burst20 clients retained
+    initial_bootstrap_chain_test.go:330: original worker deployment=95c17b73-25bc-4a24-8e72-5675265f23f0 replicaSet=21c1febf-8209-470c-ab33-23b67b1d3bb2 pod=f0de9bf4-f7d8-4572-a3ea-c4d51932b692 imageID=docker.io/library/asservat-context-worker@sha256:3dd5d40eb172eee323c1017ed5ab6b6ac52f7fe0fab1f9dae3d5fadf9bf4b30b template=669f00a58cee4531310bea3794c790ddcc4a0546ea87bdc21064f52506199d31
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T16:57:00.401638+02:00 until=2026-10-13T16:57:05.401634+02:00 remaining=3.761418277s
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T16:57:01.802045+02:00 until=2026-10-13T16:57:05.927653+02:00 remaining=3.886992492s
+    initial_runtime_worker_source_native_test.go:166: accepted owner observed=2026-10-13T16:57:02.823407+02:00 until=2026-10-13T16:57:07.327249+02:00 remaining=4.2869682s
+    initial_runtime_worker_source_native_test.go:222: original worker exit observed after Lease deletion: exit=1 reason=Error finished=2026-10-13T14:57:19Z deletion-start=2026-10-13T14:57:07.357123493Z; no internal cause attribution
+    initial_bootstrap_chain_test.go:330: actual original product Pod and one-use launch, three advancing SQL29 observations with pinned encrypted audit; source loss expired authority without changing history; exact nonzero process exit observed separately; no host runtime token, SQL acceptance write, owner launch or active capacity/cleanup qualification
+    initial_runtime_provider_pair_native_test.go:501: native phase=complete-native-provider-pair elapsed=2m23.383989144s calls[C B H S W T]=[1360 1601 860 983 90 186] original 20QPS/burst20 clients retained
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:352: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- PASS: TestInitialBootstrapChainWithRealServices (440.51s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (20.60s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/runtime-provider-worker-source (145.05s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+PASS
+ok  	asservat.local/asservat/test/integration	441.569s

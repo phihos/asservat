@@ -1,0 +1,30 @@
+=== RUN   TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput
+--- PASS: TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput (0.15s)
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/ready
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/pending
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/secret-before-receipt
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/historical-complete
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/expired-pending
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-uid
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-rv
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/replaced-journal
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/changed-worker
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-account
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/late-read
+--- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt (1.40s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/ready (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/pending (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/secret-before-receipt (0.15s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/historical-complete (0.13s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/expired-pending (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-uid (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-rv (0.13s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/replaced-journal (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/changed-worker (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-account (0.11s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/late-read (0.12s)
+=== RUN   TestCapacityProjectionCurrentReaderCancellationDoesNotReturnReceipt
+--- PASS: TestCapacityProjectionCurrentReaderCancellationDoesNotReturnReceipt (0.11s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.704s

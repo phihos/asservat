@@ -1,0 +1,536 @@
+package mtls
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	execution "asservat.local/asservat/internal/application/execution"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+)
+
+// ContextStartClient has one installed pool and connector, no caller URL or
+// callback. Every Open is one outbound POST, never a retry of attached work.
+// Its reserved connection count is separate from the hub's capture admission.
+type ContextStartClient struct {
+	root      context.Context
+	cancel    context.CancelFunc
+	rootID    string
+	pool      value.OwnerPool
+	roots     *x509.CertPool
+	verifier  *OwnerPeerVerifier
+	routes    app.OwnerRouteReader
+	owners    OwnerPeerAuthenticator
+	address   string // ADR-172 fixed dial endpoint; empty dials current route addresses
+	connector *ConnectorProcessCredentials
+	process   execution.APIProcessReader
+	now       func() time.Time
+	dial      func(context.Context, string, string) (net.Conn, error)
+	mu        sync.Mutex
+	closed    bool
+	maximum   int
+	active    map[value.OwnerBinding]*ContextStartExchange
+}
+
+// OwnerPeerAuthenticator authenticates the hub owner of an actual TLS session:
+// the hub's own OwnerAuthenticator, or the regional delegation (ADR-172).
+type OwnerPeerAuthenticator interface {
+	AuthenticateOwner(context.Context, app.OwnerPeerConnection) (value.AuthenticatedOwner, error)
+}
+
+func NewContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, routes app.OwnerRouteReader, owners *app.OwnerAuthenticator, connector *ConnectorProcessCredentials, process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+	if routes == nil || owners == nil || owners.Now == nil {
+		return nil, value.ErrInvalid
+	}
+	return newContextStartClient(ctx, rootID, pool, roots, routes, "", owners, connector, process, maximum, now)
+}
+
+// NewRegionalContextStartClient dials one installer-pinned host:port with the
+// exact SNI and HTTP authority of each owner (ADR-157/172). It reads no route
+// and authenticates owners through the given delegated authenticator.
+func NewRegionalContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, address string, owners OwnerPeerAuthenticator, connector *ConnectorProcessCredentials, process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+	host, port, e := net.SplitHostPort(address)
+	number, pe := strconv.Atoi(port)
+	if e != nil || pe != nil || number < 1 || number > 65535 || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#% \t\r\n") || owners == nil {
+		return nil, value.ErrInvalid
+	}
+	return newContextStartClient(ctx, rootID, pool, roots, nil, address, owners, connector, process, maximum, now)
+}
+
+func newContextStartClient(ctx context.Context, rootID string, pool value.OwnerPool, roots *x509.CertPool, routes app.OwnerRouteReader, address string, owners OwnerPeerAuthenticator, connector *ConnectorProcessCredentials, process execution.APIProcessReader, maximum int, now func() time.Time) (*ContextStartClient, error) {
+	if ctx == nil || ctx.Err() != nil || !authorization.UUID(rootID) || !pool.Valid() || pool.NativePort == 0 || roots == nil || len(roots.Subjects()) == 0 || (routes == nil) == (address == "") || owners == nil || connector == nil || process == nil || maximum < 1 || maximum > 16 || now == nil {
+		return nil, value.ErrInvalid
+	}
+	verifier, e := NewOwnerPeerVerifierForPool(roots, pool, now)
+	if e != nil {
+		return nil, e
+	}
+	if connector.profile.RootID != rootID || connector.profile.Binding.InstallationID != pool.InstallationID || connector.profile.Binding.IssuerEpoch != pool.IssuerEpoch {
+		return nil, value.ErrInvalid
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, routes: routes, owners: owners, address: address, connector: connector, process: process, now: now, dial: (&net.Dialer{}).DialContext, maximum: maximum, active: make(map[value.OwnerBinding]*ContextStartExchange)}, nil
+}
+
+// ContextStartExchange owns the actual one-socket HTTP/2 request. The transport
+// wrapper takes these exact I/O handles, not copied authentication fields.
+// Close interrupts the socket/body and joins setup, including the Hello writer.
+type ContextStartExchange struct {
+	client             *ContextStartClient
+	owner              value.OwnerBinding
+	ctx                context.Context
+	cancel             context.CancelFunc
+	mu                 sync.Mutex
+	raw                net.Conn
+	reader             *io.PipeReader
+	writer             *io.PipeWriter
+	response           *http.Response
+	transport          *http.Transport
+	receiver           value.APIContextReceiver
+	check              app.APIContextReceiverCheck
+	closed             bool
+	interrupted        sync.Once
+	joined             sync.Once
+	opened             chan struct{}
+	done               chan struct{}
+	stopRoot, stopWork func() bool
+	rootDone, workDone chan struct{}
+}
+
+func (e *ContextStartExchange) Context() context.Context           { return e.ctx }
+func (e *ContextStartExchange) Receiver() value.APIContextReceiver { return e.receiver }
+func (e *ContextStartExchange) Check(ctx context.Context) (value.APIContextReceiver, error) {
+	if e == nil || ctx == nil || e.ctx.Err() != nil || ctx.Err() != nil || e.check == nil {
+		return value.APIContextReceiver{}, value.ErrUnavailable
+	}
+	call, cancel := context.WithCancel(ctx)
+	defer cancel()
+	ended := make(chan struct{})
+	stop := context.AfterFunc(e.ctx, func() { cancel(); close(ended) })
+	defer func() {
+		if !stop() {
+			<-ended
+		}
+	}()
+	return e.check(call)
+}
+func (e *ContextStartExchange) IO() (*http.Response, *io.PipeWriter, net.Conn, error) {
+	if e == nil {
+		return nil, nil, nil, value.ErrInvalid
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed || e.ctx.Err() != nil || e.response == nil || e.writer == nil || e.raw == nil {
+		return nil, nil, nil, value.ErrUnavailable
+	}
+	return e.response, e.writer, e.raw, nil
+}
+func (e *ContextStartExchange) interrupt() {
+	e.interrupted.Do(func() {
+		e.cancel()
+		e.mu.Lock()
+		e.closed = true
+		raw, r, w, resp, tr := e.raw, e.reader, e.writer, e.response, e.transport
+		e.mu.Unlock()
+		if w != nil {
+			_ = w.CloseWithError(value.ErrUnavailable)
+		}
+		if r != nil {
+			_ = r.CloseWithError(value.ErrUnavailable)
+		}
+		if raw != nil {
+			_ = raw.SetDeadline(time.Now())
+			_ = raw.Close()
+		}
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		if tr != nil {
+			tr.CloseIdleConnections()
+		}
+	})
+}
+func (e *ContextStartExchange) Close() {
+	if e == nil {
+		return
+	}
+	e.interrupt()
+	<-e.opened
+	e.joined.Do(func() {
+		if e.stopRoot != nil && !e.stopRoot() {
+			<-e.rootDone
+		}
+		if e.stopWork != nil && !e.stopWork() {
+			<-e.workDone
+		}
+		e.client.mu.Lock()
+		if e.client.active[e.owner] == e {
+			delete(e.client.active, e.owner)
+		}
+		e.client.mu.Unlock()
+		close(e.done)
+	})
+	<-e.done
+}
+func (c *ContextStartClient) Close() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.closed = true
+	c.cancel()
+	list := make([]*ContextStartExchange, 0, len(c.active))
+	for _, e := range c.active {
+		list = append(list, e)
+	}
+	c.mu.Unlock()
+	for _, e := range list {
+		e.Close()
+	}
+}
+func (c *ContextStartClient) local(ctx context.Context, expected *value.APIContextChannel) (ConnectorProcessObservation, value.APIContextExecutor, time.Time, error) {
+	var zero ConnectorProcessObservation
+	started := c.now()
+	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer stop()
+	until, _ := call.Deadline()
+	observed, e := c.connector.ObserveConnectorProcess(call)
+	if e != nil {
+		return zero, value.APIContextExecutor{}, time.Time{}, e
+	}
+	until = identity.Earlier(until, observed.ValidUntil)
+	call, stopLocal := context.WithDeadline(call, until)
+	defer stopLocal()
+	process, e := c.process.ReadAPIProcess(call)
+	if e != nil || !process.Valid(c.now()) {
+		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrUnavailable
+	}
+	b := process.Binding
+	p := observed.Registration.Process
+	executor := value.APIContextExecutor{NamespaceUID: b.NamespaceUID, AccountUID: b.AccountUID, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch, StartupDigest: b.StartupDigest, ImageDigest: b.ImageDigest}
+	if !executor.Valid() || b.InstallationID != p.Binding.InstallationID || b.ClusterID != p.Binding.ClusterID || b.IssuerEpoch != p.Binding.IssuerEpoch || b.PodUID != p.PodUID || b.ProcessEpoch == p.ProcessEpoch || observed.Configuration.Profile.RootID != c.rootID {
+		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrDenied
+	}
+	until = identity.Earlier(until, process.ValidUntil)
+	if expected != nil && (expected.RootID != c.rootID || expected.Connector != p || expected.ConnectorLeaf != observed.Registration.Certificate.Digest || expected.Executor != executor) {
+		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrDenied
+	}
+	if call.Err() != nil || !c.now().Before(until) {
+		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrUnavailable
+	}
+	return observed, executor, until, nil
+}
+func (c *ContextStartClient) current(ctx context.Context, channel value.APIContextChannel, remote *OwnerConnection) (value.APIContextReceiver, error) {
+	var zero value.APIContextReceiver
+	started := c.now()
+	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer stop()
+	_, _, until, e := c.local(call, &channel)
+	if e != nil {
+		return zero, e
+	}
+	call, stopLocal := context.WithDeadline(call, until)
+	defer stopLocal()
+	owner, e := c.owners.AuthenticateOwner(call, remote)
+	if e != nil || !owner.Valid(c.now()) || owner.Certificate.Binding != channel.Hub || owner.Pool != c.pool {
+		return zero, value.ErrDenied
+	}
+	until = identity.Earlier(until, owner.ValidUntil)
+	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
+	if call.Err() != nil || c.root.Err() != nil || !out.Valid(c.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return out, nil
+}
+
+// OpenDiscovered preserves the original complete discovery cutoff through
+// setup. It is distinct from the longer, non-authorizing standby residency.
+func (c *ContextStartClient) OpenDiscovered(ctx context.Context, owner value.OwnerBinding, observed value.APIContextOwnerCandidates) (*ContextStartExchange, error) {
+	if c == nil || !observed.Valid(c.now()) || observed.Pool != c.pool {
+		return nil, value.ErrUnavailable
+	}
+	found := false
+	for _, b := range observed.Owners {
+		if b == owner {
+			found = true
+		}
+	}
+	if !found {
+		return nil, value.ErrDenied
+	}
+	return c.open(ctx, owner, observed.ValidUntil)
+}
+
+// Open is for an independently selected exact installed owner. It still reads
+// the current accepted route before dialing and cannot select an arbitrary URL.
+func (c *ContextStartClient) Open(ctx context.Context, owner value.OwnerBinding) (*ContextStartExchange, error) {
+	if c == nil {
+		return nil, value.ErrInvalid
+	}
+	return c.open(ctx, owner, c.now().Add(5*time.Second))
+}
+func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding, discoveryUntil time.Time) (*ContextStartExchange, error) {
+	if c == nil || ctx == nil || ctx.Err() != nil || !owner.Valid() || owner.InstallationID != c.pool.InstallationID || owner.ClusterID != c.pool.ClusterID || owner.IssuerEpoch != c.pool.IssuerEpoch {
+		return nil, value.ErrInvalid
+	}
+	start := c.now()
+	until, ok := ctx.Deadline()
+	if !ok || !start.Before(until) || until.After(start.Add(30*time.Second)) {
+		return nil, value.ErrInvalid
+	}
+	c.mu.Lock()
+	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum || c.active[owner] != nil {
+		c.mu.Unlock()
+		return nil, value.ErrUnavailable
+	}
+	work, cancel := context.WithCancel(ctx)
+	exchange := &ContextStartExchange{client: c, owner: owner, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
+	c.active[owner] = exchange
+	c.mu.Unlock()
+	success := false
+	exchange.rootDone, exchange.workDone = make(chan struct{}), make(chan struct{})
+	exchange.stopRoot = context.AfterFunc(c.root, func() { exchange.interrupt(); close(exchange.rootDone) })
+	exchange.stopWork = context.AfterFunc(work, func() { exchange.interrupt(); close(exchange.workDone) })
+	defer func() {
+		close(exchange.opened)
+		if !success {
+			exchange.Close()
+		}
+	}()
+	setup, stopSetup := context.WithDeadline(work, identity.Earlier(start.Add(5*time.Second), discoveryUntil))
+	defer stopSetup()
+	setupDone := make(chan struct{})
+	stopSetupIO := context.AfterFunc(setup, func() { exchange.interrupt(); close(setupDone) })
+	defer func() {
+		if !stopSetupIO() {
+			<-setupDone
+		}
+	}()
+	local, executor, bound, e := c.local(setup, nil)
+	if e != nil {
+		return nil, e
+	}
+	setup, stopLocal := context.WithDeadline(setup, bound)
+	defer stopLocal()
+	addresses := []string{c.address}
+	if c.address == "" {
+		route, e := c.routes.CurrentOwnerRoute(setup, owner)
+		if e != nil || !route.Valid(c.now()) || route.Endpoint.Binding != owner || route.Endpoint.Pool != c.pool {
+			return nil, value.ErrUnavailable
+		}
+		bound = identity.Earlier(bound, route.FreshUntil)
+		addresses = addresses[:0]
+		for _, a := range route.Endpoint.Addresses {
+			addresses = append(addresses, net.JoinHostPort(a, strconv.Itoa(c.pool.NativePort)))
+		}
+	}
+	setup, stopRoute := context.WithDeadline(setup, bound)
+	defer stopRoute()
+	channel := value.APIContextChannel{RootID: c.rootID, ExchangeID: uuid.NewString(), Challenge: uuid.NewString(), Hub: owner, Connector: local.Registration.Process, ConnectorLeaf: local.Registration.Certificate.Digest, Executor: executor}
+	if !channel.Valid() {
+		return nil, value.ErrDenied
+	}
+	name, e := OwnerServerName(owner)
+	if e != nil {
+		return nil, e
+	}
+	var raw net.Conn
+	for _, address := range addresses {
+		if setup.Err() != nil {
+			break
+		}
+		raw, e = c.dial(setup, "tcp", address)
+		if e == nil && raw != nil {
+			break
+		}
+		if raw != nil {
+			_ = raw.Close()
+			raw = nil
+		}
+	}
+	if e != nil || raw == nil {
+		return nil, value.ErrUnavailable
+	}
+	exchange.mu.Lock()
+	if exchange.closed {
+		exchange.mu.Unlock()
+		_ = raw.Close()
+		return nil, value.ErrUnavailable
+	}
+	exchange.raw = raw
+	exchange.mu.Unlock()
+	if raw.SetDeadline(bound) != nil {
+		return nil, value.ErrUnavailable
+	}
+	config := &tls.Config{RootCAs: c.roots.Clone(), MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, ServerName: name, Time: c.now, SessionTicketsDisabled: true}
+	config.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		if setup.Err() != nil || work.Err() != nil {
+			return nil, value.ErrUnavailable
+		}
+		cert, e := c.connector.GetClientCertificate(info)
+		if e != nil || cert == nil || len(cert.Certificate) == 0 || artifact.Digest(sha256.Sum256(cert.Certificate[0])) != channel.ConnectorLeaf {
+			return nil, value.ErrDenied
+		}
+		return cert, nil
+	}
+	socket := tls.Client(raw, config)
+	if socket.HandshakeContext(setup) != nil {
+		return nil, value.ErrDenied
+	}
+	state := socket.ConnectionState()
+	if state.Version != tls.VersionTLS13 || state.NegotiatedProtocol != "h2" {
+		return nil, value.ErrDenied
+	}
+	remote, e := NewOwnerServerConnection(c.verifier, &state, owner)
+	if e != nil {
+		return nil, e
+	}
+	check := func(call context.Context) (value.APIContextReceiver, error) { return c.current(call, channel, remote) }
+	receiver, e := check(setup)
+	if e != nil {
+		return nil, e
+	}
+	bound = identity.Earlier(bound, receiver.ValidUntil)
+	if setup.Err() != nil || !c.now().Before(bound) || socket.SetDeadline(bound) != nil {
+		return nil, value.ErrUnavailable
+	}
+	// The standard HTTP/2 transport owns framing/flow control. Exactly one
+	// already authenticated socket may be handed over, and the body has no replay.
+	var used atomic.Bool
+	tr := &http.Transport{ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, MaxIdleConns: 0, MaxResponseHeaderBytes: 4096, ResponseHeaderTimeout: 5 * time.Second, TLSClientConfig: config,
+		DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
+			if !used.CompareAndSwap(false, true) {
+				return nil, value.ErrUnavailable
+			}
+			return socket, nil
+		}}
+	reader, writer := io.Pipe()
+	exchange.mu.Lock()
+	if exchange.closed {
+		exchange.mu.Unlock()
+		reader.Close()
+		writer.Close()
+		return nil, value.ErrUnavailable
+	}
+	exchange.reader, exchange.writer, exchange.transport = reader, writer, tr
+	exchange.mu.Unlock()
+	// Set deadline callbacks for the smallest original observation too: socket
+	// deadlines alone cannot interrupt a blocked HTTP/2 request-body pipe.
+	phase, stopPhase := context.WithDeadline(setup, bound)
+	defer stopPhase()
+	phaseDone := make(chan struct{})
+	stopPhaseIO := context.AfterFunc(phase, func() { exchange.interrupt(); close(phaseDone) })
+	defer func() {
+		if !stopPhaseIO() {
+			<-phaseDone
+		}
+	}()
+	endpoint := "https://" + net.JoinHostPort(name, strconv.Itoa(c.pool.NativePort)) + contracts.APIContextStartPath
+	request, e := http.NewRequestWithContext(work, http.MethodPost, endpoint, reader)
+	if e != nil {
+		return nil, value.ErrInvalid
+	}
+	request.Header.Set("Content-Type", contracts.APIContextStartMedia)
+	request.Header.Set("Accept", contracts.APIContextStartMedia)
+	hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contextStartChannelWire(channel)})
+	if e != nil {
+		return nil, e
+	}
+	// ADR-178: this region's own fresh source follows Hello for the hub's
+	// accept check; the hub never reads the regional API.
+	source, e := contextStartSourceFrame(setup, c.connector.source, channel.ExchangeID)
+	if e != nil {
+		clear(hello)
+		return nil, value.ErrUnavailable
+	}
+	wrote := make(chan error, 1)
+	go func() {
+		defer clear(hello)
+		defer clear(source)
+		e := contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: contracts.APIContextHelloFrame, Payload: hello})
+		if e == nil {
+			e = contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: contracts.APIContextSourceFrame, Payload: source})
+		}
+		wrote <- e
+	}()
+	client := &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return value.ErrDenied }}
+	response, e := client.Do(request)
+	if e != nil {
+		exchange.interrupt()
+		<-wrote
+		if response != nil {
+			response.Body.Close()
+		}
+		return nil, value.ErrUnavailable
+	}
+	exchange.mu.Lock()
+	closed := exchange.closed
+	if !closed {
+		exchange.response = response
+	}
+	exchange.mu.Unlock()
+	if closed {
+		response.Body.Close()
+		<-wrote
+		return nil, value.ErrUnavailable
+	}
+	header := response.Header.Values("Content-Type")
+	if response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.ContentLength != -1 || len(response.TransferEncoding) != 0 || response.TLS == nil || !response.TLS.HandshakeComplete || response.TLS.NegotiatedProtocol != "h2" || len(header) != 1 || header[0] != contracts.APIContextStartMedia || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Location")) != 0 {
+		exchange.interrupt()
+		<-wrote
+		return nil, value.ErrDenied
+	}
+	if e = <-wrote; e != nil || phase.Err() != nil || !c.now().Before(bound) {
+		return nil, value.ErrUnavailable
+	}
+	// Header completion does not grant a capture. Future frames independently
+	// retain a current peer bound and the original signed human request interval.
+	final, e := check(phase)
+	if e != nil || !final.Valid(c.now()) || phase.Err() != nil {
+		return nil, value.ErrUnavailable
+	}
+	if socket.SetDeadline(until) != nil {
+		return nil, value.ErrUnavailable
+	}
+	exchange.mu.Lock()
+	if exchange.closed {
+		exchange.mu.Unlock()
+		return nil, value.ErrUnavailable
+	}
+	exchange.receiver, exchange.check = final, check
+	exchange.mu.Unlock()
+	success = true
+	return exchange, nil
+}
+
+// contextStartSourceFrame encodes the first ADR-178 source frame (sequence 0).
+func contextStartSourceFrame(ctx context.Context, source app.ConnectorIdentitySourceReader, exchange string) ([]byte, error) {
+	if source == nil || ctx == nil {
+		return nil, value.ErrInvalid
+	}
+	observed, e := source.ReadConnectorIdentitySource(ctx)
+	if e != nil {
+		return nil, e
+	}
+	raw, e := json.Marshal(observed)
+	if e != nil {
+		return nil, value.ErrInvalid
+	}
+	return contracts.EncodeAPIContextSource(contracts.APIContextSource{Format: contracts.APIContextExchangeFormat, ExchangeID: exchange, Sequence: 0, Source: raw})
+}

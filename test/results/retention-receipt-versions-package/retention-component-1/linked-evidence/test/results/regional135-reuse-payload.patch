@@ -1,0 +1,675 @@
+--- a/docs/architecture/regional-context-start.md
++++ b/docs/architecture/regional-context-start.md
+@@ -37,6 +37,10 @@
+ 
+ `ConnectorAPIExecutionProtection` composes the concrete connector attester, owned credentials, namespace guard and separate immutable API settings. It checks current online Pod-bound TokenReview, SSR account/Pod identity, live Deployment/ReplicaSet/Pod chain, current original CSR/leaf registration and all exact settings/input pins. A new independent API process epoch is generated once; it is not the connector epoch and cannot follow a replacement connector process silently.
+ 
++One concrete protection instance coalesces a single positively completed process proof. Reuse retains the original observation start and earliest end, including the original TokenReview and independent admission-denial intervals. It performs current process credential/source/registration, SSR account/Pod identity, namespace/account, exact guard policy/binding, immutable settings, full workload digest and approved input metadata checks before returning. These later reads can shorten the interval; they cannot create a new denial proof or renew it. An error or known change invalidates the snapshot and any in-flight publication generation. A cancelled waiter cannot detach the original producer; cancellation, expiry or invalidation prevents a late positive producer from entering the cache. There is no background refresh or general Kubernetes client cache.
++
++After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. The optional per-frame observation lease and source-reader reuse are separate unimplemented work; this correction alone does not qualify the installed HTTP/2 path or reduce the checks inside the production credential source.
++
+ The accepted template is the API-returned defaulted Deployment template. Comparison retains every PodSpec/security/mount/token field and template label/annotation. It normalizes only the deprecated service-account alias and Pod-only zero priority/default preemption/default service-links scalars. It removes exactly the qualified ReplicaSet controller hash and actual node assignment for comparison. Both 300-second not-ready/unreachable tolerations are explicit. Automount is false; the projected service-account token is explicit and dynamic, with its entire specification pinned. Init/ephemeral/sidecar injection, different mounts, privilege, image or arguments fail closed.
+ 
+ ConfigMap/Secret metadata reads bind exact UID and resourceVersion. Settings cannot include their own future UID/RV: those are independent constructor pins plus a current exact immutable source read. Changes to SQL/provider input revisions require an accepted new configuration/rollout; they do not silently refresh a running profile.
+@@ -55,8 +59,8 @@
+ 
+ Staged focused races have exercised actual loopback TLS1.3/HTTP2 with process-owned keys, seven regional identity round trips plus final hub check, owner cancellation, original-work expiry rejecting a late positive result, and EOF joining final current identity. Sources/registries/routes/API process in those tests are explicitly synthetic. Separate stream races cover passive first wait, shorter peer expiry interrupting a blocked body pipe, finite bidirectional frames and blocked identity cancellation. Signed-work tests include wrong purpose/profile/process, closed encoding, maximum strings and retention of the original trust/peer deadline. The earlier overlap condition and settings-size defect both have preserved failing-before evidence.
+ 
+-`TestConnectorAPIProcessWithRealKubernetes` is staged native source, not a passing result: real guarded Deployment/Pod defaulting, TokenReview/SSR, source/input pins, named Secret grants and both local status transitions. Its accepted connector source, CA/registry and first preparation claim are explicit fixture inputs. It records static API operation counts and elapsed phase time, never credentials or payloads. Actual API/QPS cost must fit the existing five-second intervals; whole-test duration is not evidence of a particular authority timeout.
++`TestConnectorAPIProcessWithRealKubernetes` has not passed the complete local-start sequence: real guarded Deployment/Pod defaulting, TokenReview/SSR, source/input pins, named Secret grants and both local status transitions. Its accepted connector source, CA/registry and first preparation claim are explicit fixture inputs. The preserved third native run passed the process/defaulted-input checks and named Secret/foreign-read and changed-input negatives. It created one CapacityReservation, then exhausted the original PrepareStart bound at 4.995665377 seconds before Ready. The fixture now records static per-phase API counts and elapsed request time, never credentials or payloads; the corrected timing result remains unrun. Actual API/QPS cost must fit the existing five-second intervals; whole-test duration is not evidence of a particular authority timeout.
+ 
+-Pending qualification: actual native reader/start behavior; real SQL owner enumeration; whole signed exchange plus SQL52 admission/intent, regional collection/storage, independent publication and exact native download; failure/unknown partitions across those components. The complete per-frame process/peer checks can amplify API work and need measured same-request timing. No observation is reused or deadline enlarged merely to pass a timing test.
++Pending qualification: actual native reader/start behavior; real SQL owner enumeration; whole signed exchange plus SQL52 admission/intent, regional collection/storage, independent publication and exact native download; failure/unknown partitions across those components. The complete per-frame process/peer checks can amplify API work and need measured same-request timing. Proof reuse is limited to the original interval and current checks above; no deadline or client QPS limit is enlarged.
+ 
+ Missing production inputs remain dedicated work-signing key/sign-only hub credential, verify-only regional trust, exact connector API profile/input ownership/RBAC, protected installed composition and regional command startup. Existing initial installation does not yet provision those inputs. The first installed context investigation remains unavailable until these producers and the combined runtime path are implemented and qualified.
+--- a/internal/adapters/kubernetes/connector_api_process.go
++++ b/internal/adapters/kubernetes/connector_api_process.go
+@@ -54,6 +54,7 @@
+ 	installed                            contracts.ConnectorAPIContextSettings
+ 	canonical                            []byte
+ 	startup, image, template, projection artifact.Digest
++	reuse                                connectorAPIProofState
+ }
+ 
+ func connectorAPIDigest(s string) (artifact.Digest, error) {
+@@ -140,7 +141,7 @@
+ 		SourceProtection                 artifact.Digest
+ 		Settings                         json.RawMessage
+ 	}{"asservat-connector-api-startup/v1", uid, rv, settings.digest, canonical})
+-	return &ConnectorAPIExecutionProtection{a, credentials, settings, name, uid, rv, s, canonical, sha256.Sum256(bound), image, template, projection}, nil
++	return &ConnectorAPIExecutionProtection{attester: a, credentials: credentials, settings: settings, name: name, uid: uid, rv: rv, installed: s, canonical: canonical, startup: sha256.Sum256(bound), image: image, template: template, projection: projection}, nil
+ }
+ func (g *ConnectorAPIExecutionProtection) snapshot(ctx context.Context) error {
+ 	data, ref, e := g.attester.client.installationConfigMode(ctx, g.name, g.uid, true)
+@@ -234,10 +235,9 @@
+ 	return nil
+ }
+ 
+-func (g *ConnectorAPIExecutionProtection) current(ctx context.Context) (fleet.ConnectorProcessIdentity, time.Time, error) {
+-	var zero fleet.ConnectorProcessIdentity
++func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (connectorAPIProof, error) {
+ 	if g == nil || ctx == nil || ctx.Err() != nil {
+-		return zero, time.Time{}, cfg.ErrUnavailable
++		return connectorAPIProof{}, cfg.ErrUnavailable
+ 	}
+ 	start := g.attester.client.now()
+ 	until := start.Add(5 * time.Second)
+@@ -248,60 +248,60 @@
+ 	defer cancel()
+ 	owned, e := g.credentials.ObserveConnectorProcess(call)
+ 	if e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	until = identity.Earlier(until, owned.ValidUntil)
+ 	call, c1 := context.WithDeadline(call, until)
+ 	defer c1()
+ 	proof, e := g.attester.ReadConnectorProcessProof(call, owned.Request)
+ 	if e != nil || !proof.Valid(g.attester.client.now()) || !g.matchesProof(proof) || !proof.Configuration.SameSource(owned.Configuration) || owned.Registration.Certificate.PublicKeyDigest != proof.ClientKeyDigest {
+-		return zero, time.Time{}, cfg.ErrChanged
++		return connectorAPIProof{}, cfg.ErrChanged
+ 	}
+ 	until = identity.Earlier(until, proof.FreshUntil)
+ 	call, c2 := context.WithDeadline(call, until)
+ 	defer c2()
+ 	if e = g.executionAccount(call, proof); e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	digest, sourceUntil, e := g.settings.current(call)
+ 	if e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	until = identity.Earlier(until, sourceUntil)
+ 	call, c3 := context.WithDeadline(call, until)
+ 	defer c3()
+ 	if e = g.snapshot(call); e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	if e = g.workload(call, proof); e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	last, finalUntil, e := g.settings.current(call)
+ 	if e != nil || last != digest {
+-		return zero, time.Time{}, cfg.ErrChanged
++		return connectorAPIProof{}, cfg.ErrChanged
+ 	}
+ 	until = identity.Earlier(until, finalUntil)
+ 	call, c4 := context.WithDeadline(call, until)
+ 	defer c4()
+ 	if e = g.snapshot(call); e != nil {
+-		return zero, time.Time{}, e
++		return connectorAPIProof{}, e
+ 	}
+ 	finalProtection, protectionUntil, e := g.attester.protection.Current(call)
+ 	if e != nil || finalProtection != proof.ProtectionDigest {
+-		return zero, time.Time{}, cfg.ErrChanged
++		return connectorAPIProof{}, cfg.ErrChanged
+ 	}
+ 	until = identity.Earlier(until, protectionUntil)
+ 	call, c5 := context.WithDeadline(call, until)
+ 	defer c5()
+ 	final, e := g.credentials.ObserveConnectorProcess(call)
+ 	if e != nil || final.Request.Process != owned.Request.Process || final.Registration.Certificate != owned.Registration.Certificate || !final.Configuration.SameSource(owned.Configuration) {
+-		return zero, time.Time{}, cfg.ErrChanged
++		return connectorAPIProof{}, cfg.ErrChanged
+ 	}
+ 	until = identity.Earlier(until, final.ValidUntil)
+ 	if call.Err() != nil || !identity.Fresh(start, until, g.attester.client.now(), 5*time.Second) || !proof.Valid(g.attester.client.now()) {
+-		return zero, time.Time{}, cfg.ErrUnavailable
++		return connectorAPIProof{}, cfg.ErrUnavailable
+ 	}
+-	return proof.Process, until, nil
++	return connectorAPIProof{proof: proof.Clone(), owned: owned, observedAt: start, validUntil: until}, nil
+ }
+ 
+ type ConnectorAPIExecutionProcess struct {
+@@ -315,7 +315,8 @@
+ 	if ctx == nil || g == nil {
+ 		return nil, value.ErrInvalid
+ 	}
+-	b, _, e := g.current(ctx)
++	proof, e := g.current(ctx)
++	b := proof.proof.Process
+ 	if e != nil {
+ 		return nil, e
+ 	}
+@@ -343,11 +344,12 @@
+ 			<-done
+ 		}
+ 	}()
+-	b, until, e := p.guard.current(call)
++	proof, e := p.guard.current(call)
++	b, until := proof.proof.Process, proof.validUntil
+ 	if e != nil || b != p.connector {
+ 		return zero, value.ErrUnavailable
+ 	}
+-	out := value.APIProcessObservation{Binding: p.binding, CheckedAt: start, ValidUntil: until}
++	out := value.APIProcessObservation{Binding: p.binding, CheckedAt: proof.observedAt, ValidUntil: until}
+ 	if call.Err() != nil || p.parent.Err() != nil || !out.Valid(p.guard.attester.client.now()) {
+ 		return zero, value.ErrUnavailable
+ 	}
+--- a/internal/adapters/kubernetes/connector_api_proof.go
++++ b/internal/adapters/kubernetes/connector_api_proof.go
+@@ -0,0 +1,170 @@
++package kubernetes
++
++import (
++	"context"
++	"sync"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/mtls"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	core "k8s.io/api/core/v1"
++)
++
++// One positive proof for one concrete immutable protection instance. These are
++// public provenance and original observation dates, never credentials or a new
++// denial receipt. Expiry/current failure cannot fall back to an earlier proof.
++type connectorAPIProof struct {
++	proof                  fleet.ConnectorProcessProof
++	owned                  mtls.ConnectorProcessObservation
++	observedAt, validUntil time.Time
++}
++
++func (p connectorAPIProof) valid(now time.Time) bool {
++	return p.proof.Valid(now) && p.owned.Request.Process == p.proof.Process && identity.Fresh(p.observedAt, p.validUntil, now, 5*time.Second) && !p.validUntil.After(p.proof.FreshUntil) && !p.validUntil.After(p.owned.ValidUntil)
++}
++
++type connectorAPIProofFlight struct {
++	done       chan struct{}
++	generation uint64
++	result     connectorAPIProof
++	err        error
++}
++type connectorAPIProofState struct {
++	mu         sync.Mutex
++	generation uint64
++	cached     *connectorAPIProof
++	flight     *connectorAPIProofFlight
++}
++
++// Invalidation cannot be undone by an already running producer. Every failed
++// current read uses this boundary, including an independently observed change.
++func (s *connectorAPIProofState) invalidate() {
++	s.mu.Lock()
++	s.generation++
++	s.cached = nil
++	s.mu.Unlock()
++}
++func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Time, f *connectorAPIProofFlight) (connectorAPIProof, error) {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	p := f.result
++	if f.err != nil || ctx.Err() != nil || s.generation != f.generation || !p.valid(now()) {
++		return connectorAPIProof{}, cfg.ErrUnavailable
++	}
++	if d, ok := ctx.Deadline(); ok {
++		p.validUntil = identity.Earlier(p.validUntil, d)
++	}
++	if !p.valid(now()) {
++		return connectorAPIProof{}, cfg.ErrUnavailable
++	}
++	return p, nil
++}
++
++// The initiating caller owns producer/recheck execution synchronously. Waiters
++// may cancel independently, but can neither detach a producer nor prolong its
++// original interval. No goroutine, timer or refresh survives this call.
++func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time, produce func(context.Context) (connectorAPIProof, error), recheck func(context.Context, connectorAPIProof) (connectorAPIProof, error)) (connectorAPIProof, error) {
++	if ctx == nil || ctx.Err() != nil {
++		return connectorAPIProof{}, cfg.ErrUnavailable
++	}
++	s.mu.Lock()
++	if f := s.flight; f != nil {
++		s.mu.Unlock()
++		select {
++		case <-ctx.Done():
++			return connectorAPIProof{}, cfg.ErrUnavailable
++		case <-f.done:
++			return s.finish(ctx, now, f)
++		}
++	}
++	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
++	s.flight = f
++	old := s.cached
++	if old != nil && !old.valid(now()) {
++		s.cached = nil
++		old = nil
++	}
++	s.mu.Unlock()
++	var p connectorAPIProof
++	var err error
++	if old == nil {
++		p, err = produce(ctx)
++	} else {
++		call, stop := context.WithDeadline(ctx, old.validUntil)
++		p, err = recheck(call, *old)
++		stop()
++		// A recheck can shorten this exact snapshot, never replace its start,
++		// identity or expiry with the time of the successful cheap read.
++		if err == nil && (p.observedAt != old.observedAt || p.validUntil.After(old.validUntil) || p.proof.Process != old.proof.Process) {
++			err = cfg.ErrChanged
++		}
++	}
++	s.mu.Lock()
++	if err != nil || ctx.Err() != nil || s.generation != f.generation || !p.valid(now()) {
++		s.generation++
++		s.cached = nil
++		f.err = cfg.ErrUnavailable
++	} else {
++		copy := p
++		s.cached = &copy
++		f.result = p
++	}
++	s.flight = nil
++	close(f.done)
++	s.mu.Unlock()
++	return s.finish(ctx, now, f)
++}
++func (g *ConnectorAPIExecutionProtection) current(ctx context.Context) (connectorAPIProof, error) {
++	if g == nil || g.attester == nil || g.attester.client == nil || ctx == nil {
++		return connectorAPIProof{}, cfg.ErrUnavailable
++	}
++	return g.reuse.read(ctx, g.attester.client.now, g.produceProof, g.recheckProof)
++}
++
++// Reuse only the expensive independent denial/TokenReview proof, under its
++// unchanged original interval. Read the exact current owned process, source,
++// full live workload, mounted input metadata, account, namespace and guard pins.
++// A positive GET does not synthesize either original proof.
++func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p connectorAPIProof) (connectorAPIProof, error) {
++	fail := func(e error) (connectorAPIProof, error) { g.reuse.invalidate(); return connectorAPIProof{}, e }
++	if ctx.Err() != nil || !p.valid(g.attester.client.now()) {
++		return fail(cfg.ErrUnavailable)
++	}
++	owned, e := g.credentials.ObserveConnectorProcess(ctx)
++	if e != nil || owned.Request.Process != p.owned.Request.Process || owned.Registration.Certificate != p.owned.Registration.Certificate || !owned.Configuration.SameSource(p.owned.Configuration) {
++		return fail(cfg.ErrChanged)
++	}
++	p.validUntil = identity.Earlier(p.validUntil, owned.ValidUntil)
++	call, stop := context.WithDeadline(ctx, p.validUntil)
++	defer stop()
++	ns, e := g.attester.client.namespace(call, g.attester.client.control)
++	if e != nil || ns.Deleting {
++		return fail(cfg.ErrChanged)
++	}
++	s := g.installed
++	account, e := ownerResource[core.ServiceAccount](&OwnerEndpoints{client: g.attester.client}, call, "/api/v1/namespaces/"+s.Namespace+"/serviceaccounts/"+s.Account, "v1", "ServiceAccount")
++	if e != nil || !ownerMetadata(account.ObjectMeta, s.Namespace, s.Account, s.AccountUID) {
++		return fail(cfg.ErrChanged)
++	}
++	if e = g.executionAccount(call, p.proof); e != nil {
++		return fail(e)
++	}
++	if _, e = checkAdmissionGuard(call, g.attester.client, g.attester.protection.plan.Name, g.attester.protection.pin, g.attester.protection.policy, g.attester.protection.binding); e != nil {
++		return fail(e)
++	}
++	if _, e = checkAdmissionGuard(call, g.attester.client, g.settings.plan.Name, g.settings.pin, g.settings.policy, g.settings.binding); e != nil {
++		return fail(e)
++	}
++	if e = g.snapshot(call); e != nil {
++		return fail(e)
++	}
++	if e = g.workload(call, p.proof); e != nil {
++		return fail(e)
++	}
++	if call.Err() != nil || !p.valid(g.attester.client.now()) {
++		return fail(cfg.ErrUnavailable)
++	}
++	return p, nil
++}
+--- a/internal/adapters/kubernetes/connector_api_proof_test.go
++++ b/internal/adapters/kubernetes/connector_api_proof_test.go
+@@ -0,0 +1,242 @@
++package kubernetes
++
++import (
++	"context"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/mtls"
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// Only the bounded coalescing state is under test here. This synthetic positive
++// input stands for a separately completed full proof; native tests exercise the
++// concrete token/guard/workload producer and real input changes.
++func connectorCachedProof(t *testing.T, now time.Time) connectorAPIProof {
++	t.Helper()
++	process := fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: ownerID(1), ClusterID: ownerID(2), IssuerEpoch: ownerID(3), PeerID: ownerID(4), Role: fleet.ConnectorPeer}, PodUID: ownerID(5), ProcessEpoch: ownerID(6)}
++	profile := fleet.ConnectorCredentialProfile{RootID: ownerID(7), Binding: process.Binding, Revision: identity.Revision{UID: ownerID(8), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.example", Deployment: fleet.ConnectorDeployment{Namespace: "connector", NamespaceUID: ownerID(9), ServiceAccount: "connector", AccountUID: ownerID(10), Deployment: "connector", DeploymentUID: ownerID(11), ServingSlots: 1, RetainedProcesses: 2}, ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}
++	observation := fleet.ConnectorCredentialObservation{Profile: profile, Backing: fleet.ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{3}, SourceDigest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
++	proof := fleet.ConnectorProcessProof{Process: process, Configuration: observation, Pod: "connector-pod", ReplicaSet: "connector-rs", ReplicaSetUID: ownerID(12), ClientKeyDigest: artifact.Digest{5}, ServerKeyDigest: artifact.Digest{6}, TokenDigest: artifact.Digest{7}, WorkloadDigest: artifact.Digest{8}, ProtectionDigest: artifact.Digest{9}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
++	p := connectorAPIProof{proof: proof, owned: mtls.ConnectorProcessObservation{Request: fleet.ConnectorProcessRequest{Process: process}, ValidUntil: now.Add(5 * time.Second)}, observedAt: now, validUntil: now.Add(5 * time.Second)}
++	if !p.valid(now) {
++		t.Fatal("synthetic completed observation invalid")
++	}
++	return p
++}
++func TestConnectorAPIProofCoalescesOriginalInterval(t *testing.T) {
++	now := time.Now().UTC()
++	proof := connectorCachedProof(t, now)
++	var state connectorAPIProofState
++	var producers, checks atomic.Int64
++	entered, release := make(chan struct{}), make(chan struct{})
++	produce := func(context.Context) (connectorAPIProof, error) {
++		producers.Add(1)
++		close(entered)
++		<-release
++		return proof, nil
++	}
++	check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) { checks.Add(1); return p, nil }
++	result := make(chan error, 17)
++	go func() { _, e := state.read(context.Background(), time.Now, produce, check); result <- e }()
++	<-entered
++	waiters := make([]*connectorProofWaitContext, 16)
++	for i := range waiters {
++		waiters[i] = &connectorProofWaitContext{Context: context.Background(), waiting: make(chan struct{})}
++		go func(c *connectorProofWaitContext) {
++			p, e := state.read(c, time.Now, produce, check)
++			if e == nil && (p.observedAt != proof.observedAt || p.validUntil != proof.validUntil) {
++				e = cfg.ErrChanged
++			}
++			result <- e
++		}(waiters[i])
++	}
++	for _, c := range waiters {
++		<-c.waiting
++	}
++	close(release)
++	for range 17 {
++		if e := <-result; e != nil {
++			t.Fatal(e)
++		}
++	}
++	if producers.Load() != 1 || checks.Load() != 0 {
++		t.Fatal("overlapping reads repeated proof work", producers.Load(), checks.Load())
++	}
++	short, stop := context.WithTimeout(context.Background(), time.Second)
++	defer stop()
++	p, e := state.read(short, time.Now, produce, check)
++	end, _ := short.Deadline()
++	if e != nil || p.observedAt != proof.observedAt || p.validUntil.After(end) || !p.validUntil.Before(proof.validUntil) {
++		t.Fatal("short caller or original dates changed", e)
++	}
++	p, e = state.read(context.Background(), time.Now, produce, check)
++	if e != nil || p.observedAt != proof.observedAt || p.validUntil != proof.validUntil || checks.Load() == 0 {
++		t.Fatal("current rechecks renewed or erased original proof", e)
++	}
++}
++func TestConnectorAPIProofCancelledWaiterDoesNotDetachProducer(t *testing.T) {
++	proof := connectorCachedProof(t, time.Now().UTC())
++	var state connectorAPIProofState
++	entered, release := make(chan struct{}), make(chan struct{})
++	leader := make(chan error, 1)
++	produce := func(context.Context) (connectorAPIProof, error) { close(entered); <-release; return proof, nil }
++	check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) { return p, nil }
++	go func() { _, e := state.read(context.Background(), time.Now, produce, check); leader <- e }()
++	<-entered
++	waiter, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	waiting := &connectorProofWaitContext{Context: waiter, waiting: make(chan struct{})}
++	waitResult := make(chan error, 1)
++	go func() { _, e := state.read(waiting, time.Now, produce, check); waitResult <- e }()
++	<-waiting.waiting
++	cancel()
++	if e := <-waitResult; e == nil {
++		t.Fatal("cancelled waiter reused in-flight result")
++	}
++	select {
++	case <-leader:
++		t.Fatal("waiter detached producer")
++	default:
++	}
++	close(release)
++	if e := <-leader; e != nil {
++		t.Fatal(e)
++	}
++}
++func TestConnectorAPIProofCannotPublishAfterCancellationExpiryOrKnownChange(t *testing.T) {
++	for _, mode := range []string{"cancelled-owner", "expired-proof", "known-change"} {
++		t.Run(mode, func(t *testing.T) {
++			n := time.Now().UTC()
++			proof := connectorCachedProof(t, n)
++			var state connectorAPIProofState
++			var clock atomic.Int64
++			clock.Store(n.UnixNano())
++			now := func() time.Time { return time.Unix(0, clock.Load()).UTC() }
++			entered, release := make(chan struct{}), make(chan struct{})
++			result := make(chan error, 1)
++			ctx, cancel := context.WithCancel(context.Background())
++			defer cancel()
++			produce := func(context.Context) (connectorAPIProof, error) { close(entered); <-release; return proof, nil }
++			check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) { return p, nil }
++			go func() { _, e := state.read(ctx, now, produce, check); result <- e }()
++			<-entered
++			switch mode {
++			case "cancelled-owner":
++				cancel()
++			case "expired-proof":
++				clock.Store(n.Add(5 * time.Second).UnixNano())
++			case "known-change":
++				state.invalidate()
++			}
++			close(release)
++			if e := <-result; e == nil {
++				t.Fatal("late original producer published positive result")
++			}
++			state.mu.Lock()
++			cached := state.cached
++			state.mu.Unlock()
++			if cached != nil {
++				t.Fatal("unusable producer was retained")
++			}
++		})
++	}
++}
++func TestConnectorAPIProofCurrentFailureHasNoStaleFallback(t *testing.T) {
++	proof := connectorCachedProof(t, time.Now().UTC())
++	var state connectorAPIProofState
++	var current atomic.Bool
++	current.Store(true)
++	var calls atomic.Int64
++	produce := func(context.Context) (connectorAPIProof, error) {
++		calls.Add(1)
++		if !current.Load() {
++			return connectorAPIProof{}, cfg.ErrChanged
++		}
++		return proof, nil
++	}
++	check := func(context.Context, connectorAPIProof) (connectorAPIProof, error) {
++		return connectorAPIProof{}, cfg.ErrChanged
++	}
++	if _, e := state.read(context.Background(), time.Now, produce, check); e != nil {
++		t.Fatal(e)
++	}
++	current.Store(false)
++	if _, e := state.read(context.Background(), time.Now, produce, check); e == nil {
++		t.Fatal("known current mismatch reused old positive")
++	}
++	if _, e := state.read(context.Background(), time.Now, produce, check); e == nil || calls.Load() != 2 {
++		t.Fatal("failed fresh proof fell back to cached authority", e, calls.Load())
++	}
++}
++func TestConnectorAPIProofRecheckCannotReanchorOrRenew(t *testing.T) {
++	for _, mode := range []string{"start", "expiry", "identity"} {
++		t.Run(mode, func(t *testing.T) {
++			proof := connectorCachedProof(t, time.Now().UTC())
++			var state connectorAPIProofState
++			produce := func(context.Context) (connectorAPIProof, error) { return proof, nil }
++			check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) {
++				switch mode {
++				case "start":
++					p.observedAt = p.observedAt.Add(time.Millisecond)
++				case "expiry":
++					p.validUntil = p.validUntil.Add(time.Millisecond)
++				case "identity":
++					p.proof.Process.ProcessEpoch = ownerID(99)
++				}
++				return p, nil
++			}
++			if _, e := state.read(context.Background(), time.Now, produce, check); e != nil {
++				t.Fatal(e)
++			}
++			if _, e := state.read(context.Background(), time.Now, produce, check); e == nil {
++				t.Fatal("cheap read replaced immutable proof boundary")
++			}
++		})
++	}
++}
++
++// Done is first consulted after the in-flight proof has been selected. Tests
++// use this handshake to prove a waiter actually joined, without timed sleeps.
++type connectorProofWaitContext struct {
++	context.Context
++	waiting chan struct{}
++	once    sync.Once
++}
++
++func (c *connectorProofWaitContext) Done() <-chan struct{} {
++	c.once.Do(func() { close(c.waiting) })
++	return c.Context.Done()
++}
++func TestConnectorAPIProofBlockedRecheckCannotPublishKnownChange(t *testing.T) {
++	proof := connectorCachedProof(t, time.Now().UTC())
++	var state connectorAPIProofState
++	produce := func(context.Context) (connectorAPIProof, error) { return proof, nil }
++	entered, release := make(chan struct{}), make(chan struct{})
++	check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) {
++		close(entered)
++		<-release
++		return p, nil
++	}
++	if _, e := state.read(context.Background(), time.Now, produce, check); e != nil {
++		t.Fatal(e)
++	}
++	result := make(chan error, 1)
++	go func() { _, e := state.read(context.Background(), time.Now, produce, check); result <- e }()
++	<-entered
++	state.invalidate()
++	close(release)
++	if e := <-result; e == nil {
++		t.Fatal("old current recheck overwrote known-change generation")
++	}
++	state.mu.Lock()
++	defer state.mu.Unlock()
++	if state.cached != nil {
++		t.Fatal("stale recheck remained cached")
++	}
++}
+--- a/test/integration/context_start_connector_test.go
++++ b/test/integration/context_start_connector_test.go
+@@ -316,13 +316,17 @@
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
++	processCounts := stats.snapshot()
+ 	processStarted := time.Now()
+ 	process, e := kube.NewConnectorAPIExecutionProcess(ctx, protected)
++	stats.phase(t, "process-constructor", processStarted, processCounts)
+ 	if e != nil {
+ 		t.Fatalf("actual defaulted Pod API process: elapsed=%s err=%v", time.Since(processStarted), e)
+ 	}
++	readCounts := stats.snapshot()
+ 	readStarted := time.Now()
+ 	observed, e := process.ReadAPIProcess(ctx)
++	stats.phase(t, "process-read", readStarted, readCounts)
+ 	if e != nil || !observed.Valid(time.Now()) || observed.Binding.PodUID != string(pod.UID) || observed.Binding.ImageDigest != image {
+ 		t.Fatalf("current API process: elapsed=%s err=%v", time.Since(readStarted), e)
+ 	}
+@@ -352,7 +356,7 @@
+ 		}
+ 	})
+ 	t.Run("actual-start-status-under-both-guards", func(t *testing.T) {
+-		qualifyConnectorAPIStart(t, ctx, config, tokenConfig("capacity", nil, ""), runtimeConfig, client, process, observed, control)
++		qualifyConnectorAPIStart(t, ctx, config, tokenConfig("capacity", nil, ""), runtimeConfig, client, process, observed, control, stats)
+ 	})
+ 	t.Run("changed-input-metadata", func(t *testing.T) {
+ 		v, e := admin.CoreV1().Secrets(name).Get(ctx, secret.Name, meta.GetOptions{})
+@@ -369,7 +373,7 @@
+ 	})
+ }
+ 
+-func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, capacityConfig, runtimeConfig *rest.Config, client func(*rest.Config) *kube.PermissionClient, process *kube.ConnectorAPIExecutionProcess, observed execution.APIProcessObservation, control cfg.NamespaceRef) {
++func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, capacityConfig, runtimeConfig *rest.Config, client func(*rest.Config) *kube.PermissionClient, process *kube.ConnectorAPIExecutionProcess, observed execution.APIProcessObservation, control cfg.NamespaceRef, stats *contextStartAPIStats) {
+ 	t.Helper()
+ 	dc, e := dynamic.NewForConfig(adminConfig)
+ 	if e != nil {
+@@ -414,15 +418,22 @@
+ 	n := time.Now().UTC().Truncate(time.Microsecond)
+ 	b := execution.Binding{ExecutionClass: artifact.ContextAPIExecution, OperationID: custodyID(), CaptureID: custodyID(), ActionID: "pod-status", AttemptID: custodyID(), ClusterID: observed.Binding.ClusterID, IssuerEpoch: observed.Binding.IssuerEpoch, PodUID: custodyID(), ExecutorPodUID: observed.Binding.PodUID, ExecutorAccountUID: observed.Binding.AccountUID, CollectorEpoch: observed.Binding.ProcessEpoch, ScopeDigest: artifact.Digest{1}, AuthorityDigest: artifact.Digest{2}, BudgetDigest: artifact.Digest{3}, AuditDigest: artifact.Digest{4}, NativeBytes: artifact.MaxContextBytes, NotBefore: n, NotAfter: n.Add(5 * time.Second)}
+ 	// Fixture-only acknowledged preparation grant. It is not a real SQL prepare.
++	prepareCounts := stats.snapshot()
+ 	p, e := preparer.PrepareStart(ctx, execution.PreparationCheck{Binding: b, CheckedAt: n, ValidUntil: b.NotAfter, MayCreate: true})
++	stats.phase(t, "prepare-start", n, prepareCounts)
+ 	if e != nil {
+ 		t.Fatalf("actual capacity CREATE elapsed=%s original_remaining=%s err=%v", time.Since(n), time.Until(b.NotAfter), e)
+ 	}
+ 	request := execution.Request{Binding: b, ObjectUID: p.ObjectUID, CheckedAt: n, ValidUntil: b.NotAfter}
+-	if _, e = preparer.ReadyStart(ctx, request); e != nil {
++	readyCounts, readyStarted := stats.snapshot(), time.Now()
++	_, e = preparer.ReadyStart(ctx, request)
++	stats.phase(t, "ready-start", readyStarted, readyCounts)
++	if e != nil {
+ 		t.Fatalf("actual capacity status Ready elapsed=%s original_remaining=%s err=%v", time.Since(n), time.Until(b.NotAfter), e)
+ 	}
++	consumeCounts, consumeStarted := stats.snapshot(), time.Now()
+ 	got, e := journal.ConsumeStart(ctx, request)
++	stats.phase(t, "consume-start", consumeStarted, consumeCounts)
+ 	if e != nil || !got.MayStart {
+ 		t.Fatalf("actual executor status StartCommitted elapsed=%s original_remaining=%s err=%v", time.Since(n), time.Until(b.NotAfter), e)
+ 	}
+@@ -467,3 +478,40 @@
+ 		return response, e
+ 	})
+ }
++
++// Static per-phase deltas distinguish limiter/proof work from API round trips.
++// The snapshot never includes paths, objects, credentials or response bodies.
++type contextStartAPIPhase struct {
++	counts  map[string]int
++	elapsed map[string]time.Duration
++}
++
++func (s *contextStartAPIStats) snapshot() contextStartAPIPhase {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	out := contextStartAPIPhase{counts: map[string]int{}, elapsed: map[string]time.Duration{}}
++	for k, v := range s.counts {
++		out.counts[k] = v
++	}
++	for k, v := range s.elapsed {
++		out.elapsed[k] = v
++	}
++	return out
++}
++func (s *contextStartAPIStats) phase(t *testing.T, name string, started time.Time, before contextStartAPIPhase) {
++	t.Helper()
++	after := s.snapshot()
++	for k, v := range before.counts {
++		after.counts[k] -= v
++	}
++	for k, v := range before.elapsed {
++		after.elapsed[k] -= v
++	}
++	for k, v := range after.counts {
++		if v == 0 {
++			delete(after.counts, k)
++			delete(after.elapsed, k)
++		}
++	}
++	t.Logf("bounded phase=%s elapsed=%s API_counts=%v API_roundtrip=%v", name, time.Since(started), after.counts, after.elapsed)
++}

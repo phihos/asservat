@@ -1,0 +1,67 @@
+[
+  {
+    "path": "docs/architecture/initial-activation-handover.md",
+    "base_sha256": "e012c9e3b6da3fa676532e1fd6e6af7971bbf8baeaa478f38c89c534283751d1",
+    "sha256": "7357f1453e496515b7c1e94403b31fa394a7a9927ec3f62a0e001dc30bdd9c49"
+  },
+  {
+    "path": "docs/decisions/129-initial-activation-handover.md",
+    "base_sha256": "dcc6999ae57c2833df81f7bfa5d1d04941b7b39e6e20df1f57857b775896cf51",
+    "sha256": "0a484e730548a95d6a96325b47f7e31f16e1196c6841aee9d72b73382f0006b2"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer.go",
+    "base_sha256": "ebb8de9a5b8134f363f81743172a89d3e1b909cf45ed57c0d6027b44fda955f1",
+    "sha256": "ccdd5518c267a96cdee54f075d441fd9822f6536b84aeac27400546733dc54a1"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_test.go",
+    "base_sha256": "343636df7c9c335d5f19ded5d815e64afeebf30102d1ccdf60a69431eed79a4b",
+    "sha256": "2484053a84bce80f0410cc773f882dfeb0b8140ae735771e42f55dcc3dd72265"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+    "base_sha256": "35efd444c0fd40e3addddf5a8663e61e7bcb20923dd9406d9cba19a8befde46e",
+    "sha256": "1169db7c07b5d5f3dd06948200d62bf5596bdbc44c7b4b49743e067b5ad75c6a"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_roles.go",
+    "base_sha256": "3a8c8dacd56078c267e4fae203a31b770f5a0be1dbb7b5077c28e51de4acf280",
+    "sha256": "8ab6918db7335b5a72f0b44112e228bd367d1cb35f5435cb67dcb10f0970c617"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_roles_test.go",
+    "base_sha256": "14bb91c2e6e51f4942f7e17bf57954b937958ec0809130775c65399a53245a85",
+    "sha256": "2196176bebbef63dfe25d12d2a927004cb007015475dd2338a618783919c63be"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "9d33c91cecf6457e8be0cde7526f70d52606eb2df552e1354f41b2aa0cb82dbe",
+    "sha256": "c338eacdd019fc06154ffc483d9ccce62abcd90879645dc97d3bb5b52eb2a9e4"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_handover.go",
+    "base_sha256": "169a3233caac6016c0cd2e0f39ace3eb575f1b6131884f9fa1ec73f7af54b812",
+    "sha256": "9f07fdcf1fe59245385bb7adaca2cb205a135d4f790c2c0b219d855e432b2df0"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_sql.go",
+    "base_sha256": "622c898850b8b6fbc56153a6dd7579bbaec7e8b8af092b6b4fc33fadc23264c8",
+    "sha256": "ea3137400b98b8120d3f0ae934690d1c3591df8daa730979d528c7b4662b275c"
+  },
+  {
+    "path": "internal/contracts/initial_preparer.go",
+    "base_sha256": "111e1d0d8c4dbfb17a7c0ac4a8a851c36df645d2d0f7867a0ec8becb7b8be1cb",
+    "sha256": "52166ca16cbc84f013ae44bcbbe1e9755b2fe3169a9a2f379e7dc016dc8ba8bf"
+  },
+  {
+    "path": "specs/contracts/initial-preparer.schema.json",
+    "base_sha256": "31dc939a5b73bd85a03b9a5031dc228259a051ad9788796f08b6da0733a13627",
+    "sha256": "b4d345c017b62184b020210dce2a7b1c6dd8d8074e88f5cb01e028afed47703e"
+  },
+  {
+    "path": "test/integration/initial_history_role_test.go",
+    "base_sha256": "b6e8146176341c8fde88c267e213c37d2582ec0029533460a6f56e9fe28b7ec8",
+    "sha256": "4069b808435d353dbd2d9c4074ee968d1bedb1bf9c074916218a70e63c848752"
+  }
+]

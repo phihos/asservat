@@ -1,0 +1,796 @@
+--- a/internal/adapters/kubernetes/owner_bootstrap_selection.go
++++ b/internal/adapters/kubernetes/owner_bootstrap_selection.go
+@@ -123,7 +123,8 @@
+ 				return observed, nil
+ 			}
+ 			out.Status = OwnerBootstrapStopped
+-			return out, err
++			checks := [...]ownerOperationCheck{ownerSelectionFirstPhase, ownerSelectionSecondPhase, ownerSelectionThirdPhase}
++			return out, ownerOperationError(checks[i], err)
+ 		}
+ 		if out.Status == OwnerBootstrapComplete {
+ 			return out, nil
+@@ -145,20 +146,22 @@
+ 	var out OwnerBootstrapAdvance
+ 	call, done, err := s.enter(ctx)
+ 	if err != nil {
+-		return OwnerBootstrapAdvance{Status: OwnerBootstrapStopped, Stop: OwnerInstallationClosed}, err
++		return OwnerBootstrapAdvance{Status: OwnerBootstrapStopped, Stop: OwnerInstallationClosed}, ownerOperationError(ownerSelectionEnter, err)
+ 	}
+ 	defer done()
++	entered, completed := false, false
+ 	err = s.root.operation(call, func(bounded context.Context) error {
++		entered = true
+ 		first, err := s.root.readOwnerIdentityOperationNative(bounded, s.root.input.LayoutDigest, false)
+ 		if err != nil {
+-			return err
++			return ownerOperationError(ownerSelectionInitialNative, err)
+ 		}
+ 		phase := &ownerBootstrapPhase{producer: s, initial: first, snapshot: first.retained.resources, object: first.retained.object, until: first.until}
+ 		current, end := context.WithDeadline(bounded, phase.until)
+ 		defer end()
+ 		status, err := phase.apply(current, inspect)
+ 		if err != nil {
+-			return err
++			return ownerOperationError(ownerSelectionApply, err)
+ 		}
+ 		// Actual exact child GET follows CREATE/CAS, then an independently proved
+ 		// final native bracket follows all effects. Its dates only narrow the call.
+@@ -166,38 +169,52 @@
+ 		defer narrow()
+ 		if p := phase.snapshot.State.OwnerBootstrap; p != nil && p.Child != nil {
+ 			if _, err = phase.readChild(current); err != nil {
+-				return err
++				return ownerOperationError(ownerSelectionChildRead, err)
+ 			}
+ 		}
+ 		last, err := s.root.readOwnerIdentityOperationNative(current, s.root.input.LayoutDigest, false)
+ 		expected := first
+ 		expected.retained.resources = phase.snapshot
+ 		phase.until = identity.Earlier(phase.until, last.until)
+-		if err != nil || !ownerIdentityOperationOriginalsEqual(expected, last) || initialHandoverDeadline(current, s.root.resources.now, phase.until) != nil {
+-			return cfg.ErrUnavailable
++		if err != nil {
++			return ownerOperationUnavailable(ownerSelectionFinalNative, err)
++		}
++		if check := ownerIdentityOperationOriginalDifference(expected, last); check != ownerOperationNoFailure {
++			return ownerOperationError(check, cfg.ErrUnavailable)
++		}
++		if initialHandoverDeadline(current, s.root.resources.now, phase.until) != nil {
++			return ownerOperationError(ownerSelectionFinalDeadline, cfg.ErrUnavailable)
+ 		}
+ 		raw, err := json.Marshal(phase.snapshot)
+ 		if err != nil {
+-			return err
++			return ownerOperationError(ownerSelectionSnapshotEncode, err)
+ 		}
+ 		var snapshot contracts.InitialRuntimeResourceSnapshot
+ 		if err = json.Unmarshal(raw, &snapshot); err != nil {
+-			return err
++			return ownerOperationError(ownerSelectionSnapshotDecode, err)
+ 		}
+ 		snapshot.ValidUntil = identity.Earlier(snapshot.ValidUntil, phase.until)
+ 		out = OwnerBootstrapAdvance{Status: status, Snapshot: snapshot, Selection: phase.body, OperationID: snapshot.State.OwnerBootstrap.OperationID}
+ 		if status == OwnerBootstrapComplete {
+ 			out.Input, err = ownerBootstrapDeployment(s.root, phase.body, last)
+ 			if err != nil {
+-				return err
++				return ownerOperationError(ownerSelectionDeployment, err)
+ 			}
+ 			if initialHandoverDeadline(current, s.root.resources.now, phase.until) != nil {
+-				return cfg.ErrUnavailable
++				return ownerOperationError(ownerSelectionDeploymentDeadline, cfg.ErrUnavailable)
+ 			}
+ 		}
++		completed = true
+ 		return nil
+ 	})
+ 	if err != nil {
++		// The outer boundary includes lifecycle/source admission and the SQL
++		// bridge. These labels do not attribute a pre-callback failure to SQL.
++		if !entered {
++			err = ownerOperationError(ownerSelectionOuterBefore, err)
++		} else if completed {
++			err = ownerOperationError(ownerSelectionOuterAfter, err)
++		}
+ 		out.Status = OwnerBootstrapStopped
+ 		out.Stop = OwnerInstallationUnverified
+ 		if s.pendingParent != nil {
+@@ -252,7 +269,7 @@
+ 		s.parentAttempted = true
+ 		s.pendingParent = claim
+ 		if err = p.write(ctx, next, end); err != nil {
+-			return "", err
++			return "", ownerOperationError(ownerSelectionParentCAS, err)
+ 		}
+ 		return OwnerBootstrapIntentRecorded, nil
+ 	}
+@@ -279,7 +296,7 @@
+ 		s.childAttempted = true
+ 		s.pendingChild = claim.Child
+ 		if err = p.write(ctx, next, end); err != nil {
+-			return "", err
++			return "", ownerOperationError(ownerSelectionChildCAS, err)
+ 		}
+ 		// Only this positively acknowledged child CAS permits this CREATE. On every
+ 		// later call the persisted child exists and only its exact result is read.
+@@ -287,13 +304,13 @@
+ 		effect, stop := context.WithDeadline(ctx, p.until)
+ 		defer stop()
+ 		if err = p.createChild(effect); err != nil {
+-			return "", err
++			return "", ownerOperationError(ownerSelectionChildCreate, err)
+ 		}
+ 		return OwnerBootstrapPending, nil
+ 	}
+ 	receipt, err := p.readChild(ctx)
+ 	if err != nil {
+-		return "", err
++		return "", ownerOperationError(ownerSelectionReceiptRead, err)
+ 	}
+ 	if old.Child.Receipt != nil {
+ 		return OwnerBootstrapComplete, nil
+@@ -317,7 +334,7 @@
+ 	s.receiptAttempted = true
+ 	s.pendingReceipt = &receipt
+ 	if err = p.write(ctx, next, end); err != nil {
+-		return "", err
++		return "", ownerOperationError(ownerSelectionReceiptCAS, err)
+ 	}
+ 	return OwnerBootstrapComplete, nil
+ }
+--- a/internal/adapters/kubernetes/owner_bootstrap_selection_diagnostics_test.go
++++ b/internal/adapters/kubernetes/owner_bootstrap_selection_diagnostics_test.go
+@@ -0,0 +1,188 @@
++package kubernetes
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/fleet"
++)
++
++type ownerDiagnosticAcceptedReader func(context.Context) (fleet.OwnerConfigurationObservation, error)
++
++func (f ownerDiagnosticAcceptedReader) ReadOwnerConfiguration(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
++	return f(ctx)
++}
++
++// This file also compiles with the old implementation: the failing-before
++// oracle is the missing fixed diagnostic, not a reference to a new identifier.
++func TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect(t *testing.T) {
++	f := newOwnerIdentityOperationFixture(t)
++	api := installOwnerBootstrapAPI(t, f)
++	p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(p.Close)
++	secret := errors.New("synthetic-private-driver-password")
++	reads := 0
++	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
++		reads++
++		if reads == 1 {
++			return fleet.OwnerConfigurationObservation{}, secret
++		}
++		// The existing one Inspect has a different failure. It cannot replace
++		// the first Advance's deciding code, create another claim or retry it.
++		v, err := f.accepted.ReadOwnerConfiguration(ctx)
++		v.FreshUntil = v.ObservedAt
++		return v, err
++	})
++	out, err := p.Complete(context.Background())
++	if err == nil || !strings.Contains(err.Error(), "selection.initial-native: native.accepted-read") {
++		t.Fatalf("missing original accepted-read diagnostic: %v", err)
++	}
++	if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, secret) || strings.Contains(err.Error(), secret.Error()) {
++		t.Fatalf("changed normalized error classification or disclosed driver data: %v", err)
++	}
++	if out.Status != OwnerBootstrapStopped || out.Stop != OwnerInstallationUnverified || reads != 2 || api.creates.Load() != 0 || api.writes.Load() != 0 {
++		t.Fatal("diagnostic changed stopped disposition, one Inspect or zero effects", out.Status, out.Stop, reads, api.creates.Load(), api.writes.Load())
++	}
++}
++
++func TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization(t *testing.T) {
++	f := newOwnerIdentityOperationFixture(t)
++	api := installOwnerBootstrapAPI(t, f)
++	p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(p.Close)
++	reads := 0
++	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
++		reads++
++		if reads == 2 {
++			return fleet.OwnerConfigurationObservation{}, cfg.ErrChanged
++		}
++		return f.accepted.ReadOwnerConfiguration(ctx)
++	})
++	out, err := p.Advance(context.Background())
++	if err == nil || !strings.Contains(err.Error(), "selection.final-native: native.accepted-read") || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) {
++		t.Fatalf("final native failure lost deciding check or original normalization: %v", err)
++	}
++	if reads != 2 || api.writes.Load() != 1 || api.creates.Load() != 0 || out.Status != OwnerBootstrapStopped || out.Stop != OwnerInstallationUnverified {
++		t.Fatal("failed final proof retried or certified original intent", reads, api.writes.Load(), api.creates.Load(), out.Status, out.Stop)
++	}
++}
++
++func TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads(t *testing.T) {
++	for _, tc := range []struct {
++		name, want string
++		clockReads int32
++	}{
++		{"read", "native.accepted-read", 0},
++		{"valid", "native.accepted-valid", 1},
++		{"equal", "native.accepted-equal", 1},
++		{"deadline", "native.accepted-deadline", 2},
++		{"success", "", 3},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			f := newOwnerIdentityOperationFixture(t)
++			originalClock := f.resources.preparer.protection.observer.now
++			var armed atomic.Bool
++			var clockReads atomic.Int32
++			var acceptedEnd time.Time
++			f.resources.preparer.protection.observer.now = func() time.Time {
++				if armed.Load() {
++					n := clockReads.Add(1)
++					if tc.name == "deadline" && n == 2 {
++						return acceptedEnd
++					}
++				}
++				return originalClock()
++			}
++			t.Cleanup(func() { f.resources.preparer.protection.observer.now = originalClock })
++			reads := 0
++			f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
++				reads++
++				v, err := f.accepted.ReadOwnerConfiguration(ctx)
++				acceptedEnd = v.FreshUntil
++				armed.Store(true)
++				switch tc.name {
++				case "read":
++					return v, cfg.ErrChanged
++				case "valid":
++					v.FreshUntil = v.ObservedAt
++				case "equal":
++					v.Configuration.Pool.ServiceUID = ownerID(4910)
++				}
++				return v, err
++			})
++			call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++			defer cancel()
++			err := f.root.operation(call, func(current context.Context) error {
++				_, err := f.root.readOwnerIdentityOperationNative(current, f.root.input.LayoutDigest, false)
++				return err
++			})
++			if tc.want == "" {
++				if err != nil {
++					t.Fatal("unchanged positive path failed", err)
++				}
++			} else if err == nil || !strings.Contains(err.Error(), tc.want) || !errors.Is(err, cfg.ErrUnavailable) {
++				t.Fatalf("missing accepted-source check %s: %v", tc.want, err)
++			}
++			if reads != 1 || clockReads.Load() != tc.clockReads {
++				t.Fatal("changed original accepted read or short-circuit clock sampling", reads, clockReads.Load(), tc.clockReads)
++			}
++		})
++	}
++}
++
++type ownerDiagnosticBridgeEffects struct {
++	*rootPinEffectFixture
++	after bool
++	cause error
++	calls int
++}
++
++func (s *ownerDiagnosticBridgeEffects) WithInitialRuntimeBridge(ctx context.Context, run func(context.Context) error) error {
++	s.calls++
++	if s.after {
++		if err := run(ctx); err != nil {
++			return err
++		}
++	}
++	return s.cause
++}
++
++func TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause(t *testing.T) {
++	for _, after := range []bool{false, true} {
++		t.Run(map[bool]string{false: "before", true: "after"}[after], func(t *testing.T) {
++			f := newOwnerIdentityOperationFixture(t)
++			api := installOwnerBootstrapAPI(t, f)
++			p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
++			if err != nil {
++				t.Fatal(err)
++			}
++			t.Cleanup(p.Close)
++			cause := errors.New("synthetic-private-outer-driver-password")
++			effects := &ownerDiagnosticBridgeEffects{rootPinEffectFixture: f.effects, after: after, cause: cause}
++			f.bridge.effects = effects
++			out, err := p.Advance(context.Background())
++			want := map[bool]string{false: "selection.outer-before-callback", true: "selection.outer-after-callback"}[after]
++			if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, cause) || strings.Contains(err.Error(), cause.Error()) || strings.Contains(err.Error(), "sql") {
++				t.Fatalf("incorrect outer boundary diagnostic or error identity: %v", err)
++			}
++			writes := int32(0)
++			if after {
++				writes = 1
++			}
++			if out.Status != OwnerBootstrapStopped || effects.calls != 1 || api.writes.Load() != writes || api.creates.Load() != 0 {
++				t.Fatal("outer failure changed admitted effect count", effects.calls, api.writes.Load(), api.creates.Load())
++			}
++		})
++	}
++}
+--- a/internal/adapters/kubernetes/owner_identity_operation_diagnostics_test.go
++++ b/internal/adapters/kubernetes/owner_identity_operation_diagnostics_test.go
+@@ -0,0 +1,96 @@
++package kubernetes
++
++import (
++	"errors"
++	"fmt"
++	"strings"
++	"testing"
++	"time"
++
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++func TestOwnerOperationDiagnosticsNeverRenderDriverValues(t *testing.T) {
++	secret := errors.New("synthetic-private-identity-token-and-password")
++	inner := ownerOperationError(ownerNativeRetained, secret)
++	outer := ownerOperationError(ownerSelectionInitialNative, inner)
++	want := "owner operation: selection.initial-native: native.retained-branch"
++	for _, format := range []string{"%s", "%v", "%+v"} {
++		if got := fmt.Sprintf(format, outer); got != want || strings.Contains(got, secret.Error()) {
++			t.Fatal("diagnostic rendered non-enumerated bytes", got)
++		}
++	}
++	if !errors.Is(outer, secret) || errors.Is(outer, cfg.ErrUnavailable) {
++		t.Fatal("pass-through error classification changed")
++	}
++	normalized := ownerOperationUnavailable(ownerSelectionFinalNative, inner)
++	if !errors.Is(normalized, cfg.ErrUnavailable) || errors.Is(normalized, secret) || normalized.Error() != "owner operation: selection.final-native: native.retained-branch" {
++		t.Fatal("normalized boundary changed classification or lost fixed detail")
++	}
++	if got := ownerOperationError(ownerOperationCheck(255), secret).Error(); got != "owner operation: unknown" {
++		t.Fatal("unknown enum rendered uncontrolled diagnostic", got)
++	}
++}
++
++func TestOwnerOriginalDiagnosticKeepsExactFieldsAndFirstDifference(t *testing.T) {
++	for _, tc := range []struct {
++		name, want string
++		change     func(*ownerIdentityOperationNative)
++	}{
++		{"input", "original.input", func(v *ownerIdentityOperationNative) { v.input.Namespace.Name = "changed" }},
++		{"bridge-uid", "original.bridge", func(v *ownerIdentityOperationNative) { v.retained.bridge.UID = "changed" }},
++		{"bridge-version", "original.bridge", func(v *ownerIdentityOperationNative) { v.retained.bridge.ResourceVersion = "changed" }},
++		{"bridge-state", "original.bridge", func(v *ownerIdentityOperationNative) { v.retained.bridge.State.SetupID = "changed" }},
++		{"resources-uid", "original.resources", func(v *ownerIdentityOperationNative) { v.retained.resources.UID = "changed" }},
++		{"resources-version", "original.resources", func(v *ownerIdentityOperationNative) { v.retained.resources.ResourceVersion = "changed" }},
++		{"resources-state", "original.resources", func(v *ownerIdentityOperationNative) { v.retained.resources.State.SetupID = "changed" }},
++		{"source-proof", "original.source-proof", func(v *ownerIdentityOperationNative) { v.source.proof.observation.NamespaceUID = "changed" }},
++		{"source-guards", "original.source-proof", func(v *ownerIdentityOperationNative) { v.source.proof.guards[1] = "changed" }},
++		{"fleet-reference", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.fleetRef.UID = "changed" }},
++		{"owner-reference", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.ownerRef.UID = "changed" }},
++		{"owner-configuration", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.owner.Pool.ServiceUID = "changed" }},
++		{"deployment-version", "original.deployment", func(v *ownerIdentityOperationNative) { v.source.deployment.ResourceVersion = "changed" }},
++		{"deployment-spec", "original.deployment", func(v *ownerIdentityOperationNative) {
++			replicas := int32(1)
++			v.source.deployment.Spec.Replicas = &replicas
++		}},
++		{"source-account", "original.source-accounts", func(v *ownerIdentityOperationNative) { v.source.account.UID = "changed" }},
++		{"source-administrator", "original.source-accounts", func(v *ownerIdentityOperationNative) { v.source.administrator.UID = "changed" }},
++		{"owner-account", "original.owner-objects", func(v *ownerIdentityOperationNative) { v.account.UID = "changed" }},
++		{"owner-service", "original.owner-objects", func(v *ownerIdentityOperationNative) { v.service.UID = "changed" }},
++		{"accepted-configuration", "original.accepted-configuration", func(v *ownerIdentityOperationNative) { v.accepted.Configuration.Pool.ServiceUID = "changed" }},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			var a, b ownerIdentityOperationNative
++			tc.change(&b)
++			if got := ownerIdentityOperationOriginalDifference(a, b).String(); got != tc.want || ownerIdentityOperationOriginalsEqual(a, b) {
++				t.Fatal("exact original difference lost or misidentified", got, tc.want)
++			}
++			// Earlier input mismatch wins over every later independent group.
++			b.input.Namespace.Name = "earlier"
++			if got := ownerIdentityOperationOriginalDifference(a, b).String(); got != "original.input" {
++				t.Fatal("changed original check precedence", got)
++			}
++		})
++	}
++}
++
++func TestOwnerOriginalDiagnosticDoesNotCompareObservationDates(t *testing.T) {
++	var a, b ownerIdentityOperationNative
++	at := time.Date(2026, 10, 13, 1, 0, 0, 0, time.UTC)
++	b.until = at
++	b.retained.until = at
++	b.retained.bridge.ValidUntil = at
++	b.retained.resources.ValidUntil = at
++	b.source.proof.observation.ObservedAt = at
++	b.source.proof.observation.FreshUntil = at.Add(time.Second)
++	b.source.proof.observation.Fleet.ObservedAt = at
++	b.source.proof.observation.Fleet.FreshUntil = at.Add(time.Second)
++	b.source.proof.observation.Owner.ObservedAt = at
++	b.source.proof.observation.Owner.FreshUntil = at.Add(time.Second)
++	b.accepted.ObservedAt = at
++	b.accepted.FreshUntil = at.Add(time.Second)
++	if !ownerIdentityOperationOriginalsEqual(a, b) || ownerIdentityOperationOriginalDifference(a, b) != ownerOperationNoFailure {
++		t.Fatal("independent observation dates became identity comparisons")
++	}
++}
+--- a/internal/adapters/kubernetes/owner_identity_operation_native.go
++++ b/internal/adapters/kubernetes/owner_identity_operation_native.go
+@@ -70,57 +70,78 @@
+ 		}
+ 	}()
+ 	joined.Wait()
+-	for _, err := range failures {
++	// Preserve the original joined branch precedence; this is not a claim
++	// about which concurrent request failed first in wall-clock time.
++	for i, err := range failures {
+ 		if err != nil {
+-			return zero, err
++			check := ownerNativeRetained
++			if i == 1 {
++				check = ownerNativeSource
++			}
++			return zero, ownerOperationError(check, err)
+ 		}
+ 	}
+ 	until = identity.Earlier(until, identity.Earlier(retained.until, source.proof.observation.FreshUntil))
+ 	call, narrow := context.WithDeadline(call, until)
+ 	defer narrow()
+ 	if initialHandoverDeadline(call, s.resources.now, until) != nil {
+-		return zero, cfg.ErrUnavailable
++		return zero, ownerOperationError(ownerNativeInitialDeadline, cfg.ErrUnavailable)
+ 	}
+ 	input, err := s.inputFromResources(retained.resources, layout)
+ 	if err != nil || input.OwnerLayout != contracts.OwnerProviderInstalledLayout {
+-		return zero, cfg.ErrChanged
++		return zero, ownerOperationError(ownerNativeInput, cfg.ErrChanged)
+ 	}
+ 	for _, claim := range retained.resources.State.Objects {
+ 		if claim.Receipt == nil {
+-			return zero, cfg.ErrChanged
++			return zero, ownerOperationError(ownerNativeReceipt, cfg.ErrChanged)
+ 		}
+ 	}
+ 	if s.input.Format != "" && (input != s.input || !retained.resources.State.CreatedAt.Equal(s.resourceCreatedAt) || !retained.resources.State.Until.Equal(s.resourceUntil)) {
+-		return zero, cfg.ErrChanged
++		return zero, ownerOperationError(ownerNativeOriginalInput, cfg.ErrChanged)
+ 	}
+ 	if !ownerIdentityOriginalConfiguration(s.resources, retained.resources.State, source.owner) {
+-		return zero, cfg.ErrChanged
++		return zero, ownerOperationError(ownerNativeOriginalConfiguration, cfg.ErrChanged)
+ 	}
+ 	if err = s.ownerIdentityOperationDeployment(call, source.ownerDeployment, retained.resources.State, input); err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeDeployment, err)
+ 	}
+ 	reader := &OwnerEndpoints{client: s.bridge.source.client, pool: source.owner.Pool}
+ 	account, err := ownerResource[core.ServiceAccount](reader, call, "/api/v1/namespaces/"+input.Namespace.Name+"/serviceaccounts/"+input.ServiceAccount.Name, "v1", "ServiceAccount")
+ 	if err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeAccountRead, err)
+ 	}
+ 	if err = s.ownerIdentityOperationOriginalObject(call, account, retained.resources.State, 0); err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeAccountOriginal, err)
+ 	}
+ 	service, err := ownerResource[core.Service](reader, call, "/api/v1/namespaces/"+input.Namespace.Name+"/services/"+source.owner.Pool.Service, "v1", "Service")
+ 	if err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeServiceRead, err)
+ 	}
+ 	if err = s.ownerIdentityOperationOriginalObject(call, service, retained.resources.State, 12); err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeServiceOriginal, err)
+ 	}
+ 	if err = s.ownerIdentityOperationProbes(call, account, source.account); err != nil {
+-		return zero, err
++		return zero, ownerOperationError(ownerNativeProbes, err)
+ 	}
+ 	accepted, err := s.accepted.ReadOwnerConfiguration(call)
+ 	until = identity.Earlier(until, accepted.FreshUntil)
+-	if err != nil || !accepted.Valid(s.resources.now()) || !accepted.Configuration.Equal(source.owner) || !ownerIdentityOriginalConfiguration(s.resources, retained.resources.State, accepted.Configuration) || initialHandoverDeadline(call, s.resources.now, until) != nil {
+-		return zero, cfg.ErrUnavailable
++	// Keep the exact previous short-circuit order, including clock samples.
++	// A failed reader was already normalized to unavailable here; do not expose
++	// its driver error or add that error to the existing errors.Is contract.
++	if err != nil {
++		return zero, ownerOperationError(ownerNativeAcceptedRead, cfg.ErrUnavailable)
++	}
++	if !accepted.Valid(s.resources.now()) {
++		return zero, ownerOperationError(ownerNativeAcceptedValid, cfg.ErrUnavailable)
++	}
++	if !accepted.Configuration.Equal(source.owner) {
++		return zero, ownerOperationError(ownerNativeAcceptedEqual, cfg.ErrUnavailable)
++	}
++	if !ownerIdentityOriginalConfiguration(s.resources, retained.resources.State, accepted.Configuration) {
++		return zero, ownerOperationError(ownerNativeAcceptedOriginal, cfg.ErrUnavailable)
++	}
++	if initialHandoverDeadline(call, s.resources.now, until) != nil {
++		return zero, ownerOperationError(ownerNativeAcceptedDeadline, cfg.ErrUnavailable)
+ 	}
+ 	out := ownerIdentityOperationNative{retained: retained, source: source, input: input, accepted: accepted, account: account, service: service, until: until}
+ 	if withRoles {
+@@ -152,7 +173,7 @@
+ 		}
+ 	}
+ 	if initialHandoverDeadline(call, s.resources.now, until) != nil {
+-		return zero, cfg.ErrUnavailable
++		return zero, ownerOperationError(ownerNativeFinalDeadline, cfg.ErrUnavailable)
+ 	}
+ 	return out, nil
+ }
+--- a/internal/adapters/kubernetes/owner_identity_operation_root.go
++++ b/internal/adapters/kubernetes/owner_identity_operation_root.go
+@@ -34,8 +34,14 @@
+ 		defer narrow()
+ 		last, err := out.readOwnerIdentityOperationNative(current, layout, false)
+ 		until := identity.Earlier(first.until, last.until)
+-		if err != nil || !ownerIdentityOperationOriginalsEqual(first, last) || initialHandoverDeadline(current, resources.now, until) != nil {
+-			return cfg.ErrUnavailable
++		if err != nil {
++			return ownerOperationUnavailable(ownerRootFinalNative, err)
++		}
++		if check := ownerIdentityOperationOriginalDifference(first, last); check != ownerOperationNoFailure {
++			return ownerOperationError(check, cfg.ErrUnavailable)
++		}
++		if initialHandoverDeadline(current, resources.now, until) != nil {
++			return ownerOperationError(ownerRootFinalDeadline, cfg.ErrUnavailable)
+ 		}
+ 		return nil
+ 	})
+@@ -49,12 +55,231 @@
+ // Dates of independent observations are intentionally not equated or renewed.
+ // Every original identity, protected value and exact retained journal is.
+ func ownerIdentityOperationOriginalsEqual(a, b ownerIdentityOperationNative) bool {
+-	return a.input == b.input &&
+-		a.retained.bridge.UID == b.retained.bridge.UID && a.retained.bridge.ResourceVersion == b.retained.bridge.ResourceVersion && equalJSON(a.retained.bridge.State, b.retained.bridge.State) &&
+-		a.retained.resources.UID == b.retained.resources.UID && a.retained.resources.ResourceVersion == b.retained.resources.ResourceVersion && equalJSON(a.retained.resources.State, b.retained.resources.State) &&
+-		configurationRoleSameSources(a.source.proof.observation, b.source.proof.observation) && a.source.proof.guards == b.source.proof.guards &&
+-		a.source.fleetRef == b.source.fleetRef && a.source.ownerRef == b.source.ownerRef && a.source.owner.Equal(b.source.owner) &&
+-		a.source.deployment.ResourceVersion == b.source.deployment.ResourceVersion && equalJSON(a.source.deployment.Spec, b.source.deployment.Spec) &&
+-		equalJSON(a.source.account, b.source.account) && equalJSON(a.source.administrator, b.source.administrator) &&
+-		equalJSON(a.account, b.account) && equalJSON(a.service, b.service) && a.accepted.Configuration.Equal(b.accepted.Configuration)
+-}
++	return ownerIdentityOperationOriginalDifference(a, b) == ownerOperationNoFailure
++}
++
++// Pure, ordered groups of the exact former conjunction. No extra API or clock
++// read and no relaxed field/date equality; stop at the same first false term.
++func ownerIdentityOperationOriginalDifference(a, b ownerIdentityOperationNative) ownerOperationCheck {
++	if a.input != b.input {
++		return ownerOriginalInput
++	}
++	if a.retained.bridge.UID != b.retained.bridge.UID || a.retained.bridge.ResourceVersion != b.retained.bridge.ResourceVersion || !equalJSON(a.retained.bridge.State, b.retained.bridge.State) {
++		return ownerOriginalBridge
++	}
++	if a.retained.resources.UID != b.retained.resources.UID || a.retained.resources.ResourceVersion != b.retained.resources.ResourceVersion || !equalJSON(a.retained.resources.State, b.retained.resources.State) {
++		return ownerOriginalResources
++	}
++	if !configurationRoleSameSources(a.source.proof.observation, b.source.proof.observation) || a.source.proof.guards != b.source.proof.guards {
++		return ownerOriginalSourceProof
++	}
++	if a.source.fleetRef != b.source.fleetRef || a.source.ownerRef != b.source.ownerRef || !a.source.owner.Equal(b.source.owner) {
++		return ownerOriginalSourceConfiguration
++	}
++	if a.source.deployment.ResourceVersion != b.source.deployment.ResourceVersion || !equalJSON(a.source.deployment.Spec, b.source.deployment.Spec) {
++		return ownerOriginalDeployment
++	}
++	if !equalJSON(a.source.account, b.source.account) || !equalJSON(a.source.administrator, b.source.administrator) {
++		return ownerOriginalSourceAccounts
++	}
++	if !equalJSON(a.account, b.account) || !equalJSON(a.service, b.service) {
++		return ownerOriginalOwnerObjects
++	}
++	if !a.accepted.Configuration.Equal(b.accepted.Configuration) {
++		return ownerOriginalAcceptedConfiguration
++	}
++	return ownerOperationNoFailure
++}
++
++// These private diagnostics contain only fixed check names. Causes retain the
++// existing errors.Is contract but their text is never rendered. No driver error,
++// protected identity/value or native response can become diagnostic output.
++type ownerOperationCheck uint8
++
++const (
++	ownerOperationNoFailure ownerOperationCheck = iota
++	ownerSelectionFirstPhase
++	ownerSelectionSecondPhase
++	ownerSelectionThirdPhase
++	ownerSelectionEnter
++	ownerSelectionInitialNative
++	ownerSelectionApply
++	ownerSelectionChildRead
++	ownerSelectionFinalNative
++	ownerSelectionFinalDeadline
++	ownerSelectionSnapshotEncode
++	ownerSelectionSnapshotDecode
++	ownerSelectionDeployment
++	ownerSelectionDeploymentDeadline
++	ownerSelectionOuterBefore
++	ownerSelectionOuterAfter
++	ownerSelectionParentCAS
++	ownerSelectionChildCAS
++	ownerSelectionChildCreate
++	ownerSelectionReceiptRead
++	ownerSelectionReceiptCAS
++	ownerNativeRetained
++	ownerNativeSource
++	ownerNativeInitialDeadline
++	ownerNativeInput
++	ownerNativeReceipt
++	ownerNativeOriginalInput
++	ownerNativeOriginalConfiguration
++	ownerNativeDeployment
++	ownerNativeAccountRead
++	ownerNativeAccountOriginal
++	ownerNativeServiceRead
++	ownerNativeServiceOriginal
++	ownerNativeProbes
++	ownerNativeAcceptedRead
++	ownerNativeAcceptedValid
++	ownerNativeAcceptedEqual
++	ownerNativeAcceptedOriginal
++	ownerNativeAcceptedDeadline
++	ownerNativeFinalDeadline
++	ownerRootFinalNative
++	ownerRootFinalDeadline
++	ownerOriginalInput
++	ownerOriginalBridge
++	ownerOriginalResources
++	ownerOriginalSourceProof
++	ownerOriginalSourceConfiguration
++	ownerOriginalDeployment
++	ownerOriginalSourceAccounts
++	ownerOriginalOwnerObjects
++	ownerOriginalAcceptedConfiguration
++)
++
++func (c ownerOperationCheck) String() string {
++	switch c {
++	case ownerSelectionFirstPhase:
++		return "selection.phase-one"
++	case ownerSelectionSecondPhase:
++		return "selection.phase-two"
++	case ownerSelectionThirdPhase:
++		return "selection.phase-three"
++	case ownerSelectionEnter:
++		return "selection.enter"
++	case ownerSelectionInitialNative:
++		return "selection.initial-native"
++	case ownerSelectionApply:
++		return "selection.apply"
++	case ownerSelectionChildRead:
++		return "selection.post-effect-child"
++	case ownerSelectionFinalNative:
++		return "selection.final-native"
++	case ownerSelectionFinalDeadline:
++		return "selection.final-deadline"
++	case ownerSelectionSnapshotEncode:
++		return "selection.snapshot-encode"
++	case ownerSelectionSnapshotDecode:
++		return "selection.snapshot-decode"
++	case ownerSelectionDeployment:
++		return "selection.deployment"
++	case ownerSelectionDeploymentDeadline:
++		return "selection.deployment-deadline"
++	case ownerSelectionOuterBefore:
++		return "selection.outer-before-callback"
++	case ownerSelectionOuterAfter:
++		return "selection.outer-after-callback"
++	case ownerSelectionParentCAS:
++		return "selection.parent-cas"
++	case ownerSelectionChildCAS:
++		return "selection.child-cas"
++	case ownerSelectionChildCreate:
++		return "selection.child-create"
++	case ownerSelectionReceiptRead:
++		return "selection.receipt-read"
++	case ownerSelectionReceiptCAS:
++		return "selection.receipt-cas"
++	case ownerNativeRetained:
++		return "native.retained-branch"
++	case ownerNativeSource:
++		return "native.source-branch"
++	case ownerNativeInitialDeadline:
++		return "native.initial-deadline"
++	case ownerNativeInput:
++		return "native.input"
++	case ownerNativeReceipt:
++		return "native.original-receipt"
++	case ownerNativeOriginalInput:
++		return "native.original-input"
++	case ownerNativeOriginalConfiguration:
++		return "native.original-configuration"
++	case ownerNativeDeployment:
++		return "native.deployment"
++	case ownerNativeAccountRead:
++		return "native.account-read"
++	case ownerNativeAccountOriginal:
++		return "native.account-original"
++	case ownerNativeServiceRead:
++		return "native.service-read"
++	case ownerNativeServiceOriginal:
++		return "native.service-original"
++	case ownerNativeProbes:
++		return "native.probes"
++	case ownerNativeAcceptedRead:
++		return "native.accepted-read"
++	case ownerNativeAcceptedValid:
++		return "native.accepted-valid"
++	case ownerNativeAcceptedEqual:
++		return "native.accepted-equal"
++	case ownerNativeAcceptedOriginal:
++		return "native.accepted-original"
++	case ownerNativeAcceptedDeadline:
++		return "native.accepted-deadline"
++	case ownerNativeFinalDeadline:
++		return "native.final-deadline"
++	case ownerRootFinalNative:
++		return "root.final-native"
++	case ownerRootFinalDeadline:
++		return "root.final-deadline"
++	case ownerOriginalInput:
++		return "original.input"
++	case ownerOriginalBridge:
++		return "original.bridge"
++	case ownerOriginalResources:
++		return "original.resources"
++	case ownerOriginalSourceProof:
++		return "original.source-proof"
++	case ownerOriginalSourceConfiguration:
++		return "original.source-configuration"
++	case ownerOriginalDeployment:
++		return "original.deployment"
++	case ownerOriginalSourceAccounts:
++		return "original.source-accounts"
++	case ownerOriginalOwnerObjects:
++		return "original.owner-objects"
++	case ownerOriginalAcceptedConfiguration:
++		return "original.accepted-configuration"
++	default:
++		return "unknown"
++	}
++}
++
++type ownerOperationDiagnostic struct {
++	check  ownerOperationCheck
++	cause  error
++	detail *ownerOperationDiagnostic
++}
++
++func (e *ownerOperationDiagnostic) Error() string {
++	text := "owner operation: " + e.check.String()
++	for detail := e.detail; detail != nil; detail = detail.detail {
++		text += ": " + detail.check.String()
++	}
++	return text
++}
++func (e *ownerOperationDiagnostic) Unwrap() error { return e.cause }
++
++func ownerOperationError(check ownerOperationCheck, cause error) error {
++	detail, _ := cause.(*ownerOperationDiagnostic)
++	return &ownerOperationDiagnostic{check: check, cause: cause, detail: detail}
++}
++
++// The original final-native condition normalized any read failure to
++// unavailable. Retain a nested fixed check without widening error identity.
++func ownerOperationUnavailable(check ownerOperationCheck, cause error) error {
++	detail, _ := cause.(*ownerOperationDiagnostic)
++	return &ownerOperationDiagnostic{check: check, cause: cfg.ErrUnavailable, detail: detail}
++}

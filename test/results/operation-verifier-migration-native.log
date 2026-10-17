@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-verifier-migration-preserves-history-and-spend
+--- PASS: TestContextAdmissionWithRealServices (16.04s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-verifier-migration-preserves-history-and-spend (15.70s)
+PASS
+ok  	asservat.local/asservat/test/integration	17.087s

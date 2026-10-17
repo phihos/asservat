@@ -1,0 +1,585 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/json"
+	"math/big"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	audit "asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// SQL admission, role isolation, encrypted pair writes, current recovery and
+// exact leaf activation are real. Kubernetes/source/qualification facts and the
+// protected issuer are explicitly synthetic. This is not an installed connector
+// or qualification of production backup cost, Pod proof or OpenBao issuance.
+type connectorSQLFixture struct {
+	t                        *testing.T
+	ctx                      context.Context
+	admin                    *pgxpool.Pool
+	pools                    map[string]*pgxpool.Pool
+	scenario                 captureAdmissionScenario
+	configuration            app.ConnectorIdentityConfiguration
+	source                   *postgres.ConnectorIdentitySources
+	observer                 *postgres.FleetObservation
+	processes                *postgres.ConnectorProcesses
+	credentials              *postgres.ConnectorCredentials
+	backing                  *postgres.ConnectorBackingJournal
+	registry                 *postgres.ConnectorRegistry
+	audit                    *app.ConnectorOperationAuditor
+	mac                      *auditapp.OperationMAC
+	enrollment               app.ConnectorProcessEnrollment
+	renewal                  app.ConnectorRenewal
+	request                  value.ConnectorProcessRequest
+	processID                string
+	process                  value.ConnectorCredentialProcess
+	clientCA, serverCA       *x509.Certificate
+	clientCAKey, serverCAKey *ecdsa.PrivateKey
+}
+
+func connectorSQLCA(t *testing.T) (*x509.Certificate, *ecdsa.PrivateKey) {
+	t.Helper()
+	key, e := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	n := time.Now().UTC().Truncate(time.Second)
+	c := &x509.Certificate{SerialNumber: big.NewInt(n.UnixNano()), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign, NotBefore: n.Add(-time.Minute), NotAfter: n.Add(24 * time.Hour)}
+	der, e := x509.CreateCertificate(rand.Reader, c, c, key.Public(), key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	parsed, e := x509.ParseCertificate(der)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return parsed, key
+}
+func connectorSQLCSR(t *testing.T) []byte {
+	t.Helper()
+	k, e := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	b, e := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, k)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return b
+}
+func newConnectorSQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, retained int64, sourceLimit ...int64) *connectorSQLFixture {
+	return newConnectorSQLFixtureWithOptions(t, ctx, admin, poolFor, store, keys, s, retained, connectorRetirementFixtureOptions{}, sourceLimit...)
+}
+
+// Options are fixture-only protected installation inputs, selected before any
+// source acceptance or process admission. They never rewrite original dates.
+type connectorRetirementFixtureOptions struct {
+	Enabled   bool
+	Admission time.Duration
+}
+
+func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, retained int64, retirement connectorRetirementFixtureOptions, sourceLimit ...int64) *connectorSQLFixture {
+	t.Helper()
+	// The shared pool factory belongs to the parent suite. Each connector
+	// fixture must also release its own connections when this subtest ends.
+	// Keeping completed fixtures open exhausts the bounded PostgreSQL lab.
+	parentPool := poolFor
+	poolFor = func(role, password string) *pgxpool.Pool {
+		p := parentPool(role, password)
+		t.Cleanup(p.Close)
+		return p
+	}
+	f := &connectorSQLFixture{t: t, ctx: ctx, admin: admin, pools: map[string]*pgxpool.Pool{}, scenario: s}
+	roles := value.ConnectorIdentityRoles{}
+	prefix := connectorSQLRolePrefix(custodyID())
+	names := []string{"source", "journal", "acknowledgement", "cleanup", "verifier", "finalizer", "read"}
+	for _, name := range names {
+		role := prefix + name
+		password := "synthetic-" + name
+		if _, e := admin.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" LOGIN PASSWORD '"+password+"'"); e != nil {
+			t.Fatal(e)
+		}
+		if _, e := admin.Exec(ctx, "GRANT USAGE ON SCHEMA public TO "+pgx.Identifier{role}.Sanitize()); e != nil {
+			t.Fatal(e)
+		}
+		if _, e := admin.Exec(ctx, "GRANT SELECT ON goose_db_version TO "+pgx.Identifier{role}.Sanitize()); e != nil {
+			t.Fatal(e)
+		}
+		f.pools[name] = poolFor(role, password)
+	}
+
+	// View grants are deliberately narrow. SELECT FOR UPDATE needs UPDATE on
+	// one immutable key, whose attempted changes remain denied by base guards.
+	for _, duty := range []string{"cleanup", "verifier", "finalizer"} {
+		role := pgx.Identifier{prefix + duty}.Sanitize()
+		for view, key := range map[string]string{"pool": "root_id", "account": "root_id", "audit": "id", "lifecycle": "operation_id", "history": "root_id"} {
+			if _, e := admin.Exec(ctx, "GRANT SELECT, UPDATE ("+key+") ON connector_operation_"+view+" TO "+role); e != nil {
+				t.Fatal(e)
+			}
+		}
+		if _, e := admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION connector_identity_role_ok(uuid,text) TO "+role); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if retirement.Enabled {
+		// The reused lifecycle adapter independently reads/locks current recovery;
+		// these are the same minimized read/immutable lock privileges used by its
+		// established non-connector facets, not grants on human audit tables.
+		for _, duty := range []string{"cleanup", "verifier", "finalizer"} {
+			role := pgx.Identifier{prefix + duty}.Sanitize()
+			for _, grant := range []string{"GRANT SELECT ON fleet_current_trust TO ", "GRANT UPDATE(installation_id) ON fleet_current_trust TO ", "GRANT SELECT(installation_id,activated_postmaster_at,activated_database_oid) ON fleet_trust TO "} {
+				if _, e := admin.Exec(ctx, grant+role); e != nil {
+					t.Fatal(e)
+				}
+			}
+		}
+	}
+	for duty, columns := range map[string]string{
+		"cleanup":  "lease,lease_fence,retirement,certificate_started,certificate_completion,terminal_purge,overdue_selected_at,overdue_purge",
+		"verifier": "certificate_verify_attempts,certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at",
+	} {
+		if _, e := admin.Exec(ctx, "GRANT UPDATE ("+columns+") ON connector_operation_lifecycle TO "+pgx.Identifier{prefix + duty}.Sanitize()); e != nil {
+			t.Fatal(e)
+		}
+	}
+	roles.Source = prefix + "source"
+	roles.Journal = prefix + "journal"
+	roles.Acknowledgement = prefix + "acknowledgement"
+	roles.Cleanup = prefix + "cleanup"
+	roles.Verifier = prefix + "verifier"
+	roles.Finalizer = prefix + "finalizer"
+	grants := map[string][]string{
+		"source":          {"stage_connector_identity(uuid,jsonb,jsonb)", "fence_connector_identity(uuid,uuid,timestamptz)", "promote_connector_backing(uuid,uuid,jsonb)", "close_connector_backing_candidate(uuid,uuid)"},
+		"journal":         {"read_connector_process_admission(uuid,uuid,jsonb)", "read_connector_process_backing(uuid,jsonb)", "admit_connector_process(uuid,jsonb,jsonb,jsonb)", "store_connector_process_outcome(uuid,uuid,jsonb,jsonb)", "accept_connector_process(uuid,uuid,jsonb)", "read_connector_credential_process(uuid,jsonb)", "read_connector_credential_attempt(uuid,uuid,jsonb)", "admit_connector_credential(uuid,jsonb,jsonb,jsonb)", "claim_connector_credential(uuid,uuid,jsonb,jsonb)", "store_connector_credential(uuid,uuid,jsonb,jsonb,jsonb)", "activate_connector_credential(uuid,uuid,jsonb,jsonb)", "connector_audit_journal(uuid,jsonb,text,jsonb)", "read_connector_backing_candidate(uuid,jsonb)", "read_connector_backing_admission(uuid,uuid,jsonb)", "admit_connector_backing(uuid,jsonb,jsonb)", "store_connector_backing_outcome(uuid,uuid,jsonb,jsonb)"},
+		"acknowledgement": {"connector_audit_acknowledge(uuid,jsonb,text,jsonb,jsonb)"},
+		"read":            {"read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)"},
+		"cleanup":         {"detach_connector_identity(uuid,uuid)"},
+		"finalizer":       {"finish_connector_operation_retirement(uuid,uuid,uuid)", "finish_connector_operation_history(uuid,text,bytea,timestamptz,timestamptz,uuid)"},
+	}
+	if retirement.Enabled {
+		grants["journal"] = append(grants["journal"], "read_connector_process_ticket(uuid,jsonb)", "read_connector_successor_cohorts(uuid,jsonb)", "admit_connector_process_reserved(uuid,jsonb,jsonb,jsonb,bytea[])", "admit_connector_backing_reserved(uuid,jsonb,jsonb,bytea[])", "read_connector_retirement(uuid,uuid,timestamptz,timestamptz)", "restrict_connector_retirement(uuid,uuid,text,jsonb)", "admit_connector_retirement(uuid,uuid,jsonb,timestamptz,timestamptz)", "store_connector_retirement_outcome(uuid,uuid,jsonb,timestamptz,timestamptz)")
+		grants["cleanup"] = append(grants["cleanup"], "close_connector_retirement_admission(uuid,uuid)", "close_connector_retirement_writer_reference(uuid,uuid)", "delete_connector_retirement_ticket(uuid,uuid)")
+	}
+	for role, fs := range grants {
+		for _, fn := range fs {
+			if _, e := admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION "+fn+" TO "+pgx.Identifier{prefix + role}.Sanitize()); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	recovery, e := s.recovery.reader.RecoveryState(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	binding := value.PeerBinding{InstallationID: s.recovery.installation, ClusterID: custodyID(), IssuerEpoch: recovery.IssuerEpoch, PeerID: custodyID(), Role: value.ConnectorPeer}
+	f.clientCA, f.clientCAKey = connectorSQLCA(t)
+	f.serverCA, f.serverCAKey = connectorSQLCA(t)
+	profile := value.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: binding, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{21}}, ProtectionDigest: artifact.Digest{22}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{f.clientCA.Raw}, ServerIssuerRoots: [][]byte{f.serverCA.Raw}, Deployment: value.ConnectorDeployment{Namespace: "connector", NamespaceUID: custodyID(), ServiceAccount: "connector", AccountUID: custodyID(), Deployment: "connector", DeploymentUID: custodyID(), ServingSlots: 2, RetainedProcesses: 8}}
+	q := audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{23}, Layout: audit.ConnectorOperationHistoryLayout, MaximumRowFootprintBytes: 1 << 20, MaximumTransitionWALBytes: 1 << 20, BackupCopies: 1, WALCopies: 1}
+	policy := audit.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "identity", InstallationID: binding.InstallationID, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{24}, BackupProfileDigest: artifact.Digest{25}, BackingRevision: 1, MetadataSlots: 512, MaxPurgeLeases: 2, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, ValidUntil: n.Add(40 * time.Minute), History: &q, OverdueTerminal: audit.OperationOverdueTerminal}
+	if retirement.Enabled {
+		if retirement.Admission <= 0 || retirement.Admission > 30*time.Minute {
+			t.Fatal("invalid explicitly configured retirement fixture admission interval")
+		}
+		q.Layout = audit.ConnectorRetirementHistoryLayout
+		policy.ValidUntil = n.Add(retirement.Admission)
+	}
+	bb, ww := q.SlotBacking(policy.MaxPurgeLeases)
+	policy.BackupReservedBytes = bb * policy.MetadataSlots
+	policy.WALReservedBytes = ww * policy.MetadataSlots
+	f.configuration = app.ConnectorIdentityConfiguration{Source: value.ConnectorIdentitySource{Observation: value.ConnectorCredentialObservation{Profile: profile, Backing: value.ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{26}, SourceDigest: artifact.Digest{27}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Roles: roles}, Backing: app.ConnectorIdentityBacking{AccountVersion: "connector-accounts-v1", AccountLimit: 2, RecordsPerAccount: 256, RetainedSeconds: retained, ProfileLimit: 2, SourceTransitionLimit: 64, SourceBackupReservedBytes: 6 << 20, SourceWALReservedBytes: 128 << 20, Policy: policy}}
+	if len(sourceLimit) > 0 {
+		f.configuration.Backing.SourceTransitionLimit = sourceLimit[0]
+		f.configuration.Backing.SourceWALReservedBytes = 2 * sourceLimit[0] * q.MaximumTransitionWALBytes * q.WALCopies
+	}
+	if retirement.Enabled {
+		b := &f.configuration.Backing
+		rows := 1 + b.ProfileLimit + b.ProfileLimit*(b.SourceTransitionLimit+1)
+		b.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
+		b.SourceWALReservedBytes = (2*b.SourceTransitionLimit + app.ConnectorRetirementTicketTransitions*b.ProfileLimit*(b.SourceTransitionLimit+1)) * q.MaximumTransitionWALBytes * q.WALCopies
+	}
+	if !f.configuration.Valid(n) {
+		t.Fatal("synthetic connector configuration invalid")
+	}
+	pin := app.ConnectorQualificationPin{InstallationID: binding.InstallationID, StoreID: policy.StoreID, BackupProfileID: policy.BackupProfileID, Qualification: q}
+	f.source, e = postgres.NewConnectorIdentitySources(ctx, f.pools["source"], s.a.RootID, binding, pin)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.observer, e = postgres.NewFleetObservation(ctx, poolFor("fleet_observe_runtime", "synthetic-fleet-observe"), binding.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.mac, e = auditapp.NewOperationMAC("connector-mac-v1", bytes.Repeat([]byte{31}, 32), "connector-accounts-v1", bytes.Repeat([]byte{32}, 32))
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(f.mac.Close)
+	f.refresh(t)
+	c, _ := f.ReadConnectorIdentityConfiguration(ctx)
+	if e = f.source.StageConnectorIdentity(ctx, c); e != nil {
+		t.Fatal("stage connector", e)
+	}
+	f.processes, e = postgres.NewConnectorProcesses(ctx, f.pools["journal"], s.a.RootID, binding, f.configuration.Backing, f.mac)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.credentials, e = postgres.NewConnectorCredentials(ctx, f.pools["journal"], s.a.RootID, binding, f.configuration.Backing, f.mac)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.backing, e = postgres.NewConnectorBackingJournal(ctx, f.pools["journal"], s.a.RootID, binding, pin, f.mac)
+	if e != nil {
+		t.Fatal(e)
+	}
+	j, e := postgres.NewConnectorAuditJournal(ctx, f.pools["journal"], policy)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ack, e := postgres.NewConnectorAuditAcknowledgements(ctx, f.pools["acknowledgement"], policy)
+	if e != nil {
+		t.Fatal(e)
+	}
+	closed, e := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.audit, e = app.NewConnectorOperationAuditor(policy, j, ack, &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, closed, ack, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.registry, e = postgres.NewConnectorRegistry(ctx, f.pools["read"], f, profile)
+	if e != nil {
+		t.Fatal(e)
+	}
+	verify, e := mtls.NewConnectorCredentialVerifier(profile, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.enrollment = app.ConnectorProcessEnrollment{Proof: f, Recovery: s.recovery.reader, Journal: f.processes, Audit: f.audit, MAC: f.mac, Now: time.Now}
+	f.renewal = app.ConnectorRenewal{Proof: mtls.EnrollmentProof{}, ProcessProof: f, Source: f, Recovery: s.recovery.reader, Journal: f.credentials, Audit: f.audit, MAC: f.mac, Issuer: f, Verifier: verify, Now: time.Now}
+	f.request = value.ConnectorProcessRequest{Process: value.ConnectorProcessIdentity{Binding: binding, PodUID: custodyID(), ProcessEpoch: custodyID()}, ClientCSRDER: connectorSQLCSR(t), ServerCSRDER: connectorSQLCSR(t)}
+	f.processID = custodyID()
+	f.process, e = f.enrollment.Enroll(ctx, f.processID, f.request)
+	if e != nil {
+		t.Fatal("enroll connector", e)
+	}
+	return f
+}
+func (f *connectorSQLFixture) refresh(t *testing.T) {
+	t.Helper()
+	r, e := f.scenario.recovery.reader.RecoveryState(f.ctx)
+	if e != nil { // Read original accepted issuer; observation never activates or clears recovery.
+		var epoch string
+		if e = f.admin.QueryRow(f.ctx, "SELECT issuer_epoch::text FROM fleet_trust WHERE installation_id=$1", f.scenario.recovery.installation).Scan(&epoch); e != nil {
+			t.Fatal(e)
+		}
+		r.IssuerEpoch = epoch
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	var digest artifact.Digest
+	copy(digest[:], bytes.Repeat([]byte{97}, 32))
+	a := value.Administration{InstallationID: f.scenario.recovery.installation, IssuerEpoch: r.IssuerEpoch, Issuer: "https://identity.invalid", Revision: identity.Revision{UID: "synthetic-recovery", Generation: 1, Digest: digest}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []string{"console"}, DeliveryProfiles: []string{"synthetic"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 16, MaxClusters: 2}
+	if e = f.observer.ObserveAdministration(f.ctx, a); e != nil {
+		t.Fatal("refresh existing synthetic fleet observation", e)
+	}
+}
+func (f *connectorSQLFixture) ReadConnectorIdentityConfiguration(ctx context.Context) (app.ConnectorIdentityConfiguration, error) {
+	c := f.configuration.Clone()
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	c.Source.Observation.ObservedAt = n
+	c.Source.Observation.FreshUntil = n.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok && d.Before(c.Source.Observation.FreshUntil) {
+		c.Source.Observation.FreshUntil = d.UTC().Truncate(time.Microsecond)
+	}
+	return c, ctx.Err()
+}
+func (f *connectorSQLFixture) ReadConnectorIdentitySource(ctx context.Context) (value.ConnectorIdentitySource, error) {
+	c, e := f.ReadConnectorIdentityConfiguration(ctx)
+	return c.Source, e
+}
+func (f *connectorSQLFixture) ReadConnectorProcessProof(ctx context.Context, r value.ConnectorProcessRequest) (value.ConnectorProcessProof, error) {
+	c, e := f.ReadConnectorIdentityConfiguration(ctx)
+	if e != nil {
+		return value.ConnectorProcessProof{}, e
+	}
+	a, e := mtls.EnrollmentKey(r.ClientCSRDER)
+	if e != nil {
+		return value.ConnectorProcessProof{}, e
+	}
+	b, e := mtls.EnrollmentKey(r.ServerCSRDER)
+	if e != nil {
+		return value.ConnectorProcessProof{}, e
+	}
+	return value.ConnectorProcessProof{Process: r.Process, Configuration: c.Source.Observation, Pod: "synthetic-connector", ReplicaSet: "synthetic-rs", ReplicaSetUID: c.Source.Observation.Profile.Deployment.DeploymentUID, ClientKeyDigest: a, ServerKeyDigest: b, TokenDigest: artifact.Digest{33}, WorkloadDigest: artifact.Digest{34}, ProtectionDigest: c.Source.Observation.Profile.ProtectionDigest, ObservedAt: c.Source.Observation.ObservedAt, FreshUntil: c.Source.Observation.FreshUntil}, nil
+}
+func (f *connectorSQLFixture) SignConnectorCredential(ctx context.Context, p value.ConnectorCredentialPermit, csr []byte) (value.IssuedConnectorCredential, error) {
+	if ctx.Err() != nil || !p.Valid(time.Now()) {
+		return value.IssuedConnectorCredential{}, value.ErrDenied
+	}
+	q, e := x509.ParseCertificateRequest(csr)
+	if e != nil {
+		return value.IssuedConnectorCredential{}, e
+	}
+	ca, key, usage := f.clientCA, f.clientCAKey, x509.ExtKeyUsageClientAuth
+	name := ""
+	if p.Usage == "server" {
+		ca, key, usage, name = f.serverCA, f.serverCAKey, x509.ExtKeyUsageServerAuth, p.Configuration.Profile.ServerName
+	}
+	uri, _ := mtls.PeerURI(p.Process.Binding)
+	n := p.CheckedAt.UTC().Truncate(time.Second)
+	leaf := &x509.Certificate{SerialNumber: big.NewInt(time.Now().UnixNano()), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{usage}, URIs: []*url.URL{uri}, NotBefore: n.Add(-time.Second), NotAfter: p.CertificateNotAfter}
+	if name != "" {
+		leaf.DNSNames = []string{name}
+	}
+	der, e := x509.CreateCertificate(rand.Reader, leaf, ca, q.PublicKey, key)
+	if e != nil {
+		return value.IssuedConnectorCredential{}, e
+	}
+	return value.IssuedConnectorCredential{Certificate: value.ConnectorCredentialCertificate{Binding: p.Process.Binding, Usage: p.Usage, ServerName: name, Digest: artifact.Digest(sha256.Sum256(der)), PublicKeyDigest: p.PublicKeyDigest(), NotBefore: leaf.NotBefore, NotAfter: leaf.NotAfter}, DER: der, ChainDER: [][]byte{ca.Raw}}, nil
+}
+func (f *connectorSQLFixture) issue(t *testing.T, usage string) value.IssuedConnectorCredential {
+	t.Helper()
+	f.refresh(t)
+	out, e := f.renewal.IssueProcess(f.ctx, custodyID(), usage, f.request)
+	if e != nil {
+		t.Fatal("connector "+usage+" issuance", e)
+	}
+	return out
+}
+func (f *connectorSQLFixture) renewBacking(t *testing.T, promote ...bool) string {
+	t.Helper()
+	f.refresh(t)
+	before := f.configuration.Backing.Clone()
+	f.configuration.Backing.Policy.BackingRevision++
+	f.configuration.Backing.Policy.ValidUntil = f.configuration.Backing.Policy.ValidUntil.Add(10 * time.Minute)
+	f.configuration.Backing.Policy.PolicyID = custodyID()
+	f.configuration.Backing.Policy.PolicyDigest[0]++
+	f.configuration.Source.Observation.Backing.Revision++
+	f.configuration.Source.Observation.Backing.Digest[0]++
+	f.configuration.Source.Observation.Backing.SourceDigest[0]++
+	a, _ := json.Marshal(before)
+	b, _ := json.Marshal(f.configuration.Backing)
+	var compatible bool
+	if e := f.admin.QueryRow(f.ctx, "SELECT connector_backing_can_renew($1::jsonb,$2::jsonb)", a, b).Scan(&compatible); e != nil || !compatible {
+		t.Fatal("actual SQL backing compatibility", compatible, e)
+	}
+	c, _ := f.ReadConnectorIdentityConfiguration(f.ctx)
+	if e := f.source.StageConnectorIdentity(f.ctx, c); e != nil {
+		t.Fatal("stage backing", e)
+	}
+	proof, e := f.ReadConnectorProcessProof(f.ctx, f.request)
+	if e != nil {
+		t.Fatal(e)
+	}
+	r, e := f.scenario.recovery.reader.RecoveryState(f.ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	until := identity.Earlier(proof.FreshUntil, identity.Earlier(c.Source.Observation.FreshUntil, r.FreshUntil))
+	current := app.ConnectorBackingCurrent{Configuration: c, Proof: proof, Recovery: r, ObservedAt: n, Until: until}
+	id, e := f.backing.ConnectorBackingCandidateID(f.ctx, current)
+	if e != nil {
+		t.Fatal("candidate lookup", e)
+	}
+	if len(promote) > 0 && !promote[0] {
+		return id
+	}
+	service := app.ConnectorBackingAcceptance{Source: f, Proof: f, Recovery: f.scenario.recovery.reader, Journal: f.backing, Promotion: f.source, Audit: f.audit, MAC: f.mac, Now: time.Now}
+	if _, e = service.Accept(f.ctx, id, f.request); e != nil {
+		t.Fatal("backing acceptance", e)
+	}
+	return id
+}
+func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
+	t.Run("connector-identity-fast", func(t *testing.T) {
+		f := newConnectorSQLFixture(t, ctx, admin, poolFor, store, keys, create(t, 1), 10800)
+		client, server := f.issue(t, "client"), f.issue(t, "server")
+		for _, leaf := range []value.IssuedConnectorCredential{client, server} {
+			if _, e := f.registry.ConnectorLeafRegistration(ctx, leaf.Certificate); e != nil {
+				t.Fatal("exact active leaf", e)
+			}
+		}
+		var oldProcess []byte
+		if e := admin.QueryRow(ctx, "SELECT process::text FROM connector_identity_process WHERE id=$1", f.processID).Scan(&oldProcess); e != nil {
+			t.Fatal(e)
+		}
+		qualifyConnectorLiveProfileCleanupGuard(t, f)
+		f.renewBacking(t)
+		for _, leaf := range []value.IssuedConnectorCredential{client, server} {
+			if _, e := f.registry.ConnectorLeafRegistration(ctx, leaf.Certificate); e != nil {
+				t.Fatal("backing renewal invalidated original live leaf", e)
+			}
+		}
+		// The second permitted provider attempt exercises a new exact paid intent
+		// under the new policy without waiting for the next 30-minute signing period.
+		replacement := f.issue(t, "client")
+		if replacement.Certificate.Digest == client.Certificate.Digest {
+			t.Fatal("new exact attempt did not create independent leaf")
+		}
+		var retained []byte
+		if e := admin.QueryRow(ctx, "SELECT process::text FROM connector_identity_process WHERE id=$1", f.processID).Scan(&retained); e != nil || !bytes.Equal(oldProcess, retained) {
+			t.Fatal("backing renewal rewrote original process/dates", e)
+		}
+		for role, p := range f.pools {
+			for _, table := range []string{"operation_audit", "operation_audit_account", "connector_identity_root", "connector_identity_process"} {
+				if _, e := p.Exec(ctx, "SELECT * FROM "+table+" LIMIT 1"); e == nil {
+					t.Fatal("private role has ambient base read", role, table)
+				}
+			}
+		}
+
+		for _, mode := range []string{"close", "promote"} {
+			t.Run("exhausted-source-"+mode, func(t *testing.T) {
+				bounded := newConnectorSQLFixture(t, ctx, admin, poolFor, store, keys, create(t, 1), 10800, 4)
+				candidate := bounded.renewBacking(t, mode == "promote")
+				var used, limit int64
+				if e := admin.QueryRow(ctx, "SELECT source_transitions,source_transition_limit FROM connector_identity_root WHERE root_id=$1", bounded.scenario.a.RootID).Scan(&used, &limit); e != nil || used != limit {
+					t.Fatal("fixture did not exhaust source backing", used, limit, e)
+				}
+				if mode == "close" {
+					var closed bool
+					if e := bounded.pools["source"].QueryRow(ctx, "SELECT close_connector_backing_candidate($1,$2)", bounded.scenario.a.RootID, candidate).Scan(&closed); e != nil || !closed {
+						t.Fatal("prepaid exact candidate close denied", e)
+					}
+					if e := bounded.pools["source"].QueryRow(ctx, "SELECT close_connector_backing_candidate($1,$2)", bounded.scenario.a.RootID, candidate).Scan(&closed); e != nil || !closed {
+						t.Fatal("same closed candidate replay denied", e)
+					}
+				}
+				if _, e := bounded.enrollment.Enroll(ctx, custodyID(), bounded.request); e == nil {
+					t.Fatal("exhausted negative-watermark budget admitted serving authority")
+				}
+				original := bounded.configuration.Source.Observation.Backing.SourceDigest
+				bounded.configuration.Source.Observation.Backing.SourceDigest[0]++
+				changed, _ := bounded.ReadConnectorIdentityConfiguration(ctx)
+				if e := bounded.source.StageConnectorIdentity(ctx, changed); e == nil {
+					t.Fatal("contrary exhausted source accepted")
+				}
+				bounded.configuration.Source.Observation.Backing.SourceDigest = original
+				restored, _ := bounded.ReadConnectorIdentityConfiguration(ctx)
+				_ = bounded.source.StageConnectorIdentity(ctx, restored)
+				if _, e := bounded.enrollment.Enroll(ctx, custodyID(), bounded.request); e == nil {
+					t.Fatal("restoring old source revived exhausted authority")
+				}
+				var final int64
+				if e := admin.QueryRow(ctx, "SELECT source_transitions FROM connector_identity_root WHERE root_id=$1", bounded.scenario.a.RootID).Scan(&final); e != nil || final != used {
+					t.Fatal("resolution refilled/spent unreserved transition", final, used, e)
+				}
+			})
+		}
+
+		f.qualifyPrivateViews(t, poolFor)
+		t.Log("real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic")
+	})
+}
+
+func (f *connectorSQLFixture) qualifyPrivateViews(t *testing.T, poolFor func(string, string) *pgxpool.Pool) {
+	t.Helper()
+	parentPool := poolFor
+	poolFor = func(role, password string) *pgxpool.Pool {
+		p := parentPool(role, password)
+		t.Cleanup(p.Close)
+		return p
+	}
+	f.refresh(t)
+	ctx := f.ctx
+	root := f.scenario.a.RootID
+	normal, e := postgres.New(ctx, poolFor("operation_audit_config_runtime", "synthetic-operation-config"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	if e = normal.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: "normal", AccountVersion: "synthetic-human", Accounts: 1, RecordsPerAccount: 2, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}); e != nil {
+		t.Fatal(e)
+	}
+	j, e := postgres.NewOperationJournal(ctx, poolFor("operation_audit_runtime", "synthetic-operation-journal"), root, "normal", f.scenario.recovery.guard)
+	if e != nil {
+		t.Fatal(e)
+	}
+	human := audit.OperationIntent{ID: custodyID(), RootID: root, TraceID: custodyID(), Name: "get_case", InputFormat: "context-input/v1", MACVersion: "synthetic", AccountVersion: "synthetic-human", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "human-secret", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
+	if _, e = j.ReserveOperation(ctx, human); e != nil {
+		t.Fatal("positive ordinary row for isolation", e)
+	}
+	for _, duty := range []string{"cleanup", "verifier", "finalizer"} {
+		p := f.pools[duty]
+		for _, view := range []string{"pool", "account", "audit", "lifecycle", "history"} {
+			var wrong int64
+			if e = p.QueryRow(ctx, "SELECT count(*) FROM connector_operation_"+view+" WHERE lane<>'identity'").Scan(&wrong); e != nil || wrong != 0 {
+				t.Fatal("human row visible through filtered view", duty, view, wrong, e)
+			}
+		}
+		var own int64
+		if e = p.QueryRow(ctx, "SELECT count(*) FROM connector_operation_audit WHERE root_id=$1 AND id=$2", root, f.processID).Scan(&own); e != nil || own != 1 {
+			t.Fatal("private positive view not exercised", duty, own, e)
+		}
+		var humanCount int64
+		if e = p.QueryRow(ctx, "SELECT count(*) FROM connector_operation_audit WHERE id=$1", human.ID).Scan(&humanCount); e != nil || humanCount != 0 {
+			t.Fatal("known human ID disclosed", duty, e)
+		}
+		tag, e := p.Exec(ctx, "UPDATE connector_operation_audit SET id=id WHERE id=$1", human.ID)
+		if e != nil || tag.RowsAffected() != 0 {
+			t.Fatal("human immutable-key UPDATE reached a row", duty, e)
+		}
+		for _, sql := range []string{
+			"SELECT (SELECT intent FROM operation_audit LIMIT 1) FROM connector_operation_audit",
+			"UPDATE connector_operation_audit SET id='20000000-0000-4000-8000-000000000001' WHERE id='" + f.processID + "' RETURNING intent",
+			"UPDATE connector_operation_lifecycle SET intent_completion='{}' WHERE operation_id='" + f.processID + "'",
+			"INSERT INTO connector_operation_audit SELECT * FROM connector_operation_audit RETURNING intent",
+			"DELETE FROM connector_operation_audit RETURNING intent",
+			"SET ROLE postgres",
+		} {
+			if _, e = p.Exec(ctx, sql); e == nil {
+				t.Fatal("private role escaped its exact duty", duty, sql)
+			}
+		}
+	}
+	// A view owned by the migration owner still evaluates current_user as the
+	// invoking function owner, which is deliberately different from session_user.
+	fn := "connector_view_probe_" + strings.ReplaceAll(custodyID(), "-", "")
+	if _, e = f.admin.Exec(ctx, "CREATE FUNCTION "+pgx.Identifier{fn}.Sanitize()+"() RETURNS bigint LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS 'SELECT count(*) FROM public.connector_operation_audit'"); e != nil {
+		t.Fatal(e)
+	}
+	defer f.admin.Exec(ctx, "DROP FUNCTION "+pgx.Identifier{fn}.Sanitize()+"()")
+	var throughOwner int64
+	if e = f.pools["cleanup"].QueryRow(ctx, "SELECT "+pgx.Identifier{fn}.Sanitize()+"()").Scan(&throughOwner); e != nil || throughOwner != 0 {
+		t.Fatal("view owner turned private login into ambient reader", throughOwner, e)
+	}
+	// Bounded waiting must preserve the caller's original deadline, even when
+	// SELECT FOR UPDATE is permitted on an otherwise immutable key column.
+	tx, e := f.admin.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer tx.Rollback(ctx)
+	if _, e = tx.Exec(ctx, "SELECT id FROM operation_audit WHERE id=$1 FOR UPDATE", f.processID); e != nil {
+		t.Fatal(e)
+	}
+	wait, stop := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer stop()
+	began := time.Now()
+	_, e = f.pools["cleanup"].Exec(wait, "SELECT id FROM connector_operation_audit WHERE id=$1 FOR UPDATE", f.processID)
+	if e == nil || time.Since(began) > time.Second {
+		t.Fatal("private view ignored original lock deadline", e, time.Since(began))
+	}
+}

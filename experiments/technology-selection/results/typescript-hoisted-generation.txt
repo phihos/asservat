@@ -1,0 +1,2 @@
+✨ openapi-typescript 7.13.0
+🚀 /tmp/asservat-openapi-hoisted-all.json → /tmp/asservat-browser-types-hoisted.d.ts [358.8ms]

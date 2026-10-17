@@ -1,0 +1,374 @@
+--- a/docs/architecture/initial-provider-provisioning.md
++++ b/docs/architecture/initial-provider-provisioning.md
+@@ -32,6 +32,15 @@
+ no CIDRs, no orphan/renewal/period, zero usage count and a 900-second explicit max
+ TTL. The requested TTL derives from the original claim's latest completion and
+ original parent expiry, with one second of margin; it never renews on retry.
++Policy reads use the pinned OpenBao 2.7.1 response: name/body, finite typed version,
++CAS flag, optional modification time and the two identity-template flags. The
++flags must both be false; unknown fields still deny. This first profile rejects
++any policy expiration instead of manufacturing an extra policy renewal interval.
++Modification/version metadata supplies no freshness or issue authority. The
++[exact pinned response](https://github.com/openbao/openbao/blob/a5db72cef75c24b920ade02065b18dd8eb666bac/internal/vault/logical_system.go#L2557)
++and [current policy API](https://openbao.org/docs/api/system/policies/) distinguish
++server wire fields from the exact ACL body whose meaning is checked separately.
++
+ Sending a second explicit max TTL alongside the role would produce a provider
+ warning, so the request uses the already checked role cap and its shorter TTL.
+ Every positive child is independently inspected with that child credential and
+--- a/docs/decisions/128-initial-provider-provisioning.md
++++ b/docs/decisions/128-initial-provider-provisioning.md
+@@ -38,7 +38,11 @@
+ and revocation without revealing the original token. Its token tree supplies an
+ additional parent lifetime/revocation bound. These are provider semantics to
+ qualify, not proof that a timed-out HTTP request drained. [Token API](https://openbao.org/docs/api/auth/token/),
+-[token lifecycle](https://openbao.org/docs/concepts/tokens/).
++[token lifecycle](https://openbao.org/docs/concepts/tokens/),
++[policy API](https://openbao.org/docs/api/system/policies/). Exact policy-response
++fields come from the [pinned 2.7.1 source](https://github.com/openbao/openbao/blob/a5db72cef75c24b920ade02065b18dd8eb666bac/internal/vault/logical_system.go#L2557),
++including typed version/CAS/time metadata and disabled template-expansion flags.
++The first profile refuses policy expiration; policy metadata is not freshness.
+ 
+ The implementation uses the existing pinned OpenBao Go client; no new dependency
+ or general credential controller is introduced. Existing absent-provider
+--- a/internal/adapters/kms/initial_provider.go
++++ b/internal/adapters/kms/initial_provider.go
+@@ -5,6 +5,7 @@
+ 	"context"
+ 	"encoding/json"
+ 	"encoding/json/jsontext"
++	"errors"
+ 	"io"
+ 	"net/http"
+ 	"reflect"
+@@ -222,11 +223,19 @@
+ 	}
+ 	for _, name := range []string{s.profile.IssuerPolicy, s.profile.WrapPolicy, s.profile.UnwrapPolicy} {
+ 		r, _, e := initialProviderCall(ctx, s.client, http.MethodGet, "sys/policies/acl/"+name, nil)
++		// Pinned OpenBao 2.7.1 readPolicyResponse includes finite policy
++		// metadata as well as its body. These values do not renew authority.
+ 		var value struct {
+-			Name   string `json:"name"`
+-			Policy string `json:"policy"`
+-		}
+-		if e != nil || !initialProviderDecode(r.Data, &value) || value.Name != name || len(value.Policy) > 8192 {
++			Name           string     `json:"name"`
++			Policy         string     `json:"policy"`
++			Version        int64      `json:"version"`
++			CASRequired    bool       `json:"cas_required"`
++			AllowWildcards bool       `json:"allow_wildcards_in_identity_templates"`
++			AllowSlashes   bool       `json:"allow_slashes_in_identity_templates"`
++			Modified       *time.Time `json:"modified"`
++			Expiration     *time.Time `json:"expiration"`
++		}
++		if e != nil || !initialProviderFields(r.Data, "name", "policy", "version", "cas_required", "allow_wildcards_in_identity_templates", "allow_slashes_in_identity_templates") || !initialProviderDecode(r.Data, &value) || value.Name != name || len(value.Policy) > 8192 || value.Version < 0 || value.AllowWildcards || value.AllowSlashes || value.Expiration != nil || value.Modified != nil && value.Modified.IsZero() {
+ 			return ErrKeyService
+ 		}
+ 		var got, want initialACL
+@@ -247,7 +256,36 @@
+ 
+ // Check verifies the issuer and both role/policy profiles without issuing a
+ // token. Its original <=5s lease must survive the caller's subsequent CAS/effect.
+-func (s *InitialProviderIssuer) Check(ctx context.Context, notAfter time.Time) (contracts.InitialProviderParent, time.Time, error) {
++type initialProviderCheckFailure struct {
++	phase string
++	cause error
++}
++
++func (e initialProviderCheckFailure) Error() string {
++	return "initial provider preflight " + e.phase + ": unavailable"
++}
++func (e initialProviderCheckFailure) Unwrap() error { return e.cause }
++
++// InitialProviderCheckStage returns only a fixed local phase label, never a
++// provider response, configured source name, credential or request value.
++func InitialProviderCheckStage(err error) string {
++	var e initialProviderCheckFailure
++	if !errors.As(err, &e) {
++		return ""
++	}
++	switch e.phase {
++	case "input", "wrap-role", "unwrap-role", "policies", "issuer-profile", "final-deadline":
++		return e.phase
++	}
++	return ""
++}
++func (s *InitialProviderIssuer) Check(ctx context.Context, notAfter time.Time) (_ contracts.InitialProviderParent, _ time.Time, err error) {
++	phase := "input"
++	defer func() {
++		if err != nil {
++			err = initialProviderCheckFailure{phase, err}
++		}
++	}()
+ 	var zero contracts.InitialProviderParent
+ 	if s == nil || ctx == nil || notAfter.IsZero() {
+ 		return zero, time.Time{}, ErrKeyService
+@@ -255,17 +293,25 @@
+ 	until := s.now().Add(5 * time.Second)
+ 	ctx, end := context.WithDeadline(ctx, until)
+ 	defer end()
++	phase = "wrap-role"
+ 	if e := s.role(ctx, s.profile.WrapRole, s.profile.WrapPolicy); e != nil {
+ 		return zero, time.Time{}, e
+ 	}
++	phase = "unwrap-role"
+ 	if e := s.role(ctx, s.profile.UnwrapRole, s.profile.UnwrapPolicy); e != nil {
+ 		return zero, time.Time{}, e
+ 	}
++	phase = "policies"
+ 	if e := s.policies(ctx); e != nil {
+ 		return zero, time.Time{}, e
+ 	}
++	phase = "issuer-profile"
+ 	d, e := s.lookup(ctx, s.client, s.profile.IssuerPolicy)
+-	if e != nil || d.Expire.After(notAfter) || !s.now().Before(until) || ctx.Err() != nil {
++	if e != nil || d.Expire.After(notAfter) {
++		return zero, time.Time{}, ErrKeyService
++	}
++	phase = "final-deadline"
++	if !s.now().Before(until) || ctx.Err() != nil {
+ 		return zero, time.Time{}, ErrKeyService
+ 	}
+ 	until = identity.Earlier(until, d.Expire)
+--- /dev/null
++++ b/internal/adapters/kms/initial_provider_diagnostic_test.go
+@@ -0,0 +1,49 @@
++package kms
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"testing"
++	"time"
++)
++
++func TestInitialProviderCheckDiagnosticHidesValues(t *testing.T) {
++	f := newInitialProviderFixture(t)
++	f.roleChange = func(v *initialTokenRole) { v.Type = "DO-NOT-LEAK-provider-value" }
++	_, _, e := f.issuer.Check(context.Background(), time.Now().Add(time.Hour))
++	if !errors.Is(e, ErrKeyService) || InitialProviderCheckStage(e) != "wrap-role" || strings.Contains(e.Error(), "DO-NOT-LEAK") {
++		t.Fatal("unsafe provider diagnostic")
++	}
++	if InitialProviderCheckStage(errors.New("raw failure")) != "" {
++		t.Fatal("unknown error exposed")
++	}
++}
++
++func TestInitialProviderPinnedACLReadMetadata(t *testing.T) {
++	f := newInitialProviderFixture(t)
++	f.policyMetadata = map[string]any{"version": 1, "cas_required": false, "allow_wildcards_in_identity_templates": false, "allow_slashes_in_identity_templates": false, "modified": "2026-10-01T00:00:00Z"}
++	if _, _, e := f.issuer.Check(context.Background(), time.Now().Add(time.Hour)); e != nil {
++		t.Fatal("pinned OpenBao ACL response rejected", e)
++	}
++}
++
++func TestInitialProviderRejectsUnsupportedACLMetadata(t *testing.T) {
++	for _, metadata := range []map[string]any{
++		{"allow_wildcards_in_identity_templates": true}, {"allow_slashes_in_identity_templates": true},
++		{"expiration": "2030-01-01T00:00:00Z"}, {"expiration": "2020-01-01T00:00:00Z"},
++		{"version": -1}, {"version": 1.5}, {"version": "1"}, {"modified": "invalid"}, {"new_unknown_authority": "forbidden"},
++	} {
++		f := newInitialProviderFixture(t)
++		f.policyMetadata = metadata
++		if _, _, e := f.issuer.Check(context.Background(), time.Now().Add(time.Hour)); !errors.Is(e, ErrKeyService) || InitialProviderCheckStage(e) != "policies" {
++			t.Fatal("unsupported policy metadata accepted", e)
++		}
++		f.mu.Lock()
++		issued := f.posts
++		f.mu.Unlock()
++		if issued != 0 {
++			t.Fatal("preflight created credential")
++		}
++	}
++}
+--- a/internal/adapters/kms/initial_provider_test.go
++++ b/internal/adapters/kms/initial_provider_test.go
+@@ -15,19 +15,20 @@
+ )
+ 
+ type initialProviderFixture struct {
+-	mu           sync.Mutex
+-	server       *httptest.Server
+-	profile      contracts.InitialProviderProfile
+-	issuer       *InitialProviderIssuer
+-	parent       initialTokenLookup
+-	children     map[string]initialTokenLookup
+-	policies     map[string]string
+-	roleChange   func(*initialTokenRole)
+-	parentChange func(*initialTokenLookup)
+-	issueMode    string
+-	posts        int
+-	omitField    string
+-	shift        time.Duration
++	mu             sync.Mutex
++	server         *httptest.Server
++	profile        contracts.InitialProviderProfile
++	issuer         *InitialProviderIssuer
++	parent         initialTokenLookup
++	children       map[string]initialTokenLookup
++	policies       map[string]string
++	roleChange     func(*initialTokenRole)
++	parentChange   func(*initialTokenLookup)
++	issueMode      string
++	posts          int
++	policyMetadata map[string]any
++	omitField      string
++	shift          time.Duration
+ }
+ 
+ func newInitialProviderFixture(t *testing.T) *initialProviderFixture {
+@@ -134,7 +135,11 @@
+ 	}
+ 	if strings.HasPrefix(r.URL.Path, "/v1/sys/policies/acl/") {
+ 		name := strings.TrimPrefix(r.URL.Path, "/v1/sys/policies/acl/")
+-		reply(map[string]any{"data": map[string]string{"name": name, "policy": f.policies[name]}})
++		data := map[string]any{"name": name, "policy": f.policies[name], "version": 1, "cas_required": false, "allow_wildcards_in_identity_templates": false, "allow_slashes_in_identity_templates": false}
++		for key, value := range f.policyMetadata {
++			data[key] = value
++		}
++		reply(map[string]any{"data": data})
+ 		return
+ 	}
+ 	if strings.HasPrefix(r.URL.Path, "/v1/auth/token/create/") {
+--- a/internal/bootstrap/initial_preparer.go
++++ b/internal/bootstrap/initial_preparer.go
+@@ -39,15 +39,37 @@
+ 	providerIssuer *kms.InitialProviderIssuer
+ }
+ 
+-func NewInitialPreparationDeployment(ctx context.Context, files *os.Root) (*InitialPreparationDeployment, error) {
++type initialPreparerLoadFailure struct {
++	phase string
++	cause error
++}
++
++func (e initialPreparerLoadFailure) Error() string {
++	stage := "initial preparation loader " + e.phase + ": unavailable"
++	if provider := kms.InitialProviderCheckStage(e.cause); provider != "" {
++		stage += " (provider " + provider + ")"
++	}
++	return stage
++}
++func (e initialPreparerLoadFailure) Unwrap() error { return e.cause }
++
++func NewInitialPreparationDeployment(ctx context.Context, files *os.Root) (_ *InitialPreparationDeployment, err error) {
++	phase := "process-inputs"
++	defer func() {
++		if err != nil {
++			err = initialPreparerLoadFailure{phase, err}
++		}
++	}()
+ 	if ctx == nil || ctx.Err() != nil || files == nil || disableWorkerCoreDumps() != nil {
+ 		return nil, mounts.ErrUnavailable
+ 	}
++	phase = "deployment-projection"
+ 	raw, e := mounts.Read(ctx, files, "deployment.json", contracts.InitialPreparationMaxBytes)
+ 	if e != nil {
+ 		return nil, e
+ 	}
+ 	defer clear(raw)
++	phase = "deployment-contract"
+ 	c, e := contracts.DecodeInitialPreparer(bytes.NewReader(raw))
+ 	if e != nil || c.Format != contracts.InitialPreparerFormat || c.Plan.PrivateState != nil && c.Services == nil {
+ 		return nil, mounts.ErrUnavailable
+@@ -55,6 +77,7 @@
+ 	if c.SQLMaterial != nil && (c.Plan.PrivateState == nil || c.Services == nil || !authorization.UUID(c.SQLMaterial.UID) || len(validation.IsDNS1123Subdomain(c.SQLMaterial.Name)) != 0 || c.SQLMaterial.Name == c.Plan.PrivateState.Name) {
+ 		return nil, mounts.ErrUnavailable
+ 	}
++	phase = "kubernetes-endpoint"
+ 	h, e := ownerHTTP(c.Kubernetes.Endpoint, c.Kubernetes.Roots)
+ 	if e != nil {
+ 		return nil, mounts.ErrUnavailable
+@@ -79,6 +102,7 @@
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = "native-preparer"
+ 	d.preparer, e = kube.NewInitialPreparer(adminConfig, admin, probe, c)
+ 	if e != nil {
+ 		return nil, e
+@@ -90,6 +114,7 @@
+ 		if e != nil {
+ 			return nil, e
+ 		}
++		phase = "sql-material"
+ 		if e = reader.CheckInitialSQLMaterial(root); e != nil {
+ 			return nil, e
+ 		}
+@@ -97,40 +122,48 @@
+ 		// The existing connection builder reads the fixed protected credential and
+ 		// validates all local fields before any preparation mutation. This maintenance
+ 		// connection is confined to this bootstrap and never projected into the Pod.
++		phase = "sql-connection-inputs"
+ 		config, e := in.sqlConfig(root, "sql-maintenance.json")
+ 		if e != nil {
+ 			return nil, e
+ 		}
++		phase = "sql-pool"
+ 		d.sqlPool, e = pgxpool.NewWithConfig(root, config)
+ 		if e != nil {
+ 			return nil, mounts.ErrUnavailable
+ 		}
++		phase = "sql-maintenance-scope"
+ 		d.sqlRoles, e = postgres.NewInitialSQLRoles(root, d.sqlPool, c.Plan.InstallationID)
+ 		if e != nil {
+ 			return nil, e
+ 		}
+ 	}
+ 	if c.Providers != nil {
++		phase = "provider-material"
+ 		material, until, e := d.preparer.ReadInitialProviderMaterial(root)
+ 		if e != nil {
+ 			return nil, e
+ 		}
++		phase = "provider-endpoint"
+ 		h, e := ownerHTTP(c.Services.KeyService.Endpoint, c.Services.KeyService.Roots)
+ 		if e != nil {
+ 			return nil, e
+ 		}
+ 		defer h.CloseIdleConnections()
++		phase = "provider-constructor"
+ 		d.providerIssuer, e = kms.NewInitialProviderIssuer(c.Services.KeyService.Endpoint, material.IssuerToken, c.Services.KeyService.AuditMount, c.Services.KeyService.AuditKey, c.Plan.InstallationID, c.Plan.RequestID, *c.Providers, h, time.Now)
+ 		if e != nil {
+ 			return nil, e
+ 		}
++		phase = "provider-preflight"
+ 		bounded, done := context.WithDeadline(root, until)
+ 		_, _, e = d.providerIssuer.Check(bounded, time.Now().Add(15*time.Minute))
+ 		done()
+ 		if e != nil {
+-			return nil, mounts.ErrUnavailable
+-		}
+-	}
++			return nil, e
++		}
++	}
++	phase = "final-cancellation"
+ 	if root.Err() != nil {
+ 		return nil, mounts.ErrUnavailable
+ 	}
+--- /dev/null
++++ b/internal/bootstrap/initial_preparer_diagnostic_test.go
+@@ -0,0 +1,21 @@
++package bootstrap
++
++import (
++	"asservat.local/asservat/internal/adapters/mounts"
++	"context"
++	"errors"
++	"strings"
++	"testing"
++)
++
++func TestInitialPreparerLoadDiagnosticHidesCauseAndPreservesIdentity(t *testing.T) {
++	secret := errors.New("DO-NOT-LEAK-provider-token-sql-password")
++	err := initialPreparerLoadFailure{phase: "sql-connection-inputs", cause: secret}
++	if !errors.Is(err, secret) || strings.Contains(err.Error(), secret.Error()) || err.Error() != "initial preparation loader sql-connection-inputs: unavailable" {
++		t.Fatal("unsafe loader diagnostic")
++	}
++	_, e := NewInitialPreparationDeployment(context.Background(), nil)
++	if !errors.Is(e, mounts.ErrUnavailable) || e.Error() != "initial preparation loader process-inputs: unavailable" {
++		t.Fatal("constructor phase or cause missing", e)
++	}
++}

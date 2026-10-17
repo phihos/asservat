@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/retention-topology.schema.json",
+  "title": "Accepted installation retention topology v1",
+  "description": "topology.json in an immutable installation ConfigMap; its identity and exact content must be independently accepted. Explicit null local source means no separate local source. This does not enroll a cluster or authorize evidence access.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "retention-topology/v1"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "authorityRootID": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "targetClusterID": {
+      "type": "string",
+      "format": "uuid",
+      "maxLength": 36
+    },
+    "hub": {
+      "$ref": "https://asservat.io/spec/v1/retention-topology.schema.json#/$defs/source"
+    },
+    "local": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/retention-topology.schema.json#/$defs/source"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "authorityRootID",
+    "targetClusterID",
+    "hub",
+    "local"
+  ],
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterID": {
+          "type": "string",
+          "format": "uuid",
+          "maxLength": 36
+        },
+        "controlNamespaceUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "protectionSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "clusterID",
+        "controlNamespaceUID",
+        "protectionSHA256"
+      ]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "session": 38537,
+  "terminal": 0,
+  "paths": 17,
+  "newPaths": 13,
+  "existingUTCPaths": 4,
+  "dependencies": 1944,
+  "mirrorPaths": 1957,
+  "topLevelPass": 47,
+  "namedPass": 172,
+  "skipped": 0,
+  "phases": [
+    {
+      "phase": "before-utc",
+      "exit": 1,
+      "expectedExit": 1,
+      "seconds": 3.237
+    },
+    {
+      "phase": "compile",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 6.192
+    },
+    {
+      "phase": "race",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 15.354
+    },
+    {
+      "phase": "vet",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 2.192
+    },
+    {
+      "phase": "go-architecture",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 2.138
+    }
+  ],
+  "allHashesUnchanged": true,
+  "native": false,
+  "installed": false,
+  "scratch": {
+    "removed": true,
+    "freeAfter": 9234968576
+  }
+}

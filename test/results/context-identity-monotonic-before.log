@@ -1,0 +1,7 @@
+--- FAIL: TestCurrentRequestNeverReextendsAShortenedObservation (0.00s)
+    current_request_test.go:33: shortened identity renewed: 2026-10-11 19:33:06.451607703 +0200 CEST m=+5.000547163 <nil>
+--- FAIL: TestConcurrentIdentityReadKeepsOtherReadsShorterDeadline (0.00s)
+    current_request_test.go:71: concurrent identity read restored old deadline: 2026-10-11 19:33:06.451878345 +0200 CEST m=+5.000817804 <nil> <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.005s
+FAIL

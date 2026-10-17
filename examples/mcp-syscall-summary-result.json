@@ -1,0 +1,31 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "syscallSummary",
+    "rows": [
+      {
+        "syscall": "connect",
+        "count": 10,
+        "errors": 2,
+        "paired_count": 10,
+        "total_duration_ns": 5000000
+      }
+    ],
+    "coverage": {
+      "dropped_events": 0,
+      "unmatched_events": 0,
+      "truncated": false,
+      "gaps": []
+    }
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": []
+}

@@ -1,0 +1,35 @@
+# Native fixture retention observation ownership
+
+Four test-only paths; no production, SQL, authority, budget, socket or aggregate deadline changes. Integrate `manifest.json` only after verifying every base/payload and recording dependency changes separately.
+
+The native download gate previously called `retentionEffectFixture.RetainedRetentionPolicies`, which writes `ObserveRetention` under an exclusive permission-stream lock before every accepted-source read. Publication used the same write-on-read pattern. The fixture already had a one-second source owner, but it began after publication/setup and renewed retention ownership without publishing its observations. The actual current-source consumer is now `AcceptedRetentionReader` for native cases, including the factory-captured `f.authority` closure and enrollment/control consumers. Ordinary fixture composition remains unchanged.
+
+One joined native fixture owner starts immediately after the accepted capture scenario returns, before processing initialization, crypto preparation and catalog publication. It observes only the original explicitly synthetic fleet/permission/retention roots. Each original <=5-second refresh renews the existing source lease, publishes the retention observation and refreshes permissions; the already accepted worker configuration is attached later, once, without holding the registration mutex during I/O. No source observer can clear recovery, suspension, replace a revision or revive expired ownership. Failure cancels the shared fixture context and is reported when the owner joins. `t.Cleanup` covers early setup Goexit; an idempotent explicit Close joins before native phase pools close.
+
+The capture scenario's already accepted admission, authority observations, human session, worker, encrypted artifacts and every native request keep their original dates. The source owner does not rerun capture admission or renew disclosure leases. Its early start does not synthesize production installation authority.
+
+## Verification actually run
+
+Handle **72242**, terminal **0**, GOMAXPROCS=2, GOFLAGS=-p=2, dedicated stage TMPDIR:
+
+- `go test -overlay <stage>/overlay.json -race ./test/integration -run '^TestNativeFixtureSourceOwner' -count=1 -timeout=60s -v`: exit 0; Go 4.052s, compile/run 14.565s. Explicit Close, parent cancellation and setup Goexit all join an admitted blocked refresh. The innermost Goexit branch deliberately uses Skip to trigger cleanup; its outer assertion passes after proving the refresh joined.
+- `go vet -overlay <stage>/overlay.json ./test/integration`: exit 0, 1.042s.
+- All 1,507 dependencies, three original paths, four payloads unchanged before/after both commands. Reports and original failure/passing-diagnostic logs in `evidence/`.
+
+The new real PostgreSQL/S3 selector **compiled only**, not run:
+
+`python scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^download-worker-native-retention-observation$'`
+
+It positively closes the source owner, checks three reads leave the exact original retention SQL timestamps/epoch/sequence unchanged, then waits past the actual original observation deadline. A further read must fail without changing that row. It uses no synthetic expiry UPDATE or source refresh after closure.
+
+`before-overlay.json` is an **unrun counterfactual regression overlay**, restoring only the former write-on-read retained-policy consumer while keeping the test/setup code. Its expected native failure is `retention read refreshed the original source`. It is not passing-before or failing-before evidence. A parent-owned native run using it must also retain the overlay/freeze hashes; the ordinary harness hashes live files and cannot alone attest external overlay source.
+
+After native regression qualification, compare the same original six-case selection:
+
+`python scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^download-worker-native-(content|content-resume|content-interrupted|control-races|control-admission-race|exchange)$'`
+
+## Evidence and limits
+
+The untraced predecessor exited 1: ordinary content passed; range 2 reached native admission then became Uncertain; later preparation cases expired. PostgreSQL recorded a cancelled `LockPermissionStream FOR UPDATE` wait at 18:57:15.070. The earlier passing diagnostic measured 62 retained-policy calls totaling 1.660s across two preparation phases. Those durations include complete calls and do not isolate lock time. Removing the fixture's artificial write-on-read contention is justified independently; no claim that it resolves all native availability failures is made before the actual comparison.
+
+The native compilation and pure lifecycle tests do not qualify real SQL expiry, source observation scheduling, download bytes or installed runtime. Parent owns all real-service runs. Existing full-budget, uncertain-spend, revocation, per-frame and final-effect tests remain intact.

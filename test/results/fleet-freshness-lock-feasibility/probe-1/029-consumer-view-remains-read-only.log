@@ -1,0 +1,5 @@
+NOTICE:  identifier "asservat-fleet-lock-f3896909557748f9:consumer-view-remains-read-only" will be truncated to "asservat-fleet-lock-f3896909557748f9:consumer-view-remains-read"
+ERROR:  55000: cannot update view "fleet_current_trust"
+DETAIL:  Views containing WITH are not automatically updatable.
+HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+LOCATION:  error_view_not_updatable, rewriteHandler.c:3204

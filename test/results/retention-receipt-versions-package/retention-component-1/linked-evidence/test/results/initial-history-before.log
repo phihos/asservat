@@ -1,0 +1,6 @@
+=== RUN   TestInitialSQLHistoryRoleWithRealPostgres
+    initial_history_role_test.go:72: history create failed: history_phase=history-role-privileges sqlstate=none expired=false
+--- FAIL: TestInitialSQLHistoryRoleWithRealPostgres (0.26s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.311s
+FAIL

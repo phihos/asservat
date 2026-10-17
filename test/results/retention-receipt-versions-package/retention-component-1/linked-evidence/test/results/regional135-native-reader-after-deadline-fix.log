@@ -1,0 +1,15 @@
+=== RUN   TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:329: actual guarded Deployment/ReplicaSet/Pod defaults, explicit projected token and independently pinned startup inputs accepted
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/actual-start-status-under-both-guards
+    context_start_connector_test.go:355: actual capacity CREATE elapsed=4.995665377s original_remaining=4.333884ms err=local start denied
+=== RUN   TestConnectorAPIProcessWithRealKubernetes/changed-input-metadata
+=== NAME  TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:68: bounded actual API classes: counts=map[GET configmaps:16 GET deployments:36 GET other:72 GET pods:17 GET replicasets:17 GET secrets:8 GET serviceaccounts:13 GET validatingadmissionpolicies:53 GET validatingadmissionpolicybindings:53 POST capacityreservations:1 POST other:28 POST selfsubjectreviews:34 POST tokenreviews:12 PUT configmaps/dry-run:8 PUT deployments/dry-run:19] total_roundtrip=map[GET configmaps:14.571878ms GET deployments:38.00455ms GET other:82.257108ms GET pods:17.494652ms GET replicasets:16.934086ms GET secrets:10.170225ms GET serviceaccounts:11.906843ms GET validatingadmissionpolicies:55.506359ms GET validatingadmissionpolicybindings:55.394605ms POST capacityreservations:17.03673ms POST other:18.650884ms POST selfsubjectreviews:35.382609ms POST tokenreviews:9.816285ms PUT configmaps/dry-run:9.393632ms PUT deployments/dry-run:41.176182ms]
+--- FAIL: TestConnectorAPIProcessWithRealKubernetes (15.07s)
+    --- PASS: TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial (0.01s)
+    --- FAIL: TestConnectorAPIProcessWithRealKubernetes/actual-start-status-under-both-guards (5.10s)
+    --- PASS: TestConnectorAPIProcessWithRealKubernetes/changed-input-metadata (2.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	15.122s
+FAIL

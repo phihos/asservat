@@ -1,0 +1,163 @@
+=== RUN   TestNaiveCrossRowQuotaFails
+    admission_test.go:127: unsafe Read Committed read-sum-then-insert admitted 16 units against an 8-unit budget
+--- PASS: TestNaiveCrossRowQuotaFails (0.08s)
+=== RUN   TestLastGrantAndLastCapacity
+    admission_test.go:148: 64 contenders: one last grant, one 8-unit non-context reservation; losers leak no starts
+--- PASS: TestLastGrantAndLastCapacity (0.17s)
+=== RUN   TestProtectedCapacityAndObjects
+    admission_test.go:187: A/C used their burst; B retained protected capacity; A retained context at hard ceiling; object ceiling independent
+--- PASS: TestProtectedCapacityAndObjects (0.06s)
+=== RUN   TestDuplicateOperationAndDigest
+--- PASS: TestDuplicateOperationAndDigest (0.19s)
+=== RUN   TestExpiredWhileWaitingAndTransactionClockTrap
+    admission_test.go:251: now() remained valid after real expiry; post-lock clock_timestamp check rejected without spend
+--- PASS: TestExpiredWhileWaitingAndTransactionClockTrap (1.07s)
+=== RUN   TestRevocationWinsWaitingAdmission
+--- PASS: TestRevocationWinsWaitingAdmission (0.09s)
+=== RUN   TestResultChildrenShareOneDisclosurePool
+    admission_test.go:302: collection starts exhausted, 4 children usable under one 64-unit parent pool; only 8 of 64 eight-unit spends admitted
+--- PASS: TestResultChildrenShareOneDisclosurePool (0.26s)
+=== RUN   TestUncertainChargeAndVerifiedDeletion
+--- PASS: TestUncertainChargeAndVerifiedDeletion (0.19s)
+=== RUN   TestCommitAcknowledgementLost
+==================
+WARNING: DATA RACE
+Write at 0x00c000886170 by goroutine 746:
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost.func1()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:358 +0x1b7
+  github.com/jackc/pgx/v5/pgconn.(*PgConn).CancelRequest()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:1112 +0x218
+  github.com/jackc/pgx/v5/pgconn.(*PgConn).CancelRequest()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:1101 +0x71
+  github.com/jackc/pgx/v5/pgconn.(*PgConn).asyncClose.func1()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:785 +0x1e6
+
+Previous read at 0x00c000886170 by goroutine 742:
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:365 +0x5a6
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:64 +0x10e1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:52 +0xe95
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:48 +0x9a1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:44 +0x5dc
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:40 +0x472
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:33 +0x2c1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:24 +0xf7
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:364 +0x57d
+  github.com/jackc/pgx/v5.connect()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:279 +0x78c
+  github.com/jackc/pgx/v5.ConnectConfig()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:161 +0x172
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:361 +0x344
+  testing.tRunner()
+      /usr/lib/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/lib/go/src/testing/testing.go:2258 +0x38
+
+Goroutine 746 (running) created at:
+  github.com/jackc/pgx/v5/pgconn.(*PgConn).asyncClose()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:776 +0xc4
+  github.com/jackc/pgx/v5/pgconn.(*PgConn).peekMessage()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:651 +0x298
+  github.com/jackc/pgx/v5/pgconn.(*MultiResultReader).NextResult()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/pgconn/pgconn.go:1638 +0x94
+  github.com/jackc/pgx/v5.(*Conn).execSimpleProtocol()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:598 +0x150
+  github.com/jackc/pgx/v5.(*Conn).execSimpleProtocol()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:597 +0xe8
+  github.com/jackc/pgx/v5.(*Conn).exec()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:583 +0xccb
+  github.com/jackc/pgx/v5.(*Conn).Exec()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:490 +0x277
+  github.com/jackc/pgx/v5.(*dbTx).Commit()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/tx.go:201 +0xf8
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:108 +0x2b6e
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:99 +0x2ab4
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:64 +0x10e1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:52 +0xe95
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:48 +0x9a1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:44 +0x5dc
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:40 +0x472
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:33 +0x2c1
+  asservat.local/experiments/control-crash.Admit()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission.go:24 +0xf7
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:364 +0x57d
+  github.com/jackc/pgx/v5.connect()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:279 +0x78c
+  github.com/jackc/pgx/v5.ConnectConfig()
+      /home/phil/go/pkg/mod/github.com/jackc/pgx/v5@v5.11.0/conn.go:161 +0x172
+  asservat.local/experiments/control-crash.TestCommitAcknowledgementLost()
+      /home/phil/Projekte/asservat/experiments/control-crash/go/admission_test.go:361 +0x344
+  testing.tRunner()
+      /usr/lib/go/src/testing/testing.go:2193 +0x21c
+  testing.(*T).Run.gowrap1()
+      /usr/lib/go/src/testing/testing.go:2258 +0x38
+
+Goroutine 742 (running) created at:
+  testing.(*T).Run()
+      /usr/lib/go/src/testing/testing.go:2258 +0xb12
+  testing.runTests.func1()
+      /usr/lib/go/src/testing/testing.go:2742 +0x84
+  testing.tRunner()
+      /usr/lib/go/src/testing/testing.go:2193 +0x21c
+  testing.runTests()
+      /usr/lib/go/src/testing/testing.go:2740 +0x9e9
+  testing.(*M).Run()
+      /usr/lib/go/src/testing/testing.go:2600 +0xf44
+  main.main()
+      _testmain.go:72 +0x164
+==================
+    admission_test.go:373: discarded real server COMMIT acknowledgement; original key resolved to exactly one spent reservation/work item
+    testing.go:1865: race detected during execution of test
+--- FAIL: TestCommitAcknowledgementLost (0.07s)
+=== RUN   TestBackendTerminationRollsBackAdmission
+--- PASS: TestBackendTerminationRollsBackAdmission (0.06s)
+=== RUN   TestSerializableUnprotectedPredicate
+    admission_test.go:418: unlocked predicate conflict aborted with 40001; fresh complete retry observed exhausted capacity
+--- PASS: TestSerializableUnprotectedPredicate (0.07s)
+=== RUN   TestAuditedWorkClaimsAndFences
+    admission_test.go:476: audit gate; 24 workers claimed 12 distinct items; reclaimed lease rejected fence-1 completion. No remote effect executed
+--- PASS: TestAuditedWorkClaimsAndFences (0.13s)
+=== RUN   TestPrepareDurabilityMarker
+--- PASS: TestPrepareDurabilityMarker (0.04s)
+=== RUN   TestAfterRestartDurability
+    admission_test.go:491: separate post-restart invocation
+--- SKIP: TestAfterRestartDurability (0.00s)
+FAIL
+FAIL	asservat.local/experiments/control-crash	2.491s
+FAIL

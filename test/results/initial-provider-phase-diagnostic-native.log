@@ -1,0 +1,11 @@
+=== RUN   TestInitialPreparationProvidersWithRealServices
+=== RUN   TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain
+=== NAME  TestInitialPreparationProvidersWithRealServices
+    initial_preparer_provider_test.go:256: actual preparation Run initial preparation run sql-and-providers/provider-wrap: unavailable (phase=provider-issue elapsed_ms=2427 parent_start_ms=31380 parent_remaining_ms=28953 original_operation_remaining_ms=2572)
+--- FAIL: TestInitialPreparationProvidersWithRealServices (62.58s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain (0.90s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	62.630s
+FAIL

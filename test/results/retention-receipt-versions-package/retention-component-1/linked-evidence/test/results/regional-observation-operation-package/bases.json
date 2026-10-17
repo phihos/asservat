@@ -1,0 +1,5 @@
+{
+  "internal/adapters/kubernetes/connector_observation_operation.go": null,
+  "internal/adapters/kubernetes/connector_observation_operation_native.go": null,
+  "internal/adapters/kubernetes/connector_observation_operation_test.go": null
+}

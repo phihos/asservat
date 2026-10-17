@@ -1,0 +1,35 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000007",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "threads": [
+      {
+        "thread_id": "1",
+        "frames": [
+          {
+            "index": 0,
+            "function": "synthetic_crash",
+            "file": "/src/example.c",
+            "line": 42,
+            "address": "0x1000"
+          }
+        ]
+      }
+    ],
+    "symbol_status": "complete"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000003",
+      "digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ]
+}

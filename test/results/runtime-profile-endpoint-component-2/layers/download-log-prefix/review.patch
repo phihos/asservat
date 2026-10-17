@@ -1,0 +1,292 @@
+--- a/scripts/test-context-storage.py
++++ b/scripts/test-context-storage.py
+@@ -32,6 +32,21 @@
+ def run(args, *, data=None):
+     return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+ 
++
++
++def postgres_fixture_options(regional_context_start=None):
++    if regional_context_start not in (None, "first", "continuation", "journey"):
++        raise ValueError("unknown regional context qualification")
++    options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
++    if regional_context_start == "journey":
++        # Owned synthetic fixture only. Diagnose the actual refused connection
++        # without adding a pgx tracer (forbidden by product SQL constructors).
++        # Never add statement/parameter logging or change connection capacity.
++        options += ["-c", "log_line_prefix=%m [%p] role=%u sqlstate=%e ",
++                    "-c", "log_statement=none", "-c", "log_min_error_statement=panic",
++                    "-c", "log_error_verbosity=terse",
++                    "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
++    return options
+ 
+ 
+ def source_hashes():
+@@ -278,7 +293,7 @@
+                 return info["NetworkSettings"]["Networks"][network]["IPAddress"]
+             s3ip = service("s3", SEAWEED, ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"], ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--entrypoint", "/usr/bin/weed"])
+             baoip = service("kms", BAO, ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"], ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"])
+-            pgip = service("postgres", POSTGRES, ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"], ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
++            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
+             proxy_ip = service("tls", worker_tag, ["http://"+s3ip+":8333", "http://"+baoip+":8200", pgip+":5432"], ["--user", "65532:65532", "--read-only", "--entrypoint", "/provider-proxy"])
+             for _ in range(50):
+                 try:
+--- a/scripts/test-regional-context-selection.py
++++ b/scripts/test-regional-context-selection.py
+@@ -52,6 +52,22 @@
+         pattern = "^TestContextAdmissionWithRealServices$/^native-api-runner$"
+         self.assertEqual(fixture.qualification_selection(pattern, False, False), (pattern, 2))
+ 
++    def test_server_diagnostics_only_affect_journey(self):
++        original = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
++        for mode in (None, "first", "continuation"):
++            self.assertEqual(fixture.postgres_fixture_options(mode), original)
++        journey = fixture.postgres_fixture_options("journey")
++        self.assertEqual(journey, original + [
++            "-c", "log_line_prefix=%m [%p] role=%u sqlstate=%e ",
++            "-c", "log_statement=none", "-c", "log_min_error_statement=panic",
++            "-c", "log_error_verbosity=terse",
++            "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0",
++        ])
++        journey.append("must-not-retain-mutable-options")
++        self.assertNotIn("must-not-retain-mutable-options", fixture.postgres_fixture_options("journey"))
++        with self.assertRaises(ValueError):
++            fixture.postgres_fixture_options("unexpected")
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+--- a/test/integration/capture_admission_test.go
++++ b/test/integration/capture_admission_test.go
+@@ -5,6 +5,7 @@
+ 	"crypto/aes"
+ 	"crypto/cipher"
+ 	"crypto/rand"
++	"crypto/tls"
+ 	"encoding/json"
+ 	"errors"
+ 	"net/url"
+@@ -45,6 +46,20 @@
+ 	nativeSources *nativeFixtureSourceOwner
+ }
+ 
++// Shared by the actual fixture factory and its constructor-boundary regression.
++// Keep the original role, TLS, connection limit and default idle policy. Product
++// SQL adapters reject pgx tracers; diagnostics belong in the owned server log.
++func captureAdmissionPoolConfig(dsn string, transport *tls.Config) (*pgxpool.Config, error) {
++	pc, err := pgxpool.ParseConfig(dsn)
++	if err != nil {
++		return nil, err
++	}
++	pc.ConnConfig.TLSConfig = transport
++	pc.ConnConfig.Fallbacks = nil
++	pc.MaxConns = 16
++	return pc, nil
++}
++
+ // This composes real SQL admission/capacity and encrypted authority audit. IdP,
+ // retained policy qualification and target observations are synthetic fixtures;
+ // it does not enable the public collection path or qualify fleet execution.
+@@ -89,21 +104,9 @@
+ 	address, tls := pgTLSBridge(t, u.Host)
+ 	poolFor := func(user, password string) *pgxpool.Pool {
+ 		t.Helper()
+-		pc, err := pgxpool.ParseConfig("postgres://" + user + ":" + password + "@" + address + "/custody_test?sslmode=disable")
+-		if err != nil {
+-			t.Fatal(err)
+-		}
+-		pc.ConnConfig.TLSConfig = tls
+-		pc.ConnConfig.Fallbacks = nil
+-		pc.MaxConns = 16
+-		if native != nil && os.Getenv("ASSERVAT_CONTEXT_REGIONAL_START_NATIVE") == "journey" {
+-			trace := newJourneySQLConnectTrace(user)
+-			if trace == nil || pc.ConnConfig.Tracer != nil {
+-				t.Fatal("unexpected journey SQL diagnostic role or existing tracer")
+-			}
+-			pc.ConnConfig.Tracer = trace
+-			// Registered before pool closure: cleanup joins the pool first.
+-			t.Cleanup(func() { trace.Report(t) })
++		pc, err := captureAdmissionPoolConfig("postgres://"+user+":"+password+"@"+address+"/custody_test?sslmode=disable", tls)
++		if err != nil {
++			t.Fatal(err)
+ 		}
+ 		p, err := pgxpool.NewWithConfig(ctx, pc)
+ 		if err != nil {
+--- a/test/integration/public_context_download_diagnostics_checks_test.go
++++ b/test/integration/public_context_download_diagnostics_checks_test.go
+@@ -2,18 +2,23 @@
+ 
+ import (
+ 	"context"
++	"crypto/tls"
++	"errors"
++	"net"
+ 	"reflect"
+-	"strings"
++	"sync/atomic"
+ 	"testing"
+ 	"time"
+ 
++	"asservat.local/asservat/internal/adapters/postgres"
+ 	"asservat.local/asservat/internal/application/evidence"
+ 	identities "asservat.local/asservat/internal/application/identity"
++	privacyapp "asservat.local/asservat/internal/application/privacy"
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	auditvalue "asservat.local/asservat/internal/domain/audit"
+ 	value "asservat.local/asservat/internal/domain/authorization"
+ 	"github.com/jackc/pgx/v5"
+-	"github.com/jackc/pgx/v5/pgconn"
++	"github.com/jackc/pgx/v5/pgxpool"
+ )
+ 
+ type journeyDownloadPrivateError struct{}
+@@ -258,22 +263,55 @@
+ 		t.Fatal("first original refusal overwritten")
+ 	}
+ }
+-func TestPublicJourneySQLConnectDiagnostics(t *testing.T) {
+-	ctx := context.WithValue(context.Background(), struct{}{}, "private-context")
+-	tr := newJourneySQLConnectTrace("worker_enrollment_runtime")
+-	if tr == nil || newJourneySQLConnectTrace("private-unrecognized-role") != nil {
+-		t.Fatal("role allowlist changed")
+-	}
+-	if tr.TraceConnectStart(ctx, pgx.TraceConnectStartData{}) != ctx || tr.TraceQueryStart(ctx, nil, pgx.TraceQueryStartData{SQL: "private-query", Args: []any{"private-value"}}) != ctx {
+-		t.Fatal("original tracing context changed")
+-	}
+-	// Query data and raw errors are not inspected or rendered by the no-op facet.
+-	tr.TraceQueryEnd(ctx, nil, pgx.TraceQueryEndData{Err: &journeyDownloadPrivateError{}})
+-	tr.TraceConnectEnd(ctx, pgx.TraceConnectEndData{})
+-	tr.TraceConnectEnd(ctx, pgx.TraceConnectEndData{Err: &journeyDownloadWrappedError{&pgconn.PgError{Code: "53300", Message: "private-driver-message", Detail: "private-detail"}}})
+-	tr.TraceConnectEnd(ctx, pgx.TraceConnectEndData{Err: &pgconn.PgError{Code: "PRIVATE", Message: "private-message"}})
+-	tr.TraceConnectEnd(ctx, pgx.TraceConnectEndData{Err: &journeyDownloadPrivateError{}})
+-	if tr.calls != 4 || tr.refused != 3 || tr.capacity != 1 || strings.Contains(tr.role, "private") {
+-		t.Fatal("closed connect counters changed")
+-	}
+-}
++
++// A traced fixture pool passed the old recorder tests but postgres.New refused
++// it before the native journey ran. Exercise that actual constructor boundary.
++// No socket is opened and no schema/authority success is fabricated here.
++func TestPublicJourneySQLPoolConstructorCompatibility(t *testing.T) {
++	for _, traced := range []bool{false, true} {
++		name := "original-pool-reaches-schema-read"
++		if traced {
++			name = "tracer-denied-before-connection"
++		}
++		t.Run(name, func(t *testing.T) {
++			transport := &tls.Config{ServerName: "synthetic.fixture.invalid", MinVersion: tls.VersionTLS13}
++			pc, err := captureAdmissionPoolConfig("postgres://synthetic:synthetic@127.0.0.1:1/custody_test?sslmode=disable", transport)
++			if err != nil {
++				t.Fatal("fixture pool configuration failed")
++			}
++			if pc.MaxConns != 16 || pc.MinConns != 0 || pc.ConnConfig.TLSConfig != transport || len(pc.ConnConfig.Fallbacks) != 0 || pc.ConnConfig.Tracer != nil {
++				t.Fatal("fixture pool configuration changed")
++			}
++			var calls atomic.Int32
++			pc.ConnConfig.DialFunc = func(context.Context, string, string) (net.Conn, error) {
++				calls.Add(1)
++				return nil, errors.New("synthetic connection unavailable")
++			}
++			if traced {
++				pc.ConnConfig.Tracer = journeyRejectedQueryTracer{}
++			}
++			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++			defer cancel()
++			pool, err := pgxpool.NewWithConfig(ctx, pc)
++			if err != nil {
++				t.Fatal("lazy fixture pool construction failed")
++			}
++			defer pool.Close()
++			ledger, err := postgres.New(ctx, pool)
++			if traced {
++				if ledger != nil || err != artifact.ErrInvalid || calls.Load() != 0 {
++					t.Fatal("traced pool crossed production configuration boundary")
++				}
++			} else if ledger != nil || err != privacyapp.ErrUnavailable || calls.Load() != 1 {
++				t.Fatal("original pool did not reach exactly one controlled schema connection")
++			}
++		})
++	}
++}
++
++type journeyRejectedQueryTracer struct{}
++
++func (journeyRejectedQueryTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
++	return ctx
++}
++func (journeyRejectedQueryTracer) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+--- a/test/integration/public_context_download_diagnostics_test.go
++++ b/test/integration/public_context_download_diagnostics_test.go
+@@ -2,7 +2,6 @@
+ 
+ import (
+ 	"context"
+-	"errors"
+ 	"sync"
+ 	"testing"
+ 
+@@ -12,14 +11,12 @@
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	auditvalue "asservat.local/asservat/internal/domain/audit"
+ 	value "asservat.local/asservat/internal/domain/authorization"
+-	"github.com/jackc/pgx/v5"
+-	"github.com/jackc/pgx/v5/pgconn"
+ )
+ 
+ // Fixture-only original-call diagnostics. No retries, provider text, SQL/argument
+ // retention, authority reads, clock samples, connection limits or error changes.
+-// The connection tracer spans one existing pool lifetime; enrollment counters
+-// cover actual delegates, including the overlapping requesting operation.
++// Enrollment counters cover actual delegates, including the overlapping
++// requesting operation. SQL capacity diagnostics use the owned server log.
+ var journeyEnrollmentNames = [...]string{"exchange", "current-authority", "proof", "claim", "prepare", "store", "write-enrollment", "write-certificate", "ack-enrollment", "read-certificate-receipt", "ack-certificate", "issue", "activate", "csr", "legacy-authority"}
+ 
+ type journeyEnrollmentTrace struct {
+@@ -234,47 +231,3 @@
+ 	d.trace.record(14, e)
+ 	return v, e
+ }
+-
+-// pgx requires QueryTracer as its configuration interface. These methods do
+-// nothing: only connection completion is inspected, without reading Config,
+-// SQL, Args, server addresses, parameters or driver Error() text.
+-type journeySQLConnectTrace struct {
+-	role                     string
+-	mu                       sync.Mutex
+-	calls, refused, capacity uint32
+-}
+-
+-func (s *journeySQLConnectTrace) TraceQueryStart(c context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
+-	return c
+-}
+-func (s *journeySQLConnectTrace) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+-func (s *journeySQLConnectTrace) TraceConnectStart(c context.Context, _ pgx.TraceConnectStartData) context.Context {
+-	return c
+-}
+-func (s *journeySQLConnectTrace) TraceConnectEnd(_ context.Context, v pgx.TraceConnectEndData) {
+-	var pg *pgconn.PgError
+-	capacity := v.Err != nil && errors.As(v.Err, &pg) && pg.Code == "53300"
+-	s.mu.Lock()
+-	defer s.mu.Unlock()
+-	s.calls++
+-	if v.Err != nil {
+-		s.refused++
+-	}
+-	if capacity {
+-		s.capacity++
+-	}
+-}
+-func (s *journeySQLConnectTrace) Report(t *testing.T) {
+-	t.Helper()
+-	s.mu.Lock()
+-	defer s.mu.Unlock()
+-	t.Logf("journey SQL connect role=%s calls=%d refusals=%d sqlstate-53300=%d", s.role, s.calls, s.refused, s.capacity)
+-}
+-func newJourneySQLConnectTrace(role string) *journeySQLConnectTrace {
+-	switch role {
+-	case "api_execution_prepare_runtime", "api_execution_read_runtime", "api_execution_runtime", "api_publication_gate_runtime", "authority_runtime", "capture_audit_runtime", "capture_operation_ack_runtime", "capture_operation_admit_runtime", "capture_operation_journal_runtime", "capture_operation_read_runtime", "capture_operation_source_runtime", "capture_runtime", "context_case_read_runtime", "context_catalog_read_runtime", "context_control_config_runtime", "context_preview_runtime", "context_progress_read_runtime", "context_publish_runtime", "context_request_resolution_runtime", "context_storage_read_runtime", "context_verification_audit_runtime", "context_verify_runtime", "custody_runtime", "download_audit_runtime", "download_config_runtime", "download_runtime", "download_stop_ack_runtime", "download_stop_lifecycle_config_runtime", "download_stop_runtime", "download_stop_writer_runtime", "download_worker_audit_runtime", "download_worker_runtime", "native_history_runtime", "native_key_bind_runtime", "native_key_read_runtime", "native_metadata_runtime", "native_owner_runtime", "native_plan_runtime", "operation_audit_ack_runtime", "operation_audit_config_runtime", "operation_audit_runtime", "owner_configuration_audit_runtime", "owner_configuration_read_runtime", "owner_configuration_runtime", "owner_enrollment_read_runtime", "peer_read_runtime", "retention_source_read_runtime", "retention_source_runtime", "worker_configuration_audit_runtime", "worker_configuration_read_runtime", "worker_configuration_runtime", "worker_enrollment_activate_runtime", "worker_enrollment_audit_runtime", "worker_enrollment_runtime", "worker_owner_runtime":
+-		return &journeySQLConnectTrace{role: role}
+-	default:
+-		return nil
+-	}
+-}

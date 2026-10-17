@@ -1,0 +1,160 @@
+{
+  "manifestSHA256": "7ee1a55d0ffd09826eab08c402119317448ebead2a1d24cbef2dcf9a121f411c",
+  "dependenciesSHA256": "a43f229d0368835af090dd768772c9e915001f665ce93b06e3c4ec10833bcf20",
+  "dependencyCount": 1684,
+  "freezeSHA256": "c2182cf8aa646fb7f313176a8159d57bd86542e95a4ae69aefdfa90fb39948d6",
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "base_sha256": "dde55f95eb0aaca24cd7b9f0a2d8d56f3e698b8a194c293481eff3d3821d80f8",
+      "payload_sha256": "d47faf271f4591d75f4c528a23b9aa7b9a8ef0b8e5fac618a501f5cea6c7d716"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "base_sha256": "7a2d5ed3275ef162197de03b47c1a0210b94fad9e2d1951fefc18bc8c47fef02",
+      "payload_sha256": "1bd33735443e513340d4fb4753171ba75cffcf6c3f9fb5c1b0d75c4f97879790"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_client.go",
+      "base_sha256": null,
+      "payload_sha256": "949e99ac45d1106d0bbb281d5f9c08cad4219d93286af22089cd3bd6d2104816"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_connection.go",
+      "base_sha256": null,
+      "payload_sha256": "628738eac95fddfff8d85f37f05206b30580d39c3039fec3e550aa86960be098"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_connection_test.go",
+      "base_sha256": null,
+      "payload_sha256": "c99a9ea5166b40cac7f4035ec3687eb106520179411d91a90e2f198116968c09"
+    },
+    {
+      "path": "internal/transport/clusterobservation/regional_exchange.go",
+      "base_sha256": null,
+      "payload_sha256": "eb085bc6676ba1f678329184aae2943d6eba59af2021eeb226ae53b34ecb2b05"
+    },
+    {
+      "path": "internal/transport/clusterobservation/regional_exchange_test.go",
+      "base_sha256": null,
+      "payload_sha256": "92b2b76d5302bad009dc997a296db48d3f1186420d08eb08ee081546ba1a0c61"
+    }
+  ],
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 1.659,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-run",
+        "^Test(ConnectorObservation(Stream|Hello|Channel)|RegionalObservationExchange|ClusterObservationOrder)",
+        "-v",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 8.519,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-stream-20261013/checkpoint-v1/overlay.json",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "exit": 0,
+      "seconds": 0.407,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "architecture",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "exit": 0,
+      "seconds": 1.509,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    }
+  ],
+  "scope": "Actual loopback HTTP2/mutual TLS and synthetic source/registry tests; concrete stream and terminal EOF/join. Holder routing, installed two-cluster workflow and sustained availability remain unqualified."
+}

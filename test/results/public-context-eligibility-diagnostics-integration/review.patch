@@ -1,0 +1,268 @@
+--- a/test/integration/public_context_journey_diagnostics_test.go
++++ b/test/integration/public_context_journey_diagnostics_test.go
+@@ -66,6 +66,7 @@
+ 	journeyRunnerReady
+ 	journeyRunnerConsume
+ 	journeyRunnerRecord
++	journeyRunnerEligibilityIdentity
+ 	journeyDiagnosticStages
+ )
+ 
+@@ -79,17 +80,18 @@
+ 	"capture-claim-outcome", "capture-write-outcome", "capture-complete-outcome", "capture-ack-outcome", "capture-ack-pair",
+ 	"capture-reconcile-claim-intent", "capture-reconcile-claim-outcome", "capture-find-intent", "capture-find-outcome", "capture-reconcile-ack-intent", "capture-reconcile-ack-outcome",
+ 	"regional-read", "regional-sign",
+-	"regional-verify", "runner-recovery", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-local-prepare", "runner-bind", "runner-ready", "runner-consume", "runner-record-start",
++	"regional-verify", "runner-recovery", "runner-read", "runner-target", "runner-eligibility", "runner-capability", "runner-retention", "runner-process", "runner-prepare", "runner-keys", "runner-local-prepare", "runner-bind", "runner-ready", "runner-consume", "runner-record-start", "runner-eligibility-identity",
+ }
+ 
+ type publicJourneyDiagnostics struct {
+-	mu              sync.Mutex
+-	stopped         bool
+-	requestWindow   bool
+-	calls, refusals [journeyDiagnosticStages]uint32
+-	reasons         [journeyDiagnosticStages]uint8
+-	first           int   // One-based; zero means no dependency returned a refusal.
+-	outcome         uint8 // Closed output status supplied to the actual Freeze call.
++	mu                                 sync.Mutex
++	stopped                            bool
++	requestWindow                      bool
++	calls, refusals                    [journeyDiagnosticStages]uint32
++	reasons                            [journeyDiagnosticStages]uint8
++	first                              int    // One-based; zero means no dependency returned a refusal.
++	outcome                            uint8  // Closed output status supplied to the actual Freeze call.
++	identityCanceled, identityDeadline uint32 // Returned original identity-call contexts only.
+ }
+ 
+ func (s *publicJourneyDiagnostics) record(stage int, code uint8) {
+@@ -141,6 +143,7 @@
+ 	}
+ 	s.calls, s.refusals, s.reasons = [journeyDiagnosticStages]uint32{}, [journeyDiagnosticStages]uint32{}, [journeyDiagnosticStages]uint8{}
+ 	s.first, s.outcome = 0, 0
++	s.identityCanceled, s.identityDeadline = 0, 0
+ 	s.requestWindow, s.stopped = true, false
+ 	return true
+ }
+@@ -150,6 +153,7 @@
+ 	s.mu.Lock()
+ 	s.stopped = true
+ 	calls, refusals, reasons, first, outcome := s.calls, s.refusals, s.reasons, s.first, s.outcome
++	identityCanceled, identityDeadline := s.identityCanceled, s.identityDeadline
+ 	phase := "preview"
+ 	if s.requestWindow {
+ 		phase = "request"
+@@ -178,6 +182,9 @@
+ 		status = "interrupted"
+ 	}
+ 	t.Logf("journey %s diagnostic first-refusal=%s frozen-outcome=%s", phase, name, status)
++	if calls[journeyRunnerEligibilityIdentity] != 0 {
++		t.Logf("journey original eligibility identity calls-context-canceled=%d calls-context-deadline=%d", identityCanceled, identityDeadline)
++	}
+ }
+ 
+ type publicJourneyAuditDiagnostics struct {
+@@ -401,6 +408,24 @@
+ 		return "preparation-uncertain"
+ 	case 14:
+ 		return "exchange-protocol"
++	case 20:
++		return "eligibility-authority-unavailable"
++	case 21:
++		return "eligibility-identity-unavailable"
++	case 22:
++		return "eligibility-permission-unavailable"
++	case 23:
++		return "eligibility-invalid-request"
++	case 24:
++		return "eligibility-explicit-deny"
++	case 25:
++		return "eligibility-insufficient-scope"
++	case 26:
++		return "eligibility-no-entitlement"
++	case 27:
++		return "eligibility-no-audience"
++	case 28:
++		return "eligibility-audience-overflow"
+ 	default:
+ 		return "unknown-refusal"
+ 	}
+--- a/test/integration/public_context_regional_diagnostics_test.go
++++ b/test/integration/public_context_regional_diagnostics_test.go
+@@ -6,6 +6,7 @@
+ 	"testing"
+ 	"time"
+ 
++	authapp "asservat.local/asservat/internal/application/authorization"
+ 	"asservat.local/asservat/internal/application/evidence"
+ 	executionapp "asservat.local/asservat/internal/application/execution"
+ 	fleetapp "asservat.local/asservat/internal/application/fleet"
+@@ -135,12 +136,11 @@
+ 	return v, e
+ }
+ func (s *publicJourneyRunnerDiagnostics) ContextEligibilityCurrent(c context.Context, i identities.CurrentIdentity, t authorization.Target) authorization.CaptureEligibility {
++	if i != nil {
++		i = journeyEligibilityCurrentDiagnostics{i, s.trace}
++	}
+ 	v := s.in.Eligibility.ContextEligibilityCurrent(c, i, t)
+-	var code uint8
+-	if !v.Eligible {
+-		code = 3
+-	}
+-	s.trace.record(journeyRunnerEligibility, code)
++	s.trace.record(journeyRunnerEligibility, journeyEligibilityCode(v))
+ 	return v
+ }
+ func (s *publicJourneyRunnerDiagnostics) ContextCapability(c context.Context, t authorization.Target) (planning.ContextCapability, error) {
+@@ -377,3 +377,152 @@
+ 		t.Fatal("lost prepared completion facet")
+ 	}
+ }
++
++// Whitelist the actual evaluator's deciding reason. Unknown strings never enter
++// the recorder or logs; the returned eligibility remains exactly unchanged.
++func journeyEligibilityCode(v authorization.CaptureEligibility) uint8 {
++	if v.Eligible {
++		return 0
++	}
++	switch v.Reason {
++	case "AuthorityUnavailable":
++		return 20
++	case "IdentityUnavailable":
++		return 21
++	case "PermissionUnavailable":
++		return 22
++	case "InvalidRequest":
++		return 23
++	case "ExplicitDeny":
++		return 24
++	case "InsufficientScope":
++		return 25
++	case "NoEntitlement":
++		return 26
++	case "NoEvidenceAudience":
++		return 27
++	case "AudienceOverflow":
++		return 28
++	default:
++		return 3
++	}
++}
++
++type journeyEligibilityCurrentDiagnostics struct {
++	source identities.CurrentIdentity
++	trace  *publicJourneyDiagnostics
++}
++
++func (s journeyEligibilityCurrentDiagnostics) ResolveIdentity(c context.Context) (identity.Identity, error) {
++	v, e := s.source.ResolveIdentity(c)
++	s.trace.record(journeyRunnerEligibilityIdentity, journeyRegionalCode(e))
++	// These are the original completed delegate's context flags, never a later
++	// wall-clock inference or an extra identity/permission read.
++	state := c.Err()
++	s.trace.mu.Lock()
++	if !s.trace.stopped {
++		if state == context.Canceled {
++			s.trace.identityCanceled++
++		}
++		if state == context.DeadlineExceeded {
++			s.trace.identityDeadline++
++		}
++	}
++	s.trace.mu.Unlock()
++	return v, e
++}
++
++type journeyDiagnosticPermissions func(context.Context, authorization.Target) (authorization.Projection, error)
++
++func (f journeyDiagnosticPermissions) Permissions(c context.Context, t authorization.Target) (authorization.Projection, error) {
++	return f(c, t)
++}
++
++func TestPublicJourneyDiagnosticsOriginalEligibility(t *testing.T) {
++	for _, mode := range []string{"success", "first-identity", "permission", "final-identity", "canceled-identity", "nil-identity"} {
++		t.Run(mode, func(t *testing.T) {
++			now := time.Now().UTC()
++			actor := identity.Identity{Principal: identity.Principal{Issuer: "https://fixture.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:capture"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}
++			target := authorization.Target{ClusterID: "00000000-0000-4000-8000-000000000001", NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod"}
++			projection := authorization.Projection{Target: target, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: [32]byte{2}}, ObservedAt: now, FreshUntil: actor.ValidUntil, DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: actor.ValidUntil, Allows: []authorization.CurrentAssignment{{Audience: artifact.AudienceAssignment{Kind: "User", Issuer: actor.Principal.Issuer, SubjectID: actor.Principal.Subject, Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: "00000000-0000-4000-8000-000000000002", BasisDigest: artifact.Digest{3}}, ObservedAt: now, FreshUntil: actor.ValidUntil}}}
++			trace := &publicJourneyDiagnostics{}
++			private := &journeyDiagnosticPrivateError{}
++			type marker struct{}
++			ctx, cancel := context.WithDeadline(context.WithValue(t.Context(), marker{}, "original"), actor.ValidUntil)
++			defer cancel()
++			identityCalls, permissionCalls := 0, 0
++			var originalContext context.Context
++			check := func(c context.Context) {
++				t.Helper()
++				d, ok := c.Deadline()
++				if c.Value(marker{}) != "original" || !ok || !d.Equal(actor.ValidUntil) {
++					t.Fatal("original evaluator context changed")
++				}
++				if originalContext == nil {
++					originalContext = c
++				} else if c != originalContext {
++					t.Fatal("original evaluator delegate context replaced")
++				}
++			}
++			var current identities.CurrentIdentity = journeyDiagnosticRunnerIdentity(func(c context.Context) (identity.Identity, error) {
++				check(c)
++				identityCalls++
++				if mode == "first-identity" || mode == "final-identity" && identityCalls == 2 {
++					return actor, private
++				}
++				if mode == "canceled-identity" {
++					cancel()
++					return actor, context.Canceled
++				}
++				return actor, nil
++			})
++			if mode == "nil-identity" {
++				current = nil
++			}
++			evaluator := authapp.Evaluator{Permissions: journeyDiagnosticPermissions(func(c context.Context, tgt authorization.Target) (authorization.Projection, error) {
++				check(c)
++				permissionCalls++
++				if tgt != target {
++					t.Fatal("target replaced")
++				}
++				if mode == "permission" {
++					return projection, private
++				}
++				return projection, nil
++			}), Now: func() time.Time { return now }}
++			decorated := trace.Runner(executionapp.APIContextRunner{Eligibility: evaluator}).Eligibility
++			got := decorated.ContextEligibilityCurrent(ctx, current, target)
++			reason, wantCode, wantIdentity, wantPermission := "Eligible", uint8(0), 2, 1
++			switch mode {
++			case "first-identity":
++				reason, wantCode, wantIdentity, wantPermission = "IdentityUnavailable", 21, 1, 0
++			case "permission":
++				reason, wantCode, wantIdentity, wantPermission = "PermissionUnavailable", 22, 1, 1
++			case "final-identity":
++				reason, wantCode = "AuthorityUnavailable", 20
++			case "canceled-identity":
++				reason, wantCode, wantIdentity, wantPermission = "IdentityUnavailable", 21, 1, 0
++			case "nil-identity":
++				reason, wantCode, wantIdentity, wantPermission = "AuthorityUnavailable", 20, 0, 0
++			}
++			if got.Reason != reason || got.Eligible != (mode == "success") || identityCalls != wantIdentity || permissionCalls != wantPermission || trace.calls[journeyRunnerEligibilityIdentity] != uint32(wantIdentity) || trace.calls[journeyRunnerEligibility] != 1 || trace.reasons[journeyRunnerEligibility] != wantCode {
++				t.Fatal("actual evaluator decision or original dispatch changed")
++			}
++			if mode == "success" && !reflect.DeepEqual(got, authorization.ContextEligibility(actor, projection, target, now)) {
++				t.Fatal("successful evaluator result changed")
++			}
++			if mode == "first-identity" || mode == "final-identity" {
++				if trace.reasons[journeyRunnerEligibilityIdentity] != 9 {
++					t.Fatal("private identity error escaped closed code")
++				}
++			}
++			if (trace.identityCanceled == 1) != (mode == "canceled-identity") || trace.identityDeadline != 0 {
++				t.Fatal("original context cancellation flags changed")
++			}
++			trace.Report(t)
++		})
++	}
++	if code := journeyEligibilityCode(authorization.CaptureEligibility{Result: authorization.Result{Reason: "private arbitrary reason"}}); code != 3 || journeyDiagnosticReason(code) != "denied" {
++		t.Fatal("unrecognized reason retained")
++	}
++}

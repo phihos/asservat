@@ -1,0 +1,59 @@
+package kubernetes
+
+import (
+	"encoding/hex"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// CapacityLocalOwnerBinding validates original public installation provenance.
+// It cannot establish current owner registration, route, source acceptance or
+// guard enforcement. Those checks precede token disclosure on every request.
+// The original source revision is provenance, not a perpetual runtime revision.
+func CapacityLocalOwnerBinding(c contracts.CapacityDeployment, m contracts.CapacityCredentialManifest) (value.OwnerObservationPin, error) {
+	var zero value.OwnerObservationPin
+	if c.LocalOwner == nil || c.Format != contracts.CapacityDeploymentFormat || m.Format != contracts.CapacityCredentialManifestFormat ||
+		c.InstallationID != m.Input.InstallationID || c.RoleRootUID != m.RootUID || c.RoleSetupID != m.SetupID ||
+		c.PermissionRootID != m.Capacity.PermissionRootID || c.Control.ClusterID != m.Input.ClusterID || c.Control.Namespace != m.Input.Namespace {
+		return zero, cfg.ErrInvalid
+	}
+	v := c.LocalOwner
+	o, p := v.Deployment, v.Pool
+	if o.Observation == nil || o.Observation.Activation == nil || o.Native != nil || o.Observation.Format != contracts.OwnerObservationFormat ||
+		o.InstallationID != c.InstallationID || o.ClusterID != c.Control.ClusterID || o.Namespace != c.Control.Namespace || o.PermissionRootID != c.PermissionRootID ||
+		o.ConfigurationUID != v.Source.UID || v.Source.UID != m.Input.OwnerConfigurationUID || v.Source.Name != runtimeResourceNames(c.InstallationID).OwnerSource ||
+		!installationRefValid(v.Source.Name, v.Source.UID) || p.Format != contracts.OwnerConfigurationFormat || p.InstallationID != o.InstallationID ||
+		p.ClusterID != o.ClusterID || p.Namespace != o.Namespace || p.Suspended || p.Revision != 1 || len(p.IssuerRoots) == 0 {
+		return zero, cfg.ErrInvalid
+	}
+	a := *o.Observation.Activation
+	w := m.Input.Worker
+	if !OwnerIdentityActivationBound(o, a) || a.Input.InitialClaimID != m.Input.InitialClaimID || a.Input.Resources != w.Resources ||
+		a.Input.ResourceSetupID != w.ResourceSetupID || a.Input.ResourceBinding != w.ResourceBinding || !contracts.InitialRuntimeLayoutsSupported(w.WorkerLayout, a.Input.OwnerLayout) ||
+		a.Input.Deployment != p.Deployment || a.Input.ServiceAccount != p.ServiceAccount ||
+		o.CapacityProbe == nil || o.CapacityProbe.ServiceAccount != w.Account.Reference {
+		return zero, cfg.ErrInvalid
+	}
+	pool := value.OwnerPool{InstallationID: p.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch,
+		Namespace: p.Namespace.Name, NamespaceUID: p.Namespace.UID, Service: p.Service.Name, ServiceUID: p.Service.UID,
+		Deployment: p.Deployment.Name, DeploymentUID: p.Deployment.UID, ServiceAccount: p.ServiceAccount.Name, AccountUID: p.ServiceAccount.UID,
+		Port: p.Port, NativePort: p.NativePort, NativeBootstrap: p.NativeBootstrap, NativeCandidateLimit: p.NativeCandidateLimit}
+	digest := func(s string) artifact.Digest {
+		var out artifact.Digest
+		b, err := hex.DecodeString(s)
+		if err != nil || len(b) != len(out) || hex.EncodeToString(b) != s {
+			return out
+		}
+		copy(out[:], b)
+		return out
+	}
+	pin := value.OwnerObservationPin{RootID: c.PermissionRootID, SourceUID: v.Source.UID, Pool: pool,
+		TemplateDigest: digest(o.Observation.TemplateDigest), ImageDigest: digest(o.Observation.ImageDigest), ProtectionDigest: digest(o.Observation.ProtectionDigest)}
+	if !pin.Valid() || pool.Port != 9443 || pool.NativePort != contracts.OwnerInstalledNativePort || pool.NativeBootstrap != value.OwnerBootstrapProfile {
+		return zero, cfg.ErrInvalid
+	}
+	return pin, nil
+}

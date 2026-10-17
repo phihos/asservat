@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/domain/authorization	0.102s
+ok  	asservat.local/asservat/internal/adapters/mtls	0.003s [no tests to run]
+ok  	asservat.local/asservat/internal/application/evidence	0.002s [no tests to run]
+?   	asservat.local/asservat/internal/contracts	[no test files]
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	0.112s

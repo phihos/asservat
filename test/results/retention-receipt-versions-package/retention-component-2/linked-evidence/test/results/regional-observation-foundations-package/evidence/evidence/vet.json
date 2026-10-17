@@ -1,0 +1,31 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-conversation-20261013/checkpoint-v1/overlay.json",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/contracts",
+    "./internal/adapters/mtls",
+    "./internal/adapters/kubernetes",
+    "./internal/transport/clusterobservation"
+  ],
+  "exit": 0,
+  "seconds": 1.41,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

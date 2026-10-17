@@ -1,0 +1,8 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/download_sessions_test.go:556:9: undefined: strings
+ok  	asservat.local/asservat/internal/adapters/mtls	8.295s
+ok  	asservat.local/asservat/internal/bootstrap	3.090s
+ok  	asservat.local/asservat/internal/application/evidence	1.009s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	1.007s [no tests to run]
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

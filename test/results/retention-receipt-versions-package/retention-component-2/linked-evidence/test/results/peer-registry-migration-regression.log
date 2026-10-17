@@ -1,0 +1,109 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable
+=== RUN   TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication
+=== RUN   TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry
+=== RUN   TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect
+=== RUN   TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles
+=== RUN   TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec
+=== RUN   TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version
+=== RUN   TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit
+=== RUN   TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit
+=== RUN   TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart
+=== RUN   TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock
+--- PASS: TestPermissionAuthorityWithRealServices (1.27s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-requires-exact-review-and-is-durable (0.28s)
+    --- PASS: TestPermissionAuthorityWithRealServices/bootstrap-audit-cannot-be-skipped-by-out-of-order-publication (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/audit-gated-grants-and-encrypted-retry (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/ownership-A-B-A-does-not-resurrect (0.09s)
+    --- PASS: TestPermissionAuthorityWithRealServices/journal-to-SQL-preserves-metadata-and-retires-owner-cycles (0.10s)
+    --- PASS: TestPermissionAuthorityWithRealServices/generation-gap-invalidates-even-identical-spec (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/namespace-observation-is-separate-from-source-version (0.06s)
+    --- PASS: TestPermissionAuthorityWithRealServices/scope-change-and-delete-retire-without-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/explicit-deny-precedes-audit (0.05s)
+    --- PASS: TestPermissionAuthorityWithRealServices/competing-reconcilers-and-restart (0.13s)
+    --- PASS: TestPermissionAuthorityWithRealServices/expiry-after-blocking-lock (0.26s)
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission
+=== RUN   TestContextAdmissionWithRealServices/wrong-target
+=== RUN   TestContextAdmissionWithRealServices/forged-audience
+=== RUN   TestContextAdmissionWithRealServices/wrong-store
+=== RUN   TestContextAdmissionWithRealServices/wrong-allocation
+=== RUN   TestContextAdmissionWithRealServices/missing-membership
+=== RUN   TestContextAdmissionWithRealServices/expired-identity
+=== RUN   TestContextAdmissionWithRealServices/different-permission-revision
+=== RUN   TestContextAdmissionWithRealServices/plaintext-native-ceiling
+=== RUN   TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation
+=== RUN   TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait
+=== RUN   TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission
+=== RUN   TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable
+    capture_admission_test.go:331: context admission unavailable
+=== RUN   TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry
+=== RUN   TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority
+--- FAIL: TestContextAdmissionWithRealServices (6.66s)
+    --- PASS: TestContextAdmissionWithRealServices/concurrent-replay-is-one-frozen-admission (0.39s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-target (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/forged-audience (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-store (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/wrong-allocation (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/missing-membership (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/expired-identity (0.06s)
+    --- PASS: TestContextAdmissionWithRealServices/different-permission-revision (0.05s)
+    --- PASS: TestContextAdmissionWithRealServices/plaintext-native-ceiling (0.05s)
+    --- PASS: TestContextAdmissionWithRealServices/exhausted-workload-does-not-use-another-allocation (0.13s)
+    --- PASS: TestContextAdmissionWithRealServices/authority-expires-during-pool-lock-wait (0.36s)
+    --- PASS: TestContextAdmissionWithRealServices/revocation-between-evaluation-and-admission (0.06s)
+    --- FAIL: TestContextAdmissionWithRealServices/intent-audit-is-immutable-encrypted-and-retryable (0.08s)
+    --- PASS: TestContextAdmissionWithRealServices/original-replay-after-plan-observation-expiry (5.06s)
+    --- PASS: TestContextAdmissionWithRealServices/generic-custody-does-not-become-capture-authority (0.06s)
+=== RUN   TestCustodyWithRealServices
+=== RUN   TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge
+=== RUN   TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission
+=== RUN   TestCustodyWithRealServices/protected_backing_cannot_be_overallocated
+=== RUN   TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_register
+=== RUN   TestCustodyWithRealServices/post_lock_expiry_store
+=== RUN   TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished
+=== RUN   TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting
+    custody_test.go:528: real S3: current and noncurrent versions, delete marker and multipart parts removed; neighbor preserved; writer barrier failure kept charge
+=== RUN   TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation
+--- PASS: TestCustodyWithRealServices (8.82s)
+    --- PASS: TestCustodyWithRealServices/pool_exhaustion_is_bounded_and_creates_no_charge (5.04s)
+    --- PASS: TestCustodyWithRealServices/last_capacity_slot_and_duplicate_admission (0.31s)
+    --- PASS: TestCustodyWithRealServices/protected_backing_cannot_be_overallocated (0.04s)
+    --- PASS: TestCustodyWithRealServices/configuration_fence_and_no_counter_leaks (0.01s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_register (0.50s)
+    --- PASS: TestCustodyWithRealServices/post_lock_expiry_store (0.49s)
+    --- PASS: TestCustodyWithRealServices/stored_receipts_are_immutable_and_unpublished (0.09s)
+    --- PASS: TestCustodyWithRealServices/real_version_marker_multipart_cleanup_and_accounting (2.09s)
+    --- PASS: TestCustodyWithRealServices/stale_deletion_worker_and_overdue_allocation_isolation (0.23s)
+=== RUN   TestPeerRegistryWithRealServices
+=== RUN   TestPeerRegistryWithRealServices/read-role-cannot-mint-authority
+=== RUN   TestPeerRegistryWithRealServices/active
+=== RUN   TestPeerRegistryWithRealServices/revocation
+=== RUN   TestPeerRegistryWithRealServices/root-suspended
+=== RUN   TestPeerRegistryWithRealServices/recovery
+=== RUN   TestPeerRegistryWithRealServices/epoch
+=== RUN   TestPeerRegistryWithRealServices/cluster
+=== RUN   TestPeerRegistryWithRealServices/missing-audit
+=== RUN   TestPeerRegistryWithRealServices/expired-trust
+=== RUN   TestPeerRegistryWithRealServices/expired-peer
+=== RUN   TestPeerRegistryWithRealServices/unknown-certificate
+=== RUN   TestPeerRegistryWithRealServices/rotation
+=== RUN   TestPeerRegistryWithRealServices/blocked-read
+--- PASS: TestPeerRegistryWithRealServices (5.22s)
+    --- PASS: TestPeerRegistryWithRealServices/read-role-cannot-mint-authority (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/active (0.03s)
+    --- PASS: TestPeerRegistryWithRealServices/revocation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/root-suspended (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/recovery (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/epoch (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/cluster (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/missing-audit (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-trust (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-peer (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/unknown-certificate (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/rotation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/blocked-read (5.02s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	22.026s
+FAIL

@@ -1,0 +1,18 @@
+{
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/manifest.json": "d3d2f735ff658e215445369a1d8922450d0172a69b50c05a453a7897d0e00435",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/variants.json": "ff87df00c468ebb0a13cf4620703bf27d1b805c11206b4c960b7db1b0ccd888d",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/dependencies.json": "2198576c1a7663e7fb8e3523929a2326b5f995cd36a6b0b6d06c481d99ca4f48",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/result.json": "fe82fb555eb6473fbd8f625a988c65d721ef7eaed807ce49d12075c1307f674e",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/run.py": "9c77bfa9df968548a7bf39fa719f4431b616341624fa72671c2053ab4a1b3680",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/runner.log": "1d6262508eabefde143d6e47cbc1110b679ea4bafb4b15352c88174e97721808",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/compile.log": "19283bb09b9d6feb9453b34a89adc4511d62c3f68589f6792c4ca30bf59fa28a",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/before-classification.log": "5bc12971daa79c889b88a4750d35bbb06f7c031af89bd5b4f9da87b8ee8e1b01",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/before-final-journal.log": "073a37a19fc548e1c70f54d8100161999d229f650e8054617dbff73856b89d0b",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/caller-race.log": "ea897c4f3b3d3a2c4c32945f17d95af57a1c378c98c2753fd077e59f74ee3021",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/affected-race.log": "d71b378e051f6b220e4f0581133cce18832a9bc98a6eb834db8a572376989172",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/evidence/vet.log": "65cc0f9c31311736e61082766f2627673ddb8255234119b47d9a7c8b48158d53",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller.go": "e7b4cc27df7f4e45c25df018ce311f411e73e5418d85988fe59ae33c82fe0fee",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go": "b661a959351cd4df6afbbc9153d0a1e5671c4ded8f6f2ef54da0135ff4278334",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go": "c3b2552c9921b442c3f6f7d710818b4c09dc67c858b933960f3174cc156e3f93",
+  "/home/phil/.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go": "6cf467c81490757d1839c20c262850a9bf982d145f45c5986db948318dbb2beb"
+}

@@ -1,0 +1,18 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close
+=== RUN   TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote
+=== NAME  TestContextAdmissionWithRealServices/connector-identity-fast
+    connector_identity_test.go:442: real SQL/S3 admitted process, distinct client/server activation, backing continuation and original dates passed; source/issuer facts synthetic
+=== RUN   TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release
+=== RUN   TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output
+    processing_test.go:243: complete current retention policy unavailable
+--- FAIL: TestContextAdmissionWithRealServices (5.33s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast (3.09s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-close (0.64s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-identity-fast/exhausted-source-promote (0.73s)
+    --- PASS: TestContextAdmissionWithRealServices/processing-restrictions-before-publication-and-prepaid-release (1.22s)
+    --- FAIL: TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output (0.67s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.390s
+FAIL

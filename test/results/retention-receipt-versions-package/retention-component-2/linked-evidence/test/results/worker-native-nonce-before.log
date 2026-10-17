@@ -1,0 +1,24 @@
+--- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition (0.00s)
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/joined (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/idle (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-open (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/unknown-command (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/false-joined (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/failed-close (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/foreign-idle (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/expired-idle (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/extended-idle (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+    --- FAIL: TestWorkerNativeOnlyReentersAfterPositiveDisposition/nil-stream (0.00s)
+        download_worker_native_test.go:64: startup emitted a nonce rejected by the native wire contract
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.048s
+FAIL

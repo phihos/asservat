@@ -1,0 +1,26 @@
+# ADR144 exact-holder forwarder component checkpoint-v1
+
+This immutable eight-path package adds a concrete purpose-fixed forwarding component and two narrow supporting APIs. It does not select receiving routes or an installed runtime backend. Existing protocol bytes, four proof ordinals, permission-root/installation distinction, SQL roles and source/caller/socket deadlines remain unchanged.
+
+The forwarder reads the original explicitly selected complete SQL candidate set, intersects it with one complete Ready endpoint observation, performs at most two read-only locator GETs concurrently and joins all outstanding GET work before one exact-holder claim POST. Actual common-SNI and exact-SNI TLS leaves receive independent current registry, accepted configuration/roots, Ready route, native guard and installed-template checks before and after each request. A failed or unknown POST is never replayed; no HWORK token is forwarded. Two process slots remain occupied through joined native proof, body and transport cleanup.
+
+`ObserveOwnerClient` delegates the existing complete authenticator and private-key verifier. The exported locator mappings preserve the existing wire conversions and exact uint64 semantics. The existing public constructors and other routes are unchanged.
+
+## Evidence
+
+Runner handle 68081 ended exit 0. The runner used GOMAXPROCS=2, GOFLAGS=-p=2 and checkpoint-local TMPDIR. Its exact commands and real exits are in evidence/{compile,race,vet,architecture}.json, with complete bounded logs adjacent.
+
+- Four-package compile-only: exit 0, 9.686 seconds.
+- Focused affected races: exit 0, 18.672 seconds; 152 named PASS entries (13 top-level tests), zero skipped or failed entries.
+- Four-package vet: exit 0, 1.950 seconds.
+- Isolated `make go-architecture-check`: exit 0, 1.650 seconds; 53 packages and 298 internal import edges.
+
+All 1,943 current live dependencies, eight payloads, original modified bases, source file sets, isolated mirror and freeze hashes matched before and after every phase. No live files were edited. There is no claimed failing-before result for this new component. `manifest.json` is the integration list; `files/` contains exact payloads. `RESULT.json` preserves reports and counts. `freeze.json` pins runner, bases, payload, dependencies, overlay and mirror metadata. `result-files.json` pins the completed handoff/result and phase evidence separately from the original tested freeze.
+
+The new tests exercise real process-owned private keys and mutual TLS/HTTP2, with explicitly synthetic registry/configuration/route/guard/workload/result ports. Cases cover same-Pod populations above sixteen, unknown and concurrent locator replies, bounded GET concurrency, candidate/Ready failure and mutation, excluded leaf and wrong holder, revocation/template/route/revision changes, truncated replies, single uncertain POST, original caller/source expiry, cancellation, two occupied slots and Close waiting for admitted proof work. Existing receiver and full current-boundary tests remain in the selected race run. Exact locator sequence 2^53+1 is retained, and mapping tests additionally cover uint64 max.
+
+## Remaining scope and next work
+
+No real SQL/Kubernetes/provider regional workflow, actual holder-stream attachment, installed multi-owner reachability or sustained five-second availability is qualified by these component tests. The prior candidate native SQL/S3 qualification is separate evidence. Local synthetic successful forwarding measured roughly 22–24 ms, but one success still invokes 16 registry checks, 16 guard checks, 10 route checks and 8 workload checks across both legs; these are structural component counters, not backend latency measurements.
+
+The next separate package must compose the existing bounded listener with the closed common-SNI locator GET and exact-SNI claim POST, preserving accept-time bounds and proof/standby slot separation. Runtime selection must follow the original acknowledged backend receipt, with the actual regional producer/holder and dedicated HWORK path. Then an owned native multi-owner/two-cluster fixture must measure complete per-leg work within the same original five seconds. No shared installed-v2 producer, SQL grant, migration, field default or runtime selector is included here.

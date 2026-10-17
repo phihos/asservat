@@ -1,0 +1,18 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 0,
+  "terminalExecSession": 64938,
+  "logSHA256": "68da8e9e32d56883cb5e455974c4868d2def752bbf04b2ff3da335d001f0d976",
+  "sourceHashes": {
+    "docs/implementation-progress.md": "7af54e02e70883992929f75be4fba3fccdfe7d7b21edda0f29cbb70d66570d8f",
+    "docs/decisions/159-owner-projection-split-preflight.md": "689d3cfe6ebfdcd3abc676385ab503d3a6d648ce52cbe99e735441aad1d70880",
+    "docs/decisions/README.md": "d9f0dc78c1b066729c43d8f9356c7c9eb2a988545ed11c750cc5b4b38560a113",
+    "docs/architecture/installed-owner-identity.md": "4f17431f272c0344dc371c204fbcc7c633d38de3eeb349c4df02fdd1fd03f28a"
+  }
+}

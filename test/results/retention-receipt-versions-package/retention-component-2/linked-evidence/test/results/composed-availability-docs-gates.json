@@ -1,0 +1,12 @@
+{
+  "scope": "Documentation-only complete-path availability requirements after integrated Go gate",
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check"
+  ],
+  "exit": 0,
+  "seconds": 8.519
+}

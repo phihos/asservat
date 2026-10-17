@@ -1,0 +1,7 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:78: native original source unavailable source.probe-denial-cause
+    direct_observation_native_fixture_test.go:191: native original helper Pod mode=regional original=true phase=Pending status-count=1
+--- FAIL: TestFederationRegionalProductWithRealKubernetes (17.73s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	17.792s
+FAIL

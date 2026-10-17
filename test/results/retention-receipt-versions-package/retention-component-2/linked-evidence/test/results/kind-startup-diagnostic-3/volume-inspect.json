@@ -1,0 +1,17 @@
+[
+    {
+        "CreatedAt": "2026-10-13T10:09:15+02:00",
+        "Driver": "local",
+        "Labels": {
+            "asservat.test": "asservat-startup-0f8708da32"
+        },
+        "Mountpoint": "/var/lib/docker/volumes/asservat-startup-0f8708da32-var/_data",
+        "Name": "asservat-startup-0f8708da32-var",
+        "Options": {
+            "device": "tmpfs",
+            "o": "size=3g",
+            "type": "tmpfs"
+        },
+        "Scope": "local"
+    }
+]

@@ -1,0 +1,33 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestSequentialBaseline$",
+    "-v"
+  ],
+  "scope": "Synthetic experiment only",
+  "fixture": {
+    "containerID": "c3e60d92e17de4753c0428be3f40639d740c268d6a2a6ca0228368d26b6496f7",
+    "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+    "endpoint": "http://192.168.240.2:8333",
+    "state": "running",
+    "network": "asservat-feasibility-20261009"
+  },
+  "startedUnix": 1791572075.9363012,
+  "inputSHA256": {
+    "experiments/feasibility/go/baseline_test.go": "51c40e8e1efcdd8aa2dc5aa93ff954527138e1ad3888f3266c8c2d34053e13b0",
+    "experiments/feasibility/go/cmd/filterprobe/main.go": "332547d46495bb64c523089ce184ecd05f408beaefd0d7fe30428c6e91dfde27",
+    "experiments/feasibility/go/cmd/mapprobe/main.go": "7785b0be95f3ecdb7d1f79a9feeaf7d2533b964938a9efc1fdbf0d121555ec4e",
+    "experiments/feasibility/go/delivery.go": "65a14f269ac94ae244a5121c708046a8f8d160bc0d9a479679d90780ae5c83c3",
+    "experiments/feasibility/go/packets_test.go": "0265e845194da81a5c4b1440eca1c3a35b6f0445363fa34db50f9041d5c3f868",
+    "experiments/feasibility/go/ring_test.go": "161eef8358b75608d093aa53fb74703c8353348b7e908a17139b2ab268f1e3bb",
+    "experiments/feasibility/go/storage.go": "6aa72c2808fea49a4ccf49f6487e31278580ccbcdfe8f0ce53df626b0c5384e6",
+    "experiments/feasibility/go/storage_test.go": "f59c466b91a043395effcd490e2a21932ed60f70d59fd1afd71e15ecf952ba06",
+    "experiments/feasibility/go/go.mod": "267ebf86ba14664a130bca1acda3e979b67b84b0493f096d9d39fcd4144120b9",
+    "experiments/feasibility/go/go.sum": "73349cc0fe6adcd56a46b0d7b6cf82bb989c814c3a12179e2e7cb89e20839bd4"
+  },
+  "exit": 0,
+  "elapsedSeconds": 2.286970853805542
+}

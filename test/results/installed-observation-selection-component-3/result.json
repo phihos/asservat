@@ -1,0 +1,884 @@
+{
+  "runnerSHA256": "2f496fc3e762bb8d69d8c4659af071e17ab1ed7e35223d15f4f5e61c1c19b1a9",
+  "patchSHA256": "89f8bba663071997b94912e82dfeb5662bbcdb4d903db1bcc1b0ebfc796c0754",
+  "manifestSHA256": "3275e1c6279e65c95bbeec328a01b31409c34ea58098af74c6112c145c44e4e9",
+  "selectionSHA256": "200dda058a280eee9b15b0f478dcb8b5380a32e4c1a1805d0b6ac41bd5c8880f",
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "sourceCount": 3125,
+  "reviewedPayloads": {
+    "internal/adapters/kubernetes/initial_runtime_provider_resources.go": "8c202c94de91136dc3beffc3031ff1c65dcaf805944ae8a08a95bc1e9a09d291",
+    "internal/adapters/kubernetes/initial_runtime_resources.go": "0335b5d8fe820ea37c98cc77f4054ebe9e1fc0a6d8a33470975e8a96bc465445",
+    "internal/adapters/kubernetes/owner_bootstrap_current.go": "b74e2b9aa8115b3831abe19ae4a57c661c9a22694f9c2f39791dfc0a3ff150cd",
+    "internal/adapters/kubernetes/owner_bootstrap_deployment.go": "7497d43676d3da9523d3ebb9018ce3d0f5d95157824b8e94e50c06acb50429d4",
+    "internal/adapters/kubernetes/owner_bootstrap_selection.go": "e01f2024a5e441c1040ad313ad0944a79b86d065e2c3e5cce31156d6fd60eb6b",
+    "internal/adapters/kubernetes/owner_bootstrap_state.go": "c8f79d3ede9b5c2b051b4bbbe72607ed9a18af5fe107720474e4dd447bcc7406",
+    "internal/adapters/kubernetes/owner_bootstrap_values.go": "2276ca67e53d45fe71b674f77492c31a966dfa4ba206ba29c5aec23e368c9a2e",
+    "internal/adapters/kubernetes/owner_bootstrap_worker_caller.go": "1adc857cba89a050ceb3529b4af083864d366a79733f9a9c1d42c918639e9d86",
+    "internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go": "c9db87cfabf839205ee7a6b507f71fbaa78addd4ab7ba3f4cb800fbb0e1f02b5",
+    "internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go": "f8bbc6a624c03baeb832afdb1da30c4b4e24a4a0754425db99b5329372ce352c",
+    "internal/adapters/kubernetes/owner_identity_operation_fixture_test.go": "632c046714d8e2dabd9a184d74d22a40743394a6052529f5a657db06c7f1dbff",
+    "internal/adapters/kubernetes/owner_identity_projection_input.go": "80cf7d5248576526adc42f248a5982164c451bf5c448a99c8696b3e51b41cf2b",
+    "internal/adapters/kubernetes/owner_observation_selection_test.go": "90ba0e541ecbb900af6e87537f56a8e9bd6ca51f396e19653ab04bf9b9d2f223",
+    "internal/adapters/kubernetes/owner_provider_binding.go": "d700a70956c7f2ab1562f84f0842526ea009ef3ce8ae60540fe5ee692b56a51e",
+    "internal/contracts/initial_runtime_resources.go": "57b639ae30cf5dd84f2366ead58d5ba0eb29ae25bc809ba665b93ffb0979cfb6",
+    "internal/contracts/owner_bootstrap_selection.go": "35e14645065a1cbb4bff2b10bca7829045fcb6f0883bab12163cb12c4e437a2c",
+    "internal/bootstrap/owner_observation_selection_test.go": "906b9129341e1c8c307e34fc152365675472adbb5d343b36accfcd1c794b6fa9"
+  },
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=15m",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "pid": 3445531,
+      "processGroup": 3445531,
+      "exit": 0,
+      "seconds": 7.106,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "race-resource-compatibility",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences|TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims|TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload|TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead|TestProviderResourcesFixCompletePairOriginalScopeAndCandidateLimit|TestProviderSecretPlaceholderPinsIdentityWithoutAssertingMaterial|TestInitialRuntimeRootPinOriginalCreationInputAndReplacement|TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 3446156,
+      "processGroup": 3446156,
+      "exit": 0,
+      "seconds": 5.504,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestInitialRuntimeRootPinOriginalCreationInputAndReplacement"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderResourcesFixCompletePairOriginalScopeAndCandidateLimit"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderSecretPlaceholderPinsIdentityWithoutAssertingMaterial"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/Never_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/OnFailure_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/added_init_container",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/another_annotation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/api_defaults",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_replicas",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_retention",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_template",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_volume",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/generation_change",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/later_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_generation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/noncanonical_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/original_controller_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/privilege",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/wrong_operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/Never_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/OnFailure_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/added_init_container",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/another_annotation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/api_defaults",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_replicas",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_retention",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_template",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_volume",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/generation_change",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/later_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_generation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_restart_policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/noncanonical_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/original_controller_revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/privilege",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/wrong_operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/changed_image",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/different_key_mount",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_apiVersion",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_kind",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_metadata",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_spec",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_UID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/privilege",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/sidecar",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unexpected_replica",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unqualified_annotation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/wrong_account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/adopt_original_setup_ID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/binding",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/changed_derived_object",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/future_claim",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/long_claim",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/new_template",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/omitted_sequence",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/refill_setup",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reordered",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reused_object",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/second_operation_ID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/unclosed_predecessor",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestInitialRuntimeRootPinOriginalCreationInputAndReplacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderResourcesFixCompletePairOriginalScopeAndCandidateLimit",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderSecretPlaceholderPinsIdentityWithoutAssertingMaterial"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-original-selection",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes|TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims|TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission|TestOwnerBootstrapOriginalAllocationAndGeneratedInput|TestOwnerBootstrapUnknownClaimCannotIssueCreate|TestOwnerBootstrapLostCreateAndReceiptRemainExact|TestOwnerBootstrapFinalGuardAndChildReplacementDeny|TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect|TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority|TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt|TestOwnerBootstrapUnknownParentPinsExactLocalAllocation|TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution|TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim|TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers|TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect|TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization|TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads|TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause|TestOwnerBootstrapProtectedSourceCapabilityAndDigest|TestObservationCapabilityIsOriginalResourceBinding|TestObservationCapabilityRejectsMixedAndUnknownOriginalState|TestObservationOriginalSelectionPropagatesWithoutRuntimeActivation|TestObservationV2UnknownSelectionCreateDoesNotRepeat)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 3446269,
+      "processGroup": 3446269,
+      "exit": 0,
+      "seconds": 85.459,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationCapabilityIsOriginalResourceBinding"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationCapabilityRejectsMixedAndUnknownOriginalState"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationOriginalSelectionPropagatesWithoutRuntimeActivation"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationV2UnknownSelectionCreateDoesNotRepeat"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapFinalGuardAndChildReplacementDeny"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapLostCreateAndReceiptRemainExact"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapOriginalAllocationAndGeneratedInput"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapProtectedSourceCapabilityAndDigest"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapUnknownClaimCannotIssueCreate"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapUnknownParentPinsExactLocalAllocation"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationCapabilityIsOriginalResourceBinding",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationCapabilityRejectsMixedAndUnknownOriginalState",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationOriginalSelectionPropagatesWithoutRuntimeActivation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationV2UnknownSelectionCreateDoesNotRepeat",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause/after",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause/before",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapFinalGuardAndChildReplacementDeny",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/cluster",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/issuer",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/logical-peer",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/permission-root",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pki-role",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pool-budget",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/trust",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapLostCreateAndReceiptRemainExact",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapLostCreateAndReceiptRemainExact/create",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapLostCreateAndReceiptRemainExact/receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapOriginalAllocationAndGeneratedInput",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProtectedSourceCapabilityAndDigest",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProtectedSourceCapabilityAndDigest/empty",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProtectedSourceCapabilityAndDigest/missing-port",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProtectedSourceCapabilityAndDigest/null",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapProtectedSourceCapabilityAndDigest/unknown",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-root",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/child-operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/cleanup-object",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/duplicate-peer-allocation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/issuer-allocation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/late-receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/long-child",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/mixed-layout",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/original-operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/path-mount",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/peer-allocation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/root-window",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/selected-provider",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unbounded-connections",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unfinished-original",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-sql",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/zero-digest",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownClaimCannotIssueCreate",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-committed",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-uncommitted",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-committed",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-uncommitted",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapUnknownParentPinsExactLocalAllocation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads/deadline",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads/equal",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads/read",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads/success",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads/valid"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-participant-provenance",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestOwnerBootstrapWorkerCallerOriginalReceipts|TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement|TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent|TestOwnerBootstrapWorkerCallerCloseAndCopyDeny|TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead|TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable|TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable|TestObservationParticipantsBindExactDistinctOwnerAndCaller|TestObservationParticipantsRejectLegacySelectionBeforeNativeRead|TestObservationParticipantsRejectOwnerReplacementAtFinalBoundary)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 3448162,
+      "processGroup": 3448162,
+      "exit": 0,
+      "seconds": 72.45,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationParticipantsBindExactDistinctOwnerAndCaller"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationParticipantsRejectLegacySelectionBeforeNativeRead"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestObservationParticipantsRejectOwnerReplacementAtFinalBoundary"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerCloseAndCopyDeny"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerOriginalReceipts"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationParticipantsBindExactDistinctOwnerAndCaller",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationParticipantsRejectLegacySelectionBeforeNativeRead",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestObservationParticipantsRejectOwnerReplacementAtFinalBoundary",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerCloseAndCopyDeny",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/child_replaced",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/guard_lost",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerOriginalReceipts",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/guard_receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/image",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/launch_marker",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/missing_launch_receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/role_root_UID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/template_annotation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_UID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_account_UID",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-projection-compatibility",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication|TestProviderInstalledOwnerRejectsCredentialScopeSubstitution|TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects|TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe|TestProviderOwnerAuditPlaceholderNeverBecomesUsableMaterial|TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts|TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects|TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims|TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild|TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState|TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly|TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion|TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 3449728,
+      "processGroup": 3449728,
+      "exit": 0,
+      "seconds": 7.405,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderInstalledOwnerRejectsCredentialScopeSubstitution"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerAuditPlaceholderNeverBecomesUsableMaterial"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/blocked-original-deadline",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/changed-child",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/extra-key",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/positive",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/replacement-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/unknown-create",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-kind",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-version",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/blocked-original-deadline",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/changed-child",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/extra-key",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/positive",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/replacement-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/unknown-create",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-kind",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-version",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/inert",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-controller-revision",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-generation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/replacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/template-change",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/unrelated-operation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/binding",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/capacity",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/cleanup",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/end",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/inventory",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/parent-public-input",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts/legacy-false",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts/legacy-true",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/binding-version",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-original-deadline",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-snapshot-deadline",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/changed-native-template",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-image",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-template",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/expired-snapshot",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-generation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/original",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/replacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/administrator",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-endpoint",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-roots",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-bucket",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-endpoint",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-key",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-mount",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-region",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-roots",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/concurrency-bound",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/connection-bound",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/duplicate-peer",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding-version",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-generation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-policy",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/image-zero",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-endpoint",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-roots",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/lease",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/missing-peer",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-epoch",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-installation",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/pki-role",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/protection-digest",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe-account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-database",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-host",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-pool",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-port",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-roots",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/template-zero",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/accessor",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/auth-path",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/cluster",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/missing-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/secret-name",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerRejectsCredentialScopeSubstitution/token-mount",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerAuditPlaceholderNeverBecomesUsableMaterial",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-audit-secret",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-audience",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-jwt-lifetime",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/changed-provider-uid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/extra-legacy-secret-key",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-owner",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/legacy-worker",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-selection",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/missing-sql-key",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-child-alias",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-original-alias",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/provider-owner-root-alias",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout/valid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/client",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/server",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/storage",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/unwrap",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/wrap",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/accessor",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/omission",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/recipe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/selected-secret"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-contracts",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestInitialRuntimeLayoutsRejectMixedIncompleteProfiles|TestOwnerBootstrapSelectionCodecsStayClosedAndBounded|TestOwnerOperationWireExactClosedV2|TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases|TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment)$",
+        "./internal/contracts"
+      ],
+      "pid": 3449943,
+      "processGroup": 3449943,
+      "exit": 0,
+      "seconds": 1.306,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/contracts",
+          "TestInitialRuntimeLayoutsRejectMixedIncompleteProfiles"
+        ],
+        [
+          "asservat.local/asservat/internal/contracts",
+          "TestOwnerBootstrapSelectionCodecsStayClosedAndBounded"
+        ],
+        [
+          "asservat.local/asservat/internal/contracts",
+          "TestOwnerOperationWireExactClosedV2"
+        ],
+        [
+          "asservat.local/asservat/internal/contracts",
+          "TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment"
+        ],
+        [
+          "asservat.local/asservat/internal/contracts",
+          "TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/contracts/TestInitialRuntimeLayoutsRejectMixedIncompleteProfiles",
+        "asservat.local/asservat/internal/contracts/TestOwnerBootstrapSelectionCodecsStayClosedAndBounded",
+        "asservat.local/asservat/internal/contracts/TestOwnerOperationWireExactClosedV2",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/alias",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/duplicate",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/missing-account",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/reviewer",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/role",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/token",
+        "asservat.local/asservat/internal/contracts/TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/ttl"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "race-runtime-refusal",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestOwnerObservationInputIsExplicitAndFinite|TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool|TestProviderOwnerInputRequiresCompleteSelectedBranch|TestProviderOwnerProjectionReadsOnlyFiveSQLFilesAndRejectsLegacyMaterial|TestOwnerObservationSelectionAloneCannotActivateV2Runtime)$",
+        "./internal/bootstrap"
+      ],
+      "pid": 3449996,
+      "processGroup": 3449996,
+      "exit": 0,
+      "seconds": 3.203,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/bootstrap",
+          "TestOwnerObservationInputIsExplicitAndFinite"
+        ],
+        [
+          "asservat.local/asservat/internal/bootstrap",
+          "TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool"
+        ],
+        [
+          "asservat.local/asservat/internal/bootstrap",
+          "TestOwnerObservationSelectionAloneCannotActivateV2Runtime"
+        ],
+        [
+          "asservat.local/asservat/internal/bootstrap",
+          "TestProviderOwnerInputRequiresCompleteSelectedBranch"
+        ],
+        [
+          "asservat.local/asservat/internal/bootstrap",
+          "TestProviderOwnerProjectionReadsOnlyFiveSQLFilesAndRejectsLegacyMaterial"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": true,
+      "allRunChildrenPassed": true,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/duplicate-peer",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/empty-peers",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/excess-peers",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/format",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/guessed-process",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/legacy",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/missing-activation",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/missing-root",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/mixed",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/upper-image",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/valid",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-namespace",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-root",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationInputIsExplicitAndFinite/zero-template",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/cluster",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/installation",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/namespace",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/peer-epoch",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/unopted",
+        "asservat.local/asservat/internal/bootstrap/TestOwnerObservationSelectionAloneCannotActivateV2Runtime",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/changed-recipe",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/changed-scope",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/changed-secret-name",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/legacy-layout",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/missing-activation",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/missing-observation",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/missing-profile",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/native-mixed",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerInputRequiresCompleteSelectedBranch/valid",
+        "asservat.local/asservat/internal/bootstrap/TestProviderOwnerProjectionReadsOnlyFiveSQLFilesAndRejectsLegacyMaterial"
+      ],
+      "missingPackagePasses": [],
+      "failuresOrSkips": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "pid": 3450140,
+      "processGroup": 3450140,
+      "exit": 0,
+      "seconds": 1.301,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check"
+      ],
+      "pid": 3450181,
+      "processGroup": 3450181,
+      "exit": 0,
+      "seconds": 8.406,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "generatedMirrorRestored": true
+    }
+  ],
+  "status": "passed",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "payloadsUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 0,
+  "archiveHashes": {
+    "sources.json": "105e46e1094b7426e14c59c208b67993f22b9bdbd3ca1cba485d5ded9b320058",
+    "runner.py": "2f496fc3e762bb8d69d8c4659af071e17ab1ed7e35223d15f4f5e61c1c19b1a9",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "manifest.json": "3275e1c6279e65c95bbeec328a01b31409c34ea58098af74c6112c145c44e4e9",
+    "review.patch": "89f8bba663071997b94912e82dfeb5662bbcdb4d903db1bcc1b0ebfc796c0754",
+    "selection.json": "200dda058a280eee9b15b0f478dcb8b5380a32e4c1a1805d0b6ac41bd5c8880f",
+    "compile.log": "2df2e7bd4d2cacb5cc6e35001d12025cd8e5e4141876c9c863277656b1a1799d",
+    "race-resource-compatibility.log": "c66c1cfbc4966e976a4fc32e10c9ccd86593389b6ffff79f5bef1c430f309dfb",
+    "race-original-selection.log": "b5b204e1f1a4c3d9001e7cb979cea7ab55bc4d32ee6f42628a5dd1b9d44770c5",
+    "race-participant-provenance.log": "f59a0613f28146df1faef21073c9864f3e2ace5a2cb66a87b6b11704d604eac6",
+    "race-projection-compatibility.log": "966d0d8908cc6ee3094e6f90e5f9ae68c1359a31ef5377fba77ca1daf691c575",
+    "race-contracts.log": "9ab3a706a0e8862c4c71d4e1fdd1f6046f4a364880f4364e4e74ebe9b3a283f1",
+    "race-runtime-refusal.log": "b3a26394581d556553ba9216c87e6b6a37f78cda842e356cd15a403b22964c41",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "canonical.log": "8ae5be3373ca1b190d69119037c71ae5d660ee708a977a4f16891aabfc982848",
+    "architecture-validation-after.json": "b2534c84a6662866b7cf9f1c537c05d178f64787282c90240647778996675d0e",
+    "payloads/internal/contracts/initial_runtime_resources.go.txt": "57b639ae30cf5dd84f2366ead58d5ba0eb29ae25bc809ba665b93ffb0979cfb6",
+    "payloads/internal/contracts/owner_bootstrap_selection.go.txt": "35e14645065a1cbb4bff2b10bca7829045fcb6f0883bab12163cb12c4e437a2c",
+    "payloads/internal/bootstrap/owner_observation_selection_test.go.txt": "906b9129341e1c8c307e34fc152365675472adbb5d343b36accfcd1c794b6fa9",
+    "payloads/internal/adapters/kubernetes/initial_runtime_provider_resources.go.txt": "8c202c94de91136dc3beffc3031ff1c65dcaf805944ae8a08a95bc1e9a09d291",
+    "payloads/internal/adapters/kubernetes/initial_runtime_resources.go.txt": "0335b5d8fe820ea37c98cc77f4054ebe9e1fc0a6d8a33470975e8a96bc465445",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_current.go.txt": "b74e2b9aa8115b3831abe19ae4a57c661c9a22694f9c2f39791dfc0a3ff150cd",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_deployment.go.txt": "7497d43676d3da9523d3ebb9018ce3d0f5d95157824b8e94e50c06acb50429d4",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_selection.go.txt": "e01f2024a5e441c1040ad313ad0944a79b86d065e2c3e5cce31156d6fd60eb6b",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_state.go.txt": "c8f79d3ede9b5c2b051b4bbbe72607ed9a18af5fe107720474e4dd447bcc7406",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_values.go.txt": "2276ca67e53d45fe71b674f77492c31a966dfa4ba206ba29c5aec23e368c9a2e",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_worker_caller.go.txt": "1adc857cba89a050ceb3529b4af083864d366a79733f9a9c1d42c918639e9d86",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go.txt": "c9db87cfabf839205ee7a6b507f71fbaa78addd4ab7ba3f4cb800fbb0e1f02b5",
+    "payloads/internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go.txt": "f8bbc6a624c03baeb832afdb1da30c4b4e24a4a0754425db99b5329372ce352c",
+    "payloads/internal/adapters/kubernetes/owner_identity_operation_fixture_test.go.txt": "632c046714d8e2dabd9a184d74d22a40743394a6052529f5a657db06c7f1dbff",
+    "payloads/internal/adapters/kubernetes/owner_identity_projection_input.go.txt": "80cf7d5248576526adc42f248a5982164c451bf5c448a99c8696b3e51b41cf2b",
+    "payloads/internal/adapters/kubernetes/owner_observation_selection_test.go.txt": "90ba0e541ecbb900af6e87537f56a8e9bd6ca51f396e19653ab04bf9b9d2f223",
+    "payloads/internal/adapters/kubernetes/owner_provider_binding.go.txt": "d700a70956c7f2ab1562f84f0842526ea009ef3ce8ae60540fe5ee692b56a51e"
+  }
+}

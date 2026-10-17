@@ -1,0 +1,8 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-openapi.py
+PASS: OpenAPI 3.1.1 specification validation with all canonical references bundled locally.
+/tmp/asservat-openapi-validation/bin/python scripts/check-live-watch.py
+PASS: 45 live schema/timeline checks; raw content, hidden predicates, renewed lifetimes, invalid replay and scope drift rejected. Runtime checks remain pending.
+/tmp/asservat-openapi-validation/bin/python scripts/check-downloads.py
+PASS: {"scope": "Synthetic download DTO checks only; real streams/local tools NOT RUN", "positiveChecks": 16, "rejectedInvalidCases": 48}
+/tmp/asservat-openapi-validation/bin/python scripts/check-investigation.py
+PASS: {"scope": "Synthetic paired request/grant/commit contracts only; real authorization, concurrency and local-tool workflow NOT RUN", "positiveChecks": 9, "rejectedInvalidCases": 18}

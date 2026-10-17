@@ -1,0 +1,188 @@
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/source-revision
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/source-uid
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/workload-pool
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/workload-pod
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/earlier-than-proof
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/permission-root
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/sender-purpose
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/holder-purpose
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/replicaset
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/extended-output
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/workload-name
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/template
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/guard
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/proof-expired
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/unselected-limit
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/sender-pool
+=== RUN   TestClusterObservationRoutingPeersOriginalProofs/workload-expired
+--- PASS: TestClusterObservationRoutingPeersOriginalProofs (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/source-revision (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/source-uid (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/workload-pool (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/workload-pod (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/earlier-than-proof (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/permission-root (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/sender-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/holder-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/replicaset (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/extended-output (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/workload-name (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/template (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/guard (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/proof-expired (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/unselected-limit (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/sender-pool (0.00s)
+    --- PASS: TestClusterObservationRoutingPeersOriginalProofs/workload-expired (0.00s)
+=== RUN   TestOwnerPoolNativeCandidateLimitIsExplicitAndLegacyOmitted
+--- PASS: TestOwnerPoolNativeCandidateLimitIsExplicitAndLegacyOmitted (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.008s
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/common-locator
+=== RUN   TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/exact-claim
+--- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads (0.06s)
+    --- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/common-locator (0.03s)
+    --- PASS: TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads/exact-claim (0.03s)
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/revoked
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/changed-pool
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/removed-root
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/suspended
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/source-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/revision-changed
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/route-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/guard-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/template-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/namespace-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/pod-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/replicaset-replaced
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-workload
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/close-serving-key
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/cancel-during-last-native
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/blocked-until-original-end
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-sni
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-root
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-query
+=== RUN   TestOwnerObservationRoutingPeersRejectCurrentChanges/cancelled-caller
+--- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges (0.51s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/revoked (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/changed-pool (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/removed-root (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/suspended (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/source-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/revision-changed (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/route-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/guard-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/template-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/namespace-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/pod-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/replicaset-replaced (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-workload (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/close-serving-key (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/cancel-during-last-native (0.02s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/blocked-until-original-end (0.21s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-sni (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/wrong-root (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/expired-query (0.01s)
+    --- PASS: TestOwnerObservationRoutingPeersRejectCurrentChanges/cancelled-caller (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	1.602s
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/joined
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/extra-request-byte
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/missing-request-eof
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/cancel-after-claim
+--- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim (0.65s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/joined (0.02s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/extra-request-byte (0.02s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/missing-request-eof (0.61s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/cancel-after-claim (0.01s)
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-sni
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/no-client-cert
+2026/10/13 03:58:42 http: TLS handshake error from 127.0.0.1:33758: tls: client didn't provide a certificate
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/fixed-body
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-authority
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/credential-header
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/query
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-media
+--- PASS: TestHubObservationHandlerActualTLSAndClosedRequest (0.05s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-sni (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/no-client-cert (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/fixed-body (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-authority (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/credential-header (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/query (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-media (0.01s)
+=== RUN   TestHubObservationHandlerCancellationDuringHelloJoinsSlot
+--- PASS: TestHubObservationHandlerCancellationDuringHelloJoinsSlot (0.01s)
+=== RUN   TestHubObservationHolderClaimRetainsClosingSlotAndExactEntry
+--- PASS: TestHubObservationHolderClaimRetainsClosingSlotAndExactEntry (0.01s)
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/root
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cluster
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/exchange
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/expired
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cancelled
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/normal
+--- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/root (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cluster (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/exchange (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/expired (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cancelled (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/normal (0.00s)
+=== RUN   TestHubObservationHolderNoReceiptCannotProduceSuccess
+--- PASS: TestHubObservationHolderNoReceiptCannotProduceSuccess (0.00s)
+=== RUN   TestHubObservationHolderRepeatedHelloCannotAliasOldLocator
+--- PASS: TestHubObservationHolderRepeatedHelloCannotAliasOldLocator (0.00s)
+=== RUN   TestHubObservationHolderSequenceOverflowCannotWrap
+--- PASS: TestHubObservationHolderSequenceOverflowCannotWrap (0.00s)
+=== RUN   TestObservationRoutingActualH2LookupClaimAndJoinedTerminal
+--- PASS: TestObservationRoutingActualH2LookupClaimAndJoinedTerminal (0.04s)
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-exact-sni
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/claim-common-sni
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/no-client-cert
+2026/10/13 03:58:42 http: TLS handshake error from 127.0.0.1:46348: tls: client didn't provide a certificate
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-authority
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/authorization
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/cookie
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/origin
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/idempotency
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/extra-query
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-media
+=== RUN   TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-body
+--- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof (0.08s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-exact-sni (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/claim-common-sni (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/no-client-cert (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-authority (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/authorization (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/cookie (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/origin (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/idempotency (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/extra-query (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/wrong-media (0.01s)
+    --- PASS: TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof/lookup-body (0.01s)
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/first-denied
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/root-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/holder-process-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/sender-leaf-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/source-change
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/first-shortened
+=== RUN   TestObservationRoutingCurrentProofAndOriginalDeadline/final-cancelled
+--- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline (0.23s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/first-denied (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/root-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/holder-process-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/sender-leaf-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/source-change (0.01s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/first-shortened (0.14s)
+    --- PASS: TestObservationRoutingCurrentProofAndOriginalDeadline/final-cancelled (0.02s)
+=== RUN   TestObservationRoutingCloseJoinsBlockedAuthorityAndRetainsSlot
+--- PASS: TestObservationRoutingCloseJoinsBlockedAuthorityAndRetainsSlot (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	2.101s

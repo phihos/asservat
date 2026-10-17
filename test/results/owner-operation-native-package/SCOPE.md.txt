@@ -1,0 +1,9 @@
+# Actual native owner observation primitive
+
+One new integration test uses the existing owned native-cost fixture. Six consecutive operations share the same original production-limited observer/probe clients, without sleeps or newly constructed buckets. Each operation performs an initial independent native boundary and a final one under its own original five-second request. Reading Original does no I/O; completed Final cannot replay. The test records elapsed and remaining time, actual requests and the two expected native admission denials. Exact existing resource-version conflicts may add at most four paired GET/PUT retries across the two boundaries; no new retries are introduced.
+
+A final negative case changes an actual protected Pod annotation through the fixture administrator between the native checks. It requires refusal of final facts and irreversible closure of that operation. The original Pod remains the target; no replacement or new image is selected.
+
+This is native component qualification only. The fixture supplies administrator pins/process identifiers, and the test does not authenticate a process certificate, query SQL authority, run normal background reconciliation or transport metadata. It cannot qualify complete sustained routing or installed v2 selection. The earlier real expected-denial nested composition remains separate before evidence, not a successful workflow.
+
+Overlay compile and vet passed with unchanged sources. Native execution is pending until the parent records actual terminal output and complete owned cleanup.

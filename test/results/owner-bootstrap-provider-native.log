@@ -1,0 +1,9 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:27: fixture sys/policies/acl/owner-pki-server status 400, want 204
+--- FAIL: TestEnrollmentOwnerPKIWithRealServices (0.01s)
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices
+    owner_pki_test.go:31: fixture sys/policies/acl/owner-bootstrap-pki-server status 400, want 204
+--- FAIL: TestEnrollmentOwnerBootstrapPKIWithRealServices (0.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.066s
+FAIL

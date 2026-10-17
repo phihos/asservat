@@ -1,0 +1,14 @@
+ok  	asservat.local/asservat/internal/application/evidence	1.023s
+ok  	asservat.local/asservat/internal/adapters/jose	(cached)
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+ok  	asservat.local/asservat/internal/domain/artifact	1.008s
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.010s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.009s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.008s
+ok  	asservat.local/asservat/internal/domain/identity	(cached)
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	(cached)
+?   	asservat.local/asservat/internal/domain/targets	[no test files]

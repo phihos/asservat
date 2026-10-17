@@ -1,0 +1,510 @@
+# Cluster-local observations
+
+This is the bounded ADR-144 composition under implementation. The integrated
+owner startup/local HWORK components and the following regional conversation
+have separate qualification. The regional proof, framing, channel state and
+digest components passed focused compile/race/vet checks. The concrete regional
+HTTP/2 stream now passes 62 named race cases with actual loopback mutual TLS and
+synthetic source/registry facts. The receiving holder/coordinator now passes its
+111 selected race entries. The installed listener, cross-owner routing and native
+multi-cluster workflow remain unqualified.
+
+The concrete operation-owned native reader now supplies an initial and an
+independent final observation under the earliest original deadline. It owns its
+inputs, returns original dates without additional I/O, rejects final identity
+or behavioral changes, and joins cancelled final reads. The existing standalone
+guard behavior is unchanged. Its [component qualification](../../test/results/owner-observation-operation-integration.json)
+uses a synthetic API over actual TLS; the operation has not yet replaced the
+repeated native proof composition described below. That existing composition
+has a recorded [native deadline failure](../../test/results/regional-observation-native-cost-test.log).
+
+The primitive now also [passes its real Kubernetes reference test](../../test/results/owner-operation-native-integration.json):
+six immediately consecutive same-client operations preserve the original
+five-second deadline, and an actual Pod mutation between boundaries prevents
+final facts. Each successful operation uses 28 observer/six probe calls; the
+five later requests take about 1.40 seconds each. The fixture supplies installation
+pins and process identifiers. It does not run the SQL/TLS consumers or normal
+background reconciliation, so it does not qualify complete sustained routing.
+
+The matching regional primitive now brackets four genuinely new source-value
+reads with two independent native checks. The last native check precedes the
+fourth value read, so a source change during probing is still compared before
+output. Full backing validity and original expiry remain required. Its
+[component checks](../../test/results/regional-observation-operation-integration.json)
+count 50 observer and 12 probe requests using a synthetic API over actual TLS.
+Existing full-attestation interfaces and runtime selection remain unchanged;
+the complete current SQL/TLS/process composition is still required.
+
+The separate [operation-consumer component](../../test/results/observation-operation-consumer-integration.json)
+now exposes those concrete native operations through closed application ports
+and a purpose-specific SQL49 wrapper. Native-bracket dates remain distinct from
+each actual source-value read. The fixed SQL query still runs between source
+ordinals 1/2 and then 3/4, retaining every original bound. Its first pair is
+incomplete; result delivery requires final ordinal four and continuation of
+the exact same operation, channel and certificate across both pairs. Returned
+correlation values cannot instantiate native authority. The wire/channel owner,
+current TLS/key checks and terminal Receipt/EOF composition remain pending;
+the existing full-proof interfaces are not changed into caches.
+
+The SQL consumer now also [passes actual PostgreSQL/S3 qualification](../../test/results/observation-operation-sql-integration.json)
+with synthetic native/source/TLS values. Both source pairs preserve the exact
+activated process and certificate; source fencing, recovery/incarnation changes,
+post-SQL source mutation and expiry during an observed query lock prevent final
+registration. SQL shortening reaches the last source read, and the original
+EXECUTE-only role remains isolated. The corrected fixture activates both client
+and server certificates before serving; its initial incomplete-fixture failure
+is preserved. This does not replace full framed/native routing qualification.
+
+The [v2 source/producer component](../../test/results/observation-operation-source-integration.json)
+now retains one private native operation and actual TLS exporter across all four
+ordinals. The hub source requires acceptance of the exact first SQL pair before
+the final pair and rejects cross-operation substitution. First-frame return
+does not cancel stream ownership; cancellation and closure join admitted work.
+Large integer revisions retain their exact values through the closed v2 codec.
+These checks use synthetic native/SQL facts and a typed exchange around real
+process keys/TLS. Actual v2 framing, metadata coordination, final Receipt/EOF and
+the complete native route remain pending; no installed format is selected.
+
+The subsequent [typed v2 coordinator](../../test/results/observation-operation-coordinator-integration.json)
+now composes the same original owner handle, all four regional values, both SQL
+pairs, metadata and final receipt checks. Native `Original` and `Final` each run
+once; later current checks use the retained final facts. Every earlier cutoff
+constrains the next call, and failure or closure cancels and joins admitted work.
+Source-policy protection and workload protection remain separately pinned.
+Its actual-TLS/codec tests use synthetic native, SQL and terminal ports; the
+actual framed client/receiver, exact holder claim, locator-owned lifetime and
+complete installed critical-path qualification remain pending.
+
+## Reachability and authority
+
+```mermaid
+sequenceDiagram
+    participant R as Regional connector
+    participant A as Owner A
+    participant H as Local HWORK
+    participant B as Owner B
+    participant S as Current SQL registry
+    R->>A: Reachable Service/common-SNI TLS; bounded empty standby
+    H->>S: Finite original-pool SQL owner candidates
+    H->>B: Actual selected server proof; then dedicated Pod token/request
+    B->>A: Common-SNI mutual TLS; closed locator read
+    A-->>B: Exact holder/exchange/original interval (routing only)
+    B->>A: One exact-holder POST; original request/challenge/deadline
+    A->>R: Same-channel own-owner proof and numbered source question
+    R-->>A: Current local source/Pod/controller/template/guard observation
+    A->>S: Exact activated connector leaf/process/source read
+    A->>R: Second fresh source question; same original request
+    R-->>A: Fresh source observation; unchanged exact tuple
+    A->>R: One closed metadata selection
+    R-->>A: Bounded result under original local child intervals
+    A->>R: Fresh post-result source question
+    R-->>A: Current local observation
+    A->>S: Exact current registry recheck
+    A->>R: Final fresh source question
+    R-->>A: Unchanged source/process and original bounds
+    A-->>B: Result only after current proof; no request replay
+    B-->>H: Same result with every earlier deadline retained
+```
+
+The regional connector needs only the explicit reachable Service endpoint.
+There is no assumption that remote clusters can address individual hub Pods.
+Hub-to-hub lookup uses a separately declared common-SNI mutual-TLS purpose;
+the selected claim uses exact-owner route/TLS primitives and separately typed
+observation delegation. Capture IDs, human
+identity, signed capture work and worker enrollment are not substitutes.
+
+Before lookup, the initiating hub reads a finite current owner candidate set
+bounded by the accepted pool's configured/retained limits. Lookup concurrency
+and total process slots are independently capped. The existing sixteen-entry
+component lookup is not a complete installation population bound. A future
+original, explicitly selected layout must retain a complete candidate limit,
+check limit-plus-one overflow and group candidate processes by Pod before
+contacting peers; this codec checkpoint adds no such input or SQL query. An owner with its own suitable standby
+does not need remote lookup. A locator names one exact original holder/exchange
+and its original at-most-five-second interval. It provides neither peer
+authentication nor current source authority. No SQL routing table is added.
+
+The selecting hub authenticates the exact contacted holder and retains the
+finite original candidate set. The holder independently authenticates the exact
+forwarding owner plus its installed delegation. Only one selected POST is sent.
+It carries the original typed request and challenge, never the HWORK token.
+Disappearance or uncertainty does not select another holder for that request.
+Exact-owner forwarding paths require actual exact SNI plus matching HTTP
+authority; common-SNI own-peer/local-HWORK connections cannot enter them.
+
+## Source and peer proof
+
+Each installed connector pin contains the original configuration-source UID,
+logical identity, separate issuer roots, fixed source role names and original
+namespace/account/Deployment identities, plus image/template and workload-guard
+digests. Configuration-source protection and private workload protection are
+distinct guards and are never conflated. The configuration body is provenance:
+compatible accepted revisions can change revision and backing while these pins
+stay fixed. The current revision/backing must then remain exactly unchanged
+through the entire request.
+
+The new local producer takes a private snapshot of its actual process-owned
+key/CSR/leaf and original run bound. This is not activation or source authority.
+The unchanged native attestation algorithm then performs both full protected
+source reads, online TokenReviews and before/after Pod/ReplicaSet/Deployment and
+native guard checks. A purpose-specific result retains the actual source,
+including role names, from those reads. The producer checks the exact installed
+template separately, verifies the actual leaf/key against both independently
+pinned and proof-current issuer roots, then rechecks the original live process,
+keys, leaf and cancellation before returning. Replacement or same-process leaf
+renewal invalidates the old conversation; no fallback enrollment is attempted.
+It does not invoke enrollment, signing or activation. The wire omits tokens,
+token hashes, CSRs, roots, role names and full private inputs. It carries the
+current revision/backing, actual process/leaf and minimized own-workload facts.
+The actual connection exporter and request/challenge bind each reply. This is
+explicit observation delegation to an authorized process, not cryptographic
+proof against a compromised authorized observer.
+
+Existing consumers keep the full `ObserveConnectorProcess` unchanged. Nesting
+that method before and after every numbered reply would recurse through its
+registry's source bracketing: structurally, four replies would cause thirty-two
+local configuration reads before the native attester's own reads. The new
+private snapshot removes only that recursion. Four native attestations still
+perform eight fresh full source reads; the hub retains both separate SQL49
+checks and their four independent remote source reads. These are source call
+counts, not latency measurements. Two-cluster availability within the original
+five seconds remains unqualified.
+
+The hub's concrete source reader spends a new numbered request for every call
+from the unchanged SQL49 registry. The registry retains its pre/post source
+reads and exact current leaf/process/recovery checks. Two registry checks consume
+four source reads; no cached observation is presented as a second independent
+read. A failed or unknown read permanently fails this request's source and spends
+that ordinal. A positive source reply alone is not peer activation. The current
+SQL result must match the exact attested process, leaf and source revision.
+
+All intervals are intersected with the original HWORK request (at most five
+seconds), forwarding observations, actual leaves, each native source/guard proof
+and the first accepted source deadline. Queueing, TLS, parsing, SQL locks,
+replies, pages and reconnects cannot renew them. Current checks remain necessary
+around the metadata operation and final delivery. The extra proof/forwarding
+round trips require measured native qualification within that same bound.
+
+## Closed lifetime and failure behavior
+
+The single frame-contract owner is `internal/contracts/cluster_observation_frames.go`.
+One retained conversation permits twelve frames and at most 512 KiB in total:
+one routing-only hello, four numbered proof questions/replies, one metadata
+selection/result, and one delivery receipt. Own-process replies are at most
+8 KiB. Metadata retains the existing 192 KiB, page64, cursor8192 and key256 bounds.
+Finite empty standby residency is not authority. A pre-handshake SQL candidate
+observation authenticates only that original TLS handshake. An attached request
+reads current candidates and registry for the same actual owner/leaf before
+accepting each numbered own-peer proof. It never reuses expired candidate dates
+or selects another owner on failure. The original socket/standby end is also a
+hard upper bound: late attachment does not add five more seconds. Each later
+proof retains the first attached request and its earliest accepted cutoffs. There is no background evidence I/O, command, generic RPC or target URL.
+Closing retains slots until actual admitted I/O/handlers join.
+
+| Condition | Required behavior |
+| --- | --- |
+| HWORK reaches B while the regional standby is on A | B may use bounded exact-owner locator lookup and one selected forwarding POST. |
+| No standby, unknown locator or changed holder | Unavailable; no namespace/peer discovery outside the original candidates. |
+| Holder disappears after lookup | Unavailable; no replacement, takeover or POST replay. |
+| Another request claims the standby | Exact atomic claim loses; no fallback to a different conversation. |
+| Source, backing, process, guard or template changes | Deny the whole observation; preserve the earlier deadline and spent ordinal. |
+| A copied proof names another TLS stream or request | Reject exporter/challenge/request/leaf mismatch before metadata. |
+| SQL activation is revoked while a result is pending | Final registry/source checks deny; no successful empty result. |
+| Deadline expires during any native/API/SQL/socket wait | Cancel and join; no deadline increase or refreshed receipt interval. |
+| Result or receipt delivery is uncertain | Close/join and report unavailable; no automatic request replay. |
+| Authorized observer is compromised | Outside the delegation's integrity assumption; independent SQL/pins constrain it, but its local observation cannot be cryptographically proved. |
+
+The regional channel component now enforces the four numbered same-channel
+proofs, one exact metadata read, unchanged owner/source identity and exact final
+receipt. C-04 application/fleet owns the deterministic closed request digest;
+the pure domain package retains only values and validation. The transport
+wrapper preserves the old canonical v1 bytes and domain separator. Focused
+component compile/race/vet checks passed; this is not a selected runtime route.
+
+Concrete receiving routes, router/forwarder, regional runtime/receipt wiring and
+real two-cluster load-balanced failure qualification remain required. Regional
+capacity-effect SQL credentials and writer provisioning are separate from this
+read-only observation path.
+
+### Regional stream checkpoint
+
+The concrete regional HTTP/2 client and fixed conversation runner are staged
+separately from the hub holder/router. Setup consumes one original five-second
+interval, including the actual mutual TLS handshake, headers and routing-only
+Hello. Normal roots and the original-Service-derived SNI stay enabled. The actual
+server leaf must belong to the independent finite pre-handshake candidate set;
+the client must actually present its original process-owned certificate. There
+is one socket, one streaming POST, no redirect or body replay, and no replacement
+address. An admitted standby occupies its process slot through joined shutdown.
+Configured process concurrency is separate from regional serving-process counts.
+
+After setup, the stream can wait only through its original at-most-thirty-second
+socket bound. This is empty routing residency, not a current source observation.
+The first attached proof performs the existing fresh owner/registry and local
+native checks; its original request and every shorter result interval narrow all
+later calls and socket I/O. Closure or key replacement vetoes a phase without
+enrolling again. No background source read or authority refresh runs while idle.
+
+The twelfth frame is the hub's exact Receipt. Before sending it, the holder must
+remove that original standby from claimable routing while retaining its slot.
+The regional side validates Receipt, closes the request-body writer cleanly and
+then requires response EOF. The hub requires clean request EOF before finishing
+the response. Extra bytes, a lost end marker or expiry are unavailable; a local
+Write/Flush never proves remote completion. These are the existing HTTP/2 end
+markers, not another request or authority-bearing frame. Close cancels and joins
+the actual admitted socket, proof and metadata work before releasing the slot.
+Final output authority still comes from the unchanged current checks; this is
+not partition-proof knowledge of another process's eventual shutdown.
+
+The [stream component checks](../../test/results/regional-observation-stream-integration.json)
+pass compilation, focused races, vet and Go architecture. They cover actual
+h2/mTLS, excluded candidates, no client certificate, unknown POST disposition,
+blocked reads, original setup/response deadlines, exact frame order and terminal
+EOF handling. Synthetic source/registry/template values remain explicit. Hub
+holder/forwarding, installed launch and measured two-cluster availability within
+the same five seconds are separate work.
+
+
+### Exact local holder and receiving stream
+
+The staged receiving component reserves one process slot before reading Hello
+or constructing a coordinator. Setup, idle, claimed, failed and closing entries
+share that bound. Both handler and coordinator require the listener's original
+finite socket deadline, at most thirty seconds; neither creates a replacement
+residency interval. Certificate expiry and the holder's parent context may only
+shorten it. The bootstrap-owned factory binds the actual mutual-TLS connection,
+original installed profile and separately scoped SQL49 registry. It cannot be
+selected by an incoming request.
+
+A local locator contains the original root, cluster and exchange plus a monotonic
+process-local registration sequence. It expires within five seconds and the
+original socket bound. The sequence cannot wrap; repeated Hello UUIDs cannot
+make old locators claim replacement streams. Claims are exact and irreversible.
+Later forwarding must additionally bind the independently authenticated holder
+Pod and process. Locators remain routing observations, not source authority.
+
+The coordinator uses the unchanged current SQL49 registry before metadata and
+after the result. Each registry read obtains two new numbered source replies;
+all four same-channel proofs remain mandatory. Every new own-peer proof also
+uses current accepted owner registration, route, native guard and workload.
+The result is withheld on source/revocation changes, expired original bounds or
+uncertain final delivery. No prior proof is presented as an independent read.
+
+Successful local completion first removes the exact entry from claimable
+routing, then writes Receipt and requires clean request EOF. The receiving
+handler joins admitted coordinator and stream work before releasing its holder
+slot and returning normally for response EOF. Cancellation does not certify
+completion; it interrupts and joins actual work. Stale cleanup owns only its
+original entry. The separate listener must still retain its raw socket slot
+through joined socket closure; a handler result does not prove that socket has
+closed or that a remote process observed every final byte.
+
+The [holder component checks](../../test/results/regional-observation-holder-integration.json)
+pass compilation, 111 selected race entries, vet and Go architecture with all
+1,866 dependencies unchanged. These tests use real loopback HTTP/2 and mutual TLS with explicitly synthetic native
+source, template, registry and local coordinator facts. No production listener
+or runtime route is selected. Exact-owner forwarding, installed composition and
+actual two-cluster timing/API-call counts under the unchanged five-second bound
+remain required; component timings cannot establish that availability.
+
+
+### Separate bounded regional receiving listener
+
+A new explicit `ServeOwnerRegionalObservation` entry point composes only the
+fixed own-proof, local HWORK and regional standby handlers with the same original
+common-SNI authority. Existing entry points retain their omitted-regional
+behavior. No runtime selector, backend receipt or exact-owner forwarding is
+added by this component. Only local HWORK can omit a client certificate; its
+online dedicated-token proof remains mandatory. Regional and own-proof routes
+require actual verified mutual TLS before their concrete current checks.
+
+The existing native listener owns raw slots from accept through actual joined
+closure. The combined connection ceiling remains sixty-four per process, with
+positive separate proof and regional reservations. Unclassified accepts share
+that total and the original two-second prelude; classified standby cannot take
+proof-reserved slots. Proof paths are shortened to original accept plus five
+seconds, regional residency to original accept plus thirty, and parent/leaf
+expiry can only shorten either. Path selection never restarts time. These are
+process ceilings, not installation-wide capacity or availability guarantees.
+
+Cancellation closes the actual socket and joins admitted handler/coordinator
+work before returning the purpose slot. A positive handler return does not
+certify remote completion; the stream's Receipt and both terminal EOF checks
+remain separate. The [listener component checks](../../test/results/regional-observation-listener-integration.json)
+pass compilation, 24 named race entries and vet with 1,884 unchanged
+dependencies. Loopback TLS/h2 tests retain synthetic authority. Full installed
+routing and measured two-cluster five-second availability remain required.
+
+
+### Closed locator and claim values
+
+`GET /internal/cluster-observation/locator/v1` is the fixed read-only common-SNI
+owner-to-owner routing purpose. Its canonical request target is at most 2 KiB:
+exactly `format`, `rootID`, `clusterID`, `requestID`, `challenge`, `requestedAt`
+and `notAfter`, each once. Keys are sorted and use the canonical URI encoding;
+unknown, duplicate, aliased or alternate encodings deny. The original UUIDs and
+canonical UTC RFC3339Nano interval are copied from the admitted request, never
+created at lookup receipt. There is no body, token, user evidence or selected
+workload metadata. The routing challenge is public request correlation, not a
+credential or permission. Decoding does not authenticate the sender.
+
+The positive reply uses `application/vnd.asservat.cluster-observation-locator.v1+json`
+and `cluster-observation-locator/v1`, at most 4 KiB. It binds that exact query
+identity to the independently authenticated holder installation, hub cluster,
+issuer, Pod and process, plus the original exchange UUID and nonzero uint64
+registration sequence. Its original observation interval must fit the original
+request and, at admission, current peer proof and original standby end. The
+permission root and holder installation are separate pins, as are the holder's
+hub cluster and the selected regional cluster. The codec
+preserves every integer through `18446744073709551615` without float conversion;
+zero, fractions, exponents, overflow and numeric strings deny. Unknown lookup
+is unavailable, never a successful empty result or an absence proof.
+
+`POST /internal/cluster-observation/claim/v1` is a distinct exact-SNI purpose.
+Its media type is `application/vnd.asservat.cluster-observation-claim.v1+json`
+and format is `cluster-observation-claim/v1`. The closed envelope contains only
+that locator and the original typed observation request. The entire envelope,
+including punctuation and format, is at most 196 KiB; the nested request and
+locator also retain their separate 192 KiB and 4 KiB limits. Existing request
+canonical bytes, request digest semantics, selector ordering and all four
+source-proof ordinals stay unchanged. The domain value checks the original
+request, holder and interval together; no decoded value reserves or claims a
+stream. The receiving holder must still atomically match its exact local
+exchange/sequence and establish current sender delegation before any metadata
+selection.
+
+There is one selected POST, with no automatic retry, alternate holder or
+unknown-outcome takeover. Another lookup cannot make a spent claim replayable.
+A positive result still requires all current source/registry checks and the
+existing Receipt/request-EOF/response-EOF completion. A successful local encode,
+write or close does not prove remote completion. Common-SNI connections must
+be rejected on the claim and every existing exact-owner/public/effect route;
+changing HTTP authority cannot change the actual TLS purpose. Exact-SNI
+connections cannot enter the locator path by changing Host.
+
+These value types and codecs do not install a receiving route, change candidate
+SQL, add an original layout field or select an installed v2 producer. The future
+original layout and all its receipt/identity/capacity consumers must agree
+before routing can be selected. Native multi-owner/two-cluster availability,
+with per-leg timing and actual API-call counts inside the same original five
+seconds, remains a separate required qualification.
+
+The [closed-routing component checks](../../test/results/regional-observation-routing-contract-integration.json)
+pass compilation, 154 named race entries, vet and Go architecture with 1,894
+unchanged dependencies. Of those entries, 108 exercise the new routing values
+and codecs and 46 retain existing request/frame/digest/order behavior. No
+receiving runtime or native routing qualification is inferred from this result.
+
+
+### Closed owner routing receiver
+
+The next receiver component has exactly two purposes: the canonical locator GET
+on the original common SNI, and one selected claim POST on the exact serving
+process SNI. Both require the matching HTTP authority and actual mutual TLS;
+neither accepts the HWORK token, browser credentials, an idempotency header or a
+caller-selected endpoint. No listener or installed runtime selects these routes
+yet. The component's source/tests are staged; native qualification is pending.
+
+Before accessing the local holder, its concrete checker independently verifies
+the sending owner through current registration, Ready route and workload guard,
+then the receiving process through its current owned server key and the same
+current registration/route/guard checks. Both exact installed templates and
+Pod/ReplicaSet identities are checked through the native workload reader. The
+accepted source revision must agree across these observations, and their pool,
+source UID, installation, template, image and protection pins remain original.
+The private serving key and actual peer leaf are checked again after blocking
+work; this does not replace registry or native authority.
+
+After the holder returns, the receiver performs a second independent peer check
+and requires unchanged exact identities and source revision while retaining the
+first check's original deadline. A claim returns only after the existing holder's
+four numbered source proofs, metadata result, terminal EOF and admitted handler
+cleanup have joined. Lost delivery remains unavailable; a spent claim cannot
+repeat the metadata read. Handler slots include cancelled authority and transport
+work through joined cleanup. Listener socket slots remain a separate obligation.
+
+The domain pool's optional `NativeCandidateLimit` validates only an explicitly
+opted bootstrap profile and a finite value at most the retained registration
+ceiling. Zero preserves legacy omitted bytes. This component does not add a
+public input, SQL query or installed-v2 selection. The later complete reader
+must use configured limit-plus-one overflow denial; the original context-start
+reader keeps its own explicit sixteen-entry overflow check even for an opted
+pool. No truncated set becomes complete merely because a shared value validator
+permits more entries.
+
+Structural checking costs are explicit: each receiver peer check retains both
+owners' independent registry bracketing, route and guard traversal plus both
+exact template observations, and success requires a second check. Actual TLS
+component tests with synthetic ports cannot qualify the locator/claim plus four
+regional proofs within the original five seconds. That measured installed native
+gate, bounded candidate discovery, forwarding and runtime selection remain work.
+
+### Complete configured candidates and current Ready intersection
+
+The opted observation reader uses the original accepted `NativeCandidateLimit`
+plus one, at most the existing 1,024 retained registration ceiling. Overflow
+is unavailable. It returns the complete audited, activated, current server
+process population as SQL candidates, with no Ready or process authority claim.
+The old context-start reader keeps its unchanged LIMIT17 and explicit greater
+than sixteen rejection, including for opted pools. A larger shared value bound
+must never turn its truncated result into a complete set.
+
+One bounded complete EndpointSlice LIST sequence intersects those original
+candidates with the exact original Service and namespace. It retains every
+original process binding for each present Ready Pod, the complete SQL population
+and both original observation intervals. Absent or explicitly unready retained
+Pods may be excluded only after the list completes. Unknown Ready, unidentified
+managed endpoints, changed objects/pages, overflow or an empty Ready intersection
+are unavailable. The result supplies no address or chosen process. Actual
+contacted peers still need their full current exact route/native proof and
+actual leaf membership in the complete original Pod group.
+
+Observation constructors retain an immutable pool-bound reader selection before
+any effect. Legacy omission selects only the fixed-sixteen reader. An explicit
+opted limit selects only the new complete limit-plus-one reader. Both typed
+methods must exist at startup; failure never falls back, repeats a source read
+or renews any date. The same original selection is used for each fresh attached
+regional proof and before HWORK token access. Context-start callers and their
+query remain unchanged. These components do not select installed-v2 runtime;
+complete locator/claim composition and native availability under the original
+five-second bound remain separate qualification gates.
+
+
+### One selected observation claim across bounded owner lookup
+
+The bootstrap-owned observation forwarder accepts only the original owner pin,
+process-owned client key and concrete purpose-scoped registry/configuration,
+endpoint, native protection and installed-workload adapters. Requests provide
+neither a locator, URL, peer callback nor a candidate limit. This component does
+not select a receiving listener or an installed runtime profile.
+
+At most two observations per process each use at most two concurrent read-only
+locator lookups. The fixed worker pair traverses the complete current Ready Pod
+groups, retaining all original SQL process members. It authenticates the actual
+common-SNI leaf against those members and the selected Pod, then checks both
+owners' current registry, accepted roots, Ready routes, namespace protection
+and exact installed templates before and after the bounded GET. These are
+per-process concurrency bounds, not installation-wide serving capacity.
+
+Only a positive exact locator selects the holder. All other local lookup work
+and cancellation cleanup joins before a new exact-SNI connection sends one
+claim POST. The selected holder/process, exact client and server leaves,
+accepted source revision and installed delegation must still agree; independent
+current checks bracket that POST too. An unknown lookup is not absence, and an
+unknown claim/result never selects a replacement or repeats the metadata read.
+The HWORK token is never forwarded. Existing request bytes/digest, exact uint64
+locator sequence and four regional proof ordinals are unchanged.
+
+Discovery, locator lookup, joined cancellation, claim and final result retain
+one original at-most-five-second interval. Every original caller, source, route,
+leaf, proof, locator and standby bound can only shorten it. Slots remain held
+through joined native work and body/cancellation cleanup. The application
+ObserveOwnerClient helper returns the existing full local-client observation
+through the unchanged authenticator/private-key verifier; it does not fabricate
+TLS, cache current authority or relax receiving checks.
+
+Actual mutual-TLS/HTTP2 component tests use synthetic current SQL/native/CA and
+regional-result ports. Full two-cluster/multi-owner composition must still
+measure per-leg latency and real API/SQL call counts under the same original
+five seconds. Local loopback results cannot qualify installed availability,
+regional startup, receiving route selection or the complete fresh-v2 workflow.

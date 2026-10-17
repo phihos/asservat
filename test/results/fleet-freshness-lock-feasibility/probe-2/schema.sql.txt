@@ -1,0 +1,139 @@
+-- Feasibility fixture only. This is not a migration or production authorizer.
+-- Synthetic activation is explicit; no trigger manufactures positive authority.
+CREATE TABLE public.fleet_trust (
+ installation_id uuid PRIMARY KEY,
+ issuer_epoch uuid NOT NULL,
+ source_uid text NOT NULL CHECK(octet_length(source_uid) BETWEEN 1 AND 64),
+ source_generation bigint NOT NULL CHECK(source_generation BETWEEN 1 AND 2147483647),
+ source_digest bytea NOT NULL CHECK(octet_length(source_digest)=32),
+ suspended boolean NOT NULL DEFAULT true,
+ recovery_blocked boolean NOT NULL DEFAULT true,
+ observed_at timestamptz NOT NULL,
+ fresh_until timestamptz NOT NULL,
+ activated_postmaster_at timestamptz,
+ activated_database_oid oid,
+ semantic_version bigint NOT NULL CHECK(semantic_version > 0),
+ semantic_changed_at timestamptz NOT NULL,
+ CHECK(fresh_until>observed_at AND fresh_until<=observed_at+interval '30 seconds'),
+ CHECK((activated_postmaster_at IS NULL)=(activated_database_oid IS NULL))
+);
+CREATE TABLE public.fleet_observation (
+ installation_id uuid PRIMARY KEY REFERENCES public.fleet_trust(installation_id),
+ semantic_version bigint NOT NULL CHECK(semantic_version > 0),
+ issuer_epoch uuid NOT NULL,
+ source_uid text NOT NULL CHECK(octet_length(source_uid) BETWEEN 1 AND 64),
+ source_generation bigint NOT NULL CHECK(source_generation BETWEEN 1 AND 2147483647),
+ source_digest bytea NOT NULL CHECK(octet_length(source_digest)=32),
+ activated_postmaster_at timestamptz,
+ activated_database_oid oid,
+ observed_at timestamptz NOT NULL,
+ fresh_until timestamptz NOT NULL,
+ CHECK(fresh_until>observed_at AND fresh_until<=observed_at+interval '30 seconds'),
+ CHECK((activated_postmaster_at IS NULL)=(activated_database_oid IS NULL))
+);
+CREATE TABLE public.permission_stream(id uuid PRIMARY KEY, installation_id uuid NOT NULL);
+
+-- Exact nine-column pre-change composite contract from migration 00031.
+CREATE VIEW public.fleet_legacy_contract AS
+ SELECT installation_id,issuer_epoch,source_uid,source_generation,source_digest,
+ suspended,
+ (recovery_blocked
+  OR activated_postmaster_at IS DISTINCT FROM pg_catalog.pg_postmaster_start_time()
+  OR activated_database_oid IS DISTINCT FROM
+    (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
+  OR pg_catalog.pg_is_in_recovery())::boolean AS recovery_blocked,
+ observed_at,fresh_until FROM public.fleet_trust;
+
+-- The candidate under test. The observations CTE MUST remain MATERIALIZED.
+-- The private row/version is not a new public column. Explicit blocked state
+-- plus equal finite dates avoids SQL NULL passing an IF / boolean predicate.
+CREATE VIEW public.fleet_current_trust AS
+ WITH observations AS MATERIALIZED (
+  SELECT installation_id,semantic_version,issuer_epoch,source_uid,
+   source_generation,source_digest,activated_postmaster_at,
+   activated_database_oid,observed_at,fresh_until FROM public.fleet_observation
+ )
+ SELECT t.installation_id,t.issuer_epoch,t.source_uid,t.source_generation,
+ t.source_digest,t.suspended,
+ (t.recovery_blocked
+  OR t.activated_postmaster_at IS DISTINCT FROM pg_catalog.pg_postmaster_start_time()
+  OR t.activated_database_oid IS DISTINCT FROM
+    (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
+  OR pg_catalog.pg_is_in_recovery()
+  OR o.installation_id IS NULL)::boolean AS recovery_blocked,
+ COALESCE(o.observed_at,'epoch'::timestamptz) AS observed_at,
+ COALESCE(o.fresh_until,'epoch'::timestamptz) AS fresh_until
+ FROM public.fleet_trust t LEFT JOIN observations o
+ ON o.installation_id=t.installation_id AND o.semantic_version=t.semantic_version
+ AND o.issuer_epoch=t.issuer_epoch AND o.source_uid=t.source_uid
+ AND o.source_generation=t.source_generation AND o.source_digest=t.source_digest
+ AND o.activated_postmaster_at IS NOT DISTINCT FROM t.activated_postmaster_at
+ AND o.activated_database_oid IS NOT DISTINCT FROM t.activated_database_oid;
+
+-- Deliberately wrong negative baseline: the ordinary inner join locks both
+-- underlying rows. Inner join avoids confusing this with nullable-side errors.
+CREATE VIEW public.fleet_join_baseline AS
+ SELECT t.installation_id,t.issuer_epoch,t.source_uid,t.source_generation,
+ t.source_digest,t.suspended,
+ (t.recovery_blocked
+  OR t.activated_postmaster_at IS DISTINCT FROM pg_catalog.pg_postmaster_start_time()
+  OR t.activated_database_oid IS DISTINCT FROM
+    (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
+  OR pg_catalog.pg_is_in_recovery())::boolean AS recovery_blocked,
+ o.observed_at,o.fresh_until
+ FROM public.fleet_trust t JOIN public.fleet_observation o
+ ON o.installation_id=t.installation_id AND o.semantic_version=t.semantic_version
+ AND o.issuer_epoch=t.issuer_epoch AND o.source_uid=t.source_uid
+ AND o.source_generation=t.source_generation AND o.source_digest=t.source_digest
+ AND o.activated_postmaster_at IS NOT DISTINCT FROM t.activated_postmaster_at
+ AND o.activated_database_oid IS NOT DISTINCT FROM t.activated_database_oid;
+
+-- Invoker, not definer: exercises SQL functions using the view's composite type
+-- without giving the consumer any base-table rights through this helper.
+CREATE FUNCTION public.probe_composite_share(i uuid) RETURNS public.fleet_current_trust
+ LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,pg_temp AS $$
+ DECLARE t public.fleet_current_trust;
+ BEGIN
+  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=i FOR SHARE;
+  RETURN t;
+ END $$;
+REVOKE ALL ON FUNCTION public.probe_composite_share(uuid) FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+CREATE ROLE probe_consumer LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD 'synthetic-probe-only';
+CREATE ROLE probe_select_only LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD 'synthetic-probe-only';
+CREATE ROLE probe_observer LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD 'synthetic-probe-only';
+CREATE ROLE probe_semantic LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD 'synthetic-probe-only';
+GRANT USAGE ON SCHEMA public TO probe_consumer,probe_select_only,probe_observer,probe_semantic;
+GRANT SELECT ON public.fleet_current_trust,public.fleet_join_baseline,
+ public.permission_stream TO probe_consumer;
+GRANT UPDATE(installation_id) ON public.fleet_current_trust,public.fleet_join_baseline TO probe_consumer;
+GRANT UPDATE(id) ON public.permission_stream TO probe_consumer;
+GRANT EXECUTE ON FUNCTION public.probe_composite_share(uuid) TO probe_consumer;
+GRANT SELECT ON public.fleet_current_trust TO probe_select_only;
+-- Technical lock probe writer only: not the proposed production producer ACL.
+GRANT SELECT ON public.fleet_trust,public.fleet_observation TO probe_observer;
+GRANT UPDATE(installation_id) ON public.fleet_trust TO probe_observer;
+GRANT UPDATE(observed_at,fresh_until) ON public.fleet_observation TO probe_observer;
+GRANT SELECT ON public.fleet_trust TO probe_semantic;
+GRANT UPDATE(installation_id,suspended) ON public.fleet_trust TO probe_semantic;
+
+-- Only this synthetic fixture setup uses superuser activation.
+WITH original AS MATERIALIZED (SELECT clock_timestamp() AS at)
+ INSERT INTO public.fleet_trust SELECT
+ '11111111-1111-4111-8111-111111111111'::uuid,
+ '22222222-2222-4222-8222-222222222222'::uuid,
+ 'fixture-source',1,decode(repeat('11',32),'hex'),false,false,
+ at,at+interval '5 seconds',pg_postmaster_start_time(),
+ (SELECT oid FROM pg_database WHERE datname=current_database()),1,at
+ FROM original;
+INSERT INTO public.fleet_observation SELECT installation_id,semantic_version,
+ issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,
+ activated_database_oid,observed_at,fresh_until FROM public.fleet_trust;
+INSERT INTO public.permission_stream VALUES
+ ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111');
+CREATE TABLE public.probe_trust_original AS TABLE public.fleet_trust;
+CREATE TABLE public.probe_observation_original AS TABLE public.fleet_observation;

@@ -1,0 +1,5 @@
+--- FAIL: TestNativeRegistrationPreservesOriginalAdmissionBudget (2.00s)
+    admission_budget_test.go:53: duplicate admission checks exhausted original bounded call: checks=4 err=download unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	2.028s
+FAIL

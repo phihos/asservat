@@ -1,0 +1,66 @@
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-guard/request-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-guard/caller-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-candidates/request-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-candidates/caller-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload-candidates/request-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload-candidates/caller-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload/request-bound
+=== RUN   TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload/caller-bound
+--- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds (0.62s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-guard/request-bound (0.09s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-guard/caller-bound (0.08s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-candidates/request-bound (0.07s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-namespace-candidates/caller-bound (0.07s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload-candidates/request-bound (0.08s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload-candidates/caller-bound (0.08s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload/request-bound (0.07s)
+    --- PASS: TestClusterObservationMetadataFourPurposesPreserveOriginalBounds/capacity-workload/caller-bound (0.07s)
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/root
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/cluster
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/purpose
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/key
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/expired
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/no-deadline
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/cancelled
+=== RUN   TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/namespace-path
+--- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO (0.53s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/root (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/cluster (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/purpose (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/key (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/expired (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/no-deadline (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/cancelled (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO/namespace-path (0.07s)
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/replaced-before
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/replaced-after
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/deleted-after
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/expired-first
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/expired-list
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/unavailable
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/duplicate
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/overflow
+=== RUN   TestClusterObservationMetadataRejectsChangedOrUnavailablePage/empty
+--- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage (0.65s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/replaced-before (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/replaced-after (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/deleted-after (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/expired-first (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/expired-list (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/unavailable (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/duplicate (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/overflow (0.07s)
+    --- PASS: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/empty (0.07s)
+=== RUN   TestClusterObservationMetadataGuardChangeAndCancellation
+=== RUN   TestClusterObservationMetadataGuardChangeAndCancellation/guard-change
+=== RUN   TestClusterObservationMetadataGuardChangeAndCancellation/cancel-blocked-read
+--- PASS: TestClusterObservationMetadataGuardChangeAndCancellation (0.15s)
+    --- PASS: TestClusterObservationMetadataGuardChangeAndCancellation/guard-change (0.08s)
+    --- PASS: TestClusterObservationMetadataGuardChangeAndCancellation/cancel-blocked-read (0.07s)
+=== RUN   TestClusterObservationMetadataConstructorRequiresExactClients
+--- PASS: TestClusterObservationMetadataConstructorRequiresExactClients (0.07s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.068s

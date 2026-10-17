@@ -1,0 +1,519 @@
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account
+--- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes (2.42s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account (0.02s)
+=== RUN   TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions
+--- PASS: TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions (0.00s)
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history
+--- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history (0.00s)
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim
+--- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts (0.01s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim (0.00s)
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read
+--- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState (0.46s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read (0.07s)
+=== RUN   TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority
+--- PASS: TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority (0.00s)
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/api_defaults
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/original_controller_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/later_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_retention
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/noncanonical_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/generation_change
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/Never_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/OnFailure_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/wrong_operation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_account
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/added_init_container
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/privilege
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/another_annotation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_template
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_generation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_replicas
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_volume
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/api_defaults
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/original_controller_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/noncanonical_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_generation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/Never_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/later_revision
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/generation_change
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/another_annotation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_template
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_volume
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/privilege
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/OnFailure_restart_policy
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/wrong_operation
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_account
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/added_init_container
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_retention
+=== RUN   TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_replicas
+--- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity (0.10s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/api_defaults (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/original_controller_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/later_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_retention (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/noncanonical_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/generation_change (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/Never_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/OnFailure_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/wrong_operation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_account (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/added_init_container (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/privilege (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/another_annotation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_template (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/missing_generation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_replicas (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/owner-deployment/changed_volume (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/api_defaults (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/original_controller_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/noncanonical_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_generation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/missing_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/Never_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/later_revision (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/generation_change (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/another_annotation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_template (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_volume (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/privilege (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/OnFailure_restart_policy (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/wrong_operation (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_account (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/added_init_container (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_retention (0.00s)
+    --- PASS: TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity/worker-deployment/changed_replicas (0.00s)
+=== RUN   TestInitialRuntimeObjectRoundTripWithRealKubernetes
+    initial_runtime_object_roundtrip_native_test.go:33: requires the owned runtime-object-roundtrip native harness
+--- SKIP: TestInitialRuntimeObjectRoundTripWithRealKubernetes (0.00s)
+=== RUN   TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences
+--- PASS: TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences (0.03s)
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/unclosed_predecessor
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reordered
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/second_operation_ID
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reused_object
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/future_claim
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/refill_setup
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/omitted_sequence
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/adopt_original_setup_ID
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/long_claim
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/changed_derived_object
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/new_template
+=== RUN   TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/binding
+--- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims (0.03s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/unclosed_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reordered (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/second_operation_ID (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/reused_object (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/future_claim (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/refill_setup (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/omitted_sequence (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/adopt_original_setup_ID (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/long_claim (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/changed_derived_object (0.01s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/new_template (0.00s)
+    --- PASS: TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims/binding (0.00s)
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/different_key_mount
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unqualified_annotation
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/privilege
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_operation
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/wrong_account
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/changed_image
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unexpected_replica
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/sidecar
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_UID
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_spec
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_kind
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_apiVersion
+=== RUN   TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_metadata
+--- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload (0.04s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/different_key_mount (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unqualified_annotation (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/privilege (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_operation (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/wrong_account (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/changed_image (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/unexpected_replica (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/sidecar (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/new_UID (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_spec (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_kind (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_apiVersion (0.00s)
+    --- PASS: TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload/missing_metadata (0.00s)
+=== RUN   TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead
+--- PASS: TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead (0.02s)
+=== RUN   TestInitialRuntimeRootPinOriginalCreationInputAndReplacement
+--- PASS: TestInitialRuntimeRootPinOriginalCreationInputAndReplacement (2.58s)
+=== RUN   TestInstalledOwnerOriginalLayoutDoesNotAdoptLegacyJournal
+--- PASS: TestInstalledOwnerOriginalLayoutDoesNotAdoptLegacyJournal (0.05s)
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/role-root
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/resource-root
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/role-setup
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/source
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/account
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/deployment
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/layout
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/long-root
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/future
+=== RUN   TestOwnerIdentityActivationKeepsOriginalRolesAndResources/zero-binding
+--- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources (0.02s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/role-root (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/resource-root (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/role-setup (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/source (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/account (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/deployment (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/layout (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/long-root (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/future (0.00s)
+    --- PASS: TestOwnerIdentityActivationKeepsOriginalRolesAndResources/zero-binding (0.00s)
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/no-projection
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/no-projection-receipt
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-role-setup
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-launch
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/foreign-projection
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/early-launch
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/long-launch
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/changed-inert
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/new-generation
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/unknown-owner-layout
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/pending-object
+=== RUN   TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-provider-uid
+--- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch (0.04s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/no-projection (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/no-projection-receipt (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-role-setup (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-launch (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/foreign-projection (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/early-launch (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/long-launch (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/changed-inert (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/new-generation (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/unknown-owner-layout (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/pending-object (0.00s)
+    --- PASS: TestOwnerIdentityJournalRequiresSeparatePositiveLaunch/reused-provider-uid (0.00s)
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/missing-first
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/pending-first
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/reused-child
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/early-second
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/long-child
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-uid
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-version
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-before-children
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/reused-object
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/capacity-operation
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/cleanup-child
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-root
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-setup
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-object
+=== RUN   TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/launch-sibling
+--- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation (0.04s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/missing-first (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/pending-first (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/reused-child (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/early-second (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/long-child (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-uid (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-version (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/joint-before-children (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/reused-object (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/capacity-operation (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/cleanup-child (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-root (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-setup (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/sibling-object (0.00s)
+    --- PASS: TestOwnerIdentityChildrenKeepIndependentAttemptsAndSiblingIsolation/launch-sibling (0.00s)
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/valid
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-child-marker
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/swapped-child-marker
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-projection-receipt
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-launch-receipt
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/journal-replacement
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/role-root-substitution
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/mutable-provider
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/provider-replacement
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/different-mounted-credential
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/extra-mounted-credential
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/config-substitution
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/late
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/new-image
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/scaled
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/launch-substitution
+=== RUN   TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/account-replacement
+--- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle (1.41s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/valid (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-child-marker (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/swapped-child-marker (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-projection-receipt (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-launch-receipt (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/journal-replacement (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/role-root-substitution (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/mutable-provider (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/provider-replacement (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/different-mounted-credential (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/extra-mounted-credential (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/config-substitution (0.08s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/late (0.07s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/new-image (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/scaled (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/launch-substitution (0.09s)
+    --- PASS: TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/account-replacement (0.09s)
+=== RUN   TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs
+    owner_identity_producer_test.go:22: first private root permission source identity changed
+--- FAIL: TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs (3.54s)
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit
+    owner_identity_producer_test.go:82: permission source identity changed
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit
+    owner_identity_producer_test.go:82: permission source identity changed
+--- FAIL: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement (7.17s)
+    --- FAIL: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit (3.58s)
+    --- FAIL: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit (3.59s)
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/positive
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/unknown-create
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-version
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-kind
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/changed-child
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/extra-key
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/replacement-uid
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/blocked-original-deadline
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/positive
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/unknown-create
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-version
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-kind
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/changed-child
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/extra-key
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/replacement-uid
+=== RUN   TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/blocked-original-deadline
+--- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly (1.12s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/positive (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/unknown-create (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-version (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/wrong-kind (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/changed-child (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/extra-key (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/replacement-uid (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/credentials/blocked-original-deadline (0.10s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/positive (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/unknown-create (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-version (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/wrong-kind (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/changed-child (0.06s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/extra-key (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/replacement-uid (0.07s)
+    --- PASS: TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly/configuration/blocked-original-deadline (0.10s)
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/unrelated-operation
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-controller-revision
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/template-change
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/inert
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/replacement
+=== RUN   TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-generation
+--- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion (0.07s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/unrelated-operation (0.00s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-controller-revision (0.00s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/template-change (0.00s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/inert (0.00s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/replacement (0.00s)
+    --- PASS: TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion/later-generation (0.00s)
+=== RUN   TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild
+--- PASS: TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild (0.07s)
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/inventory
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/binding
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/end
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/parent-public-input
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/capacity
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/cleanup
+--- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState (0.09s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/inventory (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/binding (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/end (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/parent-public-input (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/capacity (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/cleanup (0.00s)
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/valid
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-missing
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-lost
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/allowing-probe
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-pod
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-account
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/token-revoked
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-owner-changed
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-unassigned
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/late-guard
+=== RUN   TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/cancelled
+--- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard (3.05s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/valid (1.07s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-missing (0.08s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-lost (0.67s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/allowing-probe (0.08s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-pod (0.09s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-account (0.09s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/token-revoked (0.17s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-owner-changed (0.13s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-unassigned (0.11s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/late-guard (0.48s)
+    --- PASS: TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/cancelled (0.07s)
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/different-resource-root
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/resource-setup-reuse
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/duplicate-attempt
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/duplicate-password
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/zero-password
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/long-claim
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/new-setup
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/unknown-purpose
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/nanosecond-claim
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/future-database
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/past-original-root
+=== RUN   TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/unbounded-root
+--- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd (0.04s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/different-resource-root (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/resource-setup-reuse (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/duplicate-attempt (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/duplicate-password (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/zero-password (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/long-claim (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/new-setup (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/unknown-purpose (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/nanosecond-claim (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/future-database (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/past-original-root (0.00s)
+    --- PASS: TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd/unbounded-root (0.00s)
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/trust-replacement
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/trust-extension
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service-uid
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service-port
+=== RUN   TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/issuer-epoch
+--- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust (0.03s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/trust-replacement (0.00s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/trust-extension (0.00s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service (0.00s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service-uid (0.00s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/service-port (0.00s)
+    --- PASS: TestOwnerIdentityAcceptedRevisionCannotReplaceOriginalServiceOrTrust/issuer-epoch (0.00s)
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/changed-other-template
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/missing
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/duplicate
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/longer
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/unbounded
+=== RUN   TestInstalledOwnerTemplateHasOriginalNativeTolerations/wrong-effect
+--- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/changed-other-template (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/missing (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/duplicate (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/longer (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/unbounded (0.00s)
+    --- PASS: TestInstalledOwnerTemplateHasOriginalNativeTolerations/wrong-effect (0.00s)
+=== RUN   TestInstalledOwnerIdentityFirstWorkload
+--- PASS: TestInstalledOwnerIdentityFirstWorkload (0.00s)
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/name
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/account
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/configuration
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/credentials
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/guard
+=== RUN   TestInstalledOwnerRejectsAlternateCompartmentNames/installation
+--- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/name (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/account (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/configuration (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/credentials (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/guard (0.00s)
+    --- PASS: TestInstalledOwnerRejectsAlternateCompartmentNames/installation (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	22.494s
+FAIL

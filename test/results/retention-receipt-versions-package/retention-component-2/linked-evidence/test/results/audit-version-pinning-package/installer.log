@@ -1,0 +1,62 @@
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned
+--- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt (0.08s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned (0.01s)
+=== RUN   TestInitialInstallerAuditFormatIsImmutablePlan
+--- PASS: TestInitialInstallerAuditFormatIsImmutablePlan (0.01s)
+=== RUN   TestInitialInstallerClosedInputsAndPlan
+=== RUN   TestInitialInstallerClosedInputsAndPlan/same-principal
+=== RUN   TestInitialInstallerClosedInputsAndPlan/same-uid
+=== RUN   TestInitialInstallerClosedInputsAndPlan/shared-map
+=== RUN   TestInitialInstallerClosedInputsAndPlan/shared-guard
+=== RUN   TestInitialInstallerClosedInputsAndPlan/invalid-uid
+=== RUN   TestInitialInstallerClosedInputsAndPlan/zero-spec
+=== RUN   TestInitialInstallerClosedInputsAndPlan/upper-spec
+=== RUN   TestInitialInstallerClosedInputsAndPlan/missing-ca
+=== RUN   TestInitialInstallerClosedInputsAndPlan/http
+=== RUN   TestInitialInstallerClosedInputsAndPlan/sql-pool
+=== RUN   TestInitialInstallerClosedInputsAndPlan/unknown
+=== RUN   TestInitialInstallerClosedInputsAndPlan/duplicate
+--- PASS: TestInitialInstallerClosedInputsAndPlan (0.06s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/same-principal (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/same-uid (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/shared-map (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/shared-guard (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/invalid-uid (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/zero-spec (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/upper-spec (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/missing-ca (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/http (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/sql-pool (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/unknown (0.00s)
+    --- PASS: TestInitialInstallerClosedInputsAndPlan/duplicate (0.00s)
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-binding
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-capability
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-capability
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-bundle
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-head
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/zero-oid
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/sub-microsecond
+=== RUN   TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-handover
+--- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan (0.05s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-binding (0.00s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-capability (0.00s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-capability (0.00s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-bundle (0.01s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-head (0.01s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/zero-oid (0.01s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/sub-microsecond (0.01s)
+    --- PASS: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-handover (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.250s

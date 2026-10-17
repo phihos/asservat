@@ -1,0 +1,125 @@
+# B+A worker2 source candidate
+
+Status: source-staged, uncompiled and unqualified. No live files or installed
+selection changed. Runtime-admission-4 remains immutable at its failed 20/20
+baseline; result SHA256 ac4b6b1b07a4a0eaca6b45a643e412ea5259556279d49dee333cb87d1e90e24f.
+The current boot was independently read as e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c.
+No pre-reboot PID was reused or signalled.
+
+The new mutable layer is runtime-sustainable-changes. Its baseline.json records
+all 46 original owned payload hashes and live bases. It adds three new Go files;
+source-delta.json records every changed path against that exact baseline. Console's
+seven native continuation files remain separately owned. Six live bases still
+match; its test-context-storage.py additive rebase is being prepared by console.
+Freeze full dependencies only after the current native/integration boundary.
+
+## Exact source behavior
+
+* configuration_worker_tokens.go constructs the sole observer bucket at 40 QPS,
+  burst 20; the sole worker probe remains 20/20. Caller-supplied RateLimiter is
+  rejected on this fixed worker2 constructor. Endpoint, bearer injection, bounds
+  and transport ownership are unchanged. Generic NewPermissionClient retains
+  20/20. Test fixtures now retain the actual constructor's bucket pointers rather
+  than injecting a separate test limiter.
+* worker_runtime_admission.go retains one total ticket per purpose, five total,
+  one active. Queue plus pre-selection notice waiting has one original five-second
+  scheduling end, additionally bounded by the original outer caller. Cancellation
+  does not release actual active work before its owner joins.
+* configuration_runtime_source_notice.go forwards only concrete
+  *postgres.FleetObservation. Full changed values invalidate scheduling and cancel
+  active work before the actual SQL observation; source errors invalidate before
+  actual FenceAdministration. Only an acknowledged, still-current original SQL
+  observation produces a notice. Unknown/failed commits do not. No callback,
+  recovery writer, SQL pool, extra observer or retry is introduced.
+* worker_runtime_source_notice.go stores complete cloned public source values and
+  their exact original interval solely for scheduling. A ticket waits for a read
+  begun at/after its FIFO grant. It can consume one notice, then its context is
+  capped at that original source end. A later notice cannot extend it. This is
+  not a minimum-age guess or returned RecoveryProof: the effect still performs
+  exactly one actual recovery selection, retaining its possibly earlier end.
+* owner_provider_lifetime.go waits for this scheduling event only for due wrap or
+  unwrap maintenance. Healthy ticks remain zero-native-work hints. Actual provider
+  login/renew/reconcile, four recovery reads, uncertainty/backoff and final native
+  checks retain their existing dates and behavior.
+* worker_owner_audit.go acquires its ticket and scheduling opportunity before
+  selecting a mailbox candidate. Only pending same-revision observations can be
+  replaced. Active identity and dates are immutable. Source loss/expiry cancels
+  active work, even before a blocked negative SQL call returns.
+* configuration_provider_audit_operation.go consumes the exact same owner-audit
+  ticket once. It does not acquire a nested ticket. The application retains that
+  ticket until write/readback/final checks and acknowledgement have joined. A
+  duplicate/copy/foreign/released ticket cannot begin a second native operation.
+* bootstrap supplies the concrete wrapper and the same gate to the original
+  reconciler/provider composition. Capacity/cleanup effect semantics are unchanged;
+  their already-selected caller bounds are never restarted by admission.
+
+The single observer's capacity is an explicitly reviewed resource change, not
+an authorization change. Six clients remain. HWORK's envelope is 140 QPS/burst120
+per retained process; both retained/closing processes cost 280 QPS/burst240.
+Other installation actors require their own budget and load qualification. No
+new knob, bucket, process, role, credential, or source-age allowance exists.
+
+## Ordered phase matrix
+
+| Purpose | Before ticket | After ticket, before effect | Effect and completion |
+| --- | --- | --- | --- |
+| Wrap/unwrap | Due/healthy local scheduling hint only | One independently committed read begun after grant; one actual recovery selection; original native/current material | Existing provider attempt; actual final native plus current recovery; release after join |
+| Owner audit | At most one replaceable unselected notification | Same scheduling notice, then one immutable candidate; consume same ticket once; actual recovery/native/material | Exact-version encrypted write/readback; real final checks; original candidate acknowledgement; joined release |
+| Capacity | Original observer caller already bounded | FIFO retains it; one actual observer invocation and actual recovery | Original native final before SQL Accept; shortened original context through commit; same invalidation on failure |
+| Cleanup | Fixed bounded due-key read, no permit | FIFO, actual native/current lifecycle permit | Existing versioned retirement/history protocol and genuine final read; no refund on unknown effect |
+| Fleet/owner observers | Independent serial actual reads | Never join FIFO | Same actual call plus one-second delay; own original source dates and negative SQL semantics |
+
+Scheduling may fail, time out or expire even after the capacity change. No failed
+attempt is retried inside the same effect. Later controller iterations remain
+independent and retain existing uncertainty. A finite FIFO does not by itself
+prove uninterrupted capacity readiness or adequate cleanup throughput.
+
+## Executable local qualification proposal
+
+Keep prior passing evidence separate. Freeze a new combined source after console's
+one harness rebase and root's new live dependencies are recorded. Use one serial
+GOMAXPROCS=2 / -p=2 job, original test/authority dates, >=4GiB explicit owned /tmp
+scratch and create-only evidence. Compile first; stop on the first unexpected
+failure. No generation, native lab or live mutation.
+
+1. Compile the seven affected application/adapter/bootstrap/command/integration
+   packages and run console's selector cases on the exact composed mirror.
+2. Run a controlled earlier-selection variant against the new mailbox regression;
+   it must fail because an active candidate exists while FIFO is blocked. Preserve
+   that outcome separately from compiler/setup failure. Do not repeat the already
+   reproduced transport/lifetime failures without changes to those scopes.
+3. Full fleet/capacity races, including fixed FIFO bounds, no notice before commit,
+   finite unavailable-source wait, outer expiry, same-revision mutation, delayed
+   commit after fence, one-use owner ticket, copy/foreign rejection, active source
+   expiry despite newer observations, candidate-before-ticket regression and
+   cancellation/join. Synthetic notices here prove ordering only.
+4. Scoped Kubernetes material/token/native tests and new explicit constructor
+   capacity assertions. Run the two original contention scenarios with the actual
+   new fixed buckets, plus the scheduling variant with independent source loops
+   and retained accepted source ends. These remain native-work lower bounds with
+   synthetic SQL/audit sinks; they contain no provider HTTP or real recovery reads.
+5. Previously unrun KMS/bootstrap races, vet and Go architecture, then canonical
+   documentation gates on the exact full mirror with additive ADR148/149 and
+   reconciliation/resource-envelope patches.
+
+The concrete SQL wrapper cannot be replaced by a fake projection callback merely
+to claim a unit commit test. Actual unknown/blocked SQL and notice-after-commit
+behavior must be exercised by the native transition or an exact real-PG fixture.
+A source timing simulation is not that evidence.
+
+## Native exit and continuing gaps
+
+The next explicit runtime-provider-worker selector uses console's unchanged
+original bootstrap/provider-pair inputs, CompleteLaunch, actual compiled worker
+Pod, three independently advancing SQL29 accepts and exact-version decrypted
+owner audit. No host-side Pod token or fixture acceptance writer is permitted.
+It observes source-guard loss and process/Lease exit ordering without fabricating
+a child cause. The input-only case remains a separate zero-replica milestone.
+
+That startup milestone still does not include active capacity/cleanup. A further
+actual actor graph must retain both source loops, four real recovery reads per
+refresh, provider HTTP, already-aged first audit candidate, maintenance overlap,
+pending hints, actual capacity acceptance/gaps, nonempty cleanup progress and
+both retained processes under configured cluster load. Earlier simple floors do
+not establish sustainable service. Further resource changes require a new reviewed
+case; this candidate must not silently increase rate/burst or reset authority.

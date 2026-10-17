@@ -1,0 +1,21 @@
+{
+  "status": "frozen staged correction; not built or tested by subagent",
+  "reason": "Component1 passed all 97 named race tests but go vet found channelCancel lostcancel. Make the child channel context distinct from the watched action context, and defer its cancellation explicitly.",
+  "files": [
+    {
+      "path": "internal/adapters/diagnostics/go_profile.go",
+      "base_sha256": "f3e85ca5012552ee546b98b4c5dac6e420ee2365382694910a60b141abe686c5",
+      "payload_sha256": "7f639d8f3961cfc75c04045cb96daac11fb498fd529089987d0f89ec76d8f0b5"
+    }
+  ],
+  "patch_sha256": "1f73925085ff40d3ab35a7c715d9d1b22fb5d1fd381541b69d0a55d67955fa9d",
+  "tests_changed": false,
+  "dependencies_changed": false,
+  "authority_changed": false,
+  "verification": {
+    "prior_result": "runtime-profile-component-1",
+    "prior_result_sha256": "b44bb9d680e454d143b5f8d335805682d075e1f34e2dbb06bc79815d3738fb41",
+    "independent_closure_sha256": "e3a123d943f7337a4ffa9215deac9296e4e23d5902a6297297cc67b18d7db085"
+  },
+  "cleanup": "Channel cancellation occurs before watch.stop but does not cancel original watched ctx. HTTP socket callbacks join, connection close and watch.stop remain deferred; sink-close final check still enforces immutable earliest channel cutoff."
+}

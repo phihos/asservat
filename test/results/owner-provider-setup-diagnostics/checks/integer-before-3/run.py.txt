@@ -1,0 +1,35 @@
+from pathlib import Path
+import hashlib,json,subprocess,os,time,signal
+root=Path('/home/phil/Projekte/asservat');out=Path(__file__).parent
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+read=lambda p:json.loads(p.read_text())
+rows=read(out/'manifest.json');deps=read(out/'dependencies.json')
+frozen={n:sha(out/n) for n in ['manifest.json','dependencies.json','overlay.json','run.py']}
+def check():
+ inventory=subprocess.check_output(['rg','--files','api','cmd','internal','migrations','test/integration','go.mod','go.sum'],cwd=root,text=True).splitlines()
+ return dict(dependencies=[p for p,h in deps.items() if sha(root/p)!=h],bases=[r['path'] for r in rows if sha(root/r['path'])!=r['base']],payload=[r['path'] for r in rows if sha(out/'files'/r['path'])!=r['sha256']],inventory=sorted(set(inventory)^set(deps)),freeze=[p for p,h in frozen.items() if sha(out/p)!=h])
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(out/'tmp'))
+for k in list(env):
+ if k.startswith('ASSERVAT_'):del env[k]
+result=dict(freeze=frozen,dependencies=len(deps),paths=len(rows),phases=[])
+phases=[('regression',['go','test','-vet=off','-overlay',str(out/'overlay.json'),'-count=1','-v','-run=^TestOwnerProviderSetupBindsExactIntegerGeneration$','./internal/adapters/providerconfig'])]
+code=1
+try:
+ for name,cmd in phases:
+  before=check();assert not any(before.values()),before
+  start=time.time()
+  with (out/(name+'.log')).open('x') as f:
+   process=subprocess.Popen(cmd,cwd=root,env=env,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
+   try:process.wait(timeout=180)
+   except subprocess.TimeoutExpired:
+    os.killpg(process.pid,signal.SIGTERM)
+    try:process.wait(timeout=10)
+    except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait()
+  code=process.returncode;after=check()
+  phase=dict(name=name,command=cmd,exit=code,seconds=round(time.time()-start,3),before=before,after=after,logSHA256=sha(out/(name+'.log')));result['phases'].append(phase);print(json.dumps(phase),flush=True)
+  assert not any(after.values()),after
+  if code:break
+finally:
+ result.update(exit=code,after=check())
+ with (out/'result.json').open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+raise SystemExit(code)

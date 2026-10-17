@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/application/capture	1.253s
+ok  	asservat.local/asservat/internal/application/execution	1.130s
+ok  	asservat.local/asservat/internal/transport/presentation	8.154s
+ok  	asservat.local/asservat/internal/transport/browser	4.789s
+ok  	asservat.local/asservat/internal/transport/mcp	9.669s
+ok  	asservat.local/asservat/internal/contracts	1.371s

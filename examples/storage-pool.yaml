@@ -1,0 +1,30 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceStoragePool
+metadata:
+  name: regional-evidence
+  namespace: asservat-system
+spec:
+  storageProfileRef: eu-central-evidence
+  capacity:
+    bytes: 137438953472
+    objects: 100000
+  safetyHeadroom:
+    bytes: 17179869184
+    objects: 10000
+  systemReserve:
+    bytes: 8589934592
+    objects: 10000
+  sharedBurst:
+    bytes: 42949672960
+    objects: 40000
+  protectedAllocations:
+  - budgetPolicyRef: payments-default
+    workloadSlots: 4
+    protectedPerWorkload:
+      bytes: 17179869184
+      objects: 10000
+  upload:
+    bytesPerSecond: 134217728
+    burstBytes: 16777216
+  maxUploadRequestsPerSecond: 100
+  capacityAssurance: qualifiedReservedBackend

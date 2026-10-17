@@ -1,0 +1,12 @@
+{
+  "evidence/compile.json": "1a25b90a613f13faf143ac73345b1ff668dc6b1dcd67cee5a9aca78abf561c9b",
+  "evidence/compile.log": "f4ea48839a0e1ab43e62f16c49076360d21c8dcf7a8c03ff056ec19379c85bbd",
+  "evidence/go-architecture.json": "3f518ffd45faa52f9ba168585b78b0785f38b74e13f08f33cc4214e1b92b89c8",
+  "evidence/go-architecture.log": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d",
+  "evidence/race.json": "b630293a05d5bf20af5bef24d75f0924e43d011fe442b15c4b313fec5f7329c9",
+  "evidence/race.log": "59c06b67ea1ac3a60d8a7f0dedfd48d752748c5648a4a5ef68be81ad35b0fe24",
+  "evidence/scratch-cleanup.json": "0225d6ff588581bff546e9f0cb7e663956e32b245a23138c285fc7b8e35ea538",
+  "evidence/scratch.json": "acf1755b257766b4f7e5631977955a032acca766a9c06217e71b43b266ba6f17",
+  "evidence/vet.json": "cfd9b99afd882a346a1020adffd0fe075f66fb07f9d2c6864c9b911d8bc59f9c",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

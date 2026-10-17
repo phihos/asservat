@@ -1,0 +1,198 @@
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/fence
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/record-digest
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/writer
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/trailing-json
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/unknown-field
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/database
+=== RUN   TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/postmaster
+--- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/fence (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/record-digest (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/writer (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/trailing-json (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/unknown-field (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/database (0.00s)
+    --- PASS: TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution/postmaster (0.00s)
+=== RUN   TestContextPlanRequiresExactFiniteNativeControlAndStopBacking
+--- PASS: TestContextPlanRequiresExactFiniteNativeControlAndStopBacking (0.00s)
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/digest
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/root
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/attempt
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/actor
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/quota-principal
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/unknown-field
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/duplicate-field
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/capture
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/deadline
+=== RUN   TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/noncanonical
+--- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption (0.01s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/digest (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/root (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/attempt (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/actor (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/quota-principal (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/unknown-field (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/duplicate-field (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/capture (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/deadline (0.00s)
+    --- PASS: TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption/noncanonical (0.00s)
+=== RUN   TestContextPreviewQuotaAndRequestKeysHaveDifferentClientScopes
+--- PASS: TestContextPreviewQuotaAndRequestKeysHaveDifferentClientScopes (0.00s)
+=== RUN   TestContextMetadataDeadlineIsOriginalAndNotSerialized
+--- PASS: TestContextMetadataDeadlineIsOriginalAndNotSerialized (0.00s)
+=== RUN   TestContextResolutionShapePreservesSequentialObservationIntervals
+--- PASS: TestContextResolutionShapePreservesSequentialObservationIntervals (0.00s)
+=== RUN   TestContextStorageObservationRetainsOriginalBounds
+--- PASS: TestContextStorageObservationRetainsOriginalBounds (0.00s)
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-pool-unconfigured
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-account-unconfigured
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-full-exhausted
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-replay-exhausted
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/control-original-deadline
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/pool-paused
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/allocation-paused
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-class
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-root
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-workload
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/bad-digest
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/future-source
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/expired-source
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/overlong-source-even-if-clamped
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/missing-time
+=== RUN   TestContextStorageObservationRejectsChangedOrInvalidSources/zero-revision
+--- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-pool-unconfigured (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-account-unconfigured (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-full-exhausted (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-replay-exhausted (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/control-original-deadline (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/pool-paused (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/allocation-paused (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-class (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-root (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/wrong-workload (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/bad-digest (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/future-source (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/expired-source (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/overlong-source-even-if-clamped (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/missing-time (0.00s)
+    --- PASS: TestContextStorageObservationRejectsChangedOrInvalidSources/zero-revision (0.00s)
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/covered
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/exact-boundary
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/one-microsecond-too-long
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/expired
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/missing-initialization
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-installation
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-issuer
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/wrong-root
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/malformed-backing
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/zero-protection
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/full
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/negative-counter
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/overflow-rules
+=== RUN   TestProcessingCaptureCoverageOriginalRootBounds/future-anchor
+--- PASS: TestProcessingCaptureCoverageOriginalRootBounds (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/covered (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/exact-boundary (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/one-microsecond-too-long (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/expired (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/missing-initialization (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-installation (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-issuer (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/wrong-root (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/malformed-backing (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/zero-protection (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/full (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/negative-counter (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/overflow-rules (0.00s)
+    --- PASS: TestProcessingCaptureCoverageOriginalRootBounds/future-anchor (0.00s)
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-workload
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-artifact
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/other-workload
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/other-artifact
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/acquisition-end-exclusive
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/released
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/exact-rule-boundary
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/expired-restriction
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/duplicate
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-unrelated
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-after-short-root
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/unknown-state
+=== RUN   TestProcessingCaptureCoverageRetainsEachOriginalRule/more-rules-than-accounted
+--- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule (0.01s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-workload (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/matching-artifact (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/other-workload (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/other-artifact (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/acquisition-end-exclusive (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/released (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/exact-rule-boundary (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/expired-restriction (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/duplicate (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-unrelated (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/malformed-after-short-root (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/unknown-state (0.00s)
+    --- PASS: TestProcessingCaptureCoverageRetainsEachOriginalRule/more-rules-than-accounted (0.00s)
+=== RUN   TestProcessingCaptureCoveragePurposePrivileges
+--- PASS: TestProcessingCaptureCoveragePurposePrivileges (0.00s)
+=== RUN   TestCapacityRolePlansExposeOnlyOriginalClosedRPCs
+--- PASS: TestCapacityRolePlansExposeOnlyOriginalClosedRPCs (0.00s)
+=== RUN   TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation
+--- PASS: TestCaptureCleanupPlansKeepPrivateSQLAndPurposeSeparation (0.00s)
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function
+=== RUN   TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option
+--- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/same-overload-despite-type-display-alias (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/different-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/unresolved-compiled-overload (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/zero-oid (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/foreign-schema (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/extra-function (0.00s)
+    --- PASS: TestFixedRuntimeRoleFunctionAliasUsesExactOverload/grant-option (0.00s)
+=== RUN   TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection
+--- PASS: TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection (0.00s)
+=== RUN   TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges
+--- PASS: TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.073s
+=== RUN   TestContextPreviewStructuralBounds
+=== RUN   TestContextPreviewStructuralBounds/duplicate_audience
+=== RUN   TestContextPreviewStructuralBounds/duplicate_policy
+=== RUN   TestContextPreviewStructuralBounds/oversized_scope
+=== RUN   TestContextPreviewStructuralBounds/raw_reason_substitute
+=== RUN   TestContextPreviewStructuralBounds/duplicate_generated_ID
+=== RUN   TestContextPreviewStructuralBounds/changed_intent_namespace
+=== RUN   TestContextPreviewStructuralBounds/no_report_rule
+=== RUN   TestContextPreviewStructuralBounds/unbounded_review
+=== RUN   TestContextPreviewStructuralBounds/submicrosecond_timestamp
+=== RUN   TestContextPreviewStructuralBounds/changed_pod_pin
+--- PASS: TestContextPreviewStructuralBounds (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/duplicate_audience (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/duplicate_policy (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/oversized_scope (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/raw_reason_substitute (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/duplicate_generated_ID (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/changed_intent_namespace (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/no_report_rule (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/unbounded_review (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/submicrosecond_timestamp (0.00s)
+    --- PASS: TestContextPreviewStructuralBounds/changed_pod_pin (0.00s)
+=== RUN   TestContextPreviewRelativeRetentionAndPodNormalization
+--- PASS: TestContextPreviewRelativeRetentionAndPodNormalization (0.00s)
+=== RUN   TestContextPreviewCloneAndReasonDeadline
+--- PASS: TestContextPreviewCloneAndReasonDeadline (0.00s)
+=== RUN   TestContextPreviewExecutionClassPins
+--- PASS: TestContextPreviewExecutionClassPins (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/capture	1.010s

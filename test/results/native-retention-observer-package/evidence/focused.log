@@ -1,0 +1,17 @@
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/close
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/close/setup
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/parent-cancel
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/parent-cancel/setup
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/setup-goexit
+=== RUN   TestNativeFixtureSourceOwnerJoinsRefresh/setup-goexit/setup
+    native_retention_observer_test.go:199: exercise the cleanup path used by setup Goexit
+--- PASS: TestNativeFixtureSourceOwnerJoinsRefresh (3.00s)
+    --- PASS: TestNativeFixtureSourceOwnerJoinsRefresh/close (1.00s)
+        --- PASS: TestNativeFixtureSourceOwnerJoinsRefresh/close/setup (1.00s)
+    --- PASS: TestNativeFixtureSourceOwnerJoinsRefresh/parent-cancel (1.00s)
+        --- PASS: TestNativeFixtureSourceOwnerJoinsRefresh/parent-cancel/setup (1.00s)
+    --- PASS: TestNativeFixtureSourceOwnerJoinsRefresh/setup-goexit (1.00s)
+        --- SKIP: TestNativeFixtureSourceOwnerJoinsRefresh/setup-goexit/setup (1.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.052s

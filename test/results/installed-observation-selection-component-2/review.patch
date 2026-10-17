@@ -1,0 +1,770 @@
+--- internal/adapters/kubernetes/initial_runtime_provider_resources.go
++++ internal/adapters/kubernetes/initial_runtime_provider_resources.go
+@@ -18,6 +18,27 @@
+ // Actual scoped material and setup verification precede publication and launch.
+ func NewProviderInstalledRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, worker contracts.ConfigurationProviderSelection, owner contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
+ 	return newProviderInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner)
++}
++
++// NewObservationProviderInstalledRuntimeResources selects ADR150's original
++// observation-v2 capability before the first resource claim. It creates no
++// backend projection, regional identity or runtime route. The existing provider
++// constructor preserves its omitted v1 selection and cannot adopt this journal.
++func NewObservationProviderInstalledRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, worker contracts.ConfigurationProviderSelection, owner contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
++	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner, contracts.OwnerObservationOperationFormat)
++}
++
++func initialRuntimeObservationSelectionValid(worker, owner, format string) bool {
++	return format == "" || format == contracts.OwnerObservationOperationFormat && worker == contracts.HubWorkerProviderInstalledLayout && owner == contracts.OwnerProviderInstalledLayout
++}
++
++// Only omission selects the existing v1 behavior; an unknown explicit format
++// cannot downgrade. The enclosing journal validators reject it.
++func originalOwnerObservationFormat(format string) string {
++	if format == "" {
++		return contracts.OwnerObservationFormat
++	}
++	return format
+ }
+ 
+ func initialRuntimeProviderSelectionValid(installation, workerLayout, ownerLayout string, worker *contracts.ConfigurationProviderSelection, owner *contracts.OwnerProviderSelection) bool {
+--- internal/adapters/kubernetes/initial_runtime_resources.go
++++ internal/adapters/kubernetes/initial_runtime_resources.go
+@@ -42,6 +42,7 @@
+ 	names                       initialRuntimeResourceNames
+ 	binding, rootUID            string
+ 	workerLayout, ownerLayout   string
++	observationFormat           string
+ 	workerProvider              *contracts.ConfigurationProviderSelection
+ 	ownerProvider               *contracts.OwnerProviderSelection
+ 	ctx                         context.Context
+@@ -73,10 +74,14 @@
+ }
+ 
+ func newProviderInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, workerLayout, ownerLayout string, workerProvider *contracts.ConfigurationProviderSelection, ownerProvider *contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
++	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, workerLayout, ownerLayout, workerProvider, ownerProvider, "")
++}
++
++func newObservationInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, workerLayout, ownerLayout string, workerProvider *contracts.ConfigurationProviderSelection, ownerProvider *contracts.OwnerProviderSelection, observationFormat string) (*InitialRuntimeResources, error) {
+ 	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || preparer.plan.HistoryProbe == nil || effects == nil {
+ 		return nil, cfg.ErrInvalid
+ 	}
+-	if !initialRuntimeProviderSelectionValid(preparer.plan.InstallationID, workerLayout, ownerLayout, workerProvider, ownerProvider) {
++	if !initialRuntimeObservationSelectionValid(workerLayout, ownerLayout, observationFormat) || !initialRuntimeProviderSelectionValid(preparer.plan.InstallationID, workerLayout, ownerLayout, workerProvider, ownerProvider) {
+ 		return nil, cfg.ErrInvalid
+ 	}
+ 	if workerProvider != nil {
+@@ -130,13 +135,14 @@
+ 		OwnerLayout            string                                    `json:",omitempty"`
+ 		WorkerProvider         *contracts.ConfigurationProviderSelection `json:",omitempty"`
+ 		OwnerProvider          *contracts.OwnerProviderSelection         `json:",omitempty"`
+-	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots, workerLayout, ownerLayout, workerProvider, ownerProvider})
++		ObservationFormat      string                                    `json:",omitempty"`
++	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots, workerLayout, ownerLayout, workerProvider, ownerProvider, observationFormat})
+ 	if e != nil || initialHandoverDeadline(call, preparer.protection.observer.now, until) != nil {
+ 		return nil, cfg.ErrUnavailable
+ 	}
+ 	d := sha256.Sum256(b)
+ 	life, cancel := context.WithCancel(ctx)
+-	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, workerLayout: workerLayout, ownerLayout: ownerLayout, workerProvider: workerProvider, ownerProvider: ownerProvider, ctx: life, cancel: cancel}
++	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, workerLayout: workerLayout, ownerLayout: ownerLayout, observationFormat: observationFormat, workerProvider: workerProvider, ownerProvider: ownerProvider, ctx: life, cancel: cancel}
+ 	if e = s.providerSecretIdentities(call, until); e != nil {
+ 		s.Close()
+ 		return nil, e
+@@ -217,7 +223,7 @@
+ 
+ func (s *InitialRuntimeResources) valid(v contracts.InitialRuntimeResourceState) bool {
+ 	now := s.now()
+-	if v.OwnerLayout != s.ownerLayout || v.WorkerLayout != s.workerLayout || !initialRuntimeProviderSelectionValid(s.initial.InstallationID, v.WorkerLayout, v.OwnerLayout, v.WorkerProvider, v.OwnerProvider) || !equalJSON(v.WorkerProvider, s.workerProvider) || !equalJSON(v.OwnerProvider, s.ownerProvider) || !ownerIdentityResourceStateValid(v, now) || v.Format != contracts.InitialRuntimeResourcesFormat || v.BindingDigest != s.binding || !authorization.UUID(v.SetupID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || v.Objects == nil || len(v.Objects) > contracts.InitialRuntimeResourceCount || contracts.InitialRuntimeResourceCount != len(initialRuntimeResourceItems) {
++	if v.ObservationFormat != s.observationFormat || !initialRuntimeObservationSelectionValid(v.WorkerLayout, v.OwnerLayout, v.ObservationFormat) || v.OwnerLayout != s.ownerLayout || v.WorkerLayout != s.workerLayout || !initialRuntimeProviderSelectionValid(s.initial.InstallationID, v.WorkerLayout, v.OwnerLayout, v.WorkerProvider, v.OwnerProvider) || !equalJSON(v.WorkerProvider, s.workerProvider) || !equalJSON(v.OwnerProvider, s.ownerProvider) || !ownerIdentityResourceStateValid(v, now) || v.Format != contracts.InitialRuntimeResourcesFormat || v.BindingDigest != s.binding || !authorization.UUID(v.SetupID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || v.Objects == nil || len(v.Objects) > contracts.InitialRuntimeResourceCount || contracts.InitialRuntimeResourceCount != len(initialRuntimeResourceItems) {
+ 		return false
+ 	}
+ 	seen := map[string]bool{v.SetupID: true}
+@@ -327,7 +333,7 @@
+ 			return e
+ 		}
+ 		now := s.now().UTC().Truncate(time.Microsecond)
+-		v := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: s.binding, SetupID: id, CreatedAt: now, Until: now.Add(30 * time.Minute), WorkerLayout: s.workerLayout, OwnerLayout: s.ownerLayout, WorkerProvider: s.workerProvider, OwnerProvider: s.ownerProvider, Objects: []contracts.InitialRuntimeResourceClaim{}}
++		v := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: s.binding, SetupID: id, CreatedAt: now, Until: now.Add(30 * time.Minute), WorkerLayout: s.workerLayout, OwnerLayout: s.ownerLayout, ObservationFormat: s.observationFormat, WorkerProvider: s.workerProvider, OwnerProvider: s.ownerProvider, Objects: []contracts.InitialRuntimeResourceClaim{}}
+ 		b, e := json.Marshal(v)
+ 		if e != nil {
+ 			return cfg.ErrInvalid
+--- internal/adapters/kubernetes/owner_bootstrap_current.go
++++ internal/adapters/kubernetes/owner_bootstrap_current.go
+@@ -14,7 +14,7 @@
+ 	if !ownerBootstrapDeploymentBound(s.input, snapshot.State) {
+ 		return cfg.ErrChanged
+ 	}
+-	plan := contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: s.input.KeyService.PKIMount, Connections: s.input.Connections, Concurrency: s.input.Concurrency}
++	plan := contracts.OwnerBootstrapPlan{ObservationFormat: snapshot.State.ObservationFormat, Format: contracts.OwnerBootstrapPlanFormat, PKIMount: s.input.KeyService.PKIMount, Connections: s.input.Connections, Concurrency: s.input.Concurrency}
+ 	for _, peer := range s.input.Observation.Peers {
+ 		plan.Peers = append(plan.Peers, contracts.OwnerBootstrapPeerPlan{ClusterID: peer.ClusterID, Roots: peer.Roots})
+ 	}
+--- internal/adapters/kubernetes/owner_bootstrap_deployment.go
++++ internal/adapters/kubernetes/owner_bootstrap_deployment.go
+@@ -64,7 +64,7 @@
+ 	if len(parts) != 2 || !ownerIdentityDigestValid(parts[1]) {
+ 		return zero, cfg.ErrChanged
+ 	}
+-	in.Observation = &contracts.OwnerObservationBootstrap{Format: contracts.OwnerObservationFormat, TemplateDigest: hex.EncodeToString(digest[:]), ImageDigest: parts[1], ProtectionDigest: hex.EncodeToString(guard.digest[:]), Peers: selection.Peers}
++	in.Observation = &contracts.OwnerObservationBootstrap{Format: originalOwnerObservationFormat(selection.ObservationFormat), TemplateDigest: hex.EncodeToString(digest[:]), ImageDigest: parts[1], ProtectionDigest: hex.EncodeToString(guard.digest[:]), Peers: selection.Peers}
+ 	selected := root.resources.ownerProvider
+ 	if selected == nil {
+ 		return zero, cfg.ErrChanged
+@@ -90,7 +90,7 @@
+ func ownerBootstrapDeploymentBound(in contracts.OwnerDeployment, state contracts.InitialRuntimeResourceState) bool {
+ 	p := state.OwnerBootstrap
+ 	if p == nil || p.Child == nil || p.Child.Receipt == nil || in.Observation == nil || in.ProviderAuthentication == nil ||
+-		in.PermissionRootID != p.PermissionRootID || in.KeyService.PKIMount != p.PKIMount || in.Connections != p.Connections || in.Concurrency != p.Concurrency || len(in.Observation.Peers) != len(p.Peers) {
++		p.ObservationFormat != state.ObservationFormat || in.Observation.Format != originalOwnerObservationFormat(state.ObservationFormat) || in.PermissionRootID != p.PermissionRootID || in.KeyService.PKIMount != p.PKIMount || in.Connections != p.Connections || in.Concurrency != p.Concurrency || len(in.Observation.Peers) != len(p.Peers) {
+ 		return false
+ 	}
+ 	server, client := ownerBootstrapPKIRoles(in, in.ProviderAuthentication.ServiceAccount)
+--- internal/adapters/kubernetes/owner_bootstrap_selection.go
++++ internal/adapters/kubernetes/owner_bootstrap_selection.go
+@@ -52,7 +52,7 @@
+ }
+ 
+ func NewOwnerBootstrapSelectionProducer(root *OwnerIdentityRoleRoot, plan contracts.OwnerBootstrapPlan) (*OwnerBootstrapSelectionProducer, error) {
+-	if root == nil || root.ctx == nil || root.resources == nil || root.input.OwnerLayout != contracts.OwnerProviderInstalledLayout || !ownerBootstrapPlanValid(plan, root.resources.now()) || plan.PKIMount == root.resources.initial.KeyService.AuditMount {
++	if root == nil || root.ctx == nil || root.resources == nil || root.input.OwnerLayout != contracts.OwnerProviderInstalledLayout || !ownerBootstrapPlanValid(plan, root.resources.now()) || plan.ObservationFormat != root.resources.observationFormat || plan.PKIMount == root.resources.initial.KeyService.AuditMount {
+ 		return nil, cfg.ErrInvalid
+ 	}
+ 	raw, err := json.Marshal(plan)
+@@ -258,7 +258,7 @@
+ 		if err != nil {
+ 			return "", err
+ 		}
+-		claim := &contracts.OwnerBootstrapSelectionClaim{IssuerEpoch: s.root.resources.initial.IssuerEpoch, OperationID: uuid.NewString(), PermissionRootID: uuid.NewString(), PKIMount: s.plan.PKIMount, Connections: s.plan.Connections, Concurrency: s.plan.Concurrency, ClaimedAt: now, Until: end}
++		claim := &contracts.OwnerBootstrapSelectionClaim{ObservationFormat: s.plan.ObservationFormat, IssuerEpoch: s.root.resources.initial.IssuerEpoch, OperationID: uuid.NewString(), PermissionRootID: uuid.NewString(), PKIMount: s.plan.PKIMount, Connections: s.plan.Connections, Concurrency: s.plan.Concurrency, ClaimedAt: now, Until: end}
+ 		for _, peer := range s.plan.Peers {
+ 			claim.Peers = append(claim.Peers, contracts.OwnerBootstrapPeerAllocation{ClusterID: peer.ClusterID, PeerID: uuid.NewString(), RootsDigest: ownerBootstrapDigest("roots", peer.Roots)})
+ 		}
+--- internal/adapters/kubernetes/owner_bootstrap_state.go
++++ internal/adapters/kubernetes/owner_bootstrap_state.go
+@@ -11,11 +11,14 @@
+ // Historical public shape only. Current proofs and positive one-use admission
+ // remain the concrete producer's responsibility. Expired attempts stay readable.
+ func ownerBootstrapStateValid(installation string, state contracts.InitialRuntimeResourceState, now time.Time) bool {
++	if !initialRuntimeObservationSelectionValid(state.WorkerLayout, state.OwnerLayout, state.ObservationFormat) {
++		return false
++	}
+ 	p := state.OwnerBootstrap
+ 	if p == nil {
+ 		return true
+ 	}
+-	if !authorization.UUID(installation) || state.Format != contracts.InitialRuntimeResourcesFormat ||
++	if p.ObservationFormat != state.ObservationFormat || !authorization.UUID(installation) || state.Format != contracts.InitialRuntimeResourcesFormat ||
+ 		state.OwnerLayout != contracts.OwnerProviderInstalledLayout || state.WorkerLayout != contracts.HubWorkerProviderInstalledLayout ||
+ 		state.OwnerProvider == nil || state.WorkerProvider == nil || !authorization.UUID(state.SetupID) ||
+ 		len(state.Objects) != contracts.InitialRuntimeResourceCount || !ownerIdentityMicrotime(state.CreatedAt) || state.CreatedAt.After(now) || state.Until.Sub(state.CreatedAt) != 30*time.Minute ||
+--- internal/adapters/kubernetes/owner_bootstrap_values.go
++++ internal/adapters/kubernetes/owner_bootstrap_values.go
+@@ -28,7 +28,7 @@
+ 	return hex.EncodeToString(h.Sum(nil))
+ }
+ func ownerBootstrapPlanValid(p contracts.OwnerBootstrapPlan, now time.Time) bool {
+-	if p.Format != contracts.OwnerBootstrapPlanFormat || !ownerBootstrapMount(p.PKIMount) || !ownerBootstrapLimits(p.Connections, p.Concurrency) || len(p.Peers) < 1 || len(p.Peers) > contracts.OwnerBootstrapInitialPeers {
++	if (p.ObservationFormat != "" && p.ObservationFormat != contracts.OwnerObservationOperationFormat) || p.Format != contracts.OwnerBootstrapPlanFormat || !ownerBootstrapMount(p.PKIMount) || !ownerBootstrapLimits(p.Connections, p.Concurrency) || len(p.Peers) < 1 || len(p.Peers) > contracts.OwnerBootstrapInitialPeers {
+ 		return false
+ 	}
+ 	b, err := json.Marshal(p)
+@@ -47,7 +47,7 @@
+ }
+ func ownerBootstrapBody(root *OwnerIdentityRoleRoot, p *contracts.OwnerBootstrapSelectionClaim, plan contracts.OwnerBootstrapPlan) (contracts.OwnerBootstrapSelection, error) {
+ 	var zero contracts.OwnerBootstrapSelection
+-	if root == nil || p == nil || root.resources == nil || !ownerBootstrapPlanValid(plan, root.resources.now()) || p.IssuerEpoch != root.resources.initial.IssuerEpoch || p.PKIMount != plan.PKIMount || p.Connections != plan.Connections || p.Concurrency != plan.Concurrency || len(p.Peers) != len(plan.Peers) {
++	if root == nil || p == nil || root.resources == nil || !ownerBootstrapPlanValid(plan, root.resources.now()) || p.ObservationFormat != root.resources.observationFormat || p.ObservationFormat != plan.ObservationFormat || p.IssuerEpoch != root.resources.initial.IssuerEpoch || p.PKIMount != plan.PKIMount || p.Connections != plan.Connections || p.Concurrency != plan.Concurrency || len(p.Peers) != len(plan.Peers) {
+ 		return zero, cfg.ErrChanged
+ 	}
+ 	in := root.input
+@@ -63,7 +63,7 @@
+ 			return zero, cfg.ErrChanged
+ 		}
+ 	}
+-	body := contracts.OwnerBootstrapSelection{InitialFormat: root.resources.initial.Format, Format: contracts.OwnerBootstrapSelectionFormat, InstallationID: in.InstallationID, ControlClusterID: in.ClusterID, IssuerEpoch: root.resources.initial.IssuerEpoch, Namespace: in.Namespace, Resources: in.Resources, ResourceSetupID: in.ResourceSetupID, ResourceBinding: in.ResourceBinding, OperationID: p.OperationID, PermissionRootID: p.PermissionRootID, PKIMount: p.PKIMount, Connections: p.Connections, Concurrency: p.Concurrency}
++	body := contracts.OwnerBootstrapSelection{ObservationFormat: p.ObservationFormat, InitialFormat: root.resources.initial.Format, Format: contracts.OwnerBootstrapSelectionFormat, InstallationID: in.InstallationID, ControlClusterID: in.ClusterID, IssuerEpoch: root.resources.initial.IssuerEpoch, Namespace: in.Namespace, Resources: in.Resources, ResourceSetupID: in.ResourceSetupID, ResourceBinding: in.ResourceBinding, OperationID: p.OperationID, PermissionRootID: p.PermissionRootID, PKIMount: p.PKIMount, Connections: p.Connections, Concurrency: p.Concurrency}
+ 	for i, peer := range p.Peers {
+ 		desired := plan.Peers[i]
+ 		if peer.ClusterID != desired.ClusterID || peer.RootsDigest != ownerBootstrapDigest("roots", desired.Roots) {
+@@ -83,7 +83,7 @@
+ 	if p == nil || ownerBootstrapDigest("selection", body) != p.PublicDigest {
+ 		return false
+ 	}
+-	plan := contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: body.PKIMount, Connections: body.Connections, Concurrency: body.Concurrency}
++	plan := contracts.OwnerBootstrapPlan{ObservationFormat: body.ObservationFormat, Format: contracts.OwnerBootstrapPlanFormat, PKIMount: body.PKIMount, Connections: body.Connections, Concurrency: body.Concurrency}
+ 	for _, peer := range body.Peers {
+ 		plan.Peers = append(plan.Peers, contracts.OwnerBootstrapPeerPlan{ClusterID: peer.ClusterID, Roots: peer.Roots})
+ 	}
+--- internal/adapters/kubernetes/owner_bootstrap_worker_caller.go
++++ internal/adapters/kubernetes/owner_bootstrap_worker_caller.go
+@@ -24,13 +24,38 @@
+ 	ObservedAt, FreshUntil                                 time.Time
+ }
+ 
++// OwnerBootstrapObservationParticipants retains the independently checked original
++// owner and HWORK provenance under one native operation. It is deliberately an
++// ephemeral value: the complete backend producer must bind it with its regional
++// configuration before publishing its own immutable projection and receipt.
++// Neither pin includes an invented Pod/ReplicaSet or grants runtime authority.
++type OwnerBootstrapObservationParticipants struct {
++	Caller OwnerBootstrapWorkerCaller
++	Owner  fleet.OwnerObservationPin
++}
++
++// ReadObservationParticipants is selected only by the original v2 resource root.
++// It uses the same two real native brackets as ReadWorkerCaller, not a subsequent
++// observation that could replace or renew either participant's original facts.
++func (s *OwnerBootstrapSelectionProducer) ReadObservationParticipants(ctx context.Context) (OwnerBootstrapObservationParticipants, error) {
++	if s == nil || s.root == nil || s.root.resources == nil || s.root.resources.observationFormat != contracts.OwnerObservationOperationFormat {
++		return OwnerBootstrapObservationParticipants{}, cfg.ErrUnavailable
++	}
++	return s.readWorkerCallerParticipants(ctx, true)
++}
++
+ // ReadWorkerCaller derives the sole installed HWORK caller from acknowledged
+ // original resources, selection and launch. It does not create or acknowledge
+ // anything. Both native brackets are genuine; the private configuration journal
+ // and public selection child are read once in each bracket. Credentials from
+ // that administrator-only journal never enter the returned public value.
+ func (s *OwnerBootstrapSelectionProducer) ReadWorkerCaller(ctx context.Context) (OwnerBootstrapWorkerCaller, error) {
+-	var zero, out OwnerBootstrapWorkerCaller
++	out, err := s.readWorkerCallerParticipants(ctx, false)
++	return out.Caller, err
++}
++
++func (s *OwnerBootstrapSelectionProducer) readWorkerCallerParticipants(ctx context.Context, includeOwner bool) (OwnerBootstrapObservationParticipants, error) {
++	var zero, out OwnerBootstrapObservationParticipants
+ 	call, release, err := s.enter(ctx)
+ 	if err != nil {
+ 		return zero, err
+@@ -42,7 +67,7 @@
+ 	}, func(bounded context.Context, first ownerIdentityOperationNative) error {
+ 		current, stop := context.WithDeadline(bounded, first.until)
+ 		defer stop()
+-		firstPin, firstRoles, err := s.readWorkerCallerOriginals(current, first)
++		firstPin, firstRoles, err := s.readWorkerCallerParticipantsOriginals(current, first, includeOwner)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -62,7 +87,7 @@
+ 		}
+ 		final, end := context.WithDeadline(current, until)
+ 		defer end()
+-		lastPin, lastRoles, err := s.readWorkerCallerOriginals(final, last)
++		lastPin, lastRoles, err := s.readWorkerCallerParticipantsOriginals(final, last, includeOwner)
+ 		if initialHandoverDeadline(final, s.root.resources.now, until) != nil {
+ 			return cfg.ErrUnavailable
+ 		}
+@@ -72,11 +97,11 @@
+ 		if firstPin != lastPin || firstRoles.UID != lastRoles.UID || firstRoles.ResourceVersion != lastRoles.ResourceVersion || !equalJSON(firstRoles.State, lastRoles.State) {
+ 			return cfg.ErrChanged
+ 		}
+-		lastPin.ObservedAt, lastPin.FreshUntil = started, until
++		lastPin.Caller.ObservedAt, lastPin.Caller.FreshUntil = started, until
+ 		out = lastPin
+ 		return nil
+ 	})
+-	if err != nil || initialHandoverDeadline(call, s.root.resources.now, out.FreshUntil) != nil {
++	if err != nil || initialHandoverDeadline(call, s.root.resources.now, out.Caller.FreshUntil) != nil {
+ 		if err == nil {
+ 			err = cfg.ErrUnavailable
+ 		}
+@@ -111,3 +136,21 @@
+ 	}
+ 	return pin, roles, nil
+ }
++
++// The v2 owner derivation consumes responses from this exact admitted bracket;
++// it makes no API call, no SQL query and no clock sample of its own.
++func (s *OwnerBootstrapSelectionProducer) readWorkerCallerParticipantsOriginals(ctx context.Context, current ownerIdentityOperationNative, includeOwner bool) (OwnerBootstrapObservationParticipants, contracts.ConfigurationRuntimeRoleSnapshot, error) {
++	var zero OwnerBootstrapObservationParticipants
++	caller, roles, err := s.readWorkerCallerOriginals(ctx, current)
++	if err != nil {
++		return zero, roles, err
++	}
++	out := OwnerBootstrapObservationParticipants{Caller: caller}
++	if includeOwner {
++		out.Owner, err = s.root.ownerObservationParticipant(current, caller)
++		if err != nil {
++			return zero, roles, err
++		}
++	}
++	return out, roles, nil
++}
+--- internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go
++++ internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go
+@@ -33,10 +33,19 @@
+ // cannot qualify an installed worker, native admission or SQL role creation.
+ func newOwnerWorkerCallerFixture(t *testing.T) *ownerWorkerCallerFixture {
+ 	t.Helper()
+-	f := newOwnerIdentityOperationFixture(t)
++	return newOwnerWorkerCallerObservationFixture(t, false)
++}
++
++func newOwnerWorkerCallerObservationFixture(t *testing.T, observation bool) *ownerWorkerCallerFixture {
++	t.Helper()
++	f := newOwnerIdentityOperationObservationFixture(t, nil, observation)
+ 	startOwnerIdentityOperationAcceptedObserver(t, f)
+ 	api := installOwnerBootstrapAPI(t, f)
+-	p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
++	plan := ownerBootstrapPlanFixture(f)
++	if observation {
++		plan.ObservationFormat = contracts.OwnerObservationOperationFormat
++	}
++	p, err := NewOwnerBootstrapSelectionProducer(f.root, plan)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+--- internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go
++++ internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go
+@@ -123,3 +123,38 @@
+ 		ConfigurationRoot: worker.ConfigurationRoot, ConfigurationSetupID: worker.ConfigurationSetupID,
+ 		WorkerInputID: worker.Provider.InputOperationID, LaunchOperationID: l.OperationID}, nil
+ }
++
++func (s *OwnerIdentityRoleRoot) ownerObservationParticipant(current ownerIdentityOperationNative, caller OwnerBootstrapWorkerCaller) (fleet.OwnerObservationPin, error) {
++	var zero fleet.OwnerObservationPin
++	state := current.retained.resources.State
++	selected := state.OwnerBootstrap
++	if selected == nil || selected.Child == nil || selected.Child.Receipt == nil || state.ObservationFormat != contracts.OwnerObservationOperationFormat ||
++		selected.ObservationFormat != state.ObservationFormat || s.resources.observationFormat != state.ObservationFormat || current.input != s.input ||
++		caller.Pin.RootID != selected.PermissionRootID || caller.Selection != selected.Child.Receipt.Object || caller.ResourceBinding != state.BindingDigest {
++		return zero, cfg.ErrChanged
++	}
++	deployment := current.source.ownerDeployment
++	if len(deployment.Spec.Template.Spec.Containers) != 1 {
++		return zero, cfg.ErrChanged
++	}
++	template, err := ConnectorAPITemplateDigest(deployment.Spec.Template)
++	if err != nil {
++		return zero, cfg.ErrChanged
++	}
++	image := strings.Split(deployment.Spec.Template.Spec.Containers[0].Image, "@sha256:")
++	if len(image) != 2 || !ownerIdentityDigestValid(image[1]) {
++		return zero, cfg.ErrChanged
++	}
++	imageBytes, err := hex.DecodeString(image[1])
++	if err != nil {
++		return zero, cfg.ErrChanged
++	}
++	pin := fleet.OwnerObservationPin{RootID: selected.PermissionRootID, SourceUID: s.input.OwnerConfigurationUID,
++		Pool: current.source.owner.Pool, TemplateDigest: template, ProtectionDigest: s.bridge.source.protection.digest}
++	copy(pin.ImageDigest[:], imageBytes)
++	if !pin.Valid() || pin.Pool.DeploymentUID != s.input.Deployment.UID || pin.Pool.AccountUID != s.input.ServiceAccount.UID ||
++		pin.Pool.DeploymentUID == caller.Pin.DeploymentUID || pin.Pool.AccountUID == caller.Pin.AccountUID {
++		return zero, cfg.ErrChanged
++	}
++	return pin, nil
++}
+--- internal/adapters/kubernetes/owner_identity_operation_fixture_test.go
++++ internal/adapters/kubernetes/owner_identity_operation_fixture_test.go
+@@ -72,6 +72,10 @@
+ }
+ 
+ func newOwnerIdentityOperationProviderFixture(t *testing.T, provider *contracts.ConfigurationKeyService) *ownerIdentityOperationFixture {
++	return newOwnerIdentityOperationObservationFixture(t, provider, false)
++}
++
++func newOwnerIdentityOperationObservationFixture(t *testing.T, provider *contracts.ConfigurationKeyService, observation bool) *ownerIdentityOperationFixture {
+ 	t.Helper()
+ 	f, p, original := handoverConflictProviderFixture(t, provider)
+ 	effects := rootPinEffects(t, p, original)
+@@ -91,14 +95,18 @@
+ 		f.objects["/api/v1/namespaces/"+initial.Namespace.Name+"/secrets/"+ref.Name] = value
+ 	}
+ 	f.mu.Unlock()
+-	resources, e := NewProviderInstalledRuntimeResources(context.Background(), p, effects, [][]byte{ownerConfigurationTestRoot(t, time.Now())}, workerSelection, ownerSelection)
++	constructor := NewProviderInstalledRuntimeResources
++	if observation {
++		constructor = NewObservationProviderInstalledRuntimeResources
++	}
++	resources, e := constructor(context.Background(), p, effects, [][]byte{ownerConfigurationTestRoot(t, time.Now())}, workerSelection, ownerSelection)
+ 	if e != nil {
+ 		t.Fatal("installed resource constructor", e)
+ 	}
+ 	t.Cleanup(resources.Close)
+ 	out := &ownerIdentityOperationFixture{api: f, resources: resources, effects: effects}
+ 	now := time.Now().UTC().Truncate(time.Microsecond)
+-	state := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: resources.binding, SetupID: ownerID(4500), WorkerLayout: contracts.HubWorkerProviderInstalledLayout, OwnerLayout: contracts.OwnerProviderInstalledLayout, WorkerProvider: &workerSelection, OwnerProvider: &ownerSelection, CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
++	state := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: resources.binding, SetupID: ownerID(4500), ObservationFormat: resources.observationFormat, WorkerLayout: contracts.HubWorkerProviderInstalledLayout, OwnerLayout: contracts.OwnerProviderInstalledLayout, WorkerProvider: &workerSelection, OwnerProvider: &ownerSelection, CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
+ 	put := func(path string, object any) {
+ 		t.Helper()
+ 		b, e := json.Marshal(object)
+--- internal/adapters/kubernetes/owner_identity_projection_input.go
++++ internal/adapters/kubernetes/owner_identity_projection_input.go
+@@ -80,7 +80,7 @@
+ 		return false
+ 	}
+ 	o := in.Observation
+-	if o.Format != contracts.OwnerObservationFormat || !ownerIdentityDigestValid(o.TemplateDigest) || !ownerIdentityDigestValid(o.ImageDigest) || o.ProtectionDigest != hex.EncodeToString(guard.digest[:]) || len(o.Peers) < 1 || len(o.Peers) > 16 {
++	if o.Format != originalOwnerObservationFormat(root.resources.observationFormat) || !ownerIdentityDigestValid(o.TemplateDigest) || !ownerIdentityDigestValid(o.ImageDigest) || o.ProtectionDigest != hex.EncodeToString(guard.digest[:]) || len(o.Peers) < 1 || len(o.Peers) > 16 {
+ 		return false
+ 	}
+ 	seen := map[fleet.PeerBinding]bool{}
+--- /dev/null
++++ internal/adapters/kubernetes/owner_observation_selection_test.go
+@@ -0,0 +1,214 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"net/http"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++)
++
++func TestObservationCapabilityIsOriginalResourceBinding(t *testing.T) {
++	f := newOwnerIdentityOperationFixture(t)
++	old := f.resources
++	selected, err := NewObservationProviderInstalledRuntimeResources(context.Background(), old.preparer, old.effects, old.ownerRoots, *old.workerProvider, *old.ownerProvider)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(selected.Close)
++	if selected.binding == old.binding || selected.observationFormat != contracts.OwnerObservationOperationFormat || old.observationFormat != "" {
++		t.Fatal("original capability not independently bound")
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	// A fresh constructor cannot reinterpret the already-created old journal.
++	if _, err = selected.Read(ctx); err == nil {
++		t.Fatal("v1 journal adopted as v2")
++	}
++}
++
++func TestObservationCapabilityRejectsMixedAndUnknownOriginalState(t *testing.T) {
++	root, old := providerResourceFixture(t)
++	before, _ := json.Marshal(old)
++	if bytes.Contains(before, []byte(`"observationFormat"`)) {
++		t.Fatal("legacy wire changed")
++	}
++	selected := old
++	selected.ObservationFormat = contracts.OwnerObservationOperationFormat
++	if root.valid(selected) {
++		t.Fatal("existing resource root adopted later capability")
++	}
++	root.observationFormat = contracts.OwnerObservationOperationFormat
++	if !root.valid(selected) || root.valid(old) {
++		t.Fatal("exact original capability not required")
++	}
++	for _, bad := range []string{"owner-observation/v1", "owner-observation/v3", "unknown"} {
++		changed := selected
++		changed.ObservationFormat = bad
++		if root.valid(changed) || initialRuntimeLayoutStateValid(changed) {
++			t.Fatal("explicit unsupported capability accepted", bad)
++		}
++	}
++	selected.OwnerLayout = contracts.OwnerInstalledLayout
++	if initialRuntimeLayoutStateValid(selected) {
++		t.Fatal("v2 capability selected in old layout")
++	}
++	after, _ := json.Marshal(old)
++	if !bytes.Equal(before, after) {
++		t.Fatal("selection mutated legacy source")
++	}
++}
++
++func TestObservationOriginalSelectionPropagatesWithoutRuntimeActivation(t *testing.T) {
++	f := newOwnerIdentityOperationObservationFixture(t, nil, true)
++	startOwnerIdentityOperationAcceptedObserver(t, f)
++	api := installOwnerBootstrapAPI(t, f)
++	plan := ownerBootstrapPlanFixture(f)
++	if _, err := NewOwnerBootstrapSelectionProducer(f.root, plan); err == nil {
++		t.Fatal("omitted selection downgraded original v2")
++	}
++	plan.ObservationFormat = contracts.OwnerObservationOperationFormat
++	producer, err := NewOwnerBootstrapSelectionProducer(f.root, plan)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(producer.Close)
++	out, err := producer.Complete(context.Background())
++	if err != nil || out.Status != OwnerBootstrapComplete {
++		t.Fatal("original v2 selection", out.Status, err)
++	}
++	if out.Input.Observation.Format != contracts.OwnerObservationOperationFormat || out.Selection.ObservationFormat != contracts.OwnerObservationOperationFormat || out.Snapshot.State.OwnerBootstrap.ObservationFormat != contracts.OwnerObservationOperationFormat || !ownerBootstrapDeploymentBound(out.Input, out.Snapshot.State) {
++		t.Fatal("capability lost along original provenance")
++	}
++	if out.Snapshot.State.OwnerIdentity != nil || out.Snapshot.State.OwnerLaunch != nil || api.creates.Load() != 1 || api.writes.Load() != 3 {
++		t.Fatal("public selection performed another phase")
++	}
++	changed := out.Snapshot.State
++	changed.ObservationFormat = ""
++	if ownerBootstrapDeploymentBound(out.Input, changed) || ownerBootstrapStateValid(out.Input.InstallationID, changed, f.resources.now()) {
++		t.Fatal("v2 receipt reinterpreted through omitted capability")
++	}
++}
++
++func TestObservationV2UnknownSelectionCreateDoesNotRepeat(t *testing.T) {
++	f := newOwnerIdentityOperationObservationFixture(t, nil, true)
++	startOwnerIdentityOperationAcceptedObserver(t, f)
++	api := installOwnerBootstrapAPI(t, f)
++	plan := ownerBootstrapPlanFixture(f)
++	plan.ObservationFormat = contracts.OwnerObservationOperationFormat
++	producer, err := NewOwnerBootstrapSelectionProducer(f.root, plan)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(producer.Close)
++	if _, err = producer.Advance(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	api.loseCreate.Store(true)
++	if _, err = producer.Advance(context.Background()); err == nil {
++		t.Fatal("lost create reported acknowledged")
++	}
++	inspected, err := producer.Inspect(context.Background())
++	if err != nil || inspected.Status != OwnerBootstrapPending || api.creates.Load() != 1 {
++		t.Fatal("original exact lookup", err)
++	}
++	original := *inspected.Snapshot.State.OwnerBootstrap.Child
++	complete, err := producer.Advance(context.Background())
++	if err != nil || complete.Status != OwnerBootstrapComplete || api.creates.Load() != 1 || complete.Snapshot.State.OwnerBootstrap.Child.OperationID != original.OperationID || !complete.Snapshot.State.OwnerBootstrap.Child.Until.Equal(original.Until) {
++		t.Fatal("uncertain original child replayed or renewed", err)
++	}
++}
++
++// Synthetic predecessor receipts remain explicit in this existing fixture. The
++// production native readers/selection producer execute, but this is neither an
++// installed regional process nor proof that current runtime authority exists.
++func TestObservationParticipantsBindExactDistinctOwnerAndCaller(t *testing.T) {
++	f := newOwnerWorkerCallerObservationFixture(t, true)
++	writes, creates := f.api.writes.Load(), f.api.creates.Load()
++	var roleReads, selectionReads atomic.Int32
++	f.f.api.mu.Lock()
++	previous := f.f.api.extra
++	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
++		if r.Method == http.MethodGet && r.URL.Path == f.rolePath {
++			roleReads.Add(1)
++		}
++		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/"+f.selection.Snapshot.State.OwnerBootstrap.Child.Receipt.Object.Name) {
++			selectionReads.Add(1)
++		}
++		return previous != nil && previous(w, r)
++	}
++	f.f.api.mu.Unlock()
++	end := time.Now().Add(4 * time.Second)
++	ctx, cancel := context.WithDeadline(context.Background(), end)
++	defer cancel()
++	got, err := f.producer.ReadObservationParticipants(ctx)
++	if err != nil {
++		t.Fatal("exact original participants", err)
++	}
++	if !got.Owner.Valid() || !got.Caller.Pin.Valid() || got.Owner.RootID != got.Caller.Pin.RootID || got.Owner.RootID != f.selection.Selection.PermissionRootID ||
++		got.Owner.SourceUID != f.f.root.input.OwnerConfigurationUID || got.Owner.Pool.DeploymentUID != f.resources.State.Objects[10].Receipt.UID ||
++		got.Owner.Pool.AccountUID != f.resources.State.Objects[0].Receipt.UID || got.Caller.Pin.DeploymentUID != f.resources.State.Objects[11].Receipt.UID ||
++		got.Caller.Pin.AccountUID != f.resources.State.Objects[1].Receipt.UID || got.Owner.Pool.AccountUID == got.Caller.Pin.AccountUID ||
++		got.Owner.Pool.DeploymentUID == got.Caller.Pin.DeploymentUID || got.Caller.FreshUntil.After(end) || !got.Caller.ObservedAt.Before(got.Caller.FreshUntil) {
++		t.Fatal("original participant provenance or bound lost")
++	}
++	if roleReads.Load() != 2 || selectionReads.Load() != 2 || f.api.writes.Load() != writes || f.api.creates.Load() != creates {
++		t.Fatal("participants added effects or nested native reads", roleReads.Load(), selectionReads.Load())
++	}
++	raw, err := json.Marshal(got)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, role := range f.roles.State.Roles {
++		if bytes.Contains(raw, []byte(role.Password)) {
++			t.Fatal("public participant leaked credential")
++		}
++	}
++	if bytes.Contains(raw, []byte("PodUID")) || bytes.Contains(raw, []byte("ReplicaSetUID")) {
++		t.Fatal("invented runtime descendant")
++	}
++}
++
++func TestObservationParticipantsRejectLegacySelectionBeforeNativeRead(t *testing.T) {
++	f := newOwnerWorkerCallerFixture(t)
++	var reads atomic.Int32
++	f.f.api.mu.Lock()
++	previous := f.f.api.extra
++	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
++		reads.Add(1)
++		return previous != nil && previous(w, r)
++	}
++	f.f.api.mu.Unlock()
++	if out, err := f.producer.ReadObservationParticipants(context.Background()); err == nil || out.Owner.Valid() || reads.Load() != 0 {
++		t.Fatal("legacy original acquired v2 capability")
++	}
++	if _, err := f.producer.ReadWorkerCaller(context.Background()); err != nil {
++		t.Fatal("legacy caller path changed", err)
++	}
++}
++
++func TestObservationParticipantsRejectOwnerReplacementAtFinalBoundary(t *testing.T) {
++	f := newOwnerWorkerCallerObservationFixture(t, true)
++	var reads atomic.Int32
++	f.f.api.mu.Lock()
++	previous := f.f.api.extra
++	f.f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
++		if r.Method == http.MethodGet && r.URL.Path == f.rolePath && reads.Add(1) == 1 {
++			permissionReply(w, f.f.api.objects[f.rolePath])
++			path := "/apis/apps/v1/namespaces/" + f.f.root.input.Namespace.Name + "/deployments/" + f.f.root.input.Deployment.Name
++			f.f.api.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(23000)
++			return true
++		}
++		return previous != nil && previous(w, r)
++	}
++	f.f.api.mu.Unlock()
++	out, err := f.producer.ReadObservationParticipants(context.Background())
++	if err == nil || out.Owner.Valid() || out.Caller.Pin.Valid() {
++		t.Fatal("final replacement gained original participant provenance")
++	}
++}
+--- internal/adapters/kubernetes/owner_provider_binding.go
++++ internal/adapters/kubernetes/owner_provider_binding.go
+@@ -6,7 +6,7 @@
+ )
+ 
+ func initialRuntimeLayoutStateValid(v contracts.InitialRuntimeResourceState) bool {
+-	if !contracts.InitialRuntimeLayoutsSupported(v.WorkerLayout, v.OwnerLayout) {
++	if !initialRuntimeObservationSelectionValid(v.WorkerLayout, v.OwnerLayout, v.ObservationFormat) || !contracts.InitialRuntimeLayoutsSupported(v.WorkerLayout, v.OwnerLayout) {
+ 		return false
+ 	}
+ 	if v.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {
+--- internal/contracts/initial_runtime_resources.go
++++ internal/contracts/initial_runtime_resources.go
+@@ -13,6 +13,8 @@
+ // It has no arbitrary object payload or credential fields. Item names and order
+ // are compiled by the producer; the state itself confers no effect authority.
+ type InitialRuntimeResourceState struct {
++	// Omission preserves original v1 bytes. A fresh v2 selection is bound before claims.
++	ObservationFormat  string                          `json:"observationFormat,omitempty"`
+ 	Format             string                          `json:"format"`
+ 	BindingDigest      string                          `json:"bindingDigest"`
+ 	SetupID            string                          `json:"setupID"`
+--- internal/contracts/owner_bootstrap_selection.go
++++ internal/contracts/owner_bootstrap_selection.go
+@@ -14,11 +14,12 @@
+ // The initial batch is a public installation choice, not a live connector or
+ // permission assignment. Later protected enrollment does not edit this batch.
+ type OwnerBootstrapPlan struct {
+-	Format      string                   `json:"format"`
+-	PKIMount    string                   `json:"pkiMount"`
+-	Connections int                      `json:"connections"`
+-	Concurrency int                      `json:"concurrency"`
+-	Peers       []OwnerBootstrapPeerPlan `json:"peers"`
++	ObservationFormat string                   `json:"observationFormat,omitempty"`
++	Format            string                   `json:"format"`
++	PKIMount          string                   `json:"pkiMount"`
++	Connections       int                      `json:"connections"`
++	Concurrency       int                      `json:"concurrency"`
++	Peers             []OwnerBootstrapPeerPlan `json:"peers"`
+ }
+ type OwnerBootstrapPeerPlan struct {
+ 	ClusterID string   `json:"clusterID"`
+@@ -28,17 +29,18 @@
+ // Only compact allocation facts enter the original 32KiB resource journal.
+ // The separate child attempt has its own one-use CREATE and original deadline.
+ type OwnerBootstrapSelectionClaim struct {
+-	IssuerEpoch      string                         `json:"issuerEpoch"`
+-	OperationID      string                         `json:"operationID"`
+-	PermissionRootID string                         `json:"permissionRootID"`
+-	PKIMount         string                         `json:"pkiMount"`
+-	Connections      int                            `json:"connections"`
+-	Concurrency      int                            `json:"concurrency"`
+-	Peers            []OwnerBootstrapPeerAllocation `json:"peers"`
+-	PublicDigest     string                         `json:"publicDigest"`
+-	ClaimedAt        time.Time                      `json:"claimedAt"`
+-	Until            time.Time                      `json:"until"`
+-	Child            *OwnerBootstrapObjectAttempt   `json:"child,omitempty"`
++	ObservationFormat string                         `json:"observationFormat,omitempty"`
++	IssuerEpoch       string                         `json:"issuerEpoch"`
++	OperationID       string                         `json:"operationID"`
++	PermissionRootID  string                         `json:"permissionRootID"`
++	PKIMount          string                         `json:"pkiMount"`
++	Connections       int                            `json:"connections"`
++	Concurrency       int                            `json:"concurrency"`
++	Peers             []OwnerBootstrapPeerAllocation `json:"peers"`
++	PublicDigest      string                         `json:"publicDigest"`
++	ClaimedAt         time.Time                      `json:"claimedAt"`
++	Until             time.Time                      `json:"until"`
++	Child             *OwnerBootstrapObjectAttempt   `json:"child,omitempty"`
+ }
+ type OwnerBootstrapPeerAllocation struct {
+ 	ClusterID   string `json:"clusterID"`
+@@ -60,21 +62,22 @@
+ // The immutable child carries the full public roots. Its own UID and CREATE
+ // attempt are intentionally outside its body, avoiding self-reference cycles.
+ type OwnerBootstrapSelection struct {
+-	InitialFormat    string                 `json:"initialFormat"`
+-	Format           string                 `json:"format"`
+-	InstallationID   string                 `json:"installationID"`
+-	ControlClusterID string                 `json:"controlClusterID"`
+-	IssuerEpoch      string                 `json:"issuerEpoch"`
+-	Namespace        WorkerObjectReference  `json:"namespace"`
+-	Resources        WorkerObjectReference  `json:"resources"`
+-	ResourceSetupID  string                 `json:"resourceSetupID"`
+-	ResourceBinding  string                 `json:"resourceBinding"`
+-	OperationID      string                 `json:"operationID"`
+-	PermissionRootID string                 `json:"permissionRootID"`
+-	PKIMount         string                 `json:"pkiMount"`
+-	Connections      int                    `json:"connections"`
+-	Concurrency      int                    `json:"concurrency"`
+-	Peers            []OwnerObservationPeer `json:"peers"`
++	ObservationFormat string                 `json:"observationFormat,omitempty"`
++	InitialFormat     string                 `json:"initialFormat"`
++	Format            string                 `json:"format"`
++	InstallationID    string                 `json:"installationID"`
++	ControlClusterID  string                 `json:"controlClusterID"`
++	IssuerEpoch       string                 `json:"issuerEpoch"`
++	Namespace         WorkerObjectReference  `json:"namespace"`
++	Resources         WorkerObjectReference  `json:"resources"`
++	ResourceSetupID   string                 `json:"resourceSetupID"`
++	ResourceBinding   string                 `json:"resourceBinding"`
++	OperationID       string                 `json:"operationID"`
++	PermissionRootID  string                 `json:"permissionRootID"`
++	PKIMount          string                 `json:"pkiMount"`
++	Connections       int                    `json:"connections"`
++	Concurrency       int                    `json:"concurrency"`
++	Peers             []OwnerObservationPeer `json:"peers"`
+ }
+ 
+ func OwnerBootstrapSelectionName(installationID string) string {
+--- /dev/null
++++ b/internal/bootstrap/owner_observation_selection_test.go
+@@ -0,0 +1,36 @@
++package bootstrap
++
++import (
++	"context"
++	"strings"
++	"testing"
++
++	"asservat.local/asservat/internal/contracts"
++)
++
++func TestOwnerObservationSelectionAloneCannotActivateV2Runtime(t *testing.T) {
++	in, dir, config := ownerInputFixture(t)
++	config.Observation = &contracts.OwnerObservationBootstrap{
++		Format:           contracts.OwnerObservationFormat,
++		TemplateDigest:   strings.Repeat("1", 64),
++		ImageDigest:      strings.Repeat("2", 64),
++		ProtectionDigest: strings.Repeat("3", 64),
++		Activation:       ownerObservationTestActivation(config),
++		Peers: []contracts.OwnerObservationPeer{{
++			InstallationID: runtimeID, ClusterID: runtimeID,
++			IssuerEpoch: runtimeID, PeerID: runtimeID, Roots: config.Kubernetes.Roots,
++		}},
++	}
++	writeOwnerJSON(t, dir, "deployment.json", config)
++	legacy, err := readOwnerInputs(context.Background(), in.files)
++	if err != nil || legacy.config.Observation == nil || legacy.config.Observation.Format != contracts.OwnerObservationFormat {
++		t.Fatal("same complete legacy input must remain valid", err)
++	}
++	// Original v2 selection is future installation provenance. This component
++	// does not publish a complete regional backend or activate a v2 listener.
++	config.Observation.Format = contracts.OwnerObservationOperationFormat
++	writeOwnerJSON(t, dir, "deployment.json", config)
++	if _, err = readOwnerInputs(context.Background(), in.files); err == nil {
++		t.Fatal("selection alone activated incomplete runtime composition")
++	}
++}

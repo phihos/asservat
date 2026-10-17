@@ -1,0 +1,82 @@
+package kubernetes
+
+import (
+	"context"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+)
+
+// NewProviderInstalledRuntimeResources selects the complete joint v2 before
+// any resource claim. Selected audit Secrets may still be empty: this constructor
+// binds their original protected identities, never asserts provider readiness.
+// Actual scoped material and setup verification precede publication and launch.
+func NewProviderInstalledRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, worker contracts.ConfigurationProviderSelection, owner contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
+	return newProviderInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner)
+}
+
+func initialRuntimeProviderSelectionValid(installation, workerLayout, ownerLayout string, worker *contracts.ConfigurationProviderSelection, owner *contracts.OwnerProviderSelection) bool {
+	if !contracts.InitialRuntimeLayoutsSupported(workerLayout, ownerLayout) {
+		return false
+	}
+	if workerLayout != contracts.HubWorkerProviderInstalledLayout {
+		return worker == nil && owner == nil
+	}
+	return worker != nil && owner != nil && providerconfig.ValidateConfigurationProviderSelection(installation, *worker) == nil && providerconfig.ValidateOwnerProviderSelection(installation, *owner) == nil && worker.AuditCredentials != owner.AuditCredentials && worker.AuditCredentials.UID != owner.AuditCredentials.UID
+}
+
+// This is only original-identity validation under the already-current original
+// native guard. It neither hashes credential payloads nor treats an empty
+// placeholder as completed material. Credential validation belongs to the
+// separately bounded publication/launch and runtime paths.
+func (s *InitialRuntimeResources) providerSecretIdentities(ctx context.Context, until time.Time) error {
+	if s.workerProvider == nil && s.ownerProvider == nil {
+		return nil
+	}
+	if !initialRuntimeProviderSelectionValid(s.initial.InstallationID, s.workerLayout, s.ownerLayout, s.workerProvider, s.ownerProvider) {
+		return cfg.ErrChanged
+	}
+	call, end := context.WithDeadline(ctx, until)
+	defer end()
+	for _, selected := range []struct {
+		ref contracts.WorkerObjectReference
+		key string
+	}{
+		{s.workerProvider.AuditCredentials, contracts.ConfigurationProviderAuditCredentialFile},
+		{s.ownerProvider.AuditCredentials, contracts.OwnerProviderAuditCredentialFile},
+	} {
+		var obj core.Secret
+		raw, err := s.preparer.creator.api.Get().AbsPath("/api/v1/namespaces/" + s.initial.Namespace.Name + "/secrets/" + selected.ref.Name).MaxRetries(0).DoRaw(call)
+		if err != nil {
+			clear(raw)
+			return cfg.ErrUnavailable
+		}
+		valid := permissionJSON(raw, 64<<10, 4096) == nil && strictGuardJSON(raw, &obj) == nil
+		clear(raw)
+		if !valid || !initialProviderSecretIdentity(obj, s.initial.Namespace.Name, selected.ref, selected.key) {
+			clearRuntimeProjection(obj.Data)
+			return cfg.ErrChanged
+		}
+		clearRuntimeProjection(obj.Data)
+		if err = initialHandoverDeadline(call, s.now, until); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func initialProviderSecretIdentity(obj core.Secret, namespace string, ref contracts.WorkerObjectReference, key string) bool {
+	if obj.APIVersion != "v1" || obj.Kind != "Secret" || obj.Name != ref.Name || obj.Namespace != namespace || string(obj.UID) != ref.UID || !identity.Text(obj.ResourceVersion, 128) || obj.DeletionTimestamp != nil || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || obj.Immutable != nil && *obj.Immutable || obj.Type != core.SecretTypeOpaque || len(obj.StringData) != 0 || len(obj.Data) > 1 {
+		return false
+	}
+	if len(obj.Data) == 1 {
+		b, ok := obj.Data[key]
+		return ok && len(b) <= 32<<10
+	}
+	return true
+}

@@ -1,0 +1,11 @@
+{
+  "test/results/direct-observation-native-2/result.json": "504723016794c02edd9549bfd2dc50a5b530bbf23bad022addd6775b45a44bfb",
+  "test/results/direct-observation-native-2/direct/context-storage.log": "ca723dc6a82c52074cbb6ae4434145eca7481e998caefff1c55367020b4d643c",
+  "test/integration/direct_observation_native_fixture_test.go": "3d93efd62b3df39991ebfb565307cbdaf8cdaa90906296102d5a4afa96707e38",
+  "test/integration/direct_observation_native_test.go": "c8ce3e9eab4d98f07352e86263a640d54d1a7951701562ce7658f26b3df6ba2f",
+  "test/integration/direct_observation_native_access_test.go": "50facf397403a543755923eb8d66373d0af6736de25817845e92791f2c593dfe",
+  "test/fixtures/observation-native/main.go": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82",
+  "test/fixtures/observation-native/inputs.go": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82",
+  "internal/adapters/kubernetes/owner_workload_guard.go": "56998ec98bf56c08b54208487655e81fd09e04112ba6cc90cf7f4f4cff109680",
+  "internal/adapters/kubernetes/connector_identity.go": "6373c4b1f2c97aee82770bf78ffef0d07be10b90d675ebc316aa5f40b5913e98"
+}

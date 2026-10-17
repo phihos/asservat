@@ -1,0 +1,526 @@
+{
+  "integratedAt": 1791859329.4706748,
+  "manifestSHA256": "c47a8976833f5e501d1a1c9a71d50db6aa93b89a3c7eff1138fe111870fe53be",
+  "dependenciesSHA256": "eb6b2f5f6a045ca61a0e1de7e34fe7b52597ff3f56fc88511d008cc9801b51f0",
+  "dependencyCount": 1927,
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "action": "modify",
+      "base": "2db3e728076073788c315ff6cdff3d6d789b192f582f5cff5b3f82d506073323",
+      "sha256": "3c5061a2bcdf1f5836ea6fa80b2828c89bf71f3c0c7323b446fb147f3030424b",
+      "group": "candidates"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "action": "modify",
+      "base": "267b5859ab8983e261af7f6c37bb449b2f2988bcb173d45ed507f0058b850166",
+      "sha256": "5250e4358491e42b502156486ce2d54c602af27e4030d8432cce8eb9582e9a35",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_candidates.go",
+      "action": "add",
+      "base": null,
+      "sha256": "2575a154e84d87b421fcbfccf6e3d6daadc4a15dbad9b1d0b185020899cd5aa3",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_candidates_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "1ba2536372d33fc96a3f2da6e3e2145c200f3b1be8b56b94d5b7204c57a731bc",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_candidate_selection_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "985e44fd23d02036f3126d35c2bfeaf383b71029b7a701e533ba08591b04b20f",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_channel.go",
+      "action": "modify",
+      "base": "57233bbe7f77509acc07b09f10b36d7cb6e23e85021baa8d47fe2691018cfde1",
+      "sha256": "b1d83f91e2bcb48b85d4fdd89a10de292e7022bc32a004380586bfd59b759c0e",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_channel_test.go",
+      "action": "modify",
+      "base": "b7ba978b5497af7f7f43e56e63d93d70775465a8fd622380141a31eef550a3f2",
+      "sha256": "206431eff2c987966dff9b145e2edc14afbb2fc43d94e33601b6fa99d8a16bf1",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_client.go",
+      "action": "modify",
+      "base": "949e99ac45d1106d0bbb281d5f9c08cad4219d93286af22089cd3bd6d2104816",
+      "sha256": "5b4097cc417892dbeaae53eb7bd56fc810cbb1e8b08f65368fab13d9907a2ee6",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_observation_connection_test.go",
+      "action": "modify",
+      "base": "c99a9ea5166b40cac7f4035ec3687eb106520179411d91a90e2f198116968c09",
+      "sha256": "96da133e7bcb61bc28ba77e2cbbc32f337429da9cf9940cfed28b034235ecf16",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/mtls/owner_observation_candidates_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "b4ce94d5d03c707262b362119c8bbd67054944bcd16d96f5ef60bdc546421a48",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/mtls/owner_observation_client.go",
+      "action": "modify",
+      "base": "23bce2bcc5eca5e54cb22328b34ff5564e445ed2d7c951e5daaf918afaca4199",
+      "sha256": "69ece9f3bc840d054f4767e620a908293e4329217bd84ededa67398165bf3a40",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/adapters/postgres/context_start_owners.go",
+      "action": "modify",
+      "base": "0296dfbbd051afb4c83e3e4756bb52fafbc421f8b7544b9eafef30cb92a2dfdf",
+      "sha256": "b98ad2159931f78f05db73af22906d2cb7e7796506d906110d00cd9627d33443",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_observation_candidates.go",
+      "action": "add",
+      "base": null,
+      "sha256": "1f36d99f4b0246bcdf483797e9650b35df6493f3af5bbb7ec867b7bbc8d0a410",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/application/fleet/owner_observation_candidate_selection.go",
+      "action": "add",
+      "base": null,
+      "sha256": "5c51450160e399b1f8881efa4becd3a8fbaed86fe4bd6834bba568b42b993855",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/application/fleet/owner_observation_candidate_selection_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "59ff6f8389040d59dca6f5c510062c2b1188b05ea43d5f913a2535ad6d91bec7",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/application/fleet/owner_observation_candidates.go",
+      "action": "add",
+      "base": null,
+      "sha256": "15cf4e63aca033c302bbd8633706496fdfdde8467b8ec0dc03fddfc3ff0565da",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/bootstrap/cluster_observation_client.go",
+      "action": "modify",
+      "base": "d6eb85efb5baf728da4ab18a07a204623846fbf29f13a4c9496b7fdff71a4ded",
+      "sha256": "90f8cee512fc304982a6df3088ef5fe1b59f4418d0e182ea5cea9681c08573d5",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/bootstrap/cluster_observation_client_test.go",
+      "action": "modify",
+      "base": "48e14467a7d12c735de7ada6fbab812c762a724060d509349ed89ffdd276bc35",
+      "sha256": "7dcc7cbe9c80e74841e15766d0e9753381d4a4ca1b428deaab4df2825257a386",
+      "group": "consumers"
+    },
+    {
+      "path": "internal/domain/fleet/api_context_work.go",
+      "action": "modify",
+      "base": "5ccd710942cb56eab421b0bd4cdf8273b7ea1f82ef49d30aeb85b2f0a37ffc14",
+      "sha256": "f7f71ce0bfefc58d205cf1353b51d87d988d6d858aecaef71589677b3a42bdd7",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/domain/fleet/owner_observation_candidate_groups.go",
+      "action": "add",
+      "base": null,
+      "sha256": "69fe54684f2cceabfa139b9668d8e0ed38457abfc3d2ac2de2d7ae1b66101320",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/domain/fleet/owner_observation_candidate_groups_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "84b75ab0c8de1a51bd2dce8c7e15a8a32e154fdec13345e6cf4126e0320d7848",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/domain/fleet/owner_observation_candidates_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "6d99e61cbe5b4de99ecdcbeafcdec229d69b7448a3023a100f2a6f812f4b0d6b",
+      "group": "candidates"
+    },
+    {
+      "path": "migrations/queries/owner_observation_candidates.sql",
+      "action": "add",
+      "base": null,
+      "sha256": "32f081ce6831c80a19a8fadcf33ab9f8f5980ba063f481478aae3eef78753811",
+      "group": "candidates"
+    },
+    {
+      "path": "test/integration/context_start_owners_test.go",
+      "action": "modify",
+      "base": "bc192f96ad99adea9612d72f3e9adb1d86d36e42d7afbd3b1b99608de8e34a23",
+      "sha256": "227d602af886c24a36cbc95dca526358967c5d16fb76023e016314a5623fcee7",
+      "group": "candidates"
+    },
+    {
+      "path": "test/integration/owner_observation_candidates_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "e6d8d88195f80a1d1370099b99fa9d77e8fe7a517404f82ef34d7e0126bd8a2e",
+      "group": "candidates"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/owner_observation_candidates.sql.go",
+      "action": "add",
+      "base": null,
+      "sha256": "15e3cc81cc707917ce1c0b15c596ae46a7370b757c6319ae992caebe9cf644fe",
+      "group": "generated",
+      "source": "generation/generated/owner_observation_candidates.sql.go"
+    }
+  ],
+  "qualification": {
+    "session": 93068,
+    "terminal": 0,
+    "scope": "isolated candidate read and original-pool consumer component; no external service tests executed",
+    "phases": [
+      {
+        "phase": "sqlc-version",
+        "command": [
+          "/home/phil/.cache/asservat-build/bin/sqlc",
+          "version"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 0.19,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "generate",
+        "command": [
+          "/home/phil/.cache/asservat-build/bin/sqlc",
+          "generate",
+          "-f",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/generation/sqlc.json"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 0.5,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "before-value",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/before-value.json",
+          "-vet=off",
+          "-count=1",
+          "-timeout=60s",
+          "-run",
+          "^TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess$/^opted17$",
+          "-v",
+          "./internal/domain/fleet"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 1,
+        "seconds": 0.713,
+        "expectedFailure": true,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "before-consumer",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/before-consumer.json",
+          "-vet=off",
+          "-count=1",
+          "-timeout=60s",
+          "-run",
+          "^TestInstalledObservationClientSelectsOriginalCandidateReader$/^opted-valid$",
+          "-v",
+          "./internal/bootstrap"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 1,
+        "seconds": 7.112,
+        "expectedFailure": true,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+          "-vet=off",
+          "-run",
+          "^$",
+          "./internal/domain/fleet",
+          "./internal/application/fleet",
+          "./internal/adapters/kubernetes",
+          "./internal/adapters/mtls",
+          "./internal/adapters/postgres",
+          "./internal/bootstrap",
+          "./test/integration"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 23.751,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=180s",
+          "-run",
+          "^Test(OwnerObservationCandidate|OwnerObservationReadyGroups|OwnerObservationBootstrapUsesComplete|ConnectorObservationChannel|ConnectorObservationStream|InstalledObservationClient|OwnerEndpointBoundedDiscovery|OwnerPoolNativeCandidateLimit)",
+          "-v",
+          "./internal/domain/fleet",
+          "./internal/application/fleet",
+          "./internal/adapters/kubernetes",
+          "./internal/adapters/mtls",
+          "./internal/bootstrap"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 28.851,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+          "./internal/domain/fleet",
+          "./internal/application/fleet",
+          "./internal/adapters/kubernetes",
+          "./internal/adapters/mtls",
+          "./internal/adapters/postgres",
+          "./internal/bootstrap",
+          "./test/integration"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 4.209,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      },
+      {
+        "phase": "architecture",
+        "command": [
+          "make",
+          "go-architecture-check"
+        ],
+        "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/mirror",
+        "exit": 0,
+        "seconds": 1.251,
+        "expectedFailure": false,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": [],
+          "derived": [],
+          "tool": []
+        }
+      }
+    ],
+    "racePassEntries": 185,
+    "raceSkipEntries": 0,
+    "dependencyCount": 1927,
+    "payloadCount": 26,
+    "generated": {
+      "internal/adapters/postgres/custodydb/owner_observation_candidates.sql.go": "15e3cc81cc707917ce1c0b15c596ae46a7370b757c6319ae992caebe9cf644fe"
+    },
+    "hashesUnchanged": true
+  },
+  "scope": "Qualified component only; installed/runtime and native qualification remain separate."
+}

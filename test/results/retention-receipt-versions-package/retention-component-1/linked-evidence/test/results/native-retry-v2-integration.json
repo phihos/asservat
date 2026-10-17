@@ -1,0 +1,14 @@
+{
+  "integratedAt": "2026-10-12T11:35:27.330258+00:00",
+  "manifestSHA256": "43170c0e432d4f0b9526f98d48458552a91a1c5ed49c0045f3aa61fd1349b577",
+  "payloads": 17,
+  "dependencies": 1427,
+  "allBasesMatched": true,
+  "allDependenciesMatched": true,
+  "combinedGates": {
+    "exit": 0,
+    "log": "combined139-retry-integrated-gates.log"
+  },
+  "nativeSelectors": "unrun",
+  "builtBrowser": "unrun"
+}

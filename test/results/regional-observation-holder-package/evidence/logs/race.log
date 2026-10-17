@@ -1,0 +1,234 @@
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.006s [no tests to run]
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching
+--- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.027s
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed
+--- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner (0.12s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed (0.02s)
+=== RUN   TestConnectorObservationChannelRequiresAllProofsAndExactReceipt
+--- PASS: TestConnectorObservationChannelRequiresAllProofsAndExactReceipt (0.05s)
+=== RUN   TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof
+--- PASS: TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof (0.03s)
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close
+--- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases (0.27s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt (0.05s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close (0.05s)
+=== RUN   TestConnectorObservationChannelCloseJoinsAdmittedMetadata
+--- PASS: TestConnectorObservationChannelCloseJoinsAdmittedMetadata (0.03s)
+=== RUN   TestConnectorObservationChannelPreservesSerializedOriginalInstants
+--- PASS: TestConnectorObservationChannelPreservesSerializedOriginalInstants (0.03s)
+=== RUN   TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot
+--- PASS: TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot (0.03s)
+=== RUN   TestConnectorObservationHelloCancellationJoinsUnreadPipeWrite
+--- PASS: TestConnectorObservationHelloCancellationJoinsUnreadPipeWrite (0.04s)
+=== RUN   TestConnectorObservationStreamCloseJoinsAdmittedNativeProof
+--- PASS: TestConnectorObservationStreamCloseJoinsAdmittedNativeProof (0.03s)
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media
+--- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed (0.12s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media (0.03s)
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name
+2026/10/13 01:54:01 http: TLS handshake error from 127.0.0.1:45796: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots
+2026/10/13 01:54:01 http: TLS handshake error from 127.0.0.1:41566: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate
+--- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate (0.11s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate (0.03s)
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello
+--- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello (0.84s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers (0.42s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello (0.42s)
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3
+--- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner (0.12s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3 (0.03s)
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof
+--- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF (3.18s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof (3.02s)
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds/current
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds/first-bound
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds/revoked-after-result
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds/source-changed-after-result
+=== RUN   TestHubConnectorObservationBracketsMetadataAndPreservesBounds/lost-final-delivery
+--- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds (0.35s)
+    --- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds/current (0.07s)
+    --- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds/first-bound (0.07s)
+    --- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds/revoked-after-result (0.07s)
+    --- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds/source-changed-after-result (0.06s)
+    --- PASS: TestHubConnectorObservationBracketsMetadataAndPreservesBounds/lost-final-delivery (0.07s)
+=== RUN   TestHubConnectorObservationCloseJoinsAdmittedRegistry
+--- PASS: TestHubConnectorObservationCloseJoinsAdmittedRegistry (0.04s)
+=== RUN   TestHubConnectorObservationRejectsWrongHelloBeforeRegistry
+--- PASS: TestHubConnectorObservationRejectsWrongHelloBeforeRegistry (0.02s)
+=== RUN   TestHubConnectorObservationRequiresOriginalSocketDeadline
+--- PASS: TestHubConnectorObservationRequiresOriginalSocketDeadline (0.02s)
+=== RUN   TestHubConnectorObservationRevokedBeforeMetadataDeniesWithoutDelivery
+--- PASS: TestHubConnectorObservationRevokedBeforeMetadataDeniesWithoutDelivery (0.05s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	6.526s
+=== RUN   TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource
+--- PASS: TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource (0.00s)
+=== RUN   TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection
+--- PASS: TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection (0.00s)
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/joined
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/extra-request-byte
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/missing-request-eof
+=== RUN   TestHubObservationStreamActualHTTP2TerminalAndClaim/cancel-after-claim
+--- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim (0.65s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/joined (0.02s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/extra-request-byte (0.02s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/missing-request-eof (0.61s)
+    --- PASS: TestHubObservationStreamActualHTTP2TerminalAndClaim/cancel-after-claim (0.01s)
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-sni
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/no-client-cert
+2026/10/13 01:54:02 http: TLS handshake error from 127.0.0.1:46358: tls: client didn't provide a certificate
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/fixed-body
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-authority
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/credential-header
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/query
+=== RUN   TestHubObservationHandlerActualTLSAndClosedRequest/wrong-media
+--- PASS: TestHubObservationHandlerActualTLSAndClosedRequest (0.05s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-sni (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/no-client-cert (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/fixed-body (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-authority (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/credential-header (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/query (0.01s)
+    --- PASS: TestHubObservationHandlerActualTLSAndClosedRequest/wrong-media (0.01s)
+=== RUN   TestHubObservationHandlerCancellationDuringHelloJoinsSlot
+--- PASS: TestHubObservationHandlerCancellationDuringHelloJoinsSlot (0.01s)
+=== RUN   TestHubObservationHolderClaimRetainsClosingSlotAndExactEntry
+--- PASS: TestHubObservationHolderClaimRetainsClosingSlotAndExactEntry (0.01s)
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/root
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cluster
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/exchange
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/expired
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cancelled
+=== RUN   TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/normal
+--- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/root (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cluster (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/exchange (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/expired (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/cancelled (0.00s)
+    --- PASS: TestHubObservationHolderRejectsLocatorMutationAndKeepsOriginalSocketEnd/normal (0.00s)
+=== RUN   TestHubObservationHolderNoReceiptCannotProduceSuccess
+--- PASS: TestHubObservationHolderNoReceiptCannotProduceSuccess (0.00s)
+=== RUN   TestHubObservationHolderRepeatedHelloCannotAliasOldLocator
+--- PASS: TestHubObservationHolderRepeatedHelloCannotAliasOldLocator (0.00s)
+=== RUN   TestHubObservationHolderSequenceOverflowCannotWrap
+--- PASS: TestHubObservationHolderSequenceOverflowCannotWrap (0.00s)
+=== RUN   TestRegionalObservationExchangeClosedOrderAndOriginalCaller
+--- PASS: TestRegionalObservationExchangeClosedOrderAndOriginalCaller (0.01s)
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/proof
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/send
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/result
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/receipt
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/terminal
+=== RUN   TestRegionalObservationExchangeNeverReplaysFailedPhase/close
+--- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase (0.02s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/proof (0.00s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/send (0.00s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/result (0.00s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/receipt (0.00s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/terminal (0.00s)
+    --- PASS: TestRegionalObservationExchangeNeverReplaysFailedPhase/close (0.00s)
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/metadata-first
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/receipt-before-final-proof
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/probe-replay
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/request-changed
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/cluster-changed
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/future-request
+=== RUN   TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/unknown-format
+--- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata (0.02s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/metadata-first (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/receipt-before-final-proof (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/probe-replay (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/request-changed (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/cluster-changed (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/future-request (0.00s)
+    --- PASS: TestRegionalObservationExchangeRejectsChangedWireBeforeMetadata/unknown-format (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	1.795s

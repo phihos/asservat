@@ -1,0 +1,11 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 0,
+  "scope": "Documentation and contracts only; runtime qualification separate."
+}

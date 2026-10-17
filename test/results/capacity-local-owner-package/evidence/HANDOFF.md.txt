@@ -1,0 +1,52 @@
+# Installed capacity LocalOwner checkpoint
+
+The coherent 33-path candidate is ready for parent integration at `candidate-v2`. No own build remains. This implements the typed original LocalOwner carrier, protected capacity Secret publisher, current receipt-selected installed loader, exact owner read prerequisites on role70, fixed fresh worker RBAC, and actual SQL role qualification source. It does not switch a command/chart or enable public collection.
+
+Immutable identifiers:
+
+- `candidate-v2/manifest.json`: `6453e56568d962b9f11fe8f0c5e6e270f3fd8546a6060e26afc84e038c8d2e52`
+- `candidate-v2/dependencies.json`: `bbf7d57dbde9ab4d11027e7fc8737bf14267ef42892893561a8d60c884d21d03` (2,687 current-tree dependencies).
+- `candidate-v2/evidence.json`: `5f76d2f035603970388443dc1c9d231c434e7f3ea98ec7b0cda3636140d9a99c` (1,154 real linked evidence files, separately retained for the static mirror).
+- Original candidate-v1: `b81ba6b65da87e78de5362774055a29b4b0b2d0c9b7a8cd7725b1f60c1c07d1f`.
+- Two-test fixture correction: `fixture-correction-v1/manifest.json`, `932d0706a6aa46a69632d8140ddae32c79d7498fc0c50fbe1711c01312168b4e`.
+
+The production role70 file is separately identifiable at `changes/internal/adapters/postgres/public_runtime_capacity_role_plan.go`, SHA `291f6bdb1cbf55e384987d87dd98c63f1842ad6776b1544d85af0f9f2f6f454c`. It is byte-identical to the earlier isolated capacity-owner-registry stage. Role71, fixed MaxConns1 pools and per-purpose SQL LIMIT3 stay unchanged. No migration, new SQL query or generated output is included.
+
+## Integration and authority
+
+Apply only the 33 manifest payloads after verifying every recorded live base and dependency. No shared role inventory replacement is included. `hub_worker_installed.go` has one additive helper call; it changes fresh installed Role/ClusterRole template digests before original claims, preserves the configuration-only builder, and provides no adoption of old retained templates. `capacity_projection_wait.go` has one constructor selection change, keeping existing two-/three-child supervisor signatures and receipt rechecks.
+
+The carrier includes original `Source`, `OwnerConfiguration` and `OwnerDeployment` with its original activation and complete guard, including the exact worker-account CapacityProbe. The administrator assembler verifies the original retained bridge, source14/Service12/Deployment10/account0 receipts, positive owner projection/launch and actual immutable public owner input. The same original source body is provenance, not a permanent current-revision freeze. Compatible accepted same-pool revisions remain allowed; each runtime operation retains one exact current revision through delivery.
+
+`ReadCapacityLocalOwner(ctx, resources, deployment, manifest)` produces public input under the original current interval. `NewCapacityRuntimeProjection(bridge, resources, roles, deployment)` binds it before `Publish(ctx, verifiedRoleSnapshot)`. Publish retains all three lifetimes through its original one-use CREATE/readback/receipt; unknown replies permit exact lookup only. Original journal/claim/setup/SQL incarnation and public digest remain immutable. No public resource journal contains credentials or secret-payload hashes.
+
+`NewInstalledCapacityWorkerDeployment` requires the actual positive `InstalledWorkerProjectionReader.ReadCapacity` result before optional credentials are opened. It uses the original worker mount's local observer/probe and fixed rotating dedicated token. The concrete installed private9444 client authenticates current SQL owner registration/configuration, Ready routing, common SNI, full guard and original workload before token disclosure. Capacity70 completes its owner reads before capacity transactions; the client joins before pools/input close. No remote token fallback, URL override, role-root read or new login exists.
+
+## Actual checks
+
+All phases used GOMAXPROCS=2, GOFLAGS=-p=2 and a dedicated build TMPDIR. No native lab, generator or live mutation ran in these jobs.
+
+Original handle72144/result `checks/local-owner-v1/result.json` (`b01013fe569a5f9cde2825c2262e177b4fd62690077b9dea90f435db03f082c4`):
+
+- Five-package compile, including actual native helper: exit0,17.435s wall.
+- Before-role: intended exit1 at missing `fleet_current_trust SELECT` in the original role70 plan; no compilation failure.
+- Before-workload: intended exit1 at the original installed Role template missing the capacity probe grant; no compilation failure.
+- Full contracts/bootstrap races: exit0,101 top-level/490 total PASS entries; package times2.082s/11.596s.
+- Kubernetes race: exit1 at two fixture defects. The binding negative reused the original64xa value; the fake API handler dereferenced a deliberately nil pending receipt before dispatching an unrelated GET. That failed run remains intact.
+
+Corrected handle29517/result `checks/local-owner-v2/result.json` (`d023bc88d3bcdd9b3d2d1393db452cd5ae37dcee430bb45f98a44db4405d322c`):
+
+- Only two test payloads differ from candidate-v1; no production/expected boundary changed.
+- Focused Kubernetes race: exit0,33 top-level/222 total PASS entries; package26.103s,59.893s wall.
+- PostgreSQL role-plan race: exit0,5 top-level/12 total PASS entries; package1.070s.
+- Actual five-package vet: exit0,4.114s wall.
+- Go architecture:53 packages/297 edges. Design:1,218 positive/120 negative. Spec:113 schemas/10,380 assertions. All exit0; actual linked evidence was copied into the physical static mirror.
+- All33 payloads/bases,2,687 dependencies and linked evidence hashes matched before and after both runs.
+
+The actual encoder measured one synthetic complete carrier at4,667 bytes. The exact262,144-byte boundary passes, one byte over and HTML escape expansion over the bound reject. This tests encoded size and does not turn the synthetic original fixture into installer authority.
+
+## Parent-owned actual qualification next
+
+Use the existing fresh owned fleet harness with `python scripts/test-custody.py --fleet --run '^TestCapacityProducerWithRealPostgres$'`. The new `capacity-current-owner-registry` subcase uses actual generated role70/current SQL reads and unchanged role71. It separately provisions the original synthetic owner pool/process and test CA through existing scoped owner effect facets, real encrypted audit and SQL activation. Source/configuration/receipt identities remain unchanged. Setup and enrollment have separate bounded fixture phases; every assertion starts a new original at-most-five-second caller context after setup, while the blocked owner-row read keeps400ms. These phases precede all root/workload capacity admission observations. Effect/read negatives require real SQLSTATE42501 on existing columns. There is no widened operation/grant period.
+
+This fixture extension has compiled but has NOT run. It qualifies the role graph, not installed TLS/Ready/multi-cluster operation. Full capacity Publish against actual retained bridge/root/Secret CREATE, installed optional projection activation and the complete authenticated observation/runtime chain remain next. The passing original87-entry SQL54/ADR146 matrix does not substitute for those tests. Physical-history settlement/window reuse and measured16-account worst-case timing remain separate pending prerequisites.

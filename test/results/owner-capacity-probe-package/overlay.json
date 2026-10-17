@@ -1,0 +1,24 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/capacity_projection_reader.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/capacity_projection_reader.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/hub_worker_activation.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/hub_worker_activation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_resource_inventory.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/initial_runtime_resource_inventory.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_resource_objects.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/initial_runtime_resource_objects.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/installed_capacity_probe_test.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/installed_capacity_probe_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/installed_processing_names.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/installed_processing_names.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_workload_guard.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/adapters/kubernetes/owner_workload_guard.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/configuration_role_inputs.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/configuration_role_inputs.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/configuration_role_installer.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/configuration_role_installer.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_capacity_probe_test.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/owner_capacity_probe_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_deployment.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/owner_deployment.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_guard_inputs.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/owner_guard_inputs.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_inputs.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/owner_inputs.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_observation_deployment.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/bootstrap/owner_observation_deployment.go",
+    "/home/phil/Projekte/asservat/internal/contracts/configuration_role_installer.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/contracts/configuration_role_installer.go",
+    "/home/phil/Projekte/asservat/internal/contracts/hub_worker_activation.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/contracts/hub_worker_activation.go",
+    "/home/phil/Projekte/asservat/internal/contracts/owner_capacity_probe.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/contracts/owner_capacity_probe.go",
+    "/home/phil/Projekte/asservat/internal/contracts/owner_deployment.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/contracts/owner_deployment.go",
+    "/home/phil/Projekte/asservat/internal/domain/configuration/owner_administration.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/internal/domain/configuration/owner_administration.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_capacity_probe_test.go": "/home/phil/.cache/asservat-build/planning/capacity-owner-guard-20261013/candidate-2/files/test/integration/owner_capacity_probe_test.go"
+  }
+}

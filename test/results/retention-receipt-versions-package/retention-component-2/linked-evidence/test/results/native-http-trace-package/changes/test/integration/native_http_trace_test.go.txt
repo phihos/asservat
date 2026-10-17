@@ -1,0 +1,448 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"sync"
+	"testing"
+	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// Independent HTTP-only fixture diagnostics: original calls, contexts, return
+// values, errors and marker facets are preserved. No I/O, check, retry, authority
+// or goroutine is added by a decorator. Output is deferred until fixture cleanup.
+// The separate recorder prevents successful preparation traffic hiding ingress.
+const nativeHTTPTraceLimit = 256
+
+type nativeHTTPTrace struct {
+	mu         sync.Mutex
+	start      time.Time
+	events     [nativeHTTPTraceLimit]nativePreparationTraceEvent
+	used       int
+	omitted    uint64
+	firstError *nativePreparationTraceEvent
+}
+
+func newNativeHTTPTrace(t *testing.T) *nativeHTTPTrace {
+	t.Helper()
+	s := &nativeHTTPTrace{start: time.Now()}
+	t.Cleanup(func() { s.log(t) })
+	return s
+}
+func (s *nativeHTTPTrace) begin(ctx context.Context, phase string, inputUntil time.Time) func(error, time.Time) {
+	e := nativePreparationTraceEvent{phase: phase, started: time.Now(), inputUntil: inputUntil}
+	if ctx != nil {
+		e.deadline, _ = ctx.Deadline()
+	}
+	s.mu.Lock()
+	index := -1
+	if s.used < len(s.events) {
+		index = s.used
+		s.used++
+		s.events[index] = e
+	} else {
+		s.omitted++
+	}
+	s.mu.Unlock()
+	return func(err error, until time.Time) {
+		e.ended, e.resultUntil, e.result = time.Now(), until, nativePreparationResult(err)
+		e.contextResult = "none"
+		if ctx != nil {
+			e.contextResult = nativePreparationResult(ctx.Err())
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if index >= 0 {
+			s.events[index] = e
+		}
+		if err != nil && s.firstError == nil {
+			copy := e
+			s.firstError = &copy
+		}
+	}
+}
+func (s *nativeHTTPTrace) log(t *testing.T) {
+	t.Helper()
+	s.mu.Lock()
+	events := append([]nativePreparationTraceEvent(nil), s.events[:s.used]...)
+	omitted := s.omitted
+	var first *nativePreparationTraceEvent
+	if s.firstError != nil {
+		copy := *s.firstError
+		first = &copy
+	}
+	s.mu.Unlock()
+	for i, e := range events {
+		if e.ended.IsZero() {
+			t.Logf("native HTTP trace phase=%s seq=%d start=%s result=not-joined", e.phase, i, e.started.Sub(s.start))
+			continue
+		}
+		t.Logf("native HTTP trace phase=%s seq=%d start=%s elapsed=%s deadline=%s remaining-start=%s remaining-end=%s input-until=%s input-remaining-end=%s result-until=%s result-remaining-end=%s result=%s context=%s", e.phase, i, e.started.Sub(s.start), e.ended.Sub(e.started), e.deadline.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.deadline, e.started), nativePreparationRemaining(e.deadline, e.ended), e.inputUntil.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.inputUntil, e.ended), e.resultUntil.UTC().Format(time.RFC3339Nano), nativePreparationRemaining(e.resultUntil, e.ended), e.result, e.contextResult)
+	}
+	if first != nil {
+		t.Logf("native HTTP trace first-error phase=%s elapsed=%s result=%s context=%s", first.phase, first.ended.Sub(first.started), first.result, first.contextResult)
+	}
+	t.Logf("native HTTP trace retained=%d omitted=%d", len(events), omitted)
+}
+
+func (s *nativeHTTPTrace) transfer(t *testing.T, in evidence.DownloadResponseTransfer) evidence.DownloadResponseTransfer {
+	t.Helper()
+	original, ok := in.Responses.(nativeHTTPFirstResponses)
+	if !ok {
+		t.Fatal("HTTP trace requires the original first-context response facet")
+	}
+	in.Sessions = nativeHTTPSessions{in.Sessions, s}
+	in.Responses = nativeHTTPResponses{original, s}
+	in.Authority = nativeHTTPAuthority{in.Authority, s}
+	in.Objects = nativeHTTPWindowObjects{in.Objects, s}
+	in.Audit = nativeHTTPWindowAck{in.Audit, s}
+	return in
+}
+
+type nativeHTTPFirstResponses interface {
+	evidence.DownloadResponses
+	FirstContextResponsesOnly()
+}
+
+type nativeHTTPAuthority struct {
+	evidence.CurrentDownloadAuthority
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPAuthority) CheckDownloadCurrent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	done := s.trace.begin(ctx, "http.authority-current", time.Time{})
+	v, e := s.CurrentDownloadAuthority.CheckDownloadCurrent(ctx, current, scope)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativeHTTPSessions struct {
+	evidence.DownloadSessions
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPSessions) LookupDownload(ctx context.Context, id string, principal identity.Principal) (artifact.DownloadSession, error) {
+	done := s.trace.begin(ctx, "http.session-lookup", time.Time{})
+	v, e := s.DownloadSessions.LookupDownload(ctx, id, principal)
+	done(e, v.Deadline)
+	return v, e
+}
+
+type nativeHTTPResponses struct {
+	nativeHTTPFirstResponses
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPResponses) BeginDownloadResponse(ctx context.Context, store string, authority artifact.DownloadAuthority, response artifact.DownloadResponse) (artifact.DownloadResponse, error) {
+	done := s.trace.begin(ctx, "http.response-begin", authority.ValidUntil)
+	v, e := s.nativeHTTPFirstResponses.BeginDownloadResponse(ctx, store, authority, response)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativeHTTPResponses) BeginDownloadWindow(ctx context.Context, session, response, owner, window string, authority artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
+	done := s.trace.begin(ctx, "http.window-begin", authority.ValidUntil)
+	v, e := s.nativeHTTPFirstResponses.BeginDownloadWindow(ctx, session, response, owner, window, authority)
+	done(e, v.Window.WriteUntil)
+	return v, e
+}
+func (s nativeHTTPResponses) LeaseDownloadResponse(ctx context.Context, session, response, owner, window string, authority artifact.DownloadAuthority) (artifact.DownloadDeliveryLease, error) {
+	done := s.trace.begin(ctx, "http.response-lease", authority.ValidUntil)
+	v, e := s.nativeHTTPFirstResponses.LeaseDownloadResponse(ctx, session, response, owner, window, authority)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativeHTTPResponses) FinishDownloadWindow(ctx context.Context, in audit.DownloadWindowIntent, outcome artifact.DownloadWindowOutcome) (audit.DownloadWindowAuditOutcome, error) {
+	done := s.trace.begin(ctx, "http.window-finish", in.Window.WriteUntil)
+	v, e := s.nativeHTTPFirstResponses.FinishDownloadWindow(ctx, in, outcome)
+	done(e, v.Intent.Window.WriteUntil)
+	return v, e
+}
+func (s nativeHTTPResponses) CloseDownloadResponse(ctx context.Context, session, response, owner string) error {
+	done := s.trace.begin(ctx, "http.response-close", time.Time{})
+	e := s.nativeHTTPFirstResponses.CloseDownloadResponse(ctx, session, response, owner)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeHTTPWindowObjects struct {
+	auditapp.DownloadWindowObjects
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPWindowObjects) CreateDownloadWindowIntent(ctx context.Context, in audit.DownloadWindowIntent) (audit.DownloadWindowWriteResult, error) {
+	done := s.trace.begin(ctx, "http.window-intent-create", in.Window.WriteUntil)
+	v, e := s.DownloadWindowObjects.CreateDownloadWindowIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeHTTPWindowObjects) FindDownloadWindowIntent(ctx context.Context, in audit.DownloadWindowIntent) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "http.window-intent-find", in.Window.WriteUntil)
+	v, e := s.DownloadWindowObjects.FindDownloadWindowIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeHTTPWindowObjects) CreateDownloadWindowOutcome(ctx context.Context, out audit.DownloadWindowAuditOutcome) (audit.DownloadWindowWriteResult, error) {
+	done := s.trace.begin(ctx, "http.window-outcome-create", out.Intent.Window.WriteUntil)
+	v, e := s.DownloadWindowObjects.CreateDownloadWindowOutcome(ctx, out)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeHTTPWindowObjects) FindDownloadWindowOutcome(ctx context.Context, out audit.DownloadWindowAuditOutcome) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "http.window-outcome-find", out.Intent.Window.WriteUntil)
+	v, e := s.DownloadWindowObjects.FindDownloadWindowOutcome(ctx, out)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeHTTPWindowAck struct {
+	evidence.DownloadWindowAcknowledgements
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPWindowAck) AcknowledgeDownloadWindowIntent(ctx context.Context, in audit.DownloadWindowIntent, result audit.DownloadWindowWriteResult) error {
+	done := s.trace.begin(ctx, "http.window-intent-ack", in.Window.WriteUntil)
+	e := s.DownloadWindowAcknowledgements.AcknowledgeDownloadWindowIntent(ctx, in, result)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeHTTPWindowAck) AcknowledgeDownloadWindowOutcome(ctx context.Context, out audit.DownloadWindowAuditOutcome, result audit.DownloadWindowWriteResult) error {
+	done := s.trace.begin(ctx, "http.window-outcome-ack", out.Intent.Window.WriteUntil)
+	e := s.DownloadWindowAcknowledgements.AcknowledgeDownloadWindowOutcome(ctx, out, result)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeHTTPJournal struct {
+	auditapp.OperationJournal
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPJournal) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
+	done := s.trace.begin(ctx, "http.audit-reserve", in.RequestUntil)
+	v, e := s.OperationJournal.ReserveOperation(ctx, in)
+	done(e, v.Intent.RequestUntil)
+	return v, e
+}
+func (s nativeHTTPJournal) ClaimOperationWrite(ctx context.Context, in audit.OperationIntent, phase string) (bool, error) {
+	done := s.trace.begin(ctx, nativeHTTPAuditPhase(phase, "claim"), in.WriteUntil)
+	v, e := s.OperationJournal.ClaimOperationWrite(ctx, in, phase)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeHTTPJournal) FreezeOperationOutcome(ctx context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
+	done := s.trace.begin(ctx, "http.audit-freeze", out.Intent.WriteUntil)
+	v, e := s.OperationJournal.FreezeOperationOutcome(ctx, out)
+	done(e, v.Intent.RequestUntil)
+	return v, e
+}
+
+type nativeHTTPOperationAck struct {
+	auditapp.OperationAcknowledgements
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPOperationAck) AcknowledgeOperation(ctx context.Context, in audit.OperationIntent, phase string, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, nativeHTTPAuditPhase(phase, "ack"), in.WriteUntil)
+	e := s.OperationAcknowledgements.AcknowledgeOperation(ctx, in, phase, receipt)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeHTTPClosedObjects struct {
+	auditapp.ClosedOperationObjects
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPClosedObjects) CreateClosedOperationIntent(ctx context.Context, in audit.OperationIntent) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, "http.audit-intent-create", in.WriteUntil)
+	v, e := s.ClosedOperationObjects.CreateClosedOperationIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativeHTTPClosedObjects) CreateClosedOperationOutcome(ctx context.Context, out audit.OperationOutcome) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, "http.audit-outcome-create", out.Intent.WriteUntil)
+	v, e := s.ClosedOperationObjects.CreateClosedOperationOutcome(ctx, out)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeHTTPCompletions struct {
+	auditapp.OperationCompletions
+	trace *nativeHTTPTrace
+}
+
+func (s nativeHTTPCompletions) RecordOperationCompletion(ctx context.Context, in audit.OperationIntent, phase string, completion audit.OperationWriteCompletion) error {
+	done := s.trace.begin(ctx, nativeHTTPAuditPhase(phase, "record"), in.WriteUntil)
+	e := s.OperationCompletions.RecordOperationCompletion(ctx, in, phase, completion)
+	done(e, time.Time{})
+	return e
+}
+func (s nativeHTTPCompletions) ReadOperationCompletion(ctx context.Context, in audit.OperationIntent, phase string) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, nativeHTTPAuditPhase(phase, "read"), in.WriteUntil)
+	v, e := s.OperationCompletions.ReadOperationCompletion(ctx, in, phase)
+	done(e, time.Time{})
+	return v, e
+}
+
+// Labels remain closed even if a failing implementation supplies an unexpected
+// phase. That original value still reaches the underlying port unchanged.
+func nativeHTTPAuditPhase(phase, action string) string {
+	switch phase {
+	case "intent":
+		switch action {
+		case "claim":
+			return "http.audit-intent-claim"
+		case "ack":
+			return "http.audit-intent-ack"
+		case "record":
+			return "http.audit-intent-record"
+		case "read":
+			return "http.audit-intent-read"
+		}
+	case "outcome":
+		switch action {
+		case "claim":
+			return "http.audit-outcome-claim"
+		case "ack":
+			return "http.audit-outcome-ack"
+		case "record":
+			return "http.audit-outcome-record"
+		case "read":
+			return "http.audit-outcome-read"
+		}
+	}
+	return "http.audit-invalid-phase"
+}
+
+// This independent fixture-admin snapshot runs only after the HTTP handler has
+// joined. It adds no effect, renewal, claim or refund. Only fixed numeric totals
+// and a closed error category leave SQL; identifiers and records are not logged.
+func nativeHTTPFailureSnapshot(t *testing.T, ctx context.Context, f nativeExchangeFixture, session artifact.DownloadSession) {
+	t.Helper()
+	var intents, intentReceipts, outcomes, outcomeReceipts int64
+	var a nativeResumeAccounting
+	err := f.admin.QueryRow(ctx, `SELECT
+ (SELECT count(*) FROM operation_audit WHERE root_id=$4 AND intent->>'Name'='download_artifact_content'),
+ (SELECT count(*) FROM operation_audit WHERE root_id=$4 AND intent->>'Name'='download_artifact_content' AND intent_receipt IS NOT NULL),
+ (SELECT count(*) FROM operation_audit WHERE root_id=$4 AND intent->>'Name'='download_artifact_content' AND outcome IS NOT NULL),
+ (SELECT count(*) FROM operation_audit WHERE root_id=$4 AND intent->>'Name'='download_artifact_content' AND outcome_receipt IS NOT NULL),
+ (SELECT count(*) FROM download_response WHERE session_id=$1),
+ (SELECT count(*) FROM download_response WHERE session_id=$1 AND closed),
+ (SELECT count(*) FROM download_window WHERE session_id=$1),
+ (SELECT count(*) FROM download_window WHERE session_id=$1 AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL AND outcome_json->>'Success'='true' AND outcome_json->>'VerifiedFinal'='true'),
+ (SELECT count(*) FROM download_native_key WHERE worker_id=$2),
+ (SELECT COALESCE(sum(used_roles),0) FROM download_native_key WHERE worker_id=$2),
+ (SELECT updates FROM download_native_owner WHERE worker_id=$2),
+ (SELECT count(*) FROM download_key_binding WHERE session_id=$1),
+ (SELECT COALESCE(sum(used_roles),0) FROM download_key_binding WHERE session_id=$1),
+ reserved_responses,reserved_windows,reserved_audit_bytes
+ FROM download_control_allocation WHERE id=$3`, session.ID, f.worker.Intent.ID, session.AllocationID, f.allocation.RootID).Scan(&intents, &intentReceipts, &outcomes, &outcomeReceipts, &a.Responses, &a.Closed, &a.Windows, &a.Acknowledged, &a.KeyRows, &a.KeyRoles, &a.NativeUpdates, &a.PreparationRows, &a.PreparationRoles, &a.ReservedResponses, &a.ReservedWindows, &a.ReservedAuditBytes)
+	if err != nil {
+		t.Logf("native HTTP snapshot result=%s", nativePreparationResult(err))
+		return
+	}
+	t.Logf("native HTTP snapshot intents=%d intent-receipts=%d outcomes=%d outcome-receipts=%d responses=%d closed=%d windows=%d acknowledged=%d key-rows=%d key-roles=%d native-updates=%d preparation-rows=%d preparation-roles=%d reserved-responses=%d reserved-windows=%d reserved-audit-bytes=%d", intents, intentReceipts, outcomes, outcomeReceipts, a.Responses, a.Closed, a.Windows, a.Acknowledged, a.KeyRows, a.KeyRoles, a.NativeUpdates, a.PreparationRows, a.PreparationRoles, a.ReservedResponses, a.ReservedWindows, a.ReservedAuditBytes)
+}
+
+func TestNativeHTTPTraceForwardsOriginalAuthority(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+	defer cancel()
+	err := errors.New("sensitive underlying error")
+	until := time.Now().Add(500 * time.Millisecond)
+	port := &nativeTraceTestAuthority{context: ctx, result: artifact.DownloadAuthority{ValidUntil: until}, err: err}
+	trace := &nativeHTTPTrace{start: time.Now()}
+	wrapper := nativeHTTPAuthority{port, trace}
+	got, gotErr := wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{})
+	deadline, _ := ctx.Deadline()
+	if got != port.result || gotErr != err || port.calls != 1 || !port.sameContext || trace.used != 1 || trace.events[0].deadline != deadline || trace.events[0].resultUntil != until || trace.events[0].result != "other-error" {
+		t.Fatal("HTTP trace changed original authority call or exposed raw failure")
+	}
+	cancel()
+	_, gotErr = wrapper.CheckDownloadCurrent(ctx, nil, artifact.DownloadScope{})
+	if gotErr != err || port.calls != 2 || trace.events[1].contextResult != "context-canceled" {
+		t.Fatal("HTTP trace intercepted canceled original call")
+	}
+}
+
+type nativeHTTPTestJournal struct {
+	ctx      context.Context
+	in       audit.OperationIntent
+	out      audit.OperationOutcome
+	snapshot audit.OperationSnapshot
+	calls    [3]int
+	same     bool
+	err      error
+}
+
+func (s *nativeHTTPTestJournal) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
+	s.calls[0]++
+	s.same = s.same && ctx == s.ctx && reflect.DeepEqual(in, s.in)
+	return s.snapshot, s.err
+}
+func (s *nativeHTTPTestJournal) ClaimOperationWrite(ctx context.Context, in audit.OperationIntent, phase string) (bool, error) {
+	s.calls[1]++
+	s.same = s.same && ctx == s.ctx && reflect.DeepEqual(in, s.in) && phase == "sensitive-unknown-phase"
+	return false, s.err
+}
+func (s *nativeHTTPTestJournal) FreezeOperationOutcome(ctx context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
+	s.calls[2]++
+	s.same = s.same && ctx == s.ctx && reflect.DeepEqual(out, s.out)
+	return s.snapshot, s.err
+}
+func TestNativeHTTPTracePreservesAuditUnknownSpendAndSnapshot(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := errors.New("private audit error")
+	in := audit.OperationIntent{ID: "original-id", RequestUntil: time.Now().Add(time.Second), WriteUntil: time.Now().Add(2 * time.Second), Lifecycle: &audit.OperationLifecycleBinding{}}
+	receipt := &audit.Receipt{Key: "original-receipt"}
+	out := audit.OperationOutcome{Intent: in, Effect: "unknown"}
+	snap := audit.OperationSnapshot{Intent: in, IntentStarted: true, IntentReceipt: receipt, Outcome: &out}
+	port := &nativeHTTPTestJournal{ctx: ctx, in: in, out: out, snapshot: snap, same: true, err: err}
+	trace := &nativeHTTPTrace{start: time.Now()}
+	wrapper := nativeHTTPJournal{port, trace}
+	got, e := wrapper.ReserveOperation(ctx, in)
+	if e != err || !reflect.DeepEqual(got, snap) || got.IntentReceipt != receipt || got.Outcome != &out {
+		t.Fatal("audit snapshot changed")
+	}
+	fresh, e := wrapper.ClaimOperationWrite(ctx, in, "sensitive-unknown-phase")
+	if fresh || e != err {
+		t.Fatal("unknown claim result became fresh work")
+	}
+	got, e = wrapper.FreezeOperationOutcome(ctx, out)
+	if e != err || !reflect.DeepEqual(got, snap) || !port.same || port.calls != [3]int{1, 1, 1} {
+		t.Fatal("trace changed original audit call/result")
+	}
+	if trace.used != 3 || trace.events[1].phase != "http.audit-invalid-phase" || trace.events[1].contextResult != "context-canceled" {
+		t.Fatal("unexpected phase was logged or context changed")
+	}
+}
+func TestNativeHTTPTraceBoundedIndependentBuffer(t *testing.T) {
+	trace := &nativeHTTPTrace{start: time.Now()}
+	var wg sync.WaitGroup
+	for n := 0; n < nativeHTTPTraceLimit; n++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			trace.begin(context.Background(), "http.authority-current", time.Time{})(nil, time.Time{})
+		}()
+	}
+	wg.Wait()
+	trace.begin(context.Background(), "http.audit-reserve", time.Time{})(artifact.ErrDownloadUnavailable, time.Time{})
+	trace.begin(context.Background(), "http.audit-freeze", time.Time{})(context.Canceled, time.Time{})
+	if trace.used != nativeHTTPTraceLimit || trace.omitted != 2 || trace.firstError == nil || trace.firstError.phase != "http.audit-reserve" || trace.firstError.result != "download-unavailable" {
+		t.Fatal("bounded HTTP trace lost first returned failure after overflow")
+	}
+	for _, e := range trace.events {
+		if e.ended.IsZero() {
+			t.Fatal("trace call not joined")
+		}
+	}
+}

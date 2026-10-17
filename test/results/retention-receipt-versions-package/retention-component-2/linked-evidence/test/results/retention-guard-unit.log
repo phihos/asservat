@@ -1,0 +1,3 @@
+ok  	asservat.local/asservat/internal/adapters/postgres	0.002s
+ok  	asservat.local/asservat/internal/domain/artifact	0.002s
+ok  	asservat.local/asservat/internal/application/planning	0.003s

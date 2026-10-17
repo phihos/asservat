@@ -1,0 +1,42 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/initial_bootstrap_projection.go",
+    "sha256": "3da0c4bc36a51cb70e2cb9a81d95d3ef6ac8b8a1d93e5c16d111e0c835351dc2"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_bootstrap_manager.go",
+    "sha256": "427dec249e3990c14a8f33c7efbf802eab14990bc49d0849a4e224989abb2bff"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_handover.go",
+    "sha256": "6ecae87a0d32d13eec1b1ae15f0bff289d959eb44df37a2241e7b7b9ad26d491"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_schema.go",
+    "sha256": "b031063736928e80356d3a9b6c4ccfb40b77371b41f964e1f3b5057e53214a55"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_manager.go",
+    "sha256": "bc18bd1058929749f365678e44404f2e817ff63487f52fb7a478b75a19eb4eca"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_manager_retirement.go",
+    "sha256": "6d9a6be17f9975dcb9e89b0030c9f84e4022c46c94798beb05caa5fbd4a292ef"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_completion.go",
+    "sha256": "d4d250ddc137af6d2516bff92afd6d23d897669e89f154226481661f887111e6"
+  },
+  {
+    "path": "internal/contracts/initial_preparer.go",
+    "sha256": "60192108d90ae7bb2ec737db52406cac1a3719a5593d762908f4823d5b44992b"
+  },
+  {
+    "path": "internal/contracts/initial_installer.go",
+    "sha256": "f00aad914af8bd15c13f4e11f08b5cabbae8bcaad9d878c3ac23e6ff7bb2ddd8"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_guard_test.go",
+    "sha256": "388c404e4933e15aa68926e645b3e76cd25b66a8e785c8f8fb151a2ee15baeff"
+  }
+]

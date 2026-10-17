@@ -1,0 +1,33 @@
+{
+  "manifest": "9337806c8e68935f24c3a0245276ef51133876f1b849d349789578bc69f0e62c",
+  "dependencies": "b85026aa46057eb596e789a7396e78e4e4fa7eb120eba53fd1b6148c26cdc408",
+  "runner_sha256": "85db24b46682b776021557f83905a62d77fee41d69f70a26268639d8327803e7",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "started_at": 1791844876.268777,
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-vet=off",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/capacity-native-lineage-20261013/candidate-v1/overlay.json",
+    "./test/integration",
+    "-run",
+    "^TestCapacityNativeProcessingLineageDates$",
+    "-count=1",
+    "-v"
+  ],
+  "exit": 0,
+  "log_sha256": "815482de43cb1d6e12e09467e40b57ac74d167ae341185d0e38b8eaa748b91a3",
+  "ended_at": 1791844890.4110491,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "terminal_exit": 0
+}

@@ -1,0 +1,116 @@
+package mtls
+
+import (
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"bytes"
+	"crypto/tls"
+	"crypto/x509"
+)
+
+// An owned snapshot of a completed, verified TLS handshake. Revalidation runs
+// on each use, including reuse of the underlying transport. This does not own
+// the socket or replace request cancellation, deadlines or locator checks.
+type OwnerConnection struct {
+	verifier *OwnerPeerVerifier
+	state    tls.ConnectionState
+	expected value.OwnerBinding
+	usage    string
+}
+
+var _ app.OwnerPeerConnection = (*OwnerConnection)(nil)
+
+func NewOwnerServerConnection(v *OwnerPeerVerifier, state *tls.ConnectionState, expected value.OwnerBinding) (*OwnerConnection, error) {
+	if _, err := v.VerifyServer(state, expected); err != nil {
+		return nil, err
+	}
+	return newOwnerConnection(v, state, "server", expected)
+}
+func NewOwnerClientConnection(v *OwnerPeerVerifier, state *tls.ConnectionState) (*OwnerConnection, error) {
+	c, err := v.VerifyClient(state)
+	if err != nil {
+		return nil, err
+	}
+	return newOwnerConnection(v, state, "client", c.Binding)
+}
+func newOwnerConnection(v *OwnerPeerVerifier, state *tls.ConnectionState, usage string, expected value.OwnerBinding) (*OwnerConnection, error) {
+	if state == nil || len(state.VerifiedChains) < 1 || len(state.VerifiedChains) > 8 {
+		return nil, value.ErrDenied
+	}
+	// Copy only handshake facts consumed by the verifier. Bound and reparse all
+	// DER so caller-owned parsed fields/slices cannot mutate a later decision.
+	snapshot := tls.ConnectionState{Version: state.Version, HandshakeComplete: state.HandshakeComplete, ServerName: state.ServerName, NegotiatedProtocol: state.NegotiatedProtocol, DidResume: state.DidResume}
+	copyChain := func(input []*x509.Certificate, count, limit int) ([]*x509.Certificate, error) {
+		if len(input) < 1 || len(input) > count {
+			return nil, value.ErrDenied
+		}
+		out := make([]*x509.Certificate, 0, len(input))
+		size := 0
+		for _, certificate := range input {
+			if certificate == nil || len(certificate.Raw) < 1 || len(certificate.Raw) > 16<<10 {
+				return nil, value.ErrDenied
+			}
+			size += len(certificate.Raw)
+			if size > limit {
+				return nil, value.ErrDenied
+			}
+			parsed, err := x509.ParseCertificate(bytes.Clone(certificate.Raw))
+			if err != nil {
+				return nil, value.ErrDenied
+			}
+			out = append(out, parsed)
+		}
+		return out, nil
+	}
+	var err error
+	snapshot.PeerCertificates, err = copyChain(state.PeerCertificates, 4, 32<<10)
+	if err != nil {
+		return nil, err
+	}
+	for _, chain := range state.VerifiedChains {
+		c, e := copyChain(chain, 5, 48<<10)
+		if e != nil {
+			return nil, e
+		}
+		snapshot.VerifiedChains = append(snapshot.VerifiedChains, c)
+	}
+	out := &OwnerConnection{verifier: v, state: snapshot, expected: expected, usage: usage}
+	if _, err = out.OwnerCertificate(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+func (c *OwnerConnection) OwnerCertificate() (value.OwnerCertificate, error) {
+	if c == nil || c.verifier == nil {
+		return value.OwnerCertificate{}, value.ErrDenied
+	}
+	if c.usage == "server" {
+		return c.verifier.VerifyServer(&c.state, c.expected)
+	}
+	peer, err := c.verifier.VerifyClient(&c.state)
+	if err != nil || peer.Binding != c.expected {
+		return value.OwnerCertificate{}, value.ErrDenied
+	}
+	return peer, nil
+}
+func (c *OwnerConnection) VerifyCurrentOwner(configuration value.OwnerConfigurationObservation) (value.OwnerCertificate, error) {
+	var zero value.OwnerCertificate
+	initial, err := c.OwnerCertificate()
+	if err != nil {
+		return zero, err
+	}
+	v := c.verifier
+	p := configuration.Configuration.Pool
+	if !configuration.Valid(v.now()) || configuration.Configuration.Suspended || p.InstallationID != initial.Binding.InstallationID || p.ClusterID != initial.Binding.ClusterID || p.IssuerEpoch != initial.Binding.IssuerEpoch {
+		return zero, value.ErrDenied
+	}
+	current, err := v.currentVerifier(configuration)
+	if err != nil {
+		return zero, err
+	}
+	checked, err := current.verify(&c.state, c.usage)
+	if err != nil || checked != initial || !configuration.Valid(v.now()) {
+		return zero, value.ErrDenied
+	}
+	return checked, nil
+}

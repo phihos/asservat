@@ -1,0 +1,83 @@
+# Positive shared context journey — source-only staged candidate
+
+No build, service, Go test or native run has executed for this candidate. No live
+repository files have been changed by this lane. All nine payloads are fixture
+or qualification-selection code; no production behavior/schema/ACL changes.
+
+## Concrete path
+
+The new `--regional-context-start journey` selection owns exactly
+`TestContextAdmissionWithRealServices/native-regional-api-journey` in the existing
+fresh two-cluster PostgreSQL/S3/OpenBao context fixture. Its fixed aggregate
+fixture interval and every existing product five-second/request/worker/native
+limit are unchanged.
+
+The actual shared `NewPublicContextOperations` factory is called once, before
+Preview. Its real C09/C16/C14, SQL52 intent, request-resolution, regional start,
+publication, native runtime and Stop services remain joined to one fixture root.
+The test uses browser and bearer current-request objects through the common
+presentation operation interface; only the final authenticated native HTTP GET
+is an actual public HTTP boundary here. This is not an MCP-wire, browser POST/
+CSRF, real SSO or installed bootstrap qualification claim.
+
+Sequence: browser-shaped Preview → first signed same-port regional Request →
+MCP-shaped accepted resolution → passive same-key Request → independently verify
+and publish the original stored copies → progress/case → actual download Prepare
+which reserves and dispatches its sole session/worker → acknowledged Pending →
+explicit same-key Prepare with live routed TLS enrollment of that same worker →
+three positively joined native conversations and exact original capture bytes
+through authenticated h2 HTTP → prepaid Stop of the already-completed session →
+current identity revocation denies case/progress/download metadata and HTTP.
+Stop-after-completion covers `AlreadyTerminal` and retained accounting; it does
+not claim active-transfer cancellation, which has separate existing fixtures.
+
+Artifact keys are selected before acquisition. Captured ciphertext, original
+registration/copies, case/capture/artifact/session/worker IDs are neither reseeded
+nor rewrapped. Final SQL counts require one capture, catalog artifact, download
+session and worker, exactly seven used preparation-key bits and one collector
+call. Anonymous HTTP is denied before the positive exact-byte download. Original
+session creation/deadline/scope and all spend survive Pending continuation/Stop.
+
+## Existing fixture authority and ownership
+
+The existing synthetic human/session, accepted installation policy/readiness,
+recovery/bootstrap, qualified storage/backing, Job/Pod proof and CA remain
+explicitly synthetic. Real production adapters supply SQL admission/current
+checks, encrypted object audit, workload API collection, independent publication,
+worker enrollment/activation, remote three-slot key authority and native relay.
+No inert operation-success implementation is introduced. The serialized Job
+fixture receives only the actual dispatcher-created SQL intent and delegates to
+the original synthetic Job implementation.
+
+A pre-existing source-owner loop spans setup and request lifetime. Retention
+readers in this lane use accepted read-only sources, with the fixture loop as
+retention writer. The separate existing regional-owner fixture owns its own
+source loop. Neither loop renews caller, evidence, worker or operation intervals.
+All constructed SQL pools have test cleanup; the source-owner defer cancels and
+joins before pools close. The Prepare goroutine has unconditional cancellation
+and joining, even when credential setup fails. The native worker has an owned
+cancel/join and all three conversations must positively join on success. Native
+result closes/joins, listeners close/join via existing helpers, and credential
+signers close. Parent outer native wrapper remains responsible for process-group,
+Docker, exact source archive and scratch cleanup verification.
+
+The profile-scoped enrollment helper, concrete capture-service constructor and
+root/installation audit constructor were extracted additively; original fixture
+entrypoints preserve their previous inputs/behaviors. The original audit helper
+still funds eight normal records. The journey funds 32 up front for its finite
+whole path, before Preview; it performs no later replenishment or envelope change.
+
+## Qualification after review/integration
+
+1. Integration package compile (`go test -run '^$' ./test/integration`), affected
+   bootstrap/presentation/capture/evidence packages as parent selects, full vet.
+2. Pure `python scripts/test-regional-context-selection.py`, canonical gates.
+3. Sole native slot: `python scripts/test-context-storage.py --regional-context-start journey`.
+   Require the exact named child PASS, real terminal exit, frozen source/doc
+   hashes, positive process/Docker/scratch cleanup through parent-owned wrapper.
+4. Original regional first/continuation and native-content component paths remain
+   regression obligations because the fixture helper extractions are shared.
+
+The source-only checks performed here are gofmt, Python AST parsing, exact base/
+payload hashes, constructor/SQL/contract source inspection. Availability under
+unchanged real deadlines and runtime success are still unknown until actual gates.

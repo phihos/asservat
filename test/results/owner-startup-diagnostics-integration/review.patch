@@ -1,0 +1,1778 @@
+--- a/cmd/asservat/main.go
++++ b/cmd/asservat/main.go
+@@ -51,6 +51,10 @@
+ 		return 0
+ 	}
+ 	if err != nil {
++		if os.Args[1] == "hub-api" {
++			fmt.Fprintln(os.Stderr, bootstrap.OwnerStartupDiagnostic(err))
++			return 1
++		}
+ 		if os.Args[1] == "configuration-role-install" {
+ 			fmt.Fprintln(os.Stderr, bootstrap.ConfigurationRoleInstallerRemedy(err))
+ 			return 1
+--- a/docs/architecture/owner-startup.md
++++ b/docs/architecture/owner-startup.md
+@@ -52,3 +52,32 @@
+ creating authority adapters. Receipt-driven later backend transition and actual
+ installed observation qualification remain required; the full runtime retains
+ its existing mandatory dependencies.
++
++## Operator startup diagnostics
++
++The private `hub-api` command reports one closed startup record before a nonzero
++failure exit. Its fixed `phase` identifies the loader, current native identity
++check, one of the four SQL credential roles, accepted configuration, provider
++setup, initial paired identity, or subsequent serving phase. `native` and
++`detail` distinguish token review, original journal, mounted configuration and
++credentials, Deployment/account/live-Pod identity, and final guard/deadline
++checks. An existing accepted-configuration SQL diagnostic contributes its fixed
++check and reason. Unknown causes remain `other` or `unavailable`; a category is
++not a claim about an unobserved root cause.
++
++Operator logs contain no underlying error text, endpoints, identifiers, paths,
++credentials, mounted values, hashes, tokens or query strings. Internally the
++original error chain remains available to `errors.Is`/`errors.As`. Classification
++adds no reads, retries, clock samples, authority or observation freshness. The
++same original deadlines, constructor branches, cleanup and nonzero exits apply.
++Use the named phase to check the original installation projection, its current
++Pod/admission protection, the generated SQL role, or current source/recovery
++state. Do not replace a failed original object or grant broader privileges to
++make startup proceed.
++
++On an original owner process failure, the native fixture reads at most 8 KiB
++from each current and previous `hub` log under one original-caller-bounded
++five-second interval. It checks the original Pod UID before and after, keeps
++only the closed diagnostic record, discards unrelated output and preserves the
++failure. These reads are diagnostics, never identity or availability proof.
++Component and installed qualification for this diagnostic change are pending.
+--- a/internal/adapters/kubernetes/owner_identity_objects.go
++++ b/internal/adapters/kubernetes/owner_identity_objects.go
+@@ -26,41 +26,51 @@
+ 	return v
+ }
+ 
+-func (s *InstalledOwnerIdentityReader) projections(ctx context.Context, state contracts.InitialRuntimeResourceState, m contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) error {
++func (s *InstalledOwnerIdentityReader) projections(ctx context.Context, state contracts.InitialRuntimeResourceState, m contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (err error) {
++	check := ownerReadProjectionReceipt
++	defer ownerReadAnnotate(&check, &err)
+ 	in, p := s.activation.Input, state.OwnerIdentity
+ 	if p == nil || p.Receipt == nil || p.Configuration == nil || p.Credentials == nil {
+ 		return cfg.ErrUnavailable
+ 	}
+ 	prefix := "/api/v1/namespaces/" + in.Namespace.Name
++	check = ownerReadConfigurationRead
+ 	var config core.ConfigMap
+ 	if e := s.get(ctx, prefix+"/configmaps/"+p.Receipt.Configuration.Name, &config); e != nil {
+ 		return e
+ 	}
++	check = ownerReadConfigurationMetadata
+ 	if config.APIVersion != "v1" || config.Kind != "ConfigMap" || !ownerMetadata(config.ObjectMeta, in.Namespace.Name, p.Receipt.Configuration.Name, p.Receipt.Configuration.UID) || config.ResourceVersion != p.Receipt.ConfigurationResourceVersion || config.Immutable == nil || !*config.Immutable || len(config.OwnerReferences) != 0 || len(config.Finalizers) != 0 || len(config.Labels) != 0 || !equalJSON(config.Annotations, ownerIdentityReaderAnnotations(s.activation, p, p.Configuration)) || len(config.BinaryData) != 0 || len(config.Data) != 1 {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadConfigurationContent
+ 	parsed, e := contracts.DecodeOwnerDeployment(bytes.NewBufferString(config.Data["deployment.json"]))
+ 	if e != nil || !equalJSON(parsed, s.input) {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadConfigurationDigest
+ 	digest, e := ownerIdentityPublicDigest(parsed, m)
+ 	if e != nil || digest != p.PublicDigest {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadCredentialsRead
+ 	var secret core.Secret
+ 	if e = s.get(ctx, prefix+"/secrets/"+p.Receipt.Credentials.Name, &secret); e != nil {
+ 		return e
+ 	}
+ 	defer clearRuntimeProjection(secret.Data)
++	check = ownerReadCredentialsMetadata
+ 	keys := ownerIdentityProjectionKeys(s.input)
+ 	if secret.APIVersion != "v1" || secret.Kind != "Secret" || !ownerMetadata(secret.ObjectMeta, in.Namespace.Name, p.Receipt.Credentials.Name, p.Receipt.Credentials.UID) || secret.ResourceVersion != p.Receipt.CredentialsResourceVersion || secret.Immutable == nil || !*secret.Immutable || secret.Type != core.SecretTypeOpaque || len(secret.OwnerReferences) != 0 || len(secret.Finalizers) != 0 || len(secret.Labels) != 0 || !equalJSON(secret.Annotations, ownerIdentityReaderAnnotations(s.activation, p, p.Credentials)) || len(secret.StringData) != 0 || len(secret.Data) != len(keys) || len(mounted) != len(keys) {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadCredentialsContent
+ 	for _, key := range keys {
+ 		if len(mounted[key]) == 0 || len(mounted[key]) > contracts.OwnerIdentityRoleMaxBytes || !bytes.Equal(secret.Data[key], mounted[key]) {
+ 			return cfg.ErrChanged
+ 		}
+ 	}
++	check = ownerReadCredentialsManifest
+ 	actual, e := contracts.DecodeOwnerIdentityCredentialManifest(bytes.NewReader(secret.Data[contracts.OwnerIdentityRoleManifestFile]))
+ 	if e != nil || !equalJSON(actual, m) {
+ 		return cfg.ErrChanged
+@@ -77,18 +87,23 @@
+ 	return hex.EncodeToString(h[:]), nil
+ }
+ 
+-func (s *InstalledOwnerIdentityReader) deployment(ctx context.Context, state contracts.InitialRuntimeResourceState) error {
++func (s *InstalledOwnerIdentityReader) deployment(ctx context.Context, state contracts.InitialRuntimeResourceState) (err error) {
++	check := ownerReadLaunchReceipt
++	defer ownerReadAnnotate(&check, &err)
+ 	in, l := s.activation.Input, state.OwnerLaunch
+ 	if l == nil || l.Receipt == nil {
+ 		return cfg.ErrUnavailable
+ 	}
++	check = ownerReadDeploymentRead
+ 	var d apps.Deployment
+ 	if e := s.get(ctx, "/apis/apps/v1/namespaces/"+in.Namespace.Name+"/deployments/"+in.Deployment.Name, &d); e != nil {
+ 		return e
+ 	}
++	check = ownerReadDeploymentMetadata
+ 	if d.APIVersion != "apps/v1" || d.Kind != "Deployment" || !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Generation != l.Receipt.Generation || d.ResourceVersion == l.InertResourceVersion || len(d.Spec.Template.Spec.Containers) != 1 || d.Spec.Replicas == nil || *d.Spec.Replicas != 1 || d.Annotations[initialRuntimeResourceMarker] != state.Objects[10].OperationID || d.Annotations[ownerIdentityLaunchMarker] != l.OperationID {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadDeploymentRevision
+ 	count := 2
+ 	if revision, ok := d.Annotations["deployment.kubernetes.io/revision"]; ok {
+ 		if revision != "1" {
+@@ -96,13 +111,16 @@
+ 		}
+ 		count++
+ 	}
++	check = ownerReadDeploymentAnnotations
+ 	if len(d.Annotations) != count {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadDeploymentRunningDigest
+ 	running, e := ownerIdentitySpecDigest(d)
+ 	if e != nil || running != l.RunningDigest {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadDeploymentInertDigest
+ 	copy := d.DeepCopy()
+ 	*copy.Spec.Replicas = 0
+ 	inert, e := ownerIdentitySpecDigest(*copy)
+@@ -112,6 +130,7 @@
+ 	n := runtimeResourceNames(in.InstallationID)
+ 	plan := OwnerWorkloadPlan{InstallationID: in.InstallationID, Namespace: in.Namespace.Name, Name: n.Owner, ServiceAccount: n.Owner, Configuration: n.OwnerInputs, Credentials: n.OwnerProviders, WorkloadGuard: n.WorkloadGuard, Image: d.Spec.Template.Spec.Containers[0].Image}
+ 	var want *OwnerWorkload
++	check = ownerReadDeploymentProviderBinding
+ 	if in.OwnerLayout == contracts.OwnerProviderInstalledLayout {
+ 		if !ownerProviderJournalBound(s.input, s.activation, state) {
+ 			return cfg.ErrChanged
+@@ -120,17 +139,21 @@
+ 	} else {
+ 		want, e = BuildInstalledOwnerWorkload(plan)
+ 	}
++	check = ownerReadDeploymentTemplateDigest
+ 	if e != nil || preparationDigest(want.Deployment) != state.Objects[10].TemplateDigest || preparationDigest(want.Account) != state.Objects[0].TemplateDigest {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadDeploymentTemplate
+ 	copy.Annotations = nil
+ 	if normalizeInitialRuntimeObject(copy) != nil || normalizeInitialRuntimeObject(want.Deployment) != nil || !equalJSON(copy, want.Deployment) {
+ 		return cfg.ErrChanged
+ 	}
++	check = ownerReadAccountRead
+ 	var account core.ServiceAccount
+ 	if e = s.get(ctx, "/api/v1/namespaces/"+in.Namespace.Name+"/serviceaccounts/"+in.ServiceAccount.Name, &account); e != nil {
+ 		return e
+ 	}
++	check = ownerReadAccountContent
+ 	c := state.Objects[0]
+ 	return workerOriginalObject(&account, want.Account, contracts.PublicRuntimeWorkerObject{Reference: in.ServiceAccount, OperationID: c.OperationID, TemplateDigest: c.TemplateDigest}, in.Namespace.Name)
+ }
+--- a/internal/adapters/kubernetes/owner_identity_objects_test.go
++++ b/internal/adapters/kubernetes/owner_identity_objects_test.go
+@@ -4,6 +4,7 @@
+ 	"context"
+ 	"encoding/json"
+ 	"encoding/pem"
++	"errors"
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"strings"
+@@ -182,6 +183,25 @@
+ 			if mode == "valid" && e != nil {
+ 				t.Fatal("original mounted objects denied", e)
+ 			}
++			if mode != "valid" {
++				var failure *OwnerIdentityReadFailure
++				if !errors.As(e, &failure) {
++					t.Fatal("missing closed object diagnostic", e)
++				}
++				expected := map[string]OwnerIdentityReadCheck{
++					"missing-child-marker": ownerReadCredentialsMetadata, "swapped-child-marker": ownerReadConfigurationMetadata,
++					"missing-projection-receipt": ownerReadJournalState, "missing-launch-receipt": ownerReadJournalState,
++					"journal-replacement": ownerReadJournalMetadata, "role-root-substitution": ownerReadJournalState,
++					"mutable-provider": ownerReadCredentialsMetadata, "provider-replacement": ownerReadCredentialsMetadata,
++					"different-mounted-credential": ownerReadCredentialsContent, "extra-mounted-credential": ownerReadCredentialsMetadata,
++					"config-substitution": ownerReadConfigurationContent, "late": ownerReadJournalRead,
++					"new-image": ownerReadDeploymentRunningDigest, "scaled": ownerReadDeploymentMetadata,
++					"launch-substitution": ownerReadDeploymentMetadata, "account-replacement": ownerReadAccountContent,
++				}[mode]
++				if failure.Check() != expected {
++					t.Fatalf("wrong native object diagnostic: mode=%s error=%v", mode, e)
++				}
++			}
+ 			if mode != "valid" && e == nil {
+ 				t.Fatal("changed/pending installation accepted")
+ 			}
+--- /dev/null
++++ b/internal/adapters/kubernetes/owner_identity_read_diagnostic.go
+@@ -0,0 +1,178 @@
++package kubernetes
++
++import "errors"
++
++// OwnerIdentityReadCheck is a closed diagnostic vocabulary, not an authority.
++type OwnerIdentityReadCheck uint8
++
++const (
++	ownerReadUnspecified OwnerIdentityReadCheck = iota
++	ownerReadInput
++	ownerReadInitialGuard
++	ownerReadTokenRead
++	ownerReadInitialTokenReview
++	ownerReadTokenInterval
++	ownerReadInitialJournal
++	ownerReadProjections
++	ownerReadInitialDeployment
++	ownerReadInitialPod
++	ownerReadFinalTokenReview
++	ownerReadFinalPod
++	ownerReadFinalDeployment
++	ownerReadFinalJournal
++	ownerReadFinalGuard
++	ownerReadFinalDeadline
++	ownerReadJournalRead
++	ownerReadJournalMetadata
++	ownerReadJournalState
++	ownerReadJournalReceipts
++	ownerReadJournalOriginalPins
++	ownerReadJournalChildNames
++	ownerReadProjectionReceipt
++	ownerReadConfigurationRead
++	ownerReadConfigurationMetadata
++	ownerReadConfigurationContent
++	ownerReadConfigurationDigest
++	ownerReadCredentialsRead
++	ownerReadCredentialsMetadata
++	ownerReadCredentialsContent
++	ownerReadCredentialsManifest
++	ownerReadLaunchReceipt
++	ownerReadDeploymentRead
++	ownerReadDeploymentMetadata
++	ownerReadDeploymentRevision
++	ownerReadDeploymentAnnotations
++	ownerReadDeploymentRunningDigest
++	ownerReadDeploymentInertDigest
++	ownerReadDeploymentProviderBinding
++	ownerReadDeploymentTemplateDigest
++	ownerReadDeploymentTemplate
++	ownerReadAccountRead
++	ownerReadAccountContent
++)
++
++func (v OwnerIdentityReadCheck) String() string {
++	switch v {
++	case ownerReadUnspecified:
++		return "unspecified"
++	case ownerReadInput:
++		return "input"
++	case ownerReadInitialGuard:
++		return "initial-guard"
++	case ownerReadTokenRead:
++		return "token-read"
++	case ownerReadInitialTokenReview:
++		return "initial-token-review"
++	case ownerReadTokenInterval:
++		return "token-interval"
++	case ownerReadInitialJournal:
++		return "initial-journal"
++	case ownerReadProjections:
++		return "projections"
++	case ownerReadInitialDeployment:
++		return "initial-deployment"
++	case ownerReadInitialPod:
++		return "initial-pod"
++	case ownerReadFinalTokenReview:
++		return "final-token-review"
++	case ownerReadFinalPod:
++		return "final-pod"
++	case ownerReadFinalDeployment:
++		return "final-deployment"
++	case ownerReadFinalJournal:
++		return "final-journal"
++	case ownerReadFinalGuard:
++		return "final-guard"
++	case ownerReadFinalDeadline:
++		return "final-deadline"
++	case ownerReadJournalRead:
++		return "journal-read"
++	case ownerReadJournalMetadata:
++		return "journal-metadata"
++	case ownerReadJournalState:
++		return "journal-state"
++	case ownerReadJournalReceipts:
++		return "journal-receipts"
++	case ownerReadJournalOriginalPins:
++		return "journal-original-pins"
++	case ownerReadJournalChildNames:
++		return "journal-child-names"
++	case ownerReadProjectionReceipt:
++		return "projection-receipt"
++	case ownerReadConfigurationRead:
++		return "configuration-read"
++	case ownerReadConfigurationMetadata:
++		return "configuration-metadata"
++	case ownerReadConfigurationContent:
++		return "configuration-content"
++	case ownerReadConfigurationDigest:
++		return "configuration-digest"
++	case ownerReadCredentialsRead:
++		return "credentials-read"
++	case ownerReadCredentialsMetadata:
++		return "credentials-metadata"
++	case ownerReadCredentialsContent:
++		return "credentials-content"
++	case ownerReadCredentialsManifest:
++		return "credentials-manifest"
++	case ownerReadLaunchReceipt:
++		return "launch-receipt"
++	case ownerReadDeploymentRead:
++		return "deployment-read"
++	case ownerReadDeploymentMetadata:
++		return "deployment-metadata"
++	case ownerReadDeploymentRevision:
++		return "deployment-revision"
++	case ownerReadDeploymentAnnotations:
++		return "deployment-annotations"
++	case ownerReadDeploymentRunningDigest:
++		return "deployment-running-digest"
++	case ownerReadDeploymentInertDigest:
++		return "deployment-inert-digest"
++	case ownerReadDeploymentProviderBinding:
++		return "deployment-provider-binding"
++	case ownerReadDeploymentTemplateDigest:
++		return "deployment-template-digest"
++	case ownerReadDeploymentTemplate:
++		return "deployment-template"
++	case ownerReadAccountRead:
++		return "account-read"
++	case ownerReadAccountContent:
++		return "account-content"
++	default:
++		return "unspecified"
++	}
++}
++
++// OwnerIdentityReadFailure retains the original error chain for internal
++// errors.Is checks. Error renders only fixed check names, never its causes.
++type OwnerIdentityReadFailure struct {
++	check OwnerIdentityReadCheck
++	cause error
++}
++
++func (e *OwnerIdentityReadFailure) Check() OwnerIdentityReadCheck {
++	if e == nil {
++		return ownerReadUnspecified
++	}
++	return e.check
++}
++func (e *OwnerIdentityReadFailure) Detail() OwnerIdentityReadCheck {
++	if e == nil {
++		return ownerReadUnspecified
++	}
++	var inner *OwnerIdentityReadFailure
++	if errors.As(e.cause, &inner) {
++		return inner.Check()
++	}
++	return ownerReadUnspecified
++}
++func (e *OwnerIdentityReadFailure) Error() string {
++	return "owner identity unavailable: check=" + e.Check().String() + " detail=" + e.Detail().String()
++}
++func (e *OwnerIdentityReadFailure) Unwrap() error { return e.cause }
++func ownerReadAnnotate(check *OwnerIdentityReadCheck, result *error) {
++	if *result != nil {
++		*result = &OwnerIdentityReadFailure{check: *check, cause: *result}
++	}
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/owner_identity_read_diagnostic_test.go
+@@ -0,0 +1,29 @@
++package kubernetes
++
++import (
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"context"
++	"errors"
++	"testing"
++)
++
++type ownerReadPrivateError struct{}
++
++func (ownerReadPrivateError) Error() string { panic("private cause must never be rendered") }
++func TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks(t *testing.T) {
++	cause := ownerReadPrivateError{}
++	inner := error(errors.Join(cfg.ErrDenied, context.DeadlineExceeded, cause))
++	check := ownerReadCredentialsRead
++	ownerReadAnnotate(&check, &inner)
++	check = ownerReadProjections
++	ownerReadAnnotate(&check, &inner)
++	if inner.Error() != "owner identity unavailable: check=projections detail=credentials-read" || !errors.Is(inner, cause) || !errors.Is(inner, cfg.ErrDenied) || !errors.Is(inner, context.DeadlineExceeded) {
++		t.Fatal("diagnostic lost closed detail or original error identity")
++	}
++	check = OwnerIdentityReadCheck(255)
++	e := error(cause)
++	ownerReadAnnotate(&check, &e)
++	if e.Error() != "owner identity unavailable: check=unspecified detail=unspecified" {
++		t.Fatal("unknown check rendered caller input")
++	}
++}
+--- a/internal/adapters/kubernetes/owner_identity_reader.go
++++ b/internal/adapters/kubernetes/owner_identity_reader.go
+@@ -4,6 +4,7 @@
+ 	"bytes"
+ 	"context"
+ 	"encoding/json"
++	"errors"
+ 	"time"
+ 
+ 	app "asservat.local/asservat/internal/application/fleet"
+@@ -51,7 +52,7 @@
+ 	raw, e := s.client.api.Get().AbsPath(path).MaxRetries(0).DoRaw(ctx)
+ 	defer clear(raw)
+ 	if e != nil {
+-		return cfg.ErrUnavailable
++		return errors.Join(cfg.ErrUnavailable, e)
+ 	}
+ 	if permissionJSON(raw, 1<<20, 131072) != nil || strictGuardJSON(raw, out) != nil {
+ 		return cfg.ErrChanged
+@@ -63,7 +64,9 @@
+ 	return initialHandoverDeadline(ctx, s.client.now, until)
+ }
+ 
+-func (s *InstalledOwnerIdentityReader) journal(ctx context.Context) (contracts.InitialRuntimeResourceState, error) {
++func (s *InstalledOwnerIdentityReader) journal(ctx context.Context) (result contracts.InitialRuntimeResourceState, err error) {
++	check := ownerReadJournalRead
++	defer ownerReadAnnotate(&check, &err)
+ 	var zero contracts.InitialRuntimeResourceState
+ 	a := s.activation
+ 	in := a.Input
+@@ -72,13 +75,16 @@
+ 		return zero, e
+ 	}
+ 	defer clearRuntimeProjection(obj.Data)
++	check = ownerReadJournalMetadata
+ 	if obj.APIVersion != "v1" || obj.Kind != "Secret" || !ownerMetadata(obj.ObjectMeta, in.Namespace.Name, in.Resources.Name, in.Resources.UID) || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || len(obj.Labels) != 0 || len(obj.Annotations) != 0 || obj.Type != core.SecretTypeOpaque || obj.Immutable != nil && *obj.Immutable || len(obj.StringData) != 0 || len(obj.Data) != 1 {
+ 		return zero, cfg.ErrChanged
+ 	}
++	check = ownerReadJournalState
+ 	v, e := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(obj.Data["state.json"]))
+ 	if e != nil || v.Format != contracts.InitialRuntimeResourcesFormat || !ownerProviderJournalBound(s.input, a, v) || v.SetupID != in.ResourceSetupID || v.BindingDigest != in.ResourceBinding || !v.CreatedAt.Equal(a.ResourcesCreatedAt) || !v.Until.Equal(a.ResourcesUntil) || len(v.Objects) != len(initialRuntimeResourceItems) || !workerProjectionStateValid(in.InstallationID, v, s.client.now()) || v.OwnerIdentity == nil || v.OwnerIdentity.Receipt == nil || v.OwnerLaunch == nil || v.OwnerLaunch.Receipt == nil || v.OwnerIdentity.RoleRoot != a.RoleRoot || v.OwnerIdentity.RoleSetupID != a.RoleSetupID {
+ 		return zero, cfg.ErrChanged
+ 	}
++	check = ownerReadJournalReceipts
+ 	ids := map[string]bool{v.SetupID: true}
+ 	uids := map[string]bool{in.Resources.UID: true}
+ 	for i, c := range v.Objects {
+@@ -87,10 +93,12 @@
+ 		}
+ 		ids[c.OperationID], uids[c.Receipt.UID] = true, true
+ 	}
++	check = ownerReadJournalOriginalPins
+ 	if v.Objects[0].Receipt.UID != in.ServiceAccount.UID || v.Objects[10].Receipt.UID != in.Deployment.UID || v.Objects[10].Receipt.Generation != 1 || v.Objects[14].Receipt.UID != in.OwnerConfigurationUID || v.Objects[17].Receipt.UID != s.input.WorkloadGuard.PolicyUID || v.Objects[17].Receipt.Generation != s.input.WorkloadGuard.PolicyGeneration || v.Objects[18].Receipt.UID != s.input.WorkloadGuard.BindingUID || v.Objects[18].Receipt.ResourceVersion != s.input.WorkloadGuard.BindingResourceVersion {
+ 		return zero, cfg.ErrChanged
+ 	}
+ 	n := runtimeResourceNames(in.InstallationID)
++	check = ownerReadJournalChildNames
+ 	if v.OwnerIdentity.Receipt.Configuration.Name != n.OwnerInputs || v.OwnerIdentity.Receipt.Credentials.Name != n.OwnerProviders {
+ 		return zero, cfg.ErrChanged
+ 	}
+@@ -100,7 +108,9 @@
+ // Verify compares the complete fixed mounted provider bundle with the immutable
+ // native Secret and checks the original positive launch. Current configuration,
+ // recovery, exact SQL roles and process registration remain later prerequisites.
+-func (s *InstalledOwnerIdentityReader) Verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (time.Time, error) {
++func (s *InstalledOwnerIdentityReader) Verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (result time.Time, err error) {
++	check := ownerReadInput
++	defer ownerReadAnnotate(&check, &err)
+ 	if s == nil || ctx == nil || ctx.Err() != nil || manifest.Format != contracts.OwnerIdentityCredentialManifestFormat || !equalJSON(manifest.Input, s.activation.Input) || manifest.RootUID != s.activation.RoleRoot.UID || manifest.SetupID != s.activation.RoleSetupID {
+ 		return time.Time{}, cfg.ErrInvalid
+ 	}
+@@ -108,6 +118,7 @@
+ 	call, end := context.WithDeadline(ctx, started.Add(5*time.Second))
+ 	defer end()
+ 	until, _ := call.Deadline()
++	check = ownerReadInitialGuard
+ 	guard, bound, e := s.protection.Current(call)
+ 	if e != nil {
+ 		return time.Time{}, e
+@@ -116,29 +127,35 @@
+ 	call, narrow := context.WithDeadline(call, until)
+ 	defer narrow()
+ 	in := s.activation.Input
++	check = ownerReadTokenRead
+ 	token, e := s.tokens.ReadOwnerPodToken(call)
+ 	defer clear(token)
+ 	if e != nil || len(token) < 1 || len(token) > 16<<10 || !bytes.Equal(bytes.TrimSpace(token), token) {
+-		return time.Time{}, cfg.ErrDenied
+-	}
++		return time.Time{}, errors.Join(cfg.ErrDenied, e)
++	}
++	check = ownerReadInitialTokenReview
+ 	name, e := reviewBoundPodToken(call, s.client, token, OwnerEnrollmentAudience(in.InstallationID), in.Namespace.Name, in.ServiceAccount.Name, in.ServiceAccount.UID, s.podUID)
+ 	if e != nil {
+-		return time.Time{}, cfg.ErrDenied
+-	}
++		return time.Time{}, errors.Join(cfg.ErrDenied, e)
++	}
++	check = ownerReadTokenInterval
+ 	expiry, e := reviewedTokenExpiry(token, s.client.now())
+ 	if e != nil {
+-		return time.Time{}, cfg.ErrDenied
++		return time.Time{}, errors.Join(cfg.ErrDenied, e)
+ 	}
+ 	until = identity.Earlier(until, expiry)
+ 	call, narrowToken := context.WithDeadline(call, until)
+ 	defer narrowToken()
++	check = ownerReadInitialJournal
+ 	before, e := s.journal(call)
+ 	if e != nil {
+ 		return time.Time{}, e
+ 	}
++	check = ownerReadProjections
+ 	if e = s.projections(call, before, manifest, mounted); e != nil {
+ 		return time.Time{}, e
+ 	}
++	check = ownerReadInitialDeployment
+ 	if e = s.deployment(call, before); e != nil {
+ 		return time.Time{}, e
+ 	}
+@@ -146,29 +163,36 @@
+ 	// enrollment proof. Only these independently pinned original fields are used.
+ 	pool := value.OwnerPool{InstallationID: in.InstallationID, ClusterID: in.ClusterID, Namespace: in.Namespace.Name, NamespaceUID: in.Namespace.UID, Deployment: in.Deployment.Name, DeploymentUID: in.Deployment.UID, ServiceAccount: in.ServiceAccount.Name, AccountUID: in.ServiceAccount.UID}
+ 	reader := &OwnerEnrollmentAttester{client: s.client}
++	check = ownerReadInitialPod
+ 	first, e := reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name)
+ 	if e != nil {
+ 		return time.Time{}, e
+ 	}
++	check = ownerReadFinalTokenReview
+ 	again, e := reviewBoundPodToken(call, s.client, token, OwnerEnrollmentAudience(in.InstallationID), in.Namespace.Name, in.ServiceAccount.Name, in.ServiceAccount.UID, s.podUID)
+ 	if e != nil || again != name {
+-		return time.Time{}, cfg.ErrDenied
+-	}
++		return time.Time{}, errors.Join(cfg.ErrDenied, e)
++	}
++	check = ownerReadFinalPod
+ 	last, e := reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name)
+ 	if e != nil || first != last {
+-		return time.Time{}, cfg.ErrChanged
+-	}
++		return time.Time{}, errors.Join(cfg.ErrChanged, e)
++	}
++	check = ownerReadFinalDeployment
+ 	if e = s.deployment(call, before); e != nil {
+ 		return time.Time{}, e
+ 	}
++	check = ownerReadFinalJournal
+ 	after, e := s.journal(call)
+ 	if e != nil || !equalJSON(before, after) {
+-		return time.Time{}, cfg.ErrChanged
+-	}
++		return time.Time{}, errors.Join(cfg.ErrChanged, e)
++	}
++	check = ownerReadFinalGuard
+ 	lastGuard, lastBound, e := s.protection.Current(call)
+ 	if e != nil || guard != lastGuard {
+-		return time.Time{}, cfg.ErrUnavailable
+-	}
++		return time.Time{}, errors.Join(cfg.ErrUnavailable, e)
++	}
++	check = ownerReadFinalDeadline
+ 	until = identity.Earlier(until, lastBound)
+ 	if e = initialHandoverDeadline(call, s.client.now, until); e != nil {
+ 		return time.Time{}, e
+--- a/internal/adapters/kubernetes/owner_identity_reader_test.go
++++ b/internal/adapters/kubernetes/owner_identity_reader_test.go
+@@ -4,6 +4,7 @@
+ 	"context"
+ 	"encoding/base64"
+ 	"encoding/json"
++	"errors"
+ 	"net/http"
+ 	"strings"
+ 	"sync/atomic"
+@@ -21,7 +22,7 @@
+ )
+ 
+ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
+-	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled"} {
++	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "token-read-error", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled"} {
+ 		t.Run(mode, func(t *testing.T) {
+ 			x := newOwnerIdentityObjectFixture(t)
+ 			in := x.reader.input
+@@ -119,7 +120,12 @@
+ 			if e != nil {
+ 				t.Fatal(e)
+ 			}
+-			reader, e := NewInstalledOwnerIdentityReader(x.reader.client, guard, in, a, ownerTokenFunc(func(context.Context) ([]byte, error) { return append([]byte(nil), token...), nil }), x.reader.podUID)
++			reader, e := NewInstalledOwnerIdentityReader(x.reader.client, guard, in, a, ownerTokenFunc(func(context.Context) ([]byte, error) {
++				if mode == "token-read-error" {
++					return nil, context.DeadlineExceeded
++				}
++				return append([]byte(nil), token...), nil
++			}), x.reader.podUID)
+ 			if e != nil {
+ 				t.Fatal(e)
+ 			}
+@@ -137,6 +143,21 @@
+ 			} else if e == nil {
+ 				t.Fatal("unavailable/replaced/revoked proof accepted")
+ 			}
++			if mode != "valid" {
++				expected := map[string]OwnerIdentityReadCheck{
++					"guard-missing": ownerReadInitialGuard, "guard-lost": ownerReadFinalGuard, "allowing-probe": ownerReadInitialGuard,
++					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview, "token-revoked": ownerReadFinalTokenReview,
++					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
++					"late-guard": ownerReadFinalPod, "cancelled": ownerReadInput,
++				}[mode]
++				var failure *OwnerIdentityReadFailure
++				if !errors.As(e, &failure) || failure.Check() != expected {
++					t.Fatalf("wrong native diagnostic: mode=%s error=%v", mode, e)
++				}
++				if mode == "token-read-error" && !errors.Is(e, context.DeadlineExceeded) {
++					t.Fatal("original token error identity lost")
++				}
++			}
+ 			if e != nil && strings.Contains(e.Error(), string(token)) {
+ 				t.Fatal("token leaked")
+ 			}
+--- a/internal/bootstrap/hub_api.go
++++ b/internal/bootstrap/hub_api.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"net"
+ 	"os"
+ 	"strconv"
+@@ -14,50 +15,61 @@
+ // MCP, federation ingress and evidence flows are not enabled by this entry point.
+ // The installer owns the fixed protected projection; no flag or user request
+ // can replace a provider endpoint, credential path or startup trust source.
+-func RunHubAPI(ctx context.Context, podUID string) error {
++func RunHubAPI(ctx context.Context, podUID string) (result error) {
++	phase, purpose := startupFiles, "none"
++	defer ownerStartupAnnotate(&phase, &purpose, &result)
+ 	files, err := os.OpenRoot(contracts.OwnerDeploymentRoot)
+ 	if err != nil {
+-		return mounts.ErrUnavailable
++		return errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	defer files.Close()
+ 	// Select only the explicit original public mode before unrelated credentials
+ 	// or worker/native constructors. The concrete loader independently verifies
+ 	// actual installation receipts and current identity before any SQL authority.
++	phase = startupInputs
+ 	mode, err := readOwnerInputs(ctx, files)
+ 	if err != nil {
+-		return mounts.ErrUnavailable
++		return errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	if mode.config.Observation != nil {
++		phase = startupObservationRuntime
+ 		d, err := NewOwnerObservationDeployment(ctx, files, podUID)
+ 		if err != nil {
+-			return mounts.ErrUnavailable
++			return errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		defer d.Close()
++		phase = startupObservationListener
+ 		listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.NativePort)))
+ 		if err != nil {
+-			return mounts.ErrUnavailable
++			return errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		defer listener.Close()
++		phase = startupRuntimeSupervisor
+ 		return d.Run(listener)
+ 	}
+ 
++	phase = startupFullDeployment
+ 	d, err := NewOwnerDeployment(ctx, files, podUID)
+ 	if err != nil {
+-		return mounts.ErrUnavailable
++		return errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	defer d.Close()
++	phase = startupFullListener
+ 	listener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.Port)))
+ 	if err != nil {
+-		return mounts.ErrUnavailable
++		return errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	defer listener.Close()
+ 	if d.Runtime.pool.NativePort != 0 {
++		phase = startupNativeListener
+ 		nativeListener, err := (&net.ListenConfig{KeepAlive: -1}).Listen(ctx, "tcp", net.JoinHostPort("", strconv.Itoa(d.Runtime.pool.NativePort)))
+ 		if err != nil {
+-			return mounts.ErrUnavailable
++			return errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		defer nativeListener.Close()
++		phase = startupFullRuntime
+ 		return d.Run(listener, nativeListener)
+ 	}
++	phase = startupFullRuntime
+ 	return d.Run(listener)
+ }
+--- a/internal/bootstrap/owner_observation_deployment.go
++++ b/internal/bootstrap/owner_observation_deployment.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"net"
+ 	"os"
+ 	"sync"
+@@ -36,16 +37,20 @@
+ 	closeErr  error
+ }
+ 
+-func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerObservationDeployment, error) {
++func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (result *OwnerObservationDeployment, err error) {
++	phase, purpose := startupProcessPreconditions, "none"
++	defer ownerStartupAnnotate(&phase, &purpose, &err)
+ 	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupInputs
+ 	in, err := readOwnerInputs(ctx, files)
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	phase = startupDeploymentMode
+ 	if in.config.Observation == nil || in.config.Native != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	root, cancel := context.WithCancel(ctx)
+ 	// The base owns provider pools/HTTP clients only. Its Runtime and Router stay
+@@ -64,13 +69,15 @@
+ 	c := in.config
+ 	activation := *c.Observation.Activation
+ 	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
++	phase = startupObserverClient
+ 	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupProbeClient
+ 	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	actors := make([]configuration.KubernetesActor, len(c.WorkloadGuard.Administrators))
+ 	for i, a := range c.WorkloadGuard.Administrators {
+@@ -89,35 +96,41 @@
+ 	if p := c.InitialHistoryProbe; p != nil {
+ 		initialHistory = &configuration.OwnerInitialHistoryProbe{Namespace: configuration.NamespaceRef{Name: p.Namespace.Name, UID: p.Namespace.UID}, ServiceAccount: p.ServiceAccount.Name, ServiceAccountUID: p.ServiceAccount.UID, Configuration: p.Configuration}
+ 	}
++	phase = startupStartInputs
+ 	starts, err := ownerDeploymentStarts(c.APIContextStarts)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupCapacityInputs
+ 	capacityProbe, err := ownerDeploymentCapacityProbe(c.CapacityProbe)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupWorkloadGuard
+ 	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: activation.Input.Deployment.Name, DeploymentUID: activation.Input.Deployment.UID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
+-
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++
++	phase = startupMountedIdentity
+ 	mounted, manifest, err := readSelectedOwnerIdentityProviders(startup, files, c)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	defer func() {
+ 		for _, b := range mounted {
+ 			clear(b)
+ 		}
+ 	}()
++	phase = startupIdentityReader
+ 	identityReader, err := kube.NewInstalledOwnerIdentityReader(observer, guard, c, activation, mountedOwnerPodToken{in}, podUID)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupNativeIdentity
+ 	identityUntil, err := identityReader.Verify(startup, manifest, mounted)
+ 	if err != nil || !time.Now().Before(identityUntil) {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	// SQL credentials are not used until the exact current original projection,
+ 	// live Pod/token and native guard have been independently established. Every
+@@ -128,98 +141,120 @@
+ 	users := map[string]bool{}
+ 	roles := []string{"enrollment", "audit", "activation", "registry"}
+ 	for _, role := range roles {
++		purpose = role
++		phase = startupSqlCredential
+ 		c, err := in.sqlConfig(verified, "sql-"+role+".json")
+ 		if err != nil || c == nil || users[c.ConnConfig.User] {
+-			return nil, mounts.ErrUnavailable
+-		}
++			return nil, errors.Join(mounts.ErrUnavailable, err)
++		}
++		phase = startupSqlRoleName
+ 		expected, known := postgres.OwnerIdentityRoleName(in.config.InstallationID, role)
+ 		if !known || c.ConnConfig.User != expected {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		c.MaxConns, c.MinConns = 1, 0
+ 		c.ConnConfig.RequireAuth = "scram-sha-256"
+ 		users[c.ConnConfig.User] = true
++		phase = startupSqlPool
+ 		pool, err := pgxpool.NewWithConfig(verified, c)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		pools[role] = pool
+ 		d.closers = append(d.closers, pool.Close)
+-		if postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role) != nil {
+-			return nil, mounts.ErrUnavailable
+-		}
+-	}
++		phase = startupSqlRoleProof
++		if err = postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role); err != nil {
++			return nil, errors.Join(mounts.ErrUnavailable, err)
++		}
++	}
++	purpose = "none"
++	phase = startupConfigurationReader
+ 	configs, err := postgres.NewOwnerConfigurations(verified, pools["registry"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupAcceptedConfiguration
+ 	current, err := configs.ReadOwnerConfiguration(verified)
+ 	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupOriginalPool
+ 	pool := current.Configuration.Pool
+ 	if pool.Deployment != activation.Input.Deployment.Name || pool.DeploymentUID != activation.Input.Deployment.UID || pool.ServiceAccount != activation.Input.ServiceAccount.Name || pool.AccountUID != activation.Input.ServiceAccount.UID || verified.Err() != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupIssuerRoots
+ 	roots, _, err := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	ledgers := map[string]*postgres.OwnerEnrollments{}
+ 	for _, role := range []string{"enrollment", "audit", "activation", "registry"} {
++		purpose = role
++		phase = startupEnrollmentLedger
+ 		l, err := postgres.NewOwnerEnrollments(verified, pools[role], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID, ownerRandomID)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		ledgers[role] = l
+ 	}
++	purpose = "none"
++	phase = startupEnrollmentAttester
+ 	proofs, err := kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupEndpoints
+ 	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	routes := &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}
+ 	var audits auditapp.OwnerEnrollmentWriter
+ 	issuers := map[string]*kms.OwnerCertificateIssuer{}
+ 	if c.ProviderAuthentication != nil {
++		phase = startupProviderEffects
+ 		out.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, identityReader, configs, current.Configuration)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
+-		}
++			return nil, errors.Join(mounts.ErrUnavailable, err)
++		}
++		phase = startupProviderAudit
+ 		auditObjects, e := newInstalledOwnerEnrollmentAudit(c, out.providers)
+ 		if e != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, e)
+ 		}
+ 		audits = auditObjects
+ 		d.closers = append(d.closers, auditObjects.Close)
+ 		issuers["server"], issuers["client"] = out.providers.ServerIssuer(), out.providers.ClientIssuer()
+ 	} else {
++		phase = startupAuditHttp
+ 		h, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 		d.closers = append(d.closers, h.CloseIdleConnections)
++		phase = startupAuditSealer
+ 		seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), h)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		d.closers = append(d.closers, seal.Close)
++		phase = startupAuditOpener
+ 		open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), h)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		d.closers = append(d.closers, open.Close)
++		phase = startupAuditStoreHttp
+ 		storageHTTP, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 		d.closers = append(d.closers, storageHTTP.CloseIdleConnections)
++		phase = startupAuditStore
+ 		store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, mountedStorage{in.providerInputs}, storageHTTP)
+ 		if err != nil {
+-			return nil, mounts.ErrUnavailable
++			return nil, errors.Join(mounts.ErrUnavailable, err)
+ 		}
+ 		d.closers = append(d.closers, store.Close)
+ 		audits = &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: seal, Open: open}
+@@ -228,17 +263,20 @@
+ 			if usage == "client" {
+ 				role = c.KeyService.ClientRole
+ 			}
++			phase, purpose = startupCertificateIssuer, usage
+ 			issuer, e := kms.NewOwnerCertificateIssuerForPoolWithTokenSource(c.KeyService.Endpoint, c.KeyService.PKIMount, role, pool, usage, roots, in.token("owner-"+usage+"-sign.token"), h, time.Now)
+ 			if e != nil {
+-				return nil, mounts.ErrUnavailable
++				return nil, errors.Join(mounts.ErrUnavailable, e)
+ 			}
+ 			d.closers = append(d.closers, issuer.Close)
+ 			issuers[usage] = issuer
+ 		}
+ 	}
++	purpose = "none"
++	phase = startupPeerVerifier
+ 	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pool, time.Now)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	services := map[string]*app.OwnerEnrollmentCoordinator{}
+ 	for _, usage := range []string{"server", "client"} {
+@@ -246,17 +284,20 @@
+ 		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuer, Now: time.Now}
+ 	}
+ 
++	phase = startupObservationInputs
+ 	pin, peers, err := ownerObservationConfig(c, pool)
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	phase = startupObservationWorkload
+ 	workload, err := kube.NewOwnerObservationWorkload(observer, guard, pin)
+ 	if err != nil {
+-		return nil, mounts.ErrUnavailable
+-	}
++		return nil, errors.Join(mounts.ErrUnavailable, err)
++	}
++	phase = startupObservationRuntime
+ 	out.Runtime, err = newOwnerObservationRuntime(root, verified, OwnerObservationRuntimeConfig{Pin: pin, PodUID: podUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Workloads: workload, Peers: peers, Connections: c.Connections, Concurrency: c.Concurrency})
+ 	if err != nil || verified.Err() != nil {
+-		return nil, mounts.ErrUnavailable
++		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	complete = true
+ 	return out, nil
+@@ -290,6 +331,8 @@
+ 	})
+ }
+ func (d *OwnerObservationDeployment) Run(listener net.Listener) (result error) {
++	phase, purpose := startupRunPreconditions, "none"
++	defer ownerStartupAnnotate(&phase, &purpose, &result)
+ 	if d == nil || d.Runtime == nil || d.base == nil || d.base.root == nil || listener == nil {
+ 		return mounts.ErrUnavailable
+ 	}
+@@ -307,12 +350,15 @@
+ 		d.owners.Done()
+ 		d.Close()
+ 		if d.closeErr != nil {
++			phase = startupProviderClose
+ 			result = d.closeErr
+ 		}
+ 	}()
+ 	if d.providers == nil {
++		phase = startupRuntimeSupervisor
+ 		return d.Runtime.Run(listener)
+ 	}
++	phase = startupProviderPrime
+ 	if err := d.providers.Prime(d.base.root); err != nil {
+ 		_ = listener.Close()
+ 		return err
+@@ -323,10 +369,12 @@
+ 	go func() { runtimeDone <- d.Runtime.Run(listener) }()
+ 	select {
+ 	case result = <-runtimeDone:
++		phase = startupRuntimeSupervisor
+ 		d.base.cancel()
+ 		d.Runtime.Close()
+ 		<-providerDone
+ 	case result = <-providerDone:
++		phase = startupProviderSupervisor
+ 		d.base.cancel()
+ 		d.Runtime.Close()
+ 		<-runtimeDone
+--- a/internal/bootstrap/owner_observation_runtime.go
++++ b/internal/bootstrap/owner_observation_runtime.go
+@@ -3,6 +3,7 @@
+ import (
+ 	"context"
+ 	"crypto/x509"
++	"errors"
+ 	mathrand "math/rand/v2"
+ 	"net"
+ 	"strconv"
+@@ -55,21 +56,26 @@
+ 
+ // setup preserves the installed loader's independently observed original proof
+ // deadline without making it the lifetime of the supervised process.
+-func newOwnerObservationRuntime(ctx, setup context.Context, c OwnerObservationRuntimeConfig) (*OwnerObservationRuntime, error) {
++func newOwnerObservationRuntime(ctx, setup context.Context, c OwnerObservationRuntimeConfig) (result *OwnerObservationRuntime, err error) {
++	phase, purpose := startupRuntimeInputs, "none"
++	defer ownerStartupAnnotate(&phase, &purpose, &err)
+ 	if ctx == nil || ctx.Err() != nil || setup == nil || setup.Err() != nil || !c.Pin.Valid() || !authorization.UUID(c.PodUID) || c.Configuration == nil || c.ServerEnrollment == nil || c.ClientEnrollment == nil || c.Registry == nil || c.Proofs == nil || c.Routes == nil || c.Protection == nil || c.Workloads == nil || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections || len(c.Peers) < 1 || len(c.Peers) > 16 {
+ 		return nil, value.ErrInvalid
+ 	}
++	phase = startupRuntimeConfiguration
+ 	read, end := context.WithTimeout(setup, 5*time.Second)
+ 	current, e := c.Configuration.ReadOwnerConfiguration(read)
+ 	readErr := read.Err()
+ 	end()
+ 	if e != nil || readErr != nil || ctx.Err() != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool != c.Pin.Pool || current.Configuration.Revision.UID != c.Pin.SourceUID {
+-		return nil, value.ErrUnavailable
+-	}
++		return nil, errors.Join(value.ErrUnavailable, e, readErr)
++	}
++	phase = startupRuntimeRoots
+ 	roots, _, e := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+ 	if e != nil || disableWorkerCoreDumps() != nil {
+-		return nil, value.ErrUnavailable
+-	}
++		return nil, errors.Join(value.ErrUnavailable, e)
++	}
++	phase = startupRuntimeEpoch
+ 	epoch := ownerRandomID()
+ 	if !authorization.UUID(epoch) {
+ 		return nil, value.ErrUnavailable
+@@ -84,31 +90,38 @@
+ 			r.Close()
+ 		}
+ 	}()
++	phase = startupServerCredentials
+ 	r.server, e = mtls.NewOwnerCredentialsForPool(binding, "server", p, roots, c.ServerEnrollment, c.Registry, time.Now)
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = startupClientCredentials
+ 	r.client, e = mtls.NewOwnerCredentialsForPool(binding, "client", p, roots, c.ClientEnrollment, c.Registry, time.Now)
+ 	if e != nil {
+ 		return nil, e
+ 	}
+ 	gate := &app.OwnerAuthenticator{Registry: c.Registry, Routes: c.Routes, Protection: c.Protection, Now: time.Now}
++	phase = startupObservationIngress
+ 	ingress, e := mtls.NewOwnerObservationIngress(c.Pin, r.server, gate, c.Workloads, c.Peers, time.Now)
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = startupServerName
+ 	name, e := mtls.OwnerBootstrapServerName(p)
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = startupObservationHandler
+ 	r.handler, e = clusterobservation.NewOwnerHandler(root, net.JoinHostPort(name, strconv.Itoa(p.NativePort)), ingress, c.Concurrency, time.Now)
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = startupBootstrapServing
+ 	r.serving, e = mtls.NewOwnerBootstrapServing(r.server, p)
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	phase = startupPeerRoots
+ 	r.roots = x509.NewCertPool()
+ 	for _, peer := range c.Peers {
+ 		// This union is solely TLS pre-authentication. The ingress selects and
+@@ -125,6 +138,7 @@
+ 		}
+ 	}
+ 	r.readiness = app.OwnerStartupReadiness{Binding: binding, Pool: p, Server: r.server, Client: r.client, Registry: c.Registry, Proofs: c.Proofs, Now: time.Now}
++	phase = startupRuntimeDeadline
+ 	if root.Err() != nil || setup.Err() != nil || !current.Valid(time.Now()) {
+ 		return nil, value.ErrUnavailable
+ 	}
+@@ -177,7 +191,9 @@
+ // Run owns only the original NativePort listener. The ordinary owner port and
+ // future public port are reserved installation facts, never served as dummy
+ // endpoints. No full runtime is manufactured from missing backend credentials.
+-func (r *OwnerObservationRuntime) Run(listener net.Listener) error {
++func (r *OwnerObservationRuntime) Run(listener net.Listener) (result error) {
++	phase, purpose := startupRunPreconditions, "none"
++	defer ownerStartupAnnotate(&phase, &purpose, &result)
+ 	if r == nil || listener == nil {
+ 		return value.ErrInvalid
+ 	}
+@@ -197,6 +213,7 @@
+ 			running--
+ 		}
+ 	}()
++	phase = startupInitialIdentity
+ 	ready := make(chan app.OwnerCredentialStatus, 1)
+ 	supervisor := app.OwnerCredentialSupervisor{Server: r.server, Client: r.client, Binding: r.binding, Now: time.Now, Wait: waitWorker, Jitter: func() time.Duration { return time.Duration(mathrand.Int64N(int64(500 * time.Millisecond))) }, IdentityReady: ready}
+ 	launch(func() error { return supervisor.Run(r.root) })
+@@ -211,6 +228,7 @@
+ 		return e
+ 	case <-ready:
+ 	}
++	phase = startupRuntimeServing
+ 	launch(func() error {
+ 		return native.ServeOwnerObservation(r.root, listener, r.roots, r.serving, r.handler, r.connections)
+ 	})
+--- /dev/null
++++ b/internal/bootstrap/owner_startup_diagnostic.go
+@@ -0,0 +1,353 @@
++package bootstrap
++
++import (
++	kube "asservat.local/asservat/internal/adapters/kubernetes"
++	"asservat.local/asservat/internal/adapters/mounts"
++	"asservat.local/asservat/internal/adapters/postgres"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"context"
++	"errors"
++	apierrors "k8s.io/apimachinery/pkg/api/errors"
++	"strings"
++)
++
++type ownerStartupPhase uint8
++
++const (
++	startupUnspecified ownerStartupPhase = iota
++	startupFiles
++	startupInputs
++	startupDeploymentMode
++	startupProcessPreconditions
++	startupObserverClient
++	startupProbeClient
++	startupStartInputs
++	startupCapacityInputs
++	startupWorkloadGuard
++	startupMountedIdentity
++	startupIdentityReader
++	startupNativeIdentity
++	startupSqlCredential
++	startupSqlRoleName
++	startupSqlPool
++	startupSqlRoleProof
++	startupConfigurationReader
++	startupAcceptedConfiguration
++	startupOriginalPool
++	startupIssuerRoots
++	startupEnrollmentLedger
++	startupEnrollmentAttester
++	startupEndpoints
++	startupProviderEffects
++	startupProviderAudit
++	startupAuditHttp
++	startupAuditSealer
++	startupAuditOpener
++	startupAuditStoreHttp
++	startupAuditStore
++	startupCertificateIssuer
++	startupPeerVerifier
++	startupObservationInputs
++	startupObservationWorkload
++	startupObservationRuntime
++	startupConstructorDeadline
++	startupObservationListener
++	startupFullDeployment
++	startupFullListener
++	startupNativeListener
++	startupFullRuntime
++	startupProviderPrime
++	startupProviderSupervisor
++	startupRuntimeSupervisor
++	startupProviderClose
++	startupRunPreconditions
++	startupRuntimeInputs
++	startupRuntimeConfiguration
++	startupRuntimeRoots
++	startupRuntimeEpoch
++	startupServerCredentials
++	startupClientCredentials
++	startupObservationIngress
++	startupServerName
++	startupObservationHandler
++	startupBootstrapServing
++	startupPeerRoots
++	startupRuntimeDeadline
++	startupInitialIdentity
++	startupRuntimeServing
++)
++
++func (v ownerStartupPhase) String() string {
++	switch v {
++	case startupUnspecified:
++		return "unspecified"
++	case startupFiles:
++		return "files"
++	case startupInputs:
++		return "inputs"
++	case startupDeploymentMode:
++		return "deployment-mode"
++	case startupProcessPreconditions:
++		return "process-preconditions"
++	case startupObserverClient:
++		return "observer-client"
++	case startupProbeClient:
++		return "probe-client"
++	case startupStartInputs:
++		return "start-inputs"
++	case startupCapacityInputs:
++		return "capacity-inputs"
++	case startupWorkloadGuard:
++		return "workload-guard"
++	case startupMountedIdentity:
++		return "mounted-identity"
++	case startupIdentityReader:
++		return "identity-reader"
++	case startupNativeIdentity:
++		return "native-identity"
++	case startupSqlCredential:
++		return "sql-credential"
++	case startupSqlRoleName:
++		return "sql-role-name"
++	case startupSqlPool:
++		return "sql-pool"
++	case startupSqlRoleProof:
++		return "sql-role-proof"
++	case startupConfigurationReader:
++		return "configuration-reader"
++	case startupAcceptedConfiguration:
++		return "accepted-configuration"
++	case startupOriginalPool:
++		return "original-pool"
++	case startupIssuerRoots:
++		return "issuer-roots"
++	case startupEnrollmentLedger:
++		return "enrollment-ledger"
++	case startupEnrollmentAttester:
++		return "enrollment-attester"
++	case startupEndpoints:
++		return "endpoints"
++	case startupProviderEffects:
++		return "provider-effects"
++	case startupProviderAudit:
++		return "provider-audit"
++	case startupAuditHttp:
++		return "audit-http"
++	case startupAuditSealer:
++		return "audit-sealer"
++	case startupAuditOpener:
++		return "audit-opener"
++	case startupAuditStoreHttp:
++		return "audit-store-http"
++	case startupAuditStore:
++		return "audit-store"
++	case startupCertificateIssuer:
++		return "certificate-issuer"
++	case startupPeerVerifier:
++		return "peer-verifier"
++	case startupObservationInputs:
++		return "observation-inputs"
++	case startupObservationWorkload:
++		return "observation-workload"
++	case startupObservationRuntime:
++		return "observation-runtime"
++	case startupConstructorDeadline:
++		return "constructor-deadline"
++	case startupObservationListener:
++		return "observation-listener"
++	case startupFullDeployment:
++		return "full-deployment"
++	case startupFullListener:
++		return "full-listener"
++	case startupNativeListener:
++		return "native-listener"
++	case startupFullRuntime:
++		return "full-runtime"
++	case startupProviderPrime:
++		return "provider-prime"
++	case startupProviderSupervisor:
++		return "provider-supervisor"
++	case startupRuntimeSupervisor:
++		return "runtime-supervisor"
++	case startupProviderClose:
++		return "provider-close"
++	case startupRunPreconditions:
++		return "run-preconditions"
++	case startupRuntimeInputs:
++		return "runtime-inputs"
++	case startupRuntimeConfiguration:
++		return "runtime-configuration"
++	case startupRuntimeRoots:
++		return "runtime-roots"
++	case startupRuntimeEpoch:
++		return "runtime-epoch"
++	case startupServerCredentials:
++		return "server-credentials"
++	case startupClientCredentials:
++		return "client-credentials"
++	case startupObservationIngress:
++		return "observation-ingress"
++	case startupServerName:
++		return "server-name"
++	case startupObservationHandler:
++		return "observation-handler"
++	case startupBootstrapServing:
++		return "bootstrap-serving"
++	case startupPeerRoots:
++		return "peer-roots"
++	case startupRuntimeDeadline:
++		return "runtime-deadline"
++	case startupInitialIdentity:
++		return "initial-identity"
++	case startupRuntimeServing:
++		return "runtime-serving"
++	default:
++		return "unspecified"
++	}
++}
++
++// This is an internal error chain, not a provider-error rendering surface.
++// Underlying causes remain available to errors.Is/As; all text is closed.
++type ownerStartupFailure struct {
++	phase ownerStartupPhase
++	role  string
++	cause error
++}
++
++func (e *ownerStartupFailure) Error() string { return OwnerStartupDiagnostic(e) }
++func (e *ownerStartupFailure) Unwrap() error { return e.cause }
++func ownerStartupError(phase ownerStartupPhase, role string, cause error) error {
++	if cause == nil {
++		cause = mounts.ErrUnavailable
++	}
++	return &ownerStartupFailure{phase: phase, role: ownerStartupRole(role), cause: cause}
++}
++func ownerStartupAnnotate(phase *ownerStartupPhase, role *string, result *error) {
++	if *result != nil {
++		*result = ownerStartupError(*phase, *role, *result)
++	}
++}
++func ownerStartupRole(s string) string {
++	switch s {
++	case "enrollment", "audit", "activation", "registry", "server", "client":
++		return s
++	default:
++		return "none"
++	}
++}
++func ownerStartupReason(e error) string {
++	switch {
++	case errors.Is(e, context.DeadlineExceeded):
++		return "deadline"
++	case errors.Is(e, context.Canceled):
++		return "cancelled"
++	case apierrors.IsForbidden(e):
++		return "forbidden"
++	case apierrors.IsUnauthorized(e):
++		return "unauthorized"
++	case apierrors.IsNotFound(e):
++		return "not-found"
++	case errors.Is(e, cfg.ErrChanged):
++		return "changed"
++	case errors.Is(e, cfg.ErrDenied), errors.Is(e, value.ErrDenied):
++		return "denied"
++	case errors.Is(e, cfg.ErrInvalid), errors.Is(e, value.ErrInvalid):
++		return "invalid"
++	case errors.Is(e, mounts.ErrUnavailable), errors.Is(e, cfg.ErrUnavailable), errors.Is(e, value.ErrUnavailable):
++		return "unavailable"
++	default:
++		return "other"
++	}
++}
++
++// OwnerStartupDiagnostic contains only fixed phase/purpose/check/reason words.
++// It never formats an underlying error, identifier, path, endpoint or credential.
++func OwnerStartupDiagnostic(err error) string {
++	phase, role := startupUnspecified, "none"
++	var f *ownerStartupFailure
++	if errors.As(err, &f) {
++		phase, role = f.phase, ownerStartupRole(f.role)
++		for {
++			var next *ownerStartupFailure
++			if !errors.As(f.cause, &next) {
++				break
++			}
++			f = next
++			phase, role = f.phase, ownerStartupRole(f.role)
++		}
++	}
++	native, detail := "unspecified", "unspecified"
++	var n *kube.OwnerIdentityReadFailure
++	if errors.As(err, &n) {
++		native, detail = n.Check().String(), n.Detail().String()
++	}
++	sql, sqlReason := "unknown", "unspecified"
++	var p *postgres.OwnerConfigurationReadFailure
++	if errors.As(err, &p) {
++		sql, sqlReason = p.Check().String(), p.Reason().String()
++	}
++	return "owner startup failed: phase=" + phase.String() + " role=" + role + " reason=" + ownerStartupReason(err) + " native=" + native + " detail=" + detail + " sql=" + sql + " sql-reason=" + sqlReason
++}
++
++// OwnerStartupDiagnosticLine accepts exactly the bounded closed log record.
++// Native test collection uses this to discard all unrelated/raw process output.
++// Recognition is diagnostic only: a log line cannot establish runtime identity.
++func OwnerStartupDiagnosticLine(line string) (string, bool) {
++	if len(line) > 512 {
++		return "", false
++	}
++	fields := strings.Split(line, " ")
++	if len(fields) != 10 || fields[0] != "owner" || fields[1] != "startup" || fields[2] != "failed:" {
++		return "", false
++	}
++	keys := []string{"phase=", "role=", "reason=", "native=", "detail=", "sql=", "sql-reason="}
++	for i, key := range keys {
++		if !strings.HasPrefix(fields[i+3], key) {
++			return "", false
++		}
++		v := strings.TrimPrefix(fields[i+3], key)
++		valid := false
++		switch i {
++		case 0:
++			for n := 0; n < 256; n++ {
++				if ownerStartupPhase(n).String() == v {
++					valid = true
++					break
++				}
++			}
++		case 1:
++			valid = ownerStartupRole(v) == v
++		case 2:
++			switch v {
++			case "deadline", "cancelled", "forbidden", "unauthorized", "not-found", "changed", "denied", "invalid", "unavailable", "other":
++				valid = true
++			}
++		case 3, 4:
++			for n := 0; n < 256; n++ {
++				if kube.OwnerIdentityReadCheck(n).String() == v {
++					valid = true
++					break
++				}
++			}
++		case 5:
++			for n := 0; n < 256; n++ {
++				if postgres.OwnerConfigurationReadCheck(n).String() == v {
++					valid = true
++					break
++				}
++			}
++		case 6:
++			for n := 0; n < 256; n++ {
++				if postgres.OwnerConfigurationReadReason(n).String() == v {
++					valid = true
++					break
++				}
++			}
++		}
++		if !valid {
++			return "", false
++		}
++	}
++	return line, true
++}
+--- /dev/null
++++ b/internal/bootstrap/owner_startup_diagnostic_test.go
+@@ -0,0 +1,74 @@
++package bootstrap
++
++import (
++	"asservat.local/asservat/internal/adapters/mounts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"context"
++	"errors"
++	"strings"
++	"testing"
++	"time"
++)
++
++type startupPrivateError struct{}
++
++func (startupPrivateError) Error() string { panic("private cause must never be rendered") }
++func TestOwnerStartupDiagnosticClosedRenderingRetainsCause(t *testing.T) {
++	private := startupPrivateError{}
++	for _, v := range []struct {
++		cause  error
++		reason string
++	}{{errors.Join(private, cfg.ErrDenied), "denied"}, {errors.Join(private, context.DeadlineExceeded), "deadline"}, {errors.Join(private, context.Canceled), "cancelled"}, {errors.Join(private, cfg.ErrChanged), "changed"}, {private, "unavailable"}} {
++		cause := errors.Join(mounts.ErrUnavailable, v.cause)
++		err := ownerStartupError(startupObservationRuntime, "none", ownerStartupError(startupSqlRoleProof, "enrollment", cause))
++		line := OwnerStartupDiagnostic(err)
++		if !strings.Contains(line, "phase=sql-role-proof role=enrollment reason="+v.reason+" ") || !errors.Is(err, private) || !errors.Is(err, mounts.ErrUnavailable) {
++			t.Fatal("lost closed phase, role, reason or original errors.Is")
++		}
++		if got, ok := OwnerStartupDiagnosticLine(line); !ok || got != line {
++			t.Fatal("own fixed record rejected")
++		}
++	}
++	unknown := OwnerStartupDiagnostic(ownerStartupError(ownerStartupPhase(255), "synthetic-private-user", startupPrivateError{}))
++	if !strings.Contains(unknown, "phase=unspecified role=none") {
++		t.Fatal("caller-controlled detail rendered")
++	}
++}
++func TestOwnerStartupDiagnosticRejectsRawProcessOutput(t *testing.T) {
++	good := OwnerStartupDiagnostic(ownerStartupError(startupSqlCredential, "registry", mounts.ErrUnavailable))
++	for _, bad := range []string{"postgres://synthetic-private", "prefix " + good, good + "\npassword=synthetic", good + " extra", strings.Replace(good, "role=registry", "role=synthetic-private", 1), strings.Replace(good, "native=unspecified", "native=token-value", 1), strings.Replace(good, "reason=unavailable", "reason=synthetic-secret", 1), strings.Repeat("x", 513)} {
++		if got, ok := OwnerStartupDiagnosticLine(bad); ok || got != "" {
++			t.Fatal("untrusted process output accepted")
++		}
++	}
++}
++func TestOwnerObservationLoaderReportsInputPhaseBeforeProviderEffects(t *testing.T) {
++	in, dir, _ := ownerInputFixture(t)
++	// Actual fixed-file decoder failure, before native clients or SQL credentials.
++	writeOwnerJSON(t, dir, "deployment.json", map[string]string{"unexpected": "synthetic-private"})
++	d, err := NewOwnerObservationDeployment(context.Background(), in.files, runtimeID)
++	if d != nil {
++		d.Close()
++		t.Fatal("invalid projection started runtime")
++	}
++	if !errors.Is(err, mounts.ErrUnavailable) || !strings.Contains(OwnerStartupDiagnostic(err), "phase=inputs ") {
++		t.Fatal("input failure phase missing", err)
++	}
++}
++func TestOwnerObservationRuntimeReportsOriginalSetupDeadline(t *testing.T) {
++	f, c := observationRuntimeConfig(t)
++	s := &observationSetupReader{base: f}
++	c.Configuration = s
++	until := time.Now().Add(40 * time.Millisecond)
++	ctx, cancel := context.WithDeadline(context.Background(), until)
++	defer cancel()
++	d, err := newOwnerObservationRuntime(context.Background(), ctx, c)
++	if d != nil {
++		d.Close()
++		t.Fatal("late source accepted")
++	}
++	if !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, value.ErrUnavailable) || !s.deadline.Equal(until) || f.signings.Load() != 0 || f.routes.Load() != 0 || !strings.Contains(OwnerStartupDiagnostic(err), "phase=runtime-configuration role=none reason=deadline ") {
++		t.Fatal("original setup failure misclassified or performed effects", err)
++	}
++}
+--- a/test/integration/initial_runtime_owner_identity_native_test.go
++++ b/test/integration/initial_runtime_owner_identity_native_test.go
+@@ -6,6 +6,7 @@
+ 	"crypto/x509"
+ 	"encoding/json"
+ 	"errors"
++	"io"
+ 	"maps"
+ 	"reflect"
+ 	"strings"
+@@ -17,6 +18,7 @@
+ 	"asservat.local/asservat/internal/adapters/objectstore"
+ 	"asservat.local/asservat/internal/adapters/objectstore/framed"
+ 	"asservat.local/asservat/internal/adapters/postgres"
++	"asservat.local/asservat/internal/bootstrap"
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	"asservat.local/asservat/internal/domain/audit"
+ 	fleet "asservat.local/asservat/internal/domain/fleet"
+@@ -237,6 +239,9 @@
+ 			if status.State.Terminated != nil {
+ 				exit = status.State.Terminated.ExitCode
+ 			}
++			for _, line := range originalOwnerStartupLogDiagnostics(call, api, v) {
++				t.Log("original owner process diagnostic:", line)
++			}
+ 			t.Fatalf("original owner process stopped before identity: restarts=%d exit=%d", status.RestartCount, exit)
+ 		}
+ 		if status.State.Running == nil || status.ImageID == "" {
+@@ -333,3 +338,49 @@
+ 	defer clear(raw)
+ 	return framed.VerifyOwnerCertificate(ctx, w.opener, c, raw)
+ }
++
++// Failure diagnostics only. These reads cannot grant authority, adopt another
++// Pod, retry an effect or change the original failing verdict. Both log streams
++// share the original caller's at-most-five-second bound and 8 KiB each. Only
++// exact closed startup records survive; arbitrary stdout/stderr is discarded.
++func originalOwnerStartupLogDiagnostics(ctx context.Context, api kubernetes.Interface, original *core.Pod) []string {
++	if ctx == nil || ctx.Err() != nil || api == nil || original == nil || original.UID == "" {
++		return nil
++	}
++	call, cancel := context.WithTimeout(ctx, 5*time.Second)
++	defer cancel()
++	pods := api.CoreV1().Pods(original.Namespace)
++	before, err := pods.Get(call, original.Name, meta.GetOptions{})
++	if err != nil || before.UID != original.UID {
++		return nil
++	}
++	var out []string
++	for _, previous := range []bool{false, true} {
++		limit, tail := int64(8192), int64(32)
++		stream, e := pods.GetLogs(original.Name, &core.PodLogOptions{Container: "hub", Previous: previous, LimitBytes: &limit, TailLines: &tail, Follow: false}).Stream(call)
++		if e != nil {
++			continue
++		}
++		raw, e := io.ReadAll(io.LimitReader(stream, 8193))
++		closeErr := stream.Close()
++		if e == nil && closeErr == nil && len(raw) <= 8192 {
++			for _, line := range strings.Split(string(raw), "\n") {
++				if safe, ok := bootstrap.OwnerStartupDiagnosticLine(line); ok {
++					scope := "current"
++					if previous {
++						scope = "previous"
++					}
++					out = append(out, scope+": "+safe)
++					// One closed startup failure per process invocation is sufficient.
++					break
++				}
++			}
++		}
++		clear(raw)
++	}
++	after, err := pods.Get(call, original.Name, meta.GetOptions{})
++	if err != nil || after.UID != original.UID || call.Err() != nil {
++		return nil
++	}
++	return out
++}
+--- /dev/null
++++ b/test/integration/initial_runtime_owner_startup_diagnostic_test.go
+@@ -0,0 +1,86 @@
++package integration
++
++import (
++	"asservat.local/asservat/internal/adapters/mounts"
++	"asservat.local/asservat/internal/bootstrap"
++	"context"
++	"encoding/json"
++	core "k8s.io/api/core/v1"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/types"
++	"k8s.io/client-go/kubernetes"
++	"k8s.io/client-go/rest"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"sync/atomic"
++	"testing"
++)
++
++// This component test uses only an owned loopback API. It proves diagnostic
++// selection/bounds, not native Pod identity or authority.
++func TestOriginalOwnerStartupLogsKeepOnlyClosedOriginalPodDiagnostics(t *testing.T) {
++	for _, mode := range []string{"original", "replacement", "oversized", "cancelled"} {
++		t.Run(mode, func(t *testing.T) {
++			original := &core.Pod{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Pod"}, ObjectMeta: meta.ObjectMeta{Name: "original", Namespace: "synthetic", UID: types.UID("10000000-0000-4000-8000-000000000001")}}
++			diagnostic := bootstrap.OwnerStartupDiagnostic(mounts.ErrUnavailable)
++			var gets, logs atomic.Int32
++			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				if r.Method != http.MethodGet {
++					t.Error("diagnostics attempted mutation")
++					http.Error(w, "denied", 403)
++					return
++				}
++				if r.URL.Path == "/api/v1/namespaces/synthetic/pods/original/log" {
++					logs.Add(1)
++					if r.URL.Query().Get("container") != "hub" || r.URL.Query().Get("limitBytes") != "8192" || r.URL.Query().Get("tailLines") != "32" || r.URL.Query().Get("follow") == "true" {
++						t.Error("unbounded/wrong-container logs")
++					}
++					if mode == "oversized" {
++						_, _ = w.Write([]byte(strings.Repeat("x", 8193)))
++						return
++					}
++					_, _ = w.Write([]byte("synthetic-private-dsn-and-token\n" + diagnostic + "\nother-private-output\n"))
++					return
++				}
++				if r.URL.Path != "/api/v1/namespaces/synthetic/pods/original" {
++					t.Error("diagnostics selected another object")
++					http.NotFound(w, r)
++					return
++				}
++				n := gets.Add(1)
++				pod := original.DeepCopy()
++				if mode == "replacement" && n == 2 {
++					pod.UID = types.UID("10000000-0000-4000-8000-000000000002")
++				}
++				w.Header().Set("Content-Type", "application/json")
++				_ = json.NewEncoder(w).Encode(pod)
++			}))
++			defer server.Close()
++			api, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL})
++			if err != nil {
++				t.Fatal(err)
++			}
++			ctx, cancel := context.WithCancel(context.Background())
++			defer cancel()
++			if mode == "cancelled" {
++				cancel()
++			}
++			got := originalOwnerStartupLogDiagnostics(ctx, api, original)
++			if mode == "original" {
++				if len(got) != 2 || got[0] != "current: "+diagnostic || got[1] != "previous: "+diagnostic {
++					t.Fatal("missing or unsafe original diagnostic")
++				}
++			} else if len(got) != 0 {
++				t.Fatal("replacement/oversized/cancelled logs retained")
++			}
++			if mode == "cancelled" {
++				if gets.Load() != 0 || logs.Load() != 0 {
++					t.Fatal("cancelled log collection made requests")
++				}
++			} else if gets.Load() != 2 || logs.Load() != 2 {
++				t.Fatal("unexpected original diagnostic request census")
++			}
++		})
++	}
++}

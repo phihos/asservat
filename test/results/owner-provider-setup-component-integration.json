@@ -1,0 +1,196 @@
+{
+  "integratedAt": 1791857721.664873,
+  "manifestSHA256": "4f8af103a7daa80447562330378494a03de879e3fd29e2c26f785a105c10cf92",
+  "dependenciesSHA256": "e3c1a9015dfbf2d06a7703707f2392e952d94ffdb62591bb2ff105271c4d0804",
+  "dependencyCount": 1899,
+  "files": [
+    {
+      "path": "internal/adapters/kms/owner_provider_effects_native_test.go",
+      "base": "bc72b789ad6aa265785340bd8a67aa195af49fe8e25f24b5d6254c376209d4ed",
+      "sha256": "c4318b68b3ac2a274ed2fa96589f6be007eeb2231e1a630959a5a74803ee3dec"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_native_fixture_test.go",
+      "base": "4f7048b4367d387169de65ce0cd3525c42e01a263fe43a704cab6f1c12855ef6",
+      "sha256": "d5e34b7f386fe707f123dd87d9951c949a0a9a11f005502cbd29da126e432988"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_setup_native_test.go",
+      "base": null,
+      "sha256": "dfc334683e2facbfe0d85bbdf2c428dd4eed23f84d60b81372c68740c8935874"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_setup.go",
+      "base": null,
+      "sha256": "b6ab1e1f46941c179be02a7e1b68c17a07f133445f426350aac965b0aff8e17f"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_setup_test.go",
+      "base": null,
+      "sha256": "ff3b98639944189a9a261324ab026944da1a1727d183bce8e637dca9799df518"
+    },
+    {
+      "path": "internal/adapters/providerconfig/setup_reader.go",
+      "base": null,
+      "sha256": "ea22c1c582bdc261036d5d05ed7103ceb070257f264c12e9b5243d82ae34f94f"
+    },
+    {
+      "path": "internal/adapters/providerconfig/setup_values.go",
+      "base": null,
+      "sha256": "3e11e9405f3893dc59a8b012aa2f1f9e9d28c923fd96cc71a9d2852ee7acd22b"
+    },
+    {
+      "path": "internal/adapters/providerconfig/validate.go",
+      "base": "99f41c4ee12040044f6fed9abc64eee68f89cd8fb6074f8f20e4eed02e5bdeaa",
+      "sha256": "fafb24864c4927bb749d11d857762215d7dfe145e9c64a45a84171a170598929"
+    }
+  ],
+  "qualification": {
+    "freeze": {
+      "manifest.json": "4f8af103a7daa80447562330378494a03de879e3fd29e2c26f785a105c10cf92",
+      "dependencies.json": "e3c1a9015dfbf2d06a7703707f2392e952d94ffdb62591bb2ff105271c4d0804",
+      "overlay.json": "7a893ffe619e4e522b464774651a14fa6e6713d6bd4cfa257d587bc7fbba0854",
+      "run.py": "f340a22ee0324ae70180a78d3d6f1b22be1d5d69fb6763e250f1faa8815b4bb8"
+    },
+    "dependencies": 1899,
+    "paths": 8,
+    "phases": [
+      {
+        "name": "compile",
+        "command": [
+          "go",
+          "test",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-2/overlay.json",
+          "-run=^$",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 2.966,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "efa603ddb9186305bf41631aa1aafb4810928123961ec227d87fd0716cc5c024"
+      },
+      {
+        "name": "race",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-2/overlay.json",
+          "-count=1",
+          "-timeout=2m",
+          "-v",
+          "./internal/adapters/providerconfig"
+        ],
+        "exit": 0,
+        "seconds": 4.012,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "604260675c443ae801f5dcf1389deb949d8301773decc8c01bba2e19e75ed131"
+      },
+      {
+        "name": "kms-race",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-2/overlay.json",
+          "-count=1",
+          "-timeout=2m",
+          "-v",
+          "-run=^TestOwnerProvider",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 5.364,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "716cd132d1cb5815d36784f6c45ca76a22b112afd69833534ab31d34ea11d588"
+      },
+      {
+        "name": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-2/overlay.json",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "seconds": 0.856,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "inventory": [],
+          "freeze": []
+        },
+        "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "exit": 0,
+    "after": {
+      "dependencies": [],
+      "bases": [],
+      "payload": [],
+      "inventory": [],
+      "freeze": []
+    }
+  },
+  "topLevelPass": {
+    "race": 13,
+    "kms-race": 29
+  },
+  "scope": "Read-only provider setup components and native fixture extension. Real-provider shape qualification pending; no installed profile/public route."
+}

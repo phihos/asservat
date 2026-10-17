@@ -1,0 +1,104 @@
+{
+  "mode": "journey",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--regional-context-start",
+    "journey"
+  ],
+  "runnerSHA256": "f00532eff590d099686b32c6b9243f42bc50196de5f96b723a96c4c6e0843fef",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 3063,
+  "sourceSnapshotSHA256": "49ff97fabbbb6d215ab4fd5072652e9a39ebaadfb39bdea1437df16dc7cfdf45",
+  "expectedHarnessSourceCount": 2316,
+  "requiredPassedTests": [
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "expectedSkippedTests": [],
+  "scratch": "/home/phil/.cache/asservat-build/public-context-journey-native-1-tmp",
+  "validationErrors": [
+    "gate command failed",
+    "missing required selected PASS names",
+    "native test exit/source stability failed",
+    "exact journey parent/leaf RUN/PASS inventory failed"
+  ],
+  "processJoined": true,
+  "diskBeforeBytes": 419486019584,
+  "tmpFreeBeforeBytes": 16779939840,
+  "reviewedPayloadsSHA256": "44c31290010f7107578c337fe25238a1b8e4fdf54fe83ffab30184247649cae0",
+  "reviewedPayloadsMatch": true,
+  "processPID": 1037660,
+  "processGroup": 1037660,
+  "processGroupAbsentAfterCommand": true,
+  "commandExit": 1,
+  "seconds": 120.397,
+  "passedTests": [],
+  "missingRequiredTests": [
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "cleanupFailures": [],
+  "testExit": 1,
+  "exactHarnessSources": true,
+  "requiredLogTests": [
+    "TestContextAdmissionWithRealServices",
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "startedTests": [
+    "TestContextAdmissionWithRealServices",
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "loggedPassedTests": [],
+  "exactSelectedRUNAndPASSNames": false,
+  "failedOrSkippedTests": [
+    "TestContextAdmissionWithRealServices",
+    "TestContextAdmissionWithRealServices/native-regional-api-journey"
+  ],
+  "actualWorkerBuild": {
+    "binarySHA256": "210f91ab893d514754b96f9793fdab13e1531b8670a2b5a390491baef9f080e9",
+    "dockerImageID": "sha256:b2142a1ddd77d949bbef09683a72e0f74fac89c8452f5e50920ddde6aa317712",
+    "tag": "asservat-context-worker:context-z0inyhcq",
+    "nodeImage": "docker.io/library/asservat-context-worker@sha256:b2142a1ddd77d949bbef09683a72e0f74fac89c8452f5e50920ddde6aa317712"
+  },
+  "fixtureScratchLabel": "context-z0inyhcq",
+  "remainingFixtureScratch": [],
+  "fixtureScratchRemoved": true,
+  "ownedDockerCleanup": {
+    "container": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "network": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "volume": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "image": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "kindNodes": {
+      "exit": 0,
+      "remainingNames": []
+    }
+  },
+  "signalReceived": null,
+  "runnerUnchanged": true,
+  "finalProcessGroupAbsent": true,
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "49ff97fabbbb6d215ab4fd5072652e9a39ebaadfb39bdea1437df16dc7cfdf45",
+    "runner.py": "f00532eff590d099686b32c6b9243f42bc50196de5f96b723a96c4c6e0843fef",
+    "expected-harness-sources.json": "5270c8ddf83848d5e35307d73d0dda2b10ee42058fb090f18220df5d37feabc6",
+    "reviewed-payloads.json": "44c31290010f7107578c337fe25238a1b8e4fdf54fe83ffab30184247649cae0",
+    "gate.log": "dbf60749d00b58fbbbd48a6ded853fc7bc9c9fd3213126d763a4f457ebd9eefe",
+    "context-storage.log": "067c3820f0ff05fc00c4c46cad914581752376ea79fc9936fbd24438dafe7138",
+    "context-storage-environment.json": "d9a60f54ad613f5da19eaaa0dbc99e3133a44f537ccc628fe66f533f3550c460",
+    "context-storage-kubelet.log": "3c05a70fae4fea7b9bd8f04a5526c5ea921b2fe7f412c71ed98a34939eb370bb",
+    "context-storage-postgres.log": "85a2dd79c843763a532632dda4c5c01c15c0be4fb259a43b842f887876db2990"
+  },
+  "exit": 1
+}

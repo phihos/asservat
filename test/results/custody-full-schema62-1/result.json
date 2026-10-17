@@ -1,0 +1,35 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp-claude"
+  },
+  "note": "Run directly (not via the packaging runner); goTestSeconds is the go test package time from custody.log.",
+  "exit": 0,
+  "goTestSeconds": 759.005,
+  "passedTopLevel": [
+    "TestContextAdmissionWithRealServices",
+    "TestCustodyWithRealServices",
+    "TestEnrollmentBootstrapIssuanceWithRealServices",
+    "TestEnrollmentBootstrapReservationsWithRealServices",
+    "TestEnrollmentFleetFreshnessWithRealPostgres",
+    "TestEnrollmentFleetObservationWithRealPostgres",
+    "TestEnrollmentOwnerConfigurationWithRealServices",
+    "TestEnrollmentSigningWithRealServices",
+    "TestEnrollmentSyntheticFleetObservationBinding",
+    "TestEnrollmentWithRealServices",
+    "TestPeerRegistryWithRealServices",
+    "TestPermissionAuthorityPoliciesWithRealServices",
+    "TestPermissionAuthorityWithRealServices"
+  ],
+  "passedCount": 453,
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "status": "passed",
+  "schemaHead": 62
+}

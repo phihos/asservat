@@ -1,0 +1,13 @@
+{
+  "integratedAt": "2026-10-12T10:22:39.040298+00:00",
+  "payloads": 5,
+  "httpDependencies": 22,
+  "reviewedFinal136Changes": [
+    "internal/application/evidence/context_native_runtime.go",
+    "internal/transport/browser/download_content.go",
+    "internal/transport/browser/download_content_test.go"
+  ],
+  "manifestSHA256": "bf3b478ddf082e13254d48280725a57e336fa349a376cbc5c3712cb67cde5db4",
+  "installedQualification": "pending",
+  "publicRuntimeEnabled": false
+}

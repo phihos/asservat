@@ -1,0 +1,14 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_effects.go",
+    "base_sha256": null,
+    "payload_sha256": "256ddf78b6a211b0593d7c672d9c5c0f7bc6deb161fb84c72068a6d422b615b1",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/effects/changes/internal/adapters/kms/owner_provider_effects.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_effects_test.go",
+    "base_sha256": null,
+    "payload_sha256": "4fbb60e1df39ab0c1828b7fc78aca056f52ba8d28b870b55b1ee070a2bbcbb72",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/effects/changes/internal/adapters/kms/owner_provider_effects_test.go"
+  }
+]

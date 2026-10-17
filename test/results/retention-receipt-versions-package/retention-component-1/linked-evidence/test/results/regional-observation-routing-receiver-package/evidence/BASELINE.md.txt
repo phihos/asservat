@@ -1,0 +1,1 @@
+Receiver-v1 was never run. Its preflight detected the parent-reviewed pure provider recipe move before any job launch. Receiver-v2 preserves all ten payload and owned-base hashes unchanged, adds both new source dependencies and pins the moved wrapper. No prior test result is attributed to v1.

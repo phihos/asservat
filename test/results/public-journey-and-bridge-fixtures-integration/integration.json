@@ -1,0 +1,29 @@
+{
+  "scope": "four fixture-only files; compilation and native qualification pending",
+  "files": [
+    {
+      "path": "test/integration/initial_runtime_bridge_sql_test.go",
+      "baseSHA256": "e1da2a359461fb35c4d0af18778df4a52cac2c548063a26f5d20fd3f94a055b4",
+      "newSHA256": "a6cb0c21e8761e5503ab34f250cffb08e38d16ce8a9d99ce5502bb25840c6844",
+      "stage": "owner-bridge-sql59-fixtures-20261014"
+    },
+    {
+      "path": "test/integration/context_native_content_test.go",
+      "baseSHA256": "ef3cfcddd9b8279b23cd8bbb24799eb30f3b4a0c5bdde963e4c349c719276138",
+      "newSHA256": "5830095e3fa0f568f0b456fb9054f50c229b98af7ec10c9cabcc1bb78c209bec",
+      "stage": "public-context-journey-diagnostics-20261014"
+    },
+    {
+      "path": "test/integration/public_context_journey_test.go",
+      "baseSHA256": "7041aff3dc7edb44d7f6ee53f4f85d50994e1a35b0e324100358db4112b5f8c5",
+      "newSHA256": "5bba2ad6c46c3e11964969ff734bc9036f12c4d7d3f454cf86ddce9cb1dcf565",
+      "stage": "public-context-journey-diagnostics-20261014"
+    },
+    {
+      "path": "test/integration/public_context_journey_diagnostics_test.go",
+      "baseSHA256": null,
+      "newSHA256": "03703b97ddbc037c113dbb1a379fbafddfb0eb4f6c028ead0be72f9a9f6d80cd",
+      "stage": "public-context-journey-diagnostics-20261014"
+    }
+  ]
+}

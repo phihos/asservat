@@ -1,0 +1,7 @@
+{
+  "test/fixtures/observation-native/inputs.go": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82",
+  "test/fixtures/observation-native/main.go": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82",
+  "test/fixtures/observation-native/runtime.go": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427",
+  "test/integration/direct_observation_native_fixture_test.go": "3d93efd62b3df39991ebfb565307cbdaf8cdaa90906296102d5a4afa96707e38",
+  "test/integration/direct_observation_native_test.go": "c8ce3e9eab4d98f07352e86263a640d54d1a7951701562ce7658f26b3df6ba2f"
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-worker-input-provenance.schema.json",
+  "title": "Original configuration worker input predecessors",
+  "description": "Original retained three-role root/setup/projection and fixed ConfigMap attempt. No self UID or document digest, avoiding a circular input binding. None of these historical references grants current authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationID",
+    "configurationRoot",
+    "configurationSetupID",
+    "sqlProjection"
+  ],
+  "properties": {
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "configurationRoot": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "configurationSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "sqlProjection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    }
+  }
+}

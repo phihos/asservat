@@ -1,0 +1,21 @@
+Fixture command failed: ervedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']) THEN RAISE EXCEPTION 'audit history binding mismatch' USING ERRCODE='23514'; END IF;\n IF TG_OP='INSERT' THEN\n  IF NEW.records<>1 THEN RAISE EXCEPTION 'invalid initial audit history charge' USING ERRCODE='23514'; END IF;\n ELSE\n  IF OLD.drain_xid IS NOT NULL OR NEW.records<>OLD.records+1 OR (to_jsonb(NEW)-ARRAY['records','eligible_at','overdue']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['records','eligible_at','overdue']) OR NEW.eligible_at<OLD.eligible_at OR OLD.overdue AND NOT NEW.overdue THEN RAISE EXCEPTION 'immutable audit history' USING ERRCODE='23514'; END IF;\n END IF;\n -- This actual floor concerns safe capacity reuse, never authorized retention.\n NEW.eligible_at:=GREATEST(NEW.eligible_at,NEW.release_at,n+make_interval(secs=>NEW.horizon_seconds::double precision));\n NEW.overdue:=NEW.overdue OR (n>=d.live_retire_by OR d.overdue_selected_at IS NOT NULL);\n IF NEW.records>(SELECT charged FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane=NEW.lane AND principal_digest=NEW.principal_digest) THEN RAISE EXCEPTION 'audit history exceeds original charge' USING ERRCODE='23514'; END IF;\n RETURN NEW;\nEND $$;\nCREATE FUNCTION record_operation_proof_window_missed() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$\nBEGIN\n IF TG_RELID<>'public.operation_audit_lifecycle'::regclass OR TG_WHEN<>'AFTER' OR TG_OP<>'UPDATE' OR TG_LEVEL<>'ROW' OR OLD.overdue_selected_at IS NOT NULL OR NEW.overdue_selected_at IS NULL THEN RAISE EXCEPTION 'invalid overdue accounting source' USING ERRCODE='23514'; END IF;\n UPDATE public.operation_audit_pool SET proof_window_missed=LEAST(proof_window_missed+1,1152921504606846976) WHERE root_id=NEW.root_id AND lane=NEW.lane;\n IF NOT FOUND THEN RAISE EXCEPTION 'missing overdue accounting pool' USING ERRCODE='23514'; END IF;\n RETURN NULL;\nEND $$;": ERROR: syntax error at end of input (SQLSTATE 42601)
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 201, in <module>
+    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 98, in main
+    report["migration"] = run([goose, "-dir", str(ROOT/"migrations"), "up"], env=env)
+                          ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 20, in run
+    return subprocess.check_output(args, text=True, stderr=subprocess.PIPE, timeout=120, **kw).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/phil/.cache/asservat-build/bin/goose', '-dir', '/home/phil/Projekte/asservat/migrations', 'up']' returned non-zero exit status 1.

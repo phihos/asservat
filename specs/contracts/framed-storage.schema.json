@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/framed-storage.schema.json",
+  "title": "Asservat framed storage and commit v1",
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/layout"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/indexPage"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/commit"
+    }
+  ],
+  "$defs": {
+    "sealedKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        }
+      },
+      "required": [
+        "reference",
+        "ciphertext"
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "artifactID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "attemptID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "clusterID",
+        "artifactID",
+        "attemptID",
+        "mediaType"
+      ]
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 511
+        },
+        "firstFrame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 131071
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "nativeOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "nativeBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483648
+        },
+        "dataOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1108101562368
+        },
+        "dataBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2164260864
+        },
+        "indexOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 167772160
+        },
+        "indexBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 327680
+        },
+        "indexSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "number",
+        "firstFrame",
+        "frameCount",
+        "nativeOffset",
+        "nativeBytes",
+        "dataOffset",
+        "dataBytes",
+        "indexOffset",
+        "indexBytes",
+        "indexSHA256"
+      ]
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 131071
+        },
+        "nativeOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "nativeBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8388608
+        },
+        "dataOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1108101562368
+        },
+        "dataBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8454144
+        },
+        "codec": {
+          "enum": [
+            "identity",
+            "zstd"
+          ]
+        },
+        "nativeSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "dataSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "sequence",
+        "nativeOffset",
+        "nativeBytes",
+        "dataOffset",
+        "dataBytes",
+        "codec",
+        "nativeSHA256",
+        "dataSHA256"
+      ]
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "asservat-framed/v1"
+        },
+        "binding": {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/binding"
+        },
+        "nativeBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "dataBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1108101562368
+        },
+        "indexBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 167772160
+        },
+        "nativeSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "dataSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "indexSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "dataKey": {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/sealedKey"
+        },
+        "indexKey": {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/sealedKey"
+        },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/page"
+          }
+        }
+      },
+      "required": [
+        "format",
+        "binding",
+        "nativeBytes",
+        "dataBytes",
+        "indexBytes",
+        "nativeSHA256",
+        "dataSHA256",
+        "indexSHA256",
+        "dataKey",
+        "indexKey",
+        "pages"
+      ]
+    },
+    "indexPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "asservat-framed/v1"
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 511
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/frame"
+          }
+        }
+      },
+      "required": [
+        "format",
+        "number",
+        "frames"
+      ]
+    },
+    "objectIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "etag": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "versionID": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "etag",
+        "versionID"
+      ]
+    },
+    "commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "artifact-commit/v1"
+        },
+        "storageFormat": {
+          "const": "asservat-framed/v1"
+        },
+        "clusterID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "artifactID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "attemptID": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-f-]{36}$"
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "identity": {
+              "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/objectIdentity"
+            },
+            "ciphertextBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1114112
+            },
+            "ciphertextSHA256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "key": {
+              "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/sealedKey"
+            }
+          },
+          "required": [
+            "identity",
+            "ciphertextBytes",
+            "ciphertextSHA256",
+            "key"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "storageFormat",
+        "clusterID",
+        "artifactID",
+        "attemptID",
+        "manifest"
+      ]
+    }
+  }
+}

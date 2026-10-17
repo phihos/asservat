@@ -1,0 +1,13 @@
+{
+  "handle": 68810,
+  "terminal_exit": 1,
+  "compile_exit": 0,
+  "race_exit": 1,
+  "checked_paths": 47,
+  "base_payload_changes": [],
+  "failed_case": "TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath",
+  "recorded_elapsed": "4.951955789s",
+  "requests": 149,
+  "negative_probes": 10,
+  "race_package_seconds": 13.893
+}

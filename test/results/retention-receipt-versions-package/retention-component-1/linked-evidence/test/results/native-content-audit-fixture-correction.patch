@@ -1,0 +1,31 @@
+--- test/integration/context_native_content_test.go
++++ test/integration/context_native_content_test.go
+@@ -656,13 +656,25 @@
+ 	makeAudit := func(lane string) *auditapp.HealthyOperationAuditor {
+ 		n := time.Now().UTC().Truncate(time.Microsecond)
+ 		backing := auditapp.OperationAuditPool{RootID: f.allocation.RootID, Lane: lane, AccountVersion: "accounts-v1", Accounts: 2, RecordsPerAccount: 4, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}
++		if lane == "normal" {
++			// The actual processing initialization already provisioned revision
++			// one and spent a normal-lane record. Extend that known synthetic
++			// configuration through its real revisioned API, retaining spend.
++			// Fund all four HTTP preflights independently of transfer depletion.
++			var revision, accounts, records int64
++			if e = cp.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", backing.RootID).Scan(&revision, &accounts, &records); e != nil || revision != 1 || accounts != 2 || records != 2 {
++				t.Fatal("original processing audit backing", revision, accounts, records, e)
++			}
++			backing.ExpectedRevision = revision
++			backing.RecordsPerAccount = 8
++		}
+ 		if e = config.ProvisionOperationAuditPool(ctx, backing); e != nil {
+ 			t.Fatal(e)
+ 		}
+-		policy := audit.OperationLifecyclePolicy{RootID: f.allocation.RootID, Lane: lane, InstallationID: f.worker.Binding.InstallationID, StoreID: f.published.Expectation.Registration.StoreID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 8, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
++		policy := audit.OperationLifecyclePolicy{RootID: f.allocation.RootID, Lane: lane, InstallationID: f.worker.Binding.InstallationID, StoreID: f.published.Expectation.Registration.StoreID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: backing.ExpectedRevision + 1, MetadataSlots: backing.Accounts * backing.RecordsPerAccount, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: backing.ValidUntil, History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}}
+ 		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
+-		policy.BackupReservedBytes = bb * 8
+-		policy.WALReservedBytes = ww * 8
++		policy.BackupReservedBytes = bb * policy.MetadataSlots
++		policy.WALReservedBytes = ww * policy.MetadataSlots
+ 		j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy, f.guards.Recovery)
+ 		if e != nil {
+ 			t.Fatal(e)

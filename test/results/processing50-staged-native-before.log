@@ -1,0 +1,14 @@
+--- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath (0.00s)
+    --- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath/missing-processing (0.00s)
+        native_exchange_test.go:119: live native gate accepted absent or contradictory processing/path proof
+    --- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath/missing-path (0.00s)
+        native_exchange_test.go:119: live native gate accepted absent or contradictory processing/path proof
+    --- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath/wrong-target (0.00s)
+        native_exchange_test.go:119: live native gate accepted absent or contradictory processing/path proof
+    --- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath/expired-processing (0.00s)
+        native_exchange_test.go:119: live native gate accepted absent or contradictory processing/path proof
+    --- FAIL: TestNativeFrameGateRequiresProcessingAndExactPath/cross-cluster-connector (0.00s)
+        native_exchange_test.go:119: live native gate accepted absent or contradictory processing/path proof
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.001s
+FAIL

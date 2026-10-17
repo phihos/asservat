@@ -1,0 +1,12 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/initial_runtime_bridge.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/initial_runtime_bridge_installed_probes_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_producer_fixture_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/owner_identity_producer_fixture_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_producer_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/owner_identity_producer_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_installed.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/owner_installed.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_installed_template_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/internal/adapters/kubernetes/owner_installed_template_test.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_installation_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/test/integration/initial_installation_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_identity_roles_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-6/files/test/integration/owner_identity_roles_test.go"
+  }
+}

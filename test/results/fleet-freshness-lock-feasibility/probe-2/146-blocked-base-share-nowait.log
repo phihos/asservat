@@ -1,0 +1,2 @@
+ERROR:  55P03: could not obtain lock on row in relation "fleet_trust"
+LOCATION:  heap_lock_tuple, heapam.c:5232

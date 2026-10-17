@@ -1,0 +1,37 @@
+{
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "integratedComponent": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "integratedComponent": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "command": [
+    "go",
+    "vet",
+    "test/fixtures/observation-native/data.go",
+    "test/fixtures/observation-native/enrollment.go",
+    "test/fixtures/observation-native/inputs.go",
+    "test/fixtures/observation-native/main.go",
+    "test/fixtures/observation-native/metrics.go",
+    "test/fixtures/observation-native/runtime.go"
+  ],
+  "exit": 0,
+  "phase": "helper-vet",
+  "seconds": 51.548
+}

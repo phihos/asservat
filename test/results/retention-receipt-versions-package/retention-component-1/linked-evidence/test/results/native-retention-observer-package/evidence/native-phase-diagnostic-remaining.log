@@ -1,0 +1,495 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:95: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 21.932113ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:95: native context pending metadata read completed
+    native_exchange_test.go:95: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.898883654s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.837745147s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 538.083521ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 723.563144ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.674849753s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.630528824s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 492.018025ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 662.470647ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.763733ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 4
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.918759ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 5
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 22.075424ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 6
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.990778ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 7
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.956594ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 8
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 21.692602ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 9
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 23.046598ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 10
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 17.955344ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 11
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 22.216925ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 11 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 12
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 2.938753655s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 2.894768658s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 532.387195ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 699.485701ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 12 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 12 Uncertain native exchange unavailable
+    native_exchange_test.go:284: worker terminal uncertain original native conversation: native exchange unavailable
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:106: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.860708ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:106: native context pending metadata read completed
+    native_exchange_test.go:106: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.51845532s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.472186343s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 498.979168ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 673.229598ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.457889714s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.413363864s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 464.685076ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 632.904538ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.333856ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 4
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.337256ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 5
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 22.269705ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 6
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 18.043155ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 7
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 23.797552ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 8
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 26.661246ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 9
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.33248ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 10
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.683047ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 11
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.841013774s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.796763696s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 514.42599ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 678.320731ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 11 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 11 Joined <nil>
+    native_exchange_test.go:106: actual h2 client cancellation retained old uncertainty; explicit fresh audited preparation and new content path reconstructed Range/If-Match bytes with unchanged artifact SHA; synthetic authority/bootstrap inputs remain explicit
+=== NAME  TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=preparation.permit-metadata start=24.53342161s elapsed=12.197867ms remaining-start=1.46534376s remaining-end=1.453145903s input-remaining=1.453145903s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=native.close-pending start=24.545633627s elapsed=43.87µs remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=0s result=ok context=none
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=preparation.continue start=21.613051829s elapsed=2.932654179s remaining-start=1m37.003415291s remaining-end=1m34.070761112s input-remaining=0s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=24.604746395s elapsed=4.29098ms remaining-start=4.999781339s remaining-end=4.995490359s input-remaining=0s result-remaining=4.386776994s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=24.609057116s elapsed=3.024544ms remaining-start=4.995470618s remaining-end=4.992446074s input-remaining=0s result-remaining=4.99729771s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=24.6121209s elapsed=18.530157ms remaining-start=4.992406834s remaining-end=4.973876677s input-remaining=59m32.306121323s result-remaining=4.981477323s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=24.630670297s elapsed=12.213108ms remaining-start=4.973857437s remaining-end=4.961644329s input-remaining=4.966495975s result-remaining=4.961644329s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=24.642953705s elapsed=4.20927ms remaining-start=4.961574029s remaining-end=4.957364759s input-remaining=0s result-remaining=4.348651405s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=24.604694195s elapsed=43.076983ms remaining-start=4.999833539s remaining-end=4.956756556s input-remaining=0s result-remaining=4.348043202s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=24.648090409s elapsed=4.14266ms remaining-start=4.347723961s remaining-end=4.343581311s input-remaining=0s result-remaining=4.343581311s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=24.652256519s elapsed=3.051384ms remaining-start=4.343557861s remaining-end=4.340506467s input-remaining=0s result-remaining=4.997303467s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=24.655345483s elapsed=17.034661ms remaining-start=4.340468896s remaining-end=4.323434227s input-remaining=59m32.264392227s result-remaining=4.982974227s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=24.672401644s elapsed=12.217667ms remaining-start=4.323412736s remaining-end=4.311195059s input-remaining=4.967992059s result-remaining=4.311195059s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=24.684692541s elapsed=4.15112ms remaining-start=4.311121838s remaining-end=4.306970719s input-remaining=0s result-remaining=4.306970719s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=24.648050189s elapsed=41.390935ms remaining-start=4.347764181s remaining-end=4.306373256s input-remaining=0s result-remaining=4.306373256s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=other start=24.689680325s elapsed=31.696859ms remaining-start=4.306134055s remaining-end=4.274437196s input-remaining=4.274437196s result-remaining=4.274437196s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.catalog calls=62 elapsed=204.480662ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.current calls=62 elapsed=3.578691876s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.environment calls=62 elapsed=827.776464ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.permissions calls=124 elapsed=839.058534ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.retention calls=62 elapsed=1.659661582s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.before-command calls=2 elapsed=455.781244ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.bind-keys calls=2 elapsed=56.377315ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.claim calls=2 elapsed=81.842665ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.close-pending calls=2 elapsed=78.49µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.commit calls=2 elapsed=1.263450105s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.complete calls=2 elapsed=12.73011ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.current-frame calls=30 elapsed=3.336474818s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.next-fence calls=2 elapsed=1.82081ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.origin-sql calls=34 elapsed=1.424106322s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.prepared calls=2 elapsed=1.734346159s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.register calls=2 elapsed=1.547796ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.wait calls=2 elapsed=1.739696455s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=other calls=8 elapsed=225.47836ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.begin-batch calls=2 elapsed=80.468588ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.continue calls=2 elapsed=6.085479163s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.finish-batch calls=2 elapsed=16.150265ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-ack calls=2 elapsed=12.755189ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-write calls=2 elapsed=17.584632ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-ack calls=2 elapsed=15.197951ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-write calls=2 elapsed=15.183391ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-batch calls=4 elapsed=45.023761ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-metadata calls=2 elapsed=24.501965ms
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=native.prepared start=26.01060712s elapsed=849.051455ms remaining-start=2.98520725s remaining-end=2.136155795s input-remaining=0s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.permissions start=26.859838516s elapsed=5.235965ms remaining-start=2.135975864s remaining-end=2.130739899s input-remaining=0s result-remaining=4.152303899s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.catalog start=26.865098401s elapsed=3.245625ms remaining-start=2.130715969s remaining-end=2.127470344s input-remaining=0s result-remaining=4.997142344s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.retention start=26.868383966s elapsed=21.25352ms remaining-start=2.127430414s remaining-end=2.106176894s input-remaining=59m30.047134894s result-remaining=4.978753894s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.environment start=26.889661006s elapsed=12.562339ms remaining-start=2.106153374s remaining-end=2.093591025s input-remaining=4.963263025s result-remaining=2.093591025s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.permissions start=26.902288826s elapsed=5.114474ms remaining-start=2.093525544s remaining-end=2.08841107s input-remaining=0s result-remaining=4.10997507s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.current start=26.859795416s elapsed=48.511508ms remaining-start=2.136018954s remaining-end=2.087507466s input-remaining=0s result-remaining=2.087507466s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=native.close-pending start=26.908749226s elapsed=55.68µs remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=0s result=ok context=none
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.permissions start=26.908994287s elapsed=6.39047ms remaining-start=2.086820083s remaining-end=2.080429623s input-remaining=0s result-remaining=4.101993623s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.catalog start=26.915404557s elapsed=3.237796ms remaining-start=2.080409823s remaining-end=2.077172017s input-remaining=0s result-remaining=4.997127017s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.retention start=26.918681693s elapsed=17.00536ms remaining-start=2.077132677s remaining-end=2.060127327s input-remaining=59m30.001085327s result-remaining=4.983002327s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.environment start=26.935705993s elapsed=12.323748ms remaining-start=2.060108387s remaining-end=2.047784629s input-remaining=4.967739629s result-remaining=2.047784629s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.permissions start=26.948084101s elapsed=4.17135ms remaining-start=2.047730269s remaining-end=2.043558929s input-remaining=0s result-remaining=4.065122929s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=authority.current start=26.908945377s elapsed=43.881986ms remaining-start=2.086868993s remaining-end=2.042987006s input-remaining=0s result-remaining=2.042987006s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=other start=26.953005734s elapsed=31.671279ms remaining-start=2.042808636s remaining-end=2.011137357s input-remaining=2.011137357s result-remaining=2.011137357s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=metadata kind=recent port=metadata.read start=24.726744949s elapsed=2.258142815s remaining-start=1m33.889722171s remaining-end=1m31.631579356s input-remaining=0s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=authority.catalog calls=40 elapsed=127.783523ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=authority.current calls=40 elapsed=2.030428995s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=authority.environment calls=40 elapsed=520.651351ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=authority.permissions calls=80 elapsed=481.13567ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=authority.retention calls=40 elapsed=870.298636ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=metadata.read calls=2 elapsed=4.573537898s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.before-command calls=2 elapsed=412.959094ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.claim calls=2 elapsed=66.947105ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.close-pending calls=2 elapsed=110.79µs
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.complete calls=2 elapsed=12.274518ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.current-frame calls=22 elapsed=2.140030712s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.next-fence calls=2 elapsed=1.051026ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.origin-sql calls=26 elapsed=1.031019994s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.prepared calls=2 elapsed=1.740151978s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.register calls=2 elapsed=1.723927ms
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=native.wait calls=2 elapsed=2.073528706s
+    native_phase_diagnostic_test.go:185: native bounded phase=metadata kind=total port=other calls=4 elapsed=125.58202ms
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.identity start=38.089463504s elapsed=4.25µs remaining-start=1.903149876s remaining-end=1.903145616s input-remaining=0s result-remaining=4.99999881s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.permissions start=38.089514244s elapsed=4.487781ms remaining-start=1.903099136s remaining-end=1.898611355s input-remaining=0s result-remaining=4.940564355s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.catalog start=38.094025926s elapsed=3.183725ms remaining-start=1.898587445s remaining-end=1.895403719s input-remaining=0s result-remaining=4.997298719s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.retention start=38.097248221s elapsed=18.155445ms remaining-start=1.895365149s remaining-end=1.877209704s input-remaining=59m18.821368704s result-remaining=4.981852704s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.environment start=38.115425316s elapsed=12.420379ms remaining-start=1.877188054s remaining-end=1.864767675s input-remaining=4.966662675s result-remaining=1.864767675s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.identity start=38.127882815s elapsed=7.22µs remaining-start=1.864730565s remaining-end=1.864723345s input-remaining=0s result-remaining=4.99999819s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.permissions start=38.127946365s elapsed=4.338621ms remaining-start=1.864667015s remaining-end=1.860328384s input-remaining=0s result-remaining=4.902281384s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=authority.current start=38.089441034s elapsed=43.440685ms remaining-start=1.903172336s remaining-end=1.859731652s input-remaining=0s result-remaining=1.859731652s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.identity start=38.132947429s elapsed=5.18µs remaining-start=1.859665941s remaining-end=1.859660761s input-remaining=0s result-remaining=4.99999863s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.identity start=38.133089189s elapsed=3.92µs remaining-start=1.859524181s remaining-end=1.859520261s input-remaining=0s result-remaining=4.99999878s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=native.origin-sql start=38.13323091s elapsed=33.115226ms remaining-start=1.85938246s remaining-end=1.826267234s input-remaining=0s result-remaining=1.826267234s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=native.current-frame start=38.089243013s elapsed=77.161643ms remaining-start=1.903370357s remaining-end=1.826208714s input-remaining=1.826208714s result-remaining=1.826208714s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=native.complete start=38.166482096s elapsed=6.646132ms remaining-start=1.826131273s remaining-end=1.819485142s input-remaining=1.819485142s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=native.close-pending start=38.173745511s elapsed=20.93µs remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=0s result=ok context=none
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.window-finish start=38.173891091s elapsed=7.984818ms remaining-start=4.99999267s remaining-end=4.992007852s input-remaining=30m19.496829471s result-remaining=30m19.496829471s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=http kind=recent port=http.response-close start=38.200051275s elapsed=3.778067ms remaining-start=4.99999431s remaining-end=4.996216243s input-remaining=0s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=authority.catalog calls=76 elapsed=243.539005ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=authority.current calls=76 elapsed=4.051724311s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=authority.environment calls=76 elapsed=1.021305383s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=authority.permissions calls=152 elapsed=928.899044ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=authority.retention calls=76 elapsed=1.796390849s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-freeze calls=3 elapsed=21.989224ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-intent-ack calls=3 elapsed=22.263175ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-intent-claim calls=3 elapsed=17.822914ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-intent-create calls=3 elapsed=19.562372ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-intent-record calls=3 elapsed=25.067558ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-outcome-ack calls=3 elapsed=23.761932ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-outcome-claim calls=3 elapsed=18.504987ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-outcome-create calls=3 elapsed=18.772398ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-outcome-record calls=3 elapsed=27.63426ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.audit-reserve calls=3 elapsed=36.516562ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.client-request calls=2 elapsed=5.376476686s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.identity calls=282 elapsed=1.646939ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.response-begin calls=2 elapsed=45.182443ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.response-close calls=2 elapsed=7.761795ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.response-lease calls=2 elapsed=35.351487ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.session-lookup calls=2 elapsed=1.928708ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.window-begin calls=2 elapsed=39.443276ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.window-finish calls=2 elapsed=16.228257ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.window-intent-ack calls=2 elapsed=16.442078ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=http.window-intent-create calls=2 elapsed=17.195281ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.before-command calls=2 elapsed=495.022289ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.claim calls=2 elapsed=65.96744ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.close-pending calls=2 elapsed=179.231µs
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.complete calls=1 elapsed=6.646132ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.current-frame calls=24 elapsed=2.781160044s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.next-fence calls=2 elapsed=1.510407ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.origin-sql calls=28 elapsed=1.16246289s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.register calls=2 elapsed=1.702689ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.release calls=1 elapsed=4.338291ms
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=native.wait calls=2 elapsed=2.157327629s
+    native_phase_diagnostic_test.go:185: native bounded phase=http kind=total port=other calls=16 elapsed=416.22935ms
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.create-fixture start=17.42µs elapsed=460.367465ms remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=4.539690648s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=979.080356ms elapsed=4.411531ms remaining-start=29.997206627s remaining-end=29.992795096s input-remaining=4.016583657s result-remaining=4.016583657s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=983.499227ms elapsed=19.687922ms remaining-start=29.992787756s remaining-end=29.973099834s input-remaining=0s result-remaining=4.980313384s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=1.00319297s elapsed=950.234µs remaining-start=29.973094013s remaining-end=29.972143779s input-remaining=0s result-remaining=4.99942433s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=1.017561947s elapsed=4.467681ms remaining-start=29.958725036s remaining-end=29.954257355s input-remaining=3.978045916s result-remaining=3.978045916s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=1.022036608s elapsed=20.462626ms remaining-start=29.954250375s remaining-end=29.933787749s input-remaining=0s result-remaining=4.97953831s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=1.042509484s elapsed=876.885µs remaining-start=29.933777499s remaining-end=29.932900614s input-remaining=0s result-remaining=4.999521165s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=1.088940093s elapsed=7.505885ms remaining-start=29.88734689s remaining-end=29.879841005s input-remaining=3.903629556s result-remaining=3.903629556s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=1.096452318s elapsed=32.877605ms remaining-start=29.879834665s remaining-end=29.84695706s input-remaining=0s result-remaining=4.967123611s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=1.129336033s elapsed=791.954µs remaining-start=29.84695095s remaining-end=29.846158996s input-remaining=0s result-remaining=4.999550547s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.create-fixture calls=1 elapsed=460.367465ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.permissions calls=3 elapsed=16.385097ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.recovery calls=3 elapsed=2.619073ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.retention calls=3 elapsed=73.028153ms
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-races
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 19.792883ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 4.025830164s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.975618168s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 504.704984ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 672.297094ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:732: already-closed exact native operation denied within original current lease, charges unchanged
+    download_sessions_test.go:732: wrong fence/sequence and held-row original-deadline completion denied, owner and charges unchanged
+    download_sessions_test.go:732: incomplete closed response denies both concurrent admissions, all prior spend retained
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=3.334313779s elapsed=4.10478ms remaining-start=4.774109448s remaining-end=4.770004668s input-remaining=0s result-remaining=4.770004668s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=3.295705008s elapsed=43.317704ms remaining-start=4.812718209s remaining-end=4.769400505s input-remaining=0s result-remaining=4.769400505s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=other start=3.339229123s elapsed=31.836189ms remaining-start=4.769194095s remaining-end=4.737357905s input-remaining=4.737357905s result-remaining=4.737357905s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=8.27986661s elapsed=5.128044ms remaining-start=4.999817919s remaining-end=4.994689875s input-remaining=0s result-remaining=4.822363563s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=8.285016075s elapsed=2.999004ms remaining-start=4.994668454s remaining-end=4.99166945s input-remaining=0s result-remaining=4.997321138s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=8.288059749s elapsed=17.820204ms remaining-start=4.99162478s remaining-end=4.973804576s input-remaining=59m48.993128274s result-remaining=4.982188274s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=8.305901153s elapsed=15.271592ms remaining-start=4.973783376s remaining-end=4.958511784s input-remaining=4.964163472s result-remaining=4.958511784s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=8.321229795s elapsed=4.35596ms remaining-start=4.958454734s remaining-end=4.954098774s input-remaining=0s result-remaining=4.781772472s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=8.27981654s elapsed=46.382218ms remaining-start=4.999867989s remaining-end=4.953485771s input-remaining=0s result-remaining=4.781159459s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=8.32645831s elapsed=4.35081ms remaining-start=4.780899917s remaining-end=4.776549107s input-remaining=0s result-remaining=4.776549107s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=8.33083337s elapsed=3.073385ms remaining-start=4.776524847s remaining-end=4.773451463s input-remaining=0s result-remaining=4.997264463s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=8.333946695s elapsed=17.715363ms remaining-start=4.773411522s remaining-end=4.755696169s input-remaining=59m48.947346169s result-remaining=4.982293169s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=8.351682718s elapsed=12.7666ms remaining-start=4.755675509s remaining-end=4.742908909s input-remaining=4.966721909s result-remaining=4.742908909s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=8.364517428s elapsed=3.688298ms remaining-start=4.742840788s remaining-end=4.739152491s input-remaining=0s result-remaining=4.739152491s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=8.326417009s elapsed=42.43546ms remaining-start=4.780941208s remaining-end=4.738505748s input-remaining=0s result-remaining=4.738505748s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=other start=8.36908191s elapsed=37.705317ms remaining-start=4.738276307s remaining-end=4.700570999s input-remaining=4.700570999s result-remaining=4.700570999s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.catalog calls=33 elapsed=105.312543ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.current calls=33 elapsed=1.798801762s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.environment calls=33 elapsed=434.697877ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.permissions calls=66 elapsed=401.797393ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.retention calls=33 elapsed=831.54005ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.before-command calls=1 elapsed=222.979259ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.bind-keys calls=1 elapsed=26.056042ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.claim calls=1 elapsed=38.992974ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.close-pending calls=1 elapsed=45.08µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.commit calls=1 elapsed=637.70487ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.complete calls=1 elapsed=6.36334ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.current-frame calls=15 elapsed=1.671381764s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.next-fence calls=1 elapsed=932.755µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.origin-sql calls=17 elapsed=706.804902ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.prepared calls=1 elapsed=831.431552ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.register calls=1 elapsed=750.423µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.wait calls=1 elapsed=948.834815ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=other calls=5 elapsed=156.270194ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.begin-batch calls=1 elapsed=19.836684ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.continue calls=1 elapsed=2.989587307s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.finish-batch calls=1 elapsed=8.173739ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-ack calls=1 elapsed=5.766937ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-write calls=1 elapsed=7.505875ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-ack calls=1 elapsed=7.303795ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-write calls=1 elapsed=7.735816ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-batch calls=2 elapsed=22.917958ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-metadata calls=1 elapsed=12.187758ms
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.create-fixture start=18.93µs elapsed=246.4589ms remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=4.753588948s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=639.944481ms elapsed=4.003709ms remaining-start=29.997305228s remaining-end=29.993301519s input-remaining=4.356118588s result-remaining=4.356118588s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=643.954521ms elapsed=17.20571ms remaining-start=29.993295188s remaining-end=29.976089478s input-remaining=0s result-remaining=4.982795557s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=661.165562ms elapsed=967.164µs remaining-start=29.976084147s remaining-end=29.975116983s input-remaining=0s result-remaining=4.999441062s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=675.301948ms elapsed=4.34514ms remaining-start=29.961947761s remaining-end=29.957602621s input-remaining=4.32041969s result-remaining=4.32041969s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=679.654428ms elapsed=16.93853ms remaining-start=29.957595281s remaining-end=29.940656751s input-remaining=0s result-remaining=4.98306283s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=696.599798ms elapsed=879.784µs remaining-start=29.940649911s remaining-end=29.939770127s input-remaining=0s result-remaining=4.999511196s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=730.073095ms elapsed=4.10019ms remaining-start=29.907176614s remaining-end=29.903076424s input-remaining=4.265893503s result-remaining=4.265893503s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=734.181015ms elapsed=17.166671ms remaining-start=29.903068694s remaining-end=29.885902023s input-remaining=0s result-remaining=4.982834092s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=751.353506ms elapsed=826.024µs remaining-start=29.885896203s remaining-end=29.885070179s input-remaining=0s result-remaining=4.999500248s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.create-fixture calls=1 elapsed=246.4589ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.permissions calls=3 elapsed=12.449039ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.recovery calls=3 elapsed=2.672972ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.retention calls=3 elapsed=51.310911ms
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-admission-race
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:474: native diagnostic connector admission terminal 22.033914ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.927068776s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.87686904s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 517.488825ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 692.98513ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:732: fresh independently prepared session admits exactly one concurrent Observe/response, original budgets and loser spend preserved
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=preparation.permit-metadata start=3.220041962s elapsed=12.273807ms remaining-start=1.794526461s remaining-end=1.782252654s input-remaining=1.782252654s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=native.close-pending start=3.232325329s elapsed=40.111µs remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=0s result=ok context=none
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=preparation.continue start=206.463271ms elapsed=3.025944969s remaining-start=18.414780801s remaining-end=15.388835832s input-remaining=0s result-remaining=0s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=3.293819949s elapsed=4.21269ms remaining-start=4.999815549s remaining-end=4.995602859s input-remaining=0s result-remaining=4.736584774s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=3.298056139s elapsed=3.314335ms remaining-start=4.995579359s remaining-end=4.992265024s input-remaining=0s result-remaining=4.997057939s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=3.301408894s elapsed=17.847464ms remaining-start=4.992226604s remaining-end=4.97437914s input-remaining=59m53.861790055s result-remaining=4.982160055s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=3.319276069s elapsed=12.75631ms remaining-start=4.974359429s remaining-end=4.961603119s input-remaining=4.966396044s result-remaining=4.961603119s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=3.332104969s elapsed=4.22855ms remaining-start=4.961530529s remaining-end=4.957301979s input-remaining=0s result-remaining=4.698283894s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=3.293776149s elapsed=43.053972ms remaining-start=4.999859349s remaining-end=4.956805377s input-remaining=0s result-remaining=4.697787302s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=3.337154573s elapsed=4.2369ms remaining-start=4.69746284s remaining-end=4.69322595s input-remaining=0s result-remaining=4.69322595s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.catalog start=3.341411343s elapsed=2.926784ms remaining-start=4.69320607s remaining-end=4.690279287s input-remaining=0s result-remaining=4.997372287s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.retention start=3.344379307s elapsed=17.566322ms remaining-start=4.690238106s remaining-end=4.672671783s input-remaining=59m53.819100783s result-remaining=4.982441783s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.environment start=3.36196565s elapsed=14.332867ms remaining-start=4.672651774s remaining-end=4.658318906s input-remaining=4.965411906s result-remaining=4.658318906s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.permissions start=3.376361537s elapsed=4.327731ms remaining-start=4.658255876s remaining-end=4.653928145s input-remaining=0s result-remaining=4.653928145s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=authority.current start=3.337113702s elapsed=44.158128ms remaining-start=4.69750371s remaining-end=4.653345593s input-remaining=0s result-remaining=4.653345593s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=preparation kind=recent port=other start=3.381462171s elapsed=32.690954ms remaining-start=4.653155242s remaining-end=4.620464298s input-remaining=4.620464298s result-remaining=4.620464298s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.catalog calls=31 elapsed=99.035436ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.current calls=31 elapsed=1.729756525s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.environment calls=31 elapsed=416.048559ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.permissions calls=62 elapsed=397.828113ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=authority.retention calls=31 elapsed=793.293674ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.before-command calls=1 elapsed=232.289143ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.bind-keys calls=1 elapsed=26.676085ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.claim calls=1 elapsed=39.092664ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.close-pending calls=1 elapsed=40.111µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.commit calls=1 elapsed=638.626625ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.complete calls=1 elapsed=7.786677ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.current-frame calls=15 elapsed=1.687787072s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.next-fence calls=1 elapsed=961.165µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.origin-sql calls=17 elapsed=728.54324ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.prepared calls=1 elapsed=844.891986ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.register calls=1 elapsed=745.933µs
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=native.wait calls=1 elapsed=959.477175ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=other calls=4 elapsed=118.012605ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.begin-batch calls=1 elapsed=17.749084ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.continue calls=1 elapsed=3.025944969s
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.finish-batch calls=1 elapsed=8.332469ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-ack calls=1 elapsed=5.864717ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.intent-write calls=1 elapsed=7.485465ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-ack calls=1 elapsed=7.246425ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.outcome-write calls=1 elapsed=7.257845ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-batch calls=2 elapsed=22.446776ms
+    native_phase_diagnostic_test.go:185: native bounded phase=preparation kind=total port=preparation.permit-metadata calls=1 elapsed=12.273807ms
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.create-fixture start=23.87µs elapsed=127.197949ms remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=4.87288532s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=524.164337ms elapsed=4.512181ms remaining-start=29.997122146s remaining-end=29.992609965s input-remaining=4.471430611s result-remaining=4.471430611s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=528.684428ms elapsed=19.728313ms remaining-start=29.992602055s remaining-end=29.972873742s input-remaining=0s result-remaining=4.980272398s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=548.419871ms elapsed=1.072685ms remaining-start=29.972866612s remaining-end=29.971793927s input-remaining=0s result-remaining=4.999442583s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=563.16282ms elapsed=4.015339ms remaining-start=29.958123663s remaining-end=29.954108324s input-remaining=4.43292898s result-remaining=4.43292898s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=567.186159ms elapsed=17.624853ms remaining-start=29.954100324s remaining-end=29.936475471s input-remaining=0s result-remaining=4.982376117s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=584.818172ms elapsed=809.644µs remaining-start=29.936468311s remaining-end=29.935658667s input-remaining=0s result-remaining=4.999533313s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=620.166509ms elapsed=5.057243ms remaining-start=29.901119974s remaining-end=29.896062731s input-remaining=4.374883377s result-remaining=4.374883377s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=625.231932ms elapsed=17.266982ms remaining-start=29.896054551s remaining-end=29.878787569s input-remaining=0s result-remaining=4.982734225s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=642.506624ms elapsed=919.924µs remaining-start=29.878779859s remaining-end=29.877859935s input-remaining=0s result-remaining=4.999517581s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.create-fixture calls=1 elapsed=127.197949ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.permissions calls=3 elapsed=13.584763ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.recovery calls=3 elapsed=2.802253ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.retention calls=3 elapsed=54.620148ms
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    download_sessions_test.go:732: native diagnostic preparation started
+    native_exchange_test.go:568: native diagnostic worker opening 0
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:474: native diagnostic connector admission terminal 20.954799ms no native command admitted
+    native_exchange_test.go:570: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:568: native diagnostic worker opening 1
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.036424687s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 2.986423141s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 508.968525ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 683.738077ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:732: native diagnostic preparation terminal <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 2
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.956947705s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.911253899s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 483.470075ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 648.296901ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:568: native diagnostic worker opening 3
+    native_exchange_test.go:473: native diagnostic connector admission entered
+    native_exchange_test.go:500: native diagnostic connector origin accepted 3.471467414s
+    native_exchange_test.go:473: native diagnostic hub admission entered
+    native_exchange_test.go:489: native diagnostic hub origin accepted 3.427448387s
+    native_exchange_test.go:474: native diagnostic hub admission terminal 528.345367ms <nil>
+    native_exchange_test.go:474: native diagnostic connector admission terminal 695.087131ms <nil>
+    native_exchange_test.go:570: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:577: native diagnostic worker conversation terminal 3 Joined <nil>
+    download_sessions_test.go:732: actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=352; synthetic identity/issuer/Pod/bootstrap facts
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.create-fixture start=19.19µs elapsed=118.414868ms remaining-start=0s remaining-end=0s input-remaining=0s result-remaining=4.881654406s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=542.362522ms elapsed=7.455045ms remaining-start=29.997368528s remaining-end=29.989913483s input-remaining=4.450270907s result-remaining=4.450270907s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=549.826487ms elapsed=21.09267ms remaining-start=29.989904563s remaining-end=29.968811893s input-remaining=0s result-remaining=4.978909317s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=570.927087ms elapsed=907.754µs remaining-start=29.968803963s remaining-end=29.967896209s input-remaining=0s result-remaining=4.999516623s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=585.087253ms elapsed=4.19606ms remaining-start=29.954643797s remaining-end=29.950447737s input-remaining=4.410805161s result-remaining=4.410805161s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=589.289603ms elapsed=18.942009ms remaining-start=29.950441447s remaining-end=29.931499438s input-remaining=0s result-remaining=4.981058862s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=608.238182ms elapsed=847.644µs remaining-start=29.931492868s remaining-end=29.930645224s input-remaining=0s result-remaining=4.999507638s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.permissions start=676.185932ms elapsed=8.49982ms remaining-start=29.863545118s remaining-end=29.855045298s input-remaining=4.315402712s result-remaining=4.315402712s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.retention start=684.694042ms elapsed=100.548113ms remaining-start=29.855037008s remaining-end=29.754488895s input-remaining=0s result-remaining=4.899453319s result=ok context=ok
+    native_phase_diagnostic_test.go:175: native bounded phase=publication kind=recent port=publication.recovery start=785.251205ms elapsed=888.524µs remaining-start=29.754479845s remaining-end=29.753591321s input-remaining=0s result-remaining=4.999522735s result=ok context=ok
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.create-fixture calls=1 elapsed=118.414868ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.permissions calls=3 elapsed=20.150925ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.recovery calls=3 elapsed=2.643922ms
+    native_phase_diagnostic_test.go:185: native bounded phase=publication kind=total port=publication.retention calls=3 elapsed=140.582792ms
+--- PASS: TestContextAdmissionWithRealServices (71.74s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (41.77s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session (21.44s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session (18.22s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-control-races (11.48s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-control-admission-race (6.46s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-exchange (11.66s)
+PASS
+ok  	asservat.local/asservat/test/integration	72.797s

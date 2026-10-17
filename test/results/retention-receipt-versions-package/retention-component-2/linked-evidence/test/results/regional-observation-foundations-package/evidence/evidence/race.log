@@ -1,0 +1,521 @@
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/union
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/future
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/request
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label
+--- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/union (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/future (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/request (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label (0.00s)
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound
+--- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound (0.00s)
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-mutation
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/caller-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/no-channel
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-template
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-guard
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/suspended
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/replacement-source
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/workload-expiry
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/first-ordinal
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/ordinal-ceiling
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-image
+=== RUN   TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-roles
+--- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-mutation (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/source-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/caller-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/no-channel (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-template (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-guard (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/suspended (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/replacement-source (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/workload-expiry (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/first-ordinal (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/ordinal-ceiling (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-image (0.00s)
+    --- PASS: TestConnectorObservationKeepsOriginalChildBoundsAndPins/changed-roles (0.00s)
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roots
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/deployment
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roles
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/serving-budget
+=== RUN   TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/suspended
+--- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roots (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/deployment (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/roles (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/serving-budget (0.00s)
+    --- PASS: TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource/suspended (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.010s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.007s [no tests to run]
+=== RUN   TestClusterObservationFramesRejectOversizedBeforeReadingBody
+--- PASS: TestClusterObservationFramesRejectOversizedBeforeReadingBody (0.00s)
+=== RUN   TestClusterObservationFramesHaveNoCaptureOrCredentialFallback
+--- PASS: TestClusterObservationFramesHaveNoCaptureOrCredentialFallback (0.00s)
+=== RUN   TestClusterObservationMaximumClosedWire
+=== RUN   TestClusterObservationMaximumClosedWire/char-22
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-5c
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-3c
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-26
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+--- PASS: TestClusterObservationMaximumClosedWire (0.44s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-22 (0.13s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-5c (0.13s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-3c (0.10s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-26 (0.09s)
+=== RUN   TestClusterObservationWireRejectsSmuggledFields
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/missing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/trailing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/too-large
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/token
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/url
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/duplicate
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/alias
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/null
+--- PASS: TestClusterObservationWireRejectsSmuggledFields (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/missing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/trailing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/too-large (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/token (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/url (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/duplicate (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/alias (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/null (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.473s
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed
+--- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner (0.12s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed (0.02s)
+=== RUN   TestConnectorObservationChannelRequiresAllProofsAndExactReceipt
+--- PASS: TestConnectorObservationChannelRequiresAllProofsAndExactReceipt (0.05s)
+=== RUN   TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof
+--- PASS: TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof (0.03s)
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close
+--- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases (0.27s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt (0.05s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close (0.05s)
+=== RUN   TestConnectorObservationChannelCloseJoinsAdmittedMetadata
+--- PASS: TestConnectorObservationChannelCloseJoinsAdmittedMetadata (0.04s)
+=== RUN   TestConnectorObservationChannelPreservesSerializedOriginalInstants
+--- PASS: TestConnectorObservationChannelPreservesSerializedOriginalInstants (0.04s)
+=== RUN   TestConnectorObservationProducerUsesPrivateKeysAndFreshNativeProof
+--- PASS: TestConnectorObservationProducerUsesPrivateKeysAndFreshNativeProof (0.04s)
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/roles
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/suspended
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/backing
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-client-key
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-server-key
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/guard
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/template
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/replacement
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/renewal
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/key-replaced
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/cancelled
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/closed
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/expired
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/issuer-revoked
+=== RUN   TestConnectorObservationProducerRejectsChangedLocalAuthority/proof-unavailable
+--- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority (0.41s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/roles (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/suspended (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/backing (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-client-key (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/wrong-server-key (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/guard (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/template (0.02s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/replacement (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/renewal (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/key-replaced (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/cancelled (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/closed (0.04s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/expired (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/issuer-revoked (0.03s)
+    --- PASS: TestConnectorObservationProducerRejectsChangedLocalAuthority/proof-unavailable (0.03s)
+=== RUN   TestConnectorObservationProducerKeepsCallerDeadlineAndJoinsRootCancellation
+--- PASS: TestConnectorObservationProducerKeepsCallerDeadlineAndJoinsRootCancellation (0.03s)
+=== RUN   TestConnectorObservationPrivateSnapshotRejectsActualRenewalAndReplacement
+--- PASS: TestConnectorObservationPrivateSnapshotRejectsActualRenewalAndReplacement (0.03s)
+=== RUN   TestConnectorObservationPrivateSnapshotHasNoActivationAuthority
+--- PASS: TestConnectorObservationPrivateSnapshotHasNoActivationAuthority (0.02s)
+=== RUN   TestRemoteConnectorSourceReadsFreshEveryTimeAndPreservesFirstDeadline
+--- PASS: TestRemoteConnectorSourceReadsFreshEveryTimeAndPreservesFirstDeadline (0.05s)
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/unknown
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/ordinal
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/challenge
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/channel
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/process
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/backing
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/workload
+=== RUN   TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/revision
+--- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable (0.33s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/unknown (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/ordinal (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/challenge (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/channel (0.05s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/process (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/backing (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/workload (0.04s)
+    --- PASS: TestRemoteConnectorSourceUnknownAndChangedProofRemainUnavailable/revision (0.04s)
+=== RUN   TestRemoteConnectorSourceCloseJoinsAdmittedProofAndDeniesConcurrentRead
+--- PASS: TestRemoteConnectorSourceCloseJoinsAdmittedProofAndDeniesConcurrentRead (0.03s)
+=== RUN   TestConnectorPairedProcessKeysRenewAndAutomaticallyReplace
+--- PASS: TestConnectorPairedProcessKeysRenewAndAutomaticallyReplace (0.03s)
+=== RUN   TestConnectorPairedCloseJoinsPendingProvider
+--- PASS: TestConnectorPairedCloseJoinsPendingProvider (0.02s)
+=== RUN   TestConnectorPairedCredentialsActualDistinctTLS
+--- PASS: TestConnectorPairedCredentialsActualDistinctTLS (0.03s)
+=== RUN   TestConnectorOwnedObservationRequiresActivatedCurrentOriginalProcess
+--- PASS: TestConnectorOwnedObservationRequiresActivatedCurrentOriginalProcess (0.02s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	2.618s
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/valid
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/parent-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/token-cap
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-audience
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/unbound
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/wrong-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/duplicate-group
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/revoked-review
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-account
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/replaced-controller
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/two-controllers
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-template
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/changed-after-read
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/scaled-down
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/deleted-pod
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/lost-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/other-policy
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/late-final-guard
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/original-expired
+=== RUN   TestClusterObservationCallerExactNativeReadBoundary/cancelled
+--- PASS: TestClusterObservationCallerExactNativeReadBoundary (3.32s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/valid (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/parent-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/token-cap (0.37s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-audience (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/unbound (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/wrong-account (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/extra-admin-group (0.08s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/duplicate-group (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/revoked-review (0.11s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-account (0.11s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-pod (0.11s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/replaced-controller (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/two-controllers (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-template (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-pod-command (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/changed-after-read (0.10s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/scaled-down (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/deleted-pod (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/lost-guard (0.13s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/other-policy (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/late-final-guard (0.38s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/original-expired (0.09s)
+    --- PASS: TestClusterObservationCallerExactNativeReadBoundary/cancelled (0.08s)
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled
+--- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection (8.52s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid (0.40s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review (0.11s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection (0.14s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready (0.39s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token (0.39s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed (0.38s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection (0.13s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account (0.11s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review (0.11s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account (0.11s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod (0.12s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down (0.13s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account (0.11s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed (0.19s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late (0.41s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled (0.11s)
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/valid
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/pending
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/status-change
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/short-token
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/cached-configuration
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/ordinary-retiring
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/ordinary-short-parent
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/short-parent
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/not-retiring
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/not-suspended
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/final-retirement-cleared
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/final-backing-changed
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/invalid-csr
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/same-key
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/foreign-binding
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-unavailable
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-changed
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-expired
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/missing-protection
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/lost-protection
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-audience
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/revoked-review
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-account
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-live-account
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-deployment
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-replica
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-owner
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/deleted-pod
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/failed-pod
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/scaled-down
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/spec-changed
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/late
+=== RUN   TestConnectorRetirementProofPreservesLiveActorAndPurpose/cancelled
+--- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose (6.26s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/valid (0.37s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/pending (0.39s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/status-change (0.38s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/short-token (0.38s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/cached-configuration (0.39s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/ordinary-retiring (0.14s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/ordinary-short-parent (0.44s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/short-parent (0.39s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/not-retiring (0.11s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/not-suspended (0.11s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/final-retirement-cleared (0.40s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/final-backing-changed (0.43s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/invalid-csr (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/same-key (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/foreign-binding (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-unavailable (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-changed (0.37s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/configuration-expired (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/missing-protection (0.07s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/lost-protection (0.12s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-audience (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/revoked-review (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-account (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-live-account (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-deployment (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-replica (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/wrong-owner (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/deleted-pod (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/failed-pod (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/scaled-down (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/spec-changed (0.09s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/late (0.37s)
+    --- PASS: TestConnectorRetirementProofPreservesLiveActorAndPurpose/cancelled (0.07s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	19.146s
+=== RUN   TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose
+=== RUN   TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard
+=== RUN   TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates
+=== RUN   TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates
+=== RUN   TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-workload
+--- PASS: TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose (0.01s)
+    --- PASS: TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-namespace-guard (0.00s)
+    --- PASS: TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-namespace-candidates (0.00s)
+    --- PASS: TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-workload-candidates (0.00s)
+    --- PASS: TestClusterObservationDomainDigestPreservesEveryClosedWirePurpose/capacity-workload (0.00s)
+=== RUN   TestClusterObservationDomainDigestPreservesEmptyAndOrderingSemantics
+--- PASS: TestClusterObservationDomainDigestPreservesEmptyAndOrderingSemantics (0.00s)
+=== RUN   TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource
+--- PASS: TestClusterObservationOrderDoesNotReadMetadataBeforeBracketedSource (0.00s)
+=== RUN   TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection
+--- PASS: TestClusterObservationOrderRequiresFinalChecksAndOriginalDirection (0.00s)
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/exact-dns
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/wrong-sni-dns
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/ip-empty-sni
+=== RUN   TestClusterObservationLocalActualSNIAndAuthority/ip-wrong-dns-sni
+--- PASS: TestClusterObservationLocalActualSNIAndAuthority (0.03s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/exact-dns (0.01s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/wrong-sni-dns (0.01s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/ip-empty-sni (0.01s)
+    --- PASS: TestClusterObservationLocalActualSNIAndAuthority/ip-wrong-dns-sni (0.01s)
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/valid
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-denied
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-replaced-after-read
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-first-shortened
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-target
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-purpose
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-request-digest
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-page
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/remote-unavailable
+=== RUN   TestClusterObservationLocalTLSOriginalCallerAndSelection/expiry-before-delivery
+--- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection (0.08s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/valid (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-denied (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-replaced-after-read (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/caller-first-shortened (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-target (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-purpose (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-request-digest (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/wrong-page (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/remote-unavailable (0.01s)
+    --- PASS: TestClusterObservationLocalTLSOriginalCallerAndSelection/expiry-before-delivery (0.01s)
+=== RUN   TestClusterObservationLocalCancellationJoinsAndRetainsSlot
+--- PASS: TestClusterObservationLocalCancellationJoinsAndRetainsSlot (0.04s)
+=== RUN   TestClusterObservationLocalUnknownPOSTIsNotRetried
+--- PASS: TestClusterObservationLocalUnknownPOSTIsNotRetried (0.01s)
+=== RUN   TestClusterObservationLocalOriginalDeadlineIncludesTokenRead
+--- PASS: TestClusterObservationLocalOriginalDeadlineIncludesTokenRead (0.03s)
+=== RUN   TestClusterObservationChildIntervalsCannotEscapeRelayCap
+--- PASS: TestClusterObservationChildIntervalsCannotEscapeRelayCap (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/clusterobservation	1.218s

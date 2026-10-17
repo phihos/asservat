@@ -1,0 +1,10 @@
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:280: nativeBytes=353 dataBytes=325 indexBytes=367 wrappedMetadataBytes=1824; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:280: nativeBytes=353 dataBytes=327 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.36s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.29s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.05s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.405s

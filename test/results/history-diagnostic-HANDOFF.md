@@ -1,0 +1,13 @@
+# Initial history role diagnostics and selected PostgreSQL reproduction
+
+Six frozen paths; all three existing bases match current live, three new paths are absent. No permission/SQL/deadline behavior changed. No external lab was run by this agent.
+
+The actual corrected handover run reached history-role-provision and failed. That phase previously covered both ProvisionHistory and its subsequent binder.Bind. This patch separates history-final-binding/deadline and adds bounded SQL diagnostics: compiler-selected ProvisionHistory subphase, validated five-character SQLSTATE if retained, cancellation boolean. It never renders provider/SQL/credential text; the original error remains available through errors.Is. No logging added.
+
+New isolated native test: TestInitialSQLHistoryRoleWithRealPostgres. Select it on a fresh owned custody database using the parent's existing --run harness. It uses the actual maintenance helper/TLS bridge, original setup roles, a distinct fourth password, bounded five-second history creation/replay, actual passive login, exact membership absence and denied extra privileges. It does not invoke Kubernetes or provision actual runtime authority. Native result is pending.
+
+Narrow three-package race/compile passed. The first command's overly exact regex selected no tests (race.log); corrected race-selected.log proves the SQL diagnostic and bootstrap diagnostic tests passed, with integration compilation only. Command: external TMPDIR, GOMAXPROCS=2, go test -p 2 -race -overlay overlay.json ./internal/adapters/postgres ./internal/bootstrap ./test/integration -run 'TestInitial(SQLHistoryDiagnostic|PreparerRunDiagnostic|PreparerLoadDiagnostic)'. Affected three-package vet also terminal0 (vet.log).
+
+Current primary PostgreSQL18 docs identify a likely incompatibility, not yet measured by this fixture: the automatic creator ADMIN membership is granted by the bootstrap superuser and cannot be removed by the CREATEROLE creator. Source: https://www.postgresql.org/docs/current/role-attributes.html. ProvisionHistory currently tries that removal and rejects any remaining membership. If the selected native fixture confirms it, keep the product preparer non-superuser and design an independently pinned exact management-member exception or separately trusted SQL-administrator handover. Do not silently broaden the passive role, inject superuser credentials or treat this observation as a measured native result.
+
+Next: parent integrates this diagnostic fixture, runs only the new exact PostgreSQL test, records safe substage/SQLSTATE, then coordinates the contract-correct fix. Separate initial409 continuation source is unqualified and excluded.

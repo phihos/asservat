@@ -1,0 +1,361 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "evidenceretentionpolicies.asservat.io"
+  },
+  "spec": {
+    "group": "asservat.io",
+    "scope": "Namespaced",
+    "names": {
+      "kind": "EvidenceRetentionPolicy",
+      "plural": "evidenceretentionpolicies",
+      "singular": "evidenceretentionpolicy",
+      "categories": [
+        "asservat"
+      ]
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "subresources": {
+          "status": {}
+        },
+        "additionalPrinterColumns": [
+          {
+            "name": "Phase",
+            "type": "string",
+            "jsonPath": ".status.phase"
+          },
+          {
+            "name": "Observed",
+            "type": "integer",
+            "jsonPath": ".status.observedGeneration"
+          }
+        ],
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "required": [
+              "spec"
+            ],
+            "properties": {
+              "apiVersion": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "object",
+                    "properties": {
+                      "clusterIDs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "x-kubernetes-list-type": "set"
+                      },
+                      "namespaceSelector": {
+                        "type": "object",
+                        "properties": {
+                          "matchLabels": {
+                            "type": "object",
+                            "minProperties": 1,
+                            "maxProperties": 16,
+                            "additionalProperties": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63
+                            },
+                            "x-kubernetes-validations": [
+                              {
+                                "rule": "self.all(k, size(k) <= 253)",
+                                "message": "Label keys are at most 253 characters."
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "matchLabels"
+                        ]
+                      },
+                      "workloadSelector": {
+                        "type": "object",
+                        "properties": {
+                          "matchLabels": {
+                            "type": "object",
+                            "minProperties": 1,
+                            "maxProperties": 16,
+                            "additionalProperties": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63
+                            },
+                            "x-kubernetes-validations": [
+                              {
+                                "rule": "self.all(k, size(k) <= 253)",
+                                "message": "Label keys are at most 253 characters."
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "matchLabels"
+                        ]
+                      }
+                    }
+                  },
+                  "purposeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "defaults": {
+                    "type": "object",
+                    "properties": {
+                      "evidenceSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      },
+                      "caseMetadataSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      },
+                      "auditMetadataSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      }
+                    },
+                    "required": [
+                      "evidenceSeconds",
+                      "caseMetadataSeconds",
+                      "auditMetadataSeconds"
+                    ]
+                  },
+                  "maxima": {
+                    "type": "object",
+                    "properties": {
+                      "evidenceSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      },
+                      "caseMetadataSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      },
+                      "auditMetadataSeconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 315360000
+                      }
+                    },
+                    "required": [
+                      "evidenceSeconds",
+                      "caseMetadataSeconds",
+                      "auditMetadataSeconds"
+                    ]
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "privacyClasses": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "unknown",
+                              "potentialPersonalData",
+                              "personalData",
+                              "specialCategoryPossible",
+                              "verifiedNonPersonal"
+                            ]
+                          },
+                          "minItems": 1,
+                          "maxItems": 5,
+                          "x-kubernetes-list-type": "set"
+                        },
+                        "evidenceTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "coreDump",
+                              "heapDump",
+                              "packetCapture",
+                              "logs",
+                              "files",
+                              "profile",
+                              "commandOutput",
+                              "context",
+                              "other",
+                              "syscallTrace"
+                            ]
+                          },
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "x-kubernetes-list-type": "set"
+                        },
+                        "maxAgeSeconds": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 315360000
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "maxAgeSeconds"
+                      ]
+                    },
+                    "minItems": 0,
+                    "maxItems": 64,
+                    "x-kubernetes-list-type": "map",
+                    "x-kubernetes-list-map-keys": [
+                      "name"
+                    ]
+                  },
+                  "deletionBudgetSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 86400
+                  },
+                  "legalExceptions": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "reviewed"
+                    ]
+                  }
+                },
+                "required": [
+                  "scope",
+                  "purposeRef",
+                  "defaults",
+                  "maxima",
+                  "rules",
+                  "deletionBudgetSeconds",
+                  "legalExceptions"
+                ],
+                "x-kubernetes-validations": [
+                  {
+                    "rule": "self.deletionBudgetSeconds < self.maxima.evidenceSeconds && self.rules.all(r, self.deletionBudgetSeconds < r.maxAgeSeconds)",
+                    "message": "Deletion budget must leave positive usable evidence lifetime."
+                  }
+                ]
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Ready",
+                      "Stale",
+                      "Rejected",
+                      "Degraded"
+                    ]
+                  },
+                  "observedGeneration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "policyDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "backendCompatible": {
+                    "type": "boolean"
+                  },
+                  "maximumOutstandingLeaseSeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 60
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "maxItems": 16
+                  },
+                  "clusterAcknowledgements": {
+                    "type": "array",
+                    "maxItems": 1024,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "clusterID": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "policyDigest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "validUntil": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "clusterID",
+                        "policyDigest",
+                        "observedAt",
+                        "validUntil"
+                      ],
+                      "x-kubernetes-validations": [
+                        {
+                          "rule": "timestamp(self.validUntil) > timestamp(self.observedAt) && timestamp(self.validUntil) <= timestamp(self.observedAt) + duration(\"60s\")",
+                          "message": "Cluster acknowledgement freshness is positive and at most sixty seconds."
+                        }
+                      ]
+                    },
+                    "x-kubernetes-list-type": "map",
+                    "x-kubernetes-list-map-keys": [
+                      "clusterID"
+                    ]
+                  }
+                },
+                "required": [
+                  "phase",
+                  "observedGeneration"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

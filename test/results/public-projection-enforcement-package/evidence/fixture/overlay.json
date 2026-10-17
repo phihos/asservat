@@ -1,0 +1,5 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_worker_test.go": "/home/phil/.cache/asservat-build/planning/public-worker-fixture-scope-20261013/changes/internal/adapters/kubernetes/public_runtime_worker_test.go"
+  }
+}

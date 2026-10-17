@@ -1,0 +1,38 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 0a2d96dc-c45a-4ef5-9868-8a93c1ba1e6d image docker.io/library/asservat-context-worker@sha256:8ec04b27b48bf6b3ef1b013f39c6c077c4dbebcf5886dfb39048edbf2e09fbb0 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-30dts30d-0", namespace "bootstrap-chain-10000000", installation "4439be70-19c2-4d91-b001-62d45da4df74": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-98842a62848b3ee75e0abfb8cae55cef982441f3ac5e88cfe24032798b488372-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-98842a62848b3ee75e0abfb8cae55cef982441f3ac5e88cfe24032798b488372-audit-wrap
+        created: sys/policies/acl/asservat-configuration-98842a62848b3ee75e0abfb8cae55cef982441f3ac5e88cfe24032798b488372-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-98842a62848b3ee75e0abfb8cae55cef982441f3ac5e88cfe24032798b488372-audit-unwrap
+        created: sys/policies/acl/asservat-4439be7019c24d91b00162d45da4df74-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: applied phase 3 owner-provider:
+        Kubernetes context "kind-asservat-context-30dts30d-0", namespace "bootstrap-chain-10000000", installation "4439be70-19c2-4d91-b001-62d45da4df74": applying phase 3 owner-provider recipe.
+        created: sys/policies/acl/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-audit-wrap
+        created: auth/owner-auth/role/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-audit-wrap
+        created: sys/policies/acl/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-audit-unwrap
+        created: auth/owner-auth/role/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-audit-unwrap
+        created: sys/policies/acl/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-server-sign
+        created: auth/owner-auth/role/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-server-sign
+        created: sys/policies/acl/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-client-sign
+        created: auth/owner-auth/role/asservat-owner-1695efbd878bc2368bef9ffb81b488fb2ba8c3b6a38cc68a0612e584dfdec51d-client-sign
+        created: owner-pki/roles/asservat-owner-pki-53ccd75af52bbe9023932776a1830e5bd7d0e649a836838b234f0dc133c2419c-server
+        created: owner-pki/roles/asservat-owner-pki-53ccd75af52bbe9023932776a1830e5bd7d0e649a836838b234f0dc133c2419c-client
+        created: sys/policies/acl/asservat-4439be7019c24d91b00162d45da4df74-owner-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: permission stream 8087e96b-2b5e-431e-a4a6-aa35c4ec4f65 fresh with 2 acknowledged authority audits
+    initial_bootstrap_chain_test.go:343: capacity source initialized for the permission root
+    initial_bootstrap_chain_test.go:343: actual installer-continue Pod under the runner account and chart continuation rules, two actual applier waits; worker inputs/launch and owner identity/launch acknowledged with running worker and owner processes; bootstrap hook and continuation replay after the guard bridge without changes; no public workflow claim
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- PASS: TestInitialBootstrapChainWithRealServices (815.94s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.60s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/installer-continuation (505.67s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.80s)
+PASS
+ok  	asservat.local/asservat/test/integration	816.997s

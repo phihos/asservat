@@ -1,0 +1,30 @@
+# Fixture issuer original signing instant — qualified handoff
+
+Three fixture-only payloads in `files/`, with exact original `bases.json`, frozen `dependencies.json` (2,280 paths), and `freeze.json`. No production change, deadline extension, verifier change, source/client/pool change, or diagnostic instrumentation is included.
+
+- `test/fixtures/observation-native/enrollment.go`: change only connector certificate NotBefore from signing-time now to original permit CheckedAt, matching the existing owner fixture. DER certificate lifetime still ends at the original CertificateNotAfter.
+- `test/integration/connector_identity_test.go`: same fixture-only correction in the SQL reference issuer.
+- `test/fixtures/observation-native/enrollment_test.go`: actual-helper regression and restrictive negatives. Build-ignored with the helper; the runner passes the exact six harness helper files plus this test file explicitly. It invokes the actual issuer and unchanged mtls verifier.
+
+## Actual evidence
+
+Exec handle 88948 joined with exit 0; every frozen source/base/payload/mirror hash and file-set check passed. Owned scratch was removed after all subprocesses joined; 16,731,344,896 bytes remained free in /tmp. Evidence is create-only under `evidence/`.
+
+| Phase | Actual exit | Seconds |
+| --- | ---: | ---: |
+| Original helper regression | 1, required failure | 21.106 |
+| Corrected helper race tests | 0 | 3.320 |
+| Actual six-file CGO0 helper build | 0 | 2.620 |
+| Integration package race compile only | 0 | 13.390 |
+| Explicit helper files plus test vet | 0 | 10.430 |
+| Integration package vet | 0 | 1.373 |
+
+Before: both client and server produce the required `BEFORE-FIXTURE-ISSUER-ORIGINAL-INSTANT` failure, with the synthetic original permit age approximately 3.002 seconds and approximately 1.998 seconds remaining. Actual emitted leaf NotBefore is later than original CheckedAt; domain Matches and unchanged verifier both reject. No setup/expiry failure substituted for this reproduction.
+
+After: both purposes pass the same unchanged domain/verifier checks, certificate DER/returned date equality and original deadline checks. Expired permit, cancelled caller and wrong key remain rejected. Two top-level tests / seven named PASS entries; no external services or skips.
+
+The deliberately aged synthetic permit models the time spent before signing; it is not a measurement of actual native phase timing. Native4 remains a failed full reference fixture, and the next native result must independently establish whether other bounds remain limiting. Provider authority remains the explicit fixtureIssuer; real provider latency, installation selection and sustained HWORK availability are unqualified.
+
+## Integration and next step
+
+Copy exactly the three payload paths after rechecking bases/dependencies. No generated source or schema change. The separate unrun diagnostic stage is excluded. The next step is parent-owned native5 of the original H/A/R fixture with unchanged original bounds, source freeze and positive join checks. Do not claim that this component verdict retroactively establishes native4's exact internal substep.

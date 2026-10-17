@@ -1,0 +1,154 @@
+{
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile-integration",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-c",
+        "-vet=off",
+        "-o",
+        "/tmp/asservat-direct-projection-bszjpnq9/integration.test",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 32.645,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "fixture-tests",
+      "command": [
+        "/tmp/asservat-direct-projection-bszjpnq9/integration.test",
+        "-test.run=^TestDirectNative(Fixture(WireParity|DiagnosticLabels)|PendingIdentity|InputSetupDeadline)$",
+        "-test.v",
+        "-test.timeout=60s"
+      ],
+      "exit": 0,
+      "seconds": 1.288,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 33,
+      "skips": 0
+    },
+    {
+      "phase": "vet-integration",
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 11.906,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "python3",
+        "/tmp/asservat-direct-projection-bszjpnq9/mirror/scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "seconds": 1.031,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 16734904320
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

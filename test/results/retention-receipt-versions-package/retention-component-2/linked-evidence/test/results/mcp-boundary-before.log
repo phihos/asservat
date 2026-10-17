@@ -1,0 +1,10 @@
+--- FAIL: TestProtocolProfilesAuthenticateAcrossReplicas (0.02s)
+    --- FAIL: TestProtocolProfilesAuthenticateAcrossReplicas/2026-07-28 (0.00s)
+        handler_test.go:124: discover: 400 {"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"missing or invalid _meta field \"io.modelcontextprotocol/protocolVersion\""}}
+    handler_test.go:139: authentication count 8, want ingress and delivery checks for each request
+--- FAIL: TestIngressRejectsAmbiguityAndResourceAbuse (0.02s)
+    --- FAIL: TestIngressRejectsAmbiguityAndResourceAbuse/routing_2025-11-25 (0.00s)
+        handler_test.go:294: routing mismatch accepted 200 {"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"unknown tool \"request_capture\""}}
+FAIL
+FAIL	asservat.local/asservat/internal/transport/mcp	0.120s
+FAIL

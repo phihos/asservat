@@ -1,0 +1,11 @@
+ok  	asservat.local/asservat/internal/application/evidence	1.051s
+2026/10/10 18:35:10 http: TLS handshake error from 127.0.0.1:34110: remote error: tls: bad certificate
+2026/10/10 18:35:10 http: TLS handshake error from 127.0.0.1:37978: remote error: tls: bad certificate
+--- FAIL: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite (2.00s)
+    --- FAIL: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel (1.00s)
+        worker_delivery_lifetime_test.go:104: response never reached write
+    --- FAIL: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry (1.00s)
+        worker_delivery_lifetime_test.go:104: response never reached write
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.848s
+FAIL

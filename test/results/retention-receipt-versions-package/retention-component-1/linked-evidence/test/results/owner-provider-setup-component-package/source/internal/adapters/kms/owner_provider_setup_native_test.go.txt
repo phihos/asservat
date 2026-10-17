@@ -1,0 +1,85 @@
+package kms
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+// The provider administrator applies the generated public recipe only inside
+// this owned fixture. Actual inspection uses a separate named-read credential;
+// neither root setup nor the synthetic pool is product installation authority.
+func (f *ownerProviderNativeFixture) setupInspection(t *testing.T, pool fleet.OwnerPool, roots [][]byte) {
+	t.Helper()
+	recipe, err := providerconfig.OwnerSetupRecipeFor(f.input, f.recipe.Profile, pool, roots, time.Now())
+	if err != nil {
+		t.Fatal("generated provider setup", err)
+	}
+	f.admin(http.MethodPost, "sys/auth/owner-auth/tune", map[string]any{"default_lease_ttl": 300, "max_lease_ttl": 900, "token_type": "default-service"}, 204)
+	for _, role := range recipe.PKIRoles {
+		f.admin(http.MethodPost, f.input.KeyService.PKIMount+"/roles/"+role.Name, json.RawMessage(role.Role), 200)
+	}
+	f.admin(http.MethodPost, "sys/policies/acl/owner-setup-inspection", map[string]string{"policy": string(recipe.InspectionPolicy)}, 204)
+	reply := f.admin(http.MethodPost, "auth/token/create", map[string]any{"policies": []string{"owner-setup-inspection"}, "no_default_policy": true, "ttl": "1m", "explicit_max_ttl": "1m", "renewable": false}, 200)
+	auth, ok := reply["auth"].(map[string]any)
+	if !ok {
+		t.Fatal("fixture inspection token response")
+	}
+	token, ok := auth["client_token"].(string)
+	if !ok || token == "" {
+		t.Fatal("fixture inspection token missing")
+	}
+	t.Cleanup(func() { f.admin(http.MethodPost, "auth/token/revoke", map[string]string{"token": token}, 204) })
+	reader, err := providerconfig.NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: f.input.KeyService.Endpoint, Roots: f.input.KeyService.Roots}, []byte(token))
+	if err != nil {
+		t.Fatal("concrete inspection reader", err)
+	}
+	defer func() {
+		if e := reader.Close(context.Background()); e != nil {
+			t.Error(e)
+		}
+	}()
+	check, err := reader.VerifyOwner(f.ctx, f.input, f.recipe.Profile, pool, roots)
+	if err != nil || !check.Matches(f.input, f.recipe.Profile, pool, roots, time.Now()) {
+		t.Fatal("actual named provider setup reads", err)
+	}
+	// Read-only inspection cannot encrypt even under the known selected key.
+	call, cancel := context.WithTimeout(f.ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(call, http.MethodPost, f.input.KeyService.Endpoint+"/v1/"+f.input.KeyService.AuditMount+"/encrypt/"+f.input.KeyService.AuditKey, bytes.NewBufferString(`{"plaintext":"c3ludGhldGlj"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Vault-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+	req.GetBody = nil
+	response, err := f.http.Do(req)
+	if err != nil {
+		t.Fatal("inspection effect denial unavailable")
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatal("inspection credential gained key effect", response.StatusCode)
+	}
+	var widened map[string]any
+	if json.Unmarshal(recipe.PKIRoles[0].Role, &widened) != nil {
+		t.Fatal("fixture generated server role")
+	}
+	widened["client_flag"] = true
+	f.admin(http.MethodPost, f.input.KeyService.PKIMount+"/roles/"+recipe.PKIRoles[0].Name, widened, 200)
+	if _, e := reader.VerifyOwner(f.ctx, f.input, f.recipe.Profile, pool, roots); e == nil {
+		t.Fatal("expanded actual certificate role accepted")
+	}
+	f.admin(http.MethodPost, f.input.KeyService.PKIMount+"/roles/"+recipe.PKIRoles[0].Name, json.RawMessage(recipe.PKIRoles[0].Role), 200)
+	if _, e := reader.VerifyOwner(f.ctx, f.input, f.recipe.Profile, pool, roots); e != nil {
+		t.Fatal("restored exact provider setup", e)
+	}
+	t.Log("actual read-only setup verifies 16 named provider objects, denies an encryption effect and changed certificate purpose; subsequent leased effects qualify the generated pool-scoped PKI roles")
+}

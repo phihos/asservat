@@ -1,0 +1,8 @@
+{
+  "handle": 49582,
+  "exit": 1,
+  "framed_race": "pass, 1.616s",
+  "artifact_test_compile": "failed typed int constants in int64 literal; fixed source-only after terminal",
+  "changed_dependencies": [],
+  "dependency_count": 356
+}

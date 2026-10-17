@@ -1,0 +1,97 @@
+[
+  {
+    "handle": "56709",
+    "check": "Pre-fix uncertain closed-owner admission predicate regression",
+    "exit": 1,
+    "result": "expected failure",
+    "log": "context-native-outcome-20261012/before.log",
+    "scope": "Pure admission predicate; actual SQL reconstruction before/after remains unrun."
+  },
+  {
+    "handle": "4d0939",
+    "check": "Initial sqlc staging configuration",
+    "exit": 1,
+    "result": "stage path setup failure; no product verdict",
+    "log": "context-native-outcome-20261012/sqlc.log"
+  },
+  {
+    "handle": "cdc3d4",
+    "check": "Corrected isolated sqlc generation",
+    "exit": 0,
+    "log": "context-native-outcome-20261012/sqlc-second.log"
+  },
+  {
+    "handle": "61710",
+    "check": "Initial post-fix race selection",
+    "exit": 1,
+    "result": "Postgres tests passed; new native test used wrong comparison DTO and failed to compile",
+    "log": "context-native-outcome-20261012/after.log"
+  },
+  {
+    "handle": "73334",
+    "check": "Corrected Postgres/native focused races",
+    "exit": 0,
+    "log": "context-native-outcome-20261012/after-second.log",
+    "scope": "Includes actual h2 final-marker loss; peer/authority fixtures remain synthetic."
+  },
+  {
+    "handle": "51598",
+    "check": "Earlier positive-range fixture compile",
+    "exit": 0,
+    "log": "context-native-resume-20261012/compile.log",
+    "scope": "Earlier source only; superseded by combined-compile."
+  },
+  {
+    "handle": "12699",
+    "check": "Combined integration compilation and cookie/join helper tests",
+    "exit": 0,
+    "log": "context-native-resume-20261012/combined-compile.log",
+    "scope": "New SQL/S3 native selectors compiled but not executed."
+  },
+  {
+    "handle": "53686",
+    "check": "Initial isolated UI test setup",
+    "exit": 1,
+    "result": "missing stage examples dependency; no product verdict",
+    "log": "native-download-restart-20261012/vitest.log"
+  },
+  {
+    "handle": "18561",
+    "check": "Final affected UI tests",
+    "exit": 0,
+    "tests": 37,
+    "log": "native-download-restart-20261012/vitest-second.log"
+  },
+  {
+    "handle": "80963",
+    "check": "Final staged TypeScript noEmit",
+    "exit": 0,
+    "log": "native-download-restart-20261012/typecheck.log"
+  },
+  {
+    "handle": "47785",
+    "check": "Final combined Postgres/native/integration vet",
+    "exit": 0,
+    "log": "context-native-resume-20261012/combined-vet.log"
+  },
+  {
+    "handle": "69180",
+    "check": "Native-link click with stale Ready before correction",
+    "exit": 1,
+    "result": "Expected meaningful failure: restart button absent without a status request/error callback",
+    "log": "native-download-restart-20261012/started-before.log"
+  },
+  {
+    "handle": "71175",
+    "check": "Final v2 affected UI tests",
+    "exit": 0,
+    "tests": 38,
+    "log": "native-download-restart-20261012/started-after.log"
+  },
+  {
+    "handle": "5200",
+    "check": "Final v2 TypeScript noEmit",
+    "exit": 0,
+    "log": "native-download-restart-20261012/started-typecheck.log"
+  }
+]

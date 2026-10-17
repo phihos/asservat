@@ -1,0 +1,39 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+    "./internal/transport/native",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 1.272,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0,
+  "failureMarker": null,
+  "markerOccurrences": null
+}

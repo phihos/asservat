@@ -1,0 +1,3 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+FAIL: Broken local link in README.md: experiments/technology-selection/README.md
+make: *** [Makefile:5: spec-check] Error 1

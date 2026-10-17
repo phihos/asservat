@@ -1,0 +1,10 @@
+[
+  {
+    "path": "internal/domain/audit/owner_configuration.go",
+    "sha256": "530b673fc0ff1184b9ab59f9bae0006827ee1ffcb25847743a6f325ee99beafc"
+  },
+  {
+    "path": "internal/domain/audit/owner_enrollment.go",
+    "sha256": "089a024b821303c940db17a793a697b6ecb227817ce5d74a9f1be344627de053"
+  }
+]

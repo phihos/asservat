@@ -1,0 +1,37 @@
+[
+  {
+    "path": "internal/adapters/postgres/owner_identity_prerequisites.go",
+    "base_sha256": null,
+    "payload_sha256": "09c6b073bce8817594bc92ecd4d5e782d294c867e5fd6d434dc04eb8ce1e78b6"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_prerequisites_test.go",
+    "base_sha256": null,
+    "payload_sha256": "7b11f2b0d5aebc9e245865cad8b9ac3fdb8dcd751bf04af2dfaf247e6a5a7e00"
+  },
+  {
+    "path": "internal/adapters/postgres/owner_identity_roles.go",
+    "base_sha256": "055695a005e2da02bea8f1f1cd9f55e91ffc0c62ad12d009873362b09637b7b1",
+    "payload_sha256": "1b8f7f10f28ff1fdbf144532b5e9938db08df461588748a3637c1264407462b9"
+  },
+  {
+    "path": "test/integration/initial_installation_test.go",
+    "base_sha256": "c9724625796ea935137a5cbe624bdf2b5bdd60c8554c00e2d1a33cb07ca17e32",
+    "payload_sha256": "53b79ed93a63e849b94f03e3c77c355ec879c85039da8aebbba165246af39ab1"
+  },
+  {
+    "path": "test/integration/initial_runtime_owner_sql_diagnostic_test.go",
+    "base_sha256": null,
+    "payload_sha256": "761f2412dc4e42e1b8a7d47ca45e4e029065ef3a2a344f55e361b1d4961c561c"
+  },
+  {
+    "path": "test/integration/owner_identity_constructor_current_test.go",
+    "base_sha256": null,
+    "payload_sha256": "1ac1521f15ed22a1a5006a8728d2fce35853ecf1931bcf0672a71b99dd0f4034"
+  },
+  {
+    "path": "test/integration/owner_identity_roles_test.go",
+    "base_sha256": "7dee1b45f3ee1dd891f394ec70518b6bd8e236a541ce99e9b90ab4a50a0abda3",
+    "payload_sha256": "26954b12048830893d73b35c184ff992bb048fe3da107f98a746d5907999cd6c"
+  }
+]

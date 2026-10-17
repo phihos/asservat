@@ -1,0 +1,240 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "capacityreservations.asservat.io"
+  },
+  "spec": {
+    "group": "asservat.io",
+    "scope": "Namespaced",
+    "names": {
+      "kind": "CapacityReservation",
+      "plural": "capacityreservations",
+      "singular": "capacityreservation",
+      "categories": [
+        "asservat"
+      ]
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "subresources": {
+          "status": {}
+        },
+        "additionalPrinterColumns": [
+          {
+            "name": "Phase",
+            "type": "string",
+            "jsonPath": ".status.phase"
+          }
+        ],
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "required": [
+              "spec"
+            ],
+            "properties": {
+              "apiVersion": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "profile": {
+                    "type": "string",
+                    "enum": [
+                      "onTriggerStart/v1",
+                      "apiContextStart/v1"
+                    ]
+                  },
+                  "operationID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "captureID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "attemptID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "clusterID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "issuerEpoch": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "podUID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "nodeUID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "nodeBootID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "collectorEpoch": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "actionID": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+                  },
+                  "scopeDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "maxLength": 64
+                  },
+                  "authorityDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "maxLength": 64
+                  },
+                  "budgetDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "maxLength": 64
+                  },
+                  "auditDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "maxLength": 64
+                  },
+                  "nativeBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "notBefore": {
+                    "type": "string",
+                    "format": "date-time",
+                    "maxLength": 32
+                  },
+                  "notAfter": {
+                    "type": "string",
+                    "format": "date-time",
+                    "maxLength": 32,
+                    "description": "Original immutable start deadline. apiContextStart/v1 is at most five seconds after notBefore; the historical node profile is at most sixty seconds. Native CEL and the execution domain enforce these relational bounds."
+                  },
+                  "executorPodUID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "executorAccountUID": {
+                    "type": "string",
+                    "maxLength": 36,
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  }
+                },
+                "required": [
+                  "profile",
+                  "operationID",
+                  "captureID",
+                  "attemptID",
+                  "clusterID",
+                  "issuerEpoch",
+                  "podUID",
+                  "collectorEpoch",
+                  "actionID",
+                  "scopeDigest",
+                  "authorityDigest",
+                  "budgetDigest",
+                  "auditDigest",
+                  "nativeBytes",
+                  "notBefore",
+                  "notAfter"
+                ],
+                "x-kubernetes-validations": [
+                  {
+                    "rule": "self == oldSelf",
+                    "message": "A prepaid start binding is immutable."
+                  },
+                  {
+                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && self.actionID == \"pod-status\" && self.nativeBytes == 4096 && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))",
+                    "message": "Execution profile requires exactly its own identity and limits."
+                  },
+                  {
+                    "rule": "timestamp(self.notAfter) > timestamp(self.notBefore) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"60s\")",
+                    "message": "Start permit lifetime must be positive and at most 60 seconds."
+                  }
+                ]
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "Ready",
+                      "StartCommitted"
+                    ]
+                  },
+                  "committedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "maxLength": 32
+                  }
+                },
+                "required": [
+                  "phase"
+                ],
+                "x-kubernetes-validations": [
+                  {
+                    "rule": "self.phase == \"StartCommitted\" ? has(self.committedAt) : !has(self.committedAt)",
+                    "message": "Only a consumed start has committedAt."
+                  }
+                ]
+              }
+            },
+            "x-kubernetes-validations": [
+              {
+                "rule": "self.metadata.name == \"start-\" + self.spec.attemptID",
+                "message": "The name is bound to the immutable attempt."
+              },
+              {
+                "rule": "!has(oldSelf.status) || (has(self.status) && (self.status == oldSelf.status || (oldSelf.status.phase == \"Ready\" && self.status.phase == \"StartCommitted\")))",
+                "message": "Consumed starts cannot be reset or erased."
+              },
+              {
+                "rule": "has(oldSelf.status) || !has(self.status) || self.status.phase == \"Ready\"",
+                "message": "A reservation must become Ready before consumption."
+              },
+              {
+                "rule": "!has(self.status) || !has(self.status.committedAt) || (timestamp(self.status.committedAt) >= timestamp(self.spec.notBefore) && timestamp(self.status.committedAt) < timestamp(self.spec.notAfter))",
+                "message": "Recorded consumption must be within the original permit interval."
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

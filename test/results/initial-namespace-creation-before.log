@@ -1,0 +1,8 @@
+--- FAIL: TestInitialNamespaceCreationKeepsUncertaintyAndExactIdentity (0.17s)
+    --- FAIL: TestInitialNamespaceCreationKeepsUncertaintyAndExactIdentity/namespace-missing-label (0.01s)
+        initial_namespace_creation_test.go:139: unexpected creation result {{install 00000000-0000-4000-8000-000000000005} {00000000-0000-4000-8000-000000000003 00000000-0000-4000-8000-000000000004 2 1}} <nil>
+    --- FAIL: TestInitialNamespaceCreationKeepsUncertaintyAndExactIdentity/namespace-missing-stamp (0.01s)
+        initial_namespace_creation_test.go:139: unexpected creation result {{install 00000000-0000-4000-8000-000000000005} {00000000-0000-4000-8000-000000000003 00000000-0000-4000-8000-000000000004 2 1}} <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.209s
+FAIL

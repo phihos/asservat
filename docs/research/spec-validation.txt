@@ -1,0 +1,490 @@
+Current validation: 2026-10-09
+Scope: accepted ADR-023 PostgreSQL hub state, ADR-024 multiple managing owner teams, ADR-025 packet extensions, and reconciliation of ADR-022 capture-time/recurring sharing. Runtime implementation has not begun.
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+Exit status: 0
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 26 schemas, 24 MCP tools, 40 examples, 88 requirements, 88 scenarios, 11 tasks, 196 local links, 87 rejected invalid examples (1408 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Original brief matches supplied file: True
+Original brief SHA-256: af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20
+Added contract checks cover runtime DTO/CRD separation, forged creator/management assignment inputs, manager uniqueness, ring budgets, peer staleness, profile/transport limits and forbidden HTTP body/credential fields. These checks do not execute SQL, BPF or HTTP parsers or prove live authority.
+SQL concurrency/failover/migrations/backup/PITR, group departure/transfer, live peer updates/CNI behavior, HTTP reassembly/privacy, ring pressure, runtime performance and no-egress tests: NOT RUN; gates specified in docs/validation.md.
+Legal retention exceptions remain disabled by default; optional reviewed mode is still a proposal, not newly accepted here.
+
+Historical validations below describe their earlier specification state and do not override the accepted current architecture.
+
+Inspection date: 2026-10-09
+Scope: optional capture-time and bounded recurring-policy sharing (ADR-022); schemas, MCP inputs/results, acquisition/derivation provenance, examples, lifecycle and acceptance scenarios. Includes prior permission, ergonomics, privacy and storm/quota contracts.
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+Exit status: 0
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 24 schemas, 23 MCP tools, 36 examples, 77 requirements, 77 scenarios, 11 tasks, 157 local links, 56 rejected invalid examples (1160 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Original brief matches supplied file: True
+Original brief SHA-256: af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20
+Runtime, managed-cluster, GPU, performance, no-egress, permission-inheritance, usability, privacy/deletion, storm/quota/fairness and collection-time sharing race/revocation experiments: NOT RUN.
+SharingIntent/SharingRegistration state, admission, publication, UI and MCP extensions are specified, not implemented. Fixture checks do not prove live authorization, commit integrity or concurrency.
+Legal retention exceptions: default disabled; optional reviewed mode remains a proposal pending user preference.
+
+Reassessment validation: 2026-10-09
+Scope: proposed PostgreSQL hub-state reassessment (ADR-023); accepted runtime contracts are not converted by this proposal.
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+Exit status: 0
+PASS: 24 schemas, 23 MCP tools, 36 examples, 77 requirements, 77 scenarios, 11 tasks, 163 local links, 56 rejected invalid examples (1166 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+PostgreSQL deployment, benchmark, concurrency, backup/restore and failover tests: NOT RUN.
+Original brief matches supplied file: True
+Original brief SHA-256: af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20
+
+2026-10-09 — full design/UX review and pod/process selection refinements
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 28 schemas, 29 MCP tools, 55 examples, 100 requirements, 100 scenarios, 11 tasks, 232 local links, 115 rejected invalid examples (1885 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+18 ranked findings, 23 tabletop walkthroughs; 4 prior contract defects reproduced before correction. Runtime experiments NOT RUN.
+Original Downloads brief equals docs/research/original-brief.md; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+Longer-approval positive fixture: 30 days under administrator maximum; short permits and separate sharing expiry unchanged.
+
+2026-10-09 — guided diagnostic selection and finite discovery
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 29 schemas, 31 MCP tools, 64 examples, 106 requirements, 106 scenarios, 11 tasks, 265 local links, 137 rejected invalid examples (2182 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Six traced guidance requirements, two MCP tools, nine synthetic examples and 22 additional rejected invalid cases.
+Process, packet and recommendation runtime/usability experiments: NOT RUN (EXP-17/20).
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — capture history and repeat requests
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 30 schemas, 33 MCP tools, 70 examples, 110 requirements, 110 scenarios, 11 tasks, 285 local links, 158 rejected invalid examples (2339 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Four traced history requirements, two read tools, six synthetic examples, selector-identity fixtures and repeat-preview rejection cases.
+History runtime, privacy, concurrency and usability gates: NOT RUN (EXP-11/12/17/18/19).
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — reusable capture building blocks and bounded syscall evidence
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 34 schemas, 38 MCP tools, 93 examples, 118 requirements, 118 scenarios, 11 tasks, 340 local links, 207 rejected invalid examples (4498 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Eight traced requirements, five additional MCP tools, 23 synthetic examples and 49 additional rejected invalid examples. Fixture compilation covers typed overrides, endpoint/dependency rewrites, source identity, aggregate bounds, context deduplication, expensive duplicates and composition history. These are specification checks, not a production compiler or live authorization proof.
+Capture-profile admission, syscall acquisition/privacy/overhead, browser/MCP integration and participant usability experiments: NOT RUN (EXP-17/21/22).
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — on-trigger versus ongoing/save-on-trigger action lifecycles
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 35 schemas, 38 MCP tools, 100 examples, 123 requirements, 123 scenarios, 11 tasks, 370 local links, 231 rejected invalid examples (5339 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Five traced lifecycle requirements, one schema, seven synthetic examples and 24 additional rejected invalid cases. Validates kind defaults/allowed modes, source-versus-incident phase projections, typed overrides, dependency constraints, catalogue/preview consistency and impossible prehistory claims.
+Policy arming, recorder continuity, source/snapshot quota and revocation behavior, crash integration and usability experiments: NOT RUN (EXP-02/17/19/21/22). No collector was implemented or started.
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — combined capture impact and sensitive-data/deletion notices
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 36 schemas, 38 MCP tools, 107 examples, 128 requirements, 128 scenarios, 11 tasks, 406 local links, 266 rejected invalid examples (5853 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Five traced requirements, one schema, seven synthetic examples and 35 additional rejected invalid cases. Covers plan/action binding, observation-versus-incident scope arithmetic, unknown/known effect propagation, quantity source/coverage, retention ages, overdue state and scoped artifact notices. Direct evidence-query examples include handling reminders. Corrected known liveCore fixture typing to coreDump.
+The initial schema gate rejected a duplicate required property; fixed before this successful run.
+Preview/assessment services and UI are specified, not implemented. No live profiler, packet/syscall recorder, debugger or customer-data scan was run. Performance prediction accuracy, live authorization/admission, automatic deletion and participant comprehension remain NOT RUN (EXP-17/18/19/21/22).
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — final correctness and feature review
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 36 schemas, 38 MCP tools, 108 examples, 130 requirements, 130 scenarios, 11 tasks, 413 local links, 282 rejected invalid examples (5942 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+Nine ranked findings; clear specification corrections applied, with ADR-036 analysis-storage prerequisite awaiting maintainer decision. Two additional traced requirements, one new fixture, sixteen additional rejected invalid examples and five tabletop workflows. Manual pod bindings, lifecycle/window provenance, core target identity, log deadlines and metric bounds are checked offline. Unsupported manual policy detector removed.
+Four prior contract acceptances reproduced before editing: missing manual pod bindings, process-less core, log future window beyond timeout and missing acquisition lifecycle. Initial review edit script hit recursion while constructing the trigger schema; corrected before the successful gate.
+Runtime identity races, crash-helper outage latency, stopped-source retention, analysis isolation/logging/swap/cores, encrypted CSI scratch handoff/deletion, real trigger evaluation and participant usability: NOT RUN. No product implementation or live collection performed.
+Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — accepted recording saves and encrypted analysis scratch
+Command: make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python
+/tmp/asservat-spec-validation/bin/python scripts/check-specs.py
+PASS: 37 schemas, 40 MCP tools, 121 examples, 134 requirements, 134 scenarios, 11 tasks, 422 local links, 320 rejected invalid examples (6272 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+Actual exit: 0
+ADR-036 accepted: operator-qualified encrypted scratch StorageClass required for separate-Job offline analysis, with collection availability tracked separately. ADR-038 accepted: snapshot-only existing packet/syscall saves under reviewed policy opt-in and current initiator/source authority. Four traced requirements, one protected contract, two passive MCP tools, thirteen synthetic examples and 38 additional rejected invalid examples; existing submit/status/cancel/sharing/history reused.
+Offline checks cover opt-in digests, exact source selection and scope/preview/artifact identity, zero-history inventory, policy incident caps, lookback, expiry, prohibited acquisition arguments, typed operation provenance and fresh-selection history repeat. The initial fixture checks caught an invalid target selection enum and a metadata-versus-extract settings-result mismatch; fixtures corrected without weakening the existing result contract.
+Runtime source/authorization/SQL races, trigger/recorder dispatch, budgets/cancellation, sharing/audience inheritance, encrypted CSI handoff/cleanup and user comprehension remain NOT RUN. No collector implementation, live workload capture or privileged experiment performed. Original brief identical: True; SHA256 af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — UX, outward interfaces and domain foundation
+Commands and actual results (design-only):
+- make spec-check design-check PYTHON=/tmp/asservat-spec-validation/bin/python — exit 0.
+  PASS: 37 schemas, 40 MCP tools, 121 examples, 150 requirements, 150 scenarios,
+  11 tasks, 485 local links, 320 rejected invalid examples (6431 assertions).
+  PASS: 60 screens, 7 journeys, 44 domain entities, 63 browser operations,
+  40 MCP schema pairs, 274 resolved references.
+- make openapi-check PYTHON=/tmp/asservat-openapi-validation/bin/python — exit 0.
+  PASS: OpenAPI 3.1.1 specification validation; canonical schemas bundled locally.
+  Development validator: openapi-spec-validator 0.9.0; no schema network fetches.
+- ASSERVAT_QA_NODE_MODULES=/tmp/asservat-ui-qa/node_modules
+  ASSERVAT_CHROMIUM=/home/phil/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+  make ui-check (with loopback static server) — exit 0.
+  PASS: 60 screens, seven states, 556 assertions; widths 1440, 390 and 320 CSS pixels.
+  Zero JavaScript errors, external requests or WCAG-tagged automated axe violations.
+  Representative capture/save, live-core selection, ring sizing, dialog focus return,
+  stop-future versus revoke sharing, recipient nondisclosure and quota-blocked submission checked.
+  Screenshots: design/ui/previews/; report: docs/ux/prototype-validation.json.
+- node --check design/ui/app.js — exit 0.
+- Chromium standalone file:// load/render check — exit 0; no JavaScript errors.
+- Original brief and preserved copy SHA-256 both remain:
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+Scope limits: synthetic interactive prototype and static contracts only. No production
+HTTP/MCP server, collector, database migration or CRD implementation was deployed.
+Manual assistive-technology testing, participant studies, runtime authorization,
+Kubernetes integration, encryption/deletion qualification and performance remain unrun.
+Final documentation-link pass after adding validation-report links:
+- make spec-check PYTHON=/tmp/asservat-spec-validation/bin/python — exit 0.
+  PASS: 37 schemas, 40 MCP tools, 121 examples, 150 requirements, 150 scenarios,
+  11 tasks, 487 local links, 320 rejected invalid examples (6433 assertions).
+
+2026-10-09 — Approved live observation design
+User-selected boundary: approved live packet/HTTP/syscall projections; save before raw inspection.
+Added REQ-LIV-001–006, LiveWatch/LiveBatch, five shared browser/MCP operations,
+source picker/live mockups, bounded transient replay and explicit saving/permissions/privacy rules.
+No collector, live transport server, migration, CRD or privileged workload action was implemented.
+
+- make spec-check design-check live-check PYTHON=/tmp/asservat-spec-validation/bin/python — exit 0.
+  PASS: 38 schemas, 45 MCP tools, 133 examples, 156 requirements, 156 scenarios,
+  11 tasks, 517 local links, 320 rejected invalid examples (6541 assertions).
+  PASS: 62 screens, 8 journeys, 46 domain entities, 68 browser operations,
+  45 MCP schema pairs, 302 resolved references.
+  PASS: 45 additional live schema/timeline checks, including rejection of raw
+  content, hidden predicates, lifetime extension, scope drift and invalid replay.
+- make openapi-check PYTHON=/tmp/asservat-openapi-validation/bin/python — exit 0.
+  PASS: OpenAPI 3.1.1 validation with canonical references bundled locally.
+- Browser gate uses the same development Playwright/axe/Chromium environment above.
+  Current result is recorded in docs/ux/prototype-validation.json and appended below.
+
+Runtime qualification remains unrun: source/parser integration, overhead under event storms
+and multiple viewers, protected incident scheduling, actual rights/region enforcement,
+paused/disconnected expiry, loss/failover/cursor behavior and both supported MCP clients.
+- Final make ui-check — exit 0: 588 browser assertions over 62 screens and seven states.
+  Live assertions cover real synthetic row arrival, inspection, pause without new rows,
+  resume/gaps, errors-only display filtering, explicit delivery loss, short row expiry,
+  close/access-loss clearing and recipient nondisclosure. Widths: 1440/390/320 CSS pixels.
+  Zero JavaScript errors, external requests or automated WCAG-tagged violations.
+  Live screenshots: design/ui/previews/live-watch.png and live-watch-mobile.png.
+- node --check design/ui/app.js and design/ui/live.js — exit 0.
+- Original brief/preserved copy retain SHA-256
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+
+2026-10-09 — Minimalist web GUI overhaul (ADR-041 / REQ-UI-007)
+- Primary-source research and applied decisions: docs/ux/web-design-research.md.
+  Shared shell/components and core workflows revised; all 62 routes preserved.
+  No domain, MCP or browser API schema change; production remains unimplemented.
+- make spec-check design-check PYTHON=/tmp/asservat-spec-validation/bin/python — exit 0.
+  PASS: 38 schemas, 45 MCP tools, 133 examples, 157 requirements, 157 scenarios,
+  11 tasks, 532 local links, 320 rejected invalid examples (6562 assertions).
+  PASS: 62 screens, 8 journeys, 46 domain entities, 68 browser operations,
+  45 MCP schema pairs, 302 resolved references.
+- node --check design/ui/app.js and design/ui/live.js — exit 0.
+- ASSERVAT_QA_NODE_MODULES=/tmp/asservat-ui-qa/node_modules
+  ASSERVAT_CHROMIUM=/home/phil/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+  make ui-check — exit 0: 604 assertions, 62 screens, seven states,
+  widths 1440/390/320; zero JavaScript errors, external requests or automated
+  WCAG-tagged violations. Report: docs/ux/prototype-validation.json.
+  Added checks cover inspector default visibility/focus return, essential review
+  facts, optional sharing, contextual navigation, applicable live controls and
+  stable focused live rows. The initial run found an ambiguous dialog test
+  selector after adding the inspector; the test now selects the action dialog.
+- Visually inspected desktop overview, capture review, live viewer, administration,
+  and mobile review/live viewer. Regenerated seven PNG previews in design/ui/previews.
+- Original and preserved brief SHA-256 remain
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+- Runtime enforcement, supported-browser/screen-reader/zoom qualification and
+  participant task studies remain NOT RUN. No measured usability improvement claimed.
+
+2026-10-09 — Implementation architecture package (ADR-042/043 / REQ-ARC-001–007)
+- Added docs/architecture: deployment roles, component ownership/dependencies,
+  internal interfaces, ten runtime walkthroughs, canonical planned package layout,
+  implementation slices and primary-source research. No production code added.
+- Added strict internal-work/v1 DTO schema and seven unsigned synthetic examples.
+  Browser/MCP contracts and the UI prototype are unchanged.
+- make architecture-check spec-check design-check
+  PYTHON=/tmp/asservat-spec-validation/bin/python — exit 0.
+  Architecture PASS: 10 roles (including migration maintenance), 24 components,
+  12 interfaces, all 46 entities and 164 requirements mapped; 748 positive checks,
+  105 rejected invalid cases. Report: docs/architecture/validation.json.
+  Specification PASS: 39 schemas, 45 MCP tools, 140 examples, 164 requirements,
+  164 scenarios, 11 tasks, 605 local links, 320 rejected invalid examples
+  (6707 assertions).
+  Design PASS: 62 screens, 8 journeys, 46 domain entities, 68 browser operations,
+  45 MCP schema pairs, 302 resolved references.
+- Initial validator integration found schema-less registry entries and local
+  schema references incompatible with the repository checker. The new gate now
+  handles optional schema entries; internal references use canonical absolute
+  self IDs. The final checks above passed after those corrections.
+- Review tightened primary ownership and required object verification before
+  artifact/catalog finalization. Migration DDL remains a separate bounded Job.
+- Original and preserved brief SHA-256 remain
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+- Runtime, cryptographic, kernel/Gadget, distributed fencing, role credentials,
+  encrypted-volume isolation, overhead and deletion qualification remain NOT RUN.
+  Synthetic state checks do not establish exactly-once distributed execution.
+  UI browser checks were not repeated because no UI asset/contract changed.
+
+2026-10-09 — Native downloads for all evidence (maintainer correction / ADR-044)
+- The maintainer requires local-tool downloads for all collected artifacts and
+  saved derivatives, explicitly PCAPNG/Wireshark and native cores/GDB.
+  specs/artifact-downloads.md supersedes the original raw-file prohibition.
+  docs/reviews/local-investigation.md records its provenance and the missed
+  task-completion review; UC-44 adds the regression workflow.
+- Updated product/authority/privacy/architecture/domain/interface documents,
+  native transfer DTOs, three shared MCP/browser operations and binary HTTP
+  content endpoint. Added ArtifactDownload and distinct downloadArtifact work.
+  Managed encryption and independent missing raw-download review remain.
+- make download-check architecture-check spec-check design-check openapi-check
+  PYTHON=/tmp/asservat-openapi-validation/bin/python — exit 0.
+  Download PASS: 12 positive checks; 25 rejected invalid contracts.
+  Architecture PASS: 10 roles, 24 components, 13 interfaces, 47 entities and
+  168 requirements mapped; 775 checks and 120 rejected invalid cases.
+  Specification PASS: 40 schemas, 48 MCP tools, 146 examples, 168 requirements,
+  168 scenarios, 11 tasks, 634 local links, 320 rejected invalid examples
+  (6780 assertions).
+  Design PASS: 63 screens, 9 journeys, 47 domain entities, 72 browser operations,
+  48 MCP schema pairs, 325 resolved references. OpenAPI validation PASS.
+- node --check design/ui/app.js — exit 0.
+- Full prototype gate with existing development-only Playwright/axe/Chromium:
+  make ui-check — exit 0, 632 assertions, 63 screens, seven states, desktop and
+  390/320px layouts; no JavaScript errors, external requests or automated
+  accessibility violations. A first new navigation assertion raced hashchange
+  rendering; it now waits for the actual rendered screen.
+- Final download-view copy/retention consistency adjustments were checked with
+  a targeted browser follow-up: 12 assertions, all three widths, no JavaScript
+  errors or automated accessibility violations. QA used page.evaluate like the
+  existing gate after an initial inline-script injection was blocked by CSP;
+  the product CSP was not weakened. Report: docs/ux/download-ui-validation.json.
+  Visually reviewed design/ui/previews/download-core.png; packet/native-core
+  previews regenerated. UI actions remain synthetic and create no real files.
+- Original and preserved brief SHA-256 remain
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+- Real authenticated transfers, resume, cryptography, bandwidth fairness,
+  local Wireshark/GDB/native-tool compatibility and participant task studies
+  remain NOT RUN. Static/mockup checks do not establish implemented support.
+
+2026-10-09 — Review from user outcomes and accepted combined approval
+- Added docs/reviews/user-task-review.md: twelve evidence-backed findings,
+  dispositions and complete user tasks. This is expert inspection, not a
+  participant study. U03–U07/U09–U11 remain open (U10 label corrected only).
+- Reproduced U01 before changing the grant: download_artifact was accepted by
+  request_raw_access but rejected by the rawQuery grant enum. Also reproduced
+  rejection of download_artifact in a raw future-sharing instruction.
+  Corrected grant/request/intent/share boundaries with cross-contract checks.
+- Integrated accepted ADR-045 / REQ-INV-001–003: bounded same-human review,
+  explicit clients/output selection, exact post-commit child grants and one
+  shared disclosure pool. Updated schemas, fixtures, browser/MCP parity,
+  domain/persistence/component/runtime mappings, plan and prototype.
+- Applied immediate existing-recording save from inventory/live viewer,
+  relevant optional configuration links, and accurate approval-queue labeling.
+  Current prototype already had direct-to-review navigation; the review does
+  not claim it forced process/network pages.
+- PASS make spec-check with /tmp/asservat-openapi-validation/bin/python:
+  41 schemas, 48 MCP tools, 151 examples, 171 requirements/scenarios, 11 tasks,
+  685 local links, 320 rejected invalid examples, 6893 assertions; exit 0.
+- PASS make design-check: 63 screens, 9 journeys, 47 entities, 72 browser
+  operations, 48 MCP schema pairs, 329 references; exit 0.
+- PASS make architecture-check: 10 application roles, 24 components,
+  13 interfaces, 47 entities and 171 requirements mapped; 785 positive
+  checks and 120 invalid cases rejected; exit 0.
+- PASS make download-check: 15 positive checks, 28 invalid cases rejected.
+- PASS make investigation-check: 9 positive paired-contract checks,
+  18 invalid cases rejected. Neither gate executes production authorization.
+- PASS make openapi-check: all canonical references bundled locally; exit 0.
+- PASS final make ui-check using the development-only Playwright/axe modules
+  and Chromium: 656 checks, 63 screens, 7 states, 1440/390/320px; no JS errors,
+  external requests, detected axe violations or tested-width overflow.
+  An intermediate run caught stale save-source selection after changing the
+  live projection. The source-button change handler was corrected and the
+  complete browser gate rerun to exit 0. New investigation-approval screenshot
+  visually inspected; all standard previews regenerated by the gate.
+- Original and preserved brief SHA-256 remain
+  af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20.
+- No production collector/API/database was implemented or deployed. Actual
+  atomic grant publication, revocation/transfer concurrency, ring latency,
+  native Wireshark/GDB compatibility and participant task studies NOT RUN.
+
+2026-10-09 — Tool-neutral core download presentation
+- Replaced GDB-only core/companion guidance with the user's compatible debugger;
+  relabeled the metadata row Inspect with and clarified format/architecture/
+  runtime compatibility. Download does not require selecting a debugger.
+- Updated normative download/UX copy and the existing browser assertion;
+  GDB remains a representative compatibility test, not a tool whitelist.
+- PASS make spec-check and make design-check using the validation environment;
+  both exited 0. No public API/schema or authorization changes.
+- PASS focused Chromium presentation check: core/companion copy, both views at
+  1440/390/320px without overflow, two axe scans, no JavaScript errors.
+  Regenerated download-core.png and download-packets.png. No real debugger or
+  evidence transfer executed; full unrelated browser gate not repeated.
+
+2026-10-09 — User data terminology
+- Updated active UI, specs, research/review prose, examples and API terminology
+  to user data, covering both internal applications and external services.
+  Kept the distinct legal personal-data classification and all retention rules.
+  Original brief and earlier validation records remain unchanged.
+- Renamed draft fields/enums to may_contain_user_data and userContent; aligned
+  fixtures and synthetic retention-policy identities. The first spec check
+  caught outdated retention provenance hashes; recomputed dependency hashes
+  through collection/save/history/investigation fixtures without weakening checks.
+- PASS make spec-check, design-check, architecture-check, live-check,
+  investigation-check, download-check and openapi-check; combined exit 0.
+- PASS make ui-check: 656 checks across 63 screens and 7 states at
+  1440/390/320px; no JavaScript errors, external requests or detected accessibility
+  violations. Standard preview screenshots regenerated with the new wording.
+- Terminology scan finds no old wording in active text/contracts/examples.
+  Runtime collection, data privacy enforcement and participant testing remain
+  unimplemented/unrun; this change is terminology in the design and prototype.
+
+
+2026-10-09 technology selection and dependency maintenance pass:
+- Accepted React/TypeScript served as compiled Go assets; aligned architecture,
+  interfaces, UX technology notes and TASK plan; preserved the vanilla mockup.
+- Added all-24-component build/reuse matrix, library/tool decisions, primary-source
+  version and maintenance snapshots, ADR-046/047 and isolated synthetic experiments.
+- PASS six Go dependency tests: canonical JCS samples, all 41 schemas compiled
+  offline plus sampled validation negatives, Tink/zstd tamper checks, explicit
+  Ed25519 JWS, native libpcap/PCAPNG and independent-frame range composition.
+- PASS static React/Aria/Query Vite build. Direct TS generation succeeded but
+  strict tsc failed; complete local reference hoisting then passed both generation
+  and strict tsc without skipLibCheck. Go generation remained incompatible with
+  schema multi-type unions; retained explicit Go DTO baseline. Initial npm TS7
+  conflict resolved using TS5.9.3 without forcing peer dependencies.
+- PASS spec-check (6931 assertions, 723 links), architecture-check (811 positive,
+  120 rejected), design-check and openapi-check; actual combined exit 0.
+  Initial spec gate scanned upstream node_modules docs and failed on an upstream
+  relative link; scoped link validation to exclude installed node_modules, as
+  already done for .venv. No authored spec check was weakened.
+- PASS independent build/reuse coverage (24 unique components), 53 recorded
+  experiment input hashes and unchanged original-brief SHA256 in both locations.
+- No GUI mockup changed; no repeat full UI sweep performed. No real PostgreSQL,
+  KMS/S3, IdP, live capture, privileged VM/kernel experiment or runtime release
+  gate is claimed passed. Six tests do not complete S-00 or any product TASK.
+
+2026-10-09 packet and encrypted-native-download feasibility pass:
+- Actual Gadget v0.57.0 capture ran in a new disposable Ubuntu/KVM VM with
+  K3s/containerd and Restricted synthetic workload pods. Downloaded PCAPNG opened
+  in tshark with all 1,012 records and the original SHA256.
+- Compared 11 native libpcap expressions against Gadget's compiler: all libpcap
+  expectations passed; Gadget rejected one valid IPv6 expression. This is not
+  a compiler-parity pass. The libpcap programs passed the separate VM kernel
+  verifier/test-run corpus through the cbpfc translation dependency.
+- One standalone TCX attachment followed actual EndpointSlice replacement and
+  empty/resumed peer generations. Not an integrated Gadget/watch implementation.
+  Retained failed VIP/default-loopback/readiness attempts and final limits.
+- PASS python3 experiments/feasibility/run.py test: go test -race -count=1 -v
+  ./..., 11 PASS, three explicitly opt-in measurement SKIP, exit 0. PASS each
+  separate measure/large/baseline invocation, exit 0; source hashes recorded.
+  Ring model handled 100,000 writes and 10,000 refused overlapping snapshots.
+- Actual pinned SeaweedFS test S3, AWS SDK multipart and TLS/native delivery;
+  malformed ranges, tamper, cancellation, local expiry/revocation/budget and abort
+  tests. Fixed and regression-tested final checksum failure before final bytes.
+- Final 2 GiB synthetic stream: 256 x 8 MiB frames, peak RSS 136,188 KiB;
+  last-1-MiB read fetched 8,389,190 ciphertext bytes. Local observations only.
+- PASS make spec-check architecture-check design-check openapi-check
+  download-check investigation-check live-check
+  PYTHON=/tmp/asservat-openapi-validation/bin/python; combined exit 0.
+  Spec gate: 6,968 assertions, 760 links, 320 invalid cases rejected.
+  Architecture: 811 positive/120 rejected. Design: 63 screens, 9 journeys,
+  47 entities, 72 browser operations. No mockup changes or repeat UI sweep.
+- PASS current-source hash matching for every final experiment run and unchanged
+  original brief in both locations. Results and cleanup are recorded under
+  experiments/feasibility/results/execution.json.
+- Removed only the owned VM, private cache/SSH keys and labelled S3 container,
+  volume/network. Verified absence; no host core_pattern or host BPF capture.
+  Initial cleanup verification had a case-sensitive Docker error-text check;
+  read-only retry confirmed successful removal. No physical-erasure claim.
+- No complete EXP gate, product TASK, production format, Ceph/OpenBao, SQL/OIDC,
+  crash-helper, production Gadget adapter, HTTP privacy or workload-overhead
+  qualification is claimed. Next spikes: PostgreSQL grant/quota races and the
+  bounded native crash helper in a new disposable VM.
+
+
+2026-10-09 PostgreSQL authority and native crash-path feasibility pass:
+- Added isolated real-PostgreSQL concurrency model and a separate disposable-VM
+  Rust helper/Go Tink receiver/C crash fixture; no product implementation.
+- PASS python3 experiments/control-crash/run-sql.py test: 14 Go tests under
+  -race, one explicit post-restart SKIP, exit 0. PASS separate restart mode
+  after SIGKILL/start of the owned PostgreSQL 18.6 fixture, exit 0.
+- Reproduced unsafe aggregate overdraw and transaction-start-clock expiry.
+  Additional publication regression FAILED before the fix: clock check occurred
+  before an artifact lock wait. Moved it after the lock; final suite passed.
+  The initial lost-COMMIT test wrapper had a Go race on a cancellation dial;
+  fixed atomic first-connection capture and retained the failing log.
+- Passed last-start/capacity contention, protected/context/object isolation,
+  duplicate/digest checks, current expiry/revoke, shared child disclosure pool,
+  conservative deletion acknowledgements, actual dropped COMMIT acknowledgement,
+  backend termination rollback, Serializable conflict and stale work fence cases.
+  Single-primary restart is not replication/failover/PITR qualification.
+- PASS final VM run-4, exit 0: 14 crash cases. Real core and nested-PID-1 core
+  encrypted/decrypted and opened in GDB with exact generated executable.
+  Missing/full/stalled receiver, absent/expired/mismatched permit, byte cap,
+  SIGKILL absence, receiver loss, spent-entry restart and 16-process burst.
+  Stalled cases reaped in approximately 2.02 seconds in this VM only.
+- Initial PID-1 fixture sent a signal that was ignored; replaced with an actual
+  memory fault. The earlier harness read an admission report before finalization;
+  final code uses atomic final-outcome reporting and the harness waits for it.
+  Final oversized core retained 16,732,160 native bytes and remained incomplete.
+- Refined specs: current-time checks after every blocking decision lock;
+  absolute local IPC deadline; initial-namespace process identity; explicit
+  completion distinct from admission/EOF; independent helper resource boundary.
+- PASS make spec-check architecture-check design-check openapi-check
+  download-check investigation-check live-check
+  PYTHON=/tmp/asservat-openapi-validation/bin/python; combined exit 0.
+  7,006 spec assertions/798 links/320 rejected invalid examples;
+  architecture 811 positive/120 rejected; design 63 screens/9 journeys.
+  No GUI changes and no repeat full browser sweep.
+- PASS current-source hashes for both final SQL runs and final VM inputs;
+  Python syntax/Go formatting and unchanged original brief in both locations.
+- Restored guest crash settings, preserved simulated foreign-writer ownership,
+  removed only the owned VM/cache/SSH keys and PostgreSQL container/volume/network.
+  Host core_pattern and core_pipe_limit matched their before values.
+- Keys in this lab were memory-only: no durable KMS-wrapped core recovery claim.
+  Full SQL authority/schema/audit/HA, K8s/CRI/managed-node attribution, 5.15/arm64,
+  workload pressure/fairness and production UI/MCP/core transfer remain open.
+  No whole EXP/TASK completed. Next: persistent artifact contract and S-01/S-02.
+
+2026-10-09 — ADR-048 artifact format and first product components
+- Added versioned framed-storage/index/commit schema, manifest variant, synthetic
+  examples, fixed 8 MiB frames and paged index, explicit four-object custody and
+  worst-case capacity/deletion contract. The full commit service remains pending.
+- Added Go domain/ports, Tink/zstd encoder and bounded native range reader,
+  OpenBao wrap-only/open-only adapters, conditional small S3 writes/versioned
+  reads and an exact-pod Kubernetes status projection. No public collector role.
+- PASS make go-check go-architecture-check go-vuln-check, exit 0 on Go 1.27.2.
+  Vet/race checks and seven-package/eight-edge import gate passed; readers reject
+  unsupported Tink key suites, tampering, wrong identities, malformed indexes,
+  out-of-bounds work and revoked delivery callbacks. Final-batch withholding
+  prevents a full-length success before final hashes pass.
+- PASS bounded layout fuzzing: 395345 executions on patched Go 1.27.2.
+- PASS real-service context-storage integration under -race, exit 0: two owned
+  Kind clusters, Restricted synthetic workloads, readonly ServiceAccounts,
+  actual SeaweedFS S3 and OpenBao Transit. Exact native JSON/full-range bytes,
+  conditional creation, stored hashes, role denials, wrong binding, changed pod,
+  denied namespace and revoked KMS writer behavior verified.
+- Initial dependency scan exposed reachable x/net HTTP/2 advisories; upgraded
+  project Go minimum to 1.27.2 and x/net to v0.60.0, without changing system Go.
+  Final scan has no affected code/imported packages. The module-only advisory
+  for unused x/crypto/openpgp remains visible; the import gate forbids it.
+- PASS all seven design/contract gates after schema changes: 42 schemas,
+  154 examples, 171 requirements/scenarios, 329 invalid cases rejected.
+  The UI mockups did not change; no new browser usability result is claimed.
+- Earlier fixture failures and source-hashed final reports remain under
+  test/results. Cleanup removed only owned clusters/containers/volumes and
+  private temporary credentials/configs; original brief hashes are unchanged.
+- Scope limitation: encrypted integration metadata is the storage descriptor,
+  not a full artifact/catalog commit. Durable authority/audit/copy accounting,
+  PostgreSQL commit/recovery, verified expiry/deletion, regional HTTP relay,
+  React/MCP wiring, Ceph/KMS persistence and large multipart upload remain open.
+  No complete S-01/S-02/TASK/EXP release gate is marked achieved.

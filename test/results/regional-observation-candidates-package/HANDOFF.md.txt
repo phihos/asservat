@@ -1,0 +1,35 @@
+# Candidate selection and explicit observation consumers
+
+Frozen checkpoint-v1; actual runner session 93068 terminal exit 0. Live sources were not edited. This is a component checkpoint, with an unrun actual SQL/S3 fixture.
+
+## Exact integration inputs
+
+Use `build-manifest.json` (26 paths), not the handwritten-only `manifest.json` (25 paths). For each entry, verify its original `base` against live, and its `sha256` against the payload. Handwritten payloads are under `files/<path>`. The single generated entry supplies an explicit `source` path under `generation/generated/`; this is the tested SQLc output. Do not copy the overlay mirror or all generated output. `dependencies.json` pins 1,927 dependencies, `bases.json` retains original handwritten path hashes, and `source-groups.json` separates candidate and consumer source ownership. `freeze.json` pins the pre-run inputs; `evidence/generated.json` separately pins generation and the derived build manifest/overlay before Go phases.
+
+## Contract and behavior
+
+An original pool with omitted NativeCandidateLimit retains the existing fixed-16 candidate reader. An explicitly opted pool selects a separate read-only limit+1 SQL query and denies overflow. The old context-start LIMIT17 query and its explicit overflow denial remain unchanged even when a pool carries the larger field. No schema migration, role grant, new credential, native deadline or wire byte changes.
+
+The new Ready intersection makes one complete bounded EndpointSlice LIST sequence, brackets it with exact Service/namespace reads, and retains every original process binding for each present Ready Pod. It never chooses the newest process, drops duplicates to hide overflow, or treats unknown/incomplete/empty endpoint observations as success. Actual leaf/current registry/native workload proof remains necessary before any metadata operation or HWORK token read.
+
+Four existing observation consumers now choose their reader once from the original immutable pool through a typed dual-method source. They perform a fresh selected read for each check, preserve all original deadlines, deny changed pool/limit and never fall back to the legacy reader after an opted read error. Existing context-start consumers remain on their original reader. The shared public configuration/schema/v2 producer work belongs to the separately coordinated console package; this checkpoint does not select a new installed runtime layout.
+
+## Verification
+
+`python run.py` uses GOMAXPROCS=2, GOFLAGS=-p=2, explicit task TMPDIR, immutable overlays, pinned SQLc v1.31.1, and exclusive-create evidence paths. Exact commands and real exits are in each `evidence/<phase>.json`.
+
+- SQLc version/generation: exit 0; one added generated binding and every existing generated binding byte-identical.
+- BEFORE value regression: exit 1 as intended, `candidate bound 17 17`; the old value validator rejects an explicitly configured population of 17.
+- BEFORE client regression: exit 1 as intended, `original selected candidate reader ... 1 0`; the old client invokes the legacy reader despite the original opted pool and never attempts the required complete reader.
+- Seven affected packages compile: exit 0, 23.751 seconds. Integration package is compile-only; no skipped service test is reported as a pass.
+- Focused races: exit 0, 28.851 seconds, 185 passing named entries, zero skips. Includes complete 1,024 same-Pod bindings with one LIST, malformed/changed/incomplete/expired native observations, complete 17-member actual TLS leaf selection, no-fallback consumers, four fresh channel reads and retained stream regressions. Native/SQL facts are synthetic in these component tests.
+- Seven-package vet: exit 0, 4.209 seconds.
+- Go architecture: exit 0, 1.251 seconds; 53 packages, 298 internal edges.
+
+All payload/base/dependency/file-set/mirror/tool hashes stayed unchanged through every phase and terminal. Both failing-before logs are preserved. `RESULT.json` summarizes actual results; `result-files.json` hashes the handoff, reports, logs and immutable metadata. No spec/design/full-Go/native gate was run in this slot.
+
+## Remaining qualification and next work
+
+The new actual-service fixture `TestOwnerObservationCandidatesWithRealServices` is compiled but unrun. Parent-owned targeted command after integration is `python3 scripts/test-custody.py --run '^TestOwnerObservationCandidatesWithRealServices$'`; it needs owned SQL/S3, uses separately scoped real roles/encrypted audit/activation, and explicitly seeds synthetic source/recovery/native proof/private CA. It covers actual 17-member completeness, 18-member overflow, legacy LIMIT17 denial, exact retirement, original source expiry and configuration fencing. It does not qualify installed source production or routing.
+
+Concrete forwarding remains separate source work: complete candidate/Ready discovery, bounded common-SNI locator lookups, one exact-SNI claim POST, unchanged four fresh regional proofs, no token forwarding/replay or replacement after unknown claim. Full multi-owner/two-cluster availability within the same original five-second bound, listener route selection and the complete fresh installed-v2 producer/consumer graph remain unqualified. No runtime enablement follows from this component gate.

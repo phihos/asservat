@@ -1,0 +1,22 @@
+package bootstrap
+
+import (
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+func ownerDeploymentStarts(in *contracts.OwnerDeploymentAPIContextStarts) (*cfg.OwnerAPIContextStarts, error) {
+	if in == nil {
+		return nil, nil
+	}
+	if len(validation.IsDNS1123Subdomain(in.CapacityAccount.Name)) != 0 || len(validation.IsDNS1123Subdomain(in.ExecutionAccount.Name)) != 0 {
+		return nil, mounts.ErrUnavailable
+	}
+	out := &cfg.OwnerAPIContextStarts{CapacityAccount: in.CapacityAccount.Name, CapacityAccountUID: in.CapacityAccount.UID, ExecutionAccount: in.ExecutionAccount.Name, ExecutionAccountUID: in.ExecutionAccount.UID}
+	if !out.Valid() {
+		return nil, mounts.ErrUnavailable
+	}
+	return out, nil
+}

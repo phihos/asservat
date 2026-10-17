@@ -1,0 +1,29 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/producer-7/overlay.json",
+    "-run",
+    "^$",
+    "./internal/adapters/providerconfig",
+    "./internal/contracts",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/postgres",
+    "./internal/bootstrap",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "expected_before_failure": false,
+  "seconds": 18.535,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

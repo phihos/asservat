@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "artifact/v1",
+  "artifactID": "00000000-0000-4000-8000-000000000093",
+  "caseID": "00000000-0000-4000-8000-000000000002",
+  "occurrenceID": "00000000-0000-4000-8000-000000000005",
+  "target": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "nodeUID": "node-uid",
+    "nodeBootID": "00000000-0000-4000-8000-000000000006",
+    "podUID": "pod-uid",
+    "namespace": "payments",
+    "workloadUID": "workload-ledger-uid",
+    "scope": "pod"
+  },
+  "kind": "kubernetesSnapshot",
+  "mediaType": "application/json",
+  "format": "kubernetes-context/v1",
+  "dataClass": "raw",
+  "collector": {
+    "version": "0.0.0-spec-example",
+    "imageDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "recipeDigest": "4cbb726069eb97268b9b29b254b57d440b8cd545b0b789110715e5e76289d21c"
+  },
+  "startedAt": "2026-10-09T12:00:00Z",
+  "completedAt": "2026-10-09T12:00:01Z",
+  "expiresAt": "2026-10-10T11:55:00Z",
+  "completeness": {
+    "source": "complete",
+    "ciphertext": "complete",
+    "analyzable": "true",
+    "gaps": []
+  },
+  "sizes": {
+    "plaintextBytes": 4096,
+    "ciphertextBytes": 4352
+  },
+  "hashes": {
+    "plaintextSHA256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "ciphertextSHA256": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "encryption": {
+    "format": "asservat-framed/v1",
+    "binding": {
+      "clusterID": "00000000-0000-4000-8000-000000000001",
+      "artifactID": "00000000-0000-4000-8000-000000000093",
+      "attemptID": "00000000-0000-4000-8000-000000000094",
+      "mediaType": "application/json"
+    },
+    "nativeBytes": 4096,
+    "dataBytes": 4352,
+    "indexBytes": 1024,
+    "nativeSHA256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "dataSHA256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "indexSHA256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "dataKey": {
+      "reference": "transit/evidence",
+      "ciphertext": "SYNTHETIC-NOT-A-REAL-WRAPPED-KEY"
+    },
+    "indexKey": {
+      "reference": "transit/evidence",
+      "ciphertext": "SYNTHETIC-DISTINCT-INDEX-KEY"
+    },
+    "pages": [
+      {
+        "number": 0,
+        "firstFrame": 0,
+        "frameCount": 1,
+        "nativeOffset": 0,
+        "nativeBytes": 4096,
+        "dataOffset": 0,
+        "dataBytes": 4352,
+        "indexOffset": 0,
+        "indexBytes": 1024,
+        "indexSHA256": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    ]
+  },
+  "provenance": {
+    "parentArtifacts": [],
+    "toolDigests": [
+      "6666666666666666666666666666666666666666666666666666666666666666"
+    ],
+    "buildIDs": []
+  },
+  "accessProvenance": {
+    "namespaceUID": "namespace-payments-uid",
+    "assignments": [
+      {
+        "subject": {
+          "kind": "Group",
+          "issuer": "https://identity.example.invalid/realms/company",
+          "id": "group-payments-123"
+        },
+        "role": "workload-maintainer",
+        "basisKind": "AccessBinding",
+        "basisUID": "binding-payments-uid",
+        "basisDigest": "9c6a14ad8b32e40e97146127fcb3ec9948825236775f59090d79f5283feff78d",
+        "assignmentID": "00000000-0000-4000-8000-000000000020"
+      }
+    ]
+  },
+  "privacy": {
+    "classification": "potentialPersonalData",
+    "evidenceType": "context",
+    "purposeRef": "production-incident-investigation",
+    "classificationSource": "default"
+  },
+  "retention": {
+    "anchorAt": "2026-10-09T12:00:00Z",
+    "anchorBasis": "acquisition",
+    "requestedAgeSeconds": 259200,
+    "resolvedMaxAgeSeconds": 86400,
+    "deletionBudgetSeconds": 300,
+    "deleteBy": "2026-10-10T12:00:00Z",
+    "policyRefs": [
+      {
+        "uid": "retention-user-evidence-uid",
+        "generation": 1,
+        "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+      }
+    ]
+  },
+  "collectionProvenance": {
+    "captureUID": "00000000-0000-4000-8000-000000000084",
+    "actionID": "context",
+    "planDigest": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "actionLifecycle": {
+    "executionMode": "onTrigger",
+    "triggeredAt": "2026-10-09T12:00:00Z",
+    "triggerKind": "manual"
+  },
+  "storageObjects": {
+    "data": {
+      "etag": "\"synthetic-data\"",
+      "versionID": "synthetic-data-version"
+    },
+    "index": {
+      "etag": "\"synthetic-index\"",
+      "versionID": "synthetic-index-version"
+    }
+  }
+}

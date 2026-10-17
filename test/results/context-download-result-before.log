@@ -1,0 +1,5 @@
+--- FAIL: TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead (0.00s)
+    context_download_result_test.go:278: {{{  0} {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} {    0 [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC}} 0001-01-01 00:00:00 +0000 UTC} verified download metadata unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.008s
+FAIL

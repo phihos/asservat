@@ -1,0 +1,9 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:242: original activation a5d5f336-e0e0-457b-8ea2-9e1cdeffa470 image docker.io/library/asservat-context-worker@sha256:914dc48e2fb75cc6711a0024c1cbec37572998ee9618072594e582beb04eb94b exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:305: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; no public runtime or managed-copy deletion claim
+--- PASS: TestInitialBootstrapChainWithRealServices (248.25s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (17.60s)
+PASS
+ok  	asservat.local/asservat/test/integration	249.300s

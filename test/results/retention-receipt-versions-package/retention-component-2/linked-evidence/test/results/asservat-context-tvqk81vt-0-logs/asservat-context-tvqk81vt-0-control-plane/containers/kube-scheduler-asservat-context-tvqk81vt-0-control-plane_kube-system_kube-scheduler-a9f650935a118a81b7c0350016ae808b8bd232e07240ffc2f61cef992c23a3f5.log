@@ -1,0 +1,11 @@
+2026-10-12T18:13:36.960850492Z stderr F I1012 18:13:36.960770       1 serving.go:411] Generated self-signed cert in-memory
+2026-10-12T18:13:36.976259845Z stderr F W1012 18:13:36.962134       1 authentication.go:397] Error looking up in-cluster authentication configuration: Get "https://172.18.0.3:6443/api/v1/namespaces/kube-system/configmaps/extension-apiserver-authentication": dial tcp 172.18.0.3:6443: connect: connection refused
+2026-10-12T18:13:36.976514926Z stderr F W1012 18:13:36.962149       1 authentication.go:398] Continuing without authentication configuration. This may treat all requests as anonymous.
+2026-10-12T18:13:36.976522326Z stderr F W1012 18:13:36.962155       1 authentication.go:399] To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false
+2026-10-12T18:13:36.976546026Z stderr F E1012 18:13:36.963315       1 options.go:205] The manifest file is empty, ignoring.
+2026-10-12T18:13:36.976554076Z stderr F I1012 18:13:36.967304       1 server.go:187] "Starting Kubernetes Scheduler" version="v1.37.0"
+2026-10-12T18:13:36.976558726Z stderr F I1012 18:13:36.967315       1 server.go:189] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+2026-10-12T18:13:36.976623067Z stderr F I1012 18:13:36.968748       1 configmap_cafile_content.go:205] "Starting controller" name="client-ca::kube-system::extension-apiserver-authentication::client-ca-file"
+2026-10-12T18:13:36.977069459Z stderr F I1012 18:13:36.968766       1 shared_informer.go:524] "Waiting for caches to sync"
+2026-10-12T18:13:36.977086379Z stderr F I1012 18:13:36.968770       1 secure_serving.go:214] Serving securely on 127.0.0.1:10259
+2026-10-12T18:13:36.977158529Z stderr F I1012 18:13:36.968826       1 tlsconfig.go:243] "Starting DynamicServingCertificateController"

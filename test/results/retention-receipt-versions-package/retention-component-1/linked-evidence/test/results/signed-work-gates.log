@@ -1,0 +1,62 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 5 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.520s
+ok  	asservat.local/asservat/internal/adapters/kms	1.047s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.939s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.737s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.494s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.401s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.775s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.020s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.023s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.027s
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+?   	asservat.local/asservat/internal/application/fleet	[no test files]
+ok  	asservat.local/asservat/internal/application/identity	1.024s
+ok  	asservat.local/asservat/internal/application/planning	1.052s
+ok  	asservat.local/asservat/internal/application/privacy	1.022s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+?   	asservat.local/asservat/internal/contracts	[no test files]
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.026s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.021s
+?   	asservat.local/asservat/internal/domain/fleet	[no test files]
+ok  	asservat.local/asservat/internal/domain/identity	1.008s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.013s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/test/integration	1.052s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 33 packages, 92 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 5 files match sqlc v1.31.1
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 44 schemas, 48 MCP tools, 158 examples, 171 requirements, 171 scenarios, 11 tasks, 945 local links, 335 rejected invalid examples (7284 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 10, "components": 24, "interfaces": 13, "domainEntitiesMapped": 47, "requirementsMapped": 171, "positiveChecks": 846, "rejectedInvalidCases": 120}
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+=== Symbol Results ===
+
+No vulnerabilities found.
+
+Your code is affected by 0 vulnerabilities.
+This scan also found 0 vulnerabilities in packages you import and 1
+vulnerability in modules you require, but your code doesn't appear to call these
+vulnerabilities.
+Use '-show verbose' for more details.

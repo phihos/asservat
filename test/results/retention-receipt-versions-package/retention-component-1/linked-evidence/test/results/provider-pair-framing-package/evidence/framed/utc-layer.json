@@ -1,0 +1,18 @@
+{
+  "internal/adapters/mtls/connector_operation_channel.go": {
+    "base": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "payload": "8b2d38209e433c1e9359c9ccf96188af095be17663355dbbf2b8f8b3a55be752"
+  },
+  "internal/adapters/mtls/connector_operation_hub.go": {
+    "base": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "payload": "b25d412835a7f6229a7dd2609a7292301f3be5a33ffd1c706806f6487152dd7a"
+  },
+  "internal/adapters/mtls/observation_operation_wire.go": {
+    "base": "3798ea0f15245bf4748bab342d003386e1a5df22f1e28907cc5ca789127c563c",
+    "payload": "0b9dbb03e386bc43d03cd7c1fde49f0a44a1ff3162cb4a9e3fa75d6230b27cda"
+  },
+  "internal/adapters/mtls/owner_operation_wire.go": {
+    "base": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333",
+    "payload": "f7a46377500e982c5f17b028da7e9abd768caf286356c4349682eedb01cd285e"
+  }
+}

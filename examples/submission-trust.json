@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "submission-trust/v1",
+  "revision": 1,
+  "rootID": "75000000-0000-4000-8000-000000000001",
+  "installationID": "75000000-0000-4000-8000-000000000002",
+  "issuerEpoch": "75000000-0000-4000-8000-000000000003",
+  "keys": [
+    {
+      "id": "synthetic-submission-key",
+      "publicKey": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "notBefore": "2026-10-10T00:00:00Z",
+      "notAfter": "2026-10-11T00:00:00Z"
+    }
+  ]
+}

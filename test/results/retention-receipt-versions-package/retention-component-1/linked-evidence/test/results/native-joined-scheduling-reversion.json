@@ -1,0 +1,37 @@
+{
+  "revertedAt": "2026-10-12T14:02:13.069884+00:00",
+  "reason": "Native immediate reconnect overtook hub SQL owner release after worker-local Joined; previous original operation routed to an already-attached/closing registration and the worker stopped. Synthetic scheduling qualification did not cover this real closure race.",
+  "evidence": "test/results/native-interrupted-supervised-sources.log",
+  "paths": [
+    {
+      "path": "docs/architecture/worker-startup.md",
+      "base_sha256": "6a3d7a3f7430c146e84f11429fd2612ca6499dee01c4219ba9524573c146a8e5",
+      "sha256": "13e34d012c0f93d3e49588306daa4326d59f592fa0523c2bb8d3d48659335be4"
+    },
+    {
+      "path": "docs/decisions/121-native-worker-startup.md",
+      "base_sha256": "6f1f610a3efe134ad0a9d6eb3ec0484b0ec0d0644f7400054b32b71d16257dd5",
+      "sha256": "48ea071aa5010e667b54aa7bccfef9e062245d3f68af7e2c830c7da209dfabd5"
+    },
+    {
+      "path": "internal/bootstrap/download_worker_native.go",
+      "base_sha256": "6f479929f6274b98f5ced1f926b6d0f3a58d0e86f580200747d2d81fbce7f342",
+      "sha256": "4caffcaf29ad07890ad718ed8f1e207f70374de9be4d0ab8067ae52a44bd5298"
+    },
+    {
+      "path": "internal/bootstrap/download_worker_native_scheduling_test.go",
+      "base_sha256": null,
+      "sha256": "18e2d9d0721446bd8e5e67256b83d1a5a765ec246339d376230443fd07594c69"
+    },
+    {
+      "path": "internal/bootstrap/download_worker_native_test.go",
+      "base_sha256": "1d49724df8a58fc77f3991a4ec153b6abadeeb62d32cbceb7366dd6b14a68d10",
+      "sha256": "aa17ae03d2a4c8c36ed6da988de69637e96ba6f711adbc8d6c50b456524db81f"
+    },
+    {
+      "path": "test/integration/native_exchange_test.go",
+      "base_sha256": "7c55844f7c5f58a00a2a37fccc5ccfa824f0084ddd075b94ee6d5d73f5762c9f",
+      "sha256": "54d3b1933b5d0c1b81c51b4ff4209ecb416426205ed6a2e013ed98be960de56b"
+    }
+  ]
+}

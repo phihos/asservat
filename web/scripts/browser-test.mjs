@@ -1,0 +1,240 @@
+// Owned Go HTTPS fixture; synthetic SessionService, real transport and built UI.
+import { chromium, expect } from '@playwright/test';
+import axe from 'axe-core';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { evidenceJourney } from '../tests/evidence-journey.mjs';
+
+const origin = process.argv[2];
+const url = new URL(origin);
+assert.equal(url.protocol, 'https:');
+assert.equal(url.hostname, '127.0.0.1');
+const output = fileURLToPath(new URL('../../test/results/console-browser/', import.meta.url));
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
+const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+const page = await context.newPage();
+const errors = [], external = [], violations = [], checks = [], evidenceLoads = [];
+let scans = 0;
+page.on('pageerror', error => errors.push(error.message));
+page.on('console', message => { if (/violates.*Content Security Policy|Refused to (execute|apply|load)/i.test(message.text())) errors.push(message.text()); });
+page.on('request', request => { if (new URL(request.url()).origin !== origin) external.push(request.url()); if (/\/assets\/EvidenceWorkspace-[^/]+\.js$/.test(new URL(request.url()).pathname)) evidenceLoads.push(request.url()); });
+const control = async (state, extra = {}) => {
+  const response = await page.request.post(origin + '/test/state', { headers: { Origin: origin }, data: { state, ...extra } });
+  assert.equal(response.status(), 204);
+};
+const captureControl = async state => {
+  const response = await page.request.post(origin + '/test/capture', { headers: { Origin: origin }, data: { state } });
+  assert.equal(response.status(), 204);
+};
+const scan = async name => {
+  scans++;
+  await page.evaluate(axe.source);
+  const result = await page.evaluate(async () => await window.axe.run({ runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }));
+  for (const violation of result.violations) violations.push({ name, id: violation.id, impact: violation.impact });
+};
+try {
+  const initial = await page.goto(origin + '/');
+  assert.match(initial.headers()['content-security-policy'], /script-src 'self'/);
+  assert.equal(initial.headers()['cache-control'], 'no-store, private');
+  await expect(page.getByRole('heading', { name: 'Sign in to Asservat' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveAttribute('href', '/auth/login?return_to=%2F');
+  await scan('sign-in-desktop');
+  await page.screenshot({ path: output + '/sign-in.png', fullPage: true });
+  await page.setViewportSize({ width: 320, height: 740 });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await scan('sign-in-mobile');
+  await page.screenshot({ path: output + '/sign-in-mobile.png', fullPage: true });
+  checks.push('unavailable session stays hidden; local sign-in; 320px reflow');
+
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  assert.equal(await page.evaluate(() => document.cookie), '');
+  assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
+  await scan('signed-in');
+  const stats = await (await page.request.get(origin + '/test/stats')).json();
+  assert.equal(stats.refresh_calls, 1);
+  checks.push('real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage');
+
+  const rejected = await page.request.post(origin + '/auth/logout', { headers: { Origin: 'https://outside.invalid', 'X-CSRF-Token': 'C'.repeat(43) } });
+  assert.equal(rejected.status(), 403);
+  checks.push('actual session handler rejects wrong-origin logout');
+
+
+  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
+  await page.getByLabel('Namespace', { exact: true }).fill('payments');
+  await page.getByLabel('Workload or pod name').fill('api');
+  await page.getByText('Change evidence retention', { exact: true }).click();
+  await page.getByLabel('Requested access duration', { exact: true }).selectOption('3600');
+  await captureControl('unavailable');
+  await page.getByRole('button', { name: 'Find diagnostics' }).click();
+  await expect(page.getByRole('alert')).toContainText('unavailable');
+  await expect(page.getByRole('button', { name: 'Review collection' })).toHaveCount(0);
+  await captureControl('ready');
+  await page.getByRole('button', { name: 'Find diagnostics' }).click();
+  await page.getByRole('button', { name: 'Review collection' }).click();
+  await expect(page.getByText('payments / api-a', { exact: true })).toBeVisible();
+  await expect(page.getByText(/first eligible pod by name/)).toBeVisible();
+  await expect(page.getByText('Up to 1 hour after submission. Time waiting for collection counts toward this limit.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Within 65 minutes of that same submission.', { exact: true })).toBeVisible();
+  await expect(page.getByText(/output limit, not a prediction/)).toBeVisible();
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await scan('capture-review-mobile');
+  await page.screenshot({ path: output + '/capture-review-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  await scan('capture-review-desktop');
+  await page.screenshot({ path: output + '/capture-review.png', fullPage: true });
+  await expect(page.getByText(/The impact assessment is older/)).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole('button', { name: 'Collect pod status' })).toBeEnabled();
+  const beforeSubmit = await (await page.request.get(origin + '/test/capture-stats')).json();
+  assert.equal(beforeSubmit.requested_retention_seconds, 3600);
+  assert.equal(beforeSubmit.request_keys, null);
+  checks.push('actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview');
+
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expect(page.getByRole('button', { name: 'Continue reviewed request' })).toBeVisible();
+  await expect(page.getByText('payments / api-a', { exact: true })).toHaveCount(0);
+  await captureControl('lost-reply-always');
+  await page.getByRole('button', { name: 'Continue reviewed request' }).click();
+  await expect(page.getByRole('button', { name: 'Retry same request' })).toBeVisible();
+  await expect(page.getByText(/does not create another capture/)).toBeVisible();
+  await scan('uncertain-submission');
+  await page.getByRole('button', { name: 'Retry same request' }).click();
+  await expect(page.getByRole('button', { name: 'Resolve before editing' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Edit request' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Resolve before editing' }).click();
+  await expect(page.getByRole('heading', { name: 'Waiting to start' })).toBeVisible();
+  const afterSubmit = await (await page.request.get(origin + '/test/capture-stats')).json();
+  assert.equal(afterSubmit.request_keys.length, 2);
+  assert.equal(afterSubmit.previews, 1);
+  assert.equal(afterSubmit.request_keys[0], afterSubmit.request_keys[1]);
+  assert.equal(afterSubmit.resolution_pairs.length, 1);
+  assert(afterSubmit.resolution_pairs[0].endsWith(':' + afterSubmit.request_keys[0]));
+  assert.equal(new URL(page.url()).pathname, '/captures/00000000-0000-4000-8000-000000000008');
+  assert.equal(afterSubmit.continuation_pairs, null);
+  await captureControl('ready');
+  await page.getByRole('button', { name: 'Continue collection', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Continue collection', exact: true })).toBeEnabled();
+  const afterContinue = await (await page.request.get(origin + '/test/capture-stats')).json();
+  assert.deepEqual(afterContinue.request_keys, afterSubmit.request_keys);
+  assert.equal(afterContinue.previews, 1);
+  assert.deepEqual(afterContinue.continuation_pairs, afterSubmit.resolution_pairs);
+  await scan('explicit-capture-continuation');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Waiting to start' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue collection', exact: true })).toHaveCount(0);
+  checks.push('explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive');
+  await captureControl('finalizing');
+  await page.getByRole('button', { name: 'Check status' }).click();
+  await expect(page.getByRole('heading', { name: 'Verifying and publishing evidence' })).toBeVisible();
+  await expect(page.getByText(/still needs verification and publication/)).toBeVisible();
+  await scan('capture-progress');
+  await page.screenshot({ path: output + '/capture-progress.png', fullPage: true });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Verifying and publishing evidence' })).toBeVisible();
+  const badCSRF = await page.request.post(origin + '/api/v1/operations/get_capture', { headers: { Origin: origin, 'X-CSRF-Token': 'wrong' }, data: { capture_id: '00000000-0000-4000-8000-000000000008' } });
+  // The investigation ingress deliberately uses the same nondisclosing 401
+  // Problem for invalid cookie/current identity and CSRF authentication.
+  assert.equal(badCSRF.status(), 401);
+  assert.deepEqual(await badCSRF.json(), { type: 'about:blank', title: 'Unauthorized', status: 401 });
+  checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial');
+  await evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads });
+  await page.goto(origin + '/captures/new');
+  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
+  await page.getByLabel('Namespace', { exact: true }).fill('payments');
+  await page.getByLabel('Workload or pod name').fill('api');
+  await captureControl('reject-request');
+  await page.getByRole('button', { name: 'Find diagnostics' }).click();
+  await page.getByRole('button', { name: 'Review collection' }).click();
+  await page.getByRole('button', { name: 'Collect pod status' }).click();
+  await expect(page.getByRole('button', { name: 'Resolve before editing' })).toBeEnabled();
+  await captureControl('lost-closure');
+  await page.getByRole('button', { name: 'Resolve before editing' }).click();
+  await expect(page.getByRole('button', { name: 'Resolve before editing' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Edit request' })).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expect(page.getByRole('button', { name: 'Resolve before editing' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Resolve before editing' }).click();
+  await expect(page.getByRole('heading', { name: 'Request closed' })).toBeVisible();
+  await expect(page.getByText('payments / api-a', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Collect pod status' })).toHaveCount(0);
+  await scan('acknowledged-closure');
+  const afterClosure = await (await page.request.get(origin + '/test/capture-stats')).json();
+  assert.equal(afterClosure.request_keys.length, 3);
+  assert.equal(afterClosure.resolution_pairs.length, 3);
+  assert.equal(afterClosure.resolution_pairs[1], afterClosure.resolution_pairs[2]);
+  assert(afterClosure.resolution_pairs[1].endsWith(':' + afterClosure.request_keys[2]));
+  await page.getByRole('button', { name: 'Edit request' }).click();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  await expect(page.getByLabel('Workload or pod name')).toHaveValue('api');
+  const afterEdit = await (await page.request.get(origin + '/test/capture-stats')).json();
+  assert.deepEqual(afterEdit, afterClosure);
+  checks.push('explicit resolution opens accepted capture; lost closure reply retains original pair across refresh; acknowledged closure permits explicit edit only with no automatic preview or capture');
+  await page.goto(origin + '/');
+
+  await control('unavailable');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Unable to check your session' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toHaveCount(0);
+  await scan('session-unavailable');
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in to Asservat' })).toBeVisible();
+  checks.push('settings outage hides workspace and still permits local logout');
+
+  for (const state of ['csrf-busy-once', 'logout-check-busy-once']) {
+    await control('ready');
+    await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+    const before = await (await page.request.get(origin + '/test/stats')).json();
+    await control(state);
+    const responses = [];
+    const observe = response => { if (['/auth/csrf', '/auth/logout'].includes(new URL(response.url()).pathname)) responses.push(response.status()); };
+    page.on('response', observe);
+    try {
+      await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Sign in to Asservat' })).toBeVisible();
+    } finally { page.off('response', observe); }
+    const after = await (await page.request.get(origin + '/test/stats')).json();
+    assert.equal(after.logout_calls, before.logout_calls + 1);
+    assert.equal(responses.filter(status => status === 409).length, 1);
+    assert.equal(responses.filter(status => status === 204).length, 1);
+    checks.push(`one-click sign-out survives ${state}; exactly one revocation`);
+  }
+
+  await control('ready');
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  await control('expired-access');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  checks.push('returning tab uses CSRF and permitted POST refresh for expired access');
+
+  await control('revoked');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Sign in to Asservat' })).toBeVisible();
+  checks.push('revoked session cannot display workspace');
+
+  await control('ready');
+  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  await control('ready', { expires_in_ms: 1_800 });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Collect evidence' })).toBeVisible();
+  await expect(page.getByText('Your session has expired. Sign in again to continue.')).toBeVisible();
+  checks.push('fixed expiry clears visible workspace');
+
+  const api = await page.request.get(origin + '/api/v1/not-a-route');
+  assert.equal(api.status(), 404);
+  assert.notEqual(api.headers()['content-type'], 'text/html; charset=utf-8');
+  checks.push('unknown API path is not an HTML shell');
+  assert.deepEqual(errors, []);
+  assert.deepEqual(external, []);
+  assert.deepEqual(violations, []);
+  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, typed capture and C16 case metadata; real HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
+  console.log(`Console browser checks passed: ${checks.length} journeys, ${scans} accessibility scans, no external requests or CSP/runtime errors.`);
+} catch (error) {
+  const visiblePage = await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable');
+  await writeFile(output + '/failed-report.json', JSON.stringify({ passed: false, checks, errors, external, violations, failure: String(error), visiblePage }, null, 2) + '\n');
+  throw error;
+} finally { await context.close(); await browser.close(); }

@@ -1,0 +1,372 @@
+package fleet
+
+import (
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"time"
+)
+
+// Request identifiers fence one exact business attempt. They do not authorize a
+// new signature on replay. The receiving adapter supplies an actual verified TLS
+// peer separately; there is no personal bearer credential or chosen peer here.
+type ConnectorCredentialRequest struct {
+	ID, BootstrapID, Usage string
+	Attested               *value.ConnectorProcessIdentity
+	CSR                    []byte
+}
+
+type ConnectorCredentialCurrent struct {
+	Peer              value.AuthenticatedPeer
+	ProcessProof      *value.ConnectorProcessProof
+	Source            value.ConnectorIdentitySource
+	Recovery          value.RecoveryState
+	ObservedAt, Until time.Time
+}
+
+func (c ConnectorCredentialCurrent) Valid(now time.Time) bool {
+	b, actorUntil := c.Peer.Certificate.Binding, c.Peer.ValidUntil
+	actor := c.Peer.Certificate.Valid(now) && b.Role == value.ConnectorPeer && c.Peer.RegistrationRevision.Valid() && identity.Fresh(c.Peer.VerifiedAt, c.Peer.ValidUntil, now, 5*time.Second)
+	if p := c.ProcessProof; p != nil {
+		b = p.Process.Binding
+		actorUntil = p.FreshUntil
+		actor = c.Peer == (value.AuthenticatedPeer{}) && p.Valid(now) && p.Configuration.SameSource(c.Source.Observation)
+	}
+	return actor && c.Source.Valid(now) && !c.Source.Observation.Profile.Suspended && c.Source.Observation.Profile.Binding == b && c.Recovery.Valid(now) && c.Recovery.InstallationID == b.InstallationID && c.Recovery.IssuerEpoch == b.IssuerEpoch && identity.Fresh(c.ObservedAt, c.Until, now, 5*time.Second) && !c.Until.After(actorUntil) && !c.Until.After(c.Source.Observation.FreshUntil) && !c.Until.After(c.Recovery.FreshUntil)
+}
+func (c ConnectorCredentialCurrent) clone() ConnectorCredentialCurrent {
+	c.Source.Observation.Profile = c.Source.Observation.Profile.Clone()
+	if c.ProcessProof != nil {
+		p := c.ProcessProof.Clone()
+		c.ProcessProof = &p
+	}
+	return c
+}
+
+// The ledger obtains the original bootstrap process and fixed period itself.
+// Callers supply neither period/ordinal, accepted source state nor audit actor.
+type ConnectorCredentialCandidate struct {
+	ID, BootstrapID, Usage string
+	Attested               *value.ConnectorProcessIdentity
+	PublicKeyDigest        artifact.Digest
+	Current                ConnectorCredentialCurrent
+}
+
+func (c ConnectorCredentialCandidate) Valid(now time.Time) bool {
+	return authorization.UUID(c.ID) && connectorCredentialOrigin(c.BootstrapID, c.Attested, c.Current.binding()) && (c.Usage == "client" || c.Usage == "server") && c.PublicKeyDigest != (artifact.Digest{}) && c.Current.Valid(now)
+}
+
+// Every field is an immutable historical fact read from the exact admitted
+// business row. None independently supplies current signing/delivery authority.
+type ConnectorCredentialAttempt struct {
+	Permit          value.ConnectorCredentialPermit
+	Intent          audit.OperationIntent
+	ProviderStarted bool
+	Certificate     *value.IssuedConnectorCredential
+	Outcome         *audit.OperationOutcome
+	Activated       bool
+}
+
+func (a ConnectorCredentialAttempt) matches(c ConnectorCredentialCandidate) bool {
+	p, in := a.Permit, a.Intent
+	name := "connector_" + c.Usage + "_certificate"
+	actor := in.Process == nil && in.Peer != nil && in.Peer.Binding == p.Process.Binding && in.Peer.CertificateDigest == p.CurrentPeer.Certificate.Digest
+	if q := p.ProcessProof; q != nil {
+		actor = in.Peer == nil && in.Process != nil && *in.Process == connectorProcessActor(*q)
+	}
+	origin := p.Process.BootstrapID == c.BootstrapID && (p.Process.Attested == nil && c.Attested == nil || p.Process.Attested != nil && c.Attested != nil && *p.Process.Attested == *c.Attested)
+	if !p.WellFormed() || !in.Valid() || in.Lifecycle == nil || in.ID != c.ID || in.ID != p.ID || in.Name != name || in.RootID != c.Current.Source.Observation.Profile.RootID || in.InputFormat != "connector-credential/v1" || !actor || !origin || p.Usage != c.Usage || p.PublicKeyDigest() != c.PublicKeyDigest || p.Process.Binding != c.Current.binding() || !p.Configuration.Profile.Equal(c.Current.Source.Observation.Profile) || !p.CheckedAt.Equal(in.CreatedAt) || !p.SignBefore.Equal(in.RequestUntil) || p.IntentDigest != auditapp.OperationLifecycleDigest(in) {
+		return false
+	}
+	if a.Certificate == nil {
+		return a.Outcome == nil && !a.Activated
+	}
+	if !a.ProviderStarted || !p.Matches(*a.Certificate) || artifact.Digest(sha256.Sum256(a.Certificate.DER)) != a.Certificate.Certificate.Digest || a.Outcome == nil || !a.Outcome.Valid() || a.Outcome.Status != "success" || a.Outcome.Credential == nil || a.Outcome.Credential.CertificateDigest != a.Certificate.Certificate.Digest || !a.Outcome.Credential.NotAfter.Equal(a.Certificate.Certificate.NotAfter) {
+		return false
+	}
+	x, e := json.Marshal(a.Outcome.Intent)
+	y, f := json.Marshal(in)
+	return e == nil && f == nil && bytes.Equal(x, y)
+}
+
+type ConnectorCredentialJournal interface {
+	PrepareConnectorCredential(context.Context, ConnectorCredentialCandidate) (ConnectorCredentialAttempt, error)
+	// Acceptance is conditional on the independently acknowledged original intent
+	// and unchanged current candidate. A false claim never permits provider I/O.
+	ClaimConnectorCredential(context.Context, ConnectorCredentialAttempt, ConnectorCredentialCurrent) (bool, error)
+	StoreConnectorCredential(context.Context, ConnectorCredentialAttempt, value.IssuedConnectorCredential, audit.OperationOutcome) error
+	ActivateConnectorCredential(context.Context, ConnectorCredentialAttempt, ConnectorCredentialCurrent) (value.IssuedConnectorCredential, error)
+}
+type ConnectorCredentialAudit interface {
+	Begin(context.Context, audit.OperationIntent) error
+	Finish(context.Context, audit.OperationOutcome) error
+}
+type ConnectorCredentialResultVerifier interface {
+	CheckConnectorCredentialCurrent(value.ConnectorCredentialPermit, []byte, []byte, [][]byte, value.ConnectorCredentialObservation) (value.IssuedConnectorCredential, error)
+}
+
+// ConnectorRenewal composes real current TLS registration, independently
+// protected source, recovery, one-use SQL admission and the existing closed
+// audit pair. It is not mounted by constructing it, and cannot bootstrap peers.
+type ConnectorRenewal struct {
+	Proof        EnrollmentProofVerifier
+	ProcessProof ConnectorProcessProofReader
+	Registry     PeerRegistry
+	Source       ConnectorIdentitySourceReader
+	Recovery     RecoveryReader
+	Journal      ConnectorCredentialJournal
+	Audit        ConnectorCredentialAudit
+	MAC          *auditapp.OperationMAC
+	Issuer       ConnectorCredentialIssuer
+	Verifier     ConnectorCredentialResultVerifier
+	Now          func() time.Time
+}
+
+func (s ConnectorRenewal) current(ctx context.Context, cert value.PeerCertificate, start, until time.Time, process *value.ConnectorProcessRequest) (ConnectorCredentialCurrent, error) {
+	var c ConnectorCredentialCurrent
+	var p value.AuthenticatedPeer
+	var proof *value.ConnectorProcessProof
+	actorUntil := until
+	if process != nil {
+		q, e := s.ProcessProof.ReadConnectorProcessProof(ctx, *process)
+		if e != nil {
+			return c, value.ErrDenied
+		}
+		proof = &q
+		actorUntil = q.FreshUntil
+	} else {
+		var e error
+		p, e = (PeerAuthenticator{Registry: s.Registry, Now: s.Now}).AuthenticatePeer(ctx, cert)
+		if e != nil {
+			return c, value.ErrDenied
+		}
+		actorUntil = p.ValidUntil
+	}
+	src, e := s.Source.ReadConnectorIdentitySource(ctx)
+	if e != nil {
+		return c, value.ErrUnavailable
+	}
+	recovery, e := s.Recovery.RecoveryState(ctx)
+	if e != nil {
+		return c, value.ErrUnavailable
+	}
+	c = ConnectorCredentialCurrent{Peer: p, ProcessProof: proof, Source: src, Recovery: recovery, ObservedAt: start, Until: identity.Earlier(until, identity.Earlier(actorUntil, identity.Earlier(src.Observation.FreshUntil, recovery.FreshUntil)))}
+	if ctx.Err() != nil || !c.Valid(s.Now()) {
+		return ConnectorCredentialCurrent{}, value.ErrDenied
+	}
+	return c.clone(), nil
+}
+func (s ConnectorRenewal) Issue(ctx context.Context, cert value.PeerCertificate, request ConnectorCredentialRequest) (value.IssuedConnectorCredential, error) {
+	if s.Registry == nil {
+		return value.IssuedConnectorCredential{}, value.ErrUnavailable
+	}
+	return s.issue(ctx, cert, request, nil)
+}
+
+// IssueProcess uses actual current Pod/controller proof for the admitted initial
+// key pair. It never creates a fake TLS leaf; the SQL journal must independently
+// require the exact acknowledged process admission and the original bounded signing slot.
+func (s ConnectorRenewal) IssueProcess(ctx context.Context, id, usage string, process value.ConnectorProcessRequest) (value.IssuedConnectorCredential, error) {
+	if s.ProcessProof == nil || !process.Valid() {
+		return value.IssuedConnectorCredential{}, value.ErrUnavailable
+	}
+	process.ClientCSRDER = bytes.Clone(process.ClientCSRDER)
+	process.ServerCSRDER = bytes.Clone(process.ServerCSRDER)
+	csr := process.ClientCSRDER
+	if usage == "server" {
+		csr = process.ServerCSRDER
+	}
+	request := ConnectorCredentialRequest{ID: id, Usage: usage, Attested: &process.Process, CSR: csr}
+	return s.issue(ctx, value.PeerCertificate{}, request, &process)
+}
+func (s ConnectorRenewal) issue(ctx context.Context, cert value.PeerCertificate, request ConnectorCredentialRequest, process *value.ConnectorProcessRequest) (value.IssuedConnectorCredential, error) {
+	if s.Source == nil {
+		return value.IssuedConnectorCredential{}, value.ErrUnavailable
+	}
+	return s.issueUsing(ctx, cert, request, process, connectorLegacyCredentialChecks{s: s, cert: cert, process: process})
+}
+
+func (s ConnectorRenewal) issueUsing(ctx context.Context, cert value.PeerCertificate, request ConnectorCredentialRequest, process *value.ConnectorProcessRequest, checks connectorCredentialChecks) (value.IssuedConnectorCredential, error) {
+	var zero value.IssuedConnectorCredential
+	if ctx == nil || ctx.Err() != nil || s.Proof == nil || checks == nil || s.Recovery == nil || s.Journal == nil || s.Audit == nil || s.MAC == nil || s.Issuer == nil || s.Verifier == nil || s.Now == nil {
+		return zero, value.ErrUnavailable
+	}
+	defer checks.Close()
+	if !authorization.UUID(request.ID) || !connectorCredentialOrigin(request.BootstrapID, request.Attested, func() value.PeerBinding {
+		if process != nil {
+			return process.Process.Binding
+		}
+		return cert.Binding
+	}()) || (request.Usage != "client" && request.Usage != "server") || len(request.CSR) < 32 || len(request.CSR) > 8192 {
+		return zero, value.ErrInvalid
+	}
+	if request.Attested != nil {
+		owned := *request.Attested
+		request.Attested = &owned
+	}
+	start := s.Now().UTC().Truncate(time.Microsecond)
+	until := start.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	live, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	csr := bytes.Clone(request.CSR)
+	key, e := s.Proof.EnrollmentKey(csr)
+	if e != nil {
+		return zero, value.ErrDenied
+	}
+	c, e := checks.Current(live, value.ConnectorLifecycleInitial, start, until)
+	if e != nil {
+		return zero, e
+	}
+	until = c.Until
+	live, firstEnd := context.WithDeadline(live, until)
+	defer firstEnd()
+	candidate := ConnectorCredentialCandidate{ID: request.ID, BootstrapID: request.BootstrapID, Attested: request.Attested, Usage: request.Usage, PublicKeyDigest: key, Current: c}
+	if !candidate.Valid(s.Now()) {
+		return zero, value.ErrDenied
+	}
+	a, e := s.Journal.PrepareConnectorCredential(live, candidate)
+	if e != nil {
+		return zero, e
+	}
+	if !a.matches(candidate) || !c.Valid(s.Now()) || live.Err() != nil {
+		return zero, value.ErrDenied
+	}
+	if a.Certificate == nil {
+		if a.ProviderStarted {
+			return zero, value.ErrPending
+		}
+		if !a.Permit.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		if e = s.Audit.Begin(live, a.Intent); e != nil {
+			return zero, e
+		}
+		next, e := checks.Current(live, value.ConnectorLifecycleBeforeEffect, start, until)
+		if e != nil {
+			return zero, e
+		}
+		until = next.Until
+		currentLive, currentEnd := context.WithDeadline(live, until)
+		defer currentEnd()
+		live = currentLive
+		if !next.Source.Observation.SameSource(c.Source.Observation) || next.Source.Roles != c.Source.Roles || !a.Permit.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		claimed, e := s.Journal.ClaimConnectorCredential(live, a, next)
+		if e != nil {
+			return zero, e
+		}
+		if !claimed {
+			return zero, value.ErrPending
+		}
+		// Spend is permanent if provider delivery, verification or SQL storage is
+		// uncertain. No branch repeats signing or allocates a different operation.
+		if !next.Valid(s.Now()) || !a.Permit.Valid(s.Now()) || live.Err() != nil {
+			return zero, value.ErrDenied
+		}
+		issued, e := s.Issuer.SignConnectorCredential(live, a.Permit, csr)
+		if e != nil {
+			return zero, e
+		}
+		checked, e := s.Verifier.CheckConnectorCredentialCurrent(a.Permit, csr, issued.DER, issued.ChainDER, next.Source.Observation)
+		if e != nil || !a.Permit.Valid(s.Now()) || !next.Valid(s.Now()) || live.Err() != nil {
+			return zero, value.ErrDenied
+		}
+		recorded := s.Now().UTC().Truncate(time.Microsecond)
+		facts := audit.OperationCredentialOutcome{OperationID: a.Intent.ID, Usage: request.Usage, CertificateDigest: checked.Certificate.Digest, NotAfter: checked.Certificate.NotAfter}
+		payload, e := json.Marshal(facts)
+		if e != nil {
+			return zero, value.ErrUnavailable
+		}
+		digest, e := s.MAC.Digest("connector-result/v1", payload)
+		if e != nil {
+			return zero, e
+		}
+		outcome := audit.OperationOutcome{Intent: a.Intent, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: digest, OutputBytes: int64(len(payload)), MetadataUntil: identity.Earlier(a.Intent.RequestUntil, next.Until), RecordedAt: recorded, Credential: &facts}
+		if !outcome.Valid() {
+			return zero, value.ErrDenied
+		}
+		if e = s.Journal.StoreConnectorCredential(live, a, checked, outcome); e != nil {
+			return zero, e
+		}
+		a.Certificate = &checked
+		a.Outcome = &outcome
+		a.ProviderStarted = true
+	}
+	if !a.matches(candidate) {
+		return zero, value.ErrDenied
+	}
+	// Stored-result retry can finish the original audit; it cannot reopen an old
+	// signing interval. Its exact current source is independently checked again.
+	// Activated is a durable exact-receipt fact, not fresh authority. Re-enter
+	// the current SQL activation check below; never reopen its old audit window.
+	if !a.Activated {
+		if e = s.Audit.Finish(live, *a.Outcome); e != nil {
+			return zero, e
+		}
+	}
+	next, e := checks.Current(live, value.ConnectorLifecycleBeforeActivation, start, until)
+	if e != nil {
+		return zero, e
+	}
+	until = next.Until
+	activeLive, activeEnd := context.WithDeadline(live, until)
+	defer activeEnd()
+	live = activeLive
+	if !next.Source.Observation.SameSource(c.Source.Observation) || next.Source.Roles != c.Source.Roles {
+		return zero, value.ErrDenied
+	}
+	active, e := s.Journal.ActivateConnectorCredential(live, a, next)
+	if e != nil {
+		return zero, e
+	}
+	if !sameConnectorCredential(active, *a.Certificate) {
+		return zero, value.ErrDenied
+	}
+	final, e := checks.Current(live, value.ConnectorLifecycleFinal, start, until)
+	if e != nil {
+		return zero, e
+	}
+	if !final.Source.Observation.SameSource(c.Source.Observation) || final.Source.Roles != c.Source.Roles {
+		return zero, value.ErrDenied
+	}
+	checked, e := s.Verifier.CheckConnectorCredentialCurrent(a.Permit, csr, active.DER, active.ChainDER, final.Source.Observation)
+	if e != nil || !sameConnectorCredential(checked, active) || !final.Valid(s.Now()) || live.Err() != nil {
+		return zero, value.ErrDenied
+	}
+	return checked.Clone(), nil
+}
+func sameConnectorCredential(a, b value.IssuedConnectorCredential) bool {
+	if a.Certificate != b.Certificate || !bytes.Equal(a.DER, b.DER) || len(a.ChainDER) != len(b.ChainDER) {
+		return false
+	}
+	for i := range a.ChainDER {
+		if !bytes.Equal(a.ChainDER[i], b.ChainDER[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c ConnectorCredentialCurrent) binding() value.PeerBinding {
+	if c.ProcessProof != nil {
+		return c.ProcessProof.Process.Binding
+	}
+	return c.Peer.Certificate.Binding
+}
+func connectorCredentialOrigin(bootstrap string, p *value.ConnectorProcessIdentity, b value.PeerBinding) bool {
+	return authorization.UUID(bootstrap) && p == nil || bootstrap == "" && p != nil && p.Valid() && p.Binding == b
+}
+func connectorProcessActor(p value.ConnectorProcessProof) audit.OperationConnectorProcessActor {
+	return audit.OperationConnectorProcessActor{Process: p.Process, Deployment: p.Configuration.Profile.Deployment, ClientKeyDigest: p.ClientKeyDigest, ServerKeyDigest: p.ServerKeyDigest}
+}

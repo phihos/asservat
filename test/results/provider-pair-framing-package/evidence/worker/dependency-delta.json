@@ -1,0 +1,116 @@
+[
+  {
+    "path": "docs/architecture/cluster-observations.md",
+    "previous_sha256": "99bc3eddd375919389a7bb0e49bd69b3abaf2ffd47729983280a364cba4d118e",
+    "current_sha256": "c31a58dd526b92d01fca2ba6b38d7c66fa8101da2582e93d0aa82219a7d66aaf",
+    "reason": "Parent announced accepted versioning, qualification and current architecture documentation updates.",
+    "integration_records": []
+  },
+  {
+    "path": "docs/implementation-progress.md",
+    "previous_sha256": "e0fbf2def41e2e8e9ae9d13ab8aaae45c2f8122ba943a33ce4b994c78f7331d5",
+    "current_sha256": "6189f73033ec35f7303dfe9a0a0a350c50169325201a967d38be5b4059940482",
+    "reason": "Parent announced accepted versioning, qualification and current architecture documentation updates.",
+    "integration_records": []
+  },
+  {
+    "path": "docs/research/audit-storage-qualification.md",
+    "previous_sha256": "a3de2fdc0f960814c74f2630cf7478b3ec2899954942c14867a4b20bce4465c5",
+    "current_sha256": "cb67718cd39ba5b8645a2505795776b6b8fc0ff0e3a5b0c4605f1affc43b796c",
+    "reason": "Parent announced accepted versioning, qualification and current architecture documentation updates.",
+    "integration_records": [
+      "test/results/accepted-versioned-audit-integration.json"
+    ]
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_channel.go",
+    "previous_sha256": null,
+    "current_sha256": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_coordinator_test.go",
+    "previous_sha256": null,
+    "current_sha256": "898a2f2d79197c7537da551ddfe1ac1cae541e810c4a522c14378b260d5ef536",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/adapters/mtls/connector_operation_hub.go",
+    "previous_sha256": null,
+    "current_sha256": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/adapters/mtls/owner_operation.go",
+    "previous_sha256": null,
+    "current_sha256": "7429888e9247222473b75c60081b95e4dabfd219ee2f5b590500ad6629289712",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/adapters/mtls/owner_operation_wire.go",
+    "previous_sha256": null,
+    "current_sha256": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/contracts/owner_observation_operation.go",
+    "previous_sha256": null,
+    "current_sha256": "53609a7245115f6af1919c9956b9dbdbf95b25718a706d3a40486218305d6a71",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "internal/contracts/owner_observation_operation_test.go",
+    "previous_sha256": null,
+    "current_sha256": "12abc603eaa636466a17609208043e87872c1a79ef92c4bddfdfc865ce58d9da",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-coordinator-integration.json"
+    ]
+  },
+  {
+    "path": "specs/evidence.md",
+    "previous_sha256": "66de7fc512d77adf2e8ed5e296a35f77ef759123ca817e7bb2a8d632e89fd0d5",
+    "current_sha256": "70158b69eafed84d9a7cc7d6b4d0249983b50b7651ee86e437a48ddb3c2eea46",
+    "reason": "Parent announced accepted versioning, qualification and current architecture documentation updates.",
+    "integration_records": [
+      "test/results/accepted-versioned-audit-integration.json"
+    ]
+  },
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "previous_sha256": "3e4ef751e343048982ae5b9c911ff4dcb2eb4b32282bca68ea7ac549f876ccd3",
+    "current_sha256": "59ab35e7237a0b0fb66c370608f775346030ce08b012f31dd256bd8d70f45fe3",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-sql-integration.json",
+      "test/results/observation-operation-sql-integration.json"
+    ]
+  },
+  {
+    "path": "test/integration/connector_observation_operation_sql_test.go",
+    "previous_sha256": null,
+    "current_sha256": "01427f4a217a01e7db8f5485822c558435b616363f3460615bdeb906e9da20db",
+    "reason": "Exact parent integration payload hash matches retained report.",
+    "integration_records": [
+      "test/results/observation-operation-sql-integration.json"
+    ]
+  }
+]

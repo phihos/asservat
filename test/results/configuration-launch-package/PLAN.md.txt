@@ -1,0 +1,69 @@
+# Exact configuration reconciler handoff
+
+Source-only continuation after the integrated inert-deployment correction.
+The existing role claims and immutable credential manifest retain their inert
+Deployment specification forever. The installed command switch is still open.
+
+## Bounded launch and replay
+
+Add one optional launch disposition to the original private configuration-role
+Secret, after all three original role receipts and the independently verified
+immutable projection UID are present. It records one server-generated launch
+ID, its original at-most-five-second interval, the original complete source
+observation, exact inert Deployment resourceVersion, expected running spec
+(the original spec with replicas changed only from zero to one), and immutable
+configuration/provider/projection UIDs. It stores no new provider payload or
+payload hash. There is no collection, recovery or readiness authority in this
+state.
+
+Only a positively acknowledged first disposition CAS may issue the Deployment
+UPDATE. The UPDATE retains exact UID/resourceVersion, changes replicas only,
+and adds the fixed original launch-ID annotation. Every uncertainty afterward
+is exact lookup only; a missing Deployment or retained claim does not grant
+another UPDATE. Independent readback checks the entire expected specification,
+original account, namespace, source/guard identity, immutable input objects and
+launch marker. A known conflict does not silently choose another resourceVersion.
+
+Before the UPDATE, the installer freshly checks actual native enforcement and
+all SQL roles under current recovery, after SQL locks, in the original operation.
+A source or phase mutation before that boundary denies. After UPDATE, an
+independent read-only operation may verify the running result; it cannot revive
+or extend the original UPDATE interval. Its exact successful observation may
+be retained as the original launch receipt. An unknown receipt write is resolved
+by reading that same receipt, not repeating launch or credential creation.
+
+SQL gains a separate read-only launch-inventory method. It still checks current
+incarnation/activation/epoch/recovery and original actual role OID/ACL/password/
+provenance. The only permitted source difference from original credential claims
+is the launch disposition's exact inert-to-running specification transition.
+The claims themselves and role comments are never rewritten. The provisioning
+method retains its old exact-source rule and has no transition bypass.
+
+CLI replay first reads the disposition. Once launch exists, it follows only
+this verification path; it never calls the credential creator again. A pending
+claim with an exact running object may reconcile that original result. A pending
+claim whose object is still inert remains unavailable, with its one attempt spent.
+
+## Actual producer still required before this handoff
+
+The current generated role input needs real Deployment/account UIDs, while the
+existing BuildProvisionedHubWorkerWorkload only returns inert objects. Therefore
+this continuation must include a protected purpose-fixed object-create producer
+before deriving role inputs. It cannot require operators to invent UIDs or use
+the retired initial installation manager.
+
+Use the same already active installation, exact protected owner namespace/guard,
+fixed compiled workload/RBAC builder and separately supplied provider compartment.
+A bounded post-activation installer disposition owns the fixed account, Role,
+RoleBinding, ClusterRole, ClusterRoleBinding, immutable config/provider inputs,
+and inert Deployment. Each first acknowledged create claim permits one CREATE;
+unknown replies only read the exact original object/claim marker and contents.
+Only independently verified real UIDs feed the existing role-input generator.
+The stable activation claim is a historical join to independently current SQL
+activation/recovery checks, never fresh authority by itself. The new disposition
+must not adopt arbitrary pre-existing named objects or reset a spent claim.
+
+This is a finite compiled installation path, not a caller-selected object list,
+role/grant framework or supervisor. The actual native create/UID/CAS/unknown-reply
+matrix and the final in-Pod strict-manifest constructor must pass before the
+command switch and chart enablement are proposed. No runtime is enabled here.

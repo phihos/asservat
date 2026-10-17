@@ -1,0 +1,41 @@
+# Owner audit physical inventory follow-up
+
+Source-only five-file snapshot. The previously integrated three-file diagnostic and its component evidence are unchanged except the explicit amendment recorded here. No dependency closure or test process has been captured/launched for this snapshot.
+
+## Change
+
+The bounded reader now sets `CurrentUnmatched` when complete versions reports latest data but the complete current-key listing omits that exact key. A truncated listing remains inconclusive; latest-marker/current-absence remains consistent. There is no new authority, deletion, release or pagination claim.
+
+The new test proves this omission against the exact integrated production base, then tests corrected complete/truncated/marker outcomes. Existing inventory tests remain in the dependency tree and are selected with it.
+
+The new integration fixture and closed `--owner-audit-inventory` custody mode use actual pinned SeaweedFS and SDK/TLS with a separate LIST-only bucket credential. An independent fixture administrator creates and reads the physical graph: an actual historical zero-byte null version, three non-null versions and one marker at generation 1, neighboring generations 10/11, and one unfinished multipart upload with a real part. Independent before/after exact-version body hashes, sizes, IDs, latest flags, marker/upload/part inventories must agree. The reader sees only the exact original key and reports upload bytes as unknown. The original source observation is expired; only its structural configuration is supplied to the constructor.
+
+Actual credential negatives cover foreign-bucket LIST, version body GET, PUT, version deletion, upload abort and versioning suspension. Product inventory cannot mutate or release anything. Final physical cleanup is performed by the independent fixture administrator after product reads joined; it does not qualify a product retirement protocol. Synthetic object bodies are not encrypted audit receipts, an installed reserve or production audit acceptance.
+
+The harness refuses mixed mode/selector flags, clears inherited opt-in outside this mode, requires the exact top-level PASS, preserves selected 300-second process budget and unchanged source/cleanup reporting. The adapter itself still owns its original at-most-five-second interval. Existing fixture modes and their IAM recipes remain unchanged.
+
+## Proposed component command sequence (unrun)
+
+After parent allocates a stable source/build slot, `native-qualification-draft/prepare.py --parent-slot-allocated <new checks path>` captures the actual current closure and checks every original base/payload. Its copied runner executes, sequentially:
+
+1. `python3 scripts/test-owner-inventory-harness.py` (closed selectors only, no containers/Go).
+2. `go test -vet=off -run=^$ -count=1 ./internal/adapters/objectstore ./test/integration`.
+3. Exact integrated production body plus new `both-complete` test; require its actual named failure, then restore the candidate.
+4. `go test -json -race -count=1 -timeout=90s -run=^TestOwnerAuditInventory ./internal/adapters/objectstore` (11 expected top-level tests).
+5. Exact native test without opt-in; require SKIP and no PASS, not a native qualification.
+6. `go vet ./internal/adapters/objectstore ./test/integration` and `make go-architecture-check`.
+
+The wrapper uses GOMAXPROCS=2/-p=2, a fresh owned `/tmp` mirror with at least 4 GiB free, durable HOME logs/results, a 600-second overall budget, phase exits/log hashes, unchanged live bases/dependencies, exact mirror checks and joined scratch removal. None of these commands has been run for this source snapshot.
+
+## Later native command (parent-owned, unlaunched)
+
+`python3 scripts/test-custody.py --owner-audit-inventory`
+
+Result prefix: `owner-audit-inventory`. Require process/test/qualification exit zero, nonempty unchanged `sourceHashes`, `sourceUnchangedDuringTest: true`, `cleanupFailures: []`, and these exact PASS names:
+
+- `TestOwnerAuditInventoryWithRealServices`
+- `TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies`
+- `TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory`
+- `TestOwnerAuditInventoryWithRealServices/inventory-preserves-all-physical-obligations`
+
+A skip, missing case, unstable source or incomplete cleanup is not success. Actual backend null-version/header/marker/multipart behavior remains unqualified until that run; do not normalize responses speculatively.

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-observation.schema.json",
+  "title": "Original public bootstrap observation input",
+  "description": "Generated from retained original producer state. At most 64 KiB. No private state, credentials or effect authority. Current exact public pins and independent denial remain required before exposing each newly issued observation-only credential.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "desired",
+    "prelude",
+    "installationID",
+    "requestID",
+    "clusterID",
+    "operationID",
+    "projection",
+    "resourceVersion",
+    "planDigest",
+    "projectionDigest"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bootstrap-observation/v1"
+    },
+    "desired": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json"
+    },
+    "prelude": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap-state.schema.json#/properties/prelude"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "projection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "resourceVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "planDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "projectionDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "desired": {
+            "properties": {
+              "format": {
+                "enum": [
+                  "asservat-initial-bootstrap/v3",
+                  "asservat-initial-bootstrap/v4"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "prelude": {
+            "required": [
+              "copyMarker"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "prelude": {
+            "not": {
+              "required": [
+                "copyMarker"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

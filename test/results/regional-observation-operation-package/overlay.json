@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/connector_observation_operation.go": "/home/phil/.cache/asservat-build/planning/regional-observation-regional-proof-20261013/checkpoint-v2/files/internal/adapters/kubernetes/connector_observation_operation.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/connector_observation_operation_native.go": "/home/phil/.cache/asservat-build/planning/regional-observation-regional-proof-20261013/checkpoint-v2/files/internal/adapters/kubernetes/connector_observation_operation_native.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/connector_observation_operation_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-regional-proof-20261013/checkpoint-v2/files/internal/adapters/kubernetes/connector_observation_operation_test.go"
+  }
+}

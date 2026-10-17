@@ -1,0 +1,31 @@
+=== RUN   TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay
+    flow_test.go:62: connector serve terminal <nil>
+--- PASS: TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay (1.18s)
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/failed-close
+    flow_test.go:62: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/unknown-close
+    flow_test.go:62: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/deadline
+    flow_test.go:62: connector serve terminal context deadline exceeded
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/cancel
+    flow_test.go:62: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/concurrent-registration
+    flow_test.go:62: connector serve terminal <nil>
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/lost-final
+    flow_test.go:62: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/known-revocation
+    flow_test.go:62: connector serve terminal native exchange unavailable
+=== RUN   TestNativeHandoffRejectsUnacknowledgedClosure/known-shortening
+    flow_test.go:62: connector serve terminal native exchange unavailable
+--- PASS: TestNativeHandoffRejectsUnacknowledgedClosure (0.94s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/failed-close (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/unknown-close (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/deadline (0.70s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/cancel (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/concurrent-registration (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/lost-final (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/known-revocation (0.03s)
+    --- PASS: TestNativeHandoffRejectsUnacknowledgedClosure/known-shortening (0.05s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	3.162s

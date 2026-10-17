@@ -1,0 +1,37 @@
+{
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "phases": [
+    {
+      "name": "worker",
+      "command": [
+        "python3",
+        "scripts/test-context-storage.py",
+        "--initial-bootstrap-chain",
+        "--runtime-provider-pair",
+        "--runtime-provider-worker"
+      ],
+      "exit": 0,
+      "seconds": 527.344,
+      "diskBeforeBytes": 425120575488,
+      "diskAfterBytes": 425103286272,
+      "sourceCount": 2238,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 0,
+      "passedTests": [
+        "TestInitialBootstrapChainWithRealServices",
+        "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+        "TestInitialBootstrapChainWithRealServices/runtime-provider-worker-source",
+        "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+      ],
+      "testPhases": null,
+      "archiveHashes": {
+        "harness.log": "83bd22387e3545dd8bf6b7a6cd59a26c00b373fc772ed2c1cdb884296189f989",
+        "context-storage.log": "d009fa989767f59ce419cdbef4aa5825c8294e32d6fc774ac51dfd07e2882b15",
+        "context-storage-environment.json": "3a27baa56bb206bc8412f63a6cad53bf2c2edbb20e263a1ed52ef2d84cf20a1b"
+      }
+    }
+  ],
+  "scope": "Original protected bootstrap and one actual provider worker launch; current fleet/owner/provider/audit work; independent SQL and pinned encrypted version witnesses. Capacity and cleanup projections pending; no full active actor or public runtime qualification.",
+  "exit": 0
+}

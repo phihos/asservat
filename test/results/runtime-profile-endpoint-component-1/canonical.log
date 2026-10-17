@@ -1,0 +1,11 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 121 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 3721 local links, 716 rejected invalid examples (10867 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1222, "rejectedInvalidCases": 120}
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 59, in <module>
+    raise ValueError(f"Domain import is not a pure value utility: {imported}")
+ValueError: Domain import is not a pure value utility: net
+make: *** [Makefile:58: go-architecture-check] Error 1

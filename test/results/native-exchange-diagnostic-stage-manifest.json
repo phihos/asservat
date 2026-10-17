@@ -1,0 +1,7 @@
+[
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base": "787f60c0860d9dad051eacb328a2a5c7a45cfbd110c9e143f314fcb3a657f539",
+    "sha256": "857e53c1ce65f4fed759b085f1cac558a827083150ce14844b2bcdd79ebc189b"
+  }
+]

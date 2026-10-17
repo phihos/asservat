@@ -1,0 +1,5 @@
+--- FAIL: TestOwnerCertificateAttemptSurvivesJSONClockRepresentation (0.00s)
+    owner_enrollment_test.go:34: durable round trip changed equality despite identical identity and wall-clock deadlines
+FAIL
+FAIL	asservat.local/asservat/internal/domain/fleet	0.002s
+FAIL

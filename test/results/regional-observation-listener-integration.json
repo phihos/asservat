@@ -1,0 +1,103 @@
+{
+  "manifestSHA256": "acc4614362a03ce585748e46c4a5cb6b95f131f1857431df40ab2969f1644e0a",
+  "dependencies": 1884,
+  "files": {
+    "docs/architecture/cluster-observations.md": "487c62a40c0bc2e7a917d9d05aba99bf3d813e1344c585868228438413a42893",
+    "docs/decisions/144-cluster-local-observations.md": "d3fab603a1afd6a206a0dccac742a28119bc5c179895f9835219d5f2d5d5c442",
+    "internal/transport/native/owner_observation_server.go": "d65a6899e53c162f948ddedb64160ad30210016d5d754f4229e4ef1181459e77",
+    "internal/transport/native/owner_regional_observation_server.go": "d46f8192e6cec0d9d0f1eb0650060f293d6dbf362b95e781f79613ac3fe0a0fa",
+    "internal/transport/native/owner_regional_observation_server_test.go": "3e4a9c257a8fbdcfafcb2c894bdbf80ac6c347b9aa386be5221ca6a6a969ab05"
+  },
+  "checks": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/transport/native"
+      ],
+      "exit": 0,
+      "seconds": 1.514,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-run",
+        "^TestOwner(RegionalObservationListener|Observation)",
+        "-v",
+        "./internal/transport/native"
+      ],
+      "exit": 0,
+      "seconds": 11.483,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/overlay.json",
+        "./internal/transport/native"
+      ],
+      "exit": 0,
+      "seconds": 0.467,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "freeze": []
+      }
+    }
+  ],
+  "integratedAt": 1791853853.7084408,
+  "scope": "Loopback actual listener/TLS/h2 with synthetic source authority. No runtime selection, native two-cluster qualification or cross-owner forwarding."
+}

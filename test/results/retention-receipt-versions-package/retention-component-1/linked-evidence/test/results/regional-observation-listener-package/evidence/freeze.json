@@ -1,0 +1,16 @@
+{
+  "bases/docs/architecture/cluster-observations.md": "82b4d25ff2769d6f72d59ed0ddd30a5fa5b84c4994e02a6a61b87861ac733364",
+  "bases/docs/decisions/144-cluster-local-observations.md": "4eb168a4e30ac182e33df022cda85211de81c7ca05cab9f6aa3235b032dae835",
+  "bases/internal/transport/native/owner_observation_server.go": "e10e492c1716dfdd217aecdd5b8b488d15fe46182542f3f89d46d93816cea65c",
+  "bases.json": "0082b9b0d8c4d77740b57f25a49d4a28f8e9c95f68fd073685c5f437a12867d9",
+  "dependencies.json": "85db0ece62aaac7d116db75b8980b77d9ab95bec41e9829761384ce0cd22f9ce",
+  "files/docs/architecture/cluster-observations.md": "487c62a40c0bc2e7a917d9d05aba99bf3d813e1344c585868228438413a42893",
+  "files/docs/decisions/144-cluster-local-observations.md": "d3fab603a1afd6a206a0dccac742a28119bc5c179895f9835219d5f2d5d5c442",
+  "files/internal/transport/native/owner_observation_server.go": "d65a6899e53c162f948ddedb64160ad30210016d5d754f4229e4ef1181459e77",
+  "files/internal/transport/native/owner_regional_observation_server.go": "d46f8192e6cec0d9d0f1eb0650060f293d6dbf362b95e781f79613ac3fe0a0fa",
+  "files/internal/transport/native/owner_regional_observation_server_test.go": "3e4a9c257a8fbdcfafcb2c894bdbf80ac6c347b9aa386be5221ca6a6a969ab05",
+  "manifest.json": "acc4614362a03ce585748e46c4a5cb6b95f131f1857431df40ab2969f1644e0a",
+  "overlay.json": "c692993c434cbde9af0e327f07cf7628d1eb5342445797d7dc9b4f78ede9a34b",
+  "payload.json": "19a71b586f30b935a161da2e5d63aad5fc3c57aef0ead66986107865d773ad6d",
+  "run.py": "021b1b8b13731cda35e2bc641e2f8be97e3de16f1443de5862ca401de42dc327"
+}

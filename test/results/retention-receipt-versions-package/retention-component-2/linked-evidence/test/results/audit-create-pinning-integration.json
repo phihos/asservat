@@ -1,0 +1,109 @@
+{
+  "scope": "Known successful audit PUT readback; existing conflict semantics and separate Find retained; no new authority or whole-runtime qualification",
+  "manifest": "075f07d9a80a189b7bcd62c021a13476da255e327e478c129b7083e95c4b8239",
+  "result": "91341541354515e4a1eb9c98f336a3b7aaf6ffc20de143ed174dcb4adf0636b5",
+  "dependenciesVerified": 3023,
+  "integrated": [
+    {
+      "path": "internal/adapters/objectstore/audit_create.go",
+      "base": null,
+      "payload": "586b518b9ee5c8ebb35a1c6e6dff77af0876a6f1c34884622af1dec35305b83e"
+    },
+    {
+      "path": "internal/adapters/objectstore/audit_create_test.go",
+      "base": null,
+      "payload": "ada5b8fb4c1efd86332706282acf259cef9773c68d1b016425ea192f6380604f"
+    },
+    {
+      "path": "internal/adapters/objectstore/authority.go",
+      "base": "50743c583148f0fbb3557cfc9a616f4177eee0a7b6d480961a4805e5b7bfedef",
+      "payload": "c754e7e5ec0115a0f28f32676c59cc608483af40ca585a74ff2315aa56b860f6"
+    },
+    {
+      "path": "internal/adapters/objectstore/bootstrap.go",
+      "base": "90e3fa2431f3e410bb4d3d38f6ae9c06e668de722b202eb2eb0f298c9792e8d8",
+      "payload": "baba968cfdbeb508465b3c73e154face3cf582fd76e8cb1f9d175262513f1520"
+    },
+    {
+      "path": "internal/adapters/objectstore/capture_intent.go",
+      "base": "8d874cbb0f3dacf1903ae3c8450c0c9721aef07b2cd1eeed50978e96c11ae7f4",
+      "payload": "5e13ef9426e41b24378d0b78de476b467902b7df7db4fc0d63d657f793f4e17d"
+    },
+    {
+      "path": "internal/adapters/objectstore/context_deletion.go",
+      "base": "d796876511a3bfd3ad0b0e4497a4ca514586d9f39515e8fc5d3e9fff69b841ed",
+      "payload": "55a23a71168ab903d7a9c0aaab4ef833f9b900f789583f0834e3fd7ce03f3a71"
+    },
+    {
+      "path": "internal/adapters/objectstore/context_verification.go",
+      "base": "69c9757a4c53d6db2c50acb04fc816f008c87ab5ddafdf9ed2fe2fec25a85c11",
+      "payload": "b5a70ff63a44d964a6d8a2ce4938937f56d51cea0129a403504296edaddd8364"
+    },
+    {
+      "path": "internal/adapters/objectstore/download_audit.go",
+      "base": "3cc083e9c3bacd30b5769e07e696ccfdfaa8851d922c75368eae591efa234713",
+      "payload": "2501852d37f482234ec61c75c8e1cfe8fe4915f7256bb68ba94dce4e8f4ad184"
+    },
+    {
+      "path": "internal/adapters/objectstore/download_stop.go",
+      "base": "55589dc9cba080de30e3e5ffe32f1139a40cbaded2d4bef7450c6bb71cc8593e",
+      "payload": "97d46eaae21960bfecb90358e0aa70f2ec1d25b6a226d29c2d3ecf12a802270a"
+    },
+    {
+      "path": "internal/adapters/objectstore/download_window.go",
+      "base": "ba5a80d34a81f48eb004b2a07d3ff69ccd11ab2867865feabc75b888609d19fc",
+      "payload": "21a6777c557755776ca6c406e07cb072afd9b8581137b2d88745a28e1ed6a2a0"
+    },
+    {
+      "path": "internal/adapters/objectstore/download_worker.go",
+      "base": "a3a3fec2d7e7d0413952e85eb5d3d74b3be30edecd2c8a1a29d9c70068a78a3d",
+      "payload": "5ac264f5a4c831db6b88eb35dcae82b38c2bcc699910ec08ef91494a3ca019bf"
+    },
+    {
+      "path": "internal/adapters/objectstore/enrollment.go",
+      "base": "03a8c9ebfc5f55dc2915a65dee4742775a5303e0d255e9673ed0ee3810b37af3",
+      "payload": "ad42b5435fa0ff343fc2b93a840196968dcc886e7665a09dc646c638ea8e5a24"
+    },
+    {
+      "path": "internal/adapters/objectstore/lifecycle.go",
+      "base": "9dd839b2a108852fc2fa371215b008e91a336113d9b4c3f95dae4d738d86d03e",
+      "payload": "77032becf29ce75f624a28a858abb7a60e936f93a8dec65c041e34d16d96db1c"
+    },
+    {
+      "path": "internal/adapters/objectstore/operation_audit.go",
+      "base": "8c573720bd7f6ce0d4deb789a9328b3715ce887f019506465609d1b606dcdb8a",
+      "payload": "feb609813655b1c85f42aa0240ef9f467bfc0795d4f4ab3a0e544fa948c8db7b"
+    },
+    {
+      "path": "internal/adapters/objectstore/owner_configuration.go",
+      "base": "0b6fd4165b368d5cffd23cec08ea5bf2ca46acaa87c4a765fb3c2a7b5f6b4199",
+      "payload": "bfa47f13353d55d6e0c3fea3d20382f39617c416bb50c48d2549814a6efa3d02"
+    },
+    {
+      "path": "internal/adapters/objectstore/owner_enrollment.go",
+      "base": "7e5be06dc391191e96da71a2cd406836ca7ee587e7db56ef50f9580902131407",
+      "payload": "1b1363f78448dd5353febeb3fd0e4e4c4be9fe06dd9be7807c127d2bcfb8b1ef"
+    },
+    {
+      "path": "internal/adapters/objectstore/policy_acceptance.go",
+      "base": "8441ee0fde18ca1ff6d7a8b3a7bde9ee7c133757cd7817c0bfb2bbe26446c542",
+      "payload": "836c38ff2cca1818cd3ee1f8e8f996e93805b9252b66cb53261db691f786766d"
+    },
+    {
+      "path": "internal/adapters/objectstore/retention_acceptance.go",
+      "base": "3887cf4a78a09f564e9a5874ccc840410fe0f1bfd286a04c5148d44c9a086e37",
+      "payload": "1235563878e9276e0832ab6df367b4851397a9226a97d347ea2b0177ee00d6ee"
+    },
+    {
+      "path": "internal/adapters/objectstore/worker_configuration.go",
+      "base": "a728ed22497e9bf38cebef0c2dfa85f660f86ab9069591cd098447d4b8f0c328",
+      "payload": "151290e29b45f75313dbc12f84e83086e25148eb82fec6deccbbff8e05cfb56f"
+    },
+    {
+      "path": "internal/adapters/objectstore/worker_enrollment.go",
+      "base": "033cfecd65dc2aebf90ad98d3dd4f7f6a5d56b964f7f984ef828410f88a5b277",
+      "payload": "a2428d18150af0aaaae726c455a042c3c40e88096198ce1c1477be6efc69430a"
+    }
+  ],
+  "archiveFiles": 32
+}

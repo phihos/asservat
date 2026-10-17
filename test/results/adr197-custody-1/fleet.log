@@ -1,0 +1,6 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:150: capacity prerequisite audited activation unavailable signed control work rejected
+--- FAIL: TestCapacityProducerWithRealPostgres (0.10s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.155s
+FAIL

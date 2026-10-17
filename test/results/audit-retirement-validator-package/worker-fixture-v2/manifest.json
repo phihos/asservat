@@ -1,0 +1,16 @@
+{
+  "format": "asservat-source-only-staged-fix/v1",
+  "buildsRun": false,
+  "files": [
+    {
+      "path": "test/fixtures/sql/runtime-roles.sql",
+      "baseSha256": "18405c9b5993749d67d4adfaa596b65750babf190deb593709459c5068de61c1",
+      "payloadSha256": "18e9de2e017fc99650ea755005268fc90b158c27e94fd302a158e57e42979b9c"
+    },
+    {
+      "path": "test/integration/download_sessions_test.go",
+      "baseSha256": "a9f5915b544e0e70d16b78bf6988003d7b62e5d958f15d3810e0cee37ba131ea",
+      "payloadSha256": "518282b0f1286c664f52dde7229fffa684553a5b155180ef8bb8a1a94e2503a7"
+    }
+  ]
+}

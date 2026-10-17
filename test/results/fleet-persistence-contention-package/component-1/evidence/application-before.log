@@ -1,0 +1,23 @@
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unchanged-persistence
+    trust_observer_contention_test.go:61: failed persistence changed fencing classification
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/wrapped-persistence
+    trust_observer_contention_test.go:61: failed persistence changed fencing classification
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/source-error
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/suspended-source
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unavailable-persistence
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unknown-commit
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/expired-after-persistence
+=== RUN   TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/cancelled-after-persistence
+--- FAIL: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence (0.00s)
+    --- FAIL: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unchanged-persistence (0.00s)
+    --- FAIL: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/wrapped-persistence (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/source-error (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/suspended-source (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unavailable-persistence (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/unknown-commit (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/expired-after-persistence (0.00s)
+    --- PASS: TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence/cancelled-after-persistence (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.006s
+FAIL

@@ -1,0 +1,13 @@
+{
+  "bytes": 55503225,
+  "files": {
+    "test/fixtures/observation-native/data.go": "30f4c2c852a9094895113b02a43058de61499305dd3aa791f0222eb7efefc0fe",
+    "test/fixtures/observation-native/enrollment.go": "95556cd018b8c523832af14ff80c316679ae688d399ee73ae13d5c9b0691ba86",
+    "test/fixtures/observation-native/inputs.go": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82",
+    "test/fixtures/observation-native/main.go": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82",
+    "test/fixtures/observation-native/metrics.go": "363acac5d1729376f75ddf68a648b799c8b99d9ff8b4984b46e7f787826d71f5",
+    "test/fixtures/observation-native/runtime.go": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427"
+  },
+  "runtimeExecuted": false,
+  "sha256": "30fba810e9ff2392f2195c5aa4c469248d46534c76f5e32acd627be6adcf74d1"
+}

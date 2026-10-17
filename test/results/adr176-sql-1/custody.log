@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+--- PASS: TestContextAdmissionWithRealServices (3.53s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (3.16s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.585s

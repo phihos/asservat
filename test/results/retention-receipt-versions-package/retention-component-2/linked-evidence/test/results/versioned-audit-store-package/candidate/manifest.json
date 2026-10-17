@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/adapters/objectstore/authority.go",
+    "base_sha256": "e923d48389e257bb651701858a00ae6fe38db08e1493c5a6084538b03957dce8",
+    "payload_sha256": "50743c583148f0fbb3557cfc9a616f4177eee0a7b6d480961a4805e5b7bfedef"
+  },
+  {
+    "path": "internal/adapters/objectstore/s3.go",
+    "base_sha256": "91953e28896ef5b5182df7d0b9698b425dc9aba60ddd07d52c8f7c461cdd8ed6",
+    "payload_sha256": "56b67b76881cc6b77a276e18d3e5b2f19255cd5375a4fc424725f7613aa17f00"
+  },
+  {
+    "path": "internal/adapters/objectstore/versioned_audit_test.go",
+    "base_sha256": null,
+    "payload_sha256": "18748fce8b292002ef7f91b37c3a638cee8e8e99e630cf35ef6a0299109b226c"
+  }
+]

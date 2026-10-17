@@ -1,0 +1,25 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-key-three-slots
+=== RUN   TestContextAdmissionWithRealServices/download-key-parallel-slot
+=== RUN   TestContextAdmissionWithRealServices/download-key-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-key-peer-mismatch
+=== RUN   TestContextAdmissionWithRealServices/download-key-foreign-artifact
+=== RUN   TestContextAdmissionWithRealServices/download-key-cancelled
+=== RUN   TestContextAdmissionWithRealServices/download-key-recovery-blocked
+=== RUN   TestContextAdmissionWithRealServices/download-key-permission-changed
+=== RUN   TestContextAdmissionWithRealServices/download-key-expired-after-lock
+=== RUN   TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3
+    download_sessions_test.go:703: local service: actual TLS, SQL authority and S3 nativeBytes=352; two batches, three unwraps each
+--- PASS: TestContextAdmissionWithRealServices (7.99s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-three-slots (1.17s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-parallel-slot (0.60s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-unaudited (0.49s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-peer-mismatch (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-foreign-artifact (0.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-cancelled (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-recovery-blocked (0.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-permission-changed (0.57s)
+    --- PASS: TestContextAdmissionWithRealServices/download-key-expired-after-lock (1.45s)
+    --- PASS: TestContextAdmissionWithRealServices/local-key-download-real-sql-tls-s3 (1.13s)
+PASS
+ok  	asservat.local/asservat/test/integration	9.046s

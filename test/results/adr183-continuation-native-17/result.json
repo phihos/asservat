@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-17",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "The continuation completed; the owner stopped with 'phase=provider-proof reason=changed native=projections detail=credentials-metadata'. Cause: the kms provider's mounted identity reader still listed the four original SQL files, while the identity projection now carries six (ADR-184). Run 18 derives every identity projection file list from contracts.OwnerIdentityProjectionFiles().",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

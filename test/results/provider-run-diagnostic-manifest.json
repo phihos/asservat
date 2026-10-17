@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "d51fb7a4d82e61557be043cf36f6eabf7263debc1e25439722ac59283bc6a808",
+    "sha256": "abf7d335d76292bdb6104e26a1da7e963bad5855bcb1cdd9bafbccccc778bee4"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_sql.go",
+    "base_sha256": "acbc212cc461775c494c02fed474ff16b93d8692627e5e3c80807ccef8ae0f6d",
+    "sha256": "55674c99a96b393df481072cb7b1ce715586f58153cddf77176dd8a353864cea"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_diagnostic_test.go",
+    "base_sha256": "85e84220a4e1472394132a9fcb57792cc4795d48aaf13b04c10caafa1cf6cfe5",
+    "sha256": "acc077ae35018697d2e336760d06b8ebcee4dce322250418e0c739182e9cade3"
+  }
+]

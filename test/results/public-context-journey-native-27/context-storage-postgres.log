@@ -1,0 +1,62 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-14 07:16:23.947 UTC [301] role= sqlstate=00000 LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 07:16:23.947 UTC [301] role= sqlstate=00000 LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 07:16:23.971 UTC [307] role= sqlstate=00000 LOG:  database system was shut down at 2026-10-14 07:16:16 UTC
+2026-10-14 07:16:24.006 UTC [301] role= sqlstate=00000 LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-14 07:16:24.189 UTC [301] role= sqlstate=00000 LOG:  received fast shutdown request
+.2026-10-14 07:16:24.196 UTC [301] role= sqlstate=00000 LOG:  aborting any active transactions
+2026-10-14 07:16:24.197 UTC [301] role= sqlstate=00000 LOG:  background worker "logical replication launcher" (PID 311) exited with exit code 1
+2026-10-14 07:16:24.197 UTC [305] role= sqlstate=00000 LOG:  shutting down
+2026-10-14 07:16:24.204 UTC [305] role= sqlstate=00000 LOG:  checkpoint starting: shutdown immediate
+..2026-10-14 07:16:27.004 UTC [305] role= sqlstate=00000 LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.029 s, sync=2.733 s, total=2.807 s; sync files=303, longest=0.027 s, average=0.010 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-14 07:16:27.039 UTC [301] role= sqlstate=00000 LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-14 07:16:27.124 UTC [1] role= sqlstate=00000 LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 07:16:27.124 UTC [1] role= sqlstate=00000 LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-14 07:16:27.124 UTC [1] role= sqlstate=00000 LOG:  listening on IPv6 address "::", port 5432
+2026-10-14 07:16:27.131 UTC [1] role= sqlstate=00000 LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 07:16:27.150 UTC [431] role= sqlstate=00000 LOG:  database system was shut down at 2026-10-14 07:16:26 UTC
+2026-10-14 07:16:27.160 UTC [1] role= sqlstate=00000 LOG:  database system is ready to accept connections
+2026-10-14 07:16:27.314 UTC [442] role=postgres sqlstate=42P01 ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-14 07:18:42.285 UTC [455] role=capture_runtime sqlstate=42501 ERROR:  permission denied for table permission_stream
+2026-10-14 07:18:42.289 UTC [455] role=capture_runtime sqlstate=42501 ERROR:  permission denied for table context_storage_binding
+2026-10-14 07:18:42.290 UTC [455] role=capture_runtime sqlstate=42501 ERROR:  permission denied for table context_capture
+2026-10-14 07:18:42.290 UTC [455] role=capture_runtime sqlstate=42501 ERROR:  permission denied for table context_capture

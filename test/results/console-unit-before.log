@@ -1,0 +1,40 @@
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+ ❯ src/auth/session.test.ts (16 tests | 1 failed) 177ms
+   ❯ browser session lifecycle (13)
+     × does not reopen a workspace when a tab returns after failed sign-out 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/auth/session.test.ts > browser session lifecycle > does not reopen a workspace when a tab returns after failed sign-out
+AssertionError: expected { phase: 'unavailable' } to deeply equal { phase: 'unavailable', …(1) }
+
+- Expected
++ Received
+
+  {
+    "phase": "unavailable",
+-   "reason": "logoutFailed",
+  }
+
+ ❯ src/auth/session.test.ts:94:35
+     92|     controller.suspend();
+     93|     await controller.resume();
+     94|     expect(controller.snapshot()).toEqual({ phase: 'unavailable', reas…
+       |                                   ^
+     95|     expect(fetcher).toHaveBeenCalledTimes(2);
+     96|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 18 passed (19)
+   Start at  17:01:56
+   Duration  954ms (environment 49%, import 23%, tests 23%, transform 4%)
+

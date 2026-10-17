@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-preparer.schema.json",
+  "title": "Private resumable declaration inputs v1",
+  "description": "Fixed protected bootstrap projection, at most48KiB. Stable desired plan and separately pinned native continuity and staging guards. The supervisor owns the mutable journal; Helm must not overwrite its progress or recreate its UID. No credential/provider payloads, execution or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "plan",
+    "rootUID",
+    "continuity",
+    "staging",
+    "kubernetes"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-preparer/v1"
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installationID",
+        "requestID",
+        "clusterID",
+        "bootstrapNamespace",
+        "rootName",
+        "probeName",
+        "continuityName",
+        "administrators",
+        "workload"
+      ],
+      "properties": {
+        "installationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "requestID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "clusterID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "bootstrapNamespace": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "rootName": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "probeName": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "continuityName": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "administrators": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard/properties/administrators"
+        },
+        "workload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "namespace",
+            "name",
+            "writerAccount",
+            "probeAccount",
+            "configuration",
+            "credentials",
+            "witness",
+            "fleetSource",
+            "witnessGuard",
+            "fleetGuard",
+            "workloadGuard",
+            "stagingGuard",
+            "journal",
+            "image"
+          ],
+          "properties": {
+            "namespace": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "name": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "writerAccount": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "probeAccount": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "configuration": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "credentials": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "witness": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "fleetSource": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "witnessGuard": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "fleetGuard": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "workloadGuard": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "stagingGuard": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "journal": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "image": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\s]+@sha256:[a-f0-9]{64}$"
+            },
+            "registryAuthentication": {
+              "const": "dockerconfigjson/v1"
+            }
+          }
+        },
+        "continuation": {
+          "const": "asservat-initial-preparation-activation/v1",
+          "description": "Explicit protected producer capability, requires separately qualified continuation guard; omitted retains the declaration-only protocol."
+        },
+        "privateState": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference",
+          "description": "Producer-owned private state, pre-created and UID-pinned before the original continuity policy. Helm must never overwrite or replace its progress."
+        },
+        "probeAudience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u0020\\u007f-\\u009f]*(?![\\s\\S])",
+          "description": "One explicitly selected audience accepted by this installation Kubernetes API; no token-derived audience guessing."
+        },
+        "handover": {
+          "const": "asservat-initial-preparation-handover/v1"
+        },
+        "historyProbe": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "historyManager": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "oid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])",
+              "description": "At most 63 UTF-8 bytes at runtime; exact PostgreSQL role name, never inferred from the passive connection."
+            },
+            "oid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295,
+              "not": {
+                "const": 10
+              }
+            }
+          },
+          "description": "Independently pinned original trusted SQL setup manager; part of the immutable preparation plan, no credential or activation authority."
+        },
+        "schemaInitialization": {
+          "const": "asservat-initial-schema/v1",
+          "description": "Explicit first-install schema capability. The protected original root must record completed exact embedded migrations before declaration; omitted keeps the existing profile."
+        }
+      },
+      "dependentRequired": {
+        "privateState": [
+          "probeAudience"
+        ],
+        "probeAudience": [
+          "privateState"
+        ],
+        "historyProbe": [
+          "handover"
+        ],
+        "historyManager": [
+          "handover"
+        ],
+        "schemaInitialization": [
+          "handover"
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "handover"
+            ]
+          },
+          "then": {
+            "required": [
+              "continuation",
+              "privateState",
+              "probeAudience",
+              "historyProbe",
+              "historyManager"
+            ],
+            "properties": {
+              "continuation": {
+                "const": "asservat-initial-preparation-activation/v1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rootUID": {
+      "oneOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        {
+          "const": ""
+        }
+      ]
+    },
+    "continuity": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "staging": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "kubernetes": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes"
+    },
+    "services": {
+      "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json"
+    },
+    "sqlMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "providers": {
+      "$ref": "https://asservat.io/spec/v1/initial-provider-profile.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "sqlMaterial"
+        ]
+      },
+      "then": {
+        "required": [
+          "services"
+        ],
+        "properties": {
+          "plan": {
+            "required": [
+              "privateState"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "plan": {
+            "required": [
+              "handover"
+            ]
+          }
+        },
+        "required": [
+          "plan"
+        ]
+      },
+      "then": {
+        "required": [
+          "services",
+          "sqlMaterial",
+          "providers"
+        ]
+      }
+    }
+  ],
+  "dependentRequired": {
+    "providers": [
+      "services",
+      "sqlMaterial"
+    ]
+  }
+}

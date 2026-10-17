@@ -1,0 +1,35 @@
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch query
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch cancelled
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch administrator-identity
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch query-result
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch schema
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch activation
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch recovery
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch source-current
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch source-interval
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator
+    owner_identity_prerequisites_test.go:92: fixed diagnostic/sentinel mismatch administrator
+--- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval (0.00s)
+    --- FAIL: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.009s
+FAIL

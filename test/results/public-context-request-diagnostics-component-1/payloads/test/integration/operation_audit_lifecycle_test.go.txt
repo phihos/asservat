@@ -1,0 +1,706 @@
+package integration
+
+import (
+	"asservat.local/asservat/internal/adapters/jose"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"errors"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"sync"
+	"testing"
+	"time"
+)
+
+// Provider administration here is fixture-only observation. The actual journal,
+// completion, acknowledgement, cleanup and finalization use distinct SQL roles.
+// This fixture does not qualify production bucket IAM or bootstrap authority.
+func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s3admin *s3.Client, bucket string, create func(*testing.T, int64) captureAdmissionScenario) {
+	qualifyOperationVerificationMigration(t, ctx, admin, create)
+	for _, historySeconds := range []int64{0, 2} {
+		name := "operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend"
+		if historySeconds > 0 {
+			name = "operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend"
+		}
+		t.Run(name, func(t *testing.T) {
+			s := create(t, 1)
+			cp := poolFor("operation_audit_config_runtime", "synthetic-operation-config")
+			defer cp.Close()
+			jp := poolFor("operation_audit_runtime", "synthetic-operation-journal")
+			defer jp.Close()
+			ap := poolFor("operation_audit_ack_runtime", "synthetic-operation-ack")
+			defer ap.Close()
+			dp := poolFor("operation_audit_cleanup_runtime", "synthetic-operation-cleanup")
+			defer dp.Close()
+			fp := poolFor("operation_audit_retire_runtime", "synthetic-operation-retire")
+			defer fp.Close()
+			config, e := postgres.New(ctx, cp)
+			if e != nil {
+				t.Fatal(e)
+			}
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			backing := app.OperationAuditPool{RootID: s.a.RootID, Lane: "normal", AccountVersion: "accounts-v1", Accounts: 3, RecordsPerAccount: 3, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}
+			if e = config.ProvisionOperationAuditPool(ctx, backing); e != nil {
+				t.Fatal(e)
+			}
+			policy := value.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "normal", InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 9, MaxPurgeLeases: 16, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: now.Add(time.Hour)}
+			policy.BackupHorizonSeconds = historySeconds
+			{
+				// Fixture-only accepted qualification. This tests accounting, not actual
+				// pgBackRest/WAL retention or measured physical backup footprint.
+				policy.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+				bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
+				policy.BackupReservedBytes, policy.WALReservedBytes = bb*policy.MetadataSlots, ww*policy.MetadataSlots
+			}
+			j, e := postgres.NewHealthyOperationJournal(ctx, jp, policy, s.recovery.guard)
+			if e != nil {
+				t.Fatal(e)
+			}
+			ack, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "normal", s.recovery.guard)
+			if e != nil {
+				t.Fatal(e)
+			}
+			lifecycle := func(p *pgxpool.Pool, lane string) *postgres.OperationLifecycles {
+				x, e := postgres.NewOperationLifecycles(ctx, p, s.a.RootID, lane, s.recovery.guard)
+				if e != nil {
+					t.Fatal(e)
+				}
+				return x
+			}
+			producerLedger, cleanup, verified, finalizer := lifecycle(jp, "normal"), lifecycle(dp, "normal"), lifecycle(ap, "normal"), lifecycle(fp, "normal")
+			producer, e := objectstore.NewClosedOperationAuditObjects(store, policy.StoreID, keys, keys)
+			if e != nil {
+				t.Fatal(e)
+			}
+			legacyObjects := &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}
+			gate, e := app.NewHealthyOperationAuditor(policy, j, ack, legacyObjects, producer, producerLedger, time.Now)
+			if e != nil {
+				t.Fatal(e)
+			}
+			pub, private, e := ed25519.GenerateKey(rand.Reader)
+			if e != nil {
+				t.Fatal(e)
+			}
+			signer, e := jose.NewOperationRetirementSignatures(s.a.RootID, "synthetic-retirement", private, map[string]ed25519.PublicKey{"synthetic-retirement": pub})
+			if e != nil {
+				t.Fatal(e)
+			}
+			public, e := jose.NewOperationRetirementSignatures(s.a.RootID, "", nil, map[string]ed25519.PublicKey{"synthetic-retirement": pub})
+			if e != nil {
+				t.Fatal(e)
+			}
+			objects, e := objectstore.NewOperationAuditCleanupObjects(store, policy.StoreID, keys, keys, signer, public)
+			if e != nil {
+				t.Fatal(e)
+			}
+			verifier, e := objectstore.NewOperationAuditCleanupVerifier(store, policy.StoreID, keys, public)
+			if e != nil {
+				t.Fatal(e)
+			}
+			intent := func(who byte) value.OperationIntent {
+				n := time.Now().UTC().Truncate(time.Microsecond)
+				id := custodyID()
+				return value.OperationIntent{ID: id, RootID: s.a.RootID, TraceID: id, Name: "get_capture", InputFormat: "context-input/v1", MACVersion: "audit-v1", AccountVersion: "accounts-v1", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{who}, InputDigest: artifact.Digest{1}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(8 * time.Second), RetainUntil: n.Add(40 * time.Second)}
+			}
+			observed := func(in value.OperationIntent, want int) {
+				t.Helper()
+				prefix := value.OperationAuditKey(in.RootID, in.ID, "")
+				versions, e := s3admin.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: &bucket, Prefix: &prefix, MaxKeys: aws.Int32(128)})
+				if e != nil || aws.ToBool(versions.IsTruncated) {
+					t.Fatal("incomplete fixture version observation", e)
+				}
+				objects, e := s3admin.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &prefix, MaxKeys: aws.Int32(128)})
+				if e != nil || aws.ToBool(objects.IsTruncated) {
+					t.Fatal("incomplete fixture key observation", e)
+				}
+				uploads, e := s3admin.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: &bucket, Prefix: &prefix, MaxUploads: aws.Int32(128)})
+				if e != nil || aws.ToBool(uploads.IsTruncated) || len(uploads.Uploads) != 0 {
+					t.Fatal("unexpected pending writer", e)
+				}
+				count := max(len(objects.Contents), len(versions.Versions)+len(versions.DeleteMarkers))
+				var bytes int64
+				if len(versions.Versions) > 0 {
+					for _, v := range versions.Versions {
+						bytes += aws.ToInt64(v.Size)
+					}
+				} else {
+					for _, v := range objects.Contents {
+						bytes += aws.ToInt64(v.Size)
+					}
+				}
+				if count != want || count > 2 || bytes > 2*value.OperationCipherLimit {
+					t.Fatal("two-object backing exceeded or missing", count, bytes, want)
+				}
+			}
+			finishWith := func(in value.OperationIntent, policy value.OperationLifecyclePolicy, gate *app.HealthyOperationAuditor) value.OperationIntent {
+				t.Helper()
+				if e = gate.Begin(ctx, in); e != nil {
+					t.Fatal("healthy Begin", e)
+				}
+				out := value.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{3}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
+				if e = gate.Finish(ctx, out); e != nil {
+					t.Fatal("healthy Finish", e)
+				}
+				bound, e := app.BindOperationLifecycle(in, policy)
+				if e != nil {
+					t.Fatal(e)
+				}
+				observed(bound, 2)
+				return bound
+			}
+			finish := func(in value.OperationIntent) value.OperationIntent { return finishWith(in, policy, gate) }
+			a := finish(intent(1))
+			second := intent(1)
+			second.RetainUntil = second.RetainUntil.Add(-500 * time.Millisecond)
+			a2, b := finish(second), finish(intent(2))
+			all := []value.OperationIntent{a, a2, b}
+			var resolution value.OperationIntent
+			var rpolicy value.OperationLifecyclePolicy
+			var resolutionBacking app.OperationAuditPool
+			var rcleanup, rverified, rfinalizer *postgres.OperationLifecycles
+			if historySeconds > 0 {
+				n := time.Now().UTC().Truncate(time.Microsecond)
+				resolutionBacking = backing
+				resolutionBacking.Lane = "resolution"
+				resolutionBacking.ObservedAt = n
+				resolutionBacking.FreshUntil = n.Add(5 * time.Second)
+				if e = config.ProvisionOperationAuditPool(ctx, resolutionBacking); e != nil {
+					t.Fatal(e)
+				}
+				rpolicy = policy
+				rpolicy.Lane = "resolution"
+				rj, e := postgres.NewHealthyOperationJournal(ctx, jp, rpolicy, s.recovery.guard)
+				if e != nil {
+					t.Fatal(e)
+				}
+				ra, e := postgres.NewOperationAcknowledgements(ctx, ap, s.a.RootID, "resolution", s.recovery.guard)
+				if e != nil {
+					t.Fatal(e)
+				}
+				rg, e := app.NewHealthyOperationAuditor(rpolicy, rj, ra, legacyObjects, producer, lifecycle(jp, "resolution"), time.Now)
+				if e != nil {
+					t.Fatal(e)
+				}
+				ri := intent(7)
+				ri.Name = "resolve_capture_request"
+				resolution = finishWith(ri, rpolicy, rg)
+				all = append(all, resolution)
+				rcleanup, rverified, rfinalizer = lifecycle(dp, "resolution"), lifecycle(ap, "resolution"), lifecycle(fp, "resolution")
+			}
+
+			// A lost producer reply cannot be upgraded by exact GET, and its original
+			// account survives retirement of another completed record for that principal.
+			uncertain := intent(1)
+			lost := &closedAuditLostReply{ClosedOperationObjects: producer}
+			unknownGate, e := app.NewHealthyOperationAuditor(policy, j, ack, legacyObjects, lost, producerLedger, time.Now)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if unknownGate.Begin(ctx, uncertain) != app.ErrUnavailable || unknownGate.Begin(ctx, uncertain) != app.ErrUnavailable || lost.creates != 1 {
+				t.Fatal("uncertain closed write was reconstructed")
+			}
+			legacy, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.guard)
+			if e != nil {
+				t.Fatal(e)
+			}
+			legacyIntent := intent(3)
+			legacyGate := app.OperationAuditor{Journal: legacy, Acknowledgements: ack, Objects: legacyObjects, Now: time.Now}
+			if e = legacyGate.Begin(ctx, legacyIntent); e != nil {
+				t.Fatal(e)
+			}
+			if _, e = cleanup.BeginOperationPurge(ctx, a.ID, "original"); e != app.ErrUnavailable {
+				t.Fatal("purged during retained audit access", e)
+			}
+			for _, id := range []string{uncertain.ID, legacyIntent.ID} {
+				if _, e = cleanup.BeginOperationPurge(ctx, id, "original"); e != app.ErrUnavailable {
+					t.Fatal("legacy/unknown writer eligible", e)
+				}
+			}
+			// None of the ordinary role paths can fake independent deletion verification
+			// or directly lower quotas. These inspect actual permission SQLSTATEs.
+			for _, test := range []struct {
+				p   *pgxpool.Pool
+				sql string
+			}{
+				{jp, "UPDATE operation_audit_lifecycle SET certificate_started=true"},
+				{jp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
+				{dp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
+				{fp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
+				{dp, "UPDATE operation_audit_lifecycle SET terminal_acknowledged_at=clock_timestamp()"},
+				{dp, "UPDATE operation_audit_lifecycle SET certificate_receipt=certificate_receipt"},
+				{ap, "UPDATE operation_audit_lifecycle SET lease_fence=lease_fence+1"},
+				{ap, "UPDATE operation_audit_lifecycle SET intent_completion=intent_completion"},
+				{fp, "UPDATE operation_audit_lifecycle SET finalization_xid=pg_current_xact_id()"},
+				{fp, "DELETE FROM operation_audit_lifecycle"},
+				{fp, "DELETE FROM operation_audit"},
+				{fp, "UPDATE operation_audit_account SET charged=0"},
+				{jp, "SELECT finish_operation_audit_retirement('" + a.RootID + "','" + a.ID + "','" + policy.InstallationID + "')"},
+			} {
+				_, e = test.p.Exec(ctx, test.sql)
+				var pe *pgconn.PgError
+				if !errors.As(e, &pe) || pe.Code != "42501" {
+					t.Fatal("excess lifecycle privilege", test.sql, e)
+				}
+			}
+			if e = finalizer.RetireOperationAudit(ctx, a.ID); e != app.ErrUnavailable {
+				t.Fatal("released without audited deletion", e)
+			}
+			wait := func(until time.Time) {
+				t.Helper()
+				timer := time.NewTimer(max(0, time.Until(until)+15*time.Millisecond))
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				}
+			}
+			wait(all[len(all)-1].Lifecycle.OriginalPurgeAt)
+			refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
+			// Deleting both originals is positively observed BEFORE issuing the one
+			// certificate claim. The original record charge is retained throughout.
+
+			for _, in := range all {
+				cleanup, verified := cleanup, verified
+				if in.Name == "resolve_capture_request" {
+					cleanup, verified = rcleanup, rverified
+				}
+
+				lease, e := cleanup.BeginOperationPurge(ctx, in.ID, "original")
+				if e != nil {
+					t.Fatal("original lease", e)
+				}
+				if _, e = cleanup.ClaimOperationCertificate(ctx, value.OperationRetirement{}); e != app.ErrUnavailable {
+					t.Fatal("certificate without original purge", e)
+				}
+				if e = objects.PurgeOperationObjects(ctx, lease); e != nil {
+					t.Fatal("original purge", e)
+				}
+				observed(in, 0)
+				r, e := cleanup.RecordOriginalOperationPurge(ctx, lease)
+				if e != nil {
+					t.Fatal("original purge checkpoint", e)
+				}
+
+				fresh, e := cleanup.ClaimOperationCertificate(ctx, r)
+				if e != nil || !fresh {
+					t.Fatal("certificate claim", e, fresh)
+				}
+				if fresh, e = cleanup.ClaimOperationCertificate(ctx, r); e != nil || fresh {
+					t.Fatal("certificate claim replay replenished", e, fresh)
+				}
+				c, e := objects.CreateOperationCertificate(ctx, r)
+				if e != nil {
+					t.Fatal("certificate create", e)
+				}
+				if e = cleanup.RecordCertificateCompletion(ctx, r, c); e != nil {
+					t.Fatal("certificate completion", e)
+				}
+				mode := "one"
+				if in.ID == a.ID {
+					mode = "concurrent"
+				} else if in.ID == a2.ID {
+					mode = "unknown-claim"
+				} else if in.ID == b.ID {
+					mode = "blocked-expiry"
+				}
+				qualifyOperationCertificateVerification(t, ctx, admin, ap, verified, verifier, r, c.Receipt, mode, s.recovery.observation)
+
+				observed(in, 1)
+				if !time.Now().Add(time.Duration(policy.ProofWindowSeconds) * time.Second).Before(r.CertificatePurgeAt) {
+					t.Fatal("minimum proof window was shortened")
+				}
+			}
+			var accounts, charged int64
+			if e = admin.QueryRow(ctx, "SELECT accounts FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&accounts); e != nil || accounts != 3 {
+				t.Fatal("released account before physical terminal purge", accounts, e)
+			}
+			if e = admin.QueryRow(ctx, "SELECT sum(charged) FROM operation_audit_account WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&charged); e != nil || charged != 5 {
+				t.Fatal("released original charges early", charged, e)
+			}
+			wait(all[len(all)-1].Lifecycle.CertificatePurgeAt)
+			refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
+			for _, in := range all {
+				cleanup, verified, finalizer := cleanup, verified, finalizer
+				if in.Name == "resolve_capture_request" {
+					cleanup, verified, finalizer = rcleanup, rverified, rfinalizer
+				}
+
+				if historySeconds > 0 && in.ID == b.ID {
+					wait(in.Lifecycle.LiveRetireBy.Add(100 * time.Millisecond))
+					refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
+				}
+				lease, e := cleanup.BeginOperationPurge(ctx, in.ID, "terminal")
+				if e != nil {
+					t.Fatal("terminal lease", e)
+				}
+				if e = objects.PurgeOperationObjects(ctx, lease); e != nil {
+					t.Fatal("terminal purge", e)
+				}
+				observed(in, 0)
+				purge, e := cleanup.RecordTerminalOperationPurge(ctx, lease)
+				if e != nil {
+					t.Fatal("terminal checkpoint", e)
+				}
+				if e = finalizer.RetireOperationAudit(ctx, in.ID); e != app.ErrUnavailable {
+					t.Fatal("cleanup acknowledged its own purge", e)
+				}
+				if e = verifier.VerifyOperationAbsence(ctx, lease); e != nil {
+					t.Fatal(e)
+				}
+				if e = verified.AcknowledgeTerminalOperationPurge(ctx, lease, purge); e != nil {
+					t.Fatal("terminal independent acknowledgement", e)
+				}
+				if historySeconds == 0 && in.ID == a.ID {
+					lock, e := admin.Begin(ctx)
+					if e != nil {
+						t.Fatal(e)
+					}
+					var blocker int32
+					if e = lock.QueryRow(ctx, "SELECT pg_backend_pid() FROM operation_audit_account WHERE root_id=$1 AND lane='normal' AND principal_digest=$2 FOR UPDATE", in.RootID, in.PrincipalDigest[:]).Scan(&blocker); e != nil {
+						lock.Rollback(ctx)
+						t.Fatal(e)
+					}
+					done := make(chan error, 1)
+					go func() { done <- finalizer.RetireOperationAudit(ctx, in.ID) }()
+					blocked := false
+					for time.Now().Before(lease.Until.Add(-25 * time.Millisecond)) {
+						if e = admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename='operation_audit_retire_runtime' AND wait_event_type='Lock' AND query LIKE '%operation_audit_account%' AND $1=ANY(pg_blocking_pids(pid)))", blocker).Scan(&blocked); e != nil {
+							lock.Rollback(ctx)
+							t.Fatal(e)
+						}
+						if blocked {
+							break
+						}
+						select {
+						case e := <-done:
+							lock.Rollback(ctx)
+							t.Fatal("retirement missed account lock", e)
+						default:
+						}
+						time.Sleep(5 * time.Millisecond)
+					}
+					if !blocked {
+						lock.Rollback(ctx)
+						t.Fatal("retirement never reached exact held account")
+					}
+					wait(lease.Until)
+					if e = lock.Commit(ctx); e != nil {
+						t.Fatal(e)
+					}
+					if e = <-done; e != app.ErrUnavailable {
+						t.Fatal("post-lock expired original lease released capacity", e)
+					}
+					var count int64
+					if e = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit WHERE id=$1", in.ID).Scan(&count); e != nil || count != 1 {
+						t.Fatal("expired retirement mutated audit", e)
+					}
+					// A new independently checked absence observation can acquire a fresh
+					// finite cleanup lease; old acknowledgement never carries across fences.
+					lease, e = cleanup.BeginOperationPurge(ctx, in.ID, "terminal")
+					if e != nil {
+						t.Fatal(e)
+					}
+					if e = objects.PurgeOperationObjects(ctx, lease); e != nil {
+						t.Fatal(e)
+					}
+					purge, e = cleanup.RecordTerminalOperationPurge(ctx, lease)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if e = finalizer.RetireOperationAudit(ctx, in.ID); e != app.ErrUnavailable {
+						t.Fatal("old terminal acknowledgement survived renewed fence", e)
+					}
+					if e = verifier.VerifyOperationAbsence(ctx, lease); e != nil {
+						t.Fatal(e)
+					}
+					if e = verified.AcknowledgeTerminalOperationPurge(ctx, lease, purge); e != nil {
+						t.Fatal(e)
+					}
+				}
+				if in.ID == a.ID {
+					tx, e := admin.Begin(ctx)
+					if e != nil {
+						t.Fatal(e)
+					}
+					_, e = tx.Exec(ctx, "UPDATE operation_audit_lifecycle SET finalization_xid=pg_current_xact_id() WHERE operation_id=$1", in.ID)
+					if e != nil {
+						tx.Rollback(ctx)
+						t.Fatal(e)
+					}
+					e = tx.Commit(ctx)
+					var rejected *pgconn.PgError
+					if !errors.As(e, &rejected) || rejected.Code != "23514" || rejected.Message != "stranded audit retirement transaction" {
+						t.Fatal("stranded marker must fail the deferred retirement check", e)
+					}
+				}
+				if historySeconds > 0 && in.ID == a.ID {
+					tx, e := fp.Begin(ctx)
+					if e != nil {
+						t.Fatal(e)
+					}
+					var retired bool
+					if e = tx.QueryRow(ctx, "SELECT finish_operation_audit_retirement($1,$2,$3)", in.RootID, in.ID, policy.InstallationID).Scan(&retired); e != nil || !retired {
+						tx.Rollback(ctx)
+						t.Fatal("atomic history transfer", e)
+					}
+					var operationRows, historyRecords int64
+					if e = tx.QueryRow(ctx, "SELECT count(*) FROM operation_audit WHERE id=$1", in.ID).Scan(&operationRows); e != nil || operationRows != 0 {
+						tx.Rollback(ctx)
+						t.Fatal("operation identity not deleted inside transfer", e)
+					}
+					if e = tx.QueryRow(ctx, "SELECT COALESCE(sum(records),0)::bigint FROM operation_audit_history WHERE root_id=$1", in.RootID).Scan(&historyRecords); e != nil || historyRecords != 1 {
+						tx.Rollback(ctx)
+						t.Fatal("original charge not transferred atomically", e)
+					}
+					if e = tx.Rollback(ctx); e != nil {
+						t.Fatal(e)
+					}
+					if e = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit WHERE id=$1", in.ID).Scan(&operationRows); e != nil || operationRows != 1 {
+						t.Fatal("rollback lost original audit", e)
+					}
+					if e = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit_history WHERE root_id=$1", in.RootID).Scan(&historyRecords); e != nil || historyRecords != 0 {
+						t.Fatal("rollback stranded cooling charge", e)
+					}
+				}
+				var wg sync.WaitGroup
+				errs := make(chan error, 2)
+				for range 2 {
+					wg.Add(1)
+					go func() { defer wg.Done(); errs <- finalizer.RetireOperationAudit(ctx, in.ID) }()
+				}
+				wg.Wait()
+				close(errs)
+				success := 0
+				for e := range errs {
+					if e == nil {
+						success++
+					} else if e != app.ErrUnavailable {
+						t.Fatal(e)
+					}
+				}
+				if success != 1 {
+					t.Fatal("concurrent finalizers did not release exactly once", success)
+				}
+				if _, e = j.ReserveOperation(ctx, in); e != app.ErrUnavailable {
+					t.Fatal("retired original request reopened", e)
+				}
+			}
+			var concurrentAdmission int64
+			if historySeconds > 0 {
+				if e = admin.QueryRow(ctx, "SELECT sum(charged) FROM operation_audit_account WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&charged); e != nil || charged != 5 {
+					t.Fatal("SQL retirement refunded backup debt", charged, e)
+				}
+				if e = admin.QueryRow(ctx, "SELECT accounts FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&accounts); e != nil || accounts != 3 {
+					t.Fatal("cooling deleted original account early", accounts, e)
+				}
+				if e = gate.Begin(ctx, intent(4)); e != app.ErrUnavailable {
+					t.Fatal("saturated cooling pool admitted another account", e)
+				}
+				var keysToDrain []value.OperationHistoryKey
+				for _, in := range []value.OperationIntent{a, a2, b} {
+					k := value.OperationHistoryKey{RootID: in.RootID, Lane: "normal", PrincipalDigest: in.PrincipalDigest, ReleaseAt: in.Lifecycle.HistoryReleaseAt, DeleteBy: in.Lifecycle.HistoryDeleteBy}
+					keysToDrain = append(keysToDrain, k)
+					wrong := k
+					wrong.Lane = "resolution"
+					if _, e = finalizer.ReleaseOperationHistory(ctx, wrong); e != app.ErrUnavailable {
+						t.Fatal("cross-lane drain accepted", e)
+					}
+					var eligible, release, deleteBy, hard time.Time
+					var records int64
+					var overdue bool
+					if e = admin.QueryRow(ctx, "SELECT eligible_at,release_at,delete_by,hard_delete_by,records,overdue FROM operation_audit_history WHERE root_id=$1 AND principal_digest=$2 AND release_at=$3 AND delete_by=$4", in.RootID, in.PrincipalDigest[:], k.ReleaseAt, k.DeleteBy).Scan(&eligible, &release, &deleteBy, &hard, &records, &overdue); e != nil {
+						t.Fatal(e)
+					}
+					if !release.Equal(k.ReleaseAt) || !deleteBy.Equal(k.DeleteBy) || !hard.Equal(in.RetainUntil) || records != 1 || overdue != (in.ID == b.ID) {
+						t.Fatal("history replaced frozen dates/count/breach", overdue, records)
+					}
+					if in.ID == b.ID && (!eligible.After(k.ReleaseAt) || !eligible.After(in.Lifecycle.LiveRetireBy.Add(time.Duration(historySeconds)*time.Second))) {
+						t.Fatal("late retirement skipped actual-H floor", eligible)
+					}
+					if _, e = finalizer.ReleaseOperationHistory(ctx, k); e != app.ErrUnavailable {
+						t.Fatal("history released before actual eligibility", e)
+					}
+				}
+				if keysToDrain[0].ReleaseAt.Equal(keysToDrain[1].ReleaseAt) {
+					t.Fatal("fixture did not exercise mixed hard dates")
+				}
+				for _, role := range []*pgxpool.Pool{jp, dp, ap, fp} {
+					for _, sql := range []string{"DELETE FROM operation_audit_history", "UPDATE operation_audit_history SET drain_xid=pg_current_xact_id()", "UPDATE operation_audit_history SET records=0"} {
+						_, e = role.Exec(ctx, sql)
+						var pe *pgconn.PgError
+						if !errors.As(e, &pe) || pe.Code != "42501" {
+							t.Fatal("excess history privilege", sql, e)
+						}
+					}
+				}
+				var due time.Time
+				if e = admin.QueryRow(ctx, "SELECT max(eligible_at) FROM operation_audit_history WHERE root_id=$1", a.RootID).Scan(&due); e != nil {
+					t.Fatal(e)
+				}
+				wait(due)
+				refreshAuditFixtureRecovery(t, ctx, admin, s.recovery.observation, 30*time.Second)
+				remainingHealthyA := int64(2)
+				for _, key := range keysToDrain {
+					var wg sync.WaitGroup
+					results := make(chan value.OperationHistoryRelease, 2)
+					errs := make(chan error, 2)
+					admission := make(chan error, 1)
+					if key.PrincipalDigest == a.PrincipalDigest {
+						replacement, e := app.BindOperationLifecycle(intent(1), policy)
+						if e != nil {
+							t.Fatal(e)
+						}
+						wg.Add(1)
+						go func() { defer wg.Done(); _, e := j.ReserveOperation(ctx, replacement); admission <- e }()
+					}
+					for range 2 {
+						wg.Add(1)
+						go func() { defer wg.Done(); r, e := finalizer.ReleaseOperationHistory(ctx, key); results <- r; errs <- e }()
+					}
+					wg.Wait()
+					close(results)
+					if key.PrincipalDigest == a.PrincipalDigest {
+						if e := <-admission; e == nil {
+							concurrentAdmission++
+						} else if e != app.ErrUnavailable {
+							t.Fatal("new admission racing exact cooling drain", e)
+						}
+					}
+					close(errs)
+					for e := range errs {
+						if e != nil {
+							t.Fatal("concurrent cooling drain", e)
+						}
+					}
+					var total int64
+					overdue := false
+					for r := range results {
+						total += r.Records
+						overdue = overdue || r.Overdue
+					}
+					if key.PrincipalDigest == a.PrincipalDigest {
+						remainingHealthyA--
+					}
+					var principalCharge int64
+					if e = admin.QueryRow(ctx, "SELECT charged FROM operation_audit_account WHERE root_id=$1 AND lane='normal' AND principal_digest=$2", a.RootID, a.PrincipalDigest[:]).Scan(&principalCharge); e != nil || principalCharge != 1+remainingHealthyA+concurrentAdmission {
+						t.Fatal("drain erased another date/live/unknown charge", principalCharge, e)
+					}
+					if total != 1 || overdue != (key.PrincipalDigest == b.PrincipalDigest) {
+						t.Fatal("drain lost breach or released twice", total, overdue)
+					}
+				}
+				rk := value.OperationHistoryKey{RootID: resolution.RootID, Lane: "resolution", PrincipalDigest: resolution.PrincipalDigest, ReleaseAt: resolution.Lifecycle.HistoryReleaseAt, DeleteBy: resolution.Lifecycle.HistoryDeleteBy}
+				if r, e := rfinalizer.ReleaseOperationHistory(ctx, rk); e != nil || r.Records != 1 {
+					t.Fatal("healthy-only lane cooling drain", r, e)
+				}
+				var residualRows int64
+				if e = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM operation_audit WHERE root_id=$1 AND lane='resolution')+(SELECT count(*) FROM operation_audit_account WHERE root_id=$1 AND lane='resolution')+(SELECT count(*) FROM operation_audit_history WHERE root_id=$1 AND lane='resolution')+(SELECT count(*) FROM operation_audit_lifecycle WHERE root_id=$1 AND lane='resolution')", a.RootID).Scan(&residualRows); e != nil || residualRows != 0 {
+					t.Fatal("residual guard fixture still has identifying rows", residualRows, e)
+				}
+				var historyRows int64
+				if e = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit_history WHERE root_id=$1", a.RootID).Scan(&historyRows); e != nil || historyRows != 0 {
+					t.Fatal("cooling left indefinite correlation", historyRows, e)
+				}
+			}
+			if e = admin.QueryRow(ctx, "SELECT accounts FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&accounts); e != nil || accounts != 2 {
+				t.Fatal("empty account not retired", accounts, e)
+			}
+			if e = admin.QueryRow(ctx, "SELECT sum(charged) FROM operation_audit_account WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&charged); e != nil || charged != 2+concurrentAdmission {
+				t.Fatal("legacy/unknown spend disappeared", charged, e)
+			}
+			var rows int64
+			if e = admin.QueryRow(ctx, "SELECT count(*) FROM operation_audit_lifecycle WHERE operation_id=$1 OR operation_id=$2 OR operation_id=$3", a.ID, a2.ID, b.ID).Scan(&rows); e != nil || rows != 0 {
+				t.Fatal("per-operation tombstone retained", rows, e)
+			}
+			if historySeconds > 0 {
+				n := time.Now().UTC().Truncate(time.Microsecond)
+				smaller := resolutionBacking
+				smaller.ExpectedRevision = 1
+				smaller.ObservedAt = n
+				smaller.FreshUntil = n.Add(5 * time.Second)
+				smaller.Accounts = 2
+				smaller.ValidUntil = n.Add(time.Hour)
+				if e = config.ProvisionOperationAuditPool(ctx, smaller); e == nil {
+					t.Fatal("empty-account residual backup backing shrank before H")
+				}
+				changed := rpolicy
+				changed.BackupProfileID = custodyID()
+				other, e := postgres.NewHealthyOperationJournal(ctx, jp, changed, s.recovery.guard)
+				if e != nil {
+					t.Fatal(e)
+				}
+				changedIntent, e := app.BindOperationLifecycle(func() value.OperationIntent { x := intent(4); x.Name = "resolve_capture_request"; return x }(), changed)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, e = other.ReserveOperation(ctx, changedIntent); e != app.ErrUnavailable {
+					t.Fatal("residual profile switched before final H", e)
+				}
+				var floor time.Time
+				if e = admin.QueryRow(ctx, "SELECT history_backing_until FROM operation_audit_pool WHERE root_id=$1 AND lane='resolution'", a.RootID).Scan(&floor); e != nil || floor.Before(resolution.RetainUntil) {
+					t.Fatal("root floor lost original hard deadline", floor, e)
+				}
+				// Renewal is allowed while obligations and safety backing remain; it cannot
+				// remove the latter or lower the pool's protected guarantees.
+				renewal := resolutionBacking
+				renewal.ExpectedRevision = 1
+				renewal.ObservedAt = n
+				renewal.FreshUntil = n.Add(5 * time.Second)
+				renewal.ValidUntil = n.Add(2 * time.Hour)
+				if e = config.ProvisionOperationAuditPool(ctx, renewal); e != nil {
+					t.Fatal("safe backing renewal denied", e)
+				}
+				for _, role := range []*pgxpool.Pool{cp, jp, dp, ap, fp} {
+					_, e = role.Exec(ctx, "UPDATE operation_audit_pool SET history_backing_until=clock_timestamp()")
+					var pe *pgconn.PgError
+					if !errors.As(e, &pe) || pe.Code != "42501" {
+						t.Fatal("role can discard root residual backing", e)
+					}
+				}
+			}
+			if e = gate.Begin(ctx, intent(4)); e != nil {
+				t.Fatal("empty-account capacity not reusable", e)
+			}
+			// Recovery loss denies new cleanup and release; immutable admission incarnation
+			// is intentionally not remapped by an ordinary observer or this fixture.
+			if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", policy.InstallationID); e != nil {
+				t.Fatal(e)
+			}
+			if _, e = cleanup.ReadOperationLifecycle(ctx, uncertain.ID); e != app.ErrUnavailable {
+				t.Fatal("recovery-blocked historical audit treated as current", e)
+			}
+		})
+	}
+}
+
+type closedAuditLostReply struct {
+	app.ClosedOperationObjects
+	creates int
+}
+
+func (s *closedAuditLostReply) CreateClosedOperationIntent(ctx context.Context, in value.OperationIntent) (value.OperationWriteCompletion, error) {
+	s.creates++
+	_, e := s.ClosedOperationObjects.CreateClosedOperationIntent(ctx, in)
+	if e != nil {
+		return value.OperationWriteCompletion{}, e
+	}
+	return value.OperationWriteCompletion{}, app.ErrUnavailable
+}
+
+func refreshAuditFixtureRecovery(t *testing.T, ctx context.Context, admin *pgxpool.Pool, binding syntheticFleetBinding, valid time.Duration) {
+	t.Helper()
+	// Synthetic observation refresh only; never clears recovery or activates SQL.
+	if e := renewSyntheticFleetObservation(ctx, admin, binding, valid, false); e != nil {
+		t.Fatal(e)
+	}
+}

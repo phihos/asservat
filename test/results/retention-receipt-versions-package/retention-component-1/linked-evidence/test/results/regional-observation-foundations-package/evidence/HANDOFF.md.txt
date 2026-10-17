@@ -1,0 +1,100 @@
+# ADR144 conversation foundations
+
+This immutable component checkpoint passed its first compile, focused races and
+vet. It adds no selected runtime route, router, forwarding endpoint or installed
+authority. Parent owns live integration, contract gates and native fixtures.
+
+## Exact payload
+
+- 25 owned paths under `files/`, recorded in `payload.json`; four existing live
+  bases and 21 new paths are distinguished by `bases.json`.
+- 1,808 current live dependencies in `dependencies.json`, including the current
+  five fixture changes and canonical/embedded contracts. Progress documentation
+  is not a compiler dependency and is not overwritten.
+- Manifest SHA256: `24bdc6965f0dd7e0a5f2977bef4447bad6994f4f1c336d1ae820285847781cc8`.
+- Pre-execution freeze SHA256: `c3d51fdbe3413f90a6ac847ce76bc0941301b294b8da5a5b0328ba9bb9c616b7`.
+- The manifest's `UNRUN` value records its creation before the checks. Actual
+  terminal results are separate immutable `evidence/*.json`; the manifest was
+  not rewritten afterward. `result-files.json` pins those reports and logs.
+
+The existing mutations are the Kubernetes attester/helper tests, the delegating
+transport digest wrapper and the additive ADR144 text. Ordinary
+`ObserveConnectorProcess`, existing retirement proof validity, SQL and role
+inventories are unchanged. All additions stay outside the live repository.
+
+## Behavior and boundary
+
+The regional producer uses a private snapshot of its actual process-owned
+key/CSR/leaf as a restrictive replacement and closure veto. A purpose-specific
+native attester result retains the actual complete source already checked by
+the unchanged two-read/online-TokenReview/live-workload/guard algorithm. Exact
+installed template checks, pinned and current proof roots, and final original
+key/leaf/cancellation checks remain mandatory. No enrollment, signing or local
+SQL activation is inferred from this snapshot. The existing full observation
+method still performs its original source and registry reads.
+
+The remote source consumes four new numbered replies on the same actual TLS
+channel and original request. Its calls are spent before I/O, changed or unknown
+replies permanently fail the conversation, current SQL49 registry checks remain
+separate, and the first proof's deadline cannot be extended by later replies.
+The channel permits exactly two proof replies, one bounded metadata call, two
+post-result proof replies and the exact original receipt. Its Close cancels and
+joins actual admitted method calls; it does not claim remote stream completion.
+
+An empty standby retains only routing/socket identity and its original maximum
+30-second hard end. A later request needs fresh candidates and current registry
+proof for the same actual TLS owner/leaf. The active interval intersects that
+hard end and every original caller/proof deadline; no keepalive or late request
+adds a new socket lifetime. Key replacement, leaf renewal, current revocation or
+unknown admitted I/O terminates it.
+
+The fixed frame codec and private closed order enforce message kinds, direction,
+per-frame bounds, a 12-frame ceiling and aggregate bytes. They grant no authority
+and are not yet selected by a concrete stream runtime. The domain now owns the
+request digest; the existing transport wrapper delegates to it. Four-purpose
+tests compare the exact previous wire algorithm, including dates, optional
+fields, nil/empty keys, key ordering and mutations. The v1 domain separator and
+existing request IDs/bytes are preserved.
+
+## Actual checks
+
+One sequential runner, exec handle92283, terminal exit0. It used the immutable
+overlay, `GOMAXPROCS=2`, `GOFLAGS=-p=2`, explicit stage TMPDIR and refused an
+existing evidence destination before launching. Every phase verified all live
+dependencies, bases, payloads, the Go file set and frozen inputs before/after.
+All checks reported empty drift lists.
+
+1. Six-package compile-only: exit0, 7.722 seconds.
+2. Focused `go test -race -count=1 -timeout=120s`: exit0, 36.630 seconds.
+   Five packages executed selected tests; application/fleet compiled but had
+   no matching test and is not claimed as an exercised application test suite.
+   The log contains 252 passing test/subtest entries.
+3. Six-package `go vet`: exit0, 1.410 seconds.
+
+Exact command arrays and durations are in the reports. Selected regressions
+cover ordinary and retirement native proof behavior, changed source roles,
+private key renewal/replacement/revocation, copied channel/request tuples,
+expired candidates, delayed/near-hard-close attachment, one-shot phase order,
+post-result revocation, unknown calls and joined cancellation. TLS fixtures use
+real TLS1.3/mutual authentication/exporters with synthetic source/registry facts.
+Kubernetes unit readers use actual TLS HTTP fixtures with synthetic API objects.
+Neither supplies production/native authority.
+
+These are new foundations, so no absent pre-implementation component is
+represented as a meaningful failing-before runtime test. Digest parity directly
+checks the prior algorithm. No native, installed, two-cluster, latency, full
+repository, spec or architecture gate ran for this checkpoint. The frozen
+architecture text predates these checks and says uncompiled; the separate
+documentation-status patch corrects that narrow status without rewriting this
+tested payload/evidence.
+
+## Next implementation boundary
+
+Compose the closed stream/socket owner and exact hub-local holder locator plus
+single forwarding POST. Preserve original deadlines, independent pre/post SQL49
+checks, configured finite candidate/process limits, same-channel proof, exact
+current sender delegation and joined shutdown. No HWORK token forwarding, new
+SQL routing table, remote Pod-IP requirement or uncertain POST retry. Then wire
+the separately acknowledged installed listener/backend and regional startup
+receipt/producer. Actual multi-owner/two-cluster availability remains required;
+the structural source-read reduction is not a measured availability result.

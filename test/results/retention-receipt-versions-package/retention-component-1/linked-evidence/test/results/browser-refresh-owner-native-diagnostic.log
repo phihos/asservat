@@ -1,0 +1,11 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity
+refresh fixture diagnostic line=339 type=<nil> noRows=false code=none
+refresh fixture diagnostic line=472 type=*pgconn.PgError noRows=false code=42702
+refresh fixture diagnostic line=187 type=*pgconn.PgError noRows=false code=42702
+    browser_refresh_owners_test.go:240: one-use owned claim identity authority unavailable
+--- FAIL: TestContextAdmissionWithRealServices (2.35s)
+    --- FAIL: TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity (2.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.410s
+FAIL

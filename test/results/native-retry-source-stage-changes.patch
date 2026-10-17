@@ -1,0 +1,90 @@
+--- internal/adapters/postgres/download_control.go
++++ internal/adapters/postgres/download_control.go
+@@ -5,6 +5,7 @@
+ 	"context"
+ 	"encoding/json"
+ 	"errors"
++	"fmt"
+ 	"slices"
+ 	"time"
+ 
+@@ -136,6 +137,7 @@
+ // original accepted provenance and exact verified ciphertext object receipts.
+ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.DownloadAuthority) (evidence.ContextDownloadSource, error) {
+ 	var out evidence.ContextDownloadSource
++	stage := "initial"
+ 	if s == nil || ctx == nil || ctx.Err() != nil || a.Scope.RootID != s.root {
+ 		return out, artifact.ErrDownloadUnavailable
+ 	}
+@@ -148,44 +150,56 @@
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "recovery"
+ 		recovery, err := s.recovery.lock(ctx, q, s.root, a.Environment.Recovery())
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "permission lock"
+ 		p, err := q.LockPermissionStream(ctx, id(s.root))
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "current fence"
+ 		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+ 			return err
+ 		}
++		stage = "catalog"
+ 		row, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: id(s.root)})
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "capture"
+ 		capture, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: row.ID, RootID: row.RootID})
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "accepted publication"
+ 		expected, err := acceptedPublication(capture)
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "expected equality"
+ 		if !bytes.Equal(digest(expected), row.ExpectationDigest) || !bytes.Equal(expected.PlanDigest[:], row.ScopeDigest) || row.PublishedAt.Time.Before(row.VerifiedAt.Time) || !row.PublishedAt.Time.Before(expected.Registration.ExpiresAt) {
+ 			return privacy.ErrFence
+ 		}
++		stage = "attempt"
+ 		attempt, err := q.ReadAttempt(ctx, capture.AttemptID)
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "copies"
+ 		stored, err := record(ctx, q, attempt, expected.Registration.StoreID)
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "stored equality"
+ 		if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.CopiesDigest) || evidence.ContextCopiesDigest(stored.Copies) != a.Scope.Version {
+ 			return privacy.ErrFence
+ 		}
++		stage = "source construction"
+ 		out = evidence.ContextDownloadSource{Scope: a.Scope, Expectation: expected, Copies: stored.Copies, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, a.ValidUntil)}
++		stage = "current fence"
+ 		if err = s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+ 			return err
+ 		}
+@@ -193,12 +207,14 @@
+ 		if err != nil {
+ 			return err
+ 		}
++		stage = "source validity"
+ 		if !out.Valid(now.Time) {
+ 			return artifact.ErrDownloadUnavailable
+ 		}
+ 		return ctx.Err()
+ 	})
+ 	if err != nil || ctx.Err() != nil {
++		fmt.Printf("TEST-ONLY source diagnostic stage=%s errorType=%T contextType=%T\n", stage, err, ctx.Err())
+ 		return evidence.ContextDownloadSource{}, artifact.ErrDownloadUnavailable
+ 	}
+ 	return out, nil

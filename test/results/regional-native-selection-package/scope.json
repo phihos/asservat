@@ -1,0 +1,19 @@
+{
+  "helperFiles": [
+    "data.go",
+    "enrollment.go",
+    "inputs.go",
+    "main.go",
+    "metrics.go",
+    "runtime.go"
+  ],
+  "harness": "scripts/test-context-storage.py",
+  "buildFlags": [
+    "-trimpath",
+    "-buildvcs=false"
+  ],
+  "CGO_ENABLED": "0",
+  "runtimeSelection": false,
+  "nativeQualification": false,
+  "fixtureIssuer": "unchanged synthetic issuer; actual native/SQL/S3 qualification pending"
+}

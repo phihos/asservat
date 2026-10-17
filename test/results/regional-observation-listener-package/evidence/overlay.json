@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_observation_server.go": "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/files/internal/transport/native/owner_observation_server.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_regional_observation_server.go": "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/files/internal/transport/native/owner_regional_observation_server.go",
+    "/home/phil/Projekte/asservat/internal/transport/native/owner_regional_observation_server_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/files/internal/transport/native/owner_regional_observation_server_test.go"
+  }
+}

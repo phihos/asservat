@@ -1,0 +1,6 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+BEGIN;
+WITH original AS MATERIALIZED (SELECT clock_timestamp() AS at)
+UPDATE public.fleet_observation SET observed_at=at,fresh_until=at+interval '5 seconds'
+ FROM original WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid;
+COMMIT;

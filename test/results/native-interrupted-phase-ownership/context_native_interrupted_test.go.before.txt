@@ -1,0 +1,269 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
+)
+
+// The second phase has a new explicitly prepared session, not a replacement of
+// the uncertain first worker. These values are client/test state, not authority.
+type nativeInterruptedState struct {
+	second     bool
+	original   artifact.DownloadSession
+	worker     value.DownloadWorker
+	metadata   artifact.NativeDownloadMetadata
+	prefix     []byte
+	accounting nativeResumeAccounting
+	server     *httptest.Server
+	handler    atomic.Pointer[browser.DownloadContentHandler]
+	shared     *presentation.AuditedOperations
+	sessions   *nativeResumeSessions
+	interrupt  atomic.Bool
+	completed  chan struct{}
+}
+
+// Deliver real native bytes through the actual h2 response, then block the
+// remaining write until the real client cancels. Unwrap preserves actual socket
+// deadline control; no fake successful flush or remote Joined result is returned.
+type nativeInterruptedWriter struct {
+	http.ResponseWriter
+	ctx   context.Context
+	limit int
+}
+
+func (w nativeInterruptedWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w nativeInterruptedWriter) Write(p []byte) (int, error) {
+	n, e := w.ResponseWriter.Write(p[:min(len(p), w.limit)])
+	if e != nil {
+		return n, e
+	}
+	if e = http.NewResponseController(w.ResponseWriter).Flush(); e != nil {
+		return n, e
+	}
+	<-w.ctx.Done()
+	return n, w.ctx.Err()
+}
+
+func qualifyContextNativeInterrupted(t *testing.T, ctx context.Context, f nativeExchangeFixture, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer, coordinator evidence.ContextDownloadCoordinator, session artifact.DownloadSession, m artifact.NativeDownloadMetadata, target value.WorkerCredentialTarget, joined <-chan nativeSQLWorkerOutcome, stopWorker func()) {
+	t.Helper()
+	state := f.content.retry
+	nativeFixtureSQLUsage(t, ctx, f.admin, "enter-interrupted-phase")
+	if state == nil {
+		state = &nativeInterruptedState{original: session, worker: f.worker, metadata: m, completed: make(chan struct{}, 1)}
+		f.content.retry = state
+		state.server = httptest.NewUnstartedServer(nil)
+		state.server.EnableHTTP2 = true
+		t.Cleanup(state.server.Close)
+		origin := "https://" + state.server.Listener.Addr().String()
+		operations, e := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: custodyID}, coordinator)
+		if e != nil {
+			t.Fatal("interruption operations constructor", e)
+		}
+		inner, e := presentation.NewInvestigationOperations(nil, nil, operations)
+		if e != nil {
+			t.Fatal("interruption investigation constructor", e)
+		}
+		state.shared = nativeContentAuditFixture(t, ctx, f, inner)
+		initial, e := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+		if e != nil {
+			t.Fatal("interruption initial identity", e)
+		}
+		state.sessions = &nativeResumeSessions{nativeContentSessions: nativeContentSessions{workerBrowserSession{initial, session.Deadline, 5 * time.Second}}}
+		state.interrupt.Store(true)
+		state.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() { state.completed <- struct{}{} }()
+			if state.interrupt.Load() {
+				w = nativeInterruptedWriter{w, r.Context(), int(m.Size / 2)}
+			}
+			state.handler.Load().ServeHTTP(w, r)
+		})
+		state.server.StartTLS()
+	}
+	origin := state.server.URL
+	initial, e := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+	if e != nil {
+		t.Fatal("interruption current identity", e)
+	}
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: state.sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, state.shared, runtime, transfer)
+	if e != nil {
+		t.Fatal("interruption content handler", e)
+	}
+	state.handler.Store(handler)
+	request := func(call context.Context, offset int64) (*http.Response, error) {
+		r, e := http.NewRequestWithContext(call, http.MethodGet, origin+browser.DownloadContentPrefix+session.ID+"/content", nil)
+		if e != nil {
+			return nil, e
+		}
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		r.AddCookie(&http.Cookie{Name: browser.SessionCookie, Value: strings.Repeat("s", 43)})
+		r.Header.Set("If-Match", state.metadata.ETag)
+		if offset > 0 {
+			r.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+		}
+		return state.server.Client().Do(r)
+	}
+	if state.second {
+		if session.ID == state.original.ID || f.worker.Intent.ID == state.worker.Intent.ID || session.Scope != state.original.Scope || m.ETag != state.metadata.ETag || m.SHA256 != state.metadata.SHA256 || m.Size != state.metadata.Size {
+			t.Fatal("fresh session changed original artifact/version or revived old worker")
+		}
+		response, e := request(ctx, int64(len(state.prefix)))
+		if e != nil {
+			t.Fatal("fresh-session range request", e)
+		}
+		suffix, e := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
+		response.Body.Close()
+		waitContextNativeHTTP(t, ctx, state.completed)
+		defer clear(suffix)
+		if e != nil || response.ProtoMajor != 2 || response.StatusCode != http.StatusPartialContent || response.Header.Get("ETag") != m.ETag || response.Header.Get("Content-Range") != fmt.Sprintf("bytes %d-%d/%d", len(state.prefix), m.Size-1, m.Size) {
+			t.Fatal("new-session range failed", response.StatusCode, e)
+		}
+		requireContextNativeJoined(t, joined, target, 3)
+		body := append(append(make([]byte, 0, m.Size), state.prefix...), suffix...)
+		defer clear(body)
+		if int64(len(body)) != m.Size || artifact.Digest(sha256.Sum256(body)) != m.SHA256 {
+			t.Fatal("actual interrupted-client reconstruction changed native bytes")
+		}
+		old, e := f.runtime.LookupDownload(ctx, state.original.ID, state.original.Scope.Principal)
+		if e != nil {
+			t.Fatal("read original session after reconstruction", e)
+		}
+		requireNativeResumeOriginal(t, state.original, old)
+		oldFixture := f
+		oldFixture.worker = state.worker
+		retained := readNativeResumeAccounting(t, ctx, oldFixture, old)
+		// Allocation counters now include the separately admitted second response;
+		// all row/key/spend counters belonging to the old session stay unchanged.
+		retained.ReservedResponses = state.accounting.ReservedResponses
+		retained.ReservedWindows = state.accounting.ReservedWindows
+		retained.ReservedAuditBytes = state.accounting.ReservedAuditBytes
+		if retained != state.accounting || old.ChargedRead != 8<<20 || old.ChargedOutput != m.Size {
+			t.Fatal("fresh session erased/refunded earlier uncertain work")
+		}
+		var sessions, keys int
+		if e = f.admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM artifact_download WHERE allocation_id=$1),(SELECT count(*) FROM download_native_key WHERE allocation_id=$1)", f.allocation.ID).Scan(&sessions, &keys); e != nil || sessions != 2 || keys != 2 {
+			t.Fatal("unexpected fresh-session/crypto binding admission", sessions, keys, e)
+		}
+		current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+		if _, e = coordinator.PrepareContextDownload(ctx, current, session.Scope.ArtifactID, custodyID()); e == nil {
+			t.Fatal("depleted original worker/key/control backing refilled for a third session")
+		}
+		var after int
+		if e = f.admin.QueryRow(ctx, "SELECT count(*) FROM artifact_download WHERE allocation_id=$1", f.allocation.ID).Scan(&after); e != nil || after != sessions {
+			t.Fatal("depleted retry reserved another session", after, e)
+		}
+		t.Log("actual h2 client cancellation retained old uncertainty; explicit fresh audited preparation and new content path reconstructed Range/If-Match bytes with unchanged artifact SHA; synthetic authority/bootstrap inputs remain explicit")
+		return
+	}
+	requireContextNativeJoined(t, joined, target, 2)
+	clientCtx, cancel := context.WithCancel(ctx)
+	response, e := request(clientCtx, 0)
+	if e != nil {
+		cancel()
+		t.Fatal("initial interrupted HTTP request", e)
+	}
+	if response.StatusCode != http.StatusOK || response.ProtoMajor != 2 {
+		cancel()
+		response.Body.Close()
+		t.Fatal("actual interruption never began native h2 output", response.StatusCode)
+	}
+	state.prefix = make([]byte, m.Size/2)
+	t.Cleanup(func() { clear(state.prefix) })
+	_, e = io.ReadFull(response.Body, state.prefix)
+	cancel()
+	response.Body.Close()
+	waitContextNativeHTTP(t, ctx, state.completed)
+	if e != nil {
+		t.Fatal("native prefix was not received before actual client cancellation", e)
+	}
+	select {
+	case outcome := <-joined:
+		if outcome.err == nil || outcome.result.State != contracts.NativeUncertain || outcome.result.Reference.SessionID != session.ID || outcome.result.Reference.WorkerID != target.WorkerID {
+			t.Fatal("canceled client fabricated positively joined remote work", outcome)
+		}
+	case <-ctx.Done():
+		t.Fatal("canceled native worker did not join")
+	}
+	stopWorker()
+	state.interrupt.Store(false)
+	nativeFixtureSQLUsage(t, ctx, f.admin, "after-cancellation")
+	stopped, e := f.runtime.LookupDownload(ctx, session.ID, session.Scope.Principal)
+	if e != nil {
+		t.Fatal("read interrupted session", e)
+	}
+	requireNativeResumeOriginal(t, session, stopped)
+	if stopped.State != artifact.DownloadInterrupted || stopped.ChargedRead != 8<<20 || stopped.ChargedOutput != m.Size || stopped.EmittedBytes > int64(len(state.prefix)) {
+		t.Fatal("interrupted output lost its conservative original charge", stopped.State)
+	}
+	state.accounting = readNativeResumeAccounting(t, ctx, f, session)
+	if state.accounting.Responses != 1 || state.accounting.Closed != 1 || state.accounting.Windows != 1 || state.accounting.Acknowledged != 0 || state.accounting.KeyRows != 1 || state.accounting.KeyRoles != 7 || state.accounting.NativeUpdates != 6 {
+		t.Fatal("incorrect closed-but-failed native accounting", state.accounting)
+	}
+	current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+	if _, found, e := runtime.ReadPreparedContextDownload(ctx, current, stopped); e == nil || found {
+		t.Fatal("warm metadata treated local Close as safe worker reuse")
+	}
+	// Independent SQL facet, no process cache: deny before reserving a response.
+	nativeFixtureSQLUsage(t, ctx, f.admin, "before-independent-ledger")
+	p := f.poolFor("download_runtime", "synthetic-download")
+	defer p.Close()
+	ledger, e := postgres.NewDownloads(ctx, p, f.allocation.RootID, f.guards)
+	if e != nil {
+		t.Fatal("independent interrupted-session ledger", e)
+	}
+	first, e := postgres.NewFirstContextResponses(ledger)
+	if e != nil {
+		t.Fatal("independent interrupted-session response facet", e)
+	}
+	retry := artifact.DownloadResponse{ID: custodyID(), SessionID: session.ID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Offset: int64(len(state.prefix)), Length: m.Size - int64(len(state.prefix)), Partial: true}, WindowReadLimit: evidence.ContextDownloadReadWork}, Until: session.Deadline}
+	if _, e = first.BeginDownloadResponse(ctx, session.ID, f.authority(), retry); e == nil {
+		t.Fatal("independent first-context admission reused known failed worker")
+	}
+	if readNativeResumeAccounting(t, ctx, f, session) != state.accounting {
+		t.Fatal("denied old retry spent/refilled native or response work")
+	}
+	// One explicit public operation admits a new session using existing remaining
+	// allocation/worker/window/key/audit backing. It is not implicit GET behavior.
+	key := custodyID()
+	raw, _ := json.Marshal(presentation.ContextDownloadInput{ArtifactID: session.Scope.ArtifactID, Key: key})
+	current, _ = browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+	reply, e := state.shared.Call(ctx, current, "prepare_artifact_download", raw)
+	if e != nil {
+		t.Fatal("fresh audited preparation", e)
+	}
+	var envelope struct {
+		Status string                           `json:"status"`
+		Data   presentation.ContextDownloadData `json:"data"`
+	}
+	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.DownloadID == "" || envelope.Data.DownloadID == session.ID || envelope.Data.State != artifact.DownloadPreparing {
+		t.Fatal("fresh explicit preparation not acknowledged")
+	}
+	attachment, e := f.content.workers.ReadContextDownloadAttachment(ctx, envelope.Data.DownloadID, f.authority())
+	if e != nil || attachment.Worker == nil || attachment.Worker.Intent.ID == f.worker.Intent.ID {
+		t.Fatal("fresh preparation did not produce its own audited worker", e)
+	}
+	state.second = true
+	next := f
+	next.worker = *attachment.Worker
+	nativeFixtureSQLUsage(t, ctx, f.admin, "before-fresh-worker")
+	next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.guards, f.store, f.keys, f.gate)
+	// Same original outer context and previously installed backing. Only issuer/
+	// Pod proof is synthetic as already declared by this native fixture.
+	qualifyNativeExchange(t, ctx, next)
+}

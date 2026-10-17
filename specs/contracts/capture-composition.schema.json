@@ -1,0 +1,957 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture-composition.schema.json",
+  "title": "Flat bounded capture profile composition",
+  "x-field-bindings": {
+    "packetPeers": {
+      "actionKinds": [
+        "packetCapture"
+      ],
+      "path": [
+        "parameters",
+        "peers"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/peers"
+      }
+    },
+    "packetFilter": {
+      "actionKinds": [
+        "packetCapture"
+      ],
+      "path": [
+        "parameters",
+        "filter"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/filter"
+      }
+    },
+    "packetBefore": {
+      "actionKinds": [
+        "packetCapture"
+      ],
+      "path": [
+        "parameters",
+        "before"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/before"
+      }
+    },
+    "packetAfter": {
+      "actionKinds": [
+        "packetCapture"
+      ],
+      "path": [
+        "parameters",
+        "after"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/after"
+      }
+    },
+    "packetRing": {
+      "actionKinds": [
+        "packetCapture"
+      ],
+      "path": [
+        "parameters",
+        "ring"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/ring"
+      }
+    },
+    "processSelector": {
+      "actionKinds": [
+        "liveCore"
+      ],
+      "path": [
+        "parameters",
+        "processSelector"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
+      }
+    },
+    "processBatch": {
+      "actionKinds": [
+        "liveCore"
+      ],
+      "path": [
+        "parameters",
+        "batch"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/batch"
+      }
+    },
+    "profileDuration": {
+      "actionKinds": [
+        "profile"
+      ],
+      "path": [
+        "parameters",
+        "duration"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+      }
+    },
+    "syscallFilter": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "syscalls"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/syscalls"
+      }
+    },
+    "syscallMode": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "mode"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/mode"
+      }
+    },
+    "syscallBefore": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "before"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/before"
+      }
+    },
+    "syscallAfter": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "after"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/after"
+      }
+    },
+    "syscallRing": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "ring"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/ring"
+      }
+    },
+    "syscallArguments": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "arguments"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/arguments"
+      }
+    },
+    "syscallMaxEvents": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "maxEvents"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEvents"
+      }
+    },
+    "syscallRate": {
+      "actionKinds": [
+        "syscallTrace"
+      ],
+      "path": [
+        "parameters",
+        "maxEventsPerSecond"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEventsPerSecond"
+      }
+    },
+    "filePath": {
+      "actionKinds": [
+        "fileRead"
+      ],
+      "path": [
+        "parameters",
+        "path"
+      ],
+      "valueSchema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    },
+    "commandArgv": {
+      "actionKinds": [
+        "command"
+      ],
+      "path": [
+        "parameters",
+        "argv"
+      ],
+      "valueSchema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "maxItems": 64,
+        "minItems": 1
+      }
+    },
+    "actionMaxBytes": {
+      "actionKinds": [
+        "kubernetesSnapshot",
+        "logs",
+        "processSnapshot",
+        "fileRead",
+        "packetCapture",
+        "networkSnapshot",
+        "runtimeDiagnostic",
+        "kernelCore",
+        "liveCore",
+        "command",
+        "httpDiagnostic",
+        "artifactCollect",
+        "profile",
+        "syscallTrace"
+      ],
+      "path": [
+        "limits",
+        "maxBytes"
+      ],
+      "valueSchema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1099511627776
+      }
+    },
+    "actionTimeout": {
+      "actionKinds": [
+        "kubernetesSnapshot",
+        "logs",
+        "processSnapshot",
+        "fileRead",
+        "packetCapture",
+        "networkSnapshot",
+        "runtimeDiagnostic",
+        "kernelCore",
+        "liveCore",
+        "command",
+        "httpDiagnostic",
+        "artifactCollect",
+        "profile",
+        "syscallTrace"
+      ],
+      "path": [
+        "limits",
+        "timeout"
+      ],
+      "valueSchema": {
+        "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+      }
+    },
+    "actionExecutionMode": {
+      "actionKinds": [
+        "packetCapture",
+        "syscallTrace"
+      ],
+      "path": [
+        "executionMode"
+      ],
+      "valueSchema": {
+        "enum": [
+          "onTrigger",
+          "ongoing"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "catalog": {
+          "enum": [
+            "builtin",
+            "organization",
+            "namespace"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[1-9][0-9]*$",
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "catalog",
+        "name",
+        "version"
+      ]
+    },
+    "override": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "packetPeers"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/peers"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "packetFilter"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/filter"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "packetBefore"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/before"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "packetAfter"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/after"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "packetRing"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json#/properties/ring"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "processSelector"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "processBatch"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/batch"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "profileDuration"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallFilter"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/syscalls"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallMode"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/mode"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallBefore"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/before"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallAfter"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/after"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallRing"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/ring"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallArguments"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/arguments"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallMaxEvents"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEvents"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "syscallRate"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/syscall-trace.schema.json#/properties/maxEventsPerSecond"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "filePath"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "commandArgv"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "maxItems": 64,
+              "minItems": 1
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "actionMaxBytes"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "actionTimeout"
+            },
+            "value": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "actionExecutionMode"
+            },
+            "value": {
+              "enum": [
+                "onTrigger",
+                "ongoing"
+              ]
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,23}$"
+        },
+        "profileRef": {
+          "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/profileRef"
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/override"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "id",
+        "profileRef"
+      ]
+    },
+    "actionAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "componentID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "localActionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "actionID": {
+          "type": "string",
+          "pattern": "^a[a-f0-9]{24}$"
+        },
+        "deduplicated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "componentID",
+        "localActionID",
+        "actionID",
+        "deduplicated"
+      ]
+    },
+    "resolvedProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "componentID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "profileRef": {
+          "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/profileRef"
+        },
+        "sourceUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "definitionDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceClusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceNamespaceUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "componentID",
+        "profileRef",
+        "sourceUID",
+        "definitionDigest",
+        "sourceClusterID",
+        "sourceNamespaceUID"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authored": {
+          "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
+        },
+        "resolvedProfiles": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/resolvedProfile"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "actionMap": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/actionAlias"
+          },
+          "minItems": 1,
+          "maxItems": 128
+        }
+      },
+      "required": [
+        "authored",
+        "resolvedProfiles",
+        "actionMap"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/component"
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "maxTotalBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1099511627776
+    },
+    "maxDuration": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+    }
+  },
+  "required": [
+    "components",
+    "maxTotalBytes",
+    "maxDuration"
+  ]
+}

@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output
+    processing_test.go:279: immutable custody request conflicts
+--- FAIL: TestContextAdmissionWithRealServices (1.54s)
+    --- FAIL: TestContextAdmissionWithRealServices/processing-restriction-fences-prepaid-native-output (1.21s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.595s
+FAIL

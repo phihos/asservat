@@ -1,0 +1,112 @@
+package configuration
+
+import (
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// OwnerWorkloadAdministration protects the private hub namespace. It is
+// installation input, never a workload owner's evidence permission or selector.
+type OwnerWorkloadAdministration struct {
+	Name, Deployment, DeploymentUID string
+	ControlNamespace                NamespaceRef
+	Administrators                  []KubernetesActor
+	ConfigurationProbes             []OwnerConfigurationProbe
+	SchedulingLeases                []OwnerSchedulingLease
+	CredentialSecrets               []OwnerCredentialSecret   `json:",omitempty"`
+	CapacityProbe                   *OwnerCapacityProbe       `json:",omitempty"`
+	APIContextStarts                *OwnerAPIContextStarts    `json:",omitempty"`
+	InitialHistoryProbe             *OwnerInitialHistoryProbe `json:",omitempty"`
+}
+
+// OwnerInitialHistoryProbe is the exact retained initial-installation history
+// account. Unlike runtime source probes it lives in the original bootstrap
+// namespace. It may only probe the original configuration without persisting.
+type OwnerInitialHistoryProbe struct {
+	Namespace                                        NamespaceRef
+	ServiceAccount, ServiceAccountUID, Configuration string
+}
+
+func (p OwnerInitialHistoryProbe) Valid() bool {
+	return identity.Text(p.Namespace.Name, 63) && authorization.UUID(p.Namespace.UID) && identity.Text(p.ServiceAccount, 253) && authorization.UUID(p.ServiceAccountUID) && identity.Text(p.Configuration, 253)
+}
+
+// OwnerConfigurationProbe names one installation-owned, same-namespace account
+// and ConfigMap. It permits only dry-run UPDATE through the namespace guard;
+// the independently protected source must still deny that operation.
+type OwnerConfigurationProbe struct {
+	ConfigMap, ServiceAccount string
+}
+
+// OwnerSchedulingLease grants only the named account's UPDATE operation on a
+// precreated scheduling Lease. Lease contents are never application authority.
+type OwnerSchedulingLease struct {
+	Lease, ServiceAccount string
+}
+
+// OwnerCredentialSecret grants only the named account's persistent UPDATE of
+// its own precreated credential Secret (ADR-168/193: the connector's CAS
+// writes). It grants no create, delete, read or other Secret.
+type OwnerCredentialSecret struct {
+	Secret, ServiceAccount string
+}
+
+// OwnerAPIContextStarts is an explicit installed API-only profile. It grants
+// no RBAC and never substitutes for the independent StartAdmission policy.
+type OwnerAPIContextStarts struct {
+	CapacityAccount, CapacityAccountUID   string
+	ExecutionAccount, ExecutionAccountUID string
+	// CapacityAudience, when set, admits the execution Pod's own 600-second
+	// Pod-bound TokenRequest for the capacity account with exactly this API
+	// audience (ADR-175). Empty keeps the guard bytes of earlier plans.
+	CapacityAudience string
+}
+
+func (p OwnerAPIContextStarts) Valid() bool {
+	return identity.Text(p.CapacityAccount, 253) && authorization.UUID(p.CapacityAccountUID) && identity.Text(p.ExecutionAccount, 253) && authorization.UUID(p.ExecutionAccountUID) && p.CapacityAccount != p.ExecutionAccount && p.CapacityAccountUID != p.ExecutionAccountUID && (p.CapacityAudience == "" || identity.Text(p.CapacityAudience, 256))
+}
+
+// OwnerCapacityProbe allows only the exact installed worker to perform two
+// nonpersistent capacity-source probes. It grants neither RBAC nor source authority.
+type OwnerCapacityProbe struct{ ServiceAccount, ServiceAccountUID string }
+
+func (p OwnerCapacityProbe) Valid() bool {
+	return identity.Text(p.ServiceAccount, 253) && authorization.UUID(p.ServiceAccountUID)
+}
+
+func (p OwnerWorkloadAdministration) Valid() bool {
+	if p.CapacityProbe != nil && !p.CapacityProbe.Valid() {
+		return false
+	}
+	if p.InitialHistoryProbe != nil && (!p.InitialHistoryProbe.Valid() || p.InitialHistoryProbe.Namespace.Name == p.ControlNamespace.Name || p.InitialHistoryProbe.Namespace.UID == p.ControlNamespace.UID) {
+		return false
+	}
+	if p.APIContextStarts != nil && !p.APIContextStarts.Valid() {
+		return false
+	}
+	if !identity.Text(p.Name, 253) || !identity.Text(p.Deployment, 253) || !authorization.UUID(p.DeploymentUID) || !identity.Text(p.ControlNamespace.Name, 63) || !authorization.UUID(p.ControlNamespace.UID) || !actorsValid(p.Administrators) || len(p.ConfigurationProbes) > 8 || len(p.SchedulingLeases) > 4 {
+		return false
+	}
+	seen := map[OwnerConfigurationProbe]bool{}
+	for _, probe := range p.ConfigurationProbes {
+		if !identity.Text(probe.ConfigMap, 253) || !identity.Text(probe.ServiceAccount, 253) || seen[probe] {
+			return false
+		}
+		seen[probe] = true
+	}
+	leases := map[OwnerSchedulingLease]bool{}
+	for _, lease := range p.SchedulingLeases {
+		if !identity.Text(lease.Lease, 253) || !identity.Text(lease.ServiceAccount, 253) || leases[lease] {
+			return false
+		}
+		leases[lease] = true
+	}
+	secrets := map[OwnerCredentialSecret]bool{}
+	for _, secret := range p.CredentialSecrets {
+		if !identity.Text(secret.Secret, 253) || !identity.Text(secret.ServiceAccount, 253) || secrets[secret] || len(p.CredentialSecrets) > 1 {
+			return false
+		}
+		secrets[secret] = true
+	}
+	return true
+}

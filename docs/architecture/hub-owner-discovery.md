@@ -1,0 +1,39 @@
+# Hub owner discovery and certificate verification
+
+[ADR-076](../decisions/076-hub-owner-discovery.md) supplies discovery and TLS identity components needed by the [shared owner locator](worker-owner-locator.md), under REQ-FED-001, REQ-DLD-003, REQ-DEP-003 and REQ-CAP-003. C-04 owns `OwnerEndpointReader`; C-21 provides its Kubernetes adapter and the TLS verifier; C-24 owns internal binding/observation/certificate values. I-13's public worker request remains unchanged. No SQL migration, persistent address, new approval or developer configuration is added.
+
+## Discovery boundary
+
+`OwnerPool` pins installation, hub-cluster and issuer epoch plus namespace, Service, Deployment and service-account names/UIDs and one private TCP port. These are independently trusted bootstrap inputs. Constructing a Go value or successfully reading the API does not qualify their administrator protection or issuer authority. Only the hub cluster's client is used; the hub does not acquire workload-cluster credentials for this lookup.
+
+`OwnerEndpoints.OwnerEndpoint` accepts the expected Pod UID and process epoch from trusted request routing. It reads the pinned namespace, Service, account and Deployment, then completes a selector-filtered EndpointSlice list for that Service. The Service must have a nonempty selector, type ClusterIP (ordinary or headless), no external target, no publish-not-ready override, and exactly one `owner-control` TCP port with the configured numeric target port. Initial supported port range is 1024–65535. The fresh, explicitly accepted ADR144 bootstrap profile instead requires the exact installed three-port Service and EndpointSlice set: `owner` TCP 9443, `observation` TCP 9444 and `public` TCP 9445, all numeric matching targets. Unknown, duplicate, missing or additional ports deny. The controller may reorder EndpointSlice ports. The omitted profile keeps the original one-port behavior; observed port shape never selects or upgrades a profile.
+
+Accept only slices owned by the exact Service and labeled as managed by the standard EndpointSlice controller. Require exact Pod target UID/name/namespace, explicit ready, not terminating and no explicit false serving condition. The controller can omit the target reference's optional API version: accept absent or `v1`, reject other values, and independently read the exact core/v1 Pod. Compare node, IPs, service account, both Service/Deployment selectors and readiness. Reject deleting or host-network/host-PID/host-IPC Pods. Follow one controlling ReplicaSet and its exact Deployment owner. UID pins prevent same-name replacements from silently joining the pool.
+
+Return canonical, unique, sorted Pod IPs only: no DNS/callback, loopback, link-local, multicast, unspecified, mapped IPv4 or scoped IPv6. The adapter accepts canonical IPv4 and IPv6 Pod addresses. Dual-stack parsing has synthetic coverage; the current owned-cluster fixture is IPv4. Consistent duplicate controller observations are deduplicated; conflicting target identities fail. Re-read Service and Pod and require their original resource versions. These finite API observations are not a cross-resource transaction, a no-change watch journal, or a process attestation. TLS and current receiver authorization remain separate requirements even while an observation is fresh.
+
+Bounds are five seconds including I/O, two addresses, 64 slices/pages, 1024 total endpoints, 2 MiB per response and 8 MiB across slice pages. Pagination preserves one list resource version, bounds continuation tokens and rejects loops. No partial result, implicit retry, freshness renewal or stale fallback escapes. Individual reader bounds do not replace aggregate API admission across hub replicas.
+
+## TLS identity
+
+`OwnerBinding` names installation, hub cluster, issuer epoch, Pod UID and process epoch with canonical nonzero UUIDs. The canonical URI is:
+
+```text
+spiffe://asservat.<installation>/hub/<cluster>/issuer/<issuerEpoch>/pod/<podUID>/process/<processEpoch>
+```
+
+Server TLS verification uses `p-<podUID>.e-<processEpoch>.hub.<cluster>.asservat.<installation>`. It is an exact DNS SAN, not a name to resolve; the future dialer must connect to the independently observed address and use that verification name. No `InsecureSkipVerify`, forwarded header, caller-provided URL or ambient system-root fallback is permitted.
+
+`OwnerPeerVerifier` clones explicit roots, accepts completed TLS 1.3 verification, then independently verifies the current chain and strict leaf profile. Leaves have no subject identity, IP/email SANs or extra URIs; only DigitalSignature and the single selected server/client EKU are permitted. Without the optional [ADR144 observation-bootstrap profile](../decisions/144-cluster-local-observations.md), server leaves have exactly the deterministic DNS SAN; client leaves have none. An explicitly opted fresh pool adds exactly its original-Service-derived common SAN to server leaves. All strict issuer, credential, current-root and peer verifiers consume the same independently accepted profile. Existing exact-owner requests still require their exact original SNI and expected process; the common name cannot redirect an existing owner locator. Maximum lifetime is one hour, with the effective certificate deadline clipped to the chain's earlier expiry. Chain input is bounded to four certificates, 16 KiB each and 32 KiB total. Expired or foreign installation/cluster/issuer identities fail, including when a connection was originally established successfully.
+
+`VerifyServer` matches the exact expected Pod/process. `VerifyClient` returns the signed identity; the receiver must independently validate its current pool membership and permitted caller role before doing anything with a request. An issuer's signature alone cannot replace current Pod verification, protected configuration/recovery, the exact shared/local request fence, human authority or connector-origin proof. A TLS verifier is not a certificate activation ledger or a revocation mechanism.
+
+## Integration and remaining work
+
+The future forwarder must perform TLS identity verification before transmitting Pod tokens/CSRs, recheck discovery/locator freshness after connection setup, and preserve the original request deadline and cancellation through the response. It must not send human access tokens to another owner, redirect, resolve arbitrary hosts, silently take over ownership or restore another process's authenticated state. No forwarding endpoint or dialer is enabled by these components.
+
+Unit/race tests cover exact discovery, dual-stack/deduplication, replacement/deletion/selector/port/node/account errors, readiness overrides, resource-version changes, unavailable/expired observations and finite list limits. Real mutual TLS tests cover both leaf purposes, foreign installation/cluster/epoch/Pod/process, malformed/extra identities, wrong roots, TLS 1.2, overlong lifetime and expiry after the handshake. The owned Kubernetes fixture tests actual Deployment/ReplicaSet/Pod/EndpointSlice output, a restricted pause Pod, separate read-only RBAC, invalid scope, readiness override and deletion. The pause Pod is not a hub process and serves no TLS or evidence.
+
+[Implementation progress](../implementation-progress.md) records actual commands/results separately. Protected owner-pool configuration/issuer bootstrap, certificate issuance/activation, authenticated private forwarding, connector-local proof mediation and native delivery remain required. These tests do not qualify public downloads or HA failover.
+
+[ADR-078](owner-configuration.md) subsequently adds durable audited configuration acceptance. [ADR-079](owner-issuance.md) adds actual provider signing and CSR/current-root verification for separate client/server leaves. These supersede those individual component gaps above; protected workload/issuer bootstrap, durable enrollment/activation and forwarding remain required.

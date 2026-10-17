@@ -1,0 +1,1645 @@
+--- /dev/null
++++ b/docs/architecture/runtime-profiles.md
+@@ -0,0 +1,130 @@
++# Bounded Go runtime-profile acquisition
++
++This component implements the C-11/C-23 mechanism boundary for the existing
++`profile` action (REQ-PRF-001/002 and REQ-LIF-001). It is not an installed profile
++feature. Profile-specific acceptance, start/quota admission, endpoint resolution,
++protected node networking, semantic verification and publication remain required.
++The existing 4096-byte pod-status authorities and public routes are unchanged.
++
++## Lifetime and authority contract
++
++`GoProfileRequest` is an immutable, resolved mechanism input. It contains the
++original artifact/attempt binding, exact whole-pod/node/boot identity, named
++source and resolved endpoint digest, profile parameters, native byte limit and
++original `NotBefore`/`Deadline`. Its producer must derive the deadline from the
++earliest accepted capture, action, grant, processing/write and retention cutoff.
++The mechanism cannot extend any of those deadlines or create/renew a permit.
++`PinnedPod.ControllerUID` keeps the existing immediate-controller meaning; it is
++empty for a bare Pod, never fabricated as the Pod UID. Full workload ownership
++and credential audience come from the original accepted scope/current resolver.
++This is an on-trigger action, including a cumulative or delta profile. A timed
++profile is not a recorder and has no pre-trigger history.
++
++Before calling acquisition the execution service must have committed the
++original intrusive start, impact/output reservations and conflicting-runtime
++slot, and prepared wrap-only encryption keys. This new mechanism input cannot
++be used as an existing `ContextStart` or public collection scope. In particular,
++the existing local start binding's one-minute ceiling cannot represent a
++60-second CPU profile plus setup/shutdown margin. Profile-specific admission
++must resolve that contract explicitly before maximum-duration profiles can be
++enabled; this component does not silently widen the existing binding.
++
++The separate `GoProfileGuard` reports a current observation of that same admitted
++request, including original grants, current permission/deny/recovery state,
++exact endpoint source, target incarnation and retained runtime-domain slot.
++There is no production guard implementation in this component. Each observation
++lasts at most five seconds. A one-second current-state recheck is bounded by the
++previous observation's **original** expiry. A blocked, stale, denied or failed
++recheck stops the socket; success may replace only observation freshness inside
++the unchanged action deadline. It cannot alter the request or replenish spend.
++Original caller cancellation remains connected throughout acquisition and
++encryption. The observer is joined before returning.
++
++The mechanism requires at least two seconds of explicitly admitted setup/finish
++margin, permits at most ten, and does not synthesize defaults. Planning retains
++the product's ten-second CPU, five-second trace and five-second snapshot defaults.
++If remaining time no longer fits the requested recording plus margin, do not
++contact the application. Recording duration, not HTTP/client timeout, sets the
++server-side upper request parameter. Cancellation or even complete HTTP EOF
++does not independently prove the remote profiler stopped. Unknown starts remain
++spent; the mechanism has no retry, stop-profiler request or capacity-refund path.
++
++## Named endpoint and network boundary
++
++`GoProfileDialer` is a required trusted capability, not an implemented node
++resolver. It resolves only the admitted source/digest, rechecks exact pod/node
++identity and credential audience and opens the connection from the target node.
++For target-loopback it must enter the exact qualified target network namespace;
++ordinary collector loopback is forbidden. Pod IP and declared port are routing
++facts, not serving-process attribution. No container permission or public
++container selector is introduced. Node-local and network-namespace qualification
++remain outstanding.
++
++The dialer returns one already authenticated HTTP/1 connection with its original
++channel/credential expiry (no later than the action deadline) and a fixed
++administrator-selected Host value and optional bounded Authorization value.
++For a credentialed endpoint it must first verify the configured TLS peer and
++the credential's workload audience; unauthenticated clear transport cannot carry
++that credential. The adapter cannot supply an address override, TLS roots,
++credential reference, URL, port or arbitrary request header. Its socket deadline and request context retain the earlier channel expiry;
++neither a fresh current observation nor the longer action interval can extend it.
++Its HTTP transport
++has no environment proxy, DNS path, redirects, persistent connections or retry.
++It receives that one connection once. HTTP/2 is not negotiated by this profile.
++
++Paths are fixed Go pprof paths; CPU maps to `/debug/pprof/profile` and runtime
++trace to `/debug/pprof/trace`. Only `debug=0`, approved integral `seconds` and
++explicit heap-snapshot `gc=1` are generated. Never call index, cmdline, symbol,
++sampling controls or an application's stop endpoint. Go handles a `seconds`
++request through its delta path before heap GC, so `forceGC` combined with delta
++is rejected rather than claiming GC occurred. The standard handler's busy
++response is recognized only by its exact bounded signature; arbitrary server
++errors do not become `ProfilerBusy`. [Go pprof API](https://pkg.go.dev/net/http/pprof),
++[Go HTTP pprof implementation](https://go.dev/src/net/http/pprof/pprof.go).
++
++## Evidence and local tools
++
++Successful response entity bytes flow directly into the prepared
++`evidence.StorageEncoder`. HTTP transfer framing is removed, while content
++encoding and native gzip bytes are preserved exactly: automatic decompression
++is disabled. No native file, plaintext object or whole-profile buffer is created.
++Calling acquisition transfers ownership of the single-use prepared sink even
++when validation, current authority or endpoint opening fails. Acquisition closes
++the sink after joining source/observer work, drops prepared key references and
++checks the original cutoffs again; it cannot reuse that attempt. Releasing Go
++primitive references is not a promise of physical memory erasure.
++The existing versioned framed format retains native length/checksum for later
++authenticated byte-exact download. This component returns an encrypted layout
++and acquisition facts, not a catalog artifact or readable profile.
++
++Response headers are bounded, non-success bodies are inspected only through a
++small fixed classifier and never emitted/logged, and accepted body reads have a
++hard native cap with at most one overflow byte. Empty/truncated/over-limit and
++partially consumed responses cannot report complete acquisition. Consumer errors
++stop the socket, preserve possible-start provenance and do not return a usable
++layout. Endpoint Host, authorization and upstream error strings are absent from
++returned errors and acquisition provenance.
++
++An HTTP success and an octet-stream content type do not verify profile semantics.
++The separate offline C-18 parser must establish sample types/units, duration,
++sampling configuration, labels, mappings and format before publication. Unknown
++process attribution, disabled block/mutex sampling and remote stop must remain
++unknown until qualified. No parser or flamegraph renderer runs in this
++network-enabled mechanism process. Native downloads and local pprof/trace tools
++remain required; their publication/transfer integration is not supplied here.
++
++All originals are raw evidence that may contain user data. Original acquisition
++retention, workload quotas, encrypted custody, audit and independent verification
++must cover the output and partial copies. No sample/label redaction is claimed
++for the preserved original. Managed deletion cannot erase downloaded copies.
++
++## Qualification and remaining composition
++
++The staged tests exercise synthetic HTTP and the existing framed encoder; test
++guards and node connections are explicitly synthetic. Passing them does not
++qualify real node routing, runtime-domain mutual exclusion, production authority,
++object-store custody/publication, native-download permissions or the UI/MCP flow.
++No public/Helm profile capability is enabled by these new files. The integration
++sequence is accepted endpoint/template resolution and profile-specific admission,
++qualified node dialer/current guard, bounded custody/manifest verification, then
++the same shared capture/catalog/native-download workflow and isolated analysis.
+--- /dev/null
++++ b/internal/adapters/diagnostics/go_profile.go
+@@ -0,0 +1,376 @@
++// Package diagnostics implements bounded runtime diagnostic mechanisms. It does
++// not resolve public collection authority or publish collected evidence.
++package diagnostics
++
++import (
++	"context"
++	"crypto/tls"
++	"errors"
++	"io"
++	"mime"
++	"net"
++	"net/http"
++	"net/url"
++	"strconv"
++	"strings"
++	"sync"
++	"sync/atomic"
++	"time"
++
++	port "asservat.local/asservat/internal/application/execution"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/execution"
++)
++
++type GoProfileCollector struct {
++	dialer port.GoProfileDialer
++	guard  port.GoProfileGuard
++	now    func() time.Time
++}
++
++var _ port.GoProfileCollector = (*GoProfileCollector)(nil)
++
++func NewGoProfileCollector(dialer port.GoProfileDialer, guard port.GoProfileGuard, now func() time.Time) (*GoProfileCollector, error) {
++	if dialer == nil || guard == nil || now == nil {
++		return nil, value.ErrInvalid
++	}
++	return &GoProfileCollector{dialer: dialer, guard: guard, now: now}, nil
++}
++
++// CollectGoProfile performs exactly one HTTP acquisition. It never spends a
++// grant/start, selects another endpoint, parses profiles, stops an application
++// profiler, retries an uncertain call or publishes a readable artifact.
++func (c *GoProfileCollector) CollectGoProfile(parent context.Context, r value.GoProfileRequest, sink port.GoProfileSink) (out port.GoProfileCollection, err error) {
++	if sink == nil {
++		return out, value.ErrInvalid
++	}
++	var watch *profileWatch
++	var channelDeadline time.Time
++	defer func() {
++		sink.Close()
++		// Output disposal also joins the original attempt. Check immutable/current
++		// cutoffs after it; the collector owns even an unopened prepared sink.
++		if err == nil && (parent.Err() != nil || r.Validate(c.now()) != nil || watch == nil || !watch.valid(c.now()) || !c.now().Before(channelDeadline)) {
++			out.Layout = artifact.Layout{}
++			out.Outcome.ResponseComplete = false
++			err = value.ErrExpired
++		}
++	}()
++	if c == nil || c.dialer == nil || c.guard == nil || c.now == nil || parent == nil {
++		return out, value.ErrInvalid
++	}
++	if parent.Err() != nil {
++		return out, value.ErrExpired
++	}
++	if invalid := r.Validate(c.now()); invalid != nil {
++		return out, invalid
++	}
++	ctx, deadlineCancel := context.WithDeadline(parent, r.Deadline)
++	defer deadlineCancel()
++	ctx, cancel := context.WithCancelCause(ctx)
++	defer cancel(context.Canceled)
++	initialCtx, initialCancel := context.WithTimeout(ctx, 5*time.Second)
++	observation, observeErr := c.guard.ObserveGoProfile(initialCtx, r)
++	initialErr := initialCtx.Err()
++	initialCancel()
++	if observeErr != nil || initialErr != nil || !observation.Valid(r, c.now()) || ctx.Err() != nil {
++		return out, value.ErrDenied
++	}
++	watch = c.watch(ctx, cancel, r, observation)
++	var channelCancel context.CancelFunc
++	defer func() {
++		if channelCancel != nil {
++			channelCancel()
++		}
++	}()
++	defer func() {
++		watch.stop()
++		// Joining the original observer and closing sockets are part of this
++		// operation. A late cancellation/expiry cannot return usable output.
++		if err == nil && (ctx.Err() != nil || parent.Err() != nil || !watch.valid(c.now())) {
++			out.Layout = artifact.Layout{}
++			out.Outcome.ResponseComplete = false
++			err = value.ErrExpired
++		}
++	}()
++	if !c.now().Add(r.Parameters.Duration + time.Second).Before(r.Deadline) {
++		return out, value.ErrExpired
++	}
++	channel, dialErr := c.dialer.DialGoProfile(ctx, r)
++	if channel.Connection != nil {
++		defer channel.Connection.Close()
++	}
++	if dialErr != nil || channel.Connection == nil {
++		return out, value.ErrProfileUnavailable
++	}
++	if !validProfileChannel(channel) || !c.now().Before(channel.ValidUntil) || channel.ValidUntil.After(r.Deadline) || ctx.Err() != nil || !watch.valid(c.now()) {
++		return out, value.ErrDenied
++	}
++	channelDeadline = channel.ValidUntil
++	ctx, channelCancel = context.WithDeadline(ctx, channel.ValidUntil)
++	if err = channel.Connection.SetDeadline(channel.ValidUntil); err != nil {
++		return out, value.ErrProfileUnavailable
++	}
++	// Interrupt a blocked Read/Write at current-observation loss too, not just
++	// at the original action deadline. Join the callback before returning.
++	closed := make(chan struct{})
++	stopClose := context.AfterFunc(ctx, func() { _ = channel.Connection.Close(); close(closed) })
++	defer func() {
++		if !stopClose() {
++			<-closed
++		}
++	}()
++	var taken atomic.Bool
++	transport := &http.Transport{
++		Proxy: nil,
++		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
++			if network != "tcp" || address != "profile.invalid:80" || !taken.CompareAndSwap(false, true) || dialCtx.Err() != nil || ctx.Err() != nil || !watch.valid(c.now()) {
++				return nil, value.ErrDenied
++			}
++			return channel.Connection, nil
++		},
++		DisableCompression: true, DisableKeepAlives: true, ForceAttemptHTTP2: false,
++		MaxConnsPerHost: 1, MaxResponseHeaderBytes: 32 << 10,
++	}
++	defer transport.CloseIdleConnections()
++	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
++	path, query := goProfilePath(r.Parameters)
++	request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, (&url.URL{Scheme: "http", Host: "profile.invalid", Path: path, RawQuery: query}).String(), nil)
++	if requestErr != nil {
++		return out, value.ErrInvalid
++	}
++	request.Host = channel.Host
++	request.Header.Set("Accept", value.GoProfileMediaType)
++	request.Header.Set("Accept-Encoding", "identity")
++	request.Header.Set("User-Agent", "Asservat")
++	if channel.Authorization != "" {
++		request.Header.Set("Authorization", channel.Authorization)
++	}
++	// Dial/setup may have consumed the admitted margin. Do not contact the
++	// application unless its fixed requested duration still fits.
++	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channel.ValidUntil) {
++		return out, value.ErrExpired
++	}
++	out.Outcome = value.GoProfileOutcome{Format: r.Parameters.Format(), StartedAt: c.now().UTC(), MayHaveStarted: true}
++	response, responseErr := client.Do(request)
++	if response != nil && response.Body != nil {
++		defer response.Body.Close()
++	}
++	if responseErr != nil || response == nil {
++		return out, profileOperationError(ctx, value.ErrProfileUnavailable)
++	}
++	if response.StatusCode != http.StatusOK {
++		return out, classifyProfileStatus(ctx, response, r.Parameters)
++	}
++	media, _, mediaErr := mime.ParseMediaType(response.Header.Get("Content-Type"))
++	if mediaErr != nil || media != value.GoProfileMediaType {
++		return out, value.ErrProfileUnavailable
++	}
++	if response.ContentLength == 0 {
++		return out, value.ErrProfileUnavailable
++	}
++	if response.ContentLength > r.NativeLimit {
++		return out, value.ErrProfileLimit
++	}
++	body := &profileBody{ctx: ctx, source: response.Body, remaining: r.NativeLimit}
++	layout, sinkErr := sink.ConsumeGoProfile(ctx, r, body)
++	out.Outcome.NativeBytes = r.NativeLimit - body.remaining
++	if body.failure != nil {
++		return out, profileOperationError(ctx, body.failure)
++	}
++	if sinkErr != nil {
++		return out, profileOperationError(ctx, value.ErrProfileOutput)
++	}
++	if !body.eof || out.Outcome.NativeBytes == 0 || layout.Validate() != nil || layout.Binding != r.Binding || layout.NativeBytes != out.Outcome.NativeBytes {
++		return out, value.ErrProfileOutput
++	}
++	if ctx.Err() != nil || !watch.valid(c.now()) {
++		return out, value.ErrExpired
++	}
++	out.Outcome.CompletedAt = c.now().UTC()
++	out.Outcome.ResponseComplete = true
++	out.Layout = layout
++	return out, nil
++}
++
++func validProfileChannel(c port.GoProfileChannel) bool {
++	if c.Connection == nil || len(c.Host) == 0 || len(c.Host) > 253 || strings.ContainsAny(c.Host, "/\\?#@%\r\n\t ") || len(c.Authorization) > 4096 {
++		return false
++	}
++	for _, s := range []string{c.Host, c.Authorization} {
++		for _, b := range []byte(s) {
++			if b < 32 || b > 126 {
++				return false
++			}
++		}
++	}
++	u, err := url.Parse("http://" + c.Host)
++	if err != nil || u.Host != c.Host || u.Hostname() == "" || u.User != nil || u.Path != "" {
++		return false
++	}
++	secure, hasTLS := c.Connection.(interface{ ConnectionState() tls.ConnectionState })
++	if c.Authorization != "" && !hasTLS {
++		return false
++	}
++	if hasTLS {
++		state := secure.ConnectionState()
++		if !state.HandshakeComplete || state.Version < tls.VersionTLS12 || len(state.VerifiedChains) == 0 || (state.NegotiatedProtocol != "" && state.NegotiatedProtocol != "http/1.1") {
++			return false
++		}
++	}
++	return true
++}
++
++func goProfilePath(p value.GoProfileParameters) (string, string) {
++	name := p.Type
++	if name == "cpu" {
++		name = "profile"
++	}
++	if name == "runtimeTrace" {
++		name = "trace"
++	}
++	q := url.Values{"debug": []string{"0"}}
++	if p.Duration > 0 {
++		q.Set("seconds", strconv.FormatInt(int64(p.Duration/time.Second), 10))
++	}
++	if p.ForceGC {
++		q.Set("gc", "1")
++	}
++	return "/debug/pprof/" + name, q.Encode()
++}
++
++func classifyProfileStatus(ctx context.Context, r *http.Response, p value.GoProfileParameters) error {
++	if r.StatusCode == http.StatusInternalServerError && r.Header.Get("X-Go-Pprof") == "1" && (p.Type == "cpu" || p.Type == "runtimeTrace") {
++		var buffer [513]byte
++		defer clear(buffer[:])
++		n, err := io.ReadFull(r.Body, buffer[:])
++		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) && n <= 512 && ctx.Err() == nil {
++			text := string(buffer[:n])
++			if p.Type == "cpu" && text == "Could not enable CPU profiling: cpu profiling already in use\n" || p.Type == "runtimeTrace" && text == "Could not enable tracing: tracing is already enabled\n" {
++				return value.ErrProfilerBusy
++			}
++		}
++	}
++	return profileOperationError(ctx, value.ErrProfileUnavailable)
++}
++
++func profileOperationError(ctx context.Context, otherwise error) error {
++	if ctx.Err() != nil {
++		return value.ErrExpired
++	}
++	return otherwise
++}
++
++type profileBody struct {
++	ctx       context.Context
++	source    io.Reader
++	remaining int64
++	eof       bool
++	failure   error
++}
++
++func (b *profileBody) Read(p []byte) (int, error) {
++	if len(p) == 0 {
++		return 0, nil
++	}
++	if b.failure != nil {
++		return 0, b.failure
++	}
++	if b.ctx.Err() != nil {
++		b.failure = value.ErrExpired
++		return 0, b.failure
++	}
++	n, err := b.source.Read(p[:min(int64(len(p)), b.remaining+1)])
++	if n < 0 || n > len(p) {
++		b.failure = value.ErrProfileUnavailable
++		return 0, b.failure
++	}
++	if int64(n) > b.remaining {
++		clear(p[b.remaining:n])
++		b.failure = value.ErrProfileLimit
++		return 0, b.failure
++	}
++	b.remaining -= int64(n)
++	if b.ctx.Err() != nil {
++		clear(p[:n])
++		b.failure = value.ErrExpired
++		return 0, b.failure
++	}
++	if errors.Is(err, io.EOF) {
++		b.eof = true
++	}
++	if err != nil && !errors.Is(err, io.EOF) {
++		b.failure = value.ErrProfileUnavailable
++		return n, b.failure
++	}
++	return n, err
++}
++
++type profileWatch struct {
++	mu         sync.Mutex
++	request    value.GoProfileRequest
++	current    value.GoProfileCurrent
++	cancel     context.CancelFunc
++	done       chan struct{}
++	expiry     *time.Timer
++	expiryDone chan struct{}
++}
++
++func (w *profileWatch) valid(now time.Time) bool {
++	w.mu.Lock()
++	defer w.mu.Unlock()
++	return w.current.Valid(w.request, now)
++}
++func (w *profileWatch) stop() {
++	w.cancel()
++	<-w.done
++	if !w.expiry.Stop() {
++		<-w.expiryDone
++	}
++}
++
++func (c *GoProfileCollector) watch(ctx context.Context, cancel context.CancelCauseFunc, r value.GoProfileRequest, initial value.GoProfileCurrent) *profileWatch {
++	watchCtx, stop := context.WithCancel(ctx)
++	w := &profileWatch{request: r, current: initial, cancel: stop, done: make(chan struct{}), expiryDone: make(chan struct{})}
++	w.expiry = time.AfterFunc(time.Until(initial.ValidUntil), func() { cancel(value.ErrExpired); close(w.expiryDone) })
++	go func() {
++		defer close(w.done)
++		for {
++			w.mu.Lock()
++			previous := w.current
++			w.mu.Unlock()
++			wait := min(time.Second, time.Until(previous.ValidUntil)/2)
++			if wait <= 0 {
++				cancel(value.ErrExpired)
++				return
++			}
++			timer := time.NewTimer(wait)
++			select {
++			case <-watchCtx.Done():
++				timer.Stop()
++				return
++			case <-timer.C:
++			}
++			checkCtx, stopCheck := context.WithDeadline(watchCtx, previous.ValidUntil)
++			next, err := c.guard.ObserveGoProfile(checkCtx, r)
++			checkErr := checkCtx.Err()
++			stopCheck()
++			if watchCtx.Err() != nil {
++				return
++			}
++			if err != nil || checkErr != nil || !next.Valid(r, c.now()) || next.CheckedAt.Before(previous.CheckedAt) {
++				cancel(value.ErrDenied)
++				return
++			}
++			if !w.expiry.Stop() {
++				cancel(value.ErrExpired)
++				return
++			}
++			w.mu.Lock()
++			w.current = next
++			w.mu.Unlock()
++			w.expiry.Reset(time.Until(next.ValidUntil))
++		}
++	}()
++	return w
++}
+--- /dev/null
++++ b/internal/adapters/diagnostics/go_profile_test.go
+@@ -0,0 +1,667 @@
++package diagnostics_test
++
++import (
++	"bytes"
++	"compress/gzip"
++	"context"
++	"crypto/aes"
++	"crypto/cipher"
++	"crypto/rand"
++	"crypto/sha256"
++	"crypto/tls"
++	"encoding/base64"
++	"errors"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptest"
++	httppprof "net/http/pprof"
++	"runtime/pprof"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/diagnostics"
++	"asservat.local/asservat/internal/adapters/objectstore/framed"
++	port "asservat.local/asservat/internal/application/execution"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/execution"
++)
++
++type profileGuardFunc func(context.Context, value.GoProfileRequest) (value.GoProfileCurrent, error)
++
++func (f profileGuardFunc) ObserveGoProfile(c context.Context, r value.GoProfileRequest) (value.GoProfileCurrent, error) {
++	return f(c, r)
++}
++
++type profileDialFunc func(context.Context, value.GoProfileRequest) (port.GoProfileChannel, error)
++
++func (f profileDialFunc) DialGoProfile(c context.Context, r value.GoProfileRequest) (port.GoProfileChannel, error) {
++	return f(c, r)
++}
++
++type profileSinkFunc struct {
++	fn    func(context.Context, value.GoProfileRequest, io.Reader) (artifact.Layout, error)
++	close func()
++}
++
++func (f profileSinkFunc) ConsumeGoProfile(c context.Context, r value.GoProfileRequest, s io.Reader) (artifact.Layout, error) {
++	return f.fn(c, r, s)
++}
++func (f profileSinkFunc) Close() { f.close() }
++
++func profileRequest() value.GoProfileRequest {
++	const id = "00000000-0000-4000-8000-000000000001"
++	n := time.Now().UTC().Truncate(time.Microsecond)
++	return value.GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: value.GoProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "synthetic", NamespaceUID: id, Name: "app-0", UID: id, ControllerUID: id, NodeName: "fixture-node"}, NodeUID: id, NodeBootID: id, SourceRef: "go-debug", EndpointDigest: artifact.Digest{3}, Parameters: value.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 4096, NotBefore: n, Deadline: n.Add(5 * time.Second)}
++}
++
++func freshProfileGuard(ctx context.Context, r value.GoProfileRequest) (value.GoProfileCurrent, error) {
++	n := time.Now().UTC()
++	until := n.Add(5 * time.Second)
++	if r.Deadline.Before(until) {
++		until = r.Deadline
++	}
++	return value.GoProfileCurrent{CheckedAt: n, ValidUntil: until}, ctx.Err()
++}
++
++// This dialer is test-only. It maps a synthetic pinned Pod to the private test
++// listener. It provides no product node/netns/authority qualification.
++func profileDialer(t *testing.T, server *httptest.Server, want value.GoProfileRequest, calls *atomic.Int32, authorization string) profileDialFunc {
++	t.Helper()
++	return func(ctx context.Context, r value.GoProfileRequest) (port.GoProfileChannel, error) {
++		if r != want {
++			return port.GoProfileChannel{}, errors.New("replacement request")
++		}
++		calls.Add(1)
++		var conn net.Conn
++		var err error
++		if server.TLS != nil {
++			cfg := server.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
++			cfg.NextProtos = []string{"http/1.1"}
++			d := tls.Dialer{Config: cfg}
++			conn, err = d.DialContext(ctx, "tcp", server.Listener.Addr().String())
++		} else {
++			d := net.Dialer{}
++			conn, err = d.DialContext(ctx, "tcp", server.Listener.Addr().String())
++		}
++		return port.GoProfileChannel{Connection: conn, Host: "approved-profile.invalid", Authorization: authorization, ValidUntil: r.Deadline}, err
++	}
++}
++
++// Real authenticated test wrapping, with an ephemeral in-memory AES key. This
++// helper is never a product key provider or collector unwrap capability.
++type profileTestKeys struct {
++	a     cipher.AEAD
++	wraps int
++}
++
++func newProfileKeys(t *testing.T) *profileTestKeys {
++	t.Helper()
++	key := make([]byte, 32)
++	if _, e := rand.Read(key); e != nil {
++		t.Fatal(e)
++	}
++	b, e := aes.NewCipher(key)
++	clear(key)
++	if e != nil {
++		t.Fatal(e)
++	}
++	a, e := cipher.NewGCM(b)
++	if e != nil {
++		t.Fatal(e)
++	}
++	return &profileTestKeys{a: a}
++}
++func (k *profileTestKeys) Seal(ctx context.Context, b, aad []byte) (artifact.SealedKey, error) {
++	if ctx.Err() != nil || len(b) > 4096 {
++		return artifact.SealedKey{}, errors.New("invalid test wrap")
++	}
++	k.wraps++
++	nonce := make([]byte, k.a.NonceSize())
++	if _, e := rand.Read(nonce); e != nil {
++		return artifact.SealedKey{}, e
++	}
++	return artifact.SealedKey{Reference: "synthetic-test-key", Ciphertext: base64.StdEncoding.EncodeToString(k.a.Seal(nonce, nonce, b, aad))}, nil
++}
++func (k *profileTestKeys) Open(ctx context.Context, s artifact.SealedKey, aad []byte) ([]byte, error) {
++	b, e := base64.StdEncoding.DecodeString(s.Ciphertext)
++	if e != nil || len(b) < k.a.NonceSize() {
++		return nil, errors.New("test key invalid")
++	}
++	return k.a.Open(nil, b[:k.a.NonceSize()], b[k.a.NonceSize():], aad)
++}
++
++type profileBytesSource []byte
++
++func (s profileBytesSource) ReadRange(_ context.Context, o, n int64) ([]byte, error) {
++	if o < 0 || n < 1 || o+n > int64(len(s)) {
++		return nil, io.ErrUnexpectedEOF
++	}
++	return bytes.Clone(s[o : o+n]), nil
++}
++
++type profileDelivery struct{ bytes.Buffer }
++
++func (d *profileDelivery) Send(ctx context.Context, b []byte) error {
++	if ctx.Err() != nil {
++		return ctx.Err()
++	}
++	_, e := d.Write(b)
++	return e
++}
++
++type profileOutput struct {
++	sink        *port.GoProfileEncodingSink
++	keys        *profileTestKeys
++	data, index bytes.Buffer
++}
++
++func newProfileOutput(t *testing.T, r value.GoProfileRequest) *profileOutput {
++	t.Helper()
++	o := &profileOutput{keys: newProfileKeys(t)}
++	encoder, e := framed.Prepare(context.Background(), r.Binding, o.keys)
++	if e != nil {
++		t.Fatal(e)
++	}
++	o.sink, e = port.NewGoProfileEncodingSink(r, encoder, &o.data, &o.index)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(o.sink.Close)
++	return o
++}
++func (o *profileOutput) native(t *testing.T, layout artifact.Layout) []byte {
++	t.Helper()
++	r, e := framed.Open(context.Background(), layout, o.keys, profileBytesSource(o.data.Bytes()), profileBytesSource(o.index.Bytes()))
++	if e != nil {
++		t.Fatal(e)
++	}
++	d := &profileDelivery{}
++	if e = r.Read(context.Background(), 0, layout.NativeBytes, d); e != nil {
++		t.Fatal(e)
++	}
++	return d.Bytes()
++}
++func profileCollector(t *testing.T, d port.GoProfileDialer, g port.GoProfileGuard) *diagnostics.GoProfileCollector {
++	t.Helper()
++	c, e := diagnostics.NewGoProfileCollector(d, g, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	return c
++}
++
++func TestGoProfileEncryptedNativeBytesAndFixedQueries(t *testing.T) {
++	for _, tc := range []struct {
++		name        string
++		p           value.GoProfileParameters
++		path, query string
++	}{
++		{"heap", value.GoProfileParameters{Type: "heap", Mode: "snapshot"}, "/debug/pprof/heap", "debug=0"},
++		{"heap-gc", value.GoProfileParameters{Type: "heap", Mode: "snapshot", ForceGC: true}, "/debug/pprof/heap", "debug=0&gc=1"},
++		{"cpu", value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: time.Second}, "/debug/pprof/profile", "debug=0&seconds=1"},
++		{"delta", value.GoProfileParameters{Type: "allocs", Mode: "delta", Duration: time.Second}, "/debug/pprof/allocs", "debug=0&seconds=1"},
++		{"trace", value.GoProfileParameters{Type: "runtimeTrace", Mode: "interval", Duration: time.Second}, "/debug/pprof/trace", "debug=0&seconds=1"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			r := profileRequest()
++			r.Parameters = tc.p
++			var compressed bytes.Buffer
++			z := gzip.NewWriter(&compressed)
++			_, _ = z.Write([]byte("synthetic native bytes and user-data label"))
++			_ = z.Close()
++			native := bytes.Clone(compressed.Bytes())
++			o := newProfileOutput(t, r)
++			var calls atomic.Int32
++			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++				if q.Method != "GET" || q.URL.Path != tc.path || q.URL.RawQuery != tc.query || q.Host != "approved-profile.invalid" || q.Header.Get("Accept-Encoding") != "identity" || o.keys.wraps != 2 {
++					t.Error("changed request or keys not prepared before acquisition")
++				}
++				w.Header().Set("Content-Type", "application/octet-stream")
++				// A caller may label the already gzipped native body. It must not be
++				// transparently decoded by HTTP transport or rewritten by encryption.
++				w.Header().Set("Content-Encoding", "gzip")
++				_, _ = w.Write(native)
++			}))
++			defer s.Close()
++			c := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard))
++			got, e := c.CollectGoProfile(context.Background(), r, o.sink)
++			if e != nil || !got.Outcome.ResponseComplete || !got.Outcome.MayHaveStarted || got.Outcome.Format != r.Parameters.Format() || calls.Load() != 1 {
++				t.Fatalf("acquisition: %+v %v", got.Outcome, e)
++			}
++			if !bytes.Equal(o.native(t, got.Layout), native) || got.Layout.NativeSHA256 != artifact.Digest(sha256.Sum256(native)) {
++				t.Fatal("native profile changed")
++			}
++			if bytes.Contains(o.data.Bytes(), []byte("user-data label")) || o.keys.wraps != 2 {
++				t.Fatal("plaintext storage or payload key calls")
++			}
++		})
++	}
++}
++
++func TestGoProfileRealCPUProviderAndBusyClassification(t *testing.T) {
++	t.Run("native-provider", func(t *testing.T) {
++		r := profileRequest()
++		r.Parameters = value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: time.Second}
++		r.NativeLimit = 1 << 20
++		var calls atomic.Int32
++		o := newProfileOutput(t, r)
++		s := httptest.NewServer(http.HandlerFunc(httppprof.Profile))
++		defer s.Close()
++		got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++		if e != nil || !got.Outcome.ResponseComplete || calls.Load() != 1 {
++			t.Fatalf("real Go handler: %v", e)
++		}
++		z, e := gzip.NewReader(bytes.NewReader(o.native(t, got.Layout)))
++		if e != nil {
++			t.Fatal("native pprof gzip", e)
++		}
++		defer z.Close()
++		b, e := io.ReadAll(io.LimitReader(z, 1<<20))
++		if e != nil || len(b) == 0 {
++			t.Fatal("empty native pprof", e)
++		}
++	})
++	t.Run("application-owned-profiler", func(t *testing.T) {
++		if e := pprof.StartCPUProfile(io.Discard); e != nil {
++			t.Fatal(e)
++		}
++		defer pprof.StopCPUProfile()
++		r := profileRequest()
++		r.Parameters = value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: time.Second}
++		o := newProfileOutput(t, r)
++		var calls atomic.Int32
++		s := httptest.NewServer(http.HandlerFunc(httppprof.Profile))
++		defer s.Close()
++		got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++		if !errors.Is(e, value.ErrProfilerBusy) || got.Outcome.ResponseComplete || o.data.Len() != 0 || calls.Load() != 1 {
++			t.Fatalf("busy: %+v %v", got.Outcome, e)
++		}
++		if e := pprof.StartCPUProfile(io.Discard); e == nil {
++			pprof.StopCPUProfile()
++			t.Fatal("collector stopped application-owned profiler")
++		}
++	})
++}
++
++func TestGoProfileRedirectStatusAndErrorsNeverEscape(t *testing.T) {
++	var followed atomic.Int32
++	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { followed.Add(1) }))
++	defer other.Close()
++	for _, status := range []int{301, 302, 307, 308, 401, 403, 404, 500} {
++		t.Run(http.StatusText(status), func(t *testing.T) {
++			r := profileRequest()
++			o := newProfileOutput(t, r)
++			var calls atomic.Int32
++			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++				w.Header().Set("Location", other.URL+"/secret")
++				w.Header().Set("X-Go-Pprof", "1")
++				w.WriteHeader(status)
++				_, _ = w.Write([]byte("secret upstream body and endpoint credentials"))
++			}))
++			defer s.Close()
++			got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++			if !errors.Is(e, value.ErrProfileUnavailable) || got.Outcome.ResponseComplete || got.Layout.Format != "" || o.data.Len() != 0 || calls.Load() != 1 || strings.Contains(e.Error(), "secret") {
++				t.Fatalf("response handling: %+v %v", got.Outcome, e)
++			}
++		})
++	}
++	if followed.Load() != 0 {
++		t.Fatal("redirect followed")
++	}
++}
++
++func TestGoProfileBodyBoundsAndIncompleteResponses(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		body   string
++		length string
++		ctype  string
++		want   error
++	}{
++		{"oversized-known", strings.Repeat("x", 65), "65", "application/octet-stream", value.ErrProfileLimit},
++		{"oversized-chunked", strings.Repeat("x", 65), "", "application/octet-stream", value.ErrProfileLimit},
++		{"truncated", "xyz", "60", "application/octet-stream", value.ErrProfileUnavailable},
++		{"empty", "", "0", "application/octet-stream", value.ErrProfileUnavailable},
++		{"wrong-media", "secret-login-page", "", "text/html", value.ErrProfileUnavailable},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			r := profileRequest()
++			r.NativeLimit = 64
++			o := newProfileOutput(t, r)
++			var calls atomic.Int32
++			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++				w.Header().Set("Content-Type", tc.ctype)
++				if tc.length != "" {
++					w.Header().Set("Content-Length", tc.length)
++				}
++				w.WriteHeader(200)
++				if tc.length == "" {
++					w.(http.Flusher).Flush()
++				}
++				_, _ = io.WriteString(w, tc.body)
++			}))
++			defer s.Close()
++			got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++			if !errors.Is(e, tc.want) || got.Layout.Format != "" || got.Outcome.ResponseComplete || calls.Load() != 1 {
++				t.Fatalf("bounds: %+v %v", got.Outcome, e)
++			}
++		})
++	}
++}
++
++func TestGoProfileCurrentDenialAndBlockedRefreshCancelOriginalSocket(t *testing.T) {
++	for _, blocked := range []bool{false, true} {
++		t.Run(map[bool]string{false: "denied", true: "blocked"}[blocked], func(t *testing.T) {
++			r := profileRequest()
++			o := newProfileOutput(t, r)
++			var calls, checks atomic.Int32
++			started := make(chan struct{})
++			stopped := make(chan struct{})
++			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) { close(started); <-q.Context().Done(); close(stopped) }))
++			defer s.Close()
++			firstUntil := time.Now().Add(350 * time.Millisecond)
++			guard := profileGuardFunc(func(ctx context.Context, got value.GoProfileRequest) (value.GoProfileCurrent, error) {
++				if got != r {
++					t.Error("request changed during observation")
++				}
++				if checks.Add(1) == 1 {
++					return value.GoProfileCurrent{CheckedAt: time.Now(), ValidUntil: firstUntil}, nil
++				}
++				if blocked {
++					deadline, ok := ctx.Deadline()
++					if !ok || !deadline.Equal(firstUntil) {
++						t.Error("previous original expiry not retained")
++					}
++					<-ctx.Done()
++					n := time.Now()
++					return value.GoProfileCurrent{CheckedAt: n, ValidUntil: n.Add(time.Second)}, nil
++				}
++				return value.GoProfileCurrent{}, errors.New("private denial details")
++			})
++			got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), guard).CollectGoProfile(context.Background(), r, o.sink)
++			if e == nil || got.Outcome.ResponseComplete || got.Layout.Format != "" || !got.Outcome.MayHaveStarted || calls.Load() != 1 || checks.Load() != 2 {
++				t.Fatalf("guard: %+v %v %d", got.Outcome, e, checks.Load())
++			}
++			select {
++			case <-started:
++			default:
++				t.Fatal("request never reached original endpoint")
++			}
++			select {
++			case <-stopped:
++			case <-time.After(time.Second):
++				t.Fatal("revoked socket survived")
++			}
++		})
++	}
++}
++
++func TestGoProfileCallerCancellationRetainsUncertainStart(t *testing.T) {
++	r := profileRequest()
++	r.Parameters = value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: time.Second}
++	o := newProfileOutput(t, r)
++	var calls atomic.Int32
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	stopped := make(chan struct{})
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) { cancel(); <-q.Context().Done(); close(stopped) }))
++	defer s.Close()
++	got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(ctx, r, o.sink)
++	if !errors.Is(e, value.ErrExpired) || !got.Outcome.MayHaveStarted || got.Outcome.ResponseComplete || got.Layout.Format != "" || calls.Load() != 1 {
++		t.Fatalf("cancellation: %+v %v", got.Outcome, e)
++	}
++	select {
++	case <-stopped:
++	case <-time.After(time.Second):
++		t.Fatal("socket not closed")
++	}
++}
++
++func TestGoProfileRefusesCredentialOnClearChannel(t *testing.T) {
++	for _, secure := range []bool{false, true} {
++		t.Run(map[bool]string{false: "clear-denied", true: "verified-tls"}[secure], func(t *testing.T) {
++			r := profileRequest()
++			o := newProfileOutput(t, r)
++			var calls, requests atomic.Int32
++			h := http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++				requests.Add(1)
++				if q.Header.Get("Authorization") != "Bearer synthetic-fixture-token" {
++					t.Error("named credential missing")
++				}
++				w.Header().Set("Content-Type", "application/octet-stream")
++				_, _ = w.Write([]byte("synthetic"))
++			})
++			var s *httptest.Server
++			if secure {
++				s = httptest.NewTLSServer(h)
++			} else {
++				s = httptest.NewServer(h)
++			}
++			defer s.Close()
++			got, e := profileCollector(t, profileDialer(t, s, r, &calls, "Bearer synthetic-fixture-token"), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++			if secure {
++				if e != nil || !got.Outcome.ResponseComplete || requests.Load() != 1 {
++					t.Fatal("verified TLS", e)
++				}
++			} else {
++				if !errors.Is(e, value.ErrDenied) || got.Outcome.MayHaveStarted || requests.Load() != 0 {
++					t.Fatal("credential sent before TLS qualification", e)
++				}
++			}
++		})
++	}
++}
++
++func TestGoProfileSinkMustConsumeCompleteOriginalStream(t *testing.T) {
++	r := profileRequest()
++	o := newProfileOutput(t, r)
++	var calls atomic.Int32
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++		w.Header().Set("Content-Type", "application/octet-stream")
++		_, _ = w.Write([]byte("native-profile-with-more-than-three-bytes"))
++	}))
++	defer s.Close()
++	sink := profileSinkFunc{close: o.sink.Close, fn: func(ctx context.Context, v value.GoProfileRequest, body io.Reader) (artifact.Layout, error) {
++		return o.sink.ConsumeGoProfile(ctx, v, io.LimitReader(body, 3))
++	}}
++	got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, sink)
++	if !errors.Is(e, value.ErrProfileOutput) || got.Outcome.ResponseComplete || got.Layout.Format != "" {
++		t.Fatalf("early output was accepted: %+v %v", got.Outcome, e)
++	}
++}
++
++func TestGoProfileObserverJoinsBeforeReturningOutput(t *testing.T) {
++	r := profileRequest()
++	o := newProfileOutput(t, r)
++	var calls, checks atomic.Int32
++	entered := make(chan struct{})
++	finished := make(chan struct{})
++	guard := profileGuardFunc(func(ctx context.Context, v value.GoProfileRequest) (value.GoProfileCurrent, error) {
++		if checks.Add(1) == 1 {
++			n := time.Now()
++			return value.GoProfileCurrent{CheckedAt: n, ValidUntil: n.Add(2 * time.Second)}, nil
++		}
++		close(entered)
++		<-ctx.Done()
++		close(finished)
++		return value.GoProfileCurrent{}, ctx.Err()
++	})
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++		w.Header().Set("Content-Type", "application/octet-stream")
++		_, _ = w.Write([]byte("synthetic"))
++	}))
++	defer s.Close()
++	sink := profileSinkFunc{close: o.sink.Close, fn: func(ctx context.Context, v value.GoProfileRequest, body io.Reader) (artifact.Layout, error) {
++		select {
++		case <-entered:
++		case <-ctx.Done():
++			return artifact.Layout{}, ctx.Err()
++		}
++		return o.sink.ConsumeGoProfile(ctx, v, body)
++	}}
++	got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), guard).CollectGoProfile(context.Background(), r, sink)
++	if e != nil || !got.Outcome.ResponseComplete {
++		t.Fatalf("observer join: %+v %v", got.Outcome, e)
++	}
++	select {
++	case <-finished:
++	default:
++		t.Fatal("returned while current authority read remained active")
++	}
++}
++
++func TestGoProfileInvalidCompositionClosesPreparedAttempt(t *testing.T) {
++	for _, name := range []string{"nil-parent", "zero-collector", "nil-collector", "denied", "invalid-request"} {
++		t.Run(name, func(t *testing.T) {
++			r := profileRequest()
++			o := newProfileOutput(t, r)
++			var dials atomic.Int32
++			d := profileDialFunc(func(context.Context, value.GoProfileRequest) (port.GoProfileChannel, error) {
++				dials.Add(1)
++				return port.GoProfileChannel{}, errors.New("unexpected dial")
++			})
++			c := profileCollector(t, d, profileGuardFunc(func(context.Context, value.GoProfileRequest) (value.GoProfileCurrent, error) {
++				return value.GoProfileCurrent{}, errors.New("synthetic denied")
++			}))
++			ctx := context.Background()
++			sent := r
++			switch name {
++			case "nil-parent":
++				ctx = nil
++			case "zero-collector":
++				c = &diagnostics.GoProfileCollector{}
++			case "nil-collector":
++				c = nil
++			case "invalid-request":
++				sent.EndpointDigest = artifact.Digest{}
++			}
++			got, e := c.CollectGoProfile(ctx, sent, o.sink)
++			if e == nil || got.Outcome.MayHaveStarted || got.Layout.Format != "" || dials.Load() != 0 {
++				t.Fatalf("invalid composition: %+v %v", got.Outcome, e)
++			}
++			if _, e = o.sink.ConsumeGoProfile(context.Background(), r, strings.NewReader("synthetic")); !errors.Is(e, value.ErrProfileOutput) {
++				t.Fatal("unopened prepared attempt was reusable", e)
++			}
++		})
++	}
++}
++
++func TestGoProfileRevocationWhileBodyBlocked(t *testing.T) {
++	r := profileRequest()
++	o := newProfileOutput(t, r)
++	var calls, checks atomic.Int32
++	bodyReady := make(chan struct{})
++	stopped := make(chan struct{})
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++		w.Header().Set("Content-Type", "application/octet-stream")
++		w.WriteHeader(200)
++		w.(http.Flusher).Flush()
++		close(bodyReady)
++		<-q.Context().Done()
++		close(stopped)
++	}))
++	defer s.Close()
++	guard := profileGuardFunc(func(ctx context.Context, v value.GoProfileRequest) (value.GoProfileCurrent, error) {
++		if checks.Add(1) == 1 {
++			n := time.Now()
++			return value.GoProfileCurrent{CheckedAt: n, ValidUntil: n.Add(800 * time.Millisecond)}, nil
++		}
++		select {
++		case <-bodyReady:
++		case <-ctx.Done():
++			return value.GoProfileCurrent{}, ctx.Err()
++		}
++		return value.GoProfileCurrent{}, errors.New("revoked")
++	})
++	got, e := profileCollector(t, profileDialer(t, s, r, &calls, ""), guard).CollectGoProfile(context.Background(), r, o.sink)
++	if !errors.Is(e, value.ErrExpired) || !got.Outcome.MayHaveStarted || got.Outcome.ResponseComplete || got.Layout.Format != "" || checks.Load() != 2 {
++		t.Fatalf("body read remained authorized: %+v %v", got.Outcome, e)
++	}
++	select {
++	case <-stopped:
++	case <-time.After(time.Second):
++		t.Fatal("blocked body outlived revocation")
++	}
++}
++
++func TestGoProfileShortOriginalChannelDeadlineCannotBeExtended(t *testing.T) {
++	r := profileRequest()
++	o := newProfileOutput(t, r)
++	var calls atomic.Int32
++	stopped := make(chan struct{})
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) { <-q.Context().Done(); close(stopped) }))
++	defer s.Close()
++	base := profileDialer(t, s, r, &calls, "")
++	var original time.Time
++	d := profileDialFunc(func(ctx context.Context, v value.GoProfileRequest) (port.GoProfileChannel, error) {
++		ch, e := base(ctx, v)
++		original = time.Now().Add(1500 * time.Millisecond)
++		ch.ValidUntil = original
++		return ch, e
++	})
++	got, e := profileCollector(t, d, profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++	if !errors.Is(e, value.ErrExpired) || got.Outcome.ResponseComplete || got.Layout.Format != "" || !got.Outcome.MayHaveStarted || time.Now().After(original.Add(time.Second)) {
++		t.Fatalf("channel lifetime changed: %+v %v", got.Outcome, e)
++	}
++	select {
++	case <-stopped:
++	case <-time.After(time.Second):
++		t.Fatal("original channel still open")
++	}
++}
++
++func TestGoProfileShortChannelCannotStartUnfinishableRecording(t *testing.T) {
++	r := profileRequest()
++	r.Parameters = value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: 10 * time.Second}
++	r.Deadline = r.NotBefore.Add(15 * time.Second)
++	o := newProfileOutput(t, r)
++	var dials, requests atomic.Int32
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++		requests.Add(1)
++		w.Header().Set("Content-Type", "application/octet-stream")
++		_, _ = w.Write([]byte("must-not-be-requested"))
++	}))
++	defer s.Close()
++	original := profileDialer(t, s, r, &dials, "")
++	d := profileDialFunc(func(ctx context.Context, v value.GoProfileRequest) (port.GoProfileChannel, error) {
++		channel, e := original(ctx, v)
++		channel.ValidUntil = time.Now().Add(3 * time.Second)
++		return channel, e
++	})
++	got, e := profileCollector(t, d, profileGuardFunc(freshProfileGuard)).CollectGoProfile(context.Background(), r, o.sink)
++	if !errors.Is(e, value.ErrExpired) || got.Outcome.MayHaveStarted || got.Outcome.ResponseComplete || got.Layout.Format != "" || dials.Load() != 1 || requests.Load() != 0 || o.data.Len() != 0 {
++		t.Fatalf("short original channel started recording: %+v %v dials=%d requests=%d", got.Outcome, e, dials.Load(), requests.Load())
++	}
++	if _, e = o.sink.ConsumeGoProfile(context.Background(), r, strings.NewReader("synthetic")); !errors.Is(e, value.ErrProfileOutput) {
++		t.Fatal("failed acquisition left prepared sink reusable", e)
++	}
++}
++
++// The original caller lifetime is shorter than the requested recording. This
++// regression must fail against the v1 mechanism until the effective deadline
++// participates in the pre-request duration check; cancellation alone is too late.
++func TestGoProfileShortCallerCannotStartUnfinishableRecording(t *testing.T) {
++	r := profileRequest()
++	r.Parameters = value.GoProfileParameters{Type: "cpu", Mode: "interval", Duration: 10 * time.Second}
++	r.Deadline = r.NotBefore.Add(15 * time.Second)
++	o := newProfileOutput(t, r)
++	var dials, requests atomic.Int32
++	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
++		requests.Add(1)
++		w.Header().Set("Content-Type", "application/octet-stream")
++		_, _ = w.Write([]byte("synthetic-profile-that-should-not-be-requested"))
++	}))
++	defer s.Close()
++	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
++	defer cancel()
++	got, e := profileCollector(t, profileDialer(t, s, r, &dials, ""), profileGuardFunc(freshProfileGuard)).CollectGoProfile(ctx, r, o.sink)
++	if !errors.Is(e, value.ErrExpired) || got.Outcome.MayHaveStarted || got.Outcome.ResponseComplete || got.Layout.Format != "" || requests.Load() != 0 || o.data.Len() != 0 {
++		t.Fatalf("short original caller started recording: %+v %v dials=%d requests=%d", got.Outcome, e, dials.Load(), requests.Load())
++	}
++	if _, e = o.sink.ConsumeGoProfile(context.Background(), r, strings.NewReader("synthetic")); !errors.Is(e, value.ErrProfileOutput) {
++		t.Fatal("failed acquisition left prepared sink reusable", e)
++	}
++}
+--- /dev/null
++++ b/internal/application/execution/go_profile.go
+@@ -0,0 +1,143 @@
++package execution
++
++import (
++	"context"
++	"io"
++	"net"
++	"sync"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/execution"
++)
++
++// GoProfileGuard checks the original admitted profile attempt, current rights,
++// recovery/deny/source/target state and retained conflicting-runtime slot. It
++// cannot create a start, renew a permit, change parameters or refund spend.
++// There is deliberately no fixture/default implementation in production.
++type GoProfileGuard interface {
++	ObserveGoProfile(context.Context, value.GoProfileRequest) (value.GoProfileCurrent, error)
++}
++
++// GoProfileChannel is one already connected, HTTP/1 channel to the exact named
++// endpoint. Host and Authorization are supplied only by a qualified protected
++// resolver; never by a user, API DTO or collected evidence. A credential-bearing
++// connection must expose a completed, verified TLS ConnectionState.
++type GoProfileChannel struct {
++	Connection          net.Conn
++	Host, Authorization string
++	// Original channel/credential deadline; setting a socket deadline must not
++	// extend a shorter provider lifetime. This is not observation freshness.
++	ValidUntil time.Time
++}
++
++// GoProfileDialer resolves the accepted endpoint digest and exact pod/node/boot
++// binding, validates current configuration and credential workload audience and
++// opens a node-local connection. targetLoopback MUST use the pinned target netns.
++// Its context and connection must preserve original cancellation/deadlines. It
++// must not return before its own network operations have joined, leak a failed
++// connection, redirect, retry an HTTP request or resolve a replacement Pod.
++// This interface alone does not qualify a real node/network implementation.
++type GoProfileDialer interface {
++	DialGoProfile(context.Context, value.GoProfileRequest) (GoProfileChannel, error)
++}
++
++// GoProfileSink consumes the complete native stream synchronously into prepared
++// encryption. The reader cannot escape this call or cross a hub/controller
++// transport. On return all reads/writes must have joined; partial output stays
++// under the original reserved copy/cleanup accounting and is never published.
++type GoProfileSink interface {
++	ConsumeGoProfile(context.Context, value.GoProfileRequest, io.Reader) (artifact.Layout, error)
++	// CollectGoProfile takes ownership of this prepared attempt, including on
++	// validation/dial failure, and calls Close after all source work has joined.
++	Close()
++}
++
++type GoProfileCollection struct {
++	Outcome value.GoProfileOutcome
++	Layout  artifact.Layout
++}
++
++type GoProfileCollector interface {
++	CollectGoProfile(context.Context, value.GoProfileRequest, GoProfileSink) (GoProfileCollection, error)
++}
++
++// GoProfileEncodingSink connects the mechanism to the existing versioned
++// evidence encoder. Keys MUST already be wrapped before acquisition starts.
++// It owns one use, including failure. Destination writers receive ciphertext
++// only; they must honor the acquisition context and custody's original bounds.
++// This is not a manifest producer, copy receipt or artifact publication service.
++type GoProfileEncodingSink struct {
++	mu          sync.Mutex
++	request     value.GoProfileRequest
++	encoder     evidence.StorageEncoder
++	data, index io.Writer
++	used        bool
++}
++
++func NewGoProfileEncodingSink(r value.GoProfileRequest, encoder evidence.StorageEncoder, data, index io.Writer) (*GoProfileEncodingSink, error) {
++	if r.Validate(r.NotBefore) != nil || encoder == nil || data == nil || index == nil {
++		return nil, value.ErrInvalid
++	}
++	return &GoProfileEncodingSink{request: r, encoder: encoder, data: data, index: index}, nil
++}
++
++// Close releases prepared primitive references after success, failure or a source
++// that could not be opened. It is not a claim of physical Go heap key erasure.
++func (s *GoProfileEncodingSink) Close() {
++	if s == nil {
++		return
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	s.used = true
++	s.encoder = nil
++	s.data = nil
++	s.index = nil
++}
++
++func (s *GoProfileEncodingSink) ConsumeGoProfile(ctx context.Context, r value.GoProfileRequest, source io.Reader) (artifact.Layout, error) {
++	if s == nil || ctx == nil {
++		return artifact.Layout{}, value.ErrProfileOutput
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.used || s.encoder == nil || s.data == nil || s.index == nil || r != s.request || source == nil || ctx.Err() != nil {
++		return artifact.Layout{}, value.ErrProfileOutput
++	}
++	s.used = true
++	defer func() { s.encoder = nil; s.data = nil; s.index = nil }()
++	dataLimit, indexLimit, err := artifact.WorstCase(r.NativeLimit)
++	if err != nil {
++		return artifact.Layout{}, value.ErrProfileOutput
++	}
++	data := &profileCipherWriter{ctx: ctx, writer: s.data, remaining: dataLimit}
++	index := &profileCipherWriter{ctx: ctx, writer: s.index, remaining: indexLimit}
++	l, err := s.encoder.Encode(ctx, source, data, index, r.NativeLimit)
++	if err != nil || ctx.Err() != nil || l.Validate() != nil || l.Binding != r.Binding || l.NativeBytes < 1 || l.NativeBytes > r.NativeLimit || l.DataBytes != dataLimit-data.remaining || l.IndexBytes != indexLimit-index.remaining {
++		return artifact.Layout{}, value.ErrProfileOutput
++	}
++	return l, nil
++}
++
++type profileCipherWriter struct {
++	ctx       context.Context
++	writer    io.Writer
++	remaining int64
++}
++
++func (w *profileCipherWriter) Write(p []byte) (int, error) {
++	if w.ctx.Err() != nil || int64(len(p)) > w.remaining {
++		return 0, value.ErrProfileOutput
++	}
++	n, err := w.writer.Write(p)
++	if n < 0 || n > len(p) {
++		return 0, value.ErrProfileOutput
++	}
++	w.remaining -= int64(n)
++	if err != nil || n != len(p) || w.ctx.Err() != nil {
++		return n, value.ErrProfileOutput
++	}
++	return n, nil
++}
+--- /dev/null
++++ b/internal/domain/execution/go_profile.go
+@@ -0,0 +1,134 @@
++package execution
++
++import (
++	"errors"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++const (
++	GoProfileMediaType          = "application/octet-stream"
++	DefaultGoProfileBytes int64 = 16 << 20
++	MaximumGoProfileBytes int64 = 64 << 20
++	DefaultGoTraceBytes   int64 = 32 << 20
++	MaximumGoTraceBytes   int64 = 128 << 20
++)
++
++var (
++	ErrProfileUnavailable = errors.New("profile endpoint unavailable")
++	ErrProfilerBusy       = errors.New("application profiler already active")
++	ErrProfileLimit       = errors.New("profile output limit exceeded")
++	ErrProfileOutput      = errors.New("profile encrypted output incomplete")
++)
++
++// GoProfileParameters is the finite HTTP pprof subset of the existing profile
++// action. It cannot enable sampling, change its frequency or select a URL.
++// Defaults belong to preview/planning; execution never silently supplies them.
++type GoProfileParameters struct {
++	Type, Mode string
++	Duration   time.Duration
++	ForceGC    bool
++}
++
++func (p GoProfileParameters) Valid() bool {
++	if p.ForceGC && (p.Type != "heap" || p.Mode != "snapshot") {
++		return false
++	}
++	switch p.Type {
++	case "cpu", "runtimeTrace":
++		limit := 60 * time.Second
++		if p.Type == "runtimeTrace" {
++			limit = 15 * time.Second
++		}
++		return p.Mode == "interval" && p.Duration >= time.Second && p.Duration <= limit && p.Duration%time.Second == 0
++	case "heap", "goroutine":
++		return p.Mode == "snapshot" && p.Duration == 0 || p.Mode == "delta" && validGoDelta(p.Duration)
++	case "allocs", "block", "mutex", "threadcreate":
++		return p.Mode == "cumulative" && p.Duration == 0 || p.Mode == "delta" && validGoDelta(p.Duration)
++	default:
++		return false
++	}
++}
++
++func validGoDelta(d time.Duration) bool {
++	return d >= time.Second && d <= 60*time.Second && d%time.Second == 0
++}
++
++func (p GoProfileParameters) Format() string {
++	if p.Type == "runtimeTrace" {
++		return "go-trace"
++	}
++	return "pprof"
++}
++
++// GoProfileRequest is an already resolved mechanism input, not a public request
++// or authority. The caller must first commit intrusive-action admission, the
++// local start journal, mutually exclusive runtime-domain spend and ciphertext
++// custody. EndpointDigest covers the resolved template, endpoint, credential
++// audience and parameters. Neither changing a delivery ID nor retrying this
++// mechanism may create a new permission to start.
++type GoProfileRequest struct {
++	Binding             artifact.Binding
++	Pin                 artifact.PinnedPod
++	NodeUID, NodeBootID string
++	SourceRef           string
++	EndpointDigest      artifact.Digest
++	Parameters          GoProfileParameters
++	NativeLimit         int64
++	NotBefore, Deadline time.Time
++}
++
++func (r GoProfileRequest) Validate(now time.Time) error {
++	if r.Binding.Validate() != nil || r.Binding.MediaType != GoProfileMediaType || !r.Parameters.Valid() || !identity.Text(r.SourceRef, 63) || r.EndpointDigest == (artifact.Digest{}) {
++		return ErrInvalid
++	}
++	for _, id := range []string{r.Pin.UID, r.Pin.NamespaceUID, r.NodeUID, r.NodeBootID} {
++		if !authorization.UUID(id) {
++			return ErrInvalid
++		}
++	}
++	if r.Pin.ControllerUID != "" && !authorization.UUID(r.Pin.ControllerUID) {
++		return ErrInvalid
++	}
++	if !identity.Text(r.Pin.Namespace, 63) || !identity.Text(r.Pin.Name, 253) || !identity.Text(r.Pin.NodeName, 253) || !canonicalTime(r.NotBefore) || !canonicalTime(r.Deadline) {
++		return ErrInvalid
++	}
++	cap := MaximumGoProfileBytes
++	if r.Parameters.Type == "runtimeTrace" {
++		cap = MaximumGoTraceBytes
++	}
++	// Two seconds of explicit setup/shutdown margin must fit in the original
++	// action interval. Planning may choose more, up to ten seconds. Snapshot
++	// actions have a hard ten-second mechanism ceiling (default remains five).
++	maxInterval := r.Parameters.Duration + 10*time.Second
++	if r.NativeLimit < 1 || r.NativeLimit > cap || r.Deadline.Sub(r.NotBefore) > maxInterval || r.Deadline.Sub(r.NotBefore) < r.Parameters.Duration+2*time.Second {
++		return ErrInvalid
++	}
++	if now.Before(r.NotBefore) || !now.Before(r.Deadline) {
++		return ErrExpired
++	}
++	return nil
++}
++
++// GoProfileCurrent is a fresh observation by the purpose-specific current
++// authority guard. It does not refresh the admitted request, retention anchor,
++// endpoint digest, runtime-domain slot or action deadline.
++type GoProfileCurrent struct{ CheckedAt, ValidUntil time.Time }
++
++func (o GoProfileCurrent) Valid(r GoProfileRequest, now time.Time) bool {
++	return r.Validate(now) == nil && identity.Fresh(o.CheckedAt, o.ValidUntil, now, 5*time.Second) && !o.ValidUntil.After(r.Deadline)
++}
++
++// GoProfileOutcome describes acquisition only. ResponseComplete is neither a
++// valid parsed profile nor custody commit/catalog publication. Process identity,
++// sampling configuration and remote stop remain unknown without independent
++// qualified observations, even after the HTTP body reaches EOF.
++type GoProfileOutcome struct {
++	Format                           string
++	StartedAt, CompletedAt           time.Time
++	MayHaveStarted, ResponseComplete bool
++	NativeBytes                      int64
++}
+--- /dev/null
++++ b/internal/domain/execution/go_profile_test.go
+@@ -0,0 +1,100 @@
++package execution
++
++import (
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++)
++
++func profileRequestForTest() GoProfileRequest {
++	const id = "00000000-0000-4000-8000-000000000001"
++	n := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
++	return GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: GoProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app-0", UID: id, ControllerUID: id, NodeName: "node"}, NodeUID: id, NodeBootID: id, SourceRef: "go-debug", EndpointDigest: artifact.Digest{1}, Parameters: GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: DefaultGoProfileBytes, NotBefore: n, Deadline: n.Add(5 * time.Second)}
++}
++
++func TestGoProfileParametersUseFiniteRuntimeSemantics(t *testing.T) {
++	for _, p := range []GoProfileParameters{
++		{Type: "cpu", Mode: "interval", Duration: 10 * time.Second},
++		{Type: "cpu", Mode: "interval", Duration: 60 * time.Second},
++		{Type: "runtimeTrace", Mode: "interval", Duration: 15 * time.Second},
++		{Type: "heap", Mode: "snapshot"}, {Type: "heap", Mode: "snapshot", ForceGC: true},
++		{Type: "heap", Mode: "delta", Duration: 10 * time.Second},
++		{Type: "goroutine", Mode: "snapshot"}, {Type: "allocs", Mode: "cumulative"},
++		{Type: "threadcreate", Mode: "cumulative"}, {Type: "mutex", Mode: "cumulative"}, {Type: "block", Mode: "delta", Duration: time.Second},
++	} {
++		if !p.Valid() {
++			t.Fatalf("supported: %+v", p)
++		}
++	}
++	for _, p := range []GoProfileParameters{
++		{Type: "cpu", Mode: "interval"}, {Type: "cpu", Mode: "interval", Duration: 61 * time.Second},
++		{Type: "cpu", Mode: "interval", Duration: 1500 * time.Millisecond},
++		{Type: "runtimeTrace", Mode: "interval", Duration: 16 * time.Second},
++		{Type: "heap", Mode: "snapshot", Duration: time.Second},
++		{Type: "heap", Mode: "delta", Duration: time.Second, ForceGC: true},
++		{Type: "mutex", Mode: "cumulative", ForceGC: true},
++		{Type: "cmdline", Mode: "snapshot"}, {Type: "symbol", Mode: "snapshot"},
++		{Type: "goroutineleak", Mode: "snapshot"}, {Type: "cpu", Mode: "ongoing", Duration: time.Second},
++	} {
++		if p.Valid() {
++			t.Fatalf("unsupported became a request: %+v", p)
++		}
++	}
++}
++
++func TestGoProfileRequestRetainsExactNodeAndOriginalBounds(t *testing.T) {
++	r := profileRequestForTest()
++	if err := r.Validate(r.NotBefore); err != nil {
++		t.Fatal(err)
++	}
++	bare := r
++	bare.Pin.ControllerUID = ""
++	if bare.Validate(bare.NotBefore) != nil {
++		t.Fatal("bare Pod lost existing empty-controller semantics")
++	}
++	for name, change := range map[string]func(*GoProfileRequest){
++		"missing-boot":      func(v *GoProfileRequest) { v.NodeBootID = "" },
++		"unbound-source":    func(v *GoProfileRequest) { v.EndpointDigest = artifact.Digest{} },
++		"wrong-native-type": func(v *GoProfileRequest) { v.Binding.MediaType = "application/json" },
++		"oversized":         func(v *GoProfileRequest) { v.NativeLimit = MaximumGoProfileBytes + 1 },
++		"zero-bytes":        func(v *GoProfileRequest) { v.NativeLimit = 0 },
++		"missing-margin": func(v *GoProfileRequest) {
++			v.Parameters = GoProfileParameters{Type: "cpu", Mode: "interval", Duration: 5 * time.Second}
++		},
++		"unbounded-finish": func(v *GoProfileRequest) { v.Deadline = v.NotBefore.Add(time.Minute) },
++	} {
++		t.Run(name, func(t *testing.T) {
++			v := r
++			change(&v)
++			if v.Validate(v.NotBefore) == nil {
++				t.Fatal("invalid acquisition input accepted")
++			}
++		})
++	}
++	if r.Validate(r.Deadline) == nil || r.Validate(r.NotBefore.Add(-time.Microsecond)) == nil {
++		t.Fatal("original interval lost")
++	}
++	r.Parameters = GoProfileParameters{Type: "cpu", Mode: "interval", Duration: 60 * time.Second}
++	r.Deadline = r.NotBefore.Add(65 * time.Second)
++	if r.Validate(r.NotBefore) != nil {
++		t.Fatal("mechanism cannot express separately admitted maximum CPU duration")
++	}
++}
++
++func TestGoProfileObservationNeverExtendsActionDeadline(t *testing.T) {
++	r := profileRequestForTest()
++	o := GoProfileCurrent{CheckedAt: r.NotBefore, ValidUntil: r.Deadline}
++	if !o.Valid(r, r.NotBefore) || o.Valid(r, r.Deadline) {
++		t.Fatal("observation expiry")
++	}
++	o.ValidUntil = o.ValidUntil.Add(time.Microsecond)
++	if o.Valid(r, r.NotBefore) {
++		t.Fatal("current observation extended action")
++	}
++	r.Deadline = r.NotBefore.Add(10 * time.Second)
++	o.ValidUntil = r.NotBefore.Add(6 * time.Second)
++	if o.Valid(r, r.NotBefore) {
++		t.Fatal("observation extended five-second freshness")
++	}
++}
+--- a/specs/profiles.md
++++ b/specs/profiles.md
+@@ -34,7 +34,7 @@
+ 
+ Live profiling MUST be classified as intrusive for approval/budget purposes even if the mechanism is an HTTP GET. Default CPU profile duration 10 seconds, maximum 60 seconds under the administrator ceiling; default trace duration 5 seconds, maximum 15 seconds. Default profile output cap 16 MiB, maximum 64 MiB; default trace output cap 32 MiB, maximum 128 MiB. Snapshot profiles have a 5-second default acquisition deadline. Action deadlines must include setup/shutdown margin beyond timed recording duration.
+ 
+-Do not force GC for a heap profile by default. `forceGC=true`, changes to sample rates, attachment of an external profiler, or starting high-frequency tracing require exact approved parameters. Block/mutex profiles that contain no data because sampling is disabled MUST be distinguished from a valid zero-contention result.
++Do not force GC for a heap profile by default. `forceGC=true`, changes to sample rates, attachment of an external profiler, or starting high-frequency tracing require exact approved parameters. The bounded Go HTTP adapter supports forced GC only for heap snapshots: the standard handler processes `seconds` through its delta path before the GC branch, so `forceGC=true` combined with delta mode is unavailable and must be rejected during capability validation rather than silently ignored. [Go HTTP pprof implementation](https://go.dev/src/net/http/pprof/pprof.go). Block/mutex profiles that contain no data because sampling is disabled MUST be distinguished from a valid zero-contention result.
+ 
+ Only one Asservat CPU/trace recording in a conflicting runtime domain may run at once. If the application already owns an incompatible profiling session, return `ProfilerBusy`; do not stop or overwrite it. Record actual start/stop, requested/observed sampling settings and cancellation outcome. HTTP cancellation does not prove the application stopped profiling, so an uncertain outcome is not automatically retried.
+ 
+@@ -79,3 +79,10 @@
+ A declared port is a routing hint, not proof of its serving process. Within a pod shared networking is intentional; attribute profiles to a process only through a qualified socket/runtime check. Credential profiles must bind the pod's trusted workload identity and endpoint/TLS identity; never rely on a container port declaration as a credential audience. Endpoint ambiguity yields EndpointAmbiguous, with suggested qualified bindings, never a request to add container permissions. An expired baseline is unavailable; the UI offers an authorized compatible retained baseline or a new explicit baseline request and never silently extends retention.
+ 
+ Runtime `profile` acquisition is onTrigger in the initial lifecycle registry, including interval CPU sampling and retrieval of application-owned cumulative counters. The ten-second CPU profile starts at admitted dispatch; it is not a pre-trigger flight recorder. An explicit scheduled baseline is another bounded capture. Adding an Asservat-owned continuous profiling adapter later requires an ongoing lifecycle and qualification; it cannot be inferred from profile.mode or enabled during preview.
++
++The initial [Go acquisition component](../docs/architecture/runtime-profiles.md)
++streams an exact native response into the existing encrypted format. Its current
++observations never renew the original admitted action deadline or permit.
++Profile-specific admission, qualified named node endpoints and semantic
++publication remain prerequisites; this component does not enable a public
++profile capability or widen the pod-status collector.
+--- a/docs/architecture/runtime-profiles.md
++++ b/docs/architecture/runtime-profiles.md
+@@ -43,8 +43,12 @@
+ The mechanism requires at least two seconds of explicitly admitted setup/finish
+ margin, permits at most ten, and does not synthesize defaults. Planning retains
+ the product's ten-second CPU, five-second trace and five-second snapshot defaults.
+-If remaining time no longer fits the requested recording plus margin, do not
+-contact the application. Recording duration, not HTTP/client timeout, sets the
++Before dialing, the fit check uses the original caller/action context deadline.
++After channel resolution it uses the earliest original caller, action and
++channel cutoff for both the socket and final pre-HTTP check. A longer admitted
++action cannot bypass a shorter caller lifetime. If the remaining effective
++interval cannot fit the requested recording plus margin, do not contact the
++application. Recording duration, not HTTP/client timeout, sets the
+ server-side upper request parameter. Cancellation or even complete HTTP EOF
+ does not independently prove the remote profiler stopped. Unknown starts remain
+ spent; the mechanism has no retry, stop-profiler request or capacity-refund path.
+--- a/internal/adapters/diagnostics/go_profile.go
++++ b/internal/adapters/diagnostics/go_profile.go
+@@ -93,7 +93,8 @@
+ 			err = value.ErrExpired
+ 		}
+ 	}()
+-	if !c.now().Add(r.Parameters.Duration + time.Second).Before(r.Deadline) {
++	effectiveDeadline, hasDeadline := ctx.Deadline()
++	if !hasDeadline || !c.now().Add(r.Parameters.Duration+time.Second).Before(effectiveDeadline) {
+ 		return out, value.ErrExpired
+ 	}
+ 	channel, dialErr := c.dialer.DialGoProfile(ctx, r)
+@@ -106,9 +107,14 @@
+ 	if !validProfileChannel(channel) || !c.now().Before(channel.ValidUntil) || channel.ValidUntil.After(r.Deadline) || ctx.Err() != nil || !watch.valid(c.now()) {
+ 		return out, value.ErrDenied
+ 	}
+-	channelDeadline = channel.ValidUntil
+ 	ctx, channelCancel = context.WithDeadline(ctx, channel.ValidUntil)
+-	if err = channel.Connection.SetDeadline(channel.ValidUntil); err != nil {
++	// Preserve the earliest original caller, action and channel cutoff. A
++	// longer channel lifetime cannot make an unfinishable recording admissible.
++	channelDeadline, hasDeadline = ctx.Deadline()
++	if !hasDeadline {
++		return out, value.ErrExpired
++	}
++	if err = channel.Connection.SetDeadline(channelDeadline); err != nil {
+ 		return out, value.ErrProfileUnavailable
+ 	}
+ 	// Interrupt a blocked Read/Write at current-observation loss too, not just
+@@ -148,7 +154,7 @@
+ 	}
+ 	// Dial/setup may have consumed the admitted margin. Do not contact the
+ 	// application unless its fixed requested duration still fits.
+-	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channel.ValidUntil) {
++	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channelDeadline) {
+ 		return out, value.ErrExpired
+ 	}
+ 	out.Outcome = value.GoProfileOutcome{Format: r.Parameters.Format(), StartedAt: c.now().UTC(), MayHaveStarted: true}

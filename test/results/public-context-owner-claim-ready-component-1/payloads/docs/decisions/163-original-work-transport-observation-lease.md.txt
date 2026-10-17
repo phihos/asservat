@@ -1,0 +1,71 @@
+# ADR-163: original-work transport observation lease
+
+Status: accepted for implementation; component and native qualification pending.
+
+ADR-135's private context exchange repeated the complete local process and peer
+observation before every identity frame. The native bare-Pod process adapter
+performs ten requests on one executor REST client and two on its independent
+probe client for each uncontended process observation. Seven identity round
+trips, the post-standby work check and final result/receipt require seventeen
+transport observations. Even a full burst of twenty at the unchanged twenty
+requests per second cannot complete those 170 executor requests in five seconds.
+This excludes additional application process, target, SQL, key and local-start
+work; independent REST clients must not be added into one rate calculation.
+
+The preserved native journey 9 refused the fourth identity round trip at the
+regional `receive-peer/unavailable` boundary, with zero collector calls and a
+4.919341134-second whole public request. That identifies neither the exact
+local source predicate nor a particular limiter refusal. A separate transport
+regression actually reproduced seventeen observations and failure during the
+sixth identity Send under the original five-second, twenty-QPS/twenty-burst
+budget. Its ten-token observations model the enumerated executor graph; it is
+not a native Kubernetes performance measurement.
+
+Keep one transport observation lease inside the original frame stream. The hub
+obtains its complete exact receiver when sending its one work frame. The region
+obtains its complete exact receiver after the passive work frame arrives. The
+setup/standby observation is never reused as this work lease. Retain the original
+observation start, exact immutable channel (root, exchange, challenge, connector
+leaf and both process identities) and earliest observation/caller deadline.
+An already accepted work cannot obtain a replacement lease after expiry or
+failure. There is no background renewal, persisted lease or global cache.
+
+Only correctly ordered identity questions and answers reuse this observation.
+Each question still reaches the original live human `CurrentIdentity`; groups,
+scopes, permission, recovery, retention, process or effect checks are not cached
+by this change. Direction and phase are checked before incoming frame content
+reaches its semantic consumer. A second work frame, premature receipt, unsolicited
+identity response, interleaved result or frame after the terminal receipt fails
+closed. Existing frame, byte, connection and identity-check limits are unchanged.
+
+The regional result Send and hub result Receive each require another complete
+current peer observation, after the preceding blocking application/transport
+work. These checks use the original lease deadline and exact channel. They may
+shorten its end, never replace its start or extend any bound. The terminal receipt
+uses that final, clipped interval. The final human identity check also remains.
+A current negative cannot fall back to the earlier positive observation.
+
+Expiry has a retained cancellation owner even between frames. Known stream/peer
+failure, EOF, original caller/owner cancellation and failed final validation are
+terminal; socket, reader, producer and deadline callbacks are joined before
+release. A late successful producer cannot publish through cancellation. The
+regional runner's independently current preparation, local CAS, capture and
+post-storage checks remain unchanged. An application denial permits no further
+effect; its existing finite unavailable disposition still needs the final full
+peer check. Unknown effects remain spent, without automatic replay or reselection.
+
+This selects bounded transport freshness: an otherwise unobserved remote source
+or registration revocation may remain undiscovered during identity-frame traffic
+until the original lease expires (at most five seconds, usually less). It does
+not promise instantaneous revocation across processes. Known transport negatives
+invalidate immediately, and actual effects still require their existing current
+checks. A lease never authorizes an artifact, decryption, publication or download.
+
+The regional transport graph falls from seventeen full observations to two for
+this seven-round-trip path. This is a structural reduction, not a guaranteed
+five-second end-to-end latency. Aged source intervals, the deployed connector
+proof graph, SQL/key latency and the unmodified effect checks still need actual
+native qualification. No wire format, role, schema, QPS, deadline, public route,
+Helm enablement, activation mode or automatic continuation is added.
+
+Contract: [regional context start](../architecture/regional-context-start.md).

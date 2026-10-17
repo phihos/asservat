@@ -1,0 +1,60 @@
+{
+  "scope": "Owned native owner observation primitive qualified; installed routing, process/TLS/SQL authority and normal background composition remain pending",
+  "manifest": [
+    {
+      "path": "test/integration/owner_observation_operation_native_test.go",
+      "base": null,
+      "payload": "a5b550aed929556ce4c301021827aa88342c304edf2c8bddf735147d593f6617"
+    }
+  ],
+  "componentChecks": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-operation-native-20261013/overlay.json",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 16.206,
+      "changedSources": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-operation-native-20261013/overlay.json",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.469,
+      "changedSources": []
+    }
+  ],
+  "archive": "test/results/owner-operation-native-package",
+  "nativeQualification": {
+    "command": [
+      "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "scripts/test-context-storage.py",
+      "--run",
+      "^TestOwnerObservationOperationWithRealKubernetes$"
+    ],
+    "exit": 0,
+    "harnessSeconds": 477.811,
+    "packageSeconds": 11.995,
+    "testSeconds": 10.93,
+    "passedEntries": 8,
+    "sources": 1964,
+    "sourceUnchangedDuringTest": true,
+    "cleanupFailures": [],
+    "reports": [
+      "owner-operation-native-run.json",
+      "owner-operation-native-test.log",
+      "owner-operation-native-environment.json"
+    ]
+  }
+}

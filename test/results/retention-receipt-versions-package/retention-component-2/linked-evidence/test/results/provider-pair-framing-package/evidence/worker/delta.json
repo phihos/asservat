@@ -1,0 +1,7 @@
+[
+  {
+    "path": "internal/adapters/postgres/configuration_worker_operation.go",
+    "before": "7d314feaf66d76c9f9e563011080ae5fe53b08168ed063328c386de536025a3e",
+    "after": "7c84f4089b57fef315e6dd45b4c7371cd3c86279ff20dd1b31ee6ff66da6b4ee"
+  }
+]

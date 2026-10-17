@@ -1,0 +1,59 @@
+# Launch boundary native qualification candidate
+
+Source-only; not compiled or run. No product source, SQL migration, role grant,
+component deadline, command switch or chart enablement changes.
+
+The candidate contains two existing fixture hooks and two new test helpers.
+`candidate-manifest.json` records the exact original and staged source hashes.
+The parent owns all native labs and integration.
+
+## Actual PostgreSQL matrix
+
+Select with the owned **fleet** harness and `ASSERVAT_INITIAL_INSTALLATION=1`:
+
+`^TestInitialInstallationWithRealServices$/^configuration-runtime-roles-launched-`
+
+Six cases use actual original activation, real SQL role provisioning and the
+concrete launched-inventory adapter: positive repeated read-only replay; missing
+role without recreation; ambient PUBLIC grant denial; changed complete source;
+original deadline under a real held lock; current recovery change after an
+observed PostgreSQL lock wait. Every case preserves original claims, passwords
+and receipts. The test compares only minimized public SQL provenance and OIDs;
+it does not query or log password hashes.
+
+The protected Secret and launched-object proof are synthetic in this matrix.
+They are not evidence that native Kubernetes provisioning has occurred.
+
+## Actual Kubernetes matrix
+
+Select using the owned context harness:
+
+`^TestConfigurationRuntimeLaunchWithRealKubernetes$`
+
+Five cases exercise real namespace/source admission, current administrator and
+non-administrator probes, the concrete source reader, the private Secret journal,
+immutable projection, original inert Deployment and exact zero-to-one CAS.
+The cases are positive launch/replay; lost acknowledged claim reply (no launch);
+lost committed Deployment reply (lookup only); changed actual probe RBAC after
+claim; and missing original projection after launch. Actual ReplicaSet/Pod
+creation and foreground cleanup run while namespace protection remains present.
+
+Provider values and SQL receipts are explicitly synthetic. A fixture scheduling
+gate is part of the original immutable Pod template and prevents image pull or
+execution. This test cannot qualify a product image, an installed hub-worker,
+the original initial-namespace guard bridge, or protected SQL provisioning.
+
+The narrow transport fault wrapper only discards a real successful response or
+performs the stated administrator fixture mutation after a real committed CAS.
+It does not return synthetic success, replace a response body, refresh request
+contexts or retry product writes. Enforcement mutation waits for actual RBAC
+denial only within the original request deadline.
+
+## Next bounded check
+
+After an explicitly granted slot: freeze an immutable overlay against the new
+integrated launch source, compile `./test/integration` with `-run '^$'`, and vet
+that package. Preserve before/after base/payload/dependency hashes and real exit.
+Use `GOMAXPROCS=2`, `GOFLAGS=-p=2`, and the dedicated build TMPDIR. Native verdicts
+remain pending until the parent runs the exact selectors and records unchanged
+sources and joined teardown.

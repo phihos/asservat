@@ -1,0 +1,20 @@
+=== RUN   TestScopedVersionedAuditStorageWithRealServices
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/scoped-concurrent-encrypted-audit
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-latest-replacement-preserves-committed-version
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/configuration
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/owner
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/separate-prefix-and-anonymous-denial
+=== RUN   TestScopedVersionedAuditStorageWithRealServices/separate-multipart-inventory-and-abort
+    scoped_audit_storage_test.go:237: independent upload abort unavailable operation error S3: AbortMultipartUpload, https response error StatusCode: 403, RequestID: 18DDFB9D731253887C55F273, HostID: , api error AccessDenied: Access Denied.
+--- FAIL: TestScopedVersionedAuditStorageWithRealServices (4.14s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/scoped-concurrent-encrypted-audit (4.04s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-latest-replacement-preserves-committed-version (0.01s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure (0.01s)
+        --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/configuration (0.01s)
+        --- PASS: TestScopedVersionedAuditStorageWithRealServices/runtime-cannot-erase-or-reconfigure/owner (0.01s)
+    --- PASS: TestScopedVersionedAuditStorageWithRealServices/separate-prefix-and-anonymous-denial (0.05s)
+    --- FAIL: TestScopedVersionedAuditStorageWithRealServices/separate-multipart-inventory-and-abort (0.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	4.193s
+FAIL

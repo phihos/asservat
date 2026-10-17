@@ -1,0 +1,6 @@
+{
+  "internal/adapters/kubernetes/connector_identity.go": "6373c4b1f2c97aee82770bf78ffef0d07be10b90d675ebc316aa5f40b5913e98",
+  "internal/adapters/kubernetes/connector_process.go": "07864302052bdbd703e94f6f3eeb0a8499ab0ffcb461fbdab378a9dea34498a7",
+  "internal/application/fleet/connector_process.go": "a151db7c0c5c23d9f5d299c895d0f84c64a566fabc08cff2f951e595a053d7d8",
+  "internal/application/fleet/connector_renewal.go": "244c893cfaa027a06107ead85177e0d01e4f313c94bd9117246a38a291696dde"
+}

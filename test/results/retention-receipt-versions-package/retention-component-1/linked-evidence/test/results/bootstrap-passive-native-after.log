@@ -1,0 +1,10 @@
+=== RUN   TestInitialBootstrapPassiveWithRealKubernetes
+=== RUN   TestInitialBootstrapPassiveWithRealKubernetes/locator-replacement-and-removal-denied
+=== RUN   TestInitialBootstrapPassiveWithRealKubernetes/history-update-and-delete-denied
+=== NAME  TestInitialBootstrapPassiveWithRealKubernetes
+    initial_bootstrap_passive_test.go:247: actual native seed/guard/projection, one committed lost create, exact restart and metadata-only replay; SQL manager receipt synthetic, no SQL/provider effects
+--- PASS: TestInitialBootstrapPassiveWithRealKubernetes (31.46s)
+    --- PASS: TestInitialBootstrapPassiveWithRealKubernetes/locator-replacement-and-removal-denied (0.00s)
+    --- PASS: TestInitialBootstrapPassiveWithRealKubernetes/history-update-and-delete-denied (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	32.518s

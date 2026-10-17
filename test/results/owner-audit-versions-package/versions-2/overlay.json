@@ -1,0 +1,19 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/fleet/owner_configuration_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/application/fleet/owner_configuration_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/capture_cleanup_worker.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/bootstrap/capture_cleanup_worker.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/hub_worker.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/bootstrap/hub_worker.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_deployment.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/bootstrap/owner_deployment.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_observation_deployment.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/bootstrap/owner_observation_deployment.go",
+    "/home/phil/Projekte/asservat/internal/domain/audit/owner_configuration.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/domain/audit/owner_configuration.go",
+    "/home/phil/Projekte/asservat/internal/domain/audit/owner_enrollment.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/domain/audit/owner_enrollment.go",
+    "/home/phil/Projekte/asservat/internal/domain/audit/owner_receipt_versions_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/internal/domain/audit/owner_receipt_versions_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_producer_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/capacity_producer_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capture_admission_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/capture_admission_test.go",
+    "/home/phil/Projekte/asservat/test/integration/hub_worker_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/hub_worker_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_audit_history_versions_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/owner_audit_history_versions_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_configuration_sql_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/owner_configuration_sql_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_deployment_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/owner_deployment_test.go",
+    "/home/phil/Projekte/asservat/test/integration/owner_registration_test.go": "/home/phil/.cache/asservat-build/planning/owner-audit-versions-20261013/checks/versions-2/files/test/integration/owner_registration_test.go"
+  }
+}

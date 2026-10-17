@@ -1,0 +1,44 @@
+from pathlib import Path
+import hashlib,json,subprocess,os,time,signal
+live=Path('/home/phil/Projekte/asservat');out=Path(__file__).parent;c=out.parent.parent/'candidate-component-v2'
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(c/'manifest.json')=='c2b4b14a83ad9aa79374be5fac56094af3551a980771bc408bd85c45b0d330f3'
+assert sha(c/'dependencies.json')=='5b42fd41f822a7da7acd3603a7ade83c456ccd35fb6dbfe6b8c08645f4d0805c'
+m=json.loads((c/'manifest.json').read_text())['files'];deps=json.loads((c/'dependencies.json').read_text())
+def inventory():
+ return sorted(subprocess.check_output(['rg','--files','api','cmd','internal','migrations','test/integration','go.mod','go.sum'],cwd=live,text=True).splitlines())
+def verify():
+ return {'payload':[r['path'] for r in m if sha(c/'files'/r['path'])!=r['payload_sha256']], 'base':[r['path'] for r in m if sha(live/r['path'])!=r['base_sha256']], 'dependencies':[p for p,h in deps.items() if sha(live/p)!=h], 'inventory':sorted(set(inventory())^set(deps))}
+r={'manifest':sha(c/'manifest.json'),'dependencies':sha(c/'dependencies.json'),'runner':sha(Path(__file__)),'started':time.time(),'before':verify(),'phases':[]}
+if any(r['before'].values()): raise SystemExit('preflight hash failure')
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(out/'tmp'))
+for k in list(env):
+ if k.startswith('ASSERVAT_'): del env[k]
+code=1
+try:
+ probe=out/'tmp/fsync-probe'
+ with probe.open('xb') as f: f.write(bytes(1048576));f.flush();os.fsync(f.fileno())
+ probe.unlink()
+ phases=[
+ ('compile',['go','test','-vet=off','-overlay',str(c/'overlay.json'),'-run=^$','./internal/contracts','./internal/adapters/providerconfig','./internal/adapters/kubernetes']),
+ ('contracts-provider-race',['go','test','-race','-vet=off','-overlay',str(c/'overlay.json'),'-count=1','-timeout=2m','-v','./internal/contracts','./internal/adapters/providerconfig']),
+ ('worker-race',['go','test','-race','-vet=off','-overlay',str(c/'overlay.json'),'-count=1','-timeout=2m','-v','./internal/adapters/kubernetes','-run=^(TestProviderWorker|TestInstalledWorkerOriginalTemplate|TestInstalledWorkerActivation)']),
+ ('vet',['go','vet','-overlay',str(c/'overlay.json'),'./internal/contracts','./internal/adapters/providerconfig','./internal/adapters/kubernetes'])]
+ for name,cmd in phases:
+  start=time.time();timeout=False
+  with (out/(name+'.log')).open('x') as f:
+   p=subprocess.Popen(cmd,cwd=live,env=env,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
+   try:p.wait(timeout=240)
+   except subprocess.TimeoutExpired:
+    timeout=True;os.killpg(p.pid,signal.SIGTERM)
+    try:p.wait(timeout=10)
+    except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+  entry={'name':name,'command':cmd,'exit':p.returncode,'timed_out':timeout,'seconds':time.time()-start,'log_sha256':sha(out/(name+'.log'))}
+  r['phases'].append(entry);print(json.dumps(entry),flush=True)
+  code=p.returncode if not timeout else 124
+  if code!=0:break
+finally:
+ r.update(exit=code,ended=time.time(),after=verify())
+ with (out/'result.json').open('x') as f:json.dump(r,f,indent=2);f.write('\n')
+ print(json.dumps(r,indent=2),flush=True)
+raise SystemExit(code if not any(r['after'].values()) else 2)

@@ -1,0 +1,5 @@
+--- FAIL: TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline (0.00s)
+    capture_operation_test.go:319: intent acknowledgement continued after original write claim <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.002s
+FAIL

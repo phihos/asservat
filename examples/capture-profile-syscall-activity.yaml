@@ -1,0 +1,73 @@
+apiVersion: asservat.io/v1alpha1
+kind: CaptureProfile
+metadata:
+  name: syscall-activity-v1
+  namespace: asservat-builtin-profiles
+spec:
+  name: syscall-activity
+  version: v1
+  definition:
+    displayName: System calls of all pod processes
+    description: Bounded syscall metadata from all current and new pod processes;
+      no user-memory reads.
+    recipe:
+      description: Bounded syscall metadata from all current and new pod processes;
+        no user-memory reads.
+      actions:
+      - id: syscalls
+        kind: syscallTrace
+        parameters:
+          processes: allPodProcesses
+          mode: metadata
+          before: 30s
+          after: 10s
+          syscalls:
+            mode: all
+          result: all
+          ring:
+            maxAge: 30s
+            maxBytes: 8388608
+            segmentBytes: 2097152
+            maxSegments: 4
+            medium: memory
+          maxFrozenBytes: 16777216
+          maxConcurrentSnapshots: 1
+          maxEvents: 100000
+          maxEventsPerSecond: 10000
+          maxTrackedThreads: 4096
+        required: true
+        impact: observe
+        limits:
+          maxBytes: 16777216
+          timeout: 20s
+        executionMode: ongoing
+      maxTotalBytes: 16777216
+      maxDuration: 30s
+    editableFields:
+    - actionID: syscalls
+      field: syscallFilter
+      label: Syscall names
+    - actionID: syscalls
+      field: syscallBefore
+      label: History window
+    - actionID: syscalls
+      field: syscallAfter
+      label: Next interval
+    - actionID: syscalls
+      field: syscallRing
+      label: Ring allocation
+    - actionID: syscalls
+      field: syscallMaxEvents
+      label: Retained event limit
+    - actionID: syscalls
+      field: syscallRate
+      label: Observed event rate limit
+    - actionID: syscalls
+      field: actionTimeout
+      label: Completion deadline
+    - actionID: syscalls
+      field: actionExecutionMode
+      label: When recording starts
+  availability:
+    enabled: true
+    deprecated: false

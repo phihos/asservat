@@ -1,0 +1,60 @@
+{
+  "status": "source-only; gofmt parsed; no compile/test/native/selector/migration/grant",
+  "files": [
+    {
+      "path": "docs/architecture/owner-configuration.md",
+      "base": "85b815eb4477a4db2e0ea9c466ffc468d13efa95a2ad2b7d9f8ce38bb42e8c4b",
+      "payload": "5a879f7c4485e89fd26a64ab30b8fcedc02de177e25f3827ecf54649feae7cc8"
+    },
+    {
+      "path": "docs/decisions/156-finite-owner-audit-epochs.md",
+      "base": null,
+      "payload": "ce2638e02981a3746e0fbe7135c260671b7361b2bbd664b51267786285980e72"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base": "39b1f5d8bad56692f3129d22e0f787dbfe9fc544f458a8d20e644e98a6cbe43e",
+      "payload": "7b541b44ddaa0d25d85c1458725e4244ed56acf2c43e4fbf05312f996cf5ac77"
+    },
+    {
+      "path": "internal/application/fleet/owner_audit_epoch_ports.go",
+      "base": null,
+      "payload": "b6beefd138e56359a2e59e304731e31c42374667b808711b97ef5995580c4655"
+    },
+    {
+      "path": "internal/domain/audit/owner_configuration_epoch.go",
+      "base": null,
+      "payload": "5f6a5956b3542f42d2757e8d4f80d53bce4167872e707be62dfe229ef3311d23"
+    },
+    {
+      "path": "internal/domain/audit/owner_configuration_epoch_test.go",
+      "base": null,
+      "payload": "3cb96c0d5a6ffc964a65e7af21cf3a2a2152826804666ea4a2cef95f7c0236a4"
+    },
+    {
+      "path": "internal/domain/fleet/owner_audit_epoch.go",
+      "base": null,
+      "payload": "87a735d37690c3945c6e8718ca7a0cde1e2639ed26eb29dbf231fa6acbb02f0b"
+    },
+    {
+      "path": "internal/domain/fleet/owner_audit_epoch_accounting.go",
+      "base": null,
+      "payload": "b0baec9e3e1b08d3faa13ebd22775359b8c8e4f3d08440a61abb5b6624c208b5"
+    },
+    {
+      "path": "internal/domain/fleet/owner_audit_epoch_accounting_test.go",
+      "base": null,
+      "payload": "b6df08d489ffddf8164da8c219c2393e113d83e4974a3e77a26227a96541dbf4"
+    },
+    {
+      "path": "internal/domain/fleet/owner_audit_epoch_observation.go",
+      "base": null,
+      "payload": "931b830363853439b713f58cf2ab4929298b1f84bd3d85fac8069cc8ce14d806"
+    },
+    {
+      "path": "internal/domain/fleet/owner_audit_epoch_test.go",
+      "base": null,
+      "payload": "7352c36f2e58e62ee2005da08977e6d6ec9beb373a256af04669ecb563ab4088"
+    }
+  ]
+}

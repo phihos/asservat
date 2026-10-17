@@ -1,0 +1,25 @@
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/four-standard-logins-and-renewals
+    owner_provider_native_test.go:49: audit-wrap actual standard login+renewal 0.029s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: audit-unwrap actual standard login+renewal 0.010s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: server-sign actual standard login+renewal 0.009s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+    owner_provider_native_test.go:49: client-sign actual standard login+renewal 0.014s; acknowledged lease 298.999s, unchanged issue/hard/JWT bounds
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/first-effects-and-cross-purpose-denials
+    owner_provider_native_test.go:54: real generated four-purpose ACLs permit their first exact Transit/PKI effect and deny every other purpose and token creation; no installed effect authority inferred
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/leased-maintained-effects-and-joined-retirement
+    owner_provider_native_test.go:57: Actual leased Transit binding roundtrip, two purpose-separated verified PKI certificates and four observed self-revocations pass; installation authority remains synthetic.
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/wrong-audience-and-added-policy-denied
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/deleted-original-pod-denies-renewal-fresh-token-logs-in
+    owner_provider_native_test.go:124: old submitted JWT no longer renews; new real Pod/token on the same original SA logs in. This is Pod-deletion behavior, not 600s expiration or installed original-Pod authority.
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/external-reviewer-rotation
+=== RUN   TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/recreated-account-does-not-replace-original-uid
+--- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao (10.41s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/four-standard-logins-and-renewals (0.06s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/first-effects-and-cross-purpose-denials (0.07s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/leased-maintained-effects-and-joined-retirement (0.08s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/wrong-audience-and-added-policy-denied (0.01s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/deleted-original-pod-denies-renewal-fresh-token-logs-in (9.89s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/external-reviewer-rotation (0.06s)
+    --- PASS: TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao/recreated-account-does-not-replace-original-uid (0.03s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kms	11.468s

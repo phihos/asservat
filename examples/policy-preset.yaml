@@ -1,0 +1,16 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: api-failures
+  namespace: payments
+spec:
+  presetRef:
+    name: workload-failure
+    version: v1
+  target:
+    workloadRef:
+      kind: Deployment
+      name: api
+  logPattern:
+    match: literal
+    value: 'panic:'

@@ -1,0 +1,6 @@
+=== RUN   TestProviderCapacityNativeContextSurvivesPhaseReturnWithinOriginalEnd
+    capacity_runtime_invocation_test.go:143: phase completion cancelled native bracket before final acceptance
+--- FAIL: TestProviderCapacityNativeContextSurvivesPhaseReturnWithinOriginalEnd (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.055s
+FAIL

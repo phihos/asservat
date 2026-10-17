@@ -1,0 +1,13 @@
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 238, in <module>
+    raise SystemExit(main(args.test_pattern))
+                     ~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 176, in main
+    output = (ROOT/"test/results/context-storage.log").read_text()
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 788, in read_text
+    return f.read()
+           ~~~~~~^^
+  File "<frozen codecs>", line 325, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb2 in position 5721: invalid start byte

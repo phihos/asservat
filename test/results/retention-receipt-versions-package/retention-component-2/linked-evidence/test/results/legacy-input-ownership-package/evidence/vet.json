@@ -1,0 +1,23 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/overlay.json",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "seconds": 1.805,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  }
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "path": "docs/architecture/download-responses.md",
+    "base": "ceee82c49a81480ddccca892d0eebd38871abcb9b01c25186ca7d746b1487e15",
+    "sha256": "6730d7abaa1f26a36fbd8cff19abf3910b7f6a30f04aaa146b471a5125027f80"
+  },
+  {
+    "path": "internal/application/evidence/download_response_phase_test.go",
+    "base": null,
+    "sha256": "2698ce59fed46f4e68579b8f3f28161ee8d21b01221d32089117c5ea0e5c571d"
+  },
+  {
+    "path": "internal/application/evidence/download_response_test.go",
+    "base": "0456a76267a4130e06577e9358f4320c60eeb171f06ad1797ef40ce1b4ee4fbf",
+    "sha256": "d6019dd8a9fe61d8d3c706edf43803f956ef71f48d27a579f689be291121120d"
+  },
+  {
+    "path": "internal/application/evidence/download_response_transfer.go",
+    "base": "a5271c6df120a37fdc8dc1dd82b787b30ef417ddd56af475bdc0b6468ef4171d",
+    "sha256": "0911738dd8763051db1a02d92b9108941169662bc7dc446a0501cde12b29a75a"
+  },
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "base": "857e53c1ce65f4fed759b085f1cac558a827083150ce14844b2bcdd79ebc189b",
+    "sha256": "53a12b0c6add5426af69a3612202cf21035d62982fa0e95a8df45646c2be0d75"
+  }
+]

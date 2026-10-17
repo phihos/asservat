@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    download_sessions_test.go:381: reserve worker custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (6.15s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-resume (5.02s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.285s
+FAIL

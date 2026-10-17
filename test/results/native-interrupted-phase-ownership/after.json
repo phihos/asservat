@@ -1,0 +1,17 @@
+[
+  {
+    "path": "test/integration/native_exchange_test.go",
+    "sha256": "1dd096e4aa0646beb77fb49c2c79ca04038f9e7bd9a6a3482c8d9df7f91920ce",
+    "after_sha256": "7c55844f7c5f58a00a2a37fccc5ccfa824f0084ddd075b94ee6d5d73f5762c9f"
+  },
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "sha256": "b9c66c1ce4c863881ce9ac30996f12826b692df00d0dbf1dbfe3fda6ce983e21",
+    "after_sha256": "a2dc5ee6f6049151dd5d64a69d0a58e34082d6286eae77bfb0717d1022b19d23"
+  },
+  {
+    "path": "test/integration/context_native_interrupted_test.go",
+    "sha256": "7fea8c036a6d1957b71125893b5bd1308564dce2f3f5be7cf7038cdc298cbe66",
+    "after_sha256": "322cec1df70483c649023acc06c6ce2178e4ad4afdc95969b2f6f3bb5a052841"
+  }
+]

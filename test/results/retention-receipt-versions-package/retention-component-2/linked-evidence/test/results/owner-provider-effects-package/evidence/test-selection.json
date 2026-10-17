@@ -1,0 +1,37 @@
+{
+  "top_level_passes": 28,
+  "passed": [
+    "TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor",
+    "TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation",
+    "TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority",
+    "TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd",
+    "TestOwnerProviderUnverifiedJWTOnlyShortensReauthenticationScheduling",
+    "TestOwnerProviderControlCannotInheritTLSBypassHooks",
+    "TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential",
+    "TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure",
+    "TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure",
+    "TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath",
+    "TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow",
+    "TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning",
+    "TestOwnerProviderLeaseExpiresDuringActualTLSBody",
+    "TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins",
+    "TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd",
+    "TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential",
+    "TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline",
+    "TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup",
+    "TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken",
+    "TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication",
+    "TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow",
+    "TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath",
+    "TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned",
+    "TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining",
+    "TestOwnerProviderRecipeHasOnlyFourSeparatedEffects",
+    "TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope",
+    "TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration",
+    "TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes"
+  ],
+  "skipped": [
+    "TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao"
+  ],
+  "result_sha256": "0c9e93b6a634b3800ed3845095ff97e154c6dceef9673cbb8a6bb56f69e797dd"
+}

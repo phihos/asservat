@@ -1,0 +1,25 @@
+--- FAIL: TestNoEvidenceLookupBeforeCurrentEligibility (0.00s)
+    --- FAIL: TestNoEvidenceLookupBeforeCurrentEligibility/no_entitlement (0.00s)
+        eligibility_test.go:26: forbidden lookup: eligible=false reads=1
+    --- FAIL: TestNoEvidenceLookupBeforeCurrentEligibility/unknown_denies (0.00s)
+        eligibility_test.go:26: forbidden lookup: eligible=false reads=1
+    --- FAIL: TestNoEvidenceLookupBeforeCurrentEligibility/missing_scope (0.00s)
+        eligibility_test.go:26: forbidden lookup: eligible=false reads=1
+    --- FAIL: TestNoEvidenceLookupBeforeCurrentEligibility/explicit_deny (0.00s)
+        eligibility_test.go:26: forbidden lookup: eligible=false reads=1
+FAIL
+FAIL	asservat.local/asservat/internal/application/authorization	0.006s
+--- FAIL: TestAccessTokenIdentity (0.05s)
+    --- FAIL: TestAccessTokenIdentity/at+JWT (0.00s)
+        access_test.go:131: valid access token: invalid identity input
+--- FAIL: TestRejectTokenConfusionAndMalformedClaims (0.15s)
+    --- FAIL: TestRejectTokenConfusionAndMalformedClaims/missing_group_assertion (0.01s)
+        access_test.go:187: invalid token accepted
+    access_test.go:216: untrusted token selected a network request
+2026/10/09 23:49:28 http: TLS handshake error from 127.0.0.1:58976: remote error: tls: bad certificate
+--- FAIL: TestJWKSAndEndpointBounds (0.95s)
+    --- FAIL: TestJWKSAndEndpointBounds/key_operations (0.04s)
+        access_test.go:322: invalid key publication accepted
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/oidc	1.428s
+FAIL

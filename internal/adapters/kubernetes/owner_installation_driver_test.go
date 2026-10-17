@@ -1,0 +1,213 @@
+package kubernetes
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+)
+
+func TestProviderOwnerInstallationRunsFiniteOriginalSequence(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err != nil || !out.Complete || out.Stop != "" || out.Phase != "launch-receipt" || out.Calls != 30 || out.Finalizations != 8 || out.Inspections != 0 || out.RoleRootUID == "" || out.ResourceRootUID == "" || out.OperationID == "" {
+		t.Fatal("finite original installation", out, err)
+	}
+	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 {
+		t.Fatal("fixed effect inventory changed")
+	}
+	before := f.journalWrites.Load()
+	if again, err := driver.Run(context.Background()); err == nil || again.Stop != OwnerInstallationClosed || f.journalWrites.Load() != before {
+		t.Fatal("same invocation restarted", again, err)
+	}
+}
+
+func TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	f.roles.beforeCurrent = func() { f.fault.Store(6) }
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err == nil || out.Complete || out.Stop != OwnerInstallationSpent || out.Calls != 2 || out.Inspections != 0 || out.OperationID == "" {
+		t.Fatal("spent-before-effect disposition", out, err)
+	}
+	if f.roles.creates != 0 || f.journalWrites.Load() != 0 {
+		t.Fatal("stopped driver continued")
+	}
+}
+
+func TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	f.roles.loseEffect = true
+	// Later credential CREATE also loses its reply. The already consumed global
+	// inspection allowance must stop immediately instead of polling that object.
+	f.lose.Store(1)
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(driver.Close)
+	out, err := driver.Run(context.Background())
+	if err == nil || out.Complete || out.Stop != OwnerInstallationUnverified || out.Inspections != 1 || out.Phase != "projection" || out.Calls != 18 {
+		t.Fatal("global inspection cap", out, err)
+	}
+	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || f.creates[0].Load() != 1 || f.creates[1].Load() != 0 || f.launches.Load() != 0 {
+		t.Fatal("unknown result repeated or continued creation")
+	}
+}
+
+func TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork(t *testing.T) {
+	f := newOwnerProjectionOperationPreparedFixture(t, false)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	f.roles.beforeCurrent = func() { close(entered); <-release }
+	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan struct{})
+	go func() { defer close(finished); _, _ = driver.Run(context.Background()) }()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("driver never admitted SQL/native phase")
+	}
+	closed := make(chan struct{})
+	go func() { driver.Close(); close(closed) }()
+	select {
+	case <-closed:
+		t.Fatal("Close returned before admitted native work joined")
+	case <-time.After(20 * time.Millisecond):
+	}
+	unblock()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close failed to join")
+	}
+	<-finished
+	if f.roles.creates != 0 {
+		t.Fatal("cancelled phase reached CREATE")
+	}
+}
+
+// The wrapper changes only cancellation callback joining, not authority values,
+// deadlines or the native graph. Its first subscription is the driver's outer
+// provider borrow; all inner operation subscriptions stop normally.
+type ownerInstallationDelayedJoin struct {
+	context.Context
+	mu      sync.Mutex
+	first   bool
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *ownerInstallationDelayedJoin) Value(any) any { return nil }
+func (s *ownerInstallationDelayedJoin) AfterFunc(f func()) func() bool {
+	s.mu.Lock()
+	first := !s.first
+	s.first = true
+	s.mu.Unlock()
+	stop := context.AfterFunc(s.Context, f)
+	return func() bool {
+		if first {
+			close(s.entered)
+			<-s.release
+		}
+		return stop()
+	}
+}
+func TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete(t *testing.T) {
+	for _, mode := range []string{"caller", "driver", "root"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newOwnerProjectionOperationPreparedFixture(t, false)
+			blocked := &ownerInstallationDelayedJoin{Context: f.root.ctx, entered: make(chan struct{}), release: make(chan struct{})}
+			f.root.ctx = blocked
+			var once sync.Once
+			unblock := func() { once.Do(func() { close(blocked.release) }) }
+			defer unblock()
+			driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			caller, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			type outcome struct {
+				result OwnerInstallationResult
+				err    error
+			}
+			done, joined := make(chan outcome, 1), make(chan struct{})
+			go func() { defer close(joined); result, err := driver.Run(caller); done <- outcome{result, err} }()
+			var closing chan struct{}
+			defer func() {
+				cancel()
+				unblock()
+				<-joined
+				if closing != nil {
+					<-closing
+				}
+				driver.Close()
+			}()
+			// This watchdog covers all 30 sequential calls, each of which keeps
+			// its original at-most-five-second operation budget. It does not
+			// change any caller, root, claim, effect or authority deadline.
+			sequenceWatchdog := time.NewTimer(30 * 5 * time.Second)
+			defer sequenceWatchdog.Stop()
+			select {
+			case <-blocked.entered:
+			case out := <-done:
+				t.Fatal("driver returned before outer cleanup barrier", out.result, out.err)
+			case <-sequenceWatchdog.C:
+				t.Fatal("outer join was not reached after bounded complete sequence")
+			}
+			// An earlier production refusal also releases the outer borrow.
+			// Require the complete positively finalized launch and all fixed
+			// effects before introducing cancellation, so that refusal cannot
+			// satisfy this regression. The entered channel orders these reads
+			// after the sequence, whose goroutine is blocked in outer cleanup.
+			verified := f.projection.lastVerified
+			if f.projection.pending != nil || verified == nil || verified.resources.State.OwnerIdentity == nil || verified.resources.State.OwnerIdentity.Receipt == nil || verified.resources.State.OwnerLaunch == nil || verified.resources.State.OwnerLaunch.Receipt == nil || f.verification.finalizations != 8 || f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || projectionEffectCounts(f) != [4]int32{8, 1, 1, 1} {
+				unblock()
+				select {
+				case out := <-done:
+					t.Fatal("outer cleanup preceded complete positive sequence", out.result, out.err)
+				case <-time.After(5 * time.Second):
+					t.Fatal("early refusal did not finish outer cleanup")
+				}
+			}
+			switch mode {
+			case "caller":
+				cancel()
+			case "driver":
+				closing = make(chan struct{})
+				go func() { driver.Close(); close(closing) }()
+				<-driver.ctx.Done()
+			case "root":
+				closing = make(chan struct{})
+				go func() { f.root.Close(); close(closing) }()
+				<-f.root.ctx.Done()
+			}
+			unblock()
+			select {
+			case out := <-done:
+				if out.err == nil || out.result.Complete || out.result.Stop != OwnerInstallationCancelled || out.result.Phase != "launch-receipt" || out.result.Calls != 30 || out.result.Finalizations != 8 || out.result.Inspections != 0 || out.result.RoleRootUID == "" || out.result.ResourceRootUID == "" || out.result.OperationID == "" {
+					t.Fatal("cleanup cancellation changed the completed sequence or returned complete", out.result, out.err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("driver did not join")
+			}
+		})
+	}
+}

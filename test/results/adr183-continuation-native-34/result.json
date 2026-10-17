@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-34",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass with ADR-190 step 7's owner composition. The continuation set Observation.LocalCapacity (selector guard pin, keys, probe namespace and account, probe audience and the hub-worker caller pin) after InitializeCapacity. The owner launched with it and reached a running process: the local capacity observation factory, probe token minting and caller admission composed without failure at startup. Bootstrap hook replay and the second continuation passed. Subtest 505.7 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; synthetic operator capacity profile. Startup composition only: no request reached the local observation path, and there is no capacity projection, ReadyAt or audit profile read yet. No public workflow.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

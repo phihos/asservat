@@ -1,0 +1,391 @@
+=== RUN   TestOwnerPoolNativeCandidateLimitIsExplicitAndLegacyOmitted
+--- PASS: TestOwnerPoolNativeCandidateLimitIsExplicitAndLegacyOmitted (0.00s)
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/duplicate-process
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/wrong-pod
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/empty-ready
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/renewed-sql
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/pre-sql
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/unopted
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/dropped-process
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/invented-process
+=== RUN   TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/missing-version
+--- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/duplicate-process (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/wrong-pod (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/empty-ready (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/renewed-sql (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/pre-sql (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/unopted (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/dropped-process (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/invented-process (0.00s)
+    --- PASS: TestOwnerObservationReadyGroupsRetainCompleteOriginalMembers/missing-version (0.00s)
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/legacy16
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/legacy17
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted17
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted-overflow
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/retained-ceiling
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/over-ceiling
+=== RUN   TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/invalid-installed-limit
+--- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess (0.01s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/legacy16 (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/legacy17 (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted17 (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/opted-overflow (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/retained-ceiling (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/over-ceiling (0.00s)
+    --- PASS: TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess/invalid-installed-limit (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.013s
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy-error
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted-error
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy-overflow
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted-overflow
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/changed-pool
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/changed-limit
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/cancelled
+=== RUN   TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/cancel-during-read
+--- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy-error (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted-error (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/legacy-overflow (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/opted-overflow (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/changed-pool (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/changed-limit (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/cancelled (0.00s)
+    --- PASS: TestOwnerObservationCandidateSelectionKeepsOriginalProfileAndNeverFallsBack/cancel-during-read (0.00s)
+=== RUN   TestOwnerObservationCandidateSelectionRequiresTypedSourceAndOriginalPool
+--- PASS: TestOwnerObservationCandidateSelectionRequiresTypedSourceAndOriginalPool (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.008s
+=== RUN   TestOwnerEndpointBoundedDiscovery
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-selector
+=== RUN   TestOwnerEndpointBoundedDiscovery/terminating
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-protocol
+=== RUN   TestOwnerEndpointBoundedDiscovery/legacy-owner-alias
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-controller
+=== RUN   TestOwnerEndpointBoundedDiscovery/continuation-loop
+=== RUN   TestOwnerEndpointBoundedDiscovery/valid
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-missing
+=== RUN   TestOwnerEndpointBoundedDiscovery/too-many-endpoints
+=== RUN   TestOwnerEndpointBoundedDiscovery/expired-observation
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-duplicate
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-unknown-protocol
+=== RUN   TestOwnerEndpointBoundedDiscovery/not-serving
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-unopted
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-target-version
+=== RUN   TestOwnerEndpointBoundedDiscovery/replacement-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-family
+=== RUN   TestOwnerEndpointBoundedDiscovery/changed-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-duplicate
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-extra
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-reordered
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-wrong-native-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-slice-number
+=== RUN   TestOwnerEndpointBoundedDiscovery/two-controllers
+=== RUN   TestOwnerEndpointBoundedDiscovery/deleted-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-ip
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-missing
+=== RUN   TestOwnerEndpointBoundedDiscovery/missing-controller
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-slice-owner
+=== RUN   TestOwnerEndpointBoundedDiscovery/missing-pod
+=== RUN   TestOwnerEndpointBoundedDiscovery/unavailable
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-target
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-namespace
+=== RUN   TestOwnerEndpointBoundedDiscovery/host-network
+=== RUN   TestOwnerEndpointBoundedDiscovery/loopback
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-account
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-deployment
+=== RUN   TestOwnerEndpointBoundedDiscovery/manual-slice
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-wrong-owner-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-number
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-node
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-unknown-profile
+=== RUN   TestOwnerEndpointBoundedDiscovery/dual-stack
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-pod-account
+=== RUN   TestOwnerEndpointBoundedDiscovery/unknown-readiness
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-service-extra
+=== RUN   TestOwnerEndpointBoundedDiscovery/foreign-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/wrong-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/installed-owner
+=== RUN   TestOwnerEndpointBoundedDiscovery/omitted-target-version
+=== RUN   TestOwnerEndpointBoundedDiscovery/duplicate-observation
+=== RUN   TestOwnerEndpointBoundedDiscovery/replacement-replicaset
+=== RUN   TestOwnerEndpointBoundedDiscovery/external-service
+=== RUN   TestOwnerEndpointBoundedDiscovery/named-port
+=== RUN   TestOwnerEndpointBoundedDiscovery/not-ready
+=== RUN   TestOwnerEndpointBoundedDiscovery/publish-not-ready
+=== RUN   TestOwnerEndpointBoundedDiscovery/too-many-slices
+=== RUN   TestOwnerEndpointBoundedDiscovery/changed-pod
+--- PASS: TestOwnerEndpointBoundedDiscovery (2.50s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-selector (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/terminating (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-protocol (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/legacy-owner-alias (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-controller (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/continuation-loop (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/valid (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-missing (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/too-many-endpoints (0.10s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/expired-observation (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-duplicate (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-unknown-protocol (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/not-serving (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-unopted (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-target-version (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/replacement-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-family (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/changed-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-duplicate (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-extra (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-reordered (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-wrong-native-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-slice-number (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/two-controllers (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/deleted-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-ip (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-missing (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/missing-controller (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-slice-owner (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/missing-pod (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/unavailable (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-target (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-namespace (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/host-network (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/loopback (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-account (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-deployment (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/manual-slice (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-wrong-owner-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-number (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-node (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-unknown-profile (0.03s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/dual-stack (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-pod-account (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/unknown-readiness (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-service-extra (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/foreign-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/wrong-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/installed-owner (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/omitted-target-version (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/duplicate-observation (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/replacement-replicaset (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/external-service (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/named-port (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/not-ready (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/publish-not-ready (0.04s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/too-many-slices (0.05s)
+    --- PASS: TestOwnerEndpointBoundedDiscovery/changed-pod (0.04s)
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/one-ready-many-processes
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/retained-ceiling
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/dead-retained-pod
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/known-unready-other-pod
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/two-pages
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/empty-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/nil-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/inconsistent-ready
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-list-version
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cycle
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-list
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-service
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-service
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/foreign-namespace
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-port
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-endpoint
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/missing-list-version
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/slice-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/endpoint-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cursor-overflow
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-original-sql
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-final-namespace
+=== RUN   TestOwnerObservationCandidateReadyIntersectionOneCompleteList/original-caller-bound
+--- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList (1.13s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/one-ready-many-processes (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/retained-ceiling (0.05s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/dead-retained-pod (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/known-unready-other-pod (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/two-pages (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/empty-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/nil-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/inconsistent-ready (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-list-version (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cycle (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-list (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-service (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/changed-service (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/foreign-namespace (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/wrong-port (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/unknown-endpoint (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/missing-list-version (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/slice-overflow (0.06s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/endpoint-overflow (0.11s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/cursor-overflow (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-original-sql (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/expired-final-namespace (0.04s)
+    --- PASS: TestOwnerObservationCandidateReadyIntersectionOneCompleteList/original-caller-bound (0.13s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	4.681s
+=== RUN   TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof
+=== RUN   TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/four-fresh-reads
+=== RUN   TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/unavailable-second-read
+=== RUN   TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/changed-limit-second-read
+--- PASS: TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof (0.12s)
+    --- PASS: TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/four-fresh-reads (0.06s)
+    --- PASS: TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/unavailable-second-read (0.03s)
+    --- PASS: TestConnectorObservationChannelSelectsCompleteOriginalCandidatesOnEveryProof/changed-limit-second-read (0.03s)
+=== RUN   TestConnectorObservationChannelRejectsAnotherOriginalCandidateSelection
+--- PASS: TestConnectorObservationChannelRejectsAnotherOriginalCandidateSelection (0.02s)
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close
+=== RUN   TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed
+--- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner (0.12s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/fresh (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/revoked (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/missing (0.02s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/near-close (0.03s)
+    --- PASS: TestConnectorObservationChannelDelayedAttachNeedsFreshSameOwner/closed (0.02s)
+=== RUN   TestConnectorObservationChannelRequiresAllProofsAndExactReceipt
+--- PASS: TestConnectorObservationChannelRequiresAllProofsAndExactReceipt (0.05s)
+=== RUN   TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof
+--- PASS: TestConnectorObservationChannelDoesNotAdmitMetadataFromOneProof (0.03s)
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result
+=== RUN   TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close
+--- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases (0.27s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-channel (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/wrong-owner (0.02s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-request (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/proof-replay (0.03s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/metadata-replay (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/changed-receipt (0.05s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/registry-revoked-after-result (0.04s)
+    --- PASS: TestConnectorObservationChannelRejectsCopiedChangedAndRepeatedPhases/known-local-close (0.05s)
+=== RUN   TestConnectorObservationChannelCloseJoinsAdmittedMetadata
+--- PASS: TestConnectorObservationChannelCloseJoinsAdmittedMetadata (0.03s)
+=== RUN   TestConnectorObservationChannelPreservesSerializedOriginalInstants
+--- PASS: TestConnectorObservationChannelPreservesSerializedOriginalInstants (0.04s)
+=== RUN   TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot
+--- PASS: TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot (0.03s)
+=== RUN   TestConnectorObservationStreamCloseJoinsAdmittedNativeProof
+--- PASS: TestConnectorObservationStreamCloseJoinsAdmittedNativeProof (0.03s)
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media
+--- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed (0.12s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media (0.03s)
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name
+2026/10/13 04:39:11 http: TLS handshake error from 127.0.0.1:41776: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots
+2026/10/13 04:39:11 http: TLS handshake error from 127.0.0.1:42664: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate
+--- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate (0.11s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate (0.03s)
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello
+--- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello (0.84s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers (0.42s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello (0.42s)
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3
+--- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner (0.12s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3 (0.03s)
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof
+--- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF (3.18s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof (3.02s)
+=== RUN   TestOwnerObservationBootstrapUsesCompleteOptedCandidateBound
+--- PASS: TestOwnerObservationBootstrapUsesCompleteOptedCandidateBound (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	6.156s
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/valid
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/short-original
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/candidate-exclusion
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:35602: read tcp 127.0.0.1:38697->127.0.0.1:35602: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/wrong-common-name
+2026/10/13 04:39:14 http: TLS handshake error from 127.0.0.1:41548: remote error: tls: bad certificate
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/registry-denial
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:50250: read tcp 127.0.0.1:44177->127.0.0.1:50250: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/wrong-source
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:36514: read tcp 127.0.0.1:46309->127.0.0.1:36514: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/not-ready
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:57624: read tcp 127.0.0.1:43105->127.0.0.1:57624: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/wrong-guard
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:57620: read tcp 127.0.0.1:35601->127.0.0.1:57620: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/wrong-template
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:51428: read tcp 127.0.0.1:40121->127.0.0.1:51428: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/expired-before-token
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:52076: read tcp 127.0.0.1:45463->127.0.0.1:52076: read: connection reset by peer
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/revoked-after-response
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/source-revision-during-response
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/wrong-result
+=== RUN   TestInstalledObservationClientAuthenticatesBeforeToken/unknown-response
+--- PASS: TestInstalledObservationClientAuthenticatesBeforeToken (0.18s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/valid (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/short-original (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/candidate-exclusion (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/wrong-common-name (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/registry-denial (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/wrong-source (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/not-ready (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/wrong-guard (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/wrong-template (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/expired-before-token (0.08s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/revoked-after-response (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/source-revision-during-response (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/wrong-result (0.01s)
+    --- PASS: TestInstalledObservationClientAuthenticatesBeforeToken/unknown-response (0.01s)
+=== RUN   TestInstalledObservationClientCloseJoinsSelectedProof
+2026/10/13 04:39:14 http2: server: error reading preface from client 127.0.0.1:45186: read tcp 127.0.0.1:34373->127.0.0.1:45186: read: connection reset by peer
+--- PASS: TestInstalledObservationClientCloseJoinsSelectedProof (0.03s)
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/valid
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/opted-valid
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/opted-unavailable
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/opted-changed-limit
+=== RUN   TestInstalledObservationClientSelectsOriginalCandidateReader/opted-overflow
+--- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader (0.03s)
+    --- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader/valid (0.01s)
+    --- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader/opted-valid (0.01s)
+    --- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader/opted-unavailable (0.00s)
+    --- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader/opted-changed-limit (0.00s)
+    --- PASS: TestInstalledObservationClientSelectsOriginalCandidateReader/opted-overflow (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.290s

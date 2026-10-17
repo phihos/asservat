@@ -1,0 +1,5 @@
+--- FAIL: TestInitialProviderRoleOnlyChildCap (0.00s)
+    initial_provider_role_cap_test.go:31: qualified role-only child rejected key service refused or unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.011s
+FAIL

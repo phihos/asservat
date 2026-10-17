@@ -1,0 +1,13 @@
+=== RUN   TestNativeFixtureConnectorIssuerOriginalSigningInstant
+=== RUN   TestNativeFixtureConnectorIssuerOriginalSigningInstant/client
+    enrollment_test.go:105: issuer original-age=3.001679824s remaining=1.998319675s leaf-after-original=true domain-matches=false verified=false
+    enrollment_test.go:107: BEFORE-FIXTURE-ISSUER-ORIGINAL-INSTANT: delayed signing did not retain original checked instant
+=== RUN   TestNativeFixtureConnectorIssuerOriginalSigningInstant/server
+    enrollment_test.go:105: issuer original-age=3.001624398s remaining=1.998375142s leaf-after-original=true domain-matches=false verified=false
+    enrollment_test.go:107: BEFORE-FIXTURE-ISSUER-ORIGINAL-INSTANT: delayed signing did not retain original checked instant
+--- FAIL: TestNativeFixtureConnectorIssuerOriginalSigningInstant (0.01s)
+    --- FAIL: TestNativeFixtureConnectorIssuerOriginalSigningInstant/client (0.00s)
+    --- FAIL: TestNativeFixtureConnectorIssuerOriginalSigningInstant/server (0.00s)
+FAIL
+FAIL	command-line-arguments	0.056s
+FAIL

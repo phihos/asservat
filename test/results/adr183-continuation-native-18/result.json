@@ -1,0 +1,14 @@
+{
+  "name": "adr183-continuation-native-18",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices", "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files", "TestInitialBootstrapChainWithRealServices/installer-continuation", "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"],
+  "result": "Native pass of the extended continuation with ADR-184 steps 1-4/6, ADR-185 steps 1-4 and ADR-186, using only product commands, the actual applier and operator prerequisites: provider-installed workload guard with eight probes (five owner-account public-source probes, bridge proves three); worker roles, inputs and launch; ADR-185 public sources (browser and identity settings, empty cluster catalog with its guard); all 66 public runtime roles provisioned under operation-scoped proofs and the public runtime projection verified and published in one role operation; six owner identity roles (with routing and native-read), owner selection, provider artifact and applier, projection and launch. Both the worker and the owner run on the compiled image; the owner passes its provider proof and priming. Subtest 435.8 s inside the original 30-minute window.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; synthetic public settings. The launched owner is observation-only (no Native/Public input yet, ADR-184 steps 5/7/8). No public workflow, rerun-after-bridge or helm upgrade replay claim.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

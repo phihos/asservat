@@ -1,0 +1,5 @@
+--- FAIL: TestNativeServeDeliversPositiveIdleBeforeClosingSocket (0.02s)
+    server_idle_test.go:71: attempt 1: positive idle lost across actual listener: native exchange unavailable (admission calls 1)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	0.119s
+FAIL

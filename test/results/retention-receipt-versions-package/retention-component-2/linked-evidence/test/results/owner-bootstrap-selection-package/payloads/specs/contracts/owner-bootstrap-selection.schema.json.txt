@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-bootstrap-selection.schema.json",
+  "title": "Original public owner bootstrap selection",
+  "description": "One fixed immutable ConfigMap child, <=256KiB aggregate. Initial1..16 logical peers only; separate later enrollment extends the fleet without replaying initial activation. Allocated IDs are not permission streams, live peers, SQL49 activation or recovery authority. Exact compact claim/child receipt remains in the original32KiB resource journal. Relational validation enforces same original issuer, ordered roots, distinct generated identities and original deadlines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "initialFormat",
+    "installationID",
+    "controlClusterID",
+    "issuerEpoch",
+    "namespace",
+    "resources",
+    "resourceSetupID",
+    "resourceBinding",
+    "operationID",
+    "permissionRootID",
+    "pkiMount",
+    "connections",
+    "concurrency",
+    "peers"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-owner-bootstrap-selection/v1"
+    },
+    "initialFormat": {
+      "enum": [
+        "asservat-initial-installer/v1",
+        "asservat-initial-installer/v2"
+      ]
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "controlClusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "issuerEpoch": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/namespace"
+    },
+    "resources": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/namespace"
+    },
+    "resourceSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "resourceBinding": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "permissionRootID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "pkiMount": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+    },
+    "connections": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "peers": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/observation/properties/peers"
+    }
+  },
+  "$defs": {
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "pkiMount",
+        "connections",
+        "concurrency",
+        "peers"
+      ],
+      "properties": {
+        "format": {
+          "const": "asservat-owner-bootstrap-plan/v1"
+        },
+        "pkiMount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+        },
+        "connections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "peers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "clusterID",
+              "roots"
+            ],
+            "properties": {
+              "clusterID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "roots": {
+                "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes/properties/roots"
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuerEpoch",
+        "operationID",
+        "permissionRootID",
+        "pkiMount",
+        "connections",
+        "concurrency",
+        "peers",
+        "publicDigest",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "issuerEpoch": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "permissionRootID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "pkiMount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+        },
+        "connections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "peers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/owner-bootstrap-selection.schema.json#/$defs/allocation"
+          },
+          "uniqueItems": true
+        },
+        "publicDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "not": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "child": {
+          "$ref": "https://asservat.io/spec/v1/owner-bootstrap-selection.schema.json#/$defs/attempt"
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt": {
+          "$ref": "https://asservat.io/spec/v1/owner-bootstrap-selection.schema.json#/$defs/receipt"
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "object": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/namespace"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "allocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clusterID",
+        "peerID",
+        "rootsDigest"
+      ],
+      "properties": {
+        "clusterID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "peerID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "rootsDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "not": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      }
+    }
+  }
+}

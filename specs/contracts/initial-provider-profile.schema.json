@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-provider-profile.schema.json",
+  "title": "Protected initial provider profile",
+  "description": "Finite JSON ACL profile for original short-lived OpenBao issuer and two separate audit purpose roles. Existing role/ACLs and immutable material are protected managed-provider inputs; no retry, provider root or external S3 issuance authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "material",
+    "issuerPolicy",
+    "wrapRole",
+    "wrapPolicy",
+    "unwrapRole",
+    "unwrapPolicy"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-provider-profile/v1"
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "issuerPolicy": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    },
+    "wrapRole": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    },
+    "wrapPolicy": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    },
+    "unwrapRole": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    },
+    "unwrapPolicy": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "not": {
+        "enum": [
+          "root",
+          "default"
+        ]
+      }
+    }
+  }
+}

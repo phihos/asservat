@@ -1,0 +1,17 @@
+{
+  "source_handles": [
+    "opaque-source-handle"
+  ],
+  "projection": "syscallMetadata",
+  "display_filter": {
+    "all": [
+      {
+        "field": "error",
+        "op": "eq",
+        "value": true
+      }
+    ]
+  },
+  "duration_seconds": 600,
+  "idempotency_key": "live-open-20261009-01"
+}

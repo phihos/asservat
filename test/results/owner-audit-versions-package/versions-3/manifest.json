@@ -1,0 +1,92 @@
+[
+  {
+    "path": "docs/architecture/owner-configuration.md",
+    "base_sha256": "fb31519376fe11a6c8f5148f269e591a55a232525d8032b7527746bd3af03384",
+    "payload_sha256": "274592ae78104b6aeb6a6a3543a71f6e1738edae54b38aee2a545f02b56b0cce"
+  },
+  {
+    "path": "docs/architecture/owner-deployment.md",
+    "base_sha256": "3b7073139765750f2deb46d2a5503cfdc943f89fce88d98562f25e8bd7a0aaaf",
+    "payload_sha256": "345cec3cbd0d5885bf38ce6799d64510240217409ca550f08f31fcf0bd17a4ad"
+  },
+  {
+    "path": "docs/architecture/owner-registration.md",
+    "base_sha256": "e599ba51428b7921bcb0d4a4a7437be3c5b98c552a7cf1b76a3317a1c018cb58",
+    "payload_sha256": "b2688559fa2453bc831089e4d1e259b6ec8f27c982524e4785bbb4b142167187"
+  },
+  {
+    "path": "internal/application/fleet/owner_configuration_test.go",
+    "base_sha256": "db48ae1cf5f1c1ec5fa696e9fcb09bc28d368a8cc695edc72a92cc09fd74e9c1",
+    "payload_sha256": "a602826388fdead719089c38aa747931a52d2014e4bf7a00888cf0d70cbc96c8"
+  },
+  {
+    "path": "internal/bootstrap/capture_cleanup_worker.go",
+    "base_sha256": "6cea2605414b8f9a03d6d7befeda331bb12606d7c47a006f6f30dec91c3c72a1",
+    "payload_sha256": "3f6fe630e918ee305040754ae6f4ecae52216e022b6d0880cbd87cde53e6f184"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "base_sha256": "130fc675ba6cd96552a895122717635adba7e34bbaeac313b207d6e2574d0d46",
+    "payload_sha256": "fbd8708cf799a2cdacc1f4efdb10c8d692d809d2bd3b396f5151232679f983e9"
+  },
+  {
+    "path": "internal/bootstrap/owner_deployment.go",
+    "base_sha256": "c8dd4e113ca3632320f6921b9c6a9d2d086c60be453fb1447d38cbc2ce5707e7",
+    "payload_sha256": "8e1f021d9750b0dafc9100d380917d59143b42c47a1848bedaabfd4cb9b997e9"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_deployment.go",
+    "base_sha256": "df3e1238c442a5418b2e2226158b687b5ecbf1cb9dc31be0814bf9e15dd0a42e",
+    "payload_sha256": "8678c8d0a2ec6352f22920ea83cd155484a02bea176b3159731113f4e4120fb8"
+  },
+  {
+    "path": "internal/domain/audit/owner_configuration.go",
+    "base_sha256": "530b673fc0ff1184b9ab59f9bae0006827ee1ffcb25847743a6f325ee99beafc",
+    "payload_sha256": "c6d25c7365b949d15c43abf0a4c648dcfeb66882e3445011042a0ffe9e297408"
+  },
+  {
+    "path": "internal/domain/audit/owner_enrollment.go",
+    "base_sha256": "089a024b821303c940db17a793a697b6ecb227817ce5d74a9f1be344627de053",
+    "payload_sha256": "d53b9df880890a85f808d75b6af27dead1362d7a707043f24fe6c2b23de67054"
+  },
+  {
+    "path": "internal/domain/audit/owner_receipt_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "c3e920388f2db59f86b9fd6e0759e30856b343b723482fa0329b669f3030c94d"
+  },
+  {
+    "path": "test/integration/capacity_producer_test.go",
+    "base_sha256": "660cd6d57371542bd6f6ff0ea2ad5473df3164209da80f79d4efc3dfbdb46a55",
+    "payload_sha256": "e01211c306c46eb1d92e4283e3b6d7eb572a4e026d5e67dbf156ab18bed8909e"
+  },
+  {
+    "path": "test/integration/capture_admission_test.go",
+    "base_sha256": "59ab35e7237a0b0fb66c370608f775346030ce08b012f31dd256bd8d70f45fe3",
+    "payload_sha256": "acedbc87463749d4e2bdd112557159a60c56d6e3624370d6f5a29f0a361954c8"
+  },
+  {
+    "path": "test/integration/hub_worker_test.go",
+    "base_sha256": "d1a5d2290d323a2ed1d7f328f2c6193f8b5bf9008cb79795d609a9164b6e3427",
+    "payload_sha256": "e9f60bbe961e59e033ca877787b67f267f879dfed10f5dbb94b971679e73f9dc"
+  },
+  {
+    "path": "test/integration/owner_audit_history_versions_test.go",
+    "base_sha256": null,
+    "payload_sha256": "101d5ce4401e78799bc85ea14c3801c50e2132e8cd10735af218ad0f65ae4bcd"
+  },
+  {
+    "path": "test/integration/owner_configuration_sql_test.go",
+    "base_sha256": "b75062d1fcfe3dd4ca5ae48b30d3c22343d6d0a480ee60f70296017e4309b024",
+    "payload_sha256": "1e016fe84e2a8f64b4d8ce15590641d7fc53aa954d7e42fbe84ef393d5dfcc60"
+  },
+  {
+    "path": "test/integration/owner_deployment_test.go",
+    "base_sha256": "a0c916caf7b9d4b6279f95d4dc3a6443f40d261b59733ef3f31b788662f35794",
+    "payload_sha256": "192fa4fd78a9a5c54fc49902a13cc3cfb9f0579e562f0e6e132825125ec60d1a"
+  },
+  {
+    "path": "test/integration/owner_registration_test.go",
+    "base_sha256": "2dcd5f74c63d8c6c69f1c0475f3c9bdb535adb8a79251be6fb55b9a23946de11",
+    "payload_sha256": "28939bf7b64d7e1f08ec789208e3154f6343ae4e697f4b4c88fbcc805b8bb61a"
+  }
+]

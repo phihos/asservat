@@ -1,0 +1,37 @@
+{
+  "manifest": "dcda8a484f9f5f35b6d09ec6b7db946b243f5110e7fa654252202a720f6e9376",
+  "dependencies": "9d0d734d7f7e9fc2912d30e04b22acb2eb60f1e0f802565600dd39e27ad62e75",
+  "runner_sha256": "44fdfc11aa658ed886cce017862eac6241215c556051179f36c8ffce4203c673",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "started_at": 1791842598.9193845,
+  "steps": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-root-digest-sentinel-20261013/candidate-v1/overlay.json",
+        "./test/integration",
+        "-run",
+        "^TestCapacityRootConfigurationDigestState$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 0,
+      "log_sha256": "64d67c39e6ad9ecda076699a39b7640696a398fb15771c1c556de401aeb75dc7"
+    }
+  ],
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": []
+  },
+  "ended_at": 1791842615.5816014,
+  "terminal_exit": 0
+}

@@ -1,0 +1,11 @@
+Custody integration exit: 0
+Missing exact real-time retirement pass or actual 31-minute test interval
+Custody integration exit: 1
+Missing exact real-time retirement pass or actual 31-minute test interval
+Custody integration exit: 1
+No selected tests passed; refusing empty integration evidence
+Custody integration exit: 1
+Missing exact real-time retirement pass or actual 31-minute test interval
+Custody integration exit: 1
+Custody integration exit: 0
+PASS: 11 synthetic harness contract cases; no external fixture or real-time qualification executed

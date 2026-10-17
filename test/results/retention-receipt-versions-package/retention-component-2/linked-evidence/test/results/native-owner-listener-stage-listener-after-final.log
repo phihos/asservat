@@ -1,0 +1,10 @@
+=== RUN   TestNativeServeActualH2AndJoinedCancellation
+--- PASS: TestNativeServeActualH2AndJoinedCancellation (0.01s)
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/http1
+=== RUN   TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose
+--- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer (0.01s)
+    --- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer/http1 (0.00s)
+    --- PASS: TestNativeServeRejectsHTTP1AndClientOnlyServer/client-purpose (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	1.040s

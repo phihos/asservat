@@ -1,0 +1,8 @@
+{"Time":"2026-10-14T04:07:01.109127958+02:00","Action":"start","Package":"asservat.local/asservat/test/integration"}
+{"Time":"2026-10-14T04:07:01.158169695+02:00","Action":"run","Package":"asservat.local/asservat/test/integration","Test":"TestFleetObservationLockDispositionIsClosed"}
+{"Time":"2026-10-14T04:07:01.158244595+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestFleetObservationLockDispositionIsClosed","Output":"=== RUN   TestFleetObservationLockDispositionIsClosed\n","OutputType":"frame"}
+{"Time":"2026-10-14T04:07:01.158409496+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestFleetObservationLockDispositionIsClosed","Output":"--- PASS: TestFleetObservationLockDispositionIsClosed (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-10-14T04:07:01.158417045+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Test":"TestFleetObservationLockDispositionIsClosed","Elapsed":0}
+{"Time":"2026-10-14T04:07:01.158538906+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T04:07:02.160427404+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"ok  \tasservat.local/asservat/test/integration\t1.051s\n"}
+{"Time":"2026-10-14T04:07:02.160461255+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Elapsed":1.051}

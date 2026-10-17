@@ -1,0 +1,12 @@
+{
+  "top_level_passes": 147,
+  "all_pass_entries": 675,
+  "package_results": [
+    "ok  \tasservat.local/asservat/internal/application/fleet\t8.409s",
+    "ok  \tasservat.local/asservat/internal/bootstrap\t11.643s"
+  ],
+  "before_failures": [
+    "--- FAIL: TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer (6.01s)",
+    "--- FAIL: TestHubWorkerExternalCloseJoinsRunBeforeClosingResources (0.03s)"
+  ]
+}

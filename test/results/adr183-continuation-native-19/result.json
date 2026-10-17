@@ -1,0 +1,14 @@
+{
+  "name": "adr183-continuation-native-19",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices", "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files", "TestInitialBootstrapChainWithRealServices/installer-continuation", "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"],
+  "result": "First ADR-187 run. The continuation stopped at the first configuration role: 'worker/roles-provision/role:configuration-fleet after current=0s claim=1.75s role=3.101s stop=3.101s, 1.899s, operation 1.899s left (unavailable)'. The first attempt overran its original five-second claim, and every replay then found a non-fresh claim without a role, which stays lookup-only by design. Cause: one configuration role took three full source proofs, 118 API requests and 4.55 s in the unit fixture at 20 QPS, so run 18's pass had almost no margin. The configuration role source is independent of the ADR-187 resource producer. ADR-188 removes the completion's third proof (83 requests, 3.25 s). The replay checks were not reached.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

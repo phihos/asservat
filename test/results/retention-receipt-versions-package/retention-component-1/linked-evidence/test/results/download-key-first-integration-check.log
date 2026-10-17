@@ -1,0 +1,2 @@
+usage: test-custody.py [-h] [--fleet] [--run RUN]
+test-custody.py: error: unrecognized arguments: --test-pattern TestContextAdmissionWithRealServices/(download-key-|local-key-download-real-sql-tls-s3)

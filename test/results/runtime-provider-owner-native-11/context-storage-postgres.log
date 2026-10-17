@@ -1,0 +1,76 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-14 02:17:00.910 UTC [146] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 02:17:00.910 UTC [146] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 02:17:00.920 UTC [152] LOG:  database system was shut down at 2026-10-14 02:16:58 UTC
+2026-10-14 02:17:00.931 UTC [146] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down....2026-10-14 02:17:01.097 UTC [146] LOG:  received fast shutdown request
+2026-10-14 02:17:01.100 UTC [146] LOG:  aborting any active transactions
+2026-10-14 02:17:01.101 UTC [146] LOG:  background worker "logical replication launcher" (PID 155) exited with exit code 1
+2026-10-14 02:17:01.101 UTC [150] LOG:  shutting down
+2026-10-14 02:17:01.104 UTC [150] LOG:  checkpoint starting: shutdown immediate
+2026-10-14 02:17:02.069 UTC [150] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.021 s, sync=0.930 s, total=0.968 s; sync files=303, longest=0.019 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-14 02:17:02.084 UTC [146] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-14 02:17:02.119 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 02:17:02.119 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-14 02:17:02.119 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-14 02:17:02.122 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 02:17:02.129 UTC [210] LOG:  database system was shut down at 2026-10-14 02:17:02 UTC
+2026-10-14 02:17:02.129 UTC [211] FATAL:  the database system is starting up
+2026-10-14 02:17:02.134 UTC [1] LOG:  database system is ready to accept connections
+2026-10-14 02:21:17.545 UTC [373] FATAL:  password authentication failed for user "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager"
+2026-10-14 02:21:17.545 UTC [373] DETAIL:  User "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-14 02:21:18.098 UTC [374] FATAL:  password authentication failed for user "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager"
+2026-10-14 02:21:18.098 UTC [374] DETAIL:  User "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-14 02:21:51.748 UTC [376] FATAL:  password authentication failed for user "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager"
+2026-10-14 02:21:51.748 UTC [376] DETAIL:  User "asservat_init_497962814eeb4d7da4989ce9654ddac5_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-14 02:22:02.228 UTC [208] LOG:  checkpoint starting: time
+2026-10-14 02:23:35.052 UTC [208] LOG:  checkpoint complete: wrote 925 buffers (5.6%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=92.645 s, sync=0.156 s, total=92.824 s; sync files=597, longest=0.006 s, average=0.001 s; distance=9842 kB, estimate=9842 kB; lsn=0/2534020, redo lsn=0/2531B60
+2026-10-14 02:23:42.920 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_cfg_00" by role "postgres"
+2026-10-14 02:23:47.472 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_cfg_01" by role "postgres"
+2026-10-14 02:23:52.022 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_cfg_02" by role "postgres"
+2026-10-14 02:24:43.297 UTC [400] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_own_00" by role "postgres"
+2026-10-14 02:24:52.195 UTC [400] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_own_01" by role "postgres"
+2026-10-14 02:25:01.095 UTC [400] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_own_02" by role "postgres"
+2026-10-14 02:25:10.001 UTC [400] WARNING:  role "postgres" has not been granted membership in role "as_497962814eeb4d7da4989ce9654ddac5_own_03" by role "postgres"

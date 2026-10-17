@@ -1,0 +1,82 @@
+# ADR153 proposal: operation-owned connector enrollment and signing proof
+
+Source-only review after direct native3. No production source, runtime selector, test payload or build is part of this proposal. ADR150 remains the observation-only contract and cannot authorize this change implicitly.
+
+## Observed boundary
+
+Native3 (`test/results/direct-observation-native-3`) has test exit 1: 140.671s harness, 22.522s Go, 2,238 source hashes unchanged, external cleanup empty. The required-input correction worked: initial helper decodes are owner 475.062us, HWORK 395.672us, regional 471.442us. Owner enrollment/composition succeeds in 2.929871697s/2.970781588s. Regional constructors complete; its first enrollment phase fails unavailable after 4.959285964s and composition ends after 5.001523511s. The first original process exits 1 before any H/A/R operation. A later restarted process is not a retry qualification. Its failure under cleanup is separate.
+
+The existing diagnostic label cannot distinguish the nested current-proof/SQL/audit call. No PostgreSQL runtime ERROR/FATAL appears. The host's positive regional Joined assertion also fails: `newRuntime` logs joined failed-composition Close, but `main` exits before its success/control shutdown marker. Local trace completion is not the host's remote Joined proof, and this proposal does not erase that failed assertion.
+
+## Actual current call graph and rate floor
+
+- `test/fixtures/observation-native/enrollment.go:252`: `enrollConnector` composes real current source, process/credential SQL, audit and native attester, then calls actual process-owned credentials `Reconcile`.
+- `internal/adapters/mtls/connector_process_credentials.go:112`: one original at-most-30-second Reconcile, admission followed by separate client/server signing and exact activated leaf checks. No hidden retry.
+- `internal/application/fleet/connector_process.go:94,115,153,171`: first admission has four `current` calls in the same original at-most-five-second interval. They occur before Prepare, after audit Begin/before outcome Store, after audit Finish/before Accept, and after Accept/before return.
+- `internal/application/fleet/connector_renewal.go:218,246,310,328`: each signing operation also has four current checks under its own original at-most-five-second interval; each current additionally reads full source after full process attestation.
+- `internal/adapters/kubernetes/connector_process.go:123`: full attestation nests two full source readers, two standalone workload guard proofs, two online TokenReviews and two complete five-object workload chains.
+- `internal/adapters/kubernetes/connector_identity.go:139`: a full source read is source native guard, two namespace-bracketed full values, and final exact source policy/binding check.
+- `internal/adapters/kubernetes/permissions.go:80`: each retained actual client is fixed 20 QPS/burst 20. There is one regional observer and one regional probe; no new client per phase.
+
+Stable one-object paths without conflict, before any SQL/provider latency:
+
+| Path | Observer requests | Probe requests |
+| --- | ---: | ---: |
+| Source guard: namespace, two policy/binding pairs, denied ConfigMap GET | 6 | 3 |
+| Full source: guard + two namespace-bracketed values + final policy/binding | 14 | 3 |
+| Standalone workload Current: two namespace GETs, two policy/binding pairs, denied Deployment GET | 7 | 3 |
+| Full process attestation: two sources + two guards + two TokenReviews + two five-object chains | 54 | 12 |
+| One initial Enroll: four full process attestations | 216 | 48 |
+| One IssueProcess: four full process attestations plus four full sources | 272 | 60 |
+| Reconcile outside its three operations: before-sign source, two after-sign sources, two registry pre/post source pairs, final source | 112 | 24 |
+| Complete initial Reconcile | 872 | 192 |
+
+A cold observer bucket can send at most 20+20*T requests in T seconds. The Enroll lower bound is 9.8s, each signing lower bound 12.6s, and complete Reconcile lower bound 42.6s. Thus current composition cannot fit its existing five-/thirty-second caps even with zero server/network latency. These are source-derived lower bounds, not measured operation completion times. The unavailable result near five seconds is consistent with limiter/caller expiry; the exact first failed nested call still requires a bounded recorder. Merely changing four full proofs to two unchanged full proofs leaves 108 observer requests before all current-value checks and does not solve the graph.
+
+## Contract boundary
+
+ADR126 and `connector-renewal.md` require current actual Pod/token/controller proof, independently protected source/workload, exact source/backing, unchanged current recovery and current SQL effects. Historical signed material or acknowledged admission never becomes fresh permission. They do not make continuously unobserved Kubernetes history or instantaneous revocation possible.
+
+ADR153 should explicitly permit a new, purpose-fixed, process-local operation object for each Enroll, client signing, and server signing. Existing `ReadConnectorProcessProof`, source/registry, retirement and legacy bootstrap consumers retain their full behavior. The new object must not implement those general source/proof interfaces, and cannot be installed as a caching callback behind them.
+
+Each operation owns the original request ID, exact process/Pod identity, both immutable CSR/key digests, full original source/profile/roles/backing, native guard pins, token bytes/expiry, cancellation, and earliest original <=5s end. The owner clones all mutable inputs. Returned correlations or JSON values cannot recreate the object. Enroll, client signing and server signing have separate objects; none carries native authority across operations or extends Reconcile's original <=30s end.
+
+The native object has four closed phases matching the existing coordinator boundaries. First and Final each perform a genuine complete native boundary using actual responses once: source guard and workload guard are independent; exact namespace/account/Deployment/ReplicaSet/Pod chain and online token checks are bound to those actual observations. Reuse the actual denied-probe Deployment in the chain and pure source decoding, rather than nesting full standalone readers that discard those same bodies. The final boundary is another real I/O observation and must agree with original identities and security-relevant facts. Status/resource-version changes allowed by existing startup proof are not falsely classified as new process identity.
+
+The two intervening phases perform actual direct current checks, not an original-proof lookup alone: both policy/binding objects, exact full source/body/roles/backing, current online TokenReview for the original token, live namespace/account/Deployment/ReplicaSet/Pod security facts. The same response can satisfy overlapping checks within that one phase and its original interval. No response is represented as two independent reads. No fresh denied dry-run is claimed at these intermediate phases; the original positive native enforcement proof remains bounded and final denial is independently reproved. A known mismatch/unavailable response, cancellation or expiry permanently closes the operation.
+
+Source/body read dates and initial/final native dates stay distinct. Current reads only shorten the original proof, caller, token, issuer-root and recovery caps; each earlier cap immediately narrows subsequent native/SQL/provider/audit contexts. No final read renames its observation time to create a fresh five seconds.
+
+## Proposed deduplicated native request target
+
+This must be implemented as genuine complete boundaries, not two calls to the existing 54-request attester. The existing ADR150 native boundary is evidence that its *pure object validation/actual response ownership* can be shared, not authority to reuse an observation-purpose proof in enrollment.
+
+| New closed phase | Observer | Probe | Actual work |
+| --- | ---: | ---: | --- |
+| First native boundary plus full source value | 22 | 6 | Source guard 6; independent workload/token/chain boundary 13; namespace-bracketed full source 3 |
+| Before outcome (Enroll) / before claim (signing) | 12 | 0 | Four policy/binding GETs; namespace before/after; full source GET; account/Deployment/Pod/ReplicaSet GETs; online TokenReview |
+| Before acceptance / activation | 12 | 0 | Same fresh direct current checks, original identities/caps |
+| Final independent native boundary plus full source value | 22 | 6 | New complete actual native observation and full final value |
+| One operation target | 68 | 12 | No new clients, limiters or credential scope |
+
+The initial/final chains must bind the actual original token/CSR/key and source before any effect. The source's actual full value may be decoded from a response already read in the same boundary only if its namespace/guard and exact UID are still independently bracketed. Count reductions beyond this conservative table must be explicitly evidenced, never inferred.
+
+For a full initial Reconcile, retain the outside-operation source/registry checks unchanged first: 3*68+112 = 316 observer and 60 probe requests. The source-rate floor becomes 14.8s cold, about 15.8s with a depleted observer bucket, before real SQL/audit/provider work; the existing <=30s cap stays. Each individual operation's native floor is 2.4s cold/3.4s depleted, leaving finite but unqualified room under its original <=5s. Actual accepted recovery/source freshness can leave less time than five seconds; no minimum freshness is fabricated and no source polling/retry is introduced to make it pass. Measure the complete Reconcile and shared-client phases before claiming availability.
+
+## Effect/state preservation
+
+Keep all original coordinator effect ordering and independent SQL49 transaction/current-root/recovery checks. Enroll checks before Prepare, after Begin before Store, after Finish before Accept, and after Accept before returning an acknowledged process. Signing checks before Prepare, after Begin before irreversible Claim/provider signing, after Finish before Activate, and after Activate before delivery. Preserve current proof/permit/cancellation checks after all blocking calls, exact stored-result comparison and before/after provider verification. Do not repeat unknown signing, issue replacement IDs, refill budget, refund a late result, or activate from a failed final check.
+
+The new typed application current state must retain the original proof's dates and separately represent the actual phase/value read. It may reuse existing SQL predicates only through an explicit private conversion that preserves their original identity/source/expiry fields and current transaction checks; no newly returned value silently masquerades as a fresh legacy full attestation. If SQL needs an explicit semantic discriminator, add a reviewed additive contract instead of ignoring it. The exact smallest carrier/conversion is an implementation-review item before effects are wired.
+
+Native changes observed before an effect deny it; final native changes suppress successful delivery. Unknown prior effects remain charged and their original exact rows/keys retained. A transient A→B→A between reads is not proven absent by either old standalone checks or this protocol; native namespace protection and original five-second expiry remain the stated trust boundary. There is no claim of partition-proof instantaneous revocation or cryptographic protection against the authorized local process.
+
+## Meaningful regression and next scoped checkpoint
+
+1. Compose the existing concrete ConnectorProcessAttester + complete ConnectorIdentitySource over the existing real-HTTPS synthetic Kubernetes fixture, with the actual 20-QPS/burst-20 clients. Supply valid synthetic SQL/audit/recovery ports to the real `ConnectorProcessEnrollment.Enroll`; retain successful Prepare and unknown/failed later spend. Record only fixed phase/ordinal, elapsed/remaining original duration, observer/probe counts and booleans. Before candidate must fail from the intended original-bound exhaustion, not bad fixture identity. Do not reset the token bucket or proof clock between the four calls. A second narrow count assertion checks one actual standalone attestation's 54/12 count.
+2. For the new concrete operation, count actual response reads and test mutations at every phase: source UID/revision/roles/backing/roots, policy/binding/denial, namespace/account/Pod/RS/Deployment identity and spec, online token revocation/expiry, original key/request mismatch, shorter deadlines after waits, cancellation, concurrent phase reuse, final repetition and Close joining pending reads. Retain permitted status-only startup transitions.
+3. Real application Enroll and both signing coordinators under those readers: prove exact SQL effect order, unchanged current recovery/SQL guards, no effects after known change, final mutation suppressing result, no refund/replacement after unknown provider/store/activation output, and whole original Reconcile30s cap. Preserve all legacy process/renewal/retirement tests unchanged.
+4. Native helper recorder at existing ports, if still needed: fixed last bounded events + first error and existing metrics snapshots only; no additional SQL/API requests or raw error/query/credential data. It must locate the first failing proof/current/journal/audit boundary before any repeat external run.
+5. Only after scoped component checks and review, rerun the owned H/A/R fixture with this explicitly selected enrollment composition. It remains a synthetic-initial-root reference fixture; successful credential startup still does not prove full observation or installed sustained availability.
+
+Initial proposed production ownership (subject to review): new application fleet lifecycle operation ports/coordinator composition; new concrete Kubernetes lifecycle operation implementation and pure helper extraction; narrowly explicit process credential native composition constructor; focused tests; ADR153 plus connector-renewal architecture. Existing observation/v2 protocol, candidate readers, SQL schema, grants, QPS, pools, public runtime selectors and installed producer layouts are outside this correction unless a concrete carrier dependency is identified and approved.

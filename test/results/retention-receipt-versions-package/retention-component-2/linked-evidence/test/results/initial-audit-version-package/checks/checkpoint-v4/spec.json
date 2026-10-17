@@ -1,0 +1,26 @@
+{
+  "phase": "spec",
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "/tmp/asservat-initial-versioned-audit-build-0u69nagg/mirror/scripts/check-specs.py"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 4.987,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "markerCount": null,
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0
+}

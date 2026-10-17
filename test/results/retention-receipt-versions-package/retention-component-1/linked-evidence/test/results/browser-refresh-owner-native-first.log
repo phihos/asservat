@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity
+    browser_refresh_owners_test.go:147: actual native preparation invalid artifact storage descriptor
+--- FAIL: TestContextAdmissionWithRealServices (1.46s)
+    --- FAIL: TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity (1.12s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.516s
+FAIL

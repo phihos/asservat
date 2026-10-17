@@ -1,0 +1,5 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-identity.py
+Owned TLS Keycloak ready; running provider qualification
+Provider test exit: 1
+make: *** [Makefile:144: identity-integration] Fehler 1
+exit=2

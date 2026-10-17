@@ -1,0 +1,8 @@
+--- FAIL: TestBootstrapChannelRecordValidation (0.09s)
+    --- FAIL: TestBootstrapChannelRecordValidation/case-alias (0.01s)
+        bootstrap_test.go:85: unsafe credential record accepted case-alias
+    --- FAIL: TestBootstrapChannelRecordValidation/binding-alias (0.01s)
+        bootstrap_test.go:85: unsafe credential record accepted binding-alias
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.112s
+FAIL

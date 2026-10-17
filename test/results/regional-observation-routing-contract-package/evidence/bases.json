@@ -1,0 +1,8 @@
+{
+  "docs/architecture/cluster-observations.md": "95364c8efd19f0b2dc0ef701de749377a7ad335d315e647c43bc0a888d069087",
+  "docs/decisions/144-cluster-local-observations.md": "a9d4b89e03fdbf35a83ac22d9549af8c0c5845c516c467dc4318ac209afd8776",
+  "internal/contracts/cluster_observation_routing.go": null,
+  "internal/contracts/cluster_observation_routing_test.go": null,
+  "internal/domain/fleet/cluster_observation_routing.go": null,
+  "internal/domain/fleet/cluster_observation_routing_test.go": null
+}

@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/sharing-intent.schema.json",
+  "title": "Protected service-generated sharing intent \u2014 hub runtime DTO, not a Kubernetes resource",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "SharingIntent"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "DebugCapture",
+                "DebugPolicy"
+              ]
+            },
+            "clusterID": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "namespaceUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "resourceUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            },
+            "planDigest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            },
+            "recipeDigest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            }
+          },
+          "required": [
+            "kind",
+            "clusterID",
+            "namespaceUID",
+            "resourceUID",
+            "generation",
+            "planDigest",
+            "recipeDigest"
+          ]
+        },
+        "requestDigest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        },
+        "acceptedAt": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "notAfter": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "maxCaptures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "maxArtifactsPerCapture": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "resolvedSelections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+              },
+              "actionID": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+              },
+              "dataClass": {
+                "enum": [
+                  "metadata",
+                  "extract",
+                  "raw"
+                ]
+              },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "get_case",
+                    "list_artifacts",
+                    "get_timeline",
+                    "get_backtrace",
+                    "get_runtime_summary",
+                    "get_profile_summary",
+                    "get_pcap_summary",
+                    "get_zeek_log",
+                    "get_file_excerpt",
+                    "get_logs",
+                    "read_memory",
+                    "debugger_command",
+                    "pcap_query",
+                    "list_cases",
+                    "find_similar_cases",
+                    "compare_profiles",
+                    "get_query_result",
+                    "get_http_headers",
+                    "syscall_query",
+                    "get_syscall_summary",
+                    "get_syscall_events",
+                    "download_artifact"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true
+              },
+              "projectionDigest": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+              },
+              "independentApprovalRequired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "actionID",
+              "dataClass",
+              "operations",
+              "independentApprovalRequired"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "dataClass": {
+                      "const": "raw"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "independentApprovalRequired": {
+                      "const": true
+                    },
+                    "operations": {
+                      "contains": {
+                        "enum": [
+                          "read_memory",
+                          "debugger_command",
+                          "pcap_query",
+                          "syscall_query",
+                          "download_artifact"
+                        ]
+                      },
+                      "minContains": 1
+                    }
+                  },
+                  "not": {
+                    "required": [
+                      "projectionDigest"
+                    ]
+                  }
+                },
+                "else": {
+                  "required": [
+                    "projectionDigest"
+                  ],
+                  "properties": {
+                    "operations": {
+                      "items": {
+                        "not": {
+                          "enum": [
+                            "read_memory",
+                            "debugger_command",
+                            "pcap_query",
+                            "syscall_query",
+                            "download_artifact"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "createdBy": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "management": {
+          "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/resolved"
+        }
+      },
+      "required": [
+        "createdBy",
+        "recipients",
+        "source",
+        "requestDigest",
+        "acceptedAt",
+        "notAfter",
+        "maxCaptures",
+        "maxArtifactsPerCapture",
+        "resolvedSelections",
+        "management"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "properties": {
+                  "kind": {
+                    "const": "DebugCapture"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "maxCaptures": {
+                "const": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "enum": [
+            "PendingApproval",
+            "Active",
+            "Draining",
+            "Completed",
+            "Suspended",
+            "Revoked",
+            "Expired",
+            "Denied"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "registeredCaptures": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "materializedArtifacts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6400
+        },
+        "selectionApprovals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "selectionID": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+              },
+              "phase": {
+                "enum": [
+                  "PendingApproval",
+                  "Approved",
+                  "Denied",
+                  "Revoked"
+                ]
+              },
+              "approvedBy": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+              },
+              "approvedAt": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+              }
+            },
+            "required": [
+              "selectionID",
+              "phase"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "phase": {
+                      "const": "Approved"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "approvedBy",
+                    "approvedAt"
+                  ]
+                }
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "phase",
+        "revision",
+        "registeredCaptures",
+        "materializedArtifacts",
+        "selectionApprovals"
+      ]
+    },
+    "schemaVersion": {
+      "const": "sharing-intent/v1"
+    },
+    "id": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+    }
+  },
+  "required": [
+    "kind",
+    "spec",
+    "status",
+    "schemaVersion",
+    "id"
+  ]
+}

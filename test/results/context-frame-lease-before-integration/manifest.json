@@ -1,0 +1,9 @@
+{
+  "scope": "Before-fix transport-only budget regression; no native/installed claim",
+  "files": {
+    "internal/transport/contextstart/frame_lease_budget_test.go": {
+      "baseSHA256": null,
+      "payloadSHA256": "2f7f25b0595224b1459fdf75c590b4ba43b7164c2ba2ffce1eaacf485d0f90c1"
+    }
+  }
+}

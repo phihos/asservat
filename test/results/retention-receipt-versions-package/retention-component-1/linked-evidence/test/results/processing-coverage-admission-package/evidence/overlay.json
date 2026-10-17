@@ -1,0 +1,19 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/capture.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/adapters/postgres/capture.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/custody.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/adapters/postgres/custody.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/processing_capture.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/adapters/postgres/processing_capture.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/processing_capture_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/adapters/postgres/processing_capture_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/public_runtime_role_plan.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/adapters/postgres/public_runtime_role_plan.go",
+    "/home/phil/Projekte/asservat/internal/application/capture/context_investigation.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/application/capture/context_investigation.go",
+    "/home/phil/Projekte/asservat/internal/application/capture/context_investigation_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/application/capture/context_investigation_test.go",
+    "/home/phil/Projekte/asservat/internal/application/capture/context_processing.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/application/capture/context_processing.go",
+    "/home/phil/Projekte/asservat/internal/application/capture/context_processing_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/application/capture/context_processing_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/capture/processing.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/domain/capture/processing.go",
+    "/home/phil/Projekte/asservat/internal/transport/presentation/context_operations.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/transport/presentation/context_operations.go",
+    "/home/phil/Projekte/asservat/internal/transport/presentation/context_processing_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/internal/transport/presentation/context_processing_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_context_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/test/integration/capacity_context_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_processing_coverage_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/test/integration/capacity_processing_coverage_test.go",
+    "/home/phil/Projekte/asservat/test/integration/context_continuation_native_test.go": "/home/phil/.cache/asservat-build/planning/processing-admission-20261013/candidate-v2/changes/test/integration/context_continuation_native_test.go"
+  }
+}

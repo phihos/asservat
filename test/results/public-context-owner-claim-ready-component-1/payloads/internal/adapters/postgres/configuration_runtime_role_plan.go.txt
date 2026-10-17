@@ -1,0 +1,75 @@
+package postgres
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"slices"
+	"strconv"
+	"strings"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+)
+
+// Independent fixed SQL namespace: public/hub/capacity callers cannot select
+// these purposes through PublicRuntimeRoleName or its protected root.
+func ConfigurationRuntimeRoleName(installation, purpose string) (string, bool) {
+	n, ok := contracts.ConfigurationRuntimeRoleOrdinal(purpose)
+	if !ok || !authorization.UUID(installation) {
+		return "", false
+	}
+	return "as_" + strings.ReplaceAll(installation, "-", "") + "_cfg_0" + strconv.Itoa(n), true
+}
+func configurationRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
+	if _, ok := contracts.ConfigurationRuntimeRoleOrdinal(purpose); !ok {
+		return nil, false
+	}
+	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}}
+	add := func(table, privilege string, columns ...string) {
+		if len(columns) == 0 {
+			out = append(out, publicRuntimeGrant{"table", table, "", privilege})
+			return
+		}
+		for _, column := range columns {
+			out = append(out, publicRuntimeGrant{"table", table, column, privilege})
+		}
+	}
+	// Derived from FleetObservation, OwnerConfigurations' source/read graph and
+	// CurrentOwnerConfigurationAcknowledgements, not a union of fixture roles.
+	add("fleet_current_trust", "SELECT")
+	add("fleet_current_trust", "UPDATE", "installation_id")
+	switch purpose {
+	case "configuration-fleet":
+		add("fleet_trust", "SELECT")
+		out = append(out,
+			publicRuntimeGrant{"function", "observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz)", "", "EXECUTE"},
+			publicRuntimeGrant{"function", "fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz)", "", "EXECUTE"})
+	case "configuration-source", "configuration-audit":
+		add("hub_owner_configuration", "SELECT")
+		add("hub_owner_configuration_revision", "SELECT")
+		add("hub_owner_configuration", "UPDATE", "source_uid")
+		if purpose == "configuration-source" {
+			add("hub_owner_configuration", "INSERT")
+			add("hub_owner_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
+			add("hub_owner_configuration", "UPDATE", "generation", "observed_at", "fresh_until")
+		} else {
+			add("hub_owner_configuration_revision", "UPDATE", "audit_receipt_json")
+		}
+	}
+	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
+	return slices.CompactFunc(out, func(a, b publicRuntimeGrant) bool { return a == b }), true
+}
+func ConfigurationRuntimeRoleLayoutDigest() string {
+	h := sha256.New()
+	h.Write([]byte("asservat-configuration-runtime-role-layout/v1\x00login:noinherit:nosuperuser:nocreatedb:nocreaterole:noreplication:nobypassrls:connections=" + strconv.Itoa(contracts.ConfigurationRuntimeRoleConnections) + "\x00"))
+	for _, purpose := range contracts.ConfigurationRuntimeRolePurposes() {
+		n, _ := contracts.ConfigurationRuntimeRoleOrdinal(purpose)
+		h.Write([]byte(strconv.Itoa(n) + ":" + purpose + "\x00"))
+		grants, _ := configurationRuntimeRoleGrants(purpose)
+		for _, g := range grants {
+			h.Write([]byte(g.key() + "\x00"))
+		}
+	}
+	h.Write([]byte("projection\x00" + contracts.ConfigurationRuntimeRoleManifestFile + "\x00sql-fleet.json\x00sql-configuration.json\x00sql-audit.json\x00"))
+	return hex.EncodeToString(h.Sum(nil))
+}

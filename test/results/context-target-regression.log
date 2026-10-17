@@ -1,0 +1,9 @@
+E1010 02:13:57.340031 2247600 request.go:1198] "Unexpected error when reading response body" err="bounded pod status unavailable"
+--- FAIL: TestBoundedContextProtocol (0.02s)
+    --- FAIL: TestBoundedContextProtocol/unowned-projection (0.00s)
+        context_test.go:71: projection: invalid artifact storage descriptor
+    --- FAIL: TestBoundedContextProtocol/redirect (0.00s)
+        context_test.go:76: unsafe error handling: <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.031s
+FAIL

@@ -1,0 +1,77 @@
+{
+  "adr": 117,
+  "files": [
+    {
+      "path": "cmd/asservat/main.go",
+      "baseSha256": "b30dd9cfb3a68284b3c1b708ed4e491f470e18d879af6347422868c9b0ec238b",
+      "newSha256": "eab1ce559563cfc4bfd1897c3f4b34a074caaf1ede9b6f2374e8b792849792ed",
+      "bytes": 1707
+    },
+    {
+      "path": "docs/architecture/initial-preparer.md",
+      "baseSha256": null,
+      "newSha256": "69a39a6156b5fc346764b90d2c3dd600984342a15fb24838281ce07a0dcfc006",
+      "bytes": 6284
+    },
+    {
+      "path": "docs/decisions/117-resumable-initial-preparation.md",
+      "baseSha256": null,
+      "newSha256": "ba03294c4cd7bc5876f8066e129d93c9c42b5549053668af69dc06f7dd3936fe",
+      "bytes": 4275
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer.go",
+      "baseSha256": null,
+      "newSha256": "b5020292be7b9d633172ae759f02593e11c898bb7ff146ea1db05363e9848567",
+      "bytes": 19416
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+      "baseSha256": null,
+      "newSha256": "00a716af9a8be81746b27ff86a025755b16003530d5c7d4e1379f31a659cfe75",
+      "bytes": 12368
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_test.go",
+      "baseSha256": null,
+      "newSha256": "9e8c13ca63d513feb4858b50eea66cfb67aa913946088df955d87157cb04dcb1",
+      "bytes": 16048
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer.go",
+      "baseSha256": null,
+      "newSha256": "bece2bdb6e3886d881c23682b9dc085c665768342c0e95f1e741e6d550be932d",
+      "bytes": 4566
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_test.go",
+      "baseSha256": null,
+      "newSha256": "e61e048b9a015ca6358fdbc05204ca09efb9077d07eed9fa3f2771bf3391faee",
+      "bytes": 853
+    },
+    {
+      "path": "internal/contracts/initial_preparer.go",
+      "baseSha256": null,
+      "newSha256": "3cfac3a7ac0a54045588de7a15f2e1ebef00741df696e43671cd6d154d8cd6ac",
+      "bytes": 2902
+    },
+    {
+      "path": "specs/contracts/initial-preparation-root.schema.json",
+      "baseSha256": null,
+      "newSha256": "05d01928aeff3e5f365e95672a76b2054eba9271c3b4a9976e362854ce7a183d",
+      "bytes": 3167
+    },
+    {
+      "path": "specs/contracts/initial-preparer.schema.json",
+      "baseSha256": null,
+      "newSha256": "6aaaf87a709f444edc2d4bbd2d5f959911562e6060644c683fe4a08b03eb2010",
+      "bytes": 5268
+    },
+    {
+      "path": "test/integration/initial_preparer_test.go",
+      "baseSha256": null,
+      "newSha256": "5a0c3e5bdf771fa388f9b745eda939f35c10008f453c51bfbce7078abc97e16d",
+      "bytes": 18244
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "docs/architecture/cluster-observations.md": "29f7e4424c81a0a84947ad7748695361b4636956518c1dad05b3f77a05be58a2",
+  "docs/decisions/157-protected-observation-dial-endpoint.md": null,
+  "docs/decisions/README.md": "99e93a59b4d7a2e248d5f4aa6a8d1a7335584cab65b581c75e036a4a5b6915e6",
+  "internal/adapters/mtls/connector_observation_connection_test.go": "96da133e7bcb61bc28ba77e2cbbc32f337429da9cf9940cfed28b034235ecf16",
+  "internal/adapters/mtls/connector_operation_connection_test.go": "3da8d4278d5fbac5a8a311483c88b7a257e59206e046c565508a0d4244eae177",
+  "internal/adapters/mtls/owner_observation_client.go": "69ece9f3bc840d054f4767e620a908293e4329217bd84ededa67398165bf3a40",
+  "internal/adapters/mtls/owner_observation_dial_test.go": null,
+  "scripts/test-context-storage.py": "a0d83fe73a95a373299371280d034c323c9019bea1daaa0d38318beb689fd511",
+  "scripts/test-direct-helper-regression.py": null
+}

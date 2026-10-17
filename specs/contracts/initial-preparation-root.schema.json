@@ -1,0 +1,740 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-preparation-root.schema.json",
+  "title": "Private long-lived preparation root v1",
+  "description": "Public provenance only, at most 48 KiB. Runtime additionally requires the exact compiled ordered nine-object legacy or eleven-object handover declaration inventory, plus the separate fixed nine final inputs, one pending entry, stable operation IDs and original receipts, immutable desired-plan digest and rootUID CAS. No expiry/reset; all current proofs and credential/effect periods remain separately bounded. Not activation, clean-history or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "requestID",
+    "planDigest",
+    "rootUID",
+    "phase",
+    "creates"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-preparation-root/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "planDigest": {
+      "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+    },
+    "rootUID": {
+      "oneOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        {
+          "const": ""
+        }
+      ]
+    },
+    "phase": {
+      "enum": [
+        "declaring",
+        "declared",
+        "retiring",
+        "retired"
+      ]
+    },
+    "creates": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationID",
+          "kind",
+          "name",
+          "specDigest"
+        ],
+        "properties": {
+          "operationID": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+          },
+          "kind": {
+            "enum": [
+              "Namespace",
+              "ServiceAccount",
+              "Role",
+              "RoleBinding",
+              "ClusterRole",
+              "ClusterRoleBinding"
+            ]
+          },
+          "name": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+          },
+          "specDigest": {
+            "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "resourceVersion"
+            ],
+            "properties": {
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "resourceVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pod": {
+          "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/podPreparation"
+        },
+        "credentials": {
+          "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/credentialBinding"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "intentDigest",
+            "creates"
+          ],
+          "properties": {
+            "intentDigest": {
+              "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+            },
+            "creates": {
+              "type": "array",
+              "maxItems": 9,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operationID",
+                  "kind",
+                  "name",
+                  "specDigest"
+                ],
+                "properties": {
+                  "operationID": {
+                    "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                  },
+                  "kind": {
+                    "enum": [
+                      "ConfigMap",
+                      "ValidatingAdmissionPolicy",
+                      "ValidatingAdmissionPolicyBinding"
+                    ]
+                  },
+                  "name": {
+                    "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+                  },
+                  "specDigest": {
+                    "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+                  },
+                  "receipt": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "uid",
+                      "resourceVersion"
+                    ],
+                    "properties": {
+                      "uid": {
+                        "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                      },
+                      "resourceVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "handover": {
+          "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/handover"
+        }
+      },
+      "dependentRequired": {
+        "credentials": [
+          "pod"
+        ],
+        "handover": [
+          "pod",
+          "inputs",
+          "credentials"
+        ]
+      },
+      "required": [
+        "pod"
+      ]
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attemptID",
+        "bundleDigest",
+        "head",
+        "databaseOID",
+        "postmasterAt",
+        "ddlRole",
+        "manager",
+        "claimedAt"
+      ],
+      "properties": {
+        "attemptID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "bundleDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "head": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "databaseOID": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "postmasterAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "ddlRole": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "oid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "oid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295
+            }
+          }
+        },
+        "manager": {
+          "$ref": "https://asservat.io/spec/v1/initial-preparer.schema.json#/properties/plan/properties/historyManager"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "description": "Original public schema provenance, never SQL credentials or recovery activation. Incomplete means no declaration/effect inputs. Current administrator/guard, exact instance and embedded prefix remain independently required."
+    }
+  },
+  "$defs": {
+    "credentialBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material",
+        "startupDigest",
+        "notBefore",
+        "notAfter"
+      ],
+      "description": "Public immutable binding; exact original whole-second UTC interval lasts fifteen minutes. The complete startup digest includes the actual gated Pod UID. This has no credential bytes and no activation authority. Runtime validates original acceptance and interval arithmetic.",
+      "properties": {
+        "material": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "startupDigest": {
+          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+        },
+        "notBefore": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      }
+    },
+    "podPreparation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "templateDigest",
+        "requests"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "templateDigest": {
+          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "uid",
+            "resourceVersion"
+          ],
+          "properties": {
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+            }
+          }
+        },
+        "specDigest": {
+          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+        },
+        "requests": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/podRequest"
+          }
+        }
+      },
+      "dependentRequired": {
+        "receipt": [
+          "specDigest"
+        ],
+        "specDigest": [
+          "receipt"
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "receipt"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requests": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "podRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ownerID",
+        "startedAt",
+        "until"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "ownerID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "completedAt"
+          ],
+          "properties": {
+            "outcome": {
+              "enum": [
+                "created",
+                "alreadyExists"
+              ]
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      },
+      "description": "One original at-most-five-second HTTP CREATE invocation; only its joined live owner can attest its own positive response. Completion never derives from a subsequent observation."
+    },
+    "handover": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "startupDigest",
+        "input",
+        "credentials",
+        "reviewedAt"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "startupDigest": {
+          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "staging": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "policyResourceVersion",
+            "startedAt",
+            "until"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "policyResourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "receipt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "generation",
+                "resourceVersion"
+              ],
+              "properties": {
+                "uid": {
+                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                },
+                "generation": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "resourceVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+                }
+              }
+            },
+            "firstConflict": {
+              "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/conditionalConflictCompletion"
+            },
+            "retry": {
+              "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/conditionalRetry"
+            }
+          },
+          "dependentRequired": {
+            "retry": [
+              "firstConflict"
+            ]
+          }
+        },
+        "launch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "podResourceVersion",
+            "startedAt",
+            "until"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "podResourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "observed": {
+              "type": "boolean"
+            },
+            "firstConflict": {
+              "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/conditionalConflictCompletion"
+            },
+            "retry": {
+              "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/$defs/conditionalRetry"
+            }
+          },
+          "dependentRequired": {
+            "retry": [
+              "firstConflict"
+            ]
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationID",
+            "activatedClaimID",
+            "startedAt",
+            "podResourceVersion",
+            "sqlState",
+            "probeAnchor",
+            "steps"
+          ],
+          "properties": {
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "activatedClaimID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "podResourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "sqlState": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "uid"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "uid": {
+                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                }
+              }
+            },
+            "probeAnchor": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "uid"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "uid": {
+                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                }
+              }
+            },
+            "steps": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "step",
+                  "completedAt"
+                ],
+                "properties": {
+                  "step": {
+                    "enum": [
+                      "sql",
+                      "wrap",
+                      "unwrap",
+                      "probe",
+                      "target-secrets",
+                      "setup-rbac",
+                      "private-state",
+                      "pod"
+                    ]
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "Z$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "conditionalConflictCompletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completedAt"
+      ],
+      "properties": {
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "description": "Only the actual owner of an exact HTTP 409 resourceVersion Conflict can acknowledge this completion, within the original claim interval. A GET cannot supply it."
+    },
+    "conditionalRetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "resourceVersion",
+        "claimedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      },
+      "description": "One acknowledged CAS owner, second conditional UPDATE only; exact original UID/spec/claim deadlines remain unchanged. Lost claim replies permit lookup only."
+    }
+  }
+}

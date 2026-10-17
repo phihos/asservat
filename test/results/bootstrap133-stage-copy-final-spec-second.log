@@ -1,0 +1,2 @@
+PASS: 85 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 3028 local links, 608 rejected invalid examples (9899 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.

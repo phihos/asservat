@@ -1,0 +1,12 @@
+--- FAIL: TestAccessTokenIdentity (0.05s)
+    --- FAIL: TestAccessTokenIdentity/at+JWT (0.00s)
+        access_test.go:131: valid access token: invalid identity input
+2026/10/09 23:47:51 http: TLS handshake error from 127.0.0.1:36484: remote error: tls: bad certificate
+--- FAIL: TestJWKSAndEndpointBounds (0.77s)
+    --- FAIL: TestJWKSAndEndpointBounds/key_operations (0.14s)
+        access_test.go:321: invalid key publication accepted
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/oidc	1.546s
+ok  	asservat.local/asservat/internal/domain/identity	1.008s
+ok  	asservat.local/asservat/internal/domain/authorization	1.008s
+FAIL

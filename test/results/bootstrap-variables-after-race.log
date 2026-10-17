@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.141s
+# asservat.local/asservat/test/integration
+# [asservat.local/asservat/test/integration]
+vet: test/integration/connector_identity_test.go:93:12: undefined: connectorSQLRolePrefix
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

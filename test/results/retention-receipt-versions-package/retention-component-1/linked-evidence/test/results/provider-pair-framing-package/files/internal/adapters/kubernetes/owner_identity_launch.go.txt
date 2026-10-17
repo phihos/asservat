@@ -1,0 +1,256 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+)
+
+func ownerIdentityLaunchTransition(old, next contracts.InitialRuntimeResourceState) bool {
+	if old.OwnerIdentity == nil || old.OwnerIdentity.Receipt == nil || next.OwnerLaunch == nil {
+		return false
+	}
+	a, b := old, next
+	a.OwnerLaunch = nil
+	b.OwnerLaunch = nil
+	if !equalJSON(a, b) {
+		return false
+	}
+	if old.OwnerLaunch == nil {
+		return next.OwnerLaunch.Receipt == nil && next.OwnerLaunch.ProjectionOperationID == old.OwnerIdentity.OperationID
+	}
+	if old.OwnerLaunch.Receipt != nil || next.OwnerLaunch.Receipt == nil {
+		return false
+	}
+	x, y := *old.OwnerLaunch, *next.OwnerLaunch
+	x.Receipt = nil
+	y.Receipt = nil
+	return equalJSON(x, y)
+}
+
+// Launch performs only the original replicas0→1 CAS. It neither constructs
+// credentials nor dispatches work. Any persisted launch claim is lookup-only;
+// an unknown PUT can only be reconciled against that exact running spec.
+func (s *OwnerIdentityProjection) Launch(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return out, cfg.ErrUnavailable
+	}
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	call, release, e := s.borrowProviderCall(call)
+	if e != nil {
+		return out, e
+	}
+	defer release()
+	roles, e := s.verification.VerifyOwnerIdentityRoles(call)
+	if e != nil || roles.State.Input != s.root.input || !s.root.resources.now().Before(roles.ValidUntil) {
+		return out, cfg.ErrUnavailable
+	}
+	call, narrow := context.WithDeadline(call, roles.ValidUntil)
+	defer narrow()
+	proof, e := s.observeProvider(call)
+	if e != nil {
+		return out, e
+	}
+	if s.setup != nil {
+		var stop context.CancelFunc
+		call, stop = context.WithDeadline(call, proof.until)
+		defer stop()
+	}
+	e = s.root.operation(call, func(live context.Context) error {
+		actual, _, _, e := s.root.read(live)
+		if e != nil || actual.UID != roles.UID || !equalJSON(actual.State, roles.State) {
+			return cfg.ErrChanged
+		}
+		live, stop := context.WithDeadline(live, actual.ValidUntil)
+		defer stop()
+		snapshot, obj, e := s.root.readResources(live)
+		if e != nil {
+			return e
+		}
+		p := snapshot.State.OwnerIdentity
+		if p == nil || p.Receipt == nil {
+			return cfg.ErrUnavailable
+		}
+		if e = s.providerMaterialCurrent(live, snapshot, proof); e != nil {
+			return e
+		}
+		if e = s.originalInput(live, snapshot); e != nil {
+			return e
+		}
+		activation := contracts.OwnerIdentityActivation{Input: s.root.input, RoleRoot: contracts.WorkerObjectReference{Name: s.root.name(), UID: roles.UID}, RoleSetupID: roles.State.OperationID, ResourcesCreatedAt: snapshot.State.CreatedAt, ResourcesUntil: snapshot.State.Until}
+		input, _, data, digest, e := ownerIdentityProjectionMaterial(s.input, activation, roles, s.provider, s.root.resources.now())
+		if e != nil {
+			return e
+		}
+		defer clearRuntimeProjection(data)
+		if p.PublicDigest != digest || p.RoleRoot != activation.RoleRoot || p.RoleSetupID != activation.RoleSetupID {
+			return cfg.ErrChanged
+		}
+		if _, e = s.readObject(live, p, "credentials", input, activation, data); e != nil {
+			return e
+		}
+		if _, e = s.readObject(live, p, "configuration", input, activation, data); e != nil {
+			return e
+		}
+		d, e := s.readLaunchDeployment(live)
+		if e != nil {
+			return e
+		}
+		launch := snapshot.State.OwnerLaunch
+		fresh := false
+		if launch == nil {
+			if s.attemptedLaunch || !s.root.resources.now().Before(snapshot.State.Until) {
+				return cfg.ErrUnavailable
+			}
+			raw, e := json.Marshal(d)
+			if e != nil {
+				return cfg.ErrChanged
+			}
+			if _, e = s.root.resources.verified(live, raw, snapshot.State, 10); e != nil {
+				return e
+			}
+			inert, e := ownerIdentitySpecDigest(d)
+			if e != nil {
+				return e
+			}
+			running := d.DeepCopy()
+			*running.Spec.Replicas = 1
+			changed, e := ownerIdentitySpecDigest(*running)
+			if e != nil {
+				return e
+			}
+			now := s.root.resources.now().UTC().Truncate(time.Microsecond)
+			until, _ := live.Deadline()
+			until = identity.Earlier(until, snapshot.State.Until).UTC().Truncate(time.Microsecond)
+			launch = &contracts.OwnerIdentityLaunchClaim{OperationID: uuid.NewString(), ProjectionOperationID: p.OperationID, InertResourceVersion: d.ResourceVersion, InertDigest: inert, RunningDigest: changed, ClaimedAt: now, Until: until}
+			next := snapshot.State
+			next.OwnerLaunch = launch
+			current, launched, e := s.currentProvider(live, proof)
+			if e != nil || launched {
+				return cfg.ErrUnavailable
+			}
+			s.attemptedLaunch = true
+			ack, e := s.writeLaunch(live, snapshot, obj, next, identity.Earlier(until, current))
+			if e != nil {
+				return e
+			}
+			snapshot = ack
+			fresh = true
+		}
+		if fresh {
+			effect, finish := context.WithDeadline(live, launch.Until)
+			defer finish()
+			current, _, e := s.currentProvider(effect, proof)
+			if e != nil {
+				return e
+			}
+			effect, limited := context.WithDeadline(effect, current)
+			defer limited()
+			next := d.DeepCopy()
+			*next.Spec.Replicas = 1
+			if next.Annotations == nil {
+				next.Annotations = map[string]string{}
+			}
+			next.Annotations[ownerIdentityLaunchMarker] = launch.OperationID
+			raw, e := s.root.bridge.source.client.api.Put().AbsPath(s.launchPath()).Param("fieldValidation", "Strict").Body(next).MaxRetries(0).DoRaw(effect)
+			clear(raw)
+			if e != nil {
+				return cfg.ErrUnavailable
+			}
+			// Keep every shorter effect observation through lookup and receipt CAS.
+			live = effect
+		}
+		running, e := s.readLaunchDeployment(live)
+		if e != nil || !ownerIdentityClaimedLaunchObject(running, snapshot.State, s.root.input) {
+			return cfg.ErrUnavailable
+		}
+		if launch.Receipt != nil {
+			current, _, e := s.currentProvider(live, proof)
+			if e != nil {
+				return e
+			}
+			snapshot.ValidUntil = identity.Earlier(snapshot.ValidUntil, current)
+			out = snapshot
+			return nil
+		}
+		if !s.root.resources.now().Before(snapshot.State.Until) {
+			return cfg.ErrUnavailable
+		}
+		current, _, e := s.currentProvider(live, proof)
+		if e != nil {
+			return e
+		}
+		latest, object, e := s.root.readResources(live)
+		if e != nil || !equalJSON(latest.State.OwnerIdentity, p) || !equalJSON(latest.State.OwnerLaunch, launch) {
+			return cfg.ErrChanged
+		}
+		next := latest.State
+		copy := *launch
+		next.OwnerLaunch = &copy
+		copy.Receipt = &contracts.OwnerIdentityLaunchReceipt{ResourceVersion: running.ResourceVersion, Generation: running.Generation, ObservedAt: s.root.resources.now().UTC().Truncate(time.Microsecond)}
+		out, e = s.writeLaunch(live, latest, object, next, identity.Earlier(current, latest.State.Until))
+		return e
+	})
+	if e != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, e
+	}
+	return out, nil
+}
+func (s *OwnerIdentityProjection) launchPath() string {
+	return "/apis/apps/v1/namespaces/" + s.root.input.Namespace.Name + "/deployments/" + s.root.input.Deployment.Name
+}
+func (s *OwnerIdentityProjection) readLaunchDeployment(ctx context.Context) (apps.Deployment, error) {
+	var d apps.Deployment
+	raw, e := s.root.bridge.source.client.api.Get().AbsPath(s.launchPath()).MaxRetries(0).DoRaw(ctx)
+	if e != nil {
+		return d, cfg.ErrUnavailable
+	}
+	if permissionJSON(raw, 256<<10, 131072) != nil || strictGuardJSON(raw, &d) != nil {
+		return d, cfg.ErrChanged
+	}
+	until, ok := ctx.Deadline()
+	if !ok {
+		return d, cfg.ErrInvalid
+	}
+	if e = initialHandoverDeadline(ctx, s.root.resources.now, until); e != nil {
+		return apps.Deployment{}, e
+	}
+	return d, nil
+}
+func (s *OwnerIdentityProjection) writeLaunch(ctx context.Context, old contracts.InitialRuntimeResourceSnapshot, obj *core.Secret, next contracts.InitialRuntimeResourceState, until time.Time) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var zero contracts.InitialRuntimeResourceSnapshot
+	if !ownerIdentityLaunchTransition(old.State, next) || !s.root.resources.valid(next) || !s.root.resources.now().Before(old.State.Until) {
+		return zero, cfg.ErrChanged
+	}
+	call, end := context.WithDeadline(ctx, until)
+	defer end()
+	if initialHandoverDeadline(call, s.root.resources.now, until) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	b, e := json.Marshal(next)
+	if e != nil || len(b) > contracts.InitialRuntimeResourcesMaxBytes {
+		return zero, cfg.ErrInvalid
+	}
+	defer clear(b)
+	object := obj.DeepCopy()
+	object.Data = map[string][]byte{"state.json": b}
+	raw, e := s.root.bridge.source.client.api.Put().AbsPath(s.root.resources.path()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(call)
+	defer clear(raw)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	got, _, e := s.root.resources.decode(call, raw)
+	if e != nil || got.UID != old.UID || got.ResourceVersion == old.ResourceVersion || !equalJSON(got.State, next) || initialHandoverDeadline(call, s.root.resources.now, until) != nil {
+		return zero, cfg.ErrChanged
+	}
+	return got, nil
+}

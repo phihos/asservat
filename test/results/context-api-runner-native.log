@@ -1,0 +1,7 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:263: actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; 362 native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority
+--- PASS: TestContextAdmissionWithRealServices (7.99s)
+    --- PASS: TestContextAdmissionWithRealServices/native-api-runner (7.94s)
+PASS
+ok  	asservat.local/asservat/test/integration	9.048s

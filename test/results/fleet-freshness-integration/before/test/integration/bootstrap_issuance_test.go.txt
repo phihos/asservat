@@ -1,0 +1,428 @@
+package integration
+
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"net/url"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestEnrollmentBootstrapIssuanceWithRealServices(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if path == "" {
+		t.Skip("run make fleet-integration or custody-integration")
+	}
+	var f fixture
+	b, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(b, &f) != nil {
+		t.Fatal("fixture unavailable")
+	}
+	ctx := context.Background()
+	admin, err := pgxpool.New(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	u, err := url.Parse(f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, tlsConfig := pgTLSBridge(t, u.Host)
+	poolFor := func(purpose string) *pgxpool.Pool {
+		t.Helper()
+		config, err := pgxpool.ParseConfig("postgres://bootstrap_" + purpose + "_runtime:synthetic-bootstrap-" + purpose + "@" + address + "/custody_test?sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+		config.ConnConfig.TLSConfig = tlsConfig
+		config.ConnConfig.Fallbacks = nil
+		config.MaxConns = 16
+		pool, err := pgxpool.NewWithConfig(ctx, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(pool.Close)
+		return pool
+	}
+	reservePool, recordPool, auditPool, activatePool := poolFor("reserve"), poolFor("record"), poolFor("audit"), poolFor("activate")
+	// Claim consumes the actual issued audit projection with its existing narrow role.
+	claimConfig, err := pgxpool.ParseConfig("postgres://enrollment_claim_runtime:synthetic-enrollment-claim@" + address + "/custody_test?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimConfig.ConnConfig.TLSConfig = tlsConfig
+	claimConfig.ConnConfig.Fallbacks = nil
+	claimConfig.MaxConns = 1
+	claimPool, err := pgxpool.NewWithConfig(ctx, claimConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(claimPool.Close)
+	bridge := tlsBridge(t, f.S3)
+	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+	bucket := "bootstrap-issuance"
+	s3admin := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
+	if _, err = s3admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s3admin.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := make([]byte, 32)
+	if _, err = rand.Read(raw); err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(raw)
+	clear(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := authorityTestKeys{aead}
+	objects := &objectstore.BootstrapIssueObjects{Store: store, Seal: keys, Open: keys}
+	type state struct {
+		request                     value.BootstrapRequest
+		intent                      value.BootstrapIntent
+		reservations                *postgres.BootstrapReservations
+		records, audits, activation *postgres.BootstrapIssues
+	}
+	setup := func(t *testing.T) state {
+		t.Helper()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		a := value.EnrollmentAuthority{InstallationID: uuid.NewString(), IssuerEpoch: uuid.NewString(), DeliveryProfile: "operator-channel", Actor: identity.Principal{Issuer: "https://identity.example.test", Subject: "synthetic-operator", ClientID: "console", Kind: identity.Human}, IdentityRevision: identity.Revision{UID: "identity-policy", Generation: 1, Digest: artifact.Digest{1}}, AdministrationRevision: identity.Revision{UID: "fleet-policy", Generation: 1, Digest: artifact.Digest{2}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}
+		if _, err := admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,$3,1,$4,false,false,$5,$6)`, a.InstallationID, a.IssuerEpoch, a.AdministrationRevision.UID, a.AdministrationRevision.Digest[:], now, now.Add(30*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		r, err := postgres.NewBootstrapReservations(ctx, reservePool, a.InstallationID, uuid.NewString)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := value.BootstrapRequest{KeyDigest: artifact.Digest{1}, DisplayName: "synthetic cluster", Region: "eu-test", Authority: a}
+		intent, err := r.ReserveBootstrap(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec, err := postgres.NewBootstrapIssues(ctx, recordPool, a.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		aud, err := postgres.NewBootstrapIssues(ctx, auditPool, a.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		act, err := postgres.NewBootstrapIssues(ctx, activatePool, a.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return state{request, intent, r, rec, aud, act}
+	}
+	record := func(t *testing.T, s state) audit.BootstrapIssue {
+		t.Helper()
+		r, err := s.records.RecordBootstrapCredential(ctx, s.intent.Slot, value.BootstrapCredential{SlotID: s.intent.Slot.ID, DeliveryProfile: s.intent.Slot.DeliveryProfile, SecretDigest: artifact.Digest{3}, Version: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	publish := func(t *testing.T, s state) {
+		t.Helper()
+		if err := (auditapp.BootstrapIssuePublisher{Ledger: s.audits, Objects: objects}).PublishBootstrapIssues(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count := func(t *testing.T, s state, want int) {
+		t.Helper()
+		var n int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_bootstrap WHERE installation_id=$1", s.request.Authority.InstallationID).Scan(&n); err != nil || n != want {
+			t.Fatal("claimable tokens", n, want, err)
+		}
+	}
+	for _, version := range []struct{ name, value string }{{"empty", ""}, {"literal-null", "null"}} {
+		for _, issued := range []bool{false, true} {
+			phase := "initial"
+			if issued {
+				phase = "replay"
+			}
+			t.Run("current-intent-receipt-"+phase+"-"+version.name, func(t *testing.T) {
+				s := setup(t)
+				record(t, s)
+				publish(t, s)
+				if issued {
+					if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err != nil {
+						t.Fatal(err)
+					}
+				}
+				deny := func() {
+					if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); !errors.Is(err, value.ErrDenied) {
+						t.Fatal("historical issue audit authorized activation", err)
+					}
+					want := 0
+					if issued {
+						want = 1
+					}
+					count(t, s, want)
+					if !time.Now().Before(s.request.Authority.ValidUntil) {
+						t.Fatal("negative ran after original authority expired")
+					}
+					// Recording an already observed provider result remains historical accounting.
+					if got := record(t, s); got.ID != s.intent.Slot.ID {
+						t.Fatal("historical credential record changed")
+					}
+				}
+				withBootstrapAuditVersion(t, ctx, admin, "intent", s.request.Authority.InstallationID, s.intent.Slot.ID, version.value, func() {
+					if issued {
+						// Preserve matching legacy versions on both original rows;
+						// denial must not depend on a mismatch between projections.
+						withBootstrapAuditVersion(t, ctx, admin, "issued", s.request.Authority.InstallationID, s.intent.Slot.ID, version.value, deny)
+					} else {
+						deny()
+					}
+				})
+				if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err != nil {
+					t.Fatal("exact original receipt restoration", err)
+				}
+			})
+		}
+		t.Run("current-issued-receipt-claim-"+version.name, func(t *testing.T) {
+			s := setup(t)
+			record(t, s)
+			publish(t, s)
+			out, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			claims, err := postgres.NewEnrollmentClaims(ctx, claimPool, s.request.Authority.InstallationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			claim := value.EnrollmentClaim{InstallationID: s.request.Authority.InstallationID, BootstrapID: out.Slot.ID, SecretDigest: out.Credential.SecretDigest, PublicKeyDigest: artifact.Digest{4}}
+			withBootstrapAuditVersion(t, ctx, admin, "issued", claim.InstallationID, claim.BootstrapID, version.value, func() {
+				if _, err := claims.ClaimConnector(ctx, claim); !errors.Is(err, value.ErrDenied) {
+					t.Fatal("historical issue audit authorized claim", err)
+				}
+				var unclaimed bool
+				if err := admin.QueryRow(ctx, "SELECT claimed_at IS NULL FROM fleet_bootstrap WHERE installation_id=$1 AND id=$2", claim.InstallationID, claim.BootstrapID).Scan(&unclaimed); err != nil || !unclaimed {
+					t.Fatal("denied claim changed spend", err)
+				}
+				if !time.Now().Before(s.request.Authority.ValidUntil) {
+					t.Fatal("negative ran after original authority expired")
+				}
+			})
+			if _, err := claims.ClaimConnector(ctx, claim); err != nil {
+				t.Fatal("exact issued receipt restoration", err)
+			}
+		})
+	}
+	t.Run("requires-credential-and-encrypted-audit", func(t *testing.T) {
+		s := setup(t)
+		if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+			t.Fatal("unrecorded credential activated")
+		}
+		record(t, s)
+		if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+			t.Fatal("unaudited credential activated")
+		}
+		broken := &objectstore.BootstrapIssueObjects{Store: store, Open: keys}
+		if err := (auditapp.BootstrapIssuePublisher{Ledger: s.audits, Objects: broken}).PublishBootstrapIssues(ctx); err == nil {
+			t.Fatal("missing encryption accepted")
+		}
+		count(t, s, 0)
+		publish(t, s)
+		out, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID)
+		if err != nil || !out.Issued || out.Credential == nil {
+			t.Fatal("audited activation", err)
+		}
+		count(t, s, 1)
+		retry, err := s.reservations.ReserveBootstrap(ctx, s.request)
+		if err != nil || !retry.Issued || retry.Credential == nil || *retry.Credential != *out.Credential || !retry.Slot.NotAfter.Equal(s.intent.Slot.NotAfter) {
+			t.Fatal("lost receipt recovery", err)
+		}
+	})
+	t.Run("concurrent-retry-creates-one-unchanged-token", func(t *testing.T) {
+		s := setup(t)
+		record(t, s)
+		publish(t, s)
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				r, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID)
+				if err != nil || !r.Issued || r.Slot.Binding != s.intent.Slot.Binding || !r.Slot.NotAfter.Equal(s.intent.Slot.NotAfter) {
+					t.Error("activation retry", err)
+				}
+			})
+		}
+		wg.Wait()
+		count(t, s, 1)
+		if _, err := admin.Exec(ctx, "UPDATE fleet_bootstrap SET revoked=true WHERE installation_id=$1", s.request.Authority.InstallationID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+			t.Fatal("retry revived revoked token")
+		}
+	})
+	t.Run("immutable-credential-and-audit", func(t *testing.T) {
+		s := setup(t)
+		r := record(t, s)
+		other := r.Credential
+		other.SecretDigest[0]++
+		if _, err := s.records.RecordBootstrapCredential(ctx, s.intent.Slot, other); !errors.Is(err, value.ErrConflict) {
+			t.Fatal("credential replaced", err)
+		}
+		receipt, err := objects.WriteBootstrapIssue(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := r
+		changed.Actor.Subject = "different"
+		if err = s.audits.AcknowledgeBootstrapIssue(ctx, changed, receipt); err == nil {
+			t.Fatal("different actor acknowledged")
+		}
+		if err = s.audits.AcknowledgeBootstrapIssue(ctx, r, receipt); err != nil {
+			t.Fatal(err)
+		}
+		retry, err := objects.WriteBootstrapIssue(ctx, r)
+		if err != nil || retry != receipt {
+			t.Fatal("object receipt changed", err)
+		}
+		receipt.SHA256[0]++
+		if err = s.audits.AcknowledgeBootstrapIssue(ctx, r, receipt); !errors.Is(err, value.ErrConflict) {
+			t.Fatal("receipt replaced", err)
+		}
+		if _, err = objects.WriteBootstrapIssue(ctx, changed); err == nil {
+			t.Fatal("conflicting immutable object accepted")
+		}
+		for _, sql := range []string{"UPDATE fleet_bootstrap_intent SET credential_sha256=decode(repeat('ab',32),'hex') WHERE installation_id=$1", "UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1"} {
+			if _, err = admin.Exec(ctx, sql, s.request.Authority.InstallationID); err == nil {
+				t.Fatal("direct reset passed")
+			}
+		}
+	})
+	for _, mode := range []string{"suspended", "recovery", "epoch", "revision", "actor", "request", "expired-lock"} {
+		t.Run(mode, func(t *testing.T) {
+			s := setup(t)
+			record(t, s)
+			publish(t, s)
+			sql := ""
+			switch mode {
+			case "suspended":
+				sql = "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1"
+			case "recovery":
+				sql = "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1"
+			case "epoch":
+				sql = "UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1"
+			case "revision":
+				sql = "UPDATE fleet_trust SET source_generation=source_generation+1 WHERE installation_id=$1"
+			case "actor":
+				s.request.Authority.Actor.Subject = "different"
+			case "request":
+				s.request.DisplayName = "different"
+			}
+			if sql != "" {
+				if _, err := admin.Exec(ctx, sql, s.request.Authority.InstallationID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "expired-lock" {
+				s.request.Authority.ValidUntil = time.Now().Add(200 * time.Millisecond)
+				tx, err := admin.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback(ctx)
+				if _, err = tx.Exec(ctx, "SELECT installation_id FROM fleet_trust WHERE installation_id=$1 FOR UPDATE", s.request.Authority.InstallationID); err != nil {
+					t.Fatal(err)
+				}
+				done := make(chan error, 1)
+				go func() { _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); done <- err }()
+				time.Sleep(300 * time.Millisecond)
+				if err = tx.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err = <-done; err == nil {
+					t.Fatal("expired authority activated")
+				}
+			} else if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+				t.Fatal("changed authority activated")
+			}
+			count(t, s, 0)
+		})
+	}
+	t.Run("historical-audit-does-not-activate", func(t *testing.T) {
+		s := setup(t)
+		if _, err := admin.Exec(ctx, "UPDATE fleet_trust SET suspended=true WHERE installation_id=$1", s.request.Authority.InstallationID); err != nil {
+			t.Fatal(err)
+		}
+		record(t, s)
+		publish(t, s)
+		count(t, s, 0)
+		if _, err := s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+			t.Fatal("historical audit minted authority")
+		}
+	})
+	t.Run("role-separation-and-terminal-receipt", func(t *testing.T) {
+		s := setup(t)
+		r := record(t, s)
+		receipt, err := objects.WriteBootstrapIssue(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wrongAudit, err := postgres.NewBootstrapIssues(ctx, recordPool, s.request.Authority.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = wrongAudit.AcknowledgeBootstrapIssue(ctx, r, receipt); err == nil {
+			t.Fatal("credential writer acknowledged audit")
+		}
+		if err = s.audits.AcknowledgeBootstrapIssue(ctx, r, receipt); err != nil {
+			t.Fatal(err)
+		}
+		wrongActivation, err := postgres.NewBootstrapIssues(ctx, auditPool, s.request.Authority.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = wrongActivation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err == nil {
+			t.Fatal("audit role activated token")
+		}
+		if _, err = s.activation.ActivateBootstrap(ctx, s.request, s.intent.Slot.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, "UPDATE fleet_bootstrap_intent SET issued_at=NULL WHERE installation_id=$1", s.request.Authority.InstallationID); err == nil {
+			t.Fatal("issued state reset")
+		}
+		for _, p := range []*pgxpool.Pool{reservePool, recordPool, auditPool, activatePool} {
+			for _, sql := range []string{"UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1", "UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1", "DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1", "UPDATE fleet_peer SET enabled=true WHERE installation_id=$1"} {
+				if _, err = p.Exec(ctx, sql, s.request.Authority.InstallationID); err == nil {
+					t.Fatal("purpose role widened authority")
+				}
+			}
+		}
+	})
+}

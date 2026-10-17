@@ -1,0 +1,361 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+	"sync"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	admission "k8s.io/api/admissionregistration/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const initialRuntimeBridgeMarker = "asservat.io/initial-runtime-bridge-operation"
+
+// InitialRuntimeBridge owns exactly two fixed policy CAS operations. Its
+// concrete native source is the same independently checked configuration
+// producer used for the three bootstrap roles. It never edits the retired
+// initial root, creates runtime credentials, starts a Pod or accepts SQL trust.
+type InitialRuntimeBridge struct {
+	preparer                      *InitialPreparer
+	source                        *ConfigurationRoleSource
+	effects                       app.InitialRuntimeBridgeEffects
+	record                        audit.InitialInstallation
+	administration                cfg.InitialRuntimeBridgeAdministration
+	initial                       contracts.InitialInstaller
+	binding                       string
+	policies                      [3]*admission.ValidatingAdmissionPolicy
+	guards                        [3]*configMapProtection
+	ctx                           context.Context
+	cancel                        context.CancelFunc
+	mu                            sync.Mutex
+	closed, busy, createAttempted bool
+	joined                        sync.WaitGroup
+}
+
+func NewInitialRuntimeBridge(ctx context.Context, preparer *InitialPreparer, source *ConfigurationRoleSource, effects app.InitialRuntimeBridgeEffects, administration cfg.InitialRuntimeBridgeAdministration) (*InitialRuntimeBridge, error) {
+	if effects == nil {
+		return nil, cfg.ErrInvalid
+	}
+	record, receipt := effects.InitialRuntimeBridgeRecord()
+	return newInitialRuntimeBridge(ctx, preparer, source, effects, record, receipt, administration)
+}
+
+func newInitialRuntimeBridge(ctx context.Context, preparer *InitialPreparer, source *ConfigurationRoleSource, effects app.InitialRuntimeBridgeEffects, record audit.InitialInstallation, receipt audit.Receipt, administration cfg.InitialRuntimeBridgeAdministration) (*InitialRuntimeBridge, error) {
+	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || !authorization.UUID(preparer.rootUID) || source == nil || source.client == nil || source.protection == nil || source.fleet == nil || source.fleet.settings == nil || source.fleet.protection == nil || source.owner == nil || source.owner.protection == nil || !administration.Valid() || !equalJSON(source.protection.plan, administration.Owner) || source.client.control != administration.Initial.ControlNamespace || source.input.ClusterID != preparer.plan.ClusterID || source.input.InitialClaimID == "" {
+		return nil, cfg.ErrInvalid
+	}
+	private, copyErr := json.Marshal(administration)
+	if copyErr != nil || json.Unmarshal(private, &administration) != nil {
+		return nil, cfg.ErrInvalid
+	}
+	if !record.Valid() || !receipt.ValidInitialInstallation(record.Scope.InstallationID, record.Claim.ID) || record.Scope.InstallationID != source.input.InstallationID || record.Claim.ID != source.input.InitialClaimID || record.Scope.NamespaceUID != source.input.Namespace.UID || record.Scope.ClusterID != source.input.ClusterID {
+		return nil, cfg.ErrInvalid
+	}
+	// This read selects only original immutable inputs. No alternate policy is
+	// accepted until the exact protected journal and all native guards are read.
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	if err := preparer.creator.administrator(call); err != nil {
+		return nil, err
+	}
+	if _, _, err := preparer.protection.current(call); err != nil {
+		return nil, err
+	}
+	_, root, err := preparer.read(call)
+	if err != nil || root.Activation == nil || root.Activation.Handover == nil || root.RootUID != preparer.rootUID {
+		return nil, cfg.ErrChanged
+	}
+	c, err := preparer.inputConfiguration(root)
+	if err != nil || initialPreparationWitnessScope(c) != record.Scope || preparationDigest(c) != root.Activation.Handover.StartupDigest || source.input.FleetSource != c.FleetSource || administration.Credentials != preparer.plan.Workload.Credentials {
+		return nil, cfg.ErrChanged
+	}
+	raw, err := json.Marshal(c)
+	if err != nil || sha256.Sum256(raw) != record.Claim.PlanDigest {
+		return nil, cfg.ErrChanged
+	}
+	h := administration.Owner.InitialHistoryProbe
+	if preparer.plan.HistoryProbe == nil || h == nil || h.Namespace != (cfg.NamespaceRef{Name: preparer.plan.BootstrapNamespace.Name, UID: preparer.plan.BootstrapNamespace.UID}) || h.ServiceAccount != preparer.plan.HistoryProbe.Name || h.ServiceAccountUID != preparer.plan.HistoryProbe.UID || len(administration.SourceProbes) != 2 {
+		return nil, cfg.ErrChanged
+	}
+	found := map[string]bool{}
+	for _, probe := range administration.SourceProbes {
+		if probe.ConfigMap != source.input.FleetSource.Name && probe.ConfigMap != source.input.OwnerSource.Name || found[probe.ConfigMap] {
+			return nil, cfg.ErrChanged
+		}
+		found[probe.ConfigMap] = true
+	}
+	// Construct all three exact shapes from the same original final guard. The
+	// private alternative cannot be selected by a public request or raw boolean.
+	base, err := preparer.finalHandoverProtection(c)
+	if err != nil {
+		return nil, err
+	}
+	old, _, err := InitialWorkloadAdmission(administration.Initial)
+	if err != nil {
+		return nil, err
+	}
+	normalizePermissionPolicy(&old.Spec)
+	if !equalJSON(base.policy, old.Spec) {
+		return nil, cfg.ErrChanged
+	}
+	probe, _, err := InitialRuntimeProbeAdmission(administration)
+	if err != nil {
+		return nil, err
+	}
+	retained, _, err := InitialRuntimeRetainedAdmission(administration)
+	if err != nil {
+		return nil, err
+	}
+	life, cancel := context.WithCancel(ctx)
+	out := &InitialRuntimeBridge{preparer: preparer, source: source, effects: effects, record: record, administration: administration, initial: c, ctx: life, cancel: cancel}
+	for i, policy := range []*admission.ValidatingAdmissionPolicy{old, probe, retained} {
+		normalizePermissionPolicy(&policy.Spec)
+		out.policies[i] = policy.DeepCopy()
+		g := *base
+		g.pin.PolicyGeneration += int64(i)
+		g.policy = policy.Spec
+		out.guards[i] = &g
+	}
+	binding, err := json.Marshal(struct {
+		Format              string
+		RootUID             string
+		Initial             contracts.InitialInstaller
+		Administration      cfg.InitialRuntimeBridgeAdministration
+		Sources             contracts.ConfigurationRuntimeRoles
+		OwnerPin            GuardPin
+		FleetPin, SourcePin GuardPin
+	}{"asservat-initial-runtime-bridge-binding/v1", preparer.rootUID, c, administration, source.input, source.protection.pin, source.fleet.protection.pin, source.owner.protection.pin})
+	if err != nil {
+		cancel()
+		return nil, cfg.ErrInvalid
+	}
+	d := sha256.Sum256(binding)
+	out.binding = hex.EncodeToString(d[:])
+	return out, nil
+}
+func (s *InitialRuntimeBridge) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+}
+func (s *InitialRuntimeBridge) name() string {
+	return "asservat-runtime-bridge-" + strings.ReplaceAll(s.source.input.InstallationID, "-", "")
+}
+func (s *InitialRuntimeBridge) path() string {
+	return "/api/v1/namespaces/" + s.initial.Namespace.Name + "/secrets/" + s.name()
+}
+func (s *InitialRuntimeBridge) policyPath() string {
+	return "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + s.initial.WorkloadGuard.Name
+}
+func (s *InitialRuntimeBridge) operation(ctx context.Context, run func(context.Context) error) error {
+	if s == nil || s.effects == nil || run == nil {
+		return cfg.ErrInvalid
+	}
+	return s.withOperation(ctx, func(call context.Context) error { return s.effects.WithInitialRuntimeBridge(call, run) })
+}
+
+func (s *InitialRuntimeBridge) withOperation(ctx context.Context, run func(context.Context) error) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || run == nil {
+		return cfg.ErrInvalid
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	live, cancel := context.WithTimeout(ctx, 5*time.Second)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	defer func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+	}()
+	live, finish, err := s.source.operation(live)
+	if err != nil {
+		return err
+	}
+	defer finish()
+	return run(live)
+}
+func (s *InitialRuntimeBridge) deadline(ctx context.Context) error {
+	until, ok := ctx.Deadline()
+	if !ok {
+		return cfg.ErrInvalid
+	}
+	return initialHandoverDeadline(ctx, s.source.client.now, until)
+}
+func initialRuntimeBridgeSpecDigest(p *admission.ValidatingAdmissionPolicy) string {
+	spec := p.Spec.DeepCopy()
+	normalizePermissionPolicy(spec)
+	b, _ := json.Marshal(spec)
+	d := sha256.Sum256(b)
+	return hex.EncodeToString(d[:])
+}
+func (s *InitialRuntimeBridge) validState(v contracts.InitialRuntimeBridgeState, now time.Time) bool {
+	if v.Format != contracts.InitialRuntimeBridgeStateFormat || v.BindingDigest != s.binding || !authorization.UUID(v.SetupID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute {
+		return false
+	}
+	ids := map[string]bool{v.SetupID: true}
+	for n, c := range []*contracts.InitialRuntimeBridgeTransition{v.Probe, v.Retained} {
+		if c == nil {
+			if n == 0 && v.Retained != nil {
+				return false
+			}
+			continue
+		}
+		if n == 1 && (v.Probe == nil || v.Probe.Receipt == nil) {
+			return false
+		}
+		if !authorization.UUID(c.OperationID) || ids[c.OperationID] || !identity.Text(c.FromResourceVersion, 128) || c.FromGeneration != s.guards[n].pin.PolicyGeneration || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(now) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.After(c.ClaimedAt) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || c.Until.After(v.Until) {
+			return false
+		}
+		ids[c.OperationID] = true
+		if n == 1 && c.ClaimedAt.Before(v.Probe.ClaimedAt) {
+			return false
+		}
+		if r := c.Receipt; r != nil {
+			if r.PolicyUID != s.guards[n].pin.PolicyUID || r.Generation != c.FromGeneration+1 || !identity.Text(r.ResourceVersion, 128) || r.ResourceVersion == c.FromResourceVersion || r.SpecDigest != initialRuntimeBridgeSpecDigest(s.policies[n+1]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+func (s *InitialRuntimeBridge) decode(raw []byte, ctx context.Context) (contracts.InitialRuntimeBridgeSnapshot, *core.Secret, error) {
+	var zero contracts.InitialRuntimeBridgeSnapshot
+	var obj core.Secret
+	if permissionJSON(raw, permissionPageBytes, 131072) != nil || strictGuardJSON(raw, &obj) != nil || obj.APIVersion != "v1" || obj.Kind != "Secret" || obj.Namespace != s.initial.Namespace.Name || obj.Name != s.name() || !authorization.UUID(string(obj.UID)) || !identity.Text(obj.ResourceVersion, 128) || obj.DeletionTimestamp != nil || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || obj.Type != core.SecretTypeOpaque || obj.Immutable != nil && *obj.Immutable || len(obj.Data) != 1 || len(obj.StringData) != 0 {
+		return zero, nil, cfg.ErrChanged
+	}
+	raw, ok := obj.Data["state.json"]
+	if !ok {
+		return zero, nil, cfg.ErrChanged
+	}
+	state, err := contracts.DecodeInitialRuntimeBridgeState(bytes.NewReader(raw))
+	if err != nil || !s.validState(state, s.source.client.now()) {
+		return zero, nil, cfg.ErrChanged
+	}
+	if err = s.deadline(ctx); err != nil {
+		return zero, nil, err
+	}
+	until, _ := ctx.Deadline()
+	return contracts.InitialRuntimeBridgeSnapshot{State: state, UID: string(obj.UID), ResourceVersion: obj.ResourceVersion, ValidUntil: until}, &obj, nil
+}
+func (s *InitialRuntimeBridge) read(ctx context.Context) (contracts.InitialRuntimeBridgeSnapshot, *core.Secret, error) {
+	raw, err := s.preparer.creator.raw(ctx, s.path(), nil)
+	if err != nil {
+		return contracts.InitialRuntimeBridgeSnapshot{}, nil, err
+	}
+	return s.decode(raw, ctx)
+}
+func (s *InitialRuntimeBridge) write(ctx context.Context, obj *core.Secret, next contracts.InitialRuntimeBridgeState) (contracts.InitialRuntimeBridgeSnapshot, error) {
+	var zero contracts.InitialRuntimeBridgeSnapshot
+	if !s.validState(next, s.source.client.now()) {
+		return zero, cfg.ErrInvalid
+	}
+	if err := s.deadline(ctx); err != nil {
+		return zero, err
+	}
+	payload, err := json.Marshal(next)
+	if err != nil || len(payload) > contracts.InitialRuntimeBridgeMaxBytes {
+		return zero, cfg.ErrInvalid
+	}
+	copy := obj.DeepCopy()
+	copy.Data = map[string][]byte{"state.json": payload}
+	raw, err := json.Marshal(copy)
+	if err != nil {
+		return zero, cfg.ErrInvalid
+	}
+	result, err := s.preparer.creator.api.Put().AbsPath(s.path()).Param("fieldValidation", "Strict").MaxRetries(0).Body(raw).DoRaw(ctx)
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	out, _, err := s.decode(result, ctx)
+	if err != nil || out.UID != string(obj.UID) || !equalJSON(out.State, next) {
+		return zero, cfg.ErrUnavailable
+	}
+	return out, nil
+}
+
+// CreateInitialRuntimeBridge is an explicit fresh setup action. After any
+// unknown result the supervisor may only Read, never repeat this CREATE. The
+// original final guard must still match; a partially advanced bridge cannot
+// recreate its journal. No implicit open-or-create path exists.
+func (s *InitialRuntimeBridge) CreateInitialRuntimeBridge(ctx context.Context) (contracts.InitialRuntimeBridgeSnapshot, error) {
+	var out contracts.InitialRuntimeBridgeSnapshot
+	err := s.operation(ctx, func(call context.Context) error {
+		s.mu.Lock()
+		if s.createAttempted {
+			s.mu.Unlock()
+			return cfg.ErrUnavailable
+		}
+		s.createAttempted = true
+		s.mu.Unlock()
+		_, _, _, originalUntil, e := s.preparer.currentHandover(call)
+		if e != nil {
+			return e
+		}
+		call, finish := context.WithDeadline(call, originalUntil)
+		defer finish()
+		if _, e := s.source.configurationRoleGuardVersions(call); e != nil {
+			return e
+		}
+		if e := s.deadline(call); e != nil {
+			return e
+		}
+		now := s.source.client.now().UTC().Truncate(time.Microsecond)
+		id, e := prepUUID()
+		if e != nil {
+			return e
+		}
+		state := contracts.InitialRuntimeBridgeState{Format: contracts.InitialRuntimeBridgeStateFormat, BindingDigest: s.binding, SetupID: id, CreatedAt: now, Until: now.Add(30 * time.Minute)}
+		payload, e := json.Marshal(state)
+		if e != nil {
+			return cfg.ErrInvalid
+		}
+		object := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Namespace: s.initial.Namespace.Name, Name: s.name()}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": payload}}
+		raw, e := json.Marshal(object)
+		if e != nil {
+			return cfg.ErrInvalid
+		}
+		response, e := s.preparer.creator.api.Post().AbsPath(strings.TrimSuffix(s.path(), "/"+s.name())).Param("fieldValidation", "Strict").MaxRetries(0).Body(raw).DoRaw(call)
+		if e != nil {
+			return cfg.ErrUnavailable
+		}
+		out, _, e = s.decode(response, call)
+		if e != nil || !equalJSON(out.State, state) {
+			return cfg.ErrUnavailable
+		}
+		return nil
+	})
+	if err != nil {
+		return contracts.InitialRuntimeBridgeSnapshot{}, err
+	}
+	return out, nil
+}

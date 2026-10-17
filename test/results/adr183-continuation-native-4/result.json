@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-4",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Stopped at worker/handover (changed): after the guard bridge PUTs the workload guard to later generations, InitialPreparer.ReadHandover's final protection check reports a change. Run 5 uses the original installer input the resource producer verified under the handover at construction (InitialRuntimeResources.Initial) instead of a post-bridge handover read. This also identifies that a post-bridge replay of any ReadHandover caller (including the passive bootstrap hook) stops; recorded in ADR-183.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

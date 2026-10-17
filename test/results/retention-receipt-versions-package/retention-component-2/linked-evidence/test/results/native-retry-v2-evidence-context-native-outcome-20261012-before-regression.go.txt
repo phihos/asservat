@@ -1,0 +1,13 @@
+package postgres
+
+import "testing"
+
+// A failed/unknown attempted response can have both local SQL owners closed.
+// Those closes join local I/O only; they cannot revive the stopped remote worker
+// or turn the retained uncertainty into metadata-observation admission.
+func TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse(t *testing.T) {
+ c := contextNativeControl{remaining: 32, uncertain: true}
+ if c.canObserve() { t.Fatal("closed local owners admitted another native observation despite retained failed/unknown output") }
+ c.uncertain = false
+ if !c.canObserve() { t.Fatal("known eligible bounded retry denied") }
+}

@@ -1,0 +1,27 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-binding-lock-without-allocation-or-freshness-writes
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-lock-outage-is-unavailable-not-changed
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/missing-storage-binding-remains-changed
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation
+    capture_intent_lifecycle_test.go:310: SQL admission plus encrypted pair acknowledged in 157.845935ms under original caller bound; collector acquisition is outside this SQL/S3 fixture
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0
+=== RUN   TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2
+--- PASS: TestContextAdmissionWithRealServices (111.27s)
+    --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair (110.94s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-binding-lock-without-allocation-or-freshness-writes (0.54s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/storage-lock-outage-is-unavailable-not-changed (0.18s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/missing-storage-binding-remains-changed (0.16s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/atomic-legacy-and-wrong-key-denial (0.19s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/same-live-admission-pair-replay-and-role-separation (30.22s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/concurrent-first-claim-and-finite-reads (0.23s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/held-audit-pool-preserves-original-admission-deadline (0.54s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/old-read-claim-cannot-borrow-new-cutoff-or-create-completion (5.35s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H0 (30.28s)
+        --- PASS: TestContextAdmissionWithRealServices/capture-intent-private-pair/healthy-retirement-H2 (43.23s)
+PASS
+ok  	asservat.local/asservat/test/integration	112.324s

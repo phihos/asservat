@@ -1,0 +1,255 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Temporary opt-in fixture observer. It records only fixed SQLC query labels,
+// role labels, numeric durations and outcome booleans. SQL text, arguments,
+// credentials, error strings and evidence never enter the retained records.
+// Query/acquire tracing performs no additional database or network operation.
+// Query duration includes row consumption through rows.Close; acquire duration
+// includes possible connection creation/replacement and ping. Neither measures
+// server lock time separately. The bounded mutex/clock overhead is diagnostic,
+// not measured as zero and not a production performance qualification.
+type nativeSQLTiming struct {
+	mu                          sync.Mutex
+	started                     time.Time
+	queries, acquires, failures int64
+	slowest                     [32]nativeSQLTimingEvent
+	retained                    int
+}
+
+type nativeSQLTimingEvent struct {
+	Kind, Role, Query string
+	AtMS, ElapsedUS   int64
+	OK                bool
+}
+
+type nativeSQLTimingStart struct {
+	at    time.Time
+	query string
+}
+
+type nativeSQLTimingKey uint8
+
+const (
+	nativeSQLQueryStart nativeSQLTimingKey = iota
+	nativeSQLAcquireStart
+)
+
+type nativeSQLTimingPool struct {
+	trace *nativeSQLTiming
+	role  string
+}
+
+// The temporary diagnostic labels only this selected fixture's fixed roles.
+// In particular, do not retain a dynamically created role name or caller token.
+func nativeSQLTimingRole(v string) string {
+	switch v {
+	case "authority_runtime", "capture_runtime", "custody_runtime", "context_control_config_runtime", "capture_audit_runtime",
+		"download_runtime", "download_audit_runtime", "download_config_runtime", "peer_read_runtime", "context_catalog_read_runtime",
+		"download_worker_runtime", "download_worker_audit_runtime", "download_worker_identity_runtime", "worker_routing_read_runtime",
+		"retention_runtime", "download_key_bind_runtime", "download_key_read_runtime", "native_owner_runtime", "native_key_bind_runtime",
+		"native_key_read_runtime", "native_history_runtime", "native_metadata_runtime", "worker_owner_runtime", "native_plan_runtime",
+		"worker_enrollment_runtime", "worker_enrollment_audit_runtime", "worker_enrollment_activate_runtime",
+		"worker_configuration_runtime", "worker_configuration_audit_runtime", "worker_configuration_read_runtime",
+		"processing_config_runtime", "processing_decision_runtime", "download_stop_lifecycle_config_runtime",
+		"operation_audit_config_runtime", "operation_audit_runtime", "operation_audit_ack_runtime":
+		return strings.Clone(v)
+	default:
+		return "other"
+	}
+}
+
+// Deliberately small closed list from the current SQLC download/authority path.
+// Unknown generated query names and arbitrary SQL comments become "other".
+func nativeSQLTimingQueryLabel(v string) string {
+	switch v {
+	case "CurrentTime", "ReadFleetTrust", "ShareFleetTrust", "LockPermissionStream", "ReadAuthorityAudit",
+		"ReadPublishedContext", "ReadContextDownloadRoute", "ReadPublicationCapture", "ReadAttempt",
+		"ReadProcessingRoot", "ReadProcessingNode", "ReadProcessingRules",
+		"LockDownloadSession", "ReadDownloadBatch", "LockDownloadResponse", "LockDownloadWindow",
+		"LockDownloadWorker", "ReadWorkerEnrollment", "LockNativeOwner", "CloseNativeOwner",
+		"InsertNativeOwner", "ReplaceNativeOwner", "ReadActiveWorkerCertificate",
+		"ShareWorkerConfiguration", "ReadWorkerConfigurationRevision", "LatestDownloadWorker":
+		return strings.Clone(v)
+	default:
+		return "other"
+	}
+}
+
+func nativeSQLTimingQuery(sql string) string {
+	const prefix = "-- name: "
+	if strings.HasPrefix(sql, prefix) {
+		v := sql[len(prefix):]
+		if end := strings.IndexByte(v, ' '); end >= 0 {
+			return nativeSQLTimingQueryLabel(v[:end])
+		}
+	}
+	switch sql {
+	case "begin", "commit", "rollback":
+		return sql
+	default:
+		return "other"
+	}
+}
+
+func (t *nativeSQLTiming) pool(role string) pgx.QueryTracer {
+	return &nativeSQLTimingPool{trace: t, role: nativeSQLTimingRole(role)}
+}
+
+func (p *nativeSQLTimingPool) TraceQueryStart(ctx context.Context, _ *pgx.Conn, d pgx.TraceQueryStartData) context.Context {
+	return context.WithValue(ctx, nativeSQLQueryStart, nativeSQLTimingStart{time.Now(), nativeSQLTimingQuery(d.SQL)})
+}
+func (p *nativeSQLTimingPool) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, d pgx.TraceQueryEndData) {
+	if start, ok := ctx.Value(nativeSQLQueryStart).(nativeSQLTimingStart); ok {
+		p.trace.record("query", p.role, start, d.Err == nil)
+	}
+}
+func (p *nativeSQLTimingPool) TraceAcquireStart(ctx context.Context, _ *pgxpool.Pool, _ pgxpool.TraceAcquireStartData) context.Context {
+	return context.WithValue(ctx, nativeSQLAcquireStart, nativeSQLTimingStart{at: time.Now(), query: "none"})
+}
+func (p *nativeSQLTimingPool) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, d pgxpool.TraceAcquireEndData) {
+	if start, ok := ctx.Value(nativeSQLAcquireStart).(nativeSQLTimingStart); ok {
+		p.trace.record("acquire", p.role, start, d.Err == nil)
+	}
+}
+
+func (t *nativeSQLTiming) record(kind, role string, start nativeSQLTimingStart, ok bool) {
+	e := nativeSQLTimingEvent{Kind: kind, Role: role, Query: start.query, AtMS: start.at.Sub(t.started).Milliseconds(), ElapsedUS: time.Since(start.at).Microseconds(), OK: ok}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if kind == "query" {
+		t.queries++
+	} else {
+		t.acquires++
+	}
+	if !ok {
+		t.failures++
+	}
+	if t.retained < len(t.slowest) {
+		t.slowest[t.retained] = e
+		t.retained++
+		return
+	}
+	least := 0
+	for i := 1; i < len(t.slowest); i++ {
+		if t.slowest[i].ElapsedUS < t.slowest[least].ElapsedUS {
+			least = i
+		}
+	}
+	if e.ElapsedUS > t.slowest[least].ElapsedUS {
+		t.slowest[least] = e
+	}
+}
+
+func (t *nativeSQLTiming) report(test *testing.T) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	events := append([]nativeSQLTimingEvent(nil), t.slowest[:t.retained]...)
+	sort.Slice(events, func(i, j int) bool { return events[i].ElapsedUS > events[j].ElapsedUS })
+	test.Log("native SQL trace", "queries", t.queries, "acquires", t.acquires, "failed", t.failures, "retained", len(events))
+	for _, e := range events {
+		test.Logf("native SQL trace %+v", e)
+	}
+}
+
+func TestNativeSQLTimingRetainsLabelsAndBoundedLongestEvents(t *testing.T) {
+	for _, sql := range []string{"SELECT 'synthetic-secret'", "-- name: bad-name :one\nSELECT 'synthetic-secret'", "-- name: bad\nname :one"} {
+		if got := nativeSQLTimingQuery(sql); got != "other" {
+			t.Fatal("retained unrecognized SQL", got)
+		}
+	}
+	if got := nativeSQLTimingQuery("-- name: LockNativeOwner :one\nSELECT secret_payload"); got != "LockNativeOwner" {
+		t.Fatal(got)
+	}
+	trace := &nativeSQLTiming{started: time.Now()}
+	p := trace.pool("native_owner_runtime").(*nativeSQLTimingPool)
+	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	call := p.TraceQueryStart(parent, nil, pgx.TraceQueryStartData{SQL: "SELECT 'synthetic-secret'", Args: []any{"synthetic-secret"}})
+	end, ok := call.Deadline()
+	want, _ := parent.Deadline()
+	if !ok || !end.Equal(want) || call.Done() != parent.Done() {
+		t.Fatal("trace changed original context bounds")
+	}
+	p.TraceQueryEnd(call, nil, pgx.TraceQueryEndData{})
+	for i := 0; i < 100; i++ {
+		trace.record("query", "native_owner_runtime", nativeSQLTimingStart{at: time.Now().Add(-time.Duration(i) * time.Millisecond), query: "LockNativeOwner"}, true)
+	}
+	if trace.retained != len(trace.slowest) || trace.queries != 101 {
+		t.Fatal("unbounded or lost trace accounting")
+	}
+	for _, e := range trace.slowest {
+		if e.Query != "LockNativeOwner" || e.ElapsedUS < 60_000 {
+			t.Fatal("did not retain longest bounded observations")
+		}
+	}
+}
+
+func TestNativeSQLTimingRejectsUnknownLabelsAndSensitiveValues(t *testing.T) {
+	for _, sql := range []string{
+		"-- name: SyntheticSecretToken012345 :one\nSELECT 1",
+		"-- name: UnknownGeneratedQuery :one\nSELECT 1",
+		"-- name: LockNativeOwnerExtra :one\nSELECT 1",
+		"-- name: LockNativeOwner\n:one\nSELECT 1",
+	} {
+		if nativeSQLTimingQuery(sql) != "other" {
+			t.Fatal("unknown query comment escaped closed classifier")
+		}
+	}
+	for _, role := range []string{"", "SyntheticSecretToken012345", "native_owner_runtime_1234", "12345678_1234_1234_1234_123456789abc", "postgres"} {
+		if nativeSQLTimingRole(role) != "other" {
+			t.Fatal("unknown role escaped closed classifier")
+		}
+	}
+	trace := &nativeSQLTiming{started: time.Now()}
+	p := trace.pool("SyntheticSecretToken012345").(*nativeSQLTimingPool)
+	ctx, cancel := context.WithCancel(context.Background())
+	query := p.TraceQueryStart(ctx, nil, pgx.TraceQueryStartData{SQL: "-- name: SyntheticSecretToken012345 :one\nSELECT private_body", Args: []any{"private_argument"}})
+	acquire := p.TraceAcquireStart(ctx, nil, pgxpool.TraceAcquireStartData{})
+	cancel()
+	if query.Err() != context.Canceled || acquire.Err() != context.Canceled || query.Done() != ctx.Done() || acquire.Done() != ctx.Done() {
+		t.Fatal("trace changed original cancellation")
+	}
+	p.TraceQueryEnd(query, nil, pgx.TraceQueryEndData{Err: errors.New("private_error")})
+	p.TraceAcquireEnd(acquire, nil, pgxpool.TraceAcquireEndData{Err: errors.New("private_connection_error")})
+	if trace.queries != 1 || trace.acquires != 1 || trace.failures != 2 || trace.retained != 2 {
+		t.Fatal("trace lost failure accounting")
+	}
+	for _, e := range trace.slowest[:trace.retained] {
+		if e.Role != "other" || e.OK || (e.Query != "other" && e.Query != "none") {
+			t.Fatal("retained private query, role, or failure content")
+		}
+	}
+}
+
+func TestNativeSQLTimingConcurrentRecordingRemainsBounded(t *testing.T) {
+	trace := &nativeSQLTiming{started: time.Now()}
+	var joined sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		joined.Add(1)
+		go func() {
+			defer joined.Done()
+			p := trace.pool("native_owner_runtime").(*nativeSQLTimingPool)
+			for j := 0; j < 100; j++ {
+				ctx := p.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: "-- name: LockNativeOwner :one\nSELECT private_body"})
+				p.TraceQueryEnd(ctx, nil, pgx.TraceQueryEndData{})
+			}
+		}()
+	}
+	joined.Wait()
+	if trace.queries != 800 || trace.retained != 32 || trace.failures != 0 {
+		t.Fatal("concurrent trace lost bounded accounting")
+	}
+}

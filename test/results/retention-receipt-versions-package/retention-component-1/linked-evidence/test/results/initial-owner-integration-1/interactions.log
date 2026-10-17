@@ -1,0 +1,62 @@
+=== RUN   TestOwnerBootstrapSelectionCodecsStayClosedAndBounded
+--- PASS: TestOwnerBootstrapSelectionCodecsStayClosedAndBounded (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.028s
+=== RUN   TestInitialVersionedServicesProducePinnedInstallerFormat
+--- PASS: TestInitialVersionedServicesProducePinnedInstallerFormat (2.13s)
+=== RUN   TestInitialVersionedAuditRoutingPreservesOriginalProfiles
+=== RUN   TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v2
+=== RUN   TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v3
+=== RUN   TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v4
+--- PASS: TestInitialVersionedAuditRoutingPreservesOriginalProfiles (0.23s)
+    --- PASS: TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v2 (0.08s)
+    --- PASS: TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v3 (0.08s)
+    --- PASS: TestInitialVersionedAuditRoutingPreservesOriginalProfiles/asservat-initial-bootstrap/v4 (0.08s)
+=== RUN   TestInitialVersionedBootstrapProjectsRequiredServices
+=== RUN   TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v2
+=== RUN   TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v3
+=== RUN   TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v4
+--- PASS: TestInitialVersionedBootstrapProjectsRequiredServices (0.00s)
+    --- PASS: TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v2 (0.00s)
+    --- PASS: TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v3 (0.00s)
+    --- PASS: TestInitialVersionedBootstrapProjectsRequiredServices/asservat-initial-bootstrap/v4 (0.00s)
+=== RUN   TestOwnerBootstrapOriginalAllocationAndGeneratedInput
+--- PASS: TestOwnerBootstrapOriginalAllocationAndGeneratedInput (3.66s)
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/permission-root
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/logical-peer
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/cluster
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/issuer
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/trust
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pki-role
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pool-budget
+--- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution (3.28s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/permission-root (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/logical-peer (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/cluster (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/issuer (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/trust (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pki-role (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pool-budget (0.00s)
+=== RUN   TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes
+--- PASS: TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes (0.02s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	10.377s
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned
+--- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt (0.08s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null (0.01s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned (0.01s)
+=== RUN   TestInitialInstallerAuditFormatIsImmutablePlan
+--- PASS: TestInitialInstallerAuditFormatIsImmutablePlan (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.141s

@@ -1,0 +1,13 @@
+ok  	asservat.local/asservat/internal/domain/artifact	3.592s
+ok  	asservat.local/asservat/internal/domain/audit	1.008s
+ok  	asservat.local/asservat/internal/domain/authorization	1.463s
+ok  	asservat.local/asservat/internal/domain/privacy	1.010s
+ok  	asservat.local/asservat/internal/application/audit	1.097s
+ok  	asservat.local/asservat/internal/application/authorization	1.021s
+ok  	asservat.local/asservat/internal/application/catalog	1.013s
+ok  	asservat.local/asservat/internal/application/evidence	1.569s
+ok  	asservat.local/asservat/internal/application/fleet	2.093s
+ok  	asservat.local/asservat/internal/application/privacy	1.033s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.246s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.768s
+ok  	asservat.local/asservat/internal/transport/native	2.390s

@@ -1,0 +1,23 @@
+{
+  "scope": "ADR131 request-only native bootstrap guard correction",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_admission_test.go",
+      "base_sha256": null,
+      "sha256": "22e1f0fa3e5840c2a469e6a60ddd008e074fb7b54c4819de2ae81518afc501b5",
+      "bytes": 3496
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+      "base_sha256": "268cddb4c092a6b310d64735a1d7c8b919874f9f961b3e26e6abe0356c930d47",
+      "sha256": "b0646e86dd7b48db68e1dc44c416ce8ddadc7e400bde48a0353d2a23ca5aa1dc",
+      "bytes": 12492
+    },
+    {
+      "path": "test/integration/initial_bootstrap_guard_test.go",
+      "base_sha256": null,
+      "sha256": "388c404e4933e15aa68926e645b3e76cd25b66a8e785c8f8fb151a2ee15baeff",
+      "bytes": 17478
+    }
+  ]
+}

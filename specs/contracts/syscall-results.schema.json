@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/syscall-results.schema.json",
+  "title": "Untrusted syscall evidence projections",
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "process_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "thread_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "pod_uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "process_ref",
+            "thread_ref",
+            "pod_uid"
+          ]
+        },
+        "syscall": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "abi": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "error",
+            "unfinished",
+            "unmatched",
+            "unknown"
+          ]
+        },
+        "errno": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "identity",
+        "syscall",
+        "abi",
+        "timestamp",
+        "outcome"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "errno"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "unfinished",
+                  "unmatched",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "errno"
+                  ]
+                },
+                {
+                  "required": [
+                    "duration_ns"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rawEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "process_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "thread_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "pod_uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "process_ref",
+            "thread_ref",
+            "pod_uid"
+          ]
+        },
+        "syscall": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "abi": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "error",
+            "unfinished",
+            "unmatched",
+            "unknown"
+          ]
+        },
+        "errno": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "value": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 4096
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "value",
+              "truncated"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "identity",
+        "syscall",
+        "abi",
+        "timestamp",
+        "outcome",
+        "arguments"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "errno"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "unfinished",
+                  "unmatched",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "errno"
+                  ]
+                },
+                {
+                  "required": [
+                    "duration_ns"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dropped_events": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unmatched_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 0,
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "dropped_events",
+        "unmatched_events",
+        "truncated",
+        "gaps"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "syscallSummary"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "syscall": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "errors": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "paired_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "total_duration_ns": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "syscall",
+              "count",
+              "errors",
+              "paired_count",
+              "total_duration_ns"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "coverage": {
+          "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/coverage"
+        }
+      },
+      "required": [
+        "kind",
+        "rows",
+        "coverage"
+      ]
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "syscallEvents"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/event"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "coverage": {
+          "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/coverage"
+        }
+      },
+      "required": [
+        "kind",
+        "events",
+        "coverage"
+      ]
+    },
+    "raw": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "syscallQuery"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/rawEvent"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "coverage": {
+          "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/coverage"
+        }
+      },
+      "required": [
+        "kind",
+        "events",
+        "coverage"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/summary"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/events"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/raw"
+    }
+  ]
+}

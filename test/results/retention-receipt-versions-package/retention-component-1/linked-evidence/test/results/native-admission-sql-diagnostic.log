@@ -1,0 +1,15 @@
+=== RUN   TestContextAdmissionWithRealServices
+    capture_admission_test.go:153: invalid artifact storage descriptor
+    native_sql_timing_test.go:161: native SQL trace queries 4 acquires 4 failed 4 retained 8
+    native_sql_timing_test.go:163: native SQL trace {Kind:acquire Role:capture_runtime Query:none AtMS:1 ElapsedUS:15525 OK:true}
+    native_sql_timing_test.go:163: native SQL trace {Kind:query Role:capture_runtime Query:other AtMS:16 ElapsedUS:893 OK:false}
+    native_sql_timing_test.go:163: native SQL trace {Kind:query Role:capture_runtime Query:other AtMS:18 ElapsedUS:604 OK:false}
+    native_sql_timing_test.go:163: native SQL trace {Kind:query Role:capture_runtime Query:other AtMS:17 ElapsedUS:432 OK:false}
+    native_sql_timing_test.go:163: native SQL trace {Kind:query Role:capture_runtime Query:other AtMS:18 ElapsedUS:176 OK:false}
+    native_sql_timing_test.go:163: native SQL trace {Kind:acquire Role:capture_runtime Query:none AtMS:17 ElapsedUS:6 OK:true}
+    native_sql_timing_test.go:163: native SQL trace {Kind:acquire Role:capture_runtime Query:none AtMS:18 ElapsedUS:4 OK:true}
+    native_sql_timing_test.go:163: native SQL trace {Kind:acquire Role:capture_runtime Query:none AtMS:18 ElapsedUS:2 OK:true}
+--- FAIL: TestContextAdmissionWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.081s
+FAIL

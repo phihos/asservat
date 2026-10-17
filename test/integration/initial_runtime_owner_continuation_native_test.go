@@ -1,0 +1,281 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+// This fixed fixture continuation borrows the actual still-live predecessor.
+// It is never supplied to a product constructor as authority or a callback.
+type initialRuntimeOwnerContinuation struct {
+	resources *kube.InitialRuntimeResources
+	bridge    *kube.InitialRuntimeBridge
+	original  *apps.Deployment
+}
+
+// The enclosing worker owns this cleanup, registered before qualify can launch
+// an owner. Keep its Deployment present through the worker's later source-loss
+// assertions so owner deletion cannot become a different guard-loss trigger.
+func (o *initialRuntimeOwnerContinuation) cleanup(t *testing.T, api kubernetes.Interface) {
+	if o != nil && o.original != nil {
+		providerWorkerNativeCleanup(t, api, o.original)
+	}
+}
+
+func (o *initialRuntimeOwnerContinuation) qualify(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, inventory kube.InitialRuntimeResourceInventory, input contracts.HubWorkerDeployment, roles contracts.ConfigurationRuntimeRoleSnapshot, providers *initialRuntimeNativeProviders, witness *providerWorkerWitness, workerPod *core.Pod, workerImage string) {
+	t.Helper()
+	providers.trace.ownerDeadlines.enable()
+	acceptedPool, accepted := providerOwnerAcceptedSource(t, ctx, config, input, roles)
+	defer acceptedPool.Close()
+	original, err := api.AppsV1().Deployments(input.Namespace.Name).Get(ctx, inventory.OwnerDeployment.Name, meta.GetOptions{})
+	if err != nil || string(original.UID) != inventory.OwnerDeployment.UID || original.Spec.Replicas == nil || *original.Spec.Replicas != 0 {
+		t.Fatal("original inert owner missing", err)
+	}
+	// The enclosing worker registered original-UID foreground cleanup before
+	// entering this continuation; pin its sole target before any owner effect.
+	o.original = original.DeepCopy()
+	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
+	plan := contracts.OwnerBootstrapPlan{Format: contracts.OwnerBootstrapPlanFormat, PKIMount: "owner-pki", Connections: 4, Concurrency: 2, Peers: []contracts.OwnerBootstrapPeerPlan{{ClusterID: input.ClusterID, Roots: providers.issuerRoots}}}
+	// The one declared original logical peer and its trust root are fixture
+	// installation input. No SQL49 registration or permission stream is seeded.
+	owner := prepareProviderPairOwner(t, ctx, config, o.resources, o.bridge, providers, accepted, plan)
+	defer owner.Close()
+	inspector := owner.configureProvider(t, ctx, accepted)
+	defer func() {
+		if err := inspector.Close(context.Background()); err != nil {
+			t.Error(err)
+		}
+	}()
+	owner.provisionOwnerAudit(t, ctx, api)
+	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
+	owner.install(t, ctx, api, inspector)
+	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
+	owner.observeIdentity(t, ctx, api, config, original, accepted, witness)
+	providerWorkerRequireRunning(t, ctx, api, workerPod, workerImage)
+	t.Log("actual owner original Pod/image and paired same-process activated SQL30 identities with independent version-pinned encrypted enrollment/certificate audit and current registry checks; no receipt-gated v2 backend, HWORK route, active capacity/cleanup or public workflow claim")
+}
+
+// A real original role is reused under its existing LIMIT3: one running worker,
+// this MaxConns1 installer reader, and the already reserved verifier slot. No
+// new role, privilege, connection limit or write-on-read observer is introduced.
+func providerOwnerAcceptedSource(t *testing.T, ctx context.Context, config *pgx.ConnConfig, input contracts.HubWorkerDeployment, s contracts.ConfigurationRuntimeRoleSnapshot) (*pgxpool.Pool, *postgres.OwnerConfigurations) {
+	t.Helper()
+	if input.Activation == nil || input.ProviderInputs == nil || s.UID != input.ProviderInputs.ConfigurationRoot.UID || s.State.OperationID != input.ProviderInputs.ConfigurationSetupID || s.State.Input.OwnerSource != input.OwnerSource || s.State.Input.Deployment != input.Activation.Deployment || s.State.Input.ServiceAccount != input.Activation.ServiceAccount {
+		t.Fatal("original configuration-source provenance missing")
+	}
+	m := contracts.ConfigurationRuntimeCredentialManifest{Format: contracts.ConfigurationRuntimeCredentialManifestFormat, Input: s.State.Input, RootUID: s.UID, SetupID: s.State.OperationID}
+	var credential contracts.OwnerSQLCredential
+	for _, r := range s.State.Roles {
+		if r.Claim == nil || r.Receipt == nil {
+			t.Fatal("configuration role lacks original receipt")
+		}
+		m.Roles = append(m.Roles, contracts.ConfigurationRuntimeCredentialProof{Purpose: r.Purpose, Claim: *r.Claim, Receipt: *r.Receipt})
+		if r.Purpose == "configuration-source" {
+			credential = contracts.OwnerSQLCredential{Username: r.Receipt.RoleName, Password: r.Password}
+		}
+	}
+	pool := providerOwnerScopedPool(t, ctx, config, credential)
+	complete := false
+	defer func() {
+		if !complete {
+			pool.Close()
+		}
+	}()
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	if err := postgres.VerifyConfigurationRuntimeCredential(call, pool, m, "configuration-source"); err != nil {
+		t.Fatal("actual original configuration-source credential verification", err)
+	}
+	reader, err := postgres.NewOwnerConfigurations(call, pool, input.InstallationID, input.ClusterID, input.Namespace.UID, input.OwnerSource.UID)
+	if err != nil {
+		t.Fatal("actual accepted owner reader", err)
+	}
+	complete = true
+	return pool, reader
+}
+
+func providerOwnerScopedPool(t *testing.T, ctx context.Context, config *pgx.ConnConfig, credential contracts.OwnerSQLCredential) *pgxpool.Pool {
+	t.Helper()
+	if credential.Username == "" || credential.Password == "" {
+		t.Fatal("original scoped credential missing")
+	}
+	p, err := pgxpool.ParseConfig("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.ConnConfig = config.Copy()
+	p.ConnConfig.User, p.ConnConfig.Password = credential.Username, credential.Password
+	p.ConnConfig.RuntimeParams = map[string]string{"application_name": "asservat-original-owner-native-observer", "statement_timeout": "5000ms", "lock_timeout": "1000ms", "idle_in_transaction_session_timeout": "5000ms"}
+	p.MaxConns, p.MinConns = 1, 0
+	pool, err := pgxpool.NewWithConfig(ctx, p)
+	if err != nil {
+		t.Fatal("original scoped observer connection", err)
+	}
+	return pool
+}
+
+// Installation has already acknowledged this exact child. This fixture reads
+// the original public journal and immutable mounted registry credential only;
+// these historical bytes do not stand in for current registry/recovery checks.
+func (o *initialRuntimeNativeOwner) registry(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig) (*pgxpool.Pool, *postgres.OwnerEnrollments) {
+	t.Helper()
+	in := o.root.Input()
+	journal, err := api.CoreV1().Secrets(in.Namespace.Name).Get(ctx, in.Resources.Name, meta.GetOptions{})
+	if err != nil || string(journal.UID) != in.Resources.UID {
+		t.Fatal("original owner resource journal", err)
+	}
+	state, err := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(journal.Data["state.json"]))
+	if err != nil || state.SetupID != in.ResourceSetupID || state.BindingDigest != in.ResourceBinding || state.OwnerIdentity == nil || state.OwnerIdentity.Receipt == nil || state.OwnerLaunch == nil || state.OwnerLaunch.Receipt == nil {
+		t.Fatal("owner identity and launch were not acknowledged", err)
+	}
+	claim := state.OwnerIdentity
+	if claim.Credentials == nil || claim.Credentials.Receipt == nil || claim.Credentials.Receipt.Object != claim.Receipt.Credentials {
+		t.Fatal("original owner credential child missing")
+	}
+	ref := claim.Receipt.Credentials
+	secret, err := api.CoreV1().Secrets(in.Namespace.Name).Get(ctx, ref.Name, meta.GetOptions{})
+	if err != nil || string(secret.UID) != ref.UID || secret.Immutable == nil || !*secret.Immutable || secret.ResourceVersion != claim.Credentials.Receipt.ResourceVersion || len(secret.Data) != 5 {
+		t.Fatal("original immutable owner credential projection", err)
+	}
+	defer func() {
+		for _, b := range secret.Data {
+			clear(b)
+		}
+	}()
+	manifest, err := contracts.DecodeOwnerIdentityCredentialManifest(bytes.NewReader(secret.Data[contracts.OwnerIdentityRoleManifestFile]))
+	if err != nil || manifest.Input != in || manifest.RootUID != claim.RoleRoot.UID || manifest.SetupID != claim.RoleSetupID {
+		t.Fatal("original owner registry manifest", err)
+	}
+	credential, err := contracts.DecodeOwnerSQLCredential(bytes.NewReader(secret.Data["sql-registry.json"]))
+	if err != nil {
+		t.Fatal("original owner registry credential", err)
+	}
+	pool := providerOwnerScopedPool(t, ctx, config, credential)
+	complete := false
+	defer func() {
+		if !complete {
+			pool.Close()
+		}
+	}()
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	if err = postgres.VerifyOwnerIdentityCredential(call, pool, manifest, "registry"); err != nil {
+		t.Fatal("actual original owner registry role", err)
+	}
+	reader, err := postgres.NewOwnerEnrollments(call, pool, in.InstallationID, in.ClusterID, in.Namespace.UID, in.OwnerConfigurationUID, custodyID)
+	if err != nil {
+		t.Fatal("actual original owner registry reader", err)
+	}
+	complete = true
+	return pool, reader
+}
+
+// Counts and original request-deadline minima are diagnostics only. This fixed
+// six-client recorder sees neither paths, headers nor bodies, performs no I/O,
+// and does not create a context or a limiter. At most four nested named phases
+// are retained; memory does not grow with request count.
+type nativeOwnerDeadlineTrace struct {
+	mu      sync.Mutex
+	enabled bool
+	phases  [4]*nativeOwnerDeadlinePhase
+}
+type nativeOwnerDeadlinePhase struct {
+	name                    string
+	calls, missing, expired [6]int64
+	before, after           [6]time.Duration
+}
+
+func (x *nativeOwnerDeadlineTrace) enable() { x.mu.Lock(); x.enabled = true; x.mu.Unlock() }
+func (x *nativeOwnerDeadlineTrace) begin(name string) func(*testing.T) {
+	x.mu.Lock()
+	if !x.enabled {
+		x.mu.Unlock()
+		return func(*testing.T) {}
+	}
+	p := &nativeOwnerDeadlinePhase{name: name}
+	slot := -1
+	for i, old := range x.phases {
+		if old == nil {
+			slot = i
+			break
+		}
+	}
+	if slot < 0 {
+		x.mu.Unlock()
+		return func(t *testing.T) { t.Error("owner trace phase bound exceeded") }
+	}
+	x.phases[slot] = p
+	x.mu.Unlock()
+	return func(t *testing.T) {
+		x.mu.Lock()
+		copy := *p
+		x.phases[slot] = nil
+		x.mu.Unlock()
+		t.Logf("native original-deadline phase=%s calls=%v missing=%v expired-at-return=%v minimum-before[C B H S W T]=%v minimum-after=%v; no deadline created or renewed", copy.name, copy.calls, copy.missing, copy.expired, copy.before, copy.after)
+	}
+}
+func (x *nativeOwnerDeadlineTrace) request(client int, ctx context.Context) func() {
+	x.mu.Lock()
+	if !x.enabled {
+		x.mu.Unlock()
+		return func() {}
+	}
+	phases := x.phases
+	deadline, ok := ctx.Deadline()
+	remaining := time.Until(deadline)
+	for _, p := range phases {
+		if p == nil {
+			continue
+		}
+		p.calls[client]++
+		if !ok {
+			p.missing[client]++
+			continue
+		}
+		if p.calls[client] == 1 || remaining < p.before[client] {
+			p.before[client] = remaining
+		}
+	}
+	x.mu.Unlock()
+	return func() {
+		x.mu.Lock()
+		defer x.mu.Unlock()
+		remaining := time.Until(deadline)
+		for _, p := range phases {
+			if p == nil || !ok {
+				continue
+			}
+			if p.after[client] == 0 || remaining < p.after[client] {
+				p.after[client] = remaining
+			}
+			if remaining <= 0 || ctx.Err() != nil {
+				p.expired[client]++
+			}
+		}
+	}
+}
+
+func initialBootstrapFixtureDuration(owner bool) time.Duration {
+	if owner {
+		return 12 * time.Minute
+	}
+	return 8 * time.Minute
+}
+func TestInitialBootstrapAggregateDeadlineSelection(t *testing.T) {
+	if initialBootstrapFixtureDuration(false) != 8*time.Minute || initialBootstrapFixtureDuration(true) != 12*time.Minute {
+		t.Fatal("owner-only aggregate fixture budget changed legacy or product selection")
+	}
+}

@@ -1,0 +1,36 @@
+{
+  "scope": "Fixture correction: remove forbidden pgx tracer; retain original enrollment decorators; journey-only owned PostgreSQL role/SQLSTATE prefix with no statement/bind/detail logging; actual constructor-boundary regression",
+  "status": "source-only frozen; no build or execution",
+  "native11ResultSHA256": "fed8dac92210967fb4376f6a5a74eb18c9a8a8f49dec3fdf86499127b86afcf7",
+  "paths": [
+    {
+      "path": "scripts/test-context-storage.py",
+      "baseSHA256": "4b4ac1cfe44ca1b1df658f6cf7cde5e359ba2265dd12d46aaaab5d0c0e4ad548",
+      "sha256": "db90d1a7123f79b8e74547f0a1b664d0f1b27b593866b6a2fc0d139ba9aac82d"
+    },
+    {
+      "path": "scripts/test-regional-context-selection.py",
+      "baseSHA256": "69f508d97c8626fb9763665ab5c0bf6669bb2dbdab444bf75f5d0b68d5a204ea",
+      "sha256": "c9483b1b88f04798acb872549683483f88d027b4bfaaa9a15d0f8ee5efab74e9"
+    },
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "baseSHA256": "86de509cb8ae77939ede3df758783a9ffdf594d55e223720ce21e97ddce67e3a",
+      "sha256": "3833db17490c92ab795590fc3600bf4e93295cdd4f3f401c66188d265a0d6174"
+    },
+    {
+      "path": "test/integration/public_context_download_diagnostics_checks_test.go",
+      "baseSHA256": "d1058dc4a88883bca3e07fd691168ee4383535d2f43198f8b4b56295784110ae",
+      "sha256": "fa340a7566f7ad65e9ca1d3a24439eb16cbf4477b4f453b7aed17504f041bda2"
+    },
+    {
+      "path": "test/integration/public_context_download_diagnostics_test.go",
+      "baseSHA256": "e24877094a715f045d21fb77c3627ce74d29af220bb1485be71e79ee9e12cd55",
+      "sha256": "2ffa4691fd938e8f0ad1acc37cb6d5cf1263ae6fe02fbb1b845ea785d9a375ae"
+    }
+  ],
+  "unchangedEnrollmentComposition": {
+    "test/integration/public_context_journey_native_test.go": "001420f3430669509b79b541db545fc4839f5e3f6e50d05b0df568d281f6e829"
+  },
+  "patchSHA256": "1d9f97b9086d8f2527afdaa636b3a9e257d879ab30441d667096af7e31eecebf"
+}

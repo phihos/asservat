@@ -1,0 +1,64 @@
+from pathlib import Path
+import hashlib, json, os, signal, subprocess, time
+
+C = Path(__file__).resolve().parent
+L = Path('/home/phil/Projekte/asservat')
+h = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+before_manifest = json.loads((C/'before-manifest.json').read_text())
+manifest = json.loads((C/'manifest.json').read_text())
+deps = json.loads((C/'dependencies.json').read_text())
+def check():
+    return {
+        'dependencies': [p for p,v in deps.items() if h(L/p) != v],
+        'bases': [v['path'] for v in manifest if h(L/v['path']) != v['base_sha256']],
+        'payloads': [v['path'] for v in manifest if h(C/'files'/v['path']) != v['payload_sha256']],
+        'before_payloads': [p for p,v in before_manifest.items() if h(C/'before'/p) != v],
+    }
+with (C/'evidence/started').open('x'): pass
+env = {k:v for k,v in os.environ.items() if not k.startswith('ASSERVAT_')}
+env.update(GOMAXPROCS='2', GOFLAGS='-p=2', TMPDIR=str(C/'tmp'))
+overlay = '-overlay='+str(C/'overlay.json')
+packages = ['./internal/adapters/kubernetes']
+selection = '^Test(LegacyInputOwnership|InitialBootstrap|InitialRuntimeBridge|CaptureCleanupProjection)'
+steps = [
+    ('compile', ['go','test',overlay,'-run','^$',*packages]),
+    ('before-alias', ['go','test','-overlay='+str(C/'before-overlay.json'),'-race','-count=1','-timeout=90s','-v','-run','^Test(LegacyInputOwnership|InitialRuntimeBridgeInstalledOriginalSourceProbes)','./internal/adapters/kubernetes']),
+    ('focused-races', ['go','test',overlay,'-race','-count=1','-timeout=180s','-v','-run',selection,*packages]),
+    ('vet', ['go','vet',overlay,*packages]),
+]
+result = {'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'runner_sha256':h(C/'run.py'),'paths':len(manifest),'dependencies':len(deps),'native_executed':False,'status':'legacy constructor input ownership only; no runtime selector or authority change','commands':[]}
+terminal = 0
+for name, command in steps:
+    before = check()
+    if any(before.values()):
+        result['before_failure'] = before
+        terminal = 1
+        break
+    start = time.monotonic()
+    with (C/'evidence'/f'{name}.log').open('x') as log:
+        process = subprocess.Popen(command, cwd=L, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        print(json.dumps({'phase':name,'pid':process.pid}), flush=True)
+        try:
+            code = process.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGTERM)
+            try: process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid,signal.SIGKILL)
+                process.wait()
+            code = 124
+    after = check()
+    item = {'phase':name,'command':command,'exit':code,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+    result['commands'].append(item)
+    with (C/'evidence'/f'{name}.json').open('x') as f: json.dump(item,f,indent=2); f.write('\n')
+    print(json.dumps(item),flush=True)
+    expected_failure = name == 'before-alias' and code == 1 and all(x in (C/'evidence'/f'{name}.log').read_text() for x in ['caller changed retained bootstrap input', 'caller changed retained observer input', 'caller changed retained bootstrap state', 'caller changed retained cleanup input', 'caller changed retained bridge administration'])
+    if (code and not expected_failure) or (name == 'before-alias' and not expected_failure) or any(after.values()):
+        terminal = 1
+        break
+result['final_hash_check'] = check()
+if any(result['final_hash_check'].values()): terminal = 1
+result['terminal_exit'] = terminal
+with (C/'result.json').open('x') as f: json.dump(result,f,indent=2); f.write('\n')
+print(json.dumps(result),flush=True)
+raise SystemExit(terminal)

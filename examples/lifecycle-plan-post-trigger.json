@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "action-lifecycle/v1",
+  "requestKind": "DebugPolicy",
+  "actions": [
+    {
+      "actionID": "traffic",
+      "kind": "packetCapture",
+      "executionMode": "onTrigger",
+      "requestedBefore": "0s",
+      "after": "10s"
+    },
+    {
+      "actionID": "syscalls",
+      "kind": "syscallTrace",
+      "executionMode": "onTrigger",
+      "requestedBefore": "0s",
+      "after": "10s"
+    }
+  ],
+  "ongoingPodScope": "none"
+}

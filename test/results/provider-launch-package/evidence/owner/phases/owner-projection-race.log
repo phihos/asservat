@@ -1,0 +1,98 @@
+=== RUN   TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput
+--- PASS: TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput (2.16s)
+=== RUN   TestProviderOwnerOperationOpenAndFourOriginalRolePhases
+--- PASS: TestProviderOwnerOperationOpenAndFourOriginalRolePhases (4.71s)
+=== RUN   TestProviderOwnerOperationClaimBeforePostLockDenialStaysSpent
+--- PASS: TestProviderOwnerOperationClaimBeforePostLockDenialStaysSpent (3.18s)
+=== RUN   TestProviderOwnerOperationUnknownEffectOnlyReconcilesOriginalResult
+--- PASS: TestProviderOwnerOperationUnknownEffectOnlyReconcilesOriginalResult (3.12s)
+=== RUN   TestProviderOwnerAcceptedObservationDoesNotRefreshOnRead
+--- PASS: TestProviderOwnerAcceptedObservationDoesNotRefreshOnRead (2.69s)
+=== RUN   TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks
+=== RUN   TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks/1
+=== RUN   TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks/2
+--- PASS: TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks (5.85s)
+    --- PASS: TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks/1 (2.92s)
+    --- PASS: TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks/2 (2.92s)
+=== RUN   TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls
+=== RUN   TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls/lost-create-final-denied
+=== RUN   TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls/positive-create-final-denied
+--- PASS: TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls (5.93s)
+    --- PASS: TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls/lost-create-final-denied (2.96s)
+    --- PASS: TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls/positive-create-final-denied (2.96s)
+=== RUN   TestOwnerIdentityOperationRetainsShorterAdmittedPhaseDeadline
+--- PASS: TestOwnerIdentityOperationRetainsShorterAdmittedPhaseDeadline (0.05s)
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/zero
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/other-root
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/detached-context
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/canceled-phase
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/closed-root
+=== RUN   TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/repeated-phase
+--- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls (0.30s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/zero (0.05s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/other-root (0.05s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/detached-context (0.05s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/canceled-phase (0.05s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/closed-root (0.05s)
+    --- PASS: TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls/repeated-phase (0.05s)
+=== RUN   TestOwnerIdentityOperationCloseJoinsAdmittedRead
+--- PASS: TestOwnerIdentityOperationCloseJoinsAdmittedRead (0.05s)
+=== RUN   TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex
+=== RUN   TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex/begin
+=== RUN   TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex/finish
+--- PASS: TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex (0.10s)
+    --- PASS: TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex/begin (0.05s)
+    --- PASS: TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex/finish (0.05s)
+=== RUN   TestOwnerIdentityOperationRoleAttemptIsSingleUse
+--- PASS: TestOwnerIdentityOperationRoleAttemptIsSingleUse (0.05s)
+=== RUN   TestOwnerIdentityOperationFinalCannotSkipActualCurrentPhase
+--- PASS: TestOwnerIdentityOperationFinalCannotSkipActualCurrentPhase (0.05s)
+=== RUN   TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs
+--- PASS: TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs (15.01s)
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit
+=== RUN   TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit
+--- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement (10.31s)
+    --- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/before-commit (5.15s)
+    --- PASS: TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement/after-commit (5.15s)
+=== RUN   TestProviderOwnerInstallationRunsFiniteOriginalSequence
+--- PASS: TestProviderOwnerInstallationRunsFiniteOriginalSequence (8.40s)
+=== RUN   TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling
+--- PASS: TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling (2.90s)
+=== RUN   TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection
+--- PASS: TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection (5.61s)
+=== RUN   TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork
+--- PASS: TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork (2.89s)
+=== RUN   TestProviderOwnerProjectionOperationCompleteAndLaunch
+--- PASS: TestProviderOwnerProjectionOperationCompleteAndLaunch (8.72s)
+=== RUN   TestProviderOwnerProjectionOperationLostCreateIsInspectOnly
+--- PASS: TestProviderOwnerProjectionOperationLostCreateIsInspectOnly (6.22s)
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/not-committed
+=== RUN   TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/committed
+--- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS (12.43s)
+    --- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/not-committed (6.08s)
+    --- PASS: TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS/committed (6.35s)
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/post-lock
+=== RUN   TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/final
+--- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof (11.84s)
+    --- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/post-lock (5.72s)
+    --- PASS: TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof/final (6.12s)
+=== RUN   TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent
+--- PASS: TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent (5.13s)
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/apply
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/final
+=== RUN   TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/result
+--- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect (0.15s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/apply (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/final (0.05s)
+    --- PASS: TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect/result (0.05s)
+=== RUN   TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce
+--- PASS: TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce (0.09s)
+=== RUN   TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext
+--- PASS: TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext (0.07s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	119.077s

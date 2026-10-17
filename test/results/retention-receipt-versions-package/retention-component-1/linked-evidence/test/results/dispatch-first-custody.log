@@ -1,0 +1,20 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-parallel-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-binding-replacement
+=== RUN   TestContextAdmissionWithRealServices/download-worker-capacity-held
+=== RUN   TestContextAdmissionWithRealServices/download-worker-expired-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+--- PASS: TestContextAdmissionWithRealServices (7.53s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (1.43s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-parallel-claim (0.76s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-unaudited (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-binding-replacement (0.79s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-capacity-held (0.82s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-expired-claim (1.03s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.06s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.584s

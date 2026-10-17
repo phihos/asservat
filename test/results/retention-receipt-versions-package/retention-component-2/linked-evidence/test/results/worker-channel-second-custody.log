@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-enrollment-channel
+--- PASS: TestContextAdmissionWithRealServices (2.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-enrollment-channel (1.69s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.063s

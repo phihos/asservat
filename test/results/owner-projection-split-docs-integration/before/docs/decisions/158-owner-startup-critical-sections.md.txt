@@ -1,0 +1,95 @@
+# ADR-158 — Owner startup preflight before recovery locking
+
+Status: implemented; qualification pending. Requirements:
+REQ-FED-001, REQ-DB-005 and REQ-DEP-003.
+
+## Observed failure
+
+The fourth original installed-owner run fails at
+`selection.phase-two: selection.initial-native: native.accepted-read`.
+The accepted SQL reader reports `fleet-interval/expired-interval` using its
+original rows and database clock. Individual native responses still have time
+remaining. The fleet observer records lock timeouts while startup holds the
+shared recovery row across its first native graph, effects and final graph.
+See [the original run](../../test/results/runtime-provider-owner-native-4/result.json); this is measured
+failure, not a claim that the following correction is qualified.
+
+ADR-155 prevents an additional suspension after a definitely aborted unchanged
+refresh. It deliberately cannot extend the stored observation. Consecutive
+startup operations can therefore consume that observation faster than the
+ordinary worker can replace it.
+
+## Decision
+
+Split the fresh installed-owner operation into read-only preflight and guarded
+effects. Keep one original at-most-five-second call, root/resource/source
+serialization, cancellation and joined shutdown across both parts. Perform the
+first full independent native bracket before acquiring the retained bridge SQL
+recovery lock. Its existing short accepted-configuration transactions remain.
+Preflight cannot claim an attempt, create credentials, mutate a journal or
+start a workload. It is a transient observation, not an effect permit.
+
+Role-aware preflight may read the original private password journal only after
+the existing native administrator/source protection and positive accepted SQL
+configuration/recovery check. Preserve that check immediately before the fixed
+journal GET. Bytes remain inside the privileged installer; preflight cannot use
+them for SQL login, provider effects or credential delivery. Failure before that
+GET must produce no private journal read. This is not permission for runtime
+services to read the installer's journal.
+
+Acquire the original recovery and activation locks before any effect. Verify
+the exact preflight fleet source UID, generation, digest, installation and
+issuer against current SQL, in addition to current incarnation, suspension,
+recovery, original activation and schema checks. After blocking acquisition,
+read current native source/guard versions and journals and require the same
+original identities and values. Read the currently accepted owner configuration
+and compare the complete configuration and pool. Reject any disagreement before
+claims or writes; never adopt a newer configuration within that operation.
+
+All original intervals remain binding. Post-lock observations can shorten the
+call, never replace preflight dates or restart its deadline. Effects and the
+full final native bracket remain under the original shared recovery lock and
+join before release. Existing per-role post-lock checks, exact CAS, one-use
+claims and unknown-result handling remain mandatory. Repeat or inspection does
+not create another attempt for an existing claim.
+
+Apply the shared preflight boundary consistently to the seven fresh owner
+paths: root construction, bootstrap selection, private journal opening,
+role advancement, role verification, worker-caller verification and provider
+projection. Legacy operations keep their existing boundary. This changes no
+public API, permission, schema, pool size, rate limiter, observation cadence or
+deadline. No source refresh is requested by the installer.
+
+## Alternatives
+
+A weaker recovery lock would permit concurrent semantic changes and is rejected.
+PostgreSQL's documented row-lock matrix confirms that an ordinary timestamp
+UPDATE conflicts with FOR SHARE; changing only the UPDATE predicate cannot
+remove that conflict. See [PostgreSQL row locking](https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS).
+
+Separating semantic state and freshness into different rows remains a broader
+option if measured availability requires it. It would require a migration,
+enforced writer protocol, compatibility-view lock review, restore handling and
+qualification of every authority consumer. The smaller critical-section change
+is selected first. Moving the accepted reader into the retained transaction
+without further design is also rejected: its owner-head lock could prevent the
+owner observer from refreshing instead.
+
+## Required evidence
+
+Tests must establish preflight without the SQL guard, effects and final checking
+with the guard, current checks after blocking acquisition, rejection of source,
+guard, journal, accepted-configuration or recovery changes before effects,
+original deadline/cancellation preservation, and no replacement after uncertain
+claims. Real SQL must exercise a queued fleet writer with the separate accepted
+reader. The original packaged startup must run unchanged and advance beyond
+selection, followed by sustained observation and relevant regression gates.
+Neither a pure test nor one successful startup proves sustained availability.
+
+The actual implementation and qualification status belongs in
+[implementation progress](../implementation-progress.md). No public service is enabled by this decision.
+
+Component races and real SQL lock-contention tests now pass. The fifth original
+installed run passes the previous selection failure, then stops at projection
+verification. These results qualify the narrower boundaries; they do not establish
+complete startup or sustained availability.

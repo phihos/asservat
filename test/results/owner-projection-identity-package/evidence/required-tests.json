@@ -1,0 +1,12 @@
+{
+  "before-copy": [
+    "TestOwnerProjectionOperationRejectsCopiedOuterHandle"
+  ],
+  "copy-race": [
+    "TestOwnerProjectionOperationRejectsCopiedOuterHandle",
+    "TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect",
+    "TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce",
+    "TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext",
+    "TestProviderOwnerProjectionOperationCompleteAndLaunch"
+  ]
+}

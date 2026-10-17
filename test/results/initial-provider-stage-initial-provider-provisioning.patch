@@ -1,0 +1,2942 @@
+--- /dev/null
++++ b/docs/architecture/initial-provider-provisioning.md
+@@ -0,0 +1,116 @@
++# Initial provider provisioning
++
++This C-21 checkpoint extends [SQL preparation](initial-sql-provisioning.md) under
++[ADR-128](../decisions/128-initial-provider-provisioning.md). It prepares original
++provider credentials and a fixed immutable target projection. The original
++installation Pod stays gated until the separate handover continuation succeeds.
++
++## Protected inputs and actual producer
++
++`InitialPreparer.providers` is optional, explicit installation configuration. It
++selects one immutable bootstrap Secret UID, distinct issuer/encrypt/decrypt
++policy names and distinct child token roles. Its public SHA-256 is held only as
++private progress provenance; no credential or secret-payload hash enters the
++public ConfigMap. All fields, source contents and provider endpoints are checked
++before declaration. The actual `NewInitialPreparationDeployment` loads fixed
++files, uses the pinned administrator/probe identities and composes SQL preparation,
++`PrepareProvider` twice, then `PersistProviderProjection`.
++
++The material Secret contains an existing non-root OpenBao issuer token and managed
++S3 credentials. It is installation/request bound, immutable, at most 8 KiB, and
++is never adopted or recreated. Current native administration and exact Secret
++identity are required for reads. The selected JSON ACL profile has no wildcard,
++HCL interpretation, `sudo`, identity-policy inheritance or default policy. The
++issuer may read only the three selected ACLs and two roles, create against those
++two roles, inspect itself and perform accessor lookup/revocation. Accessor APIs
++cannot be scoped to an as-yet-unissued value by a static ACL; that credential
++therefore remains exclusively in the trusted bootstrap process. No list-accessor
++or root capability is used.
++
++The child ACLs each contain only self-inspection plus the exact Transit encrypt
++or decrypt operation. Roles fix service tokens, no default policy, no aliases,
++no CIDRs, no orphan/renewal/period, zero usage count and a 900-second explicit max
++TTL. The requested TTL derives from the original claim's latest completion and
++original parent expiry, with one second of margin; it never renews on retry.
++Sending a second explicit max TTL alongside the role would produce a provider
++warning, so the request uses the already checked role cap and its shorter TTL.
++Every positive child is independently inspected with that child credential and
++must retain its exact role, policy, operation metadata and finite original dates.
++
++The parent's actual expiry must fit the original fifteen-minute SQL interval.
++Positive child expiry must fit the parent end. Unknown late issue responses remain
++uncertain and bounded by the original parent tree; client cancellation or another
++lookup is not completion of an unknown POST. Native supported-version behavior
++must be measured before this profile can be enabled.
++
++## Private persistence and bounded ownership
++
++After the existing positive SQL Secret reference, the private state accepts only:
++
++1. One fixed provider profile digest and original parent accessor/issue/expiry.
++2. One wrap claim, then its positive response.
++3. One unwrap claim, then its positive response.
++4. One final projection claim, then its exact original Secret UID.
++
++Claims bind server-generated operation IDs and the original at-most-five-second
++current interval. Every current observation retains its original deadline across
++provider reads, Kubernetes CAS and final protection checks. A claim's original
++expiry is never replaced by the next observation. At most two live positive
++provider replies are retained; process closure prevents new ownership, cancels
++and joins admitted calls, and clears the response map.
++
++The private 16 KiB ceiling includes both maximum 1,024-byte provider tokens,
++128-byte accessors and the final projection receipt. The producer checks the full
++worst-case representation before its first provider POST. One immutable managed
++material Secret and one final target Secret add a finite pair of setup objects;
++they do not add unbounded public journal entries.
++
++A lost issue-claim reply never sends a POST. A failed/unknown POST never retries.
++A retained positive response can finish a lost private persistence write in the
++same joined process. Another process needs the exact already persisted response.
++No policy read, token accessor, absence or timeout manufactures that response.
++
++The final Secret has exactly `sql-prepare.json`, `sql-audit.json`,
++`sql-activate.json`, `audit-storage.json`, `audit-wrap.token`,
++`audit-unwrap.token` and `kube-probe.token`. It contains no bootstrap issuer or
++SQL maintenance credential. `kube-writer.token` remains the existing kubelet
++projection. Unknown Secret CREATE permits only an exact read, preserving its
++operation marker, immutable body and eventual pinned UID.
++
++## Retirement boundary
++
++The provider adapter exposes exact accessor revocation for a positively retained
++original reply. It checks the current original issuer/profile, sends no issue or
++renewal, and requires both explicit invalid-accessor rejection and rejection of
++the original token's live authentication. A lost revoke response may be resolved
++by those exact current observations. Generic HTTP failure or authentication denial
++alone is insufficient. This is a rights reduction, not proof that earlier
++Transit, SQL or object-storage effects did not occur.
++
++Production composition must first join original issuers and establish the actual
++activation owner's termination and effect disposition before credential cleanup.
++The current checkpoint does not call provider revocation automatically, clear
++private state or claim a completed retirement. Expired issuer/unknown issue
++recovery still needs its separately accepted provider reconciliation path.
++
++## Qualification and next continuation
++
++The staged native fixture calls the actual fixed-file loader and `Run`, using real
++Kubernetes, PostgreSQL and OpenBao. Bootstrap ServiceAccount/admin pin, initial
++provider role/ACLs and managed S3 keys are explicitly fixture-provided. It checks
++original loader replay, immutable projection, separate actual Transit purposes,
++and exact child-token revocation after the preparation owners join while the Pod
++remains gated. That revocation is provider evidence, not composed activation
++retirement.
++It does not execute the gated activation image or qualify S3 credential scope.
++Unit TLS/CAS tests cover role/issuer/policy rejection, lost claims/replies,
++concurrency, deadlines, private size and exact revocation. Actual commands/results
++belong in the package handoff and implementation progress after they run.
++
++Next: introduce an explicit new plan capability for kubelet writer TokenRequest
++and staging-to-final handover, preserve all old compiled guard shapes, launch only
++the recorded original Pod UID after joined request checks, observe the actual
++initial-install result, and compose positive credential retirement. The retained
++continuity policy must allow only the qualified writer request intersected with
++the final policy's actual Pod identity; a broad token exception is not acceptable.
++This checkpoint does not enable Helm runtime or public investigation routes.
+--- /dev/null
++++ b/docs/decisions/128-initial-provider-provisioning.md
+@@ -0,0 +1,51 @@
++# ADR-128: Original installation provider credentials and projection
++
++Status: implementation checkpoint; staged tests and native qualification must be
++recorded separately. Full preparation/activation/retirement remains in progress.
++
++## Decision
++
++Extend the protected initial preparer with one explicit provider profile and one
++immutable bootstrap material Secret reference. For managed OpenBao, configure
++separate fixed token roles and JSON ACLs for audit encryption and decryption.
++The installation-only issuer token stays outside the activation Pod. Both child
++credentials use actual provider-generated service-token values and accessors;
++no custom token IDs, token listing, orphaning, periodicity or renewal.
++
++Current provider reads must verify the exact role/ACL profile and the original
++nonrenewable issuer expiry. That expiry must fit the original SQL interval before
++any child claim. Persist each claim before its single POST. Keep the original
++positive response privately, including its exact provider dates. An unknown
++claim or POST response never permits a second issue; the same joined owner may
++finish persistence of its retained positive response. An accessor does not
++recover a missing secret.
++
++Assemble exactly the seven existing `initial-install` private files from the
++original probe, SQL Secret, positive provider replies and pinned managed S3
++input. Persist one create claim, reconcile only exact immutable contents, and
++pin the actual target Secret UID. This step does not remove a scheduling gate or
++consume the installation witness.
++
++Externally managed S3 keys are supplied, not issued or revoked by Asservat.
++Their local `storageUseUntil` bounds use by this installation; it is not a claim
++about provider expiry or deletion. The accepted bundled SeaweedFS profile still
++requires its own credential lifecycle and backend qualification.
++
++## Rationale and boundaries
++
++OpenBao permits role settings to override create parameters, and caller-selected
++IDs require elevated privileges. Its service-token accessors support inspection
++and revocation without revealing the original token. Its token tree supplies an
++additional parent lifetime/revocation bound. These are provider semantics to
++qualify, not proof that a timed-out HTTP request drained. [Token API](https://openbao.org/docs/api/auth/token/),
++[token lifecycle](https://openbao.org/docs/concepts/tokens/).
++
++The implementation uses the existing pinned OpenBao Go client; no new dependency
++or general credential controller is introduced. Existing absent-provider
++configuration and serialized private progress retain their shapes.
++
++The healthy checkpoint prepares providers through the real fixed-file loader
++and supervisor. Guarded handover, actual activation, joined credential
++retirement, unknown provider issuance recovery, old-record reconciliation and
++Helm packaging remain necessary. A stored Secret or successful preparation
++result is never SQL activation, recovery acceptance or enabled collection.
+--- /dev/null
++++ b/internal/adapters/kms/initial_provider.go
+@@ -0,0 +1,350 @@
++package kms
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"encoding/json/jsontext"
++	"io"
++	"net/http"
++	"reflect"
++	"strconv"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/providerconfig"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++	bao "github.com/openbao/openbao/api/v2"
++)
++
++// InitialProviderIssuer is installation-only. The caller must persist its
++// original one-use issue claim before Issue, own/join each call, and never replay
++// it after an unknown response. Check and Verify are read-only and cannot recover
++// the secret from an accessor. No KMS administrator token enters the target Pod.
++type InitialProviderIssuer struct {
++	client                            *bao.Client
++	profile                           contracts.InitialProviderProfile
++	installation, request, mount, key string
++	now                               func() time.Time
++}
++
++func NewInitialProviderIssuer(endpoint, token, mount, key, installation, request string, profile contracts.InitialProviderProfile, h *http.Client, now func() time.Time) (*InitialProviderIssuer, error) {
++	if !providerconfig.InitialProviderProfile(profile) || !keyName.MatchString(mount) || !keyName.MatchString(key) || !authorization.UUID(installation) || !authorization.UUID(request) || !ValidProviderToken([]byte(token)) || len(token) > contracts.InitialProviderTokenMaxBytes || now == nil {
++		return nil, ErrKeyService
++	}
++	c, e := client(endpoint, token, h)
++	if e != nil {
++		return nil, e
++	}
++	return &InitialProviderIssuer{client: c, profile: profile, installation: installation, request: request, mount: mount, key: key, now: now}, nil
++}
++func (s *InitialProviderIssuer) Close() {
++	if s != nil && s.client != nil {
++		s.client.CloneConfig().HttpClient.CloseIdleConnections()
++	}
++}
++
++type initialProviderReply struct {
++	Data     json.RawMessage      `json:"data"`
++	Auth     *initialProviderAuth `json:"auth"`
++	Warnings []string             `json:"warnings"`
++	Wrap     json.RawMessage      `json:"wrap_info"`
++}
++type initialProviderAuth struct {
++	bao.SecretAuth
++	Type string `json:"token_type"`
++	Uses int    `json:"num_uses"`
++}
++
++func initialProviderCall(ctx context.Context, c *bao.Client, method, path string, body any) (initialProviderReply, int, error) {
++	var zero initialProviderReply
++	if ctx == nil || ctx.Err() != nil || c == nil {
++		return zero, 0, ErrKeyService
++	}
++	r := c.NewRequest(method, "/v1/"+path)
++	if body != nil && r.SetJSONBody(body) != nil {
++		return zero, 0, ErrKeyService
++	}
++	response, e := c.RawRequestWithContext(ctx, r)
++	if response != nil && response.Body != nil {
++		defer response.Body.Close()
++	}
++	if response == nil {
++		return zero, 0, ErrKeyService
++	}
++	status := response.StatusCode
++	if e != nil || status != http.StatusOK && status != http.StatusNoContent {
++		return zero, status, ErrKeyService
++	}
++	if status == http.StatusNoContent {
++		if ctx.Err() != nil {
++			return zero, status, ErrKeyService
++		}
++		return zero, status, nil
++	}
++	raw, e := io.ReadAll(io.LimitReader(response.Body, 32769))
++	defer clear(raw)
++	if e != nil || len(raw) > 32768 || !jsontext.Value(raw).IsValid() || json.Unmarshal(raw, &zero) != nil || len(zero.Warnings) != 0 || len(zero.Wrap) > 0 && string(zero.Wrap) != "null" || ctx.Err() != nil {
++		return initialProviderReply{}, status, ErrKeyService
++	}
++	if zero.Auth != nil {
++		var outer map[string]json.RawMessage
++		if json.Unmarshal(raw, &outer) != nil || !initialProviderFields(outer["auth"], "client_token", "accessor", "token_type", "policies", "token_policies", "metadata", "lease_duration", "renewable", "orphan", "entity_id", "num_uses") {
++			return initialProviderReply{}, status, ErrKeyService
++		}
++	}
++	return zero, status, nil
++}
++func initialProviderFields(raw []byte, names ...string) bool {
++	var fields map[string]json.RawMessage
++	if json.Unmarshal(raw, &fields) != nil {
++		return false
++	}
++	for _, name := range names {
++		v, ok := fields[name]
++		if !ok || len(v) == 0 || string(v) == "null" {
++			return false
++		}
++	}
++	return true
++}
++func initialProviderDecode(raw []byte, out any) bool {
++	if len(raw) == 0 || !jsontext.Value(raw).IsValid() {
++		return false
++	}
++	d := json.NewDecoder(bytes.NewReader(raw))
++	d.DisallowUnknownFields()
++	return d.Decode(out) == nil && d.Decode(new(any)) == io.EOF
++}
++
++type initialTokenRole struct {
++	Name           string   `json:"name"`
++	Allowed        []string `json:"allowed_policies"`
++	Disallowed     []string `json:"disallowed_policies"`
++	AllowedGlob    []string `json:"allowed_policies_glob"`
++	DisallowedGlob []string `json:"disallowed_policies_glob"`
++	Aliases        []string `json:"allowed_entity_aliases"`
++	Orphan         bool     `json:"orphan"`
++	Renewable      bool     `json:"renewable"`
++	NoDefault      bool     `json:"token_no_default_policy"`
++	Type           string   `json:"token_type"`
++	Suffix         string   `json:"path_suffix"`
++	Period         int64    `json:"period"`
++	TokenPeriod    int64    `json:"token_period"`
++	MaxTTL         int64    `json:"explicit_max_ttl"`
++	TokenMaxTTL    int64    `json:"token_explicit_max_ttl"`
++	Uses           int64    `json:"token_num_uses"`
++	Bound          []string `json:"bound_cidrs"`
++	TokenBound     []string `json:"token_bound_cidrs"`
++}
++type initialTokenLookup struct {
++	ID               string            `json:"id"`
++	Accessor         string            `json:"accessor"`
++	Policies         []string          `json:"policies"`
++	IdentityPolicies []string          `json:"identity_policies"`
++	Path             string            `json:"path"`
++	Meta             map[string]string `json:"meta"`
++	Display          string            `json:"display_name"`
++	Uses             int64             `json:"num_uses"`
++	Orphan           bool              `json:"orphan"`
++	Creation         int64             `json:"creation_time"`
++	CreationTTL      int64             `json:"creation_ttl"`
++	Expire           time.Time         `json:"expire_time"`
++	TTL              int64             `json:"ttl"`
++	MaxTTL           int64             `json:"explicit_max_ttl"`
++	Entity           string            `json:"entity_id"`
++	Type             string            `json:"type"`
++	Role             string            `json:"role"`
++	Period           int64             `json:"period"`
++	Bound            []string          `json:"bound_cidrs"`
++	Renewable        bool              `json:"renewable"`
++	Issued           time.Time         `json:"issue_time"`
++	LastRenewal      int64             `json:"last_renewal_time"`
++	LastRenewalDate  time.Time         `json:"last_renewal"`
++}
++
++func (s *InitialProviderIssuer) purpose(purpose string) (string, string, bool) {
++	switch purpose {
++	case "wrap":
++		return s.profile.WrapRole, s.profile.WrapPolicy, true
++	case "unwrap":
++		return s.profile.UnwrapRole, s.profile.UnwrapPolicy, true
++	default:
++		return "", "", false
++	}
++}
++func (s *InitialProviderIssuer) role(ctx context.Context, name, policy string) error {
++	r, _, e := initialProviderCall(ctx, s.client, http.MethodGet, "auth/token/roles/"+name, nil)
++	var d initialTokenRole
++	if e != nil || !initialProviderFields(r.Data, "name", "orphan", "renewable", "token_no_default_policy", "token_type", "period", "token_period", "explicit_max_ttl", "token_explicit_max_ttl") || !initialProviderDecode(r.Data, &d) || d.Name != name || !reflect.DeepEqual(d.Allowed, []string{policy}) || len(d.Disallowed)+len(d.AllowedGlob)+len(d.DisallowedGlob)+len(d.Aliases)+len(d.Bound)+len(d.TokenBound) != 0 || d.Orphan || d.Renewable || !d.NoDefault || d.Type != "service" || d.Suffix != "" || d.Period != 0 || d.TokenPeriod != 0 || d.Uses != 0 || d.TokenMaxTTL != 900 || d.MaxTTL != 0 && d.MaxTTL != d.TokenMaxTTL {
++		return ErrKeyService
++	}
++	return nil
++}
++
++type initialACLRule struct {
++	Capabilities []string `json:"capabilities"`
++}
++type initialACL struct {
++	Path map[string]initialACLRule `json:"path"`
++}
++
++// InitialProviderPolicies supplies exact finite JSON ACLs for protected provider
++// configuration. It creates no policy, role or token and is not source acceptance.
++func InitialProviderPolicies(profile contracts.InitialProviderProfile, mount, key string) (map[string]string, error) {
++	if !providerconfig.InitialProviderProfile(profile) || !keyName.MatchString(mount) || !keyName.MatchString(key) {
++		return nil, ErrKeyService
++	}
++	paths := map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, "auth/token/lookup-accessor": {[]string{"update"}}, "auth/token/revoke-accessor": {[]string{"update"}}}
++	for _, role := range []string{profile.WrapRole, profile.UnwrapRole} {
++		paths["auth/token/roles/"+role] = initialACLRule{[]string{"read"}}
++		paths["auth/token/create/"+role] = initialACLRule{[]string{"update"}}
++	}
++	for _, policy := range []string{profile.IssuerPolicy, profile.WrapPolicy, profile.UnwrapPolicy} {
++		paths["sys/policies/acl/"+policy] = initialACLRule{[]string{"read"}}
++	}
++	specs := map[string]initialACL{profile.IssuerPolicy: {paths}, profile.WrapPolicy: {map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, mount + "/encrypt/" + key: {[]string{"update"}}}}, profile.UnwrapPolicy: {map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, mount + "/decrypt/" + key: {[]string{"update"}}}}}
++	out := map[string]string{}
++	for name, v := range specs {
++		b, e := json.Marshal(v)
++		if e != nil {
++			return nil, ErrKeyService
++		}
++		out[name] = string(b)
++	}
++	return out, nil
++}
++func (s *InitialProviderIssuer) policies(ctx context.Context) error {
++	expected, e := InitialProviderPolicies(s.profile, s.mount, s.key)
++	if e != nil {
++		return e
++	}
++	for _, name := range []string{s.profile.IssuerPolicy, s.profile.WrapPolicy, s.profile.UnwrapPolicy} {
++		r, _, e := initialProviderCall(ctx, s.client, http.MethodGet, "sys/policies/acl/"+name, nil)
++		var value struct {
++			Name   string `json:"name"`
++			Policy string `json:"policy"`
++		}
++		if e != nil || !initialProviderDecode(r.Data, &value) || value.Name != name || len(value.Policy) > 8192 {
++			return ErrKeyService
++		}
++		var got, want initialACL
++		if !initialProviderDecode([]byte(value.Policy), &got) || json.Unmarshal([]byte(expected[name]), &want) != nil || !reflect.DeepEqual(got, want) {
++			return ErrKeyService
++		}
++	}
++	return nil
++}
++func (s *InitialProviderIssuer) lookup(ctx context.Context, c *bao.Client, policy string) (initialTokenLookup, error) {
++	r, _, e := initialProviderCall(ctx, c, http.MethodGet, "auth/token/lookup-self", nil)
++	var d initialTokenLookup
++	if e != nil || !initialProviderFields(r.Data, "accessor", "type", "policies", "num_uses", "orphan", "renewable", "entity_id", "creation_ttl", "explicit_max_ttl", "issue_time", "expire_time") || !initialProviderDecode(r.Data, &d) || !identity.Text(d.Accessor, 128) || d.Type != "service" || d.Orphan || d.Renewable || d.Period != 0 || d.Entity != "" || len(d.IdentityPolicies) != 0 || len(d.Bound) != 0 || d.Uses != 0 || !reflect.DeepEqual(d.Policies, []string{policy}) || d.MaxTTL < 1 || d.MaxTTL > 900 || d.CreationTTL < 1 || d.CreationTTL > 900 || d.Issued.IsZero() || d.Expire.IsZero() || !d.Issued.Before(d.Expire) || d.Expire.Sub(d.Issued) > 901*time.Second || d.LastRenewal != 0 || !d.LastRenewalDate.IsZero() || s.now().Before(d.Issued) || !s.now().Before(d.Expire) || ctx.Err() != nil {
++		return initialTokenLookup{}, ErrKeyService
++	}
++	return d, nil
++}
++
++// Check verifies the issuer and both role/policy profiles without issuing a
++// token. Its original <=5s lease must survive the caller's subsequent CAS/effect.
++func (s *InitialProviderIssuer) Check(ctx context.Context, notAfter time.Time) (contracts.InitialProviderParent, time.Time, error) {
++	var zero contracts.InitialProviderParent
++	if s == nil || ctx == nil || notAfter.IsZero() {
++		return zero, time.Time{}, ErrKeyService
++	}
++	until := s.now().Add(5 * time.Second)
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	if e := s.role(ctx, s.profile.WrapRole, s.profile.WrapPolicy); e != nil {
++		return zero, time.Time{}, e
++	}
++	if e := s.role(ctx, s.profile.UnwrapRole, s.profile.UnwrapPolicy); e != nil {
++		return zero, time.Time{}, e
++	}
++	if e := s.policies(ctx); e != nil {
++		return zero, time.Time{}, e
++	}
++	d, e := s.lookup(ctx, s.client, s.profile.IssuerPolicy)
++	if e != nil || d.Expire.After(notAfter) || !s.now().Before(until) || ctx.Err() != nil {
++		return zero, time.Time{}, ErrKeyService
++	}
++	until = identity.Earlier(until, d.Expire)
++	return contracts.InitialProviderParent{Accessor: d.Accessor, IssuedAt: d.Issued.UTC(), ExpiresAt: d.Expire.UTC()}, until, nil
++}
++func initialProviderParentEqual(a, b contracts.InitialProviderParent) bool {
++	return a.Accessor == b.Accessor && a.IssuedAt.Equal(b.IssuedAt) && a.ExpiresAt.Equal(b.ExpiresAt)
++}
++func (s *InitialProviderIssuer) metadata(purpose string, i contracts.InitialProviderIssue) map[string]string {
++	return map[string]string{"asservat-installation": s.installation, "asservat-request": s.request, "asservat-operation": i.ID, "asservat-purpose": purpose}
++}
++func (s *InitialProviderIssuer) validIssue(i contracts.InitialProviderIssue, parent contracts.InitialProviderParent) bool {
++	return authorization.UUID(i.ID) && !i.StartedAt.IsZero() && i.StartedAt.Before(i.Until) && i.Until.Sub(i.StartedAt) <= 5*time.Second && i.Until.Before(i.ExpiresBefore) && i.ExpiresBefore.Equal(parent.ExpiresAt)
++}
++func (s *InitialProviderIssuer) Issue(ctx context.Context, purpose string, i contracts.InitialProviderIssue, parent contracts.InitialProviderParent) (contracts.InitialProviderResponse, error) {
++	var zero contracts.InitialProviderResponse
++	if s == nil || ctx == nil || !s.validIssue(i, parent) || i.Response != nil {
++		return zero, ErrKeyService
++	}
++	role, policy, ok := s.purpose(purpose)
++	if !ok {
++		return zero, ErrKeyService
++	}
++	ctx, end := context.WithDeadline(ctx, i.Until)
++	defer end()
++	got, until, e := s.Check(ctx, i.ExpiresBefore)
++	if e != nil || !initialProviderParentEqual(got, parent) || s.now().Before(i.StartedAt) || !s.now().Before(i.Until) {
++		return zero, ErrKeyService
++	}
++	ctx, done := context.WithDeadline(ctx, until)
++	defer done()
++	// Derive TTL from the original latest permitted completion, so a slow
++	// acknowledged POST inside that same interval cannot slide child expiry.
++	seconds := int64(i.ExpiresBefore.Sub(i.Until)/time.Second) - 1
++	if seconds < 1 || seconds > 900 {
++		return zero, ErrKeyService
++	}
++	body := map[string]any{"policies": []string{policy}, "meta": s.metadata(purpose, i), "no_parent": false, "no_default_policy": true, "renewable": false, "ttl": strconv.FormatInt(seconds, 10) + "s", "type": "service", "num_uses": 0, "display_name": "asservat-initial-" + purpose}
++	r, _, e := initialProviderCall(ctx, s.client, http.MethodPost, "auth/token/create/"+role, body)
++	a := r.Auth
++	if e != nil || a == nil || !ValidProviderToken([]byte(a.ClientToken)) || len(a.ClientToken) > contracts.InitialProviderTokenMaxBytes || !identity.Text(a.Accessor, 128) || a.Type != "service" || a.Orphan || a.Renewable || a.EntityID != "" || len(a.IdentityPolicies) != 0 || a.MFARequirement != nil || a.Uses != 0 || a.LeaseDuration < 1 || int64(a.LeaseDuration) > seconds || !reflect.DeepEqual(a.Policies, []string{policy}) || !reflect.DeepEqual(a.TokenPolicies, []string{policy}) || !reflect.DeepEqual(a.Metadata, s.metadata(purpose, i)) {
++		return zero, ErrKeyService
++	}
++	c, e := s.client.Clone()
++	if e != nil {
++		return zero, ErrKeyService
++	}
++	c.SetToken(a.ClientToken)
++	d, e := s.lookup(ctx, c, policy)
++	if e != nil || d.Accessor != a.Accessor || d.Path != "auth/token/create/"+role || d.Role != role || !reflect.DeepEqual(d.Meta, s.metadata(purpose, i)) || d.Issued.Before(i.StartedAt) || d.Issued.After(i.Until) || d.Expire.After(i.ExpiresBefore) || !s.now().Before(i.Until) || !s.now().Before(until) || ctx.Err() != nil {
++		return zero, ErrKeyService
++	}
++	return contracts.InitialProviderResponse{Token: a.ClientToken, Accessor: a.Accessor, IssuedAt: d.Issued.UTC(), ExpiresAt: d.Expire.UTC()}, nil
++}
++
++// Verify rechecks a retained positive response. It never constructs completion
++// for a missing response, calls Create, or renews any original provider date.
++func (s *InitialProviderIssuer) Verify(ctx context.Context, purpose string, i contracts.InitialProviderIssue, parent contracts.InitialProviderParent, r contracts.InitialProviderResponse) error {
++	if s == nil || ctx == nil || !s.validIssue(i, parent) || !ValidProviderToken([]byte(r.Token)) || len(r.Token) > contracts.InitialProviderTokenMaxBytes {
++		return ErrKeyService
++	}
++	role, policy, ok := s.purpose(purpose)
++	if !ok {
++		return ErrKeyService
++	}
++	got, until, e := s.Check(ctx, i.ExpiresBefore)
++	if e != nil || !initialProviderParentEqual(got, parent) {
++		return ErrKeyService
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	c, e := s.client.Clone()
++	if e != nil {
++		return ErrKeyService
++	}
++	c.SetToken(r.Token)
++	d, e := s.lookup(ctx, c, policy)
++	if e != nil || d.Accessor != r.Accessor || !d.Issued.Equal(r.IssuedAt) || !d.Expire.Equal(r.ExpiresAt) || d.Issued.Before(i.StartedAt) || d.Issued.After(i.Until) || d.Expire.After(i.ExpiresBefore) || d.Path != "auth/token/create/"+role || d.Role != role || !reflect.DeepEqual(d.Meta, s.metadata(purpose, i)) || !s.now().Before(until) || ctx.Err() != nil {
++		return ErrKeyService
++	}
++	return nil
++}
+--- /dev/null
++++ b/internal/adapters/kms/initial_provider_retirement.go
+@@ -0,0 +1,79 @@
++package kms
++
++import (
++	"context"
++	"errors"
++	"net/http"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	bao "github.com/openbao/openbao/api/v2"
++)
++
++// Revoke retires only an already positively returned original credential. The
++// caller must first join its original local issuers and the activation owner;
++// this is provider authentication revocation, not proof that earlier Transit,
++// storage or SQL operations had no effect. Retrying this exact rights reduction
++// is safe; it never creates, renews, adopts or lists credentials.
++func (s *InitialProviderIssuer) Revoke(ctx context.Context, purpose string, i contracts.InitialProviderIssue, parent contracts.InitialProviderParent, r contracts.InitialProviderResponse) (time.Time, error) {
++	if s == nil || ctx == nil || !s.validIssue(i, parent) || i.Response == nil || *i.Response != r || !ValidProviderToken([]byte(r.Token)) || len(r.Token) > contracts.InitialProviderTokenMaxBytes || r.Accessor == "" || r.Accessor == parent.Accessor || r.IssuedAt.Before(i.StartedAt) || r.IssuedAt.After(i.Until) || r.ExpiresAt.After(i.ExpiresBefore) {
++		return time.Time{}, ErrKeyService
++	}
++	if _, _, ok := s.purpose(purpose); !ok {
++		return time.Time{}, ErrKeyService
++	}
++	got, until, e := s.Check(ctx, i.ExpiresBefore)
++	if e != nil || !initialProviderParentEqual(parent, got) {
++		return time.Time{}, ErrKeyService
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	if s.verifyRevoked(ctx, r) == nil {
++		if ctx.Err() != nil || !s.now().Before(until) {
++			return time.Time{}, ErrKeyService
++		}
++		return until, nil
++	}
++	if e = s.Verify(ctx, purpose, i, parent, r); e != nil {
++		return time.Time{}, ErrKeyService
++	}
++	// A lost revocation reply is resolved only by the original accessor's explicit
++	// provider rejection AND the original token's live authentication rejection.
++	_, _, _ = initialProviderCall(ctx, s.client, http.MethodPost, "auth/token/revoke-accessor", map[string]string{"accessor": r.Accessor})
++	if e = s.verifyRevoked(ctx, r); e != nil || ctx.Err() != nil || !s.now().Before(until) {
++		return time.Time{}, ErrKeyService
++	}
++	return until, nil
++}
++func initialProviderRejection(ctx context.Context, c *bao.Client, method, path string, body any, status int, exactError string) bool {
++	if ctx.Err() != nil {
++		return false
++	}
++	request := c.NewRequest(method, "/v1/"+path)
++	if body != nil && request.SetJSONBody(body) != nil {
++		return false
++	}
++	response, e := c.RawRequestWithContext(ctx, request)
++	if response != nil && response.Body != nil {
++		defer response.Body.Close()
++	}
++	var provider *bao.ResponseError
++	if response == nil || response.StatusCode != status || !errors.As(e, &provider) || provider.StatusCode != status || ctx.Err() != nil {
++		return false
++	}
++	return exactError == "" || len(provider.Errors) == 1 && provider.Errors[0] == exactError
++}
++func (s *InitialProviderIssuer) verifyRevoked(ctx context.Context, r contracts.InitialProviderResponse) error {
++	if !initialProviderRejection(ctx, s.client, http.MethodPost, "auth/token/lookup-accessor", map[string]string{"accessor": r.Accessor}, http.StatusBadRequest, "invalid accessor") {
++		return ErrKeyService
++	}
++	child, e := s.client.Clone()
++	if e != nil {
++		return ErrKeyService
++	}
++	child.SetToken(r.Token)
++	if !initialProviderRejection(ctx, child, http.MethodGet, "auth/token/lookup-self", nil, http.StatusForbidden, "") {
++		return ErrKeyService
++	}
++	return nil
++}
+--- /dev/null
++++ b/internal/adapters/kms/initial_provider_test.go
+@@ -0,0 +1,342 @@
++package kms
++
++import (
++	"context"
++	"encoding/json"
++	"net/http"
++	"net/http/httptest"
++	"strconv"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++)
++
++type initialProviderFixture struct {
++	mu           sync.Mutex
++	server       *httptest.Server
++	profile      contracts.InitialProviderProfile
++	issuer       *InitialProviderIssuer
++	parent       initialTokenLookup
++	children     map[string]initialTokenLookup
++	policies     map[string]string
++	roleChange   func(*initialTokenRole)
++	parentChange func(*initialTokenLookup)
++	issueMode    string
++	posts        int
++	omitField    string
++	shift        time.Duration
++}
++
++func newInitialProviderFixture(t *testing.T) *initialProviderFixture {
++	t.Helper()
++	now := time.Now().UTC()
++	f := &initialProviderFixture{profile: contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: "providers", UID: "20000000-0000-4000-8000-000000000001"}, IssuerPolicy: "initial-issuer", WrapRole: "initial-wrap-role", WrapPolicy: "initial-wrap-policy", UnwrapRole: "initial-unwrap-role", UnwrapPolicy: "initial-unwrap-policy"}, children: map[string]initialTokenLookup{}}
++	f.parent = initialTokenLookup{Accessor: "original-parent", Type: "service", Policies: []string{f.profile.IssuerPolicy}, MaxTTL: 600, CreationTTL: 600, Issued: now.Add(-time.Minute), Expire: now.Add(5 * time.Minute), TTL: 300}
++	var e error
++	f.policies, e = InitialProviderPolicies(f.profile, "transit", "initial-audit")
++	if e != nil {
++		t.Fatal(e)
++	}
++	f.server = httptest.NewTLSServer(http.HandlerFunc(f.handle))
++	t.Cleanup(f.server.Close)
++	f.issuer, e = NewInitialProviderIssuer(f.server.URL, "original-issuer-token", "transit", "initial-audit", "20000000-0000-4000-8000-000000000002", "20000000-0000-4000-8000-000000000003", f.profile, f.server.Client(), func() time.Time { f.mu.Lock(); defer f.mu.Unlock(); return time.Now().Add(f.shift) })
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(f.issuer.Close)
++	return f
++}
++func (f *initialProviderFixture) handle(w http.ResponseWriter, r *http.Request) {
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	reply := func(v any) {
++		w.Header().Set("Content-Type", "application/json")
++		if f.omitField != "" {
++			body, _ := json.Marshal(v)
++			var projected map[string]map[string]json.RawMessage
++			if json.Unmarshal(body, &projected) == nil {
++				parts := strings.SplitN(f.omitField, ".", 2)
++				if len(parts) == 2 {
++					delete(projected[parts[0]], parts[1])
++				}
++				v = projected
++			}
++		}
++		_ = json.NewEncoder(w).Encode(v)
++	}
++	token := r.Header.Get("X-Vault-Token")
++	if r.URL.Path == "/v1/auth/token/lookup-self" {
++		d, ok := f.children[token]
++		if token == "original-issuer-token" {
++			d = f.parent
++			ok = true
++			if f.parentChange != nil {
++				f.parentChange(&d)
++			}
++		}
++		if !ok {
++			w.WriteHeader(403)
++			reply(map[string]any{"errors": []string{"permission denied"}})
++			return
++		}
++		reply(map[string]any{"data": d})
++		return
++	}
++	if r.URL.Path == "/v1/auth/token/lookup-accessor" || r.URL.Path == "/v1/auth/token/revoke-accessor" {
++		var body map[string]string
++		_ = json.NewDecoder(r.Body).Decode(&body)
++		found := ""
++		var d initialTokenLookup
++		for key, value := range f.children {
++			if value.Accessor == body["accessor"] {
++				found = key
++				d = value
++				break
++			}
++		}
++		if found == "" {
++			w.WriteHeader(400)
++			reply(map[string]any{"errors": []string{"invalid accessor"}})
++			return
++		}
++		if r.URL.Path == "/v1/auth/token/lookup-accessor" {
++			reply(map[string]any{"data": d})
++			return
++		}
++		delete(f.children, found)
++		if f.issueMode == "lost-revoke" {
++			w.WriteHeader(503)
++			reply(map[string]any{"errors": []string{"MUST-NOT-LEAK"}})
++			return
++		}
++		w.WriteHeader(204)
++		return
++	}
++	if token != "original-issuer-token" {
++		w.WriteHeader(403)
++		return
++	}
++	if strings.HasPrefix(r.URL.Path, "/v1/auth/token/roles/") {
++		name := strings.TrimPrefix(r.URL.Path, "/v1/auth/token/roles/")
++		policy := f.profile.WrapPolicy
++		if name == f.profile.UnwrapRole {
++			policy = f.profile.UnwrapPolicy
++		}
++		d := initialTokenRole{Name: name, Allowed: []string{policy}, NoDefault: true, Type: "service", TokenMaxTTL: 900}
++		if f.roleChange != nil {
++			f.roleChange(&d)
++		}
++		reply(map[string]any{"data": d})
++		return
++	}
++	if strings.HasPrefix(r.URL.Path, "/v1/sys/policies/acl/") {
++		name := strings.TrimPrefix(r.URL.Path, "/v1/sys/policies/acl/")
++		reply(map[string]any{"data": map[string]string{"name": name, "policy": f.policies[name]}})
++		return
++	}
++	if strings.HasPrefix(r.URL.Path, "/v1/auth/token/create/") {
++		f.posts++
++		var body struct {
++			Policies  []string          `json:"policies"`
++			Meta      map[string]string `json:"meta"`
++			TTL       string            `json:"ttl"`
++			Type      string            `json:"type"`
++			Renewable bool              `json:"renewable"`
++			Orphan    bool              `json:"no_parent"`
++		}
++		_ = json.NewDecoder(r.Body).Decode(&body)
++		ttl, _ := time.ParseDuration(body.TTL)
++		now := time.Now().UTC()
++		role := strings.TrimPrefix(r.URL.Path, "/v1/auth/token/create/")
++		value := "original-child-" + strconv.Itoa(f.posts)
++		accessor := "original-accessor-" + strconv.Itoa(f.posts)
++		d := initialTokenLookup{Accessor: accessor, Type: "service", Policies: body.Policies, MaxTTL: int64(ttl / time.Second), CreationTTL: int64(ttl / time.Second), Issued: now, Expire: now.Add(ttl), TTL: int64(ttl / time.Second), Role: role, Path: "auth/token/create/" + role, Meta: body.Meta}
++		f.children[value] = d
++		if f.issueMode == "lost" {
++			w.WriteHeader(503)
++			reply(map[string]any{"errors": []string{"MUST-NOT-LEAK"}})
++			return
++		}
++		if f.issueMode == "late" {
++			f.shift = 6 * time.Second
++		}
++		if f.issueMode == "oversize" {
++			value = strings.Repeat("x", 1025)
++		}
++		auth := map[string]any{"client_token": value, "accessor": accessor, "token_type": "service", "policies": body.Policies, "token_policies": body.Policies, "metadata": body.Meta, "lease_duration": int64(ttl / time.Second), "renewable": false, "orphan": false, "num_uses": 0, "entity_id": ""}
++		if f.issueMode == "orphan" {
++			auth["orphan"] = true
++		}
++		if f.issueMode == "extra-policy" {
++			auth["policies"] = []string{body.Policies[0], "default"}
++		}
++		reply(map[string]any{"auth": auth})
++		return
++	}
++	w.WriteHeader(404)
++}
++func (f *initialProviderFixture) claim(t *testing.T) (contracts.InitialProviderParent, contracts.InitialProviderIssue) {
++	t.Helper()
++	parent, _, e := f.issuer.Check(context.Background(), time.Now().Add(15*time.Minute))
++	if e != nil {
++		t.Fatal(e)
++	}
++	now := time.Now().UTC().Truncate(time.Microsecond)
++	return parent, contracts.InitialProviderIssue{ID: "20000000-0000-4000-8000-000000000004", StartedAt: now, Until: now.Add(5 * time.Second), ExpiresBefore: parent.ExpiresAt}
++}
++func TestInitialProviderPositiveResponseRetainsOriginalDates(t *testing.T) {
++	f := newInitialProviderFixture(t)
++	parent, claim := f.claim(t)
++	got, e := f.issuer.Issue(context.Background(), "wrap", claim, parent)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = f.issuer.Verify(context.Background(), "wrap", claim, parent, got); e != nil {
++		t.Fatal(e)
++	}
++	if e = f.issuer.Verify(context.Background(), "unwrap", claim, parent, got); e == nil {
++		t.Fatal("opposite purpose accepted")
++	}
++	changed := got
++	changed.ExpiresAt = changed.ExpiresAt.Add(time.Second)
++	if e = f.issuer.Verify(context.Background(), "wrap", claim, parent, changed); e == nil {
++		t.Fatal("renewed expiry accepted")
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if f.posts != 1 {
++		t.Fatal("verification repeated issuance")
++	}
++}
++func TestInitialProviderRejectsUnsafeRoleBeforeIssue(t *testing.T) {
++	cases := map[string]func(*initialTokenRole){"orphan": func(v *initialTokenRole) { v.Orphan = true }, "renewable": func(v *initialTokenRole) { v.Renewable = true }, "default": func(v *initialTokenRole) { v.NoDefault = false }, "batch": func(v *initialTokenRole) { v.Type = "batch" }, "period": func(v *initialTokenRole) { v.TokenPeriod = 30 }, "legacy-period": func(v *initialTokenRole) { v.Period = 30 }, "glob": func(v *initialTokenRole) { v.AllowedGlob = []string{"*"} }, "alias": func(v *initialTokenRole) { v.Aliases = []string{"human"} }, "cidr": func(v *initialTokenRole) { v.Bound = []string{"0.0.0.0/0"} }, "ttl": func(v *initialTokenRole) { v.TokenMaxTTL = 901 }, "uses": func(v *initialTokenRole) { v.Uses = 1 }}
++	for name, change := range cases {
++		t.Run(name, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			f.roleChange = change
++			if _, _, e := f.issuer.Check(context.Background(), time.Now().Add(15*time.Minute)); e == nil {
++				t.Fatal("unsafe role accepted")
++			}
++			if f.posts != 0 {
++				t.Fatal("read-only preflight issued token")
++			}
++		})
++	}
++}
++func TestInitialProviderRejectsBroaderPolicyAndIssuer(t *testing.T) {
++	for _, mode := range []string{"wildcard", "extra-capability", "identity", "root", "renewable", "orphan", "parent-after-original-interval"} {
++		t.Run(mode, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			switch mode {
++			case "wildcard":
++				f.policies[f.profile.WrapPolicy] = `{"path":{"*":{"capabilities":["update"]}}}`
++			case "extra-capability":
++				f.policies[f.profile.WrapPolicy] = strings.Replace(f.policies[f.profile.WrapPolicy], `["update"]`, `["update","sudo"]`, 1)
++			case "identity":
++				f.parentChange = func(v *initialTokenLookup) { v.IdentityPolicies = []string{"admin"} }
++			case "root":
++				f.parentChange = func(v *initialTokenLookup) { v.Policies = []string{"root"} }
++			case "renewable":
++				f.parentChange = func(v *initialTokenLookup) { v.Renewable = true }
++			case "orphan":
++				f.parentChange = func(v *initialTokenLookup) { v.Orphan = true }
++			}
++			limit := time.Now().Add(15 * time.Minute)
++			if mode == "parent-after-original-interval" {
++				limit = time.Now().Add(time.Minute)
++			}
++			if _, _, e := f.issuer.Check(context.Background(), limit); e == nil {
++				t.Fatal("broader issuer/policy accepted")
++			}
++			if f.posts != 0 {
++				t.Fatal("preflight issued token")
++			}
++		})
++	}
++}
++func TestInitialProviderUncertainOrLateCreateNeverReturnsCredential(t *testing.T) {
++	for _, mode := range []string{"lost", "late", "oversize", "orphan", "extra-policy"} {
++		t.Run(mode, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			parent, claim := f.claim(t)
++			f.issueMode = mode
++			got, e := f.issuer.Issue(context.Background(), "wrap", claim, parent)
++			if e == nil || got.Token != "" || strings.Contains(e.Error(), "MUST-NOT-LEAK") {
++				t.Fatal("unsafe provider response exposed")
++			}
++			f.mu.Lock()
++			defer f.mu.Unlock()
++			if f.posts != 1 {
++				t.Fatal("provider POST retried", f.posts)
++			}
++		})
++	}
++}
++
++func TestInitialProviderRetirementRequiresOriginalPositiveResponseAndLiveDenial(t *testing.T) {
++	for _, mode := range []string{"positive", "lost-revoke", "forged-reply"} {
++		t.Run(mode, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			parent, claim := f.claim(t)
++			got, e := f.issuer.Issue(context.Background(), "wrap", claim, parent)
++			if e != nil {
++				t.Fatal(e)
++			}
++			claim.Response = &got
++			f.issueMode = mode
++			target := got
++			if mode == "forged-reply" {
++				target.Accessor = "foreign"
++			}
++			until, e := f.issuer.Revoke(context.Background(), "wrap", claim, parent, target)
++			if mode == "forged-reply" {
++				if e == nil {
++					t.Fatal("foreign credential retired")
++				}
++				return
++			}
++			if e != nil || !time.Now().Before(until) {
++				t.Fatal("positive provider retirement", e)
++			}
++			if _, e = f.issuer.Revoke(context.Background(), "wrap", claim, parent, got); e != nil {
++				t.Fatal("exact retirement retry", e)
++			}
++			if e = f.issuer.Verify(context.Background(), "wrap", claim, parent, got); e == nil {
++				t.Fatal("retired credential accepted")
++			}
++			if f.posts != 1 {
++				t.Fatal("retirement issued credential")
++			}
++		})
++	}
++}
++
++func TestInitialProviderRequiresExplicitSafetyFields(t *testing.T) {
++	for _, field := range []string{"data.orphan", "data.renewable", "data.token_no_default_policy", "data.token_explicit_max_ttl"} {
++		t.Run(field, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			f.omitField = field
++			if _, _, e := f.issuer.Check(context.Background(), time.Now().Add(15*time.Minute)); e == nil {
++				t.Fatal("missing role safety value accepted as zero")
++			}
++		})
++	}
++	for _, field := range []string{"auth.orphan", "auth.renewable", "auth.entity_id", "auth.num_uses", "auth.metadata"} {
++		t.Run(field, func(t *testing.T) {
++			f := newInitialProviderFixture(t)
++			parent, claim := f.claim(t)
++			f.omitField = field
++			if got, e := f.issuer.Issue(context.Background(), "wrap", claim, parent); e == nil || got.Token != "" {
++				t.Fatal("missing issuance safety value accepted as zero")
++			}
++			f.mu.Lock()
++			defer f.mu.Unlock()
++			if f.posts != 1 {
++				t.Fatal("missing response caused another issuance")
++			}
++		})
++	}
++}
+--- a/internal/adapters/kubernetes/initial_preparer.go
++++ b/internal/adapters/kubernetes/initial_preparer.go
+@@ -10,6 +10,7 @@
+ 	"sync"
+ 	"time"
+ 
++	"asservat.local/asservat/internal/adapters/providerconfig"
+ 	"asservat.local/asservat/internal/contracts"
+ 	"asservat.local/asservat/internal/domain/authorization"
+ 	cfg "asservat.local/asservat/internal/domain/configuration"
+@@ -27,21 +28,23 @@
+ // provenance, never a witness, cleanliness assertion, or recovery authority.
+ // The continuity bootstrap and its independent probe are operator-owned inputs.
+ type InitialPreparer struct {
+-	services       *contracts.InitialPreparationServices
+-	plan           contracts.InitialPreparationPlan
+-	rootUID        string
+-	creator        *InitialNamespaceCreator
+-	protection     *configMapProtection
+-	staging        GuardPin
+-	objects        []initialPreparationResource
+-	requestMu      sync.Mutex
+-	requestOwner   string
+-	requestClosed  bool
+-	requestJoin    sync.WaitGroup
+-	requestCancel  context.CancelFunc
+-	requestContext context.Context
+-	requestProofs  map[string]contracts.InitialPreparationPodRequestCompletion
+-	probeResponses map[string]contracts.InitialPreparationProbeResponse
++	providers         *contracts.InitialProviderProfile
++	providerResponses map[string]contracts.InitialProviderResponse
++	services          *contracts.InitialPreparationServices
++	plan              contracts.InitialPreparationPlan
++	rootUID           string
++	creator           *InitialNamespaceCreator
++	protection        *configMapProtection
++	staging           GuardPin
++	objects           []initialPreparationResource
++	requestMu         sync.Mutex
++	requestOwner      string
++	requestClosed     bool
++	requestJoin       sync.WaitGroup
++	requestCancel     context.CancelFunc
++	requestContext    context.Context
++	requestProofs     map[string]contracts.InitialPreparationPodRequestCompletion
++	probeResponses    map[string]contracts.InitialPreparationProbeResponse
+ }
+ 
+ func NewInitialPreparer(config *rest.Config, observer, probe *PermissionClient, c contracts.InitialPreparer) (*InitialPreparer, error) {
+@@ -102,6 +105,14 @@
+ 			return nil, e
+ 		}
+ 		result.services = &value
++	}
++	if c.Providers != nil {
++		if c.SQLMaterial == nil || c.Plan.PrivateState == nil || result.services == nil || !providerconfig.InitialProviderProfile(*c.Providers) || c.Providers.Material.Name == c.SQLMaterial.Name || c.Providers.Material.Name == c.Plan.PrivateState.Name {
++			cancel()
++			return nil, cfg.ErrInvalid
++		}
++		profile := *c.Providers
++		result.providers = &profile
+ 	}
+ 	return result, nil
+ }
+--- a/internal/adapters/kubernetes/initial_preparer_private.go
++++ b/internal/adapters/kubernetes/initial_preparer_private.go
+@@ -23,7 +23,7 @@
+ 		return false
+ 	}
+ 	if v.RootUID == "" {
+-		return v.PlanDigest == "" && v.Probe == nil && v.SQL == nil
++		return v.PlanDigest == "" && v.Probe == nil && v.SQL == nil && v.Providers == nil
+ 	}
+ 	if !authorization.UUID(v.RootUID) || v.PlanDigest != preparationPlanDigest(s.plan) {
+ 		return false
+@@ -36,6 +36,9 @@
+ 			return false
+ 		}
+ 	}
++	if !s.validPrivateProviders(v) {
++		return false
++	}
+ 	if v.Probe == nil {
+ 		return true
+ 	}
+@@ -146,7 +149,7 @@
+ 		copy.SQL = &sql
+ 		return sql.Secret != nil && equalJSON(copy, next)
+ 	}
+-	return false
++	return s.privateProviderTransition(old, next)
+ }
+ func (s *InitialPreparer) writePrivate(ctx context.Context, secret *core.Secret, old, next contracts.InitialPreparationPrivateState, until time.Time) error {
+ 	if secret == nil || !s.privateTransition(old, next) {
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider.go
+@@ -0,0 +1,215 @@
++package kubernetes
++
++import (
++	"context"
++	"encoding/json"
++	"strings"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// Consumer-owned fixed-purpose port. Only the acknowledged private claim in
++// PrepareProvider can authorize Issue; Check/Verify are observations, not effects.
++type InitialProviderIssuer interface {
++	Check(context.Context, time.Time) (contracts.InitialProviderParent, time.Time, error)
++	Issue(context.Context, string, contracts.InitialProviderIssue, contracts.InitialProviderParent) (contracts.InitialProviderResponse, error)
++	Verify(context.Context, string, contracts.InitialProviderIssue, contracts.InitialProviderParent, contracts.InitialProviderResponse) error
++}
++
++func (s *InitialPreparer) providerResponse(id string) (contracts.InitialProviderResponse, bool) {
++	s.requestMu.Lock()
++	defer s.requestMu.Unlock()
++	v, ok := s.providerResponses[id]
++	return v, ok
++}
++func (s *InitialPreparer) keepProviderResponse(id string, v contracts.InitialProviderResponse) {
++	s.requestMu.Lock()
++	defer s.requestMu.Unlock()
++	if !s.requestClosed {
++		if s.providerResponses == nil {
++			s.providerResponses = map[string]contracts.InitialProviderResponse{}
++		}
++		if len(s.providerResponses) < 2 {
++			s.providerResponses[id] = v
++		}
++	}
++}
++func sameProviderParent(a, b contracts.InitialProviderParent) bool {
++	return a.Accessor == b.Accessor && a.IssuedAt.Equal(b.IssuedAt) && a.ExpiresAt.Equal(b.ExpiresAt)
++}
++
++// Account for both maximum positive replies and the final projection receipt
++// before any provider POST; private progress cannot overflow after issuance.
++func (s *InitialPreparer) providerStateFits(v contracts.InitialPreparationPrivateState) bool {
++	raw, e := json.Marshal(v)
++	if e != nil {
++		return false
++	}
++	defer clear(raw)
++	var full contracts.InitialPreparationPrivateState
++	if json.Unmarshal(raw, &full) != nil || full.Providers == nil {
++		return false
++	}
++	for n := 0; n < 2; n++ {
++		i := &contracts.InitialProviderIssue{ID: "ffffffff-ffff-4fff-8fff-ffffffffffff", StartedAt: time.Date(9999, 1, 1, 0, 0, 0, 999999000, time.UTC), Until: time.Date(9999, 1, 1, 0, 0, 5, 999999000, time.UTC), ExpiresBefore: time.Date(9999, 1, 1, 0, 15, 0, 999999999, time.UTC), Response: &contracts.InitialProviderResponse{Token: strings.Repeat("x", contracts.InitialProviderTokenMaxBytes), Accessor: strings.Repeat("x", 128), IssuedAt: time.Date(9999, 1, 1, 0, 0, 1, 999999999, time.UTC), ExpiresAt: time.Date(9999, 1, 1, 0, 15, 0, 999999999, time.UTC)}}
++		if n == 0 {
++			full.Providers.Wrap = i
++		} else {
++			full.Providers.Unwrap = i
++		}
++	}
++	full.Providers.Projection = &contracts.InitialPreparationSQLState{OperationID: "ffffffff-ffff-4fff-8fff-ffffffffffff", Secret: &contracts.WorkerObjectReference{Name: s.plan.Workload.Credentials, UID: "ffffffff-ffff-4fff-8fff-ffffffffffff"}}
++	raw, e = json.Marshal(full)
++	defer clear(raw)
++	return e == nil && len(raw) <= contracts.InitialPreparationPrivateMaxBytes
++}
++
++// PrepareProvider freezes an exact original parent identity, then spends one
++// issue claim. Unknown claim/POST replies never issue again. A positive response
++// retained by this joined process may finish persistence after a lost CAS reply;
++// another process needs the already persisted original response.
++func (b *InitialPreparationCredentialBinder) PrepareProvider(ctx context.Context, purpose string, issuer InitialProviderIssuer) (contracts.InitialProviderResponse, time.Time, error) {
++	var zero contracts.InitialProviderResponse
++	if b == nil || ctx == nil || issuer == nil || !b.preparer.ProviderInputsEnabled() || purpose != "wrap" && purpose != "unwrap" {
++		return zero, time.Time{}, cfg.ErrInvalid
++	}
++	s := b.preparer
++	ctx, joined, e := s.ownPodRequest(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	defer joined()
++	_, binding, until, e := b.Bind(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	if !s.protection.observer.now().Before(binding.NotAfter) {
++		return zero, time.Time{}, cfg.ErrUnavailable
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	material, e := s.readProviderMaterial(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	if material.StorageUseUntil.Before(binding.NotAfter) {
++		return zero, time.Time{}, cfg.ErrChanged
++	}
++	root, _, e := s.originalPrivateScope(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	private, state, e := s.readPrivate(ctx)
++	if e != nil || state.RootUID != root.RootUID || state.SQL == nil || state.SQL.Secret == nil {
++		return zero, time.Time{}, cfg.ErrChanged
++	}
++	parent, providerUntil, e := issuer.Check(ctx, binding.NotAfter)
++	until = identity.Earlier(until, providerUntil)
++	if e != nil {
++		return zero, time.Time{}, cfg.ErrUnavailable
++	}
++	ctx, done := context.WithDeadline(ctx, until)
++	defer done()
++	if state.Providers == nil {
++		next := state
++		next.Providers = &contracts.InitialPreparationProviders{ProfileDigest: preparationDigest(*s.providers), Parent: parent}
++		if !s.providerStateFits(next) {
++			return zero, time.Time{}, cfg.ErrInvalid
++		}
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, time.Time{}, e
++		}
++		private, state, e = s.readPrivate(ctx)
++		if e != nil {
++			return zero, time.Time{}, e
++		}
++	}
++	if !sameProviderParent(state.Providers.Parent, parent) || state.Providers.ProfileDigest != preparationDigest(*s.providers) {
++		return zero, time.Time{}, cfg.ErrChanged
++	}
++	issue := state.Providers.Wrap
++	if purpose == "unwrap" {
++		issue = state.Providers.Unwrap
++		if state.Providers.Wrap == nil || state.Providers.Wrap.Response == nil {
++			return zero, time.Time{}, cfg.ErrChanged
++		}
++	}
++	fresh := false
++	if issue == nil {
++		id, e := prepUUID()
++		if e != nil {
++			return zero, time.Time{}, e
++		}
++		now := s.protection.observer.now().UTC().Truncate(time.Microsecond)
++		claimUntil := until.UTC().Truncate(time.Microsecond)
++		if !now.Before(claimUntil) || !claimUntil.Before(parent.ExpiresAt) {
++			return zero, time.Time{}, cfg.ErrUnavailable
++		}
++		issue = &contracts.InitialProviderIssue{ID: id, StartedAt: now, Until: claimUntil, ExpiresBefore: parent.ExpiresAt}
++		next := state
++		p := *state.Providers
++		next.Providers = &p
++		if purpose == "wrap" {
++			p.Wrap = issue
++		} else {
++			p.Unwrap = issue
++		}
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, time.Time{}, e
++		}
++		fresh = true
++		private, state, e = s.readPrivate(ctx)
++		if e != nil {
++			return zero, time.Time{}, e
++		}
++	}
++	response := issue.Response
++	if response == nil {
++		value, ok := s.providerResponse(issue.ID)
++		if !ok && fresh {
++			if e = s.finish(ctx, until); e != nil {
++				return zero, time.Time{}, e
++			}
++			value, e = issuer.Issue(ctx, purpose, *issue, parent)
++			if e != nil {
++				return zero, time.Time{}, cfg.ErrUnavailable
++			}
++			s.keepProviderResponse(issue.ID, value)
++			ok = true
++		}
++		if !ok {
++			return zero, time.Time{}, cfg.ErrUnavailable
++		}
++		if e = issuer.Verify(ctx, purpose, *issue, parent, value); e != nil {
++			return zero, time.Time{}, cfg.ErrUnavailable
++		}
++		next := state
++		p := *state.Providers
++		next.Providers = &p
++		i := *issue
++		i.Response = &value
++		if purpose == "wrap" {
++			p.Wrap = &i
++		} else {
++			p.Unwrap = &i
++		}
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, time.Time{}, e
++		}
++		response = &value
++	} else if e = issuer.Verify(ctx, purpose, *issue, parent, *response); e != nil {
++		return zero, time.Time{}, cfg.ErrUnavailable
++	}
++	final, e := b.current.current(ctx, true)
++	until = identity.Earlier(until, final)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	if e = s.finish(ctx, until); e != nil {
++		return zero, time.Time{}, e
++	}
++	return *response, until, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider_projection.go
+@@ -0,0 +1,172 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/identity"
++	core "k8s.io/api/core/v1"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/utils/ptr"
++)
++
++// PersistProviderProjection creates the exact seven private files consumed by
++// initial-install. It never copies the bootstrap issuer or SQL maintenance
++// credential. The writer token remains the existing bounded kubelet projection.
++func (b *InitialPreparationCredentialBinder) PersistProviderProjection(ctx context.Context, issuer InitialProviderIssuer) (InitialPreparedSQLState, error) {
++	var zero InitialPreparedSQLState
++	if b == nil || ctx == nil || issuer == nil || !b.preparer.ProviderInputsEnabled() {
++		return zero, cfg.ErrInvalid
++	}
++	s := b.preparer
++	ctx, joined, e := s.ownPodRequest(ctx)
++	if e != nil {
++		return zero, e
++	}
++	defer joined()
++	probe, e := s.PrepareProbe(ctx)
++	if e != nil {
++		return zero, e
++	}
++	defer clear(probe.Token)
++	_, binding, until, e := b.Bind(ctx)
++	if e != nil {
++		return zero, e
++	}
++	until = identity.Earlier(until, probe.ValidUntil)
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	if !s.protection.observer.now().Before(binding.NotAfter) {
++		return zero, cfg.ErrUnavailable
++	}
++	material, e := s.readProviderMaterial(ctx)
++	if e != nil || material.StorageUseUntil.Before(binding.NotAfter) {
++		return zero, cfg.ErrUnavailable
++	}
++	root, _, e := s.originalPrivateScope(ctx)
++	if e != nil {
++		return zero, e
++	}
++	private, state, e := s.readPrivate(ctx)
++	if e != nil || state.RootUID != root.RootUID || state.SQL == nil || state.SQL.Secret == nil || state.Providers == nil || state.Providers.Wrap == nil || state.Providers.Wrap.Response == nil || state.Providers.Unwrap == nil || state.Providers.Unwrap.Response == nil {
++		return zero, cfg.ErrChanged
++	}
++	p := state.Providers
++	if e = issuer.Verify(ctx, "wrap", *p.Wrap, p.Parent, *p.Wrap.Response); e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	if e = issuer.Verify(ctx, "unwrap", *p.Unwrap, p.Parent, *p.Unwrap.Response); e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	sqlStore := &InitialCredentialStateStore{protection: b.current.protection, inputUID: b.current.inputUID, installation: b.current.installation, plan: b.plan, name: s.plan.Workload.Credentials + "-sql"}
++	raw, e := sqlStore.Read(ctx, *state.SQL.Secret)
++	if e != nil {
++		return zero, e
++	}
++	defer clear(raw)
++	sql, e := contracts.DecodeInitialSQLCredentialState(bytes.NewReader(raw))
++	if e != nil || sql.PlanDigest != binding.StartupDigest || !sql.NotBefore.Equal(binding.NotBefore) || !sql.NotAfter.Equal(binding.NotAfter) {
++		return zero, cfg.ErrChanged
++	}
++	files := map[string][]byte{"audit-wrap.token": []byte(p.Wrap.Response.Token), "audit-unwrap.token": []byte(p.Unwrap.Response.Token), "kube-probe.token": append([]byte(nil), probe.Token...)}
++	defer func() {
++		for _, data := range files {
++			clear(data)
++		}
++	}()
++	for name, v := range map[string]any{"sql-prepare.json": sql.Preparation, "sql-audit.json": sql.Audit, "sql-activate.json": sql.Activation, "audit-storage.json": material.Storage} {
++		data, e := json.Marshal(v)
++		if e != nil {
++			return zero, cfg.ErrInvalid
++		}
++		files[name] = data
++	}
++	fresh := false
++	if p.Projection == nil {
++		id, e := prepUUID()
++		if e != nil {
++			return zero, e
++		}
++		next := state
++		copy := *p
++		copy.Projection = &contracts.InitialPreparationSQLState{OperationID: id}
++		next.Providers = &copy
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, e
++		}
++		fresh = true
++		private, state, e = s.readPrivate(ctx)
++		if e != nil {
++			return zero, e
++		}
++		p = state.Providers
++	}
++	if fresh {
++		if e = s.finish(ctx, until); e != nil {
++			return zero, e
++		}
++		object := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: s.plan.Workload.Credentials, Namespace: s.plan.Workload.Namespace}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: files}
++		s.creator.stamp(&object.ObjectMeta)
++		object.Annotations[initialPreparationOperationAnnotation] = p.Projection.OperationID
++		reply, err := s.creator.post(ctx, "/api/v1/namespaces/"+s.plan.Workload.Namespace+"/secrets", &object)
++		clear(reply)
++		if err == cfg.ErrDenied {
++			return zero, err
++		}
++	}
++	ref, e := s.readProviderProjection(ctx, *p.Projection, files)
++	if e != nil {
++		return zero, e
++	}
++	if p.Projection.Secret == nil {
++		next := state
++		copy := *p
++		projection := *p.Projection
++		projection.Secret = &ref
++		copy.Projection = &projection
++		next.Providers = &copy
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, e
++		}
++	}
++	final, e := b.current.current(ctx, true)
++	until = identity.Earlier(until, final)
++	if e != nil {
++		return zero, e
++	}
++	if e = s.finish(ctx, until); e != nil {
++		return zero, e
++	}
++	return InitialPreparedSQLState{Secret: ref, ValidUntil: until}, nil
++}
++func (s *InitialPreparer) readProviderProjection(ctx context.Context, claim contracts.InitialPreparationSQLState, files map[string][]byte) (contracts.WorkerObjectReference, error) {
++	var zero contracts.WorkerObjectReference
++	raw, e := s.creator.raw(ctx, "/api/v1/namespaces/"+s.plan.Workload.Namespace+"/secrets/"+s.plan.Workload.Credentials, nil)
++	if e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	defer clear(raw)
++	var secret core.Secret
++	if strictGuardJSON(raw, &secret) != nil {
++		return zero, cfg.ErrChanged
++	}
++	for _, data := range secret.Data {
++		defer clear(data)
++	}
++	if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Type != core.SecretTypeOpaque || secret.Immutable == nil || !*secret.Immutable || secret.Namespace != s.plan.Workload.Namespace || !s.creator.owns(secret.ObjectMeta, s.plan.Workload.Credentials) || len(secret.Annotations) != 3 || secret.Annotations[initialPreparationOperationAnnotation] != claim.OperationID || len(secret.Labels) != 0 || len(secret.OwnerReferences) != 0 || len(secret.Finalizers) != 0 || len(secret.StringData) != 0 || len(secret.Data) != len(files) {
++		return zero, cfg.ErrChanged
++	}
++	for name, data := range files {
++		if !bytes.Equal(secret.Data[name], data) {
++			return zero, cfg.ErrChanged
++		}
++	}
++	ref := contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
++	if claim.Secret != nil && *claim.Secret != ref {
++		return zero, cfg.ErrChanged
++	}
++	return ref, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider_state.go
+@@ -0,0 +1,103 @@
++package kubernetes
++
++import (
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++func validProviderTime(v time.Time) bool { return !v.IsZero() && v.Location() == time.UTC }
++func (s *InitialPreparer) validPrivateProviders(v contracts.InitialPreparationPrivateState) bool {
++	p := v.Providers
++	if p == nil {
++		return true
++	}
++	if s.providers == nil || v.SQL == nil || v.SQL.Secret == nil || p.ProfileDigest != preparationDigest(*s.providers) || !identity.Text(p.Parent.Accessor, 128) || !validProviderTime(p.Parent.IssuedAt) || !validProviderTime(p.Parent.ExpiresAt) || !p.Parent.IssuedAt.Before(p.Parent.ExpiresAt) || p.Parent.ExpiresAt.Sub(p.Parent.IssuedAt) > 901*time.Second {
++		return false
++	}
++	seen := map[string]bool{v.SQL.OperationID: true, v.Probe.AnchorOperationID: true, v.Probe.Issue.ID: true}
++	for n, i := range []*contracts.InitialProviderIssue{p.Wrap, p.Unwrap} {
++		if i == nil {
++			if n == 0 && (p.Unwrap != nil || p.Projection != nil) {
++				return false
++			}
++			continue
++		}
++		if n == 1 && (p.Wrap == nil || p.Wrap.Response == nil) {
++			return false
++		}
++		if !authorization.UUID(i.ID) || seen[i.ID] || !validInitialPrivateTime(i.StartedAt) || !validInitialPrivateTime(i.Until) || !i.StartedAt.Before(i.Until) || i.Until.Sub(i.StartedAt) > 5*time.Second || !i.Until.Before(i.ExpiresBefore) || !i.ExpiresBefore.Equal(p.Parent.ExpiresAt) {
++			return false
++		}
++		seen[i.ID] = true
++		if r := i.Response; r != nil {
++			if !initialProviderASCII(r.Token, contracts.InitialProviderTokenMaxBytes) || !identity.Text(r.Accessor, 128) || r.Accessor == p.Parent.Accessor || !validProviderTime(r.IssuedAt) || !validProviderTime(r.ExpiresAt) || r.IssuedAt.Before(i.StartedAt) || r.IssuedAt.After(i.Until) || !r.IssuedAt.Before(r.ExpiresAt) || r.ExpiresAt.After(i.ExpiresBefore) {
++				return false
++			}
++			if n == 1 && (r.Token == p.Wrap.Response.Token || r.Accessor == p.Wrap.Response.Accessor) {
++				return false
++			}
++		}
++	}
++	if p.Projection != nil {
++		if p.Unwrap == nil || p.Unwrap.Response == nil || !authorization.UUID(p.Projection.OperationID) || seen[p.Projection.OperationID] {
++			return false
++		}
++		if r := p.Projection.Secret; r != nil && (r.Name != s.plan.Workload.Credentials || !authorization.UUID(r.UID)) {
++			return false
++		}
++	}
++	return true
++}
++func (s *InitialPreparer) privateProviderTransition(old, next contracts.InitialPreparationPrivateState) bool {
++	if old.SQL == nil || old.SQL.Secret == nil || next.Providers == nil {
++		return false
++	}
++	copy := old
++	if old.Providers == nil {
++		copy.Providers = next.Providers
++		return next.Providers.Wrap == nil && next.Providers.Unwrap == nil && next.Providers.Projection == nil && equalJSON(copy, next)
++	}
++	p := *old.Providers
++	copy.Providers = &p
++	for n, i := range []*contracts.InitialProviderIssue{p.Wrap, p.Unwrap} {
++		replacement := next.Providers.Wrap
++		if n == 1 {
++			replacement = next.Providers.Unwrap
++		}
++		if i == nil {
++			if n == 0 {
++				p.Wrap = replacement
++			} else {
++				p.Unwrap = replacement
++			}
++			return replacement != nil && replacement.Response == nil && equalJSON(copy, next)
++		}
++		if i.Response == nil {
++			if replacement == nil {
++				return false
++			}
++			issue := *i
++			issue.Response = replacement.Response
++			if n == 0 {
++				p.Wrap = &issue
++			} else {
++				p.Unwrap = &issue
++			}
++			return issue.Response != nil && equalJSON(copy, next)
++		}
++	}
++	if p.Projection == nil {
++		p.Projection = next.Providers.Projection
++		return p.Projection != nil && p.Projection.Secret == nil && equalJSON(copy, next)
++	}
++	if p.Projection.Secret == nil && next.Providers.Projection != nil {
++		projection := *p.Projection
++		projection.Secret = next.Providers.Projection.Secret
++		p.Projection = &projection
++		return projection.Secret != nil && equalJSON(copy, next)
++	}
++	return false
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_provider_test.go
+@@ -0,0 +1,234 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"io"
++	"net/http"
++	"strings"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	core "k8s.io/api/core/v1"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/utils/ptr"
++)
++
++type syntheticInitialIssuer struct {
++	parent     contracts.InitialProviderParent
++	issues     atomic.Int32
++	fail       bool
++	afterIssue func()
++}
++
++func (s *syntheticInitialIssuer) Check(context.Context, time.Time) (contracts.InitialProviderParent, time.Time, error) {
++	return s.parent, time.Now().Add(5 * time.Second), nil
++}
++func (s *syntheticInitialIssuer) Issue(_ context.Context, purpose string, i contracts.InitialProviderIssue, p contracts.InitialProviderParent) (contracts.InitialProviderResponse, error) {
++	s.issues.Add(1)
++	if s.afterIssue != nil {
++		s.afterIssue()
++	}
++	if s.fail {
++		return contracts.InitialProviderResponse{}, cfg.ErrUnavailable
++	}
++	return contracts.InitialProviderResponse{Token: "synthetic-" + purpose + "-token", Accessor: "synthetic-" + purpose + "-accessor", IssuedAt: time.Now().UTC(), ExpiresAt: p.ExpiresAt.Add(-time.Second)}, nil
++}
++func (s *syntheticInitialIssuer) Verify(_ context.Context, purpose string, _ contracts.InitialProviderIssue, _ contracts.InitialProviderParent, r contracts.InitialProviderResponse) error {
++	if r.Token != "synthetic-"+purpose+"-token" {
++		return cfg.ErrChanged
++	}
++	return nil
++}
++func initialProviderPreparationFixture(t *testing.T) (*preparationBindingFixture, *InitialPreparationCredentialBinder, *syntheticInitialIssuer) {
++	t.Helper()
++	f, b, payload := initialSQLPreparationFixture(t)
++	if _, e := b.PersistSQLState(context.Background(), payload); e != nil {
++		t.Fatal(e)
++	}
++	m := contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: f.f.plan.InstallationID, RequestID: f.f.plan.RequestID, IssuerToken: "synthetic-original-issuer", Storage: contracts.OwnerStorageCredential{AccessKeyID: "synthetic-access", SecretAccessKey: "synthetic-private"}, StorageUseUntil: time.Now().UTC().Add(time.Hour)}
++	raw, _ := json.Marshal(m)
++	defer clear(raw)
++	secret := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: "provider-material", Namespace: "bootstrap"}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"material.json": raw}}
++	encoded, _ := json.Marshal(secret)
++	defer clear(encoded)
++	path := "/api/v1/namespaces/bootstrap/secrets/provider-material"
++	f.f.mu.Lock()
++	f.f.store(path, encoded)
++	uid := f.f.objects[path]["metadata"].(map[string]any)["uid"].(string)
++	f.f.mu.Unlock()
++	// Synthetic composition supplies the protected provider profile directly; real
++	// constructor/native profile admission is tested separately from these CAS cases.
++	b.preparer.providers = &contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: secret.Name, UID: uid}, IssuerPolicy: "issuer", WrapRole: "wrap-role", WrapPolicy: "wrap-policy", UnwrapRole: "unwrap-role", UnwrapPolicy: "unwrap-policy"}
++	return f, b, &syntheticInitialIssuer{parent: contracts.InitialProviderParent{Accessor: "synthetic-parent", IssuedAt: time.Now().UTC().Add(-time.Minute), ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}}
++}
++func providerBinderAgain(t *testing.T, f *preparationBindingFixture, b *InitialPreparationCredentialBinder) *InitialPreparationCredentialBinder {
++	t.Helper()
++	next := f.binder(t)
++	p := *b.preparer.providers
++	next.preparer.providers = &p
++	return next
++}
++func TestInitialProviderPreparationOriginalClaimsAndProjection(t *testing.T) {
++	f, b, issuer := initialProviderPreparationFixture(t)
++	first, _, e := b.PrepareProvider(context.Background(), "wrap", issuer)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if _, _, e = b.PrepareProvider(context.Background(), "unwrap", issuer); e != nil {
++		t.Fatal(e)
++	}
++	got, _, e := providerBinderAgain(t, f, b).PrepareProvider(context.Background(), "wrap", issuer)
++	if e != nil || got != first {
++		t.Fatal("original reply changed", e)
++	}
++	projection, e := b.PersistProviderProjection(context.Background(), issuer)
++	if e != nil {
++		t.Fatal(e)
++	}
++	replay, e := providerBinderAgain(t, f, b).PersistProviderProjection(context.Background(), issuer)
++	if e != nil || replay.Secret != projection.Secret {
++		t.Fatal("projection replay changed", e)
++	}
++	if issuer.issues.Load() != 2 {
++		t.Fatal("reissued provider credential")
++	}
++	f.f.mu.Lock()
++	defer f.f.mu.Unlock()
++	path := "/api/v1/namespaces/initial-target/secrets/credentials"
++	if f.f.posts[path] != 1 {
++		t.Fatal("projection CREATE repeated")
++	}
++	raw, _ := json.Marshal(f.f.objects[path])
++	defer clear(raw)
++	var secret core.Secret
++	if json.Unmarshal(raw, &secret) != nil || len(secret.Data) != 7 {
++		t.Fatal("wrong projection")
++	}
++	for _, data := range secret.Data {
++		defer clear(data)
++		if bytes.Contains(data, []byte("synthetic-original-issuer")) {
++			t.Fatal("issuer projected")
++		}
++	}
++	if string(secret.Data["audit-wrap.token"]) != "synthetic-wrap-token" || string(secret.Data["audit-unwrap.token"]) != "synthetic-unwrap-token" || len(secret.Data["kube-writer.token"]) != 0 {
++		t.Fatal("provider purpose crossed or writer fabricated")
++	}
++}
++func TestInitialProviderPreparationUnknownClaimsAndResponses(t *testing.T) {
++	for _, mode := range []string{"claim-before", "claim-after", "response-before", "response-after", "provider-lost"} {
++		t.Run(mode, func(t *testing.T) {
++			f, b, issuer := initialProviderPreparationFixture(t)
++			var injected atomic.Bool
++			if mode == "provider-lost" {
++				issuer.fail = true
++			} else {
++				f.f.client.Wrap(func(next http.RoundTripper) http.RoundTripper {
++					return prepActivationRoundTrip(func(r *http.Request) (*http.Response, error) {
++						selected := false
++						if r.Method == "PUT" && r.URL.Path == "/api/v1/namespaces/bootstrap/secrets/private-progress" {
++							raw, _ := io.ReadAll(r.Body)
++							r.Body = io.NopCloser(bytes.NewReader(raw))
++							defer clear(raw)
++							var secret core.Secret
++							_ = json.Unmarshal(raw, &secret)
++							state, _ := contracts.DecodeInitialPreparationPrivateState(bytes.NewReader(secret.Data["state.json"]))
++							selected = state.Providers != nil && state.Providers.Wrap != nil && ((state.Providers.Wrap.Response == nil && strings.HasPrefix(mode, "claim-")) || (state.Providers.Wrap.Response != nil && strings.HasPrefix(mode, "response-")))
++							for _, data := range secret.Data {
++								clear(data)
++							}
++						}
++						if selected && injected.CompareAndSwap(false, true) {
++							if strings.HasSuffix(mode, "-after") {
++								response, e := next.RoundTrip(r)
++								if e != nil {
++									return response, e
++								}
++								response.Body.Close()
++							}
++							raw, _ := json.Marshal(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonServiceUnavailable, Code: 503})
++							return &http.Response{StatusCode: 503, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(bytes.NewReader(raw)), ContentLength: int64(len(raw)), Request: r}, nil
++						}
++						return next.RoundTrip(r)
++					})
++				})
++				b = providerBinderAgain(t, f, b)
++			}
++			_, _, e := b.PrepareProvider(context.Background(), "wrap", issuer)
++			if e == nil {
++				t.Fatal("injected uncertainty accepted")
++			}
++			// Only the same still-live joined owner retains an unpersisted positive reply.
++			replay := b
++			if mode != "response-before" {
++				replay = providerBinderAgain(t, f, b)
++			}
++			_, _, e = replay.PrepareProvider(context.Background(), "wrap", issuer)
++			want := mode == "claim-before" || strings.HasPrefix(mode, "response-")
++			if (e == nil) != want {
++				t.Fatal("wrong original response disposition", mode, e)
++			}
++			count := int32(1)
++			if mode == "claim-after" {
++				count = 0
++			}
++			if issuer.issues.Load() != count {
++				t.Fatal("unknown POST repeated", issuer.issues.Load())
++			}
++		})
++	}
++}
++func TestInitialProviderPreparationConcurrentClaimAndChangedParent(t *testing.T) {
++	f, b, issuer := initialProviderPreparationFixture(t)
++	var wg sync.WaitGroup
++	var successes atomic.Int32
++	for range 4 {
++		peer := providerBinderAgain(t, f, b)
++		wg.Go(func() {
++			if _, _, e := peer.PrepareProvider(context.Background(), "wrap", issuer); e == nil {
++				successes.Add(1)
++			}
++		})
++	}
++	wg.Wait()
++	if successes.Load() == 0 || issuer.issues.Load() != 1 {
++		t.Fatal("concurrent issue claim did not serialize", successes.Load(), issuer.issues.Load())
++	}
++	issuer.parent.ExpiresAt = issuer.parent.ExpiresAt.Add(time.Second)
++	if _, _, e := b.PrepareProvider(context.Background(), "wrap", issuer); e == nil {
++		t.Fatal("parent lifetime changed")
++	}
++	if issuer.issues.Load() != 1 {
++		t.Fatal("changed parent caused new issue")
++	}
++}
++func TestInitialProviderPreparationFinalDeadlineAndSize(t *testing.T) {
++	f, b, issuer := initialProviderPreparationFixture(t)
++	issuer.afterIssue = func() { f.f.mu.Lock(); f.f.shift = 6 * time.Second; f.f.mu.Unlock() }
++	if got, until, e := b.PrepareProvider(context.Background(), "wrap", issuer); e == nil || got.Token != "" || !until.IsZero() {
++		t.Fatal("final original authority expiry ignored")
++	}
++	f.f.mu.Lock()
++	f.f.shift = 0
++	f.f.mu.Unlock()
++	issuer.afterIssue = nil
++	if _, _, e := b.PrepareProvider(context.Background(), "wrap", issuer); e != nil {
++		t.Fatal("live positive reply could not finish original persistence", e)
++	}
++	_, state, e := b.preparer.readPrivate(context.Background())
++	if e != nil {
++		t.Fatal(e)
++	}
++	if !b.preparer.providerStateFits(state) {
++		t.Fatal("maximum finite replies do not fit private state")
++	}
++	state.Probe.Issue.Response.Token = strings.Repeat("x", contracts.InitialPreparationPrivateMaxBytes)
++	if b.preparer.providerStateFits(state) {
++		t.Fatal("oversized future replies accepted")
++	}
++}
+--- a/internal/adapters/kubernetes/initial_preparer_requests.go
++++ b/internal/adapters/kubernetes/initial_preparer_requests.go
+@@ -32,6 +32,8 @@
+ 	}
+ 	s.requestJoin.Wait()
+ 	s.requestMu.Lock()
++	clear(s.providerResponses)
++	s.providerResponses = nil
+ 	clear(s.probeResponses)
+ 	s.probeResponses = nil
+ 	s.requestMu.Unlock()
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_provider_material.go
+@@ -0,0 +1,81 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	core "k8s.io/api/core/v1"
++)
++
++func (s *InitialPreparer) ProviderInputsEnabled() bool { return s != nil && s.providers != nil }
++func initialProviderASCII(s string, limit int) bool {
++	if len(s) < 1 || len(s) > limit {
++		return false
++	}
++	for _, b := range []byte(s) {
++		if b < 33 || b > 126 {
++			return false
++		}
++	}
++	return true
++}
++func validInitialProviderMaterial(v contracts.InitialProviderMaterial, installation, request string, now time.Time) bool {
++	return v.Format == contracts.InitialProviderMaterialFormat && v.InstallationID == installation && v.RequestID == request && initialProviderASCII(v.IssuerToken, contracts.InitialProviderTokenMaxBytes) && initialProviderASCII(v.Storage.AccessKeyID, 256) && initialProviderASCII(v.Storage.SecretAccessKey, 1024) && (v.Storage.SessionToken == "" || initialProviderASCII(v.Storage.SessionToken, 4096)) && !v.StorageUseUntil.IsZero() && v.StorageUseUntil.Location() == time.UTC && now.Before(v.StorageUseUntil)
++}
++func (s *InitialPreparer) readProviderMaterial(ctx context.Context) (contracts.InitialProviderMaterial, error) {
++	var zero contracts.InitialProviderMaterial
++	if !s.ProviderInputsEnabled() {
++		return zero, cfg.ErrInvalid
++	}
++	ref := s.providers.Material
++	raw, e := s.creator.raw(ctx, "/api/v1/namespaces/"+s.plan.BootstrapNamespace.Name+"/secrets/"+ref.Name, nil)
++	if e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	defer clear(raw)
++	var secret core.Secret
++	if strictGuardJSON(raw, &secret) != nil {
++		return zero, cfg.ErrChanged
++	}
++	for _, b := range secret.Data {
++		defer clear(b)
++	}
++	if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Type != core.SecretTypeOpaque || !ownerMetadata(secret.ObjectMeta, s.plan.BootstrapNamespace.Name, ref.Name, ref.UID) || secret.Immutable == nil || !*secret.Immutable || len(secret.OwnerReferences) != 0 || len(secret.Data) != 1 || len(secret.StringData) != 0 {
++		return zero, cfg.ErrChanged
++	}
++	v, e := contracts.DecodeInitialProviderMaterial(bytes.NewReader(secret.Data["material.json"]))
++	if e != nil || !validInitialProviderMaterial(v, s.plan.InstallationID, s.plan.RequestID, s.protection.observer.now()) {
++		return zero, cfg.ErrChanged
++	}
++	return v, nil
++}
++
++// ReadInitialProviderMaterial is a current exact immutable-source read. It also
++// works before declaration so malformed local settings fail before any CREATE.
++// Its result grants no issuer/effect authority and must not enter diagnostics.
++func (s *InitialPreparer) ReadInitialProviderMaterial(ctx context.Context) (contracts.InitialProviderMaterial, time.Time, error) {
++	var zero contracts.InitialProviderMaterial
++	if ctx == nil || !s.ProviderInputsEnabled() {
++		return zero, time.Time{}, cfg.ErrInvalid
++	}
++	until, e := s.current(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	v, e := s.readProviderMaterial(ctx)
++	if e != nil {
++		return zero, time.Time{}, e
++	}
++	if v.StorageUseUntil.Before(until) {
++		until = v.StorageUseUntil
++	}
++	if e = s.finish(ctx, until); e != nil {
++		return zero, time.Time{}, e
++	}
++	return v, until, nil
++}
+--- /dev/null
++++ b/internal/adapters/providerconfig/initial_provider.go
+@@ -0,0 +1,28 @@
++package providerconfig
++
++import (
++	"regexp"
++
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/authorization"
++	"k8s.io/apimachinery/pkg/util/validation"
++)
++
++var initialProviderName = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
++
++// This is pure input validation. It supplies no current provider, source,
++// credential-issue or installation authority.
++func InitialProviderProfile(p contracts.InitialProviderProfile) bool {
++	if p.Format != contracts.InitialProviderProfileFormat || !authorization.UUID(p.Material.UID) || len(validation.IsDNS1123Subdomain(p.Material.Name)) != 0 {
++		return false
++	}
++	names := []string{p.IssuerPolicy, p.WrapRole, p.WrapPolicy, p.UnwrapRole, p.UnwrapPolicy}
++	seen := map[string]bool{}
++	for _, name := range names {
++		if !initialProviderName.MatchString(name) || seen[name] || name == "root" || name == "default" {
++			return false
++		}
++		seen[name] = true
++	}
++	return true
++}
+--- a/internal/bootstrap/initial_preparer.go
++++ b/internal/bootstrap/initial_preparer.go
+@@ -9,6 +9,7 @@
+ 	"sync/atomic"
+ 	"time"
+ 
++	"asservat.local/asservat/internal/adapters/kms"
+ 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+ 	"asservat.local/asservat/internal/adapters/mounts"
+ 	"asservat.local/asservat/internal/adapters/postgres"
+@@ -26,15 +27,16 @@
+ // continuation can issue its original bounded probe token; it does not activate
+ // SQL, schedule the installation Pod or enable public collection.
+ type InitialPreparationDeployment struct {
+-	root        context.Context
+-	cancel      context.CancelFunc
+-	once        sync.Once
+-	running     atomic.Bool
+-	inputs      *providerInputs
+-	preparer    *kube.InitialPreparer
+-	sqlMaterial *contracts.WorkerObjectReference
+-	sqlPool     *pgxpool.Pool
+-	sqlRoles    *postgres.InitialSQLRoles
++	root           context.Context
++	cancel         context.CancelFunc
++	once           sync.Once
++	running        atomic.Bool
++	inputs         *providerInputs
++	preparer       *kube.InitialPreparer
++	sqlMaterial    *contracts.WorkerObjectReference
++	sqlPool        *pgxpool.Pool
++	sqlRoles       *postgres.InitialSQLRoles
++	providerIssuer *kms.InitialProviderIssuer
+ }
+ 
+ func NewInitialPreparationDeployment(ctx context.Context, files *os.Root) (*InitialPreparationDeployment, error) {
+@@ -106,6 +108,27 @@
+ 		d.sqlRoles, e = postgres.NewInitialSQLRoles(root, d.sqlPool, c.Plan.InstallationID)
+ 		if e != nil {
+ 			return nil, e
++		}
++	}
++	if c.Providers != nil {
++		material, until, e := d.preparer.ReadInitialProviderMaterial(root)
++		if e != nil {
++			return nil, e
++		}
++		h, e := ownerHTTP(c.Services.KeyService.Endpoint, c.Services.KeyService.Roots)
++		if e != nil {
++			return nil, e
++		}
++		defer h.CloseIdleConnections()
++		d.providerIssuer, e = kms.NewInitialProviderIssuer(c.Services.KeyService.Endpoint, material.IssuerToken, c.Services.KeyService.AuditMount, c.Services.KeyService.AuditKey, c.Plan.InstallationID, c.Plan.RequestID, *c.Providers, h, time.Now)
++		if e != nil {
++			return nil, e
++		}
++		bounded, done := context.WithDeadline(root, until)
++		_, _, e = d.providerIssuer.Check(bounded, time.Now().Add(15*time.Minute))
++		done()
++		if e != nil {
++			return nil, mounts.ErrUnavailable
+ 		}
+ 	}
+ 	if root.Err() != nil {
+@@ -169,6 +192,9 @@
+ 		if d.preparer != nil {
+ 			d.preparer.Close()
+ 		}
++		if d.providerIssuer != nil {
++			d.providerIssuer.Close()
++		}
+ 		if d.sqlPool != nil {
+ 			d.sqlPool.Close()
+ 		}
+--- a/internal/bootstrap/initial_preparer_sql.go
++++ b/internal/bootstrap/initial_preparer_sql.go
+@@ -15,8 +15,8 @@
+ )
+ 
+ // prepareSQL composes the original private material and current native guards
+-// with the existing scoped SQL provisioner. It neither creates provider tokens
+-// nor changes the activation witness, staging protection or Pod scheduling gate.
++// with the existing scoped SQL provisioner and optional bounded provider phase.
++// It does not change the activation witness, staging protection or Pod gate.
+ func (d *InitialPreparationDeployment) prepareSQL(ctx context.Context) error {
+ 	if d == nil || d.sqlMaterial == nil || d.sqlRoles == nil {
+ 		return mounts.ErrUnavailable
+@@ -93,5 +93,15 @@
+ 	if effect.Err() != nil || !time.Now().Before(stored.ValidUntil) {
+ 		return mounts.ErrUnavailable
+ 	}
++	if d.providerIssuer != nil {
++		for _, purpose := range []string{"wrap", "unwrap"} {
++			if _, _, e = binder.PrepareProvider(ctx, purpose, d.providerIssuer); e != nil {
++				return e
++			}
++		}
++		if _, e = binder.PersistProviderProjection(ctx, d.providerIssuer); e != nil {
++			return e
++		}
++	}
+ 	return nil
+ }
+--- a/internal/contracts/initial_preparation_private.go
++++ b/internal/contracts/initial_preparation_private.go
+@@ -13,13 +13,14 @@
+ // Initial bootstrap supplies only Format/InstallationID/RequestID. The producer
+ // freezes the actual root binding before any credential issuance.
+ type InitialPreparationPrivateState struct {
+-	SQL            *InitialPreparationSQLState `json:"sql,omitempty"`
+-	Format         string                      `json:"format"`
+-	InstallationID string                      `json:"installationID"`
+-	RequestID      string                      `json:"requestID"`
+-	RootUID        string                      `json:"rootUID,omitempty"`
+-	PlanDigest     string                      `json:"planDigest,omitempty"`
+-	Probe          *InitialPreparationProbe    `json:"probe,omitempty"`
++	Providers      *InitialPreparationProviders `json:"providers,omitempty"`
++	SQL            *InitialPreparationSQLState  `json:"sql,omitempty"`
++	Format         string                       `json:"format"`
++	InstallationID string                       `json:"installationID"`
++	RequestID      string                       `json:"requestID"`
++	RootUID        string                       `json:"rootUID,omitempty"`
++	PlanDigest     string                       `json:"planDigest,omitempty"`
++	Probe          *InitialPreparationProbe     `json:"probe,omitempty"`
+ }
+ 
+ type InitialPreparationProbe struct {
+--- a/internal/contracts/initial_preparer.go
++++ b/internal/contracts/initial_preparer.go
+@@ -44,6 +44,7 @@
+ }
+ 
+ type InitialPreparer struct {
++	Providers   *InitialProviderProfile     `json:"providers,omitempty"`
+ 	SQLMaterial *WorkerObjectReference      `json:"sqlMaterial,omitempty"`
+ 	Services    *InitialPreparationServices `json:"services,omitempty"`
+ 	Format      string                      `json:"format"`
+--- /dev/null
++++ b/internal/contracts/initial_provider.go
+@@ -0,0 +1,74 @@
++package contracts
++
++import (
++	"io"
++	"time"
++)
++
++const InitialProviderProfileFormat = "asservat-initial-provider-profile/v1"
++const InitialProviderMaterialFormat = "asservat-initial-provider-material/v1"
++const InitialProviderTokenMaxBytes = 1024
++
++// Explicit protected installation input, never inferred from a token or endpoint.
++// Policies use the finite JSON ACL profile validated by the provider adapter.
++type InitialProviderProfile struct {
++	Format       string                `json:"format"`
++	Material     WorkerObjectReference `json:"material"`
++	IssuerPolicy string                `json:"issuerPolicy"`
++	WrapRole     string                `json:"wrapRole"`
++	WrapPolicy   string                `json:"wrapPolicy"`
++	UnwrapRole   string                `json:"unwrapRole"`
++	UnwrapPolicy string                `json:"unwrapPolicy"`
++}
++
++// Original immutable bootstrap material. S3 credentials are externally managed;
++// their declared use interval is not proof that Asservat can revoke them.
++type InitialProviderMaterial struct {
++	Format          string                 `json:"format"`
++	InstallationID  string                 `json:"installationID"`
++	RequestID       string                 `json:"requestID"`
++	IssuerToken     string                 `json:"issuerToken"`
++	Storage         OwnerStorageCredential `json:"storage"`
++	StorageUseUntil time.Time              `json:"storageUseUntil"`
++}
++
++func DecodeInitialProviderMaterial(r io.Reader) (InitialProviderMaterial, error) {
++	return decodeClosedRPC[InitialProviderMaterial](r, 8192)
++}
++func (InitialProviderMaterial) String() string   { return "protected initial provider material" }
++func (InitialProviderMaterial) GoString() string { return "protected initial provider material" }
++
++// Original provider-issued identity and hard end, retained independently of each
++// request deadline. No token or secret-payload digest belongs in the public root.
++type InitialProviderParent struct {
++	Accessor  string    `json:"accessor"`
++	IssuedAt  time.Time `json:"issuedAt"`
++	ExpiresAt time.Time `json:"expiresAt"`
++}
++type InitialPreparationProviders struct {
++	ProfileDigest string                      `json:"profileDigest"`
++	Parent        InitialProviderParent       `json:"parent"`
++	Wrap          *InitialProviderIssue       `json:"wrap,omitempty"`
++	Unwrap        *InitialProviderIssue       `json:"unwrap,omitempty"`
++	Projection    *InitialPreparationSQLState `json:"projection,omitempty"`
++}
++type InitialProviderIssue struct {
++	ID            string                   `json:"id"`
++	StartedAt     time.Time                `json:"startedAt"`
++	Until         time.Time                `json:"until"`
++	ExpiresBefore time.Time                `json:"expiresBefore"`
++	Response      *InitialProviderResponse `json:"response,omitempty"`
++}
++type InitialProviderResponse struct {
++	Token     string    `json:"token"`
++	Accessor  string    `json:"accessor"`
++	IssuedAt  time.Time `json:"issuedAt"`
++	ExpiresAt time.Time `json:"expiresAt"`
++}
++
++func (InitialProviderResponse) String() string       { return "protected initial provider credential" }
++func (InitialProviderResponse) GoString() string     { return "protected initial provider credential" }
++func (InitialProviderIssue) String() string          { return "protected initial provider issue claim" }
++func (InitialProviderIssue) GoString() string        { return "protected initial provider issue claim" }
++func (InitialPreparationProviders) String() string   { return "protected initial provider progress" }
++func (InitialPreparationProviders) GoString() string { return "protected initial provider progress" }
+--- a/specs/contracts/initial-preparation-private.schema.json
++++ b/specs/contracts/initial-preparation-private.schema.json
+@@ -2,7 +2,7 @@
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://asservat.io/spec/v1/initial-preparation-private.schema.json",
+   "title": "Private producer-owned initial preparation progress",
+-  "description": "One UID-pinned mutable bootstrap Secret; at most16KiB. Contains private credential replies, never public/audit data. Root binding, anchor, issuance and optional original SQL state intent/receipt are monotonic; runtime checks exact compiled plan, original <=5s claim, <=605s outer lifetime, current token authentication and Secret binding. Initial bootstrap supplies only format/installationID/requestID. Final clearing requires separately qualified retirement and irreversible native inert state.",
++  "description": "One UID-pinned mutable bootstrap Secret; at most16KiB. Contains private credential replies, never public/audit data. Root binding, anchor, issuance and optional original SQL state intent/receipt are monotonic; runtime checks exact compiled plan, original <=5s claim, <=605s outer lifetime, current token authentication and Secret binding. Initial bootstrap supplies only format/installationID/requestID. Final clearing requires separately qualified retirement and irreversible native inert state. Explicit provider continuation retains one original issuer identity and two one-use claims/positive replies plus exact immutable final projection. Original dates never renew; runtime reserves maximum private reply size before issuance.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+@@ -131,6 +131,245 @@
+           }
+         }
+       }
++    },
++    "providers": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "profileDigest",
++        "parent"
++      ],
++      "properties": {
++        "profileDigest": {
++          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
++        },
++        "parent": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "accessor",
++            "issuedAt",
++            "expiresAt"
++          ],
++          "properties": {
++            "accessor": {
++              "type": "string",
++              "minLength": 1,
++              "maxLength": 128,
++              "pattern": "^[!-~]+$"
++            },
++            "issuedAt": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "expiresAt": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            }
++          }
++        },
++        "wrap": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "startedAt",
++            "until",
++            "expiresBefore"
++          ],
++          "properties": {
++            "id": {
++              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++            },
++            "startedAt": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "until": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "expiresBefore": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "response": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "token",
++                "accessor",
++                "issuedAt",
++                "expiresAt"
++              ],
++              "properties": {
++                "token": {
++                  "type": "string",
++                  "minLength": 1,
++                  "maxLength": 1024,
++                  "pattern": "^[!-~]+$"
++                },
++                "accessor": {
++                  "type": "string",
++                  "minLength": 1,
++                  "maxLength": 128,
++                  "pattern": "^[!-~]+$"
++                },
++                "issuedAt": {
++                  "type": "string",
++                  "format": "date-time",
++                  "pattern": "Z$"
++                },
++                "expiresAt": {
++                  "type": "string",
++                  "format": "date-time",
++                  "pattern": "Z$"
++                }
++              }
++            }
++          }
++        },
++        "unwrap": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "id",
++            "startedAt",
++            "until",
++            "expiresBefore"
++          ],
++          "properties": {
++            "id": {
++              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++            },
++            "startedAt": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "until": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "expiresBefore": {
++              "type": "string",
++              "format": "date-time",
++              "pattern": "Z$"
++            },
++            "response": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "token",
++                "accessor",
++                "issuedAt",
++                "expiresAt"
++              ],
++              "properties": {
++                "token": {
++                  "type": "string",
++                  "minLength": 1,
++                  "maxLength": 1024,
++                  "pattern": "^[!-~]+$"
++                },
++                "accessor": {
++                  "type": "string",
++                  "minLength": 1,
++                  "maxLength": 128,
++                  "pattern": "^[!-~]+$"
++                },
++                "issuedAt": {
++                  "type": "string",
++                  "format": "date-time",
++                  "pattern": "Z$"
++                },
++                "expiresAt": {
++                  "type": "string",
++                  "format": "date-time",
++                  "pattern": "Z$"
++                }
++              }
++            }
++          }
++        },
++        "projection": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "operationID"
++          ],
++          "properties": {
++            "operationID": {
++              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++            },
++            "secret": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "name",
++                "uid"
++              ],
++              "properties": {
++                "name": {
++                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
++                },
++                "uid": {
++                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++                }
++              }
++            }
++          }
++        }
++      },
++      "dependentRequired": {
++        "unwrap": [
++          "wrap"
++        ],
++        "projection": [
++          "unwrap",
++          "wrap"
++        ]
++      },
++      "allOf": [
++        {
++          "if": {
++            "required": [
++              "unwrap"
++            ]
++          },
++          "then": {
++            "properties": {
++              "wrap": {
++                "required": [
++                  "response"
++                ]
++              }
++            }
++          }
++        },
++        {
++          "if": {
++            "required": [
++              "projection"
++            ]
++          },
++          "then": {
++            "properties": {
++              "unwrap": {
++                "required": [
++                  "response"
++                ]
++              }
++            }
++          }
++        }
++      ]
+     }
+   },
+   "dependentRequired": {
+@@ -145,6 +384,12 @@
+       "planDigest"
+     ],
+     "sql": [
++      "probe",
++      "rootUID",
++      "planDigest"
++    ],
++    "providers": [
++      "sql",
+       "probe",
+       "rootUID",
+       "planDigest"
+@@ -173,6 +418,22 @@
+           }
+         }
+       }
++    },
++    {
++      "if": {
++        "required": [
++          "providers"
++        ]
++      },
++      "then": {
++        "properties": {
++          "sql": {
++            "required": [
++              "secret"
++            ]
++          }
++        }
++      }
+     }
+   ]
+ }
+--- a/specs/contracts/initial-preparer.schema.json
++++ b/specs/contracts/initial-preparer.schema.json
+@@ -184,6 +184,9 @@
+           "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+         }
+       }
++    },
++    "providers": {
++      "$ref": "https://asservat.io/spec/v1/initial-provider-profile.schema.json"
+     }
+   },
+   "allOf": [
+@@ -206,5 +209,11 @@
+         }
+       }
+     }
+-  ]
++  ],
++  "dependentRequired": {
++    "providers": [
++      "services",
++      "sqlMaterial"
++    ]
++  }
+ }
+--- /dev/null
++++ b/specs/contracts/initial-provider-material.schema.json
+@@ -0,0 +1,67 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://asservat.io/spec/v1/initial-provider-material.schema.json",
++  "title": "Immutable private initial provider material",
++  "description": "At most 8 KiB, independently pinned bootstrap Secret. Issuer remains outside activation Pod. Storage use-until is a local use bound, not proof of external credential expiry or revocation.",
++  "type": "object",
++  "additionalProperties": false,
++  "required": [
++    "format",
++    "installationID",
++    "requestID",
++    "issuerToken",
++    "storage",
++    "storageUseUntil"
++  ],
++  "properties": {
++    "format": {
++      "const": "asservat-initial-provider-material/v1"
++    },
++    "installationID": {
++      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++    },
++    "requestID": {
++      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++    },
++    "issuerToken": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 1024,
++      "pattern": "^[!-~]+$"
++    },
++    "storage": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "accessKeyID",
++        "secretAccessKey",
++        "sessionToken"
++      ],
++      "properties": {
++        "accessKeyID": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 256,
++          "pattern": "^[!-~]+$"
++        },
++        "secretAccessKey": {
++          "type": "string",
++          "minLength": 1,
++          "maxLength": 1024,
++          "pattern": "^[!-~]+$"
++        },
++        "sessionToken": {
++          "type": "string",
++          "minLength": 0,
++          "maxLength": 4096,
++          "pattern": "^[!-~]*$"
++        }
++      }
++    },
++    "storageUseUntil": {
++      "type": "string",
++      "format": "date-time",
++      "pattern": "Z$"
++    }
++  }
++}
+--- /dev/null
++++ b/specs/contracts/initial-provider-profile.schema.json
+@@ -0,0 +1,88 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://asservat.io/spec/v1/initial-provider-profile.schema.json",
++  "title": "Protected initial provider profile",
++  "description": "Finite JSON ACL profile for original short-lived OpenBao issuer and two separate audit purpose roles. Existing role/ACLs and immutable material are protected managed-provider inputs; no retry, provider root or external S3 issuance authority.",
++  "type": "object",
++  "additionalProperties": false,
++  "required": [
++    "format",
++    "material",
++    "issuerPolicy",
++    "wrapRole",
++    "wrapPolicy",
++    "unwrapRole",
++    "unwrapPolicy"
++  ],
++  "properties": {
++    "format": {
++      "const": "asservat-initial-provider-profile/v1"
++    },
++    "material": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "name",
++        "uid"
++      ],
++      "properties": {
++        "name": {
++          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
++        },
++        "uid": {
++          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++        }
++      }
++    },
++    "issuerPolicy": {
++      "type": "string",
++      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
++      "not": {
++        "enum": [
++          "root",
++          "default"
++        ]
++      }
++    },
++    "wrapRole": {
++      "type": "string",
++      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
++      "not": {
++        "enum": [
++          "root",
++          "default"
++        ]
++      }
++    },
++    "wrapPolicy": {
++      "type": "string",
++      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
++      "not": {
++        "enum": [
++          "root",
++          "default"
++        ]
++      }
++    },
++    "unwrapRole": {
++      "type": "string",
++      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
++      "not": {
++        "enum": [
++          "root",
++          "default"
++        ]
++      }
++    },
++    "unwrapPolicy": {
++      "type": "string",
++      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
++      "not": {
++        "enum": [
++          "root",
++          "default"
++        ]
++      }
++    }
++  }
++}
+--- /dev/null
++++ b/test/integration/initial_preparer_provider_test.go
+@@ -0,0 +1,323 @@
++package integration
++
++import (
++	"bytes"
++	"context"
++	"crypto/tls"
++	"encoding/base64"
++	"encoding/json"
++	"encoding/pem"
++	"io"
++	"net"
++	"net/url"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/kms"
++	kube "asservat.local/asservat/internal/adapters/kubernetes"
++	"asservat.local/asservat/internal/adapters/postgres"
++	"asservat.local/asservat/internal/bootstrap"
++	"asservat.local/asservat/internal/contracts"
++	"github.com/jackc/pgx/v5/pgxpool"
++	auth "k8s.io/api/authentication/v1"
++	core "k8s.io/api/core/v1"
++	rbac "k8s.io/api/rbac/v1"
++	apierrors "k8s.io/apimachinery/pkg/api/errors"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/client-go/kubernetes"
++	"k8s.io/client-go/rest"
++	"k8s.io/utils/ptr"
++)
++
++// Runs the actual fixed-file loader and InitialPreparationDeployment.Run against
++// real Kubernetes/Postgres/OpenBao. The finite bootstrap roots/admin grants,
++// existing OpenBao roles/ACLs and externally managed S3 keys are fixture inputs.
++// This checkpoint leaves the original Pod gated; it is not installed activation.
++func TestInitialPreparationProvidersWithRealServices(t *testing.T) {
++	if os.Getenv("ASSERVAT_CONTEXT_FIXTURES") == "" {
++		t.Skip("run owned context-integration fixture")
++	}
++	var f fixture
++	raw, e := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
++	if e != nil || json.Unmarshal(raw, &f) != nil || f.Postgres == "" || f.KMS == "" || f.S3 == "" {
++		t.Fatal("provider fixture unavailable")
++	}
++	var materialRef, providerRef contracts.WorkerObjectReference
++	var adminToken string
++	setup := func(ctx context.Context, kc *rest.Config, api kubernetes.Interface, plan *contracts.InitialPreparationPlan) {
++		body, _ := json.Marshal(contracts.InitialPreparationPrivateState{Format: contracts.InitialPreparationPrivateFormat, InstallationID: plan.InstallationID, RequestID: plan.RequestID})
++		private, e := api.CoreV1().Secrets(plan.BootstrapNamespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "private-progress", Annotations: map[string]string{"asservat.io/installation-id": plan.InstallationID, "asservat.io/preparation-request": plan.RequestID}}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": body}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture private progress", e)
++		}
++		plan.PrivateState = &contracts.WorkerObjectReference{Name: private.Name, UID: string(private.UID)}
++		account, e := api.CoreV1().ServiceAccounts(plan.BootstrapNamespace.Name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "preparer"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal(e)
++		}
++		plan.Administrators = append(plan.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + account.Namespace + ":" + account.Name})
++		role, e := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: "initial-provider-fixture-bootstrap"}, Rules: []rbac.PolicyRule{
++			{APIGroups: []string{""}, Resources: []string{"namespaces", "serviceaccounts", "serviceaccounts/token", "configmaps", "secrets", "pods"}, Verbs: []string{"get", "create", "update"}},
++			{APIGroups: []string{rbac.GroupName}, Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"}, Verbs: []string{"get", "create", "update"}},
++			{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, Verbs: []string{"get", "create", "update"}},
++			{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews", "tokenreviews"}, Verbs: []string{"create"}},
++		}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal(e)
++		}
++		binding, e := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: account.Namespace, Name: account.Name}}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal(e)
++		}
++		t.Cleanup(func() {
++			clean, done := context.WithTimeout(context.Background(), 10*time.Second)
++			defer done()
++			if e := api.RbacV1().ClusterRoleBindings().Delete(clean, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); e != nil && !apierrors.IsNotFound(e) {
++				t.Error(e)
++			}
++			if e := api.RbacV1().ClusterRoles().Delete(clean, role.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &role.UID}}); e != nil && !apierrors.IsNotFound(e) {
++				t.Error(e)
++			}
++		})
++		token, e := api.CoreV1().ServiceAccounts(account.Namespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600)), BoundObjectRef: &auth.BoundObjectReference{APIVersion: "v1", Kind: "Secret", Name: private.Name, UID: private.UID}}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture scoped bootstrap token unavailable")
++		}
++		adminToken = token.Status.Token
++		parts := strings.Split(adminToken, ".")
++		if len(parts) != 3 {
++			t.Fatal("fixture audience syntax")
++		}
++		body, e = base64.RawURLEncoding.DecodeString(parts[1])
++		if e != nil {
++			t.Fatal("fixture audience encoding")
++		}
++		defer clear(body)
++		var claims struct {
++			Audience []string `json:"aud"`
++		}
++		if json.Unmarshal(body, &claims) != nil || len(claims.Audience) != 1 {
++			t.Fatal("fixture audience profile")
++		}
++		plan.ProbeAudience = claims.Audience[0]
++		seed, e := postgres.NewInitialSQLCredentials(plan.InstallationID, time.Now())
++		if e != nil {
++			t.Fatal(e)
++		}
++		material := contracts.InitialSQLMaterial{Format: contracts.InitialSQLMaterialFormat, InstallationID: plan.InstallationID, RequestID: plan.RequestID, PreparationPassword: seed.Preparation.Password, AuditPassword: seed.Audit.Password, ActivationPassword: seed.Activation.Password}
++		body, _ = json.Marshal(material)
++		defer clear(body)
++		secret, e := api.CoreV1().Secrets(account.Namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "sql-material"}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"material.json": body}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture SQL material", e)
++		}
++		materialRef = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
++	}
++	initialPreparationSupervisorNativePlan(t, true, false, setup, func(ctx context.Context, kc *rest.Config, api kubernetes.Interface, _, _ *kube.PermissionClient, c contracts.InitialPreparer) {
++		admin, e := pgxpool.New(ctx, f.Postgres)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer admin.Close()
++		endpoint, e := url.Parse(f.Postgres)
++		if e != nil {
++			t.Fatal(e)
++		}
++		address, pgTLS := pgTLSBridge(t, endpoint.Host)
++		maintenance := initialSQLMaintenance(t, ctx, admin, address, pgTLS)
++		defer maintenance.Close()
++		connection, e := net.DialTimeout("tcp", address, time.Second)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer connection.Close()
++		_ = connection.SetDeadline(time.Now().Add(2 * time.Second))
++		if _, e = connection.Write([]byte{0, 0, 0, 8, 4, 210, 22, 47}); e != nil {
++			t.Fatal(e)
++		}
++		var ssl [1]byte
++		if _, e = io.ReadFull(connection, ssl[:]); e != nil || ssl[0] != 'S' {
++			t.Fatal("fixture SQL TLS unavailable")
++		}
++		secure := tls.Client(connection, pgTLS)
++		if e = secure.HandshakeContext(ctx); e != nil {
++			t.Fatal(e)
++		}
++		sqlRoot := secure.ConnectionState().PeerCertificates[0].Raw
++		secure.Close()
++		host, portText, _ := net.SplitHostPort(address)
++		port, _ := strconv.Atoi(portText)
++		keys, storage := tlsBridge(t, f.KMS), tlsBridge(t, f.S3)
++		native := rest.CopyConfig(kc)
++		if e = rest.LoadTLSFiles(native); e != nil {
++			t.Fatal(e)
++		}
++		block, _ := pem.Decode(native.CAData)
++		if block == nil {
++			t.Fatal("fixture API roots")
++		}
++		profile := contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: "provider-material", UID: custodyID()}, IssuerPolicy: "initial-provider-issuer", WrapRole: "initial-provider-wrap", WrapPolicy: "initial-provider-encrypt", UnwrapRole: "initial-provider-unwrap", UnwrapPolicy: "initial-provider-decrypt"}
++		policies, e := kms.InitialProviderPolicies(profile, "initial-provider-transit", "audit")
++		if e != nil {
++			t.Fatal(e)
++		}
++		request(t, f.KMS, "synthetic-root", "sys/mounts/initial-provider-transit", map[string]any{"type": "transit"}, 204)
++		request(t, f.KMS, "synthetic-root", "initial-provider-transit/keys/audit", map[string]any{"type": "aes256-gcm96"}, 200)
++		for name, policy := range policies {
++			request(t, f.KMS, "synthetic-root", "sys/policies/acl/"+name, map[string]any{"policy": policy}, 204)
++		}
++		for role, policy := range map[string]string{profile.WrapRole: profile.WrapPolicy, profile.UnwrapRole: profile.UnwrapPolicy} {
++			request(t, f.KMS, "synthetic-root", "auth/token/roles/"+role, map[string]any{"allowed_policies": []string{policy}, "orphan": false, "renewable": false, "token_type": "service", "token_no_default_policy": true, "token_explicit_max_ttl": 900}, 204)
++		}
++		issued := request(t, f.KMS, "synthetic-root", "auth/token/create", map[string]any{"policies": []string{profile.IssuerPolicy}, "no_default_policy": true, "no_parent": false, "renewable": false, "type": "service", "ttl": "10m", "explicit_max_ttl": "10m"}, 200)
++		issuerToken := issued["auth"].(map[string]any)["client_token"].(string)
++		material := contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: c.Plan.InstallationID, RequestID: c.Plan.RequestID, IssuerToken: issuerToken, Storage: contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}, StorageUseUntil: time.Now().UTC().Add(time.Hour)}
++		data, _ := json.Marshal(material)
++		defer clear(data)
++		secret, e := api.CoreV1().Secrets(c.Plan.BootstrapNamespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: profile.Material.Name}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"material.json": data}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture provider material", e)
++		}
++		providerRef = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
++		profile.Material = providerRef
++		var fleet contracts.FleetSettings
++		raw, e := os.ReadFile("../../examples/fleet-settings.json")
++		if e != nil || json.Unmarshal(raw, &fleet) != nil {
++			t.Fatal("fixture public fleet")
++		}
++		fleet.InstallationID = c.Plan.InstallationID
++		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: [][]byte{block.Bytes}}, Postgres: contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: "custody_test", Roots: [][]byte{sqlRoot}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: storage.URL, Roots: [][]byte{storage.Certificate().Raw}, Region: "us-east-1", Bucket: "initial-provider"}, KeyService: contracts.ConfigurationKeyService{Endpoint: keys.URL, Roots: [][]byte{keys.Certificate().Raw}, AuditMount: "initial-provider-transit", AuditKey: "audit"}}
++		c.Kubernetes = c.Services.Kubernetes
++		c.SQLMaterial = &materialRef
++		c.Providers = &profile
++		// Native helper's exact cleanup owner remains separate from the projected SA.
++		t.Cleanup(func() {
++			clean, done := context.WithTimeout(context.Background(), 15*time.Second)
++			defer done()
++			for _, name := range []string{c.Plan.Workload.FleetGuard, c.Plan.Workload.WitnessGuard, c.Plan.Workload.WorkloadGuard} {
++				b, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(clean, name, meta.GetOptions{})
++				if e == nil && b.Annotations["asservat.io/installation-id"] == c.Plan.InstallationID {
++					if e = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(clean, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &b.UID}}); e != nil && !apierrors.IsNotFound(e) {
++						t.Error(e)
++					}
++				}
++				p, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(clean, name, meta.GetOptions{})
++				if e == nil && p.Annotations["asservat.io/installation-id"] == c.Plan.InstallationID {
++					if e = api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(clean, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &p.UID}}); e != nil && !apierrors.IsNotFound(e) {
++						t.Error(e)
++					}
++				}
++			}
++		})
++		anchor, e := api.CoreV1().Secrets(c.Plan.BootstrapNamespace.Name).Get(ctx, "probe-lifetime", meta.GetOptions{})
++		if e != nil {
++			t.Fatal(e)
++		}
++		probe, e := api.CoreV1().ServiceAccounts(anchor.Namespace).CreateToken(ctx, "probe", &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600)), BoundObjectRef: &auth.BoundObjectReference{APIVersion: "v1", Kind: "Secret", Name: anchor.Name, UID: anchor.UID}}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture bootstrap probe unavailable")
++		}
++		dir := t.TempDir()
++		write := func(name string, v []byte) {
++			t.Helper()
++			if e := os.WriteFile(filepath.Join(dir, name), v, 0600); e != nil {
++				t.Fatal(e)
++			}
++		}
++		data, _ = json.Marshal(c)
++		write("deployment.json", data)
++		clear(data)
++		write("administrator-token", []byte(adminToken))
++		write("probe-token", []byte(probe.Status.Token))
++		maintenanceConfig := maintenance.Config()
++		data, _ = json.Marshal(contracts.OwnerSQLCredential{Username: maintenanceConfig.ConnConfig.User, Password: maintenanceConfig.ConnConfig.Password})
++		write("sql-maintenance.json", data)
++		clear(data)
++		files, e := os.OpenRoot(dir)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer files.Close()
++		run := func() {
++			t.Helper()
++			deployment, e := bootstrap.NewInitialPreparationDeployment(ctx, files)
++			if e != nil {
++				t.Fatal("actual preparation loader", e)
++			}
++			defer deployment.Close()
++			if _, e = deployment.Run(); e != nil {
++				t.Fatal("actual preparation Run", e)
++			}
++		}
++		run()
++		projection, e := api.CoreV1().Secrets(c.Plan.Workload.Namespace).Get(ctx, c.Plan.Workload.Credentials, meta.GetOptions{})
++		if e != nil || projection.Immutable == nil || !*projection.Immutable || len(projection.Data) != 7 {
++			t.Fatal("actual fixed provider projection", e)
++		}
++		for _, name := range []string{"sql-prepare.json", "sql-audit.json", "sql-activate.json", "audit-storage.json", "audit-wrap.token", "audit-unwrap.token", "kube-probe.token"} {
++			if len(projection.Data[name]) == 0 {
++				t.Fatal("required fixed projection member missing", name)
++			}
++		}
++		for _, v := range projection.Data {
++			defer clear(v)
++			if bytes.Contains(v, []byte(issuerToken)) || bytes.Contains(v, []byte(maintenanceConfig.ConnConfig.Password)) || bytes.Contains(v, []byte(maintenanceConfig.ConnConfig.User)) {
++				t.Fatal("maintenance credential leaked into activation projection")
++			}
++		}
++		t.Run("original-loader-replay", func(t *testing.T) {
++			run()
++			after, e := api.CoreV1().Secrets(projection.Namespace).Get(ctx, projection.Name, meta.GetOptions{})
++			if e != nil || after.UID != projection.UID || after.ResourceVersion != projection.ResourceVersion {
++				t.Fatal("retry replaced final projection", e)
++			}
++		})
++		wrap, unwrap := string(projection.Data["audit-wrap.token"]), string(projection.Data["audit-unwrap.token"])
++		encrypted := request(t, f.KMS, wrap, "initial-provider-transit/encrypt/audit", map[string]any{"plaintext": base64.StdEncoding.EncodeToString([]byte("synthetic-installation-audit"))}, 200)
++		cipher := encrypted["data"].(map[string]any)["ciphertext"].(string)
++		request(t, f.KMS, unwrap, "initial-provider-transit/decrypt/audit", map[string]any{"ciphertext": cipher}, 200)
++		request(t, f.KMS, wrap, "initial-provider-transit/decrypt/audit", map[string]any{"ciphertext": cipher}, 403)
++		request(t, f.KMS, unwrap, "initial-provider-transit/encrypt/audit", map[string]any{"plaintext": base64.StdEncoding.EncodeToString([]byte("synthetic"))}, 403)
++		pod, e := api.CoreV1().Pods(c.Plan.Workload.Namespace).Get(ctx, c.Plan.Workload.Name, meta.GetOptions{})
++		if e != nil || len(pod.Spec.SchedulingGates) != 1 || pod.Spec.NodeName != "" {
++			t.Fatal("provider preparation unexpectedly activated Pod", e)
++		}
++		// Both real Run owners have joined and the original Pod has never run.
++		// This qualifies provider revocation only; activation/SQL/storage cleanup
++		// and command-level retirement remain separate composition work.
++		t.Run("original-provider-rights-retirement", func(t *testing.T) {
++			private, err := api.CoreV1().Secrets(c.Plan.BootstrapNamespace.Name).Get(ctx, c.Plan.PrivateState.Name, meta.GetOptions{})
++			var state contracts.InitialPreparationPrivateState
++			if err != nil || string(private.UID) != c.Plan.PrivateState.UID || json.Unmarshal(private.Data["state.json"], &state) != nil || state.Providers == nil || state.Providers.Wrap == nil || state.Providers.Unwrap == nil {
++				t.Fatal("retained original provider state unavailable")
++			}
++			defer clear(private.Data["state.json"])
++			issuer, err := kms.NewInitialProviderIssuer(keys.URL, issuerToken, "initial-provider-transit", "audit", c.Plan.InstallationID, c.Plan.RequestID, profile, keys.Client(), time.Now)
++			if err != nil {
++				t.Fatal("retained provider retirement adapter unavailable")
++			}
++			defer issuer.Close()
++			for purpose, claim := range map[string]*contracts.InitialProviderIssue{"wrap": state.Providers.Wrap, "unwrap": state.Providers.Unwrap} {
++				if claim.Response == nil {
++					t.Fatal("original positive provider completion missing")
++				}
++				for range 2 {
++					deadline, err := issuer.Revoke(ctx, purpose, *claim, state.Providers.Parent, *claim.Response)
++					if err != nil || !time.Now().Before(deadline) {
++						t.Fatal("original provider revocation/replay unavailable")
++					}
++				}
++				if issuer.Verify(ctx, purpose, *claim, state.Providers.Parent, *claim.Response) == nil {
++					t.Fatal("retired original token remained valid")
++				}
++			}
++			request(t, f.KMS, wrap, "initial-provider-transit/encrypt/audit", map[string]any{"plaintext": base64.StdEncoding.EncodeToString([]byte("synthetic"))}, 403)
++			request(t, f.KMS, unwrap, "initial-provider-transit/decrypt/audit", map[string]any{"ciphertext": cipher}, 403)
++		})
++		t.Log("actual fixed-file preparation loader and Run; original SQL/native probe, two scoped OpenBao issue claims and seven immutable target files. Bootstrap identity/roles/material/S3 credentials remain explicit fixture inputs. Provider revocation follows joined preparation while original Pod stays gated; activation/handover and composed retirement remain pending")
++	})
++}
+--- a/test/integration/initial_preparer_test.go
++++ b/test/integration/initial_preparer_test.go
+@@ -289,7 +289,10 @@
+ 		t.Fatal(e)
+ 	}
+ 	continuity := install(cp, cb)
+-	np := cfg.InitialNamespaceAdministration{Name: plan.Workload.StagingGuard, Namespace: plan.Workload.Namespace, ProbeSource: plan.Workload.Journal, Inputs: plan.Workload.Configuration, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}}
++	np := cfg.InitialNamespaceAdministration{Name: plan.Workload.StagingGuard, Namespace: plan.Workload.Namespace, ProbeSource: plan.Workload.Journal, Inputs: plan.Workload.Configuration}
++	for _, actor := range plan.Administrators {
++		np.Administrators = append(np.Administrators, cfg.KubernetesActor{Kind: actor.Kind, Name: actor.Name})
++	}
+ 	sp, sb, e := kube.InitialNamespaceAdmission(np)
+ 	if e != nil {
+ 		t.Fatal(e)

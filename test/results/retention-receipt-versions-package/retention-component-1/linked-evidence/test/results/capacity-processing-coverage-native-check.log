@@ -1,0 +1,2 @@
+Fleet integration exit: 0
+{"terminalExit": 0, "testExit": 0, "passedEntries": 87, "sourceHashes": 1805, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

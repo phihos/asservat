@@ -1,0 +1,108 @@
+{
+  "scope": "ADR146 current pre-collection processing coverage using existing role15 and atomic SQL54 managed admission; no migration or runtime enablement",
+  "qualification": "immutable source candidate before allocated local checks; actual native follow-up pending",
+  "actual_origin": "Native12332 admitted actual managed capture+intent then rejected publication for unqualified lineage; native28121 passed with explicit short fixture policy; product gap remains until this follow-up qualifies",
+  "files": [
+    {
+      "path": "docs/architecture/context-admission.md",
+      "base_sha256": "b14e54679e6feb6313fb55cd4e3186e92cf9016e54ec3dd69198f168da26de29",
+      "payload_sha256": "fd5cd4d75edbabef47b02e4b0b9a324b8554d2adbe577736dcbec7e9c1449d0e"
+    },
+    {
+      "path": "docs/architecture/processing-admission.md",
+      "base_sha256": null,
+      "payload_sha256": "6cf3d96d8693fc5c366a86f2c8501c3b84aebb407faacc7e0f331e8daee6540c"
+    },
+    {
+      "path": "docs/decisions/146-processing-coverage-before-collection.md",
+      "base_sha256": null,
+      "payload_sha256": "d569102e3ddd8824fd05db7cdd3b7117bc99ab40f06252783e016f5210bf41cc"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base_sha256": "e75108ff7e6f415a0a4464e787c08c32f612cc372bc604e50eb666c4c3de5182",
+      "payload_sha256": "2e7f3ab0fd12691997adc12a9d61c0a0d7498c1006b7a803382ad00b4bbd8b40"
+    },
+    {
+      "path": "internal/adapters/postgres/capture.go",
+      "base_sha256": "9cfa6f1f7e459376fd7ccd82345042e4be1babc35635b456055a0edc76b0100d",
+      "payload_sha256": "16bd69c4349acb3215c635e8953ca78d1ba11c77f402ed3e2101d02a56cd4b89"
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "base_sha256": "d323c07339530fcbe31aacf8ba31868457f851c3a17139d3ce6a62ea2869c9d6",
+      "payload_sha256": "825da441c32bb6165c9a6f456b263946dec0f2321ad70a5a537435a623a0b898"
+    },
+    {
+      "path": "internal/adapters/postgres/processing_capture.go",
+      "base_sha256": null,
+      "payload_sha256": "10ee82e4776fa99fd3b58271a159014d7a34224111604d0e2c51c016fcafceff"
+    },
+    {
+      "path": "internal/adapters/postgres/processing_capture_test.go",
+      "base_sha256": null,
+      "payload_sha256": "3448ecabf5e7ed836e163fecd4ad9365b785c8ab619d2e3ab268a855312eef4f"
+    },
+    {
+      "path": "internal/adapters/postgres/public_runtime_role_plan.go",
+      "base_sha256": "701772474c7bf42efda8de0d85987ce7731f1bd293463253af3d9ce1de7c6bc0",
+      "payload_sha256": "e4ba4fadc1c968e2854075ec7e31d6770ccd7931e252419d25bc5f51e85edc98"
+    },
+    {
+      "path": "internal/application/capture/context_investigation.go",
+      "base_sha256": "1a0d90b90696b9e00e432c39ecee4f925b579430a04c889e8296fb38d669fb40",
+      "payload_sha256": "843b80085bbe7bf6e06f62993a669162a9f1426fb34be74acc8d58f9deb9e293"
+    },
+    {
+      "path": "internal/application/capture/context_investigation_test.go",
+      "base_sha256": "253199f976d8e3b9c41acff204879bab660b4b3500df25c0cde6133a7333efc2",
+      "payload_sha256": "da10b02d9240475940fde2945b9eb6e3f0eeadbf4a2a390aefa48fa53ce9bb7c"
+    },
+    {
+      "path": "internal/application/capture/context_processing.go",
+      "base_sha256": null,
+      "payload_sha256": "728cdf6768500ffa57056a875c9982056261516d5ec2326542aa08a74d2d3d7d"
+    },
+    {
+      "path": "internal/application/capture/context_processing_test.go",
+      "base_sha256": null,
+      "payload_sha256": "9f4920ba991aeb3bacefdeaae7aea8cba84b7e29eb81e1a39875522f4f743a28"
+    },
+    {
+      "path": "internal/domain/capture/processing.go",
+      "base_sha256": null,
+      "payload_sha256": "c0db8da72eed64245ca3dfdd136908deffe23bfb956f0b27ddc8727d4b3e452b"
+    },
+    {
+      "path": "internal/transport/presentation/context_operations.go",
+      "base_sha256": "ace989876e80dd266f3ec6304baa4374972a94489e946243ea14d0b8483ea6c7",
+      "payload_sha256": "6899c8d3dd538e656d66a45e3438a7d604d7399f25f32fdcf7f9ec438dc61ae8"
+    },
+    {
+      "path": "internal/transport/presentation/context_processing_test.go",
+      "base_sha256": null,
+      "payload_sha256": "eae5d40dcb7154c513faf94c1727fce14c8f1ee3ac76b6c33a42abc1a829d51c"
+    },
+    {
+      "path": "specs/capacity.md",
+      "base_sha256": "7253ded8a694c2bb45361aaa0d7be24c3ef19d62133b2936524f495bc9aa4895",
+      "payload_sha256": "e740c8f6b44d0bb409556f8052637be2e33479bfc5c8e4d54251dc576bbc9a9e"
+    },
+    {
+      "path": "test/integration/capacity_context_test.go",
+      "base_sha256": "5c067e4e80a5fa23e7f0867db5f6fc71858dd1132e02ed8815f142fb4667d9fe",
+      "payload_sha256": "f692bab1efc0ef4813c40a82cfb02892e5f9fb8d836c360154d87f84b38edc9e"
+    },
+    {
+      "path": "test/integration/capacity_processing_coverage_test.go",
+      "base_sha256": null,
+      "payload_sha256": "92084132de9f4cbf5ea2cac116d245e867bc40923e2c9245819408892e538d28"
+    },
+    {
+      "path": "test/integration/context_continuation_native_test.go",
+      "base_sha256": "686ff205dbaf0829736495cd98429ac25550637e2a87ada247490b4a795c22b8",
+      "payload_sha256": "b5e93ceb1a0fabf680a60cdb066e59e971f374efc5f83dc5d9e47bba3d9e3cfb"
+    }
+  ],
+  "parent_manifest": "90995844f6f6cc6ebd5f9117a7cf7ea0652d0928ac56f043a6fa4022a2bee326"
+}

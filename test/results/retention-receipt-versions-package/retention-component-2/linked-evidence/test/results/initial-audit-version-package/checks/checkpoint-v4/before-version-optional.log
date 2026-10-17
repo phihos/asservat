@@ -1,0 +1,21 @@
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing
+    initial_installer_audit_test.go:87: missing immutable version produced a usable initial receipt <nil> {initial/test  "synthetic-etag" 31 [140 125 66 202 245 238 72 144 253 15 10 225 239 212 182 225 10 243 78 115 63 230 121 140 211 154 128 74 55 4 152 101]}
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null
+    initial_installer_audit_test.go:87: missing immutable version produced a usable initial receipt <nil> {initial/test null "synthetic-etag" 31 [140 125 66 202 245 238 72 144 253 15 10 225 239 212 182 225 10 243 78 115 63 230 121 140 211 154 128 74 55 4 152 101]}
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing
+    initial_installer_audit_test.go:87: missing immutable version produced a usable initial receipt <nil> {initial/test  "synthetic-etag" 31 [140 125 66 202 245 238 72 144 253 15 10 225 239 212 182 225 10 243 78 115 63 230 121 140 211 154 128 74 55 4 152 101]}
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null
+    initial_installer_audit_test.go:87: missing immutable version produced a usable initial receipt <nil> {initial/test null "synthetic-etag" 31 [140 125 66 202 245 238 72 144 253 15 10 225 239 212 182 225 10 243 78 115 63 230 121 140 211 154 128 74 55 4 152 101]}
+=== RUN   TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned
+--- FAIL: TestInitialInstallerRequiresVersionBeforeAuditReceipt (0.02s)
+    --- FAIL: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-missing (0.00s)
+    --- FAIL: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-null (0.00s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/required-pinned (0.00s)
+    --- FAIL: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-missing (0.00s)
+    --- FAIL: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-null (0.00s)
+    --- PASS: TestInitialInstallerRequiresVersionBeforeAuditReceipt/legacy-pinned (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.032s
+FAIL

@@ -1,0 +1,35 @@
+{
+  "phase": "generate",
+  "command": [
+    "/home/phil/.cache/asservat-build/bin/sqlc",
+    "generate",
+    "-f",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/generation/sqlc.json"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 0.5,
+  "expectedFailure": false,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": [],
+    "derived": [],
+    "tool": []
+  }
+}

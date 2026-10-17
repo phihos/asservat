@@ -1,0 +1,329 @@
+package contextstart
+
+import (
+	"context"
+	"io"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// frameStream is deliberately internal to the single API context protocol. The
+// server/client constructors supply actual HTTP/2 stream/socket deadline hooks.
+type frameStream struct {
+	ctx                          context.Context
+	cancel                       context.CancelFunc
+	channel                      fleet.APIContextChannel
+	check                        ReceiverCheck
+	read                         io.Reader
+	write                        io.Writer
+	readDeadline, writeDeadline  func(time.Time) error
+	flush                        func() error
+	interruptIO                  func()
+	mu                           sync.Mutex
+	reads, writes, frames, bytes int
+	closed                       bool
+	work                         sync.WaitGroup
+	once                         sync.Once
+	interrupted                  chan struct{}
+	incoming                     chan contracts.APIContextFrame
+	pumpDone                     chan struct{}
+	awaited                      bool
+	stopOwner                    func() bool
+	ownerDone                    chan struct{}
+}
+
+func newFrameStream(ctx context.Context, channel fleet.APIContextChannel, check ReceiverCheck, read io.Reader, write io.Writer, rd, wd func(time.Time) error, flush func() error, interrupt func()) (*frameStream, error) {
+	if ctx == nil || ctx.Err() != nil || !channel.Valid() || check == nil || read == nil || write == nil || rd == nil || wd == nil || flush == nil || interrupt == nil {
+		return nil, fleet.ErrInvalid
+	}
+	owner, cancel := context.WithCancel(ctx)
+	s := &frameStream{ctx: owner, cancel: cancel, channel: channel, check: check, read: read, write: write, readDeadline: rd, writeDeadline: wd, flush: flush, interruptIO: interrupt, interrupted: make(chan struct{})}
+	s.ownerDone = make(chan struct{})
+	s.stopOwner = context.AfterFunc(owner, func() { s.interrupt(); close(s.ownerDone) })
+	return s, nil
+}
+func (s *frameStream) interrupt() {
+	s.once.Do(func() {
+		s.mu.Lock()
+		s.closed = true
+		s.cancel()
+		s.mu.Unlock()
+		s.interruptIO()
+		close(s.interrupted)
+	})
+}
+func (s *frameStream) Context() context.Context { return s.ctx }
+func (s *frameStream) Close() error {
+	if s == nil {
+		return nil
+	}
+	s.interrupt()
+	<-s.interrupted
+	if !s.stopOwner() {
+		<-s.ownerDone
+	}
+	s.work.Wait()
+	s.mu.Lock()
+	pump := s.pumpDone
+	s.mu.Unlock()
+	if pump != nil {
+		<-pump
+		for f := range s.incoming {
+			clear(f.Payload)
+		}
+	}
+	return nil
+}
+func (s *frameStream) begin(ctx context.Context, read bool) (context.Context, time.Time, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, time.Time{}, nil, fleet.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.ctx.Err() != nil || (!read && s.frames >= contracts.APIContextMaximumFrames) || read && s.reads != 0 || !read && s.writes != 0 {
+		s.mu.Unlock()
+		return nil, time.Time{}, nil, fleet.ErrUnavailable
+	}
+	if read {
+		s.reads++
+	} else {
+		s.writes++
+	}
+	s.work.Add(1)
+	s.mu.Unlock()
+	until := time.Now().Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, cancel := context.WithDeadline(ctx, until)
+	stopOwner := context.AfterFunc(s.ctx, cancel)
+	// After any timeout, this stream is terminal. An uncertain I/O never gets a
+	// longer next deadline or a replacement connection carrying the same work.
+	interruptDone := make(chan struct{})
+	stopCall := context.AfterFunc(call, func() { s.interrupt(); close(interruptDone) })
+	finish := func() {
+		if !stopCall() {
+			<-interruptDone
+		}
+		stopOwner()
+		cancel()
+		s.mu.Lock()
+		if read {
+			s.reads--
+		} else {
+			s.writes--
+		}
+		s.mu.Unlock()
+		s.work.Done()
+	}
+	observed, e := s.check(call)
+	if e != nil || !observed.Valid(time.Now()) || observed.Channel != s.channel || call.Err() != nil {
+		s.interrupt()
+		finish()
+		return nil, time.Time{}, nil, fleet.ErrUnavailable
+	}
+	until = identity.Earlier(until, observed.ValidUntil)
+	bounded, narrow := context.WithDeadline(call, until)
+	// A socket write deadline does not necessarily interrupt a blocked HTTP/2
+	// request-body pipe. Join an explicit callback at the shorter original peer
+	// deadline before returning or reusing any stream resources.
+	boundedDone := make(chan struct{})
+	stopBounded := context.AfterFunc(bounded, func() { s.interrupt(); close(boundedDone) })
+	end := func() {
+		if !stopBounded() {
+			<-boundedDone
+		}
+		finish()
+		narrow()
+	}
+	deadline := s.writeDeadline
+	if read {
+		deadline = s.readDeadline
+	}
+	if e = deadline(until); e != nil || !time.Now().Before(until) || bounded.Err() != nil {
+		s.interrupt()
+		end()
+		return nil, time.Time{}, nil, fleet.ErrUnavailable
+	}
+	return bounded, until, end, nil
+}
+func (s *frameStream) count(n int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || n < 0 || s.frames >= contracts.APIContextMaximumFrames || s.bytes > contracts.APIContextMaximumExchangeBytes-n {
+		return false
+	}
+	s.frames++
+	s.bytes += n
+	return true
+}
+func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) error {
+	call, until, end, e := s.begin(ctx, false)
+	if e != nil {
+		return e
+	}
+	defer end()
+	if !s.count(len(f.Payload) + 5) {
+		s.interrupt()
+		return contracts.ErrAPIContextProtocol
+	}
+	e = contracts.WriteAPIContextFrame(s.write, f)
+	if e == nil {
+		e = s.flush()
+	}
+	if e != nil || call.Err() != nil || !time.Now().Before(until) {
+		s.interrupt()
+		return fleet.ErrUnavailable
+	}
+	return nil
+}
+
+// The sole reader remains active between identity calls so an actual EOF
+// cancels a blocked regional runner. Only one frame can wait for its consumer;
+// one additional frame may be in the bounded decoder. Reading ahead supplies
+// no authority: Receive still checks the exact current peer and caller bound.
+func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.ctx.Err() != nil {
+		return nil, fleet.ErrUnavailable
+	}
+	if s.pumpDone != nil {
+		return s.incoming, nil
+	}
+	s.incoming = make(chan contracts.APIContextFrame, 1)
+	s.pumpDone = make(chan struct{})
+	go func() {
+		defer close(s.pumpDone)
+		defer close(s.incoming)
+		for {
+			f, e := contracts.ReadAPIContextFrame(s.read)
+			if e != nil || !s.count(len(f.Payload)+5) {
+				clear(f.Payload)
+				s.interrupt()
+				return
+			}
+			select {
+			case s.incoming <- f:
+			case <-s.ctx.Done():
+				clear(f.Payload)
+				return
+			}
+			// Receipt is the protocol's terminal frame. No later body value is accepted
+			// or used. Let its exact semantic check finish before joined Close, avoiding
+			// an EOF race against an already received terminal acknowledgement.
+			if f.Kind == contracts.APIContextReceiptFrame {
+				return
+			}
+		}
+	}()
+	return s.incoming, nil
+}
+func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, error) {
+	call, until, end, e := s.begin(ctx, true)
+	if e != nil {
+		return contracts.APIContextFrame{}, e
+	}
+	defer end()
+	incoming, e := s.startReader()
+	if e != nil {
+		return contracts.APIContextFrame{}, e
+	}
+	var f contracts.APIContextFrame
+	select {
+	case received, ok := <-incoming:
+		if !ok {
+			return contracts.APIContextFrame{}, fleet.ErrUnavailable
+		}
+		f = received
+	case <-call.Done():
+		s.interrupt()
+		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+	case <-s.ctx.Done():
+		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+	}
+	if call.Err() != nil || s.ctx.Err() != nil || !time.Now().Before(until) {
+		clear(f.Payload)
+		s.interrupt()
+		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+	}
+	return f, nil
+}
+
+// AwaitWork is a once-only passive read before any signed capture exists. Its
+// residency bound is not an effect/peer grant. Only after the bounded work frame
+// arrives is the exact connection checked under a fresh original <=5s interval.
+// No later identity/result read can select this passive path.
+func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame, fleet.APIContextReceiver, error) {
+	var empty contracts.APIContextFrame
+	var zero fleet.APIContextReceiver
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return empty, zero, fleet.ErrInvalid
+	}
+	until, ok := ctx.Deadline()
+	if !ok || !time.Now().Before(until) || until.After(time.Now().Add(30*time.Second)) {
+		return empty, zero, fleet.ErrInvalid
+	}
+	if d, ok := s.ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	s.mu.Lock()
+	if s.closed || s.awaited || s.pumpDone != nil || s.reads != 0 || s.writes != 0 || s.frames > 1 {
+		s.mu.Unlock()
+		return empty, zero, fleet.ErrDenied
+	}
+	s.awaited = true
+	s.reads++
+	s.work.Add(1)
+	s.mu.Unlock()
+	call, cancel := context.WithDeadline(ctx, until)
+	done := make(chan struct{})
+	stop := context.AfterFunc(call, func() { s.interrupt(); close(done) })
+	defer func() {
+		if !stop() {
+			<-done
+		}
+		cancel()
+		s.mu.Lock()
+		s.reads--
+		s.mu.Unlock()
+		s.work.Done()
+	}()
+	if s.readDeadline(until) != nil {
+		s.interrupt()
+		return empty, zero, fleet.ErrUnavailable
+	}
+	incoming, e := s.startReader()
+	if e != nil {
+		return empty, zero, e
+	}
+	var f contracts.APIContextFrame
+	select {
+	case v, ok := <-incoming:
+		if !ok {
+			return empty, zero, fleet.ErrUnavailable
+		}
+		f = v
+	case <-call.Done():
+		return empty, zero, fleet.ErrUnavailable
+	case <-s.ctx.Done():
+		return empty, zero, fleet.ErrUnavailable
+	}
+	if f.Kind != contracts.APIContextWorkFrame || call.Err() != nil || s.ctx.Err() != nil {
+		clear(f.Payload)
+		s.interrupt()
+		return empty, zero, fleet.ErrDenied
+	}
+	checkCtx, end := context.WithTimeout(call, 5*time.Second)
+	defer end()
+	receiver, e := s.check(checkCtx)
+	if e != nil || checkCtx.Err() != nil || receiver.Channel != s.channel || !receiver.Valid(time.Now()) {
+		clear(f.Payload)
+		s.interrupt()
+		return empty, zero, fleet.ErrDenied
+	}
+	return f, receiver, nil
+}

@@ -1,0 +1,14 @@
+# Owner identity root and SQL qualification fixture — producer 7
+
+Four test-only paths; no production authority or deadline changes. The three new files and the exact eight-case hook are listed with base/payload hashes in manifest.json. Integration must verify those hashes and dependencies.json; dependency-delta.json records all 27 reviewed changes since producer 6. reviewed-integrated-subset.json verifies the four bridge/template files already integrated independently.
+
+The root API fixture now models native v1 Secret responses for exact private-root CREATE/CAS/read, including unknown committed CAS. It retains wrong-version and wrong-kind rejection alongside changed RBAC/admission/accepted-Service negatives. The actual production root executes original current proof, four ordered role claims/completions and exact lost-result reconciliation under original deadlines. Synthetic Kubernetes/SQL authority in this component fixture is explicit.
+
+Handle 43629 completed exit 0. Six-package compile: 18.535 seconds. Focused race ^TestOwnerIdentityProducer: 36.669 seconds wall, 27.132 seconds package. Six-package vet: 2.301 seconds. All four bases/payloads and 1,906 dependency hashes remained unchanged before/after each phase and at terminal. Exact commands, output and result are under evidence/ and result.json. Earlier producer 3–6 failures remain preserved; no failing-before rerun was needed for the already-qualified bridge/template correction.
+
+Manifest SHA256: ce7651df05e24a5532ff8a27f02273c0399dbd4d9f94e6298298740533e3fbee.
+Dependency manifest SHA256: 013fec05eaf880ff1dfa1877da0a140d839c6c6eff1891cd367c9eaa4397a99e.
+
+The actual SQL helper has only compiled/vetted: run the owned fleet harness with ASSERVAT_INITIAL_INSTALLATION=1 and --run '^TestInitialInstallationWithRealServices$/^owner-identity-roles-'. All eight children create independent fixture scopes and use actual audited initial activation; their Kubernetes role root/source remains synthetic. Plain custody lacks the OpenBao setup required by the initial fixture. Do not combine --initial-installation with --run. Parent owns native execution and source freeze.
+
+Still unqualified: actual four-role SQL matrix, original fresh installed-layout API/guard composition, complete projection/launch effect chain and installed provider credential provenance/recipe issuance. Input crosschecks are a separate uncompiled candidate. No public service or chart runtime is enabled.

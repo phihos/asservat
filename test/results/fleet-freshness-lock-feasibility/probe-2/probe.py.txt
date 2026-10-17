@@ -1,0 +1,480 @@
+#!/usr/bin/env python3
+"""Owned PostgreSQL 18 view-lock feasibility only; never a migration runner."""
+from pathlib import Path
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import uuid
+
+ROOT = Path('/home/phil/Projekte/asservat')
+STAGE = Path(__file__).resolve().parent
+IMAGE = 'postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c'
+INSTALLATION = '11111111-1111-4111-8111-111111111111'
+KEY = "installation_id='" + INSTALLATION + "'::uuid"
+PASSWORD = 'synthetic-probe-only'
+first_signal = None
+
+
+def interrupt(signum, _frame):
+    # Never raise between Popen spawning a child and retaining its owned handle.
+    global first_signal
+    if first_signal is None:
+        first_signal = signum
+
+
+def check_interrupt():
+    if first_signal is not None:
+        raise InterruptedError('probe interrupted: ' + str(first_signal))
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def group_exists(pid):
+    try:
+        os.killpg(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def join_owned(child):
+    def send(sig):
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+    if child.poll() is None:
+        send(signal.SIGTERM)
+        try:
+            child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            send(signal.SIGKILL)
+            child.wait(timeout=5)
+    else:
+        child.wait(timeout=1)
+    if group_exists(child.pid):
+        send(signal.SIGKILL)
+        until = time.monotonic() + 5
+        while group_exists(child.pid) and time.monotonic() < until:
+            time.sleep(.05)
+    return child.poll() is not None and not group_exists(child.pid)
+
+
+def save(path, value):
+    with path.open('x') as f:
+        json.dump(value, f, indent=2)
+        f.write('\n')
+
+
+class Probe:
+    def __init__(self):
+        self.run_id = 'asservat-fleet-lock-' + uuid.uuid4().hex[:16]
+        self.container = self.run_id + '-postgres'
+        self.container_id = None
+        self.created = False
+        self.processes = []
+        self.commands = []
+        self.cases = []
+        self.counter = 0
+        self.cleaning = False
+        self.started = time.monotonic()
+        self.out = STAGE / 'checks' / 'probe-2'
+        self.out.mkdir(parents=True, exist_ok=False)
+        self.manifest = json.loads((STAGE / 'manifest.json').read_text())
+        self.manifest_sha = sha(STAGE / 'manifest.json')
+        self.report = {'scope': 'SQL view lock feasibility only', 'native': True,
+                       'productionSelected': False, 'containerName': self.container,
+                       'runID': self.run_id, 'manifestSHA256': self.manifest_sha,
+                       'bootID': Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+                       'commands': self.commands, 'cases': self.cases}
+
+    def unchanged(self):
+        result = []
+        for root, entries in ((STAGE, self.manifest['payloads']), (ROOT, self.manifest['sources'])):
+            for name, expected in entries.items():
+                p = root / name
+                if not p.is_file() or sha(p) != expected:
+                    result.append(str(p))
+        if sha(STAGE / 'manifest.json') != self.manifest_sha:
+            result.append('manifest.json')
+        return result
+
+    def start(self, label, argv, text=None, interactive=False):
+        if not self.cleaning:
+            check_interrupt()
+            assert time.monotonic() - self.started < 300, 'five-minute harness ceiling'
+        self.counter += 1
+        tag = '%03d-%s' % (self.counter, label)
+        log = self.out / (tag + '.log')
+        if text is not None:
+            (self.out / (tag + '.sql')).write_text(text)
+        with log.open('x') as output:
+            p = subprocess.Popen(argv, stdin=subprocess.PIPE if text is not None or interactive else subprocess.DEVNULL,
+                                 stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+        # Signal handler only records, so this append cannot lose a spawned child.
+        self.processes.append(p)
+        entry = {'label': label, 'pid': p.pid, 'argv': argv, 'log': log.name}
+        self.commands.append(entry)
+        if text is not None:
+            p.stdin.write(text.encode())
+            p.stdin.flush()
+        if not interactive and p.stdin is not None:
+            p.stdin.close()
+        return p, log, entry
+
+    def finish(self, child, expected=0, timeout=20):
+        p, log, entry = child
+        until = time.monotonic() + timeout
+        while p.poll() is None:
+            if not self.cleaning:
+                check_interrupt()
+            if time.monotonic() >= until or log.stat().st_size > 4 * 1024**2:
+                raise RuntimeError('owned command exceeded bounded output/time: ' + entry['label'])
+            time.sleep(.025)
+        entry['exit'] = p.returncode
+        entry['ownedGroupJoined'] = join_owned(p)
+        entry['logSHA256'] = sha(log)
+        assert entry['ownedGroupJoined'], entry
+        output = log.read_text()
+        if expected is not None:
+            assert p.returncode == expected, (entry['label'], p.returncode, output[-4000:])
+        return output
+
+    def command(self, label, argv, expected=0, timeout=20):
+        return self.finish(self.start(label, argv), expected, timeout)
+
+    def sql_argv(self, role, app):
+        return ['docker', 'exec', '-i', '--env', 'PGPASSWORD=' + PASSWORD,
+                '--env', 'PGAPPNAME=' + app, self.container_id,
+                'psql', '-X', '-qAt', '--no-password', '-h', '127.0.0.1',
+                '-U', role, '-d', 'fleet_lock_probe', '-v', 'ON_ERROR_STOP=1',
+                '-v', 'VERBOSITY=verbose']
+
+    def sql_start(self, label, text, role='postgres', interactive=False):
+        # PostgreSQL truncates long application names and emits a NOTICE. Keep
+        # the descriptive label in command metadata; only the unique numeric
+        # command identity belongs in PGAPPNAME and backend matching predicates.
+        app = self.run_id + ':' + str(self.counter + 1)
+        assert app.isascii() and 0 < len(app.encode('ascii')) <= 63
+        # Statement ceilings bound this synthetic harness, not product proof life.
+        prefix = "SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';\n"
+        child = self.start(label, self.sql_argv(role, app), prefix + text, interactive)
+        child[2]['applicationName'] = app
+        return child
+
+    def sql(self, label, text, role='postgres', expected=0):
+        return self.finish(self.sql_start(label, text, role), expected)
+
+    def scalar(self, label, query):
+        lines = self.sql(label, query).strip().splitlines()
+        assert len(lines) == 1, (label, lines)
+        return lines[0]
+
+    def expect_error(self, label, query, role, state):
+        child = self.sql_start(label, query, role)
+        out = self.finish(child, expected=3)
+        assert re.search(r'ERROR:\s+' + re.escape(state) + r':', out), (label, state, out)
+        self.cases.append({'name': label, 'SQLSTATE': state, 'passed': True})
+
+    def wait_marker(self, child, marker):
+        p, log, entry = child
+        until = time.monotonic() + 10
+        while time.monotonic() < until:
+            check_interrupt()
+            if marker in log.read_text().splitlines():
+                assert p.poll() is None, entry
+                return
+            assert p.poll() is None, (entry, log.read_text())
+            time.sleep(.025)
+        raise RuntimeError('holder never acquired original lock: ' + entry['label'])
+
+    def holder(self, name, query, role='probe_consumer'):
+        child = self.sql_start(name, "BEGIN;\n" + query + ";\nSELECT 'probe-backend:' || pg_backend_pid();\n\\echo probe-holder-ready\n", role, True)
+        self.wait_marker(child, 'probe-holder-ready')
+        matches = re.findall(r'^probe-backend:(\d+)$', child[1].read_text(), re.M)
+        assert len(matches) == 1
+        child[2]['backendPID'] = int(matches[0])
+        # Exact backend/name/user and an idle open transaction prove it is held.
+        assert self.scalar(name + '-held', "SELECT count(*) FROM pg_stat_activity WHERE pid=%d AND application_name='%s' AND usename='%s' AND state='idle in transaction' AND xact_start IS NOT NULL;" % (int(matches[0]), child[2]['applicationName'], role)) == '1'
+        return child
+
+    def release(self, child):
+        child[0].stdin.write(b'ROLLBACK;\n\\q\n')
+        child[0].stdin.flush()
+        child[0].stdin.close()
+        self.finish(child)
+        assert self.scalar(child[2]['label'] + '-gone', 'SELECT count(*) FROM pg_stat_activity WHERE pid=%d;' % child[2]['backendPID']) == '0'
+
+    def blocked(self, contender, holder):
+        until = time.monotonic() + 5
+        label = contender[2]['label']
+        while time.monotonic() < until:
+            check_interrupt()
+            assert contender[0].poll() is None, (label, contender[1].read_text())
+            query = "SELECT COALESCE(json_agg(json_build_object('pid',pid,'role',usename,'state',state,'waitType',wait_event_type,'waitEvent',wait_event,'blockers',pg_blocking_pids(pid)))::text,'[]') FROM pg_stat_activity WHERE application_name='%s' AND wait_event_type='Lock' AND %d=ANY(pg_blocking_pids(pid));" % (contender[2]['applicationName'], holder[2]['backendPID'])
+            rows = json.loads(self.scalar(label + '-blocking', query))
+            if len(rows) == 1:
+                contender[2]['observedBlocking'] = rows[0]
+                return rows[0]
+            time.sleep(.025)
+        raise RuntimeError('no positive server lock evidence for ' + label)
+
+    def reset(self, name):
+        self.sql(name + '-reset', """BEGIN;
+DELETE FROM public.fleet_observation;
+DELETE FROM public.fleet_trust;
+INSERT INTO public.fleet_trust SELECT * FROM public.probe_trust_original;
+WITH original AS MATERIALIZED (SELECT clock_timestamp() AS at)
+UPDATE public.fleet_trust SET observed_at=at,fresh_until=at+interval '5 seconds' FROM original;
+INSERT INTO public.fleet_observation SELECT installation_id,semantic_version,
+ issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,
+ activated_database_oid,observed_at,fresh_until FROM public.fleet_trust;
+COMMIT;
+""")
+        active = self.sql(name + '-active', 'SELECT NOT suspended AND NOT recovery_blocked AND observed_at<=clock_timestamp() AND clock_timestamp()<fresh_until FROM public.fleet_current_trust WHERE ' + KEY + ';', 'probe_consumer').strip()
+        assert active == 't', (name, active)
+
+    def renew_sql(self, authority_share=False):
+        prefix = 'BEGIN;\n'
+        if authority_share:
+            prefix += 'SELECT installation_id FROM public.fleet_trust WHERE ' + KEY + ' FOR SHARE;\n'
+        # This direct writer is solely a lock-mechanics instrument. It does not
+        # implement the production current-binding/monotonic-admission procedure.
+        return prefix + """WITH original AS MATERIALIZED (SELECT clock_timestamp() AS at)
+UPDATE public.fleet_observation SET observed_at=at,fresh_until=at+interval '5 seconds'
+ FROM original WHERE """ + KEY + ";\nCOMMIT;\n"
+
+    def run(self):
+        assert not self.unchanged(), self.unchanged()
+        for name in self.manifest['payloads']:
+            shutil.copyfile(STAGE / name, self.out / name)
+        for name in self.manifest['sources']:
+            destination = self.out / 'sources' / (name + '.txt')
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / name, destination)
+        shutil.copyfile(STAGE / 'manifest.json', self.out / 'manifest.json')
+        assert shutil.disk_usage(STAGE).free >= 2 * 1024**3, 'insufficient fixture disk reserve'
+        context = self.command('docker-context', ['docker', 'context', 'show']).strip()
+        info = json.loads(self.command('docker-context-inspect', ['docker', 'context', 'inspect', context]))
+        endpoint = os.environ.get('DOCKER_HOST') or info[0]['Endpoints']['docker']['Host']
+        assert endpoint.startswith('unix://'), 'probe requires local owned Docker service'
+        image = json.loads(self.command('image-inspect', ['docker', 'image', 'inspect', IMAGE]))[0]
+        assert IMAGE in image['RepoDigests'], image['RepoDigests']
+        self.report['imageID'] = image['Id']
+        self.report['imageRepoDigests'] = image['RepoDigests']
+        # No pulling, building, host ports, mounts or host/kernel changes.
+        created = self.command('create', ['docker', 'create', '--pull=never', '--name', self.container,
+            '--label', 'asservat.test=' + self.run_id, '--label', 'asservat.probe=fleet-lock',
+            '--network', 'none', '--memory', '768m', '--cpus', '2', '--pids-limit', '256',
+            '--cap-drop', 'ALL', '--user', 'postgres', '--read-only',
+            '--tmpfs', '/tmp:rw,nosuid,nodev,size=32m',
+            '--tmpfs', '/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777',
+            '-v', '/var/lib/postgresql', '-e', 'POSTGRES_PASSWORD=' + PASSWORD,
+            '-e', 'POSTGRES_DB=fleet_lock_probe', IMAGE,
+            '-c', 'max_connections=48', '-c', 'shared_buffers=128MB',
+            '-c', 'fsync=on', '-c', 'synchronous_commit=on'])
+        self.container_id = created.strip()
+        assert re.fullmatch(r'[a-f0-9]{64}', self.container_id)
+        self.created = True
+        self.report['containerID'] = self.container_id
+        self.command('start', ['docker', 'start', self.container_id])
+        until = time.monotonic() + 30
+        while True:
+            ready = self.start('ready', ['docker', 'exec', self.container_id, 'pg_isready', '-h127.0.0.1', '-Upostgres', '-dfleet_lock_probe'])
+            self.finish(ready, expected=None)
+            if ready[0].returncode == 0:
+                break
+            assert time.monotonic() < until, 'PostgreSQL readiness deadline'
+            time.sleep(.25)
+        server = json.loads(self.scalar('server', "SELECT json_build_object('version',version(),'versionNum',current_setting('server_version_num'),'startedAt',pg_postmaster_start_time(),'databaseOID',(SELECT oid FROM pg_database WHERE datname=current_database()),'inRecovery',pg_is_in_recovery());"))
+        assert 180000 <= int(server['versionNum']) < 190000 and server['inRecovery'] is False
+        self.report['server'] = server
+        self.sql('schema', (STAGE / 'schema.sql').read_text())
+        columns = json.loads(self.scalar('view-contract', "SELECT json_object_agg(relname,cols) FROM (SELECT c.relname,json_agg(json_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod)) ORDER BY a.attnum) AS cols FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid WHERE c.oid IN ('public.fleet_current_trust'::regclass,'public.fleet_legacy_contract'::regclass) AND a.attnum>0 AND NOT a.attisdropped GROUP BY c.relname) x;"))
+        assert columns['fleet_current_trust'] == columns['fleet_legacy_contract'] and len(columns['fleet_current_trust']) == 9, columns
+        self.report['viewColumns'] = columns
+        self.sql('view-definition', "SELECT pg_get_viewdef('public.fleet_current_trust',true);")
+        acl = self.sql('consumer-acl', "SELECT current_user,rolsuper,rolcreaterole,rolbypassrls,has_table_privilege(current_user,'public.fleet_trust','SELECT'),has_table_privilege(current_user,'public.fleet_observation','SELECT'),has_column_privilege(current_user,'public.fleet_current_trust','installation_id','UPDATE'),has_column_privilege(current_user,'public.fleet_current_trust','suspended','UPDATE') FROM pg_roles WHERE rolname=current_user;", 'probe_consumer').strip()
+        assert acl == 'probe_consumer|f|f|f|f|f|t|f', acl
+        self.expect_error('select-only-cannot-lock', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR SHARE;', 'probe_select_only', '42501')
+        self.expect_error('consumer-cannot-read-base', 'SELECT * FROM public.fleet_trust;', 'probe_consumer', '42501')
+        self.expect_error('consumer-cannot-write-observation', "UPDATE public.fleet_observation SET fresh_until=fresh_until;", 'probe_consumer', '42501')
+        self.expect_error('consumer-view-remains-read-only', 'UPDATE public.fleet_current_trust SET installation_id=installation_id;', 'probe_consumer', '55000')
+
+        forms = [
+            ('share-all', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR SHARE', True),
+            ('update-all', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR UPDATE', False),
+            ('share-column', 'SELECT installation_id::text FROM public.fleet_current_trust WHERE ' + KEY + ' FOR SHARE', True),
+            ('share-nowait', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR SHARE NOWAIT', True),
+            ('update-nowait', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR UPDATE NOWAIT', False),
+            ('join-share-of', 'SELECT t.* FROM public.fleet_current_trust t JOIN public.permission_stream p ON p.installation_id=t.installation_id WHERE t.' + KEY + ' FOR SHARE OF t', True),
+            ('join-share-all', 'SELECT t.* FROM public.fleet_current_trust t JOIN public.permission_stream p ON p.installation_id=t.installation_id WHERE t.' + KEY + ' FOR SHARE', True),
+            ('composite-share', "SELECT * FROM public.probe_composite_share('" + INSTALLATION + "'::uuid)", True),
+        ]
+        for name, query, shared in forms:
+            self.reset(name)
+            holder = self.holder(name, query)
+            old = self.scalar(name + '-old-dates', 'SELECT row_to_json(o)::text FROM public.fleet_observation o;')
+            self.sql(name + '-renew', self.renew_sql(shared), 'probe_observer')
+            new = self.scalar(name + '-new-dates', 'SELECT row_to_json(o)::text FROM public.fleet_observation o;')
+            assert json.loads(old)['observed_at'] < json.loads(new)['observed_at'] and old != new
+            blocked = self.sql_start(name + '-semantic', 'BEGIN; UPDATE public.fleet_trust SET suspended=true WHERE ' + KEY + '; COMMIT;', 'probe_semantic')
+            proof = self.blocked(blocked, holder)
+            assert self.scalar(name + '-uncommitted', 'SELECT suspended FROM public.fleet_trust WHERE ' + KEY + ';') == 'f'
+            self.release(holder)
+            self.finish(blocked)
+            assert self.scalar(name + '-fenced', 'SELECT suspended FROM public.fleet_current_trust WHERE ' + KEY + ';') == 't'
+            self.cases.append({'name': name, 'renewalCompletedWithAuthorityShare': shared,
+                'directObservationUpdateCompleted': True, 'semanticBlocking': proof,
+                'semanticCommittedOnlyAfterRelease': True, 'passed': True})
+
+        # FOR UPDATE still excludes an observer's mandatory authority SHARE.
+        # A direct technical observation UPDATE alone is not production authority.
+        self.reset('update-excludes-observer')
+        holder = self.holder('authority-exclusive', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' FOR UPDATE')
+        writer = self.sql_start('observer-authority-share', self.renew_sql(True), 'probe_observer')
+        proof = self.blocked(writer, holder)
+        self.release(holder)
+        self.finish(writer)
+        self.cases.append({'name': 'exclusive-authority-still-excludes-renewal', 'blocking': proof, 'passed': True})
+
+        self.reset('ordinary-join')
+        holder = self.holder('ordinary-join-holder', 'SELECT * FROM public.fleet_join_baseline WHERE ' + KEY + ' FOR SHARE')
+        writer = self.sql_start('ordinary-join-renew', self.renew_sql(False), 'probe_observer')
+        proof = self.blocked(writer, holder)
+        self.release(holder)
+        self.finish(writer)
+        self.cases.append({'name': 'ordinary-join-blocks-observation', 'blocking': proof, 'passed': True})
+
+        self.reset('nowait-negative')
+        holder = self.holder('semantic-exclusive', 'SELECT * FROM public.fleet_trust WHERE ' + KEY + ' FOR UPDATE', 'probe_semantic')
+        for name, suffix in [('share', 'FOR SHARE NOWAIT'), ('update', 'FOR UPDATE NOWAIT')]:
+            self.expect_error('blocked-' + name + '-nowait', 'SELECT * FROM public.fleet_current_trust WHERE ' + KEY + ' ' + suffix + ';', 'probe_consumer', '55P03')
+        self.expect_error('blocked-base-share-nowait', 'SELECT 1 FROM public.fleet_trust WHERE ' + KEY + ' FOR SHARE NOWAIT;', 'probe_semantic', '55P03')
+        self.release(holder)
+
+        negatives = {
+            'missing': ('DELETE FROM public.fleet_observation;', True),
+            'version': ('UPDATE public.fleet_observation SET semantic_version=semantic_version+1;', True),
+            'issuer': ("UPDATE public.fleet_observation SET issuer_epoch='44444444-4444-4444-8444-444444444444';", True),
+            'uid': ("UPDATE public.fleet_observation SET source_uid='other';", True),
+            'generation': ('UPDATE public.fleet_observation SET source_generation=source_generation+1;', True),
+            'digest': ("UPDATE public.fleet_observation SET source_digest=decode(repeat('22',32),'hex');", True),
+            'postmaster': ("UPDATE public.fleet_observation SET activated_postmaster_at=activated_postmaster_at-interval '1 second';", True),
+            'database': ('UPDATE public.fleet_observation SET activated_database_oid=0;', True),
+            'missing-incarnation': ('UPDATE public.fleet_observation SET activated_postmaster_at=NULL,activated_database_oid=NULL;', True),
+            'aba-version': ('UPDATE public.fleet_trust SET semantic_version=semantic_version+2;', True),
+            'suspended': ('UPDATE public.fleet_trust SET suspended=true;', False),
+            'recovery': ('UPDATE public.fleet_trust SET recovery_blocked=true;', False),
+            'wrong-process': ("UPDATE public.fleet_trust SET activated_postmaster_at=activated_postmaster_at-interval '1 second'; UPDATE public.fleet_observation SET activated_postmaster_at=activated_postmaster_at-interval '1 second';", False),
+            'wrong-database': ('UPDATE public.fleet_trust SET activated_database_oid=0; UPDATE public.fleet_observation SET activated_database_oid=0;', False),
+        }
+        for name, (change, invalid_dates) in negatives.items():
+            self.reset('binding-' + name)
+            self.sql('binding-' + name + '-change', change)
+            rows = self.sql('binding-' + name + '-deny', "SELECT json_build_object('suspended',suspended,'blocked',recovery_blocked,'nonnull',observed_at IS NOT NULL AND fresh_until IS NOT NULL,'invalidDates',observed_at=fresh_until,'admitted',NOT suspended AND NOT recovery_blocked AND observed_at<=clock_timestamp() AND clock_timestamp()<fresh_until) FROM public.fleet_current_trust WHERE " + KEY + ' FOR SHARE;', 'probe_consumer').strip()
+            facts = json.loads(rows)
+            assert facts['admitted'] is False and facts['nonnull'] is True
+            assert facts['suspended'] or facts['blocked']
+            if invalid_dates:
+                assert facts['blocked'] and facts['invalidDates']
+            self.cases.append({'name': 'binding-' + name, 'facts': facts, 'passed': True})
+        assert not self.unchanged(), self.unchanged()
+
+    def cleanup(self):
+        self.cleaning = True
+        # A repeated signal cannot interrupt exact-container cleanup or joins.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        result = {'containerRemoved': False, 'ownedGroupsJoined': False}
+        # Stop/join every known host command first. Killing docker exec alone is
+        # not SQL cleanup: exact-container removal below closes remote sessions.
+        initial_joins = [join_owned(p) for p in self.processes]
+        assert all(initial_joins), 'owned host command remains during cleanup'
+        # A lost create response can leave an owned container even before the ID
+        # is assigned. Name lookup is allowed only with exact unique run labels.
+        inspect = self.start('cleanup-inspect', ['docker', 'container', 'inspect', self.container])
+        raw = self.finish(inspect, expected=None)
+        if inspect[0].returncode == 0:
+            objects = json.loads(raw)
+            assert len(objects) == 1
+            obj = objects[0]
+            labels = obj['Config'].get('Labels') or {}
+            assert obj['Name'] == '/' + self.container and labels.get('asservat.test') == self.run_id and labels.get('asservat.probe') == 'fleet-lock', 'refuse cleanup of non-owned container'
+            if self.container_id is not None:
+                assert obj['Id'] == self.container_id, 'container identity replaced'
+            assert obj['Image'] == self.report['imageID'], 'owned container image differs'
+            self.container_id = obj['Id']
+            result['containerID'] = obj['Id']
+            result['volumes'] = [m['Name'] for m in obj['Mounts'] if m['Type'] == 'volume']
+            self.command('postgres-log', ['docker', 'logs', self.container_id], expected=None)
+            self.command('remove-owned-container', ['docker', 'rm', '-f', '-v', self.container_id], timeout=30)
+        else:
+            # Explicit Docker not-found is required, not a daemon/transport error.
+            assert 'No such container:' in raw or 'No such object:' in raw, raw
+            result['volumes'] = []
+            creates = [e for e in self.commands if e['label'] == 'create']
+            if creates and not self.created:
+                # A lost create response is never certified clean from a single
+                # absence read; preserve the unique name for explicit recovery.
+                raise RuntimeError('create result unknown; absence alone is not cleanup proof for ' + self.container)
+        absent = self.command('remaining-owned-containers', ['docker', 'ps', '-aq', '--no-trunc', '--filter', 'label=asservat.test=' + self.run_id]).strip()
+        assert not absent, absent
+        for volume in result['volumes']:
+            check = self.start('remaining-volume', ['docker', 'volume', 'inspect', volume])
+            output = self.finish(check, expected=None)
+            assert check[0].returncode != 0 and ('no such volume' in output.lower() or 'No such volume:' in output), output
+        result['containerRemoved'] = True
+        final_joins = [join_owned(p) for p in self.processes]
+        result['ownedGroupsJoined'] = all(final_joins)
+        for entry, process in zip(self.commands, self.processes, strict=True):
+            entry['exit'] = process.returncode
+            entry['ownedGroupJoined'] = not group_exists(process.pid)
+            entry['logSHA256'] = sha(self.out / entry['log'])
+        result['processGroups'] = [{'pid': p.pid, 'exit': p.returncode, 'absent': not group_exists(p.pid)} for p in self.processes]
+        assert result['ownedGroupsJoined']
+        return result
+
+
+def main():
+    assert sys.argv[1:] == ['--parent-exclusive-slot-allocated'], 'requires root-owned native slot'
+    signal.signal(signal.SIGINT, interrupt)
+    signal.signal(signal.SIGTERM, interrupt)
+    p = Probe()
+    code = 2
+    try:
+        p.run()
+        check_interrupt()
+        code = 0
+    except BaseException as err:
+        p.report['error'] = repr(err)
+    finally:
+        try:
+            p.report['cleanup'] = p.cleanup()
+        except BaseException as err:
+            p.report['cleanupError'] = repr(err)
+            code = 2
+            # Still join every known host descendant on exceptional cleanup.
+            p.report['exceptionalJoins'] = [join_owned(child) for child in p.processes]
+        p.report['sourceChanges'] = p.unchanged()
+        p.report['signalReceived'] = first_signal
+        if p.report['sourceChanges'] or first_signal is not None:
+            code = 2
+        p.report['exit'] = code
+        p.report['seconds'] = round(time.monotonic() - p.started, 3)
+        p.report['artifacts'] = {q.relative_to(p.out).as_posix(): sha(q) for q in sorted(p.out.rglob('*')) if q.is_file()}
+        save(p.out / 'result.json', p.report)
+        print(json.dumps({'exit': code, 'result': str(p.out / 'result.json'), 'SHA256': sha(p.out / 'result.json')}), flush=True)
+    return code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

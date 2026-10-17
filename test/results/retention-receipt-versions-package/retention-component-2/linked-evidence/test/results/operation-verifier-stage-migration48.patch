@@ -1,0 +1,1537 @@
+--- a/docs/architecture/operation-audit-lifecycle.md
++++ b/docs/architecture/operation-audit-lifecycle.md
+@@ -10,7 +10,9 @@
+ ## Explicit selection and unchanged legacy records
+ 
+ `NewHealthyOperationAuditor` and `NewHealthyOperationJournal` require explicit
+-protected installation policy and the same normal/resolution lane.
++protected installation policy and the same normal/resolution lane. New healthy
++admission requires the explicitly accepted `operation-audit-history/v3`
++qualification, including H=0; historical binding validation stays compatible.
+ `HealthyOperationAuditor.Configured()` checks immutable composition, not current
+ authority. `presentation.NewHealthyAuditedOperations` selects this protocol for
+ both independently backed lanes and rejects nil/zero-value auditors. The legacy
+@@ -58,7 +60,10 @@
+ 3. One irreversible certificate claim authorizes one signed/encrypted object
+    in a freed slot. Its once-frozen write interval is at most thirty seconds
+    and ends early enough to preserve the full minimum proof window P. A separate
+-   verifier checks the exact receipt/signature/encrypted result before SQL ack.
++   verifier spends one of two durable attempts before checking the exact
++   receipt/signature/encrypted result. The same original maximum-five-second
++   context covers the claim, provider read/open and SQL acknowledgement. Unknown
++   claim replies return no permit; failure or lost acknowledgement stays spent.
+ 4. After the fixed certificate cutoff, a terminal lease permits purging the
+    three registered key names. A separate current absence acknowledgement
+    precedes finalization. A new lease clears the old terminal acknowledgement;
+@@ -142,9 +147,72 @@
+ avoid integer overflow. It reserves two residual generations and all fixed plus
+ finite lease transitions. Qualification must cover the deployment's accepted
+ traffic/replay/rollback/row-lock envelope; these numbers are accepted results,
+-not measured by this adapter. Outstanding obligations prevent silently changing
+-history profile, account correlation or qualification. Current source/revision
+-renewal may preserve compatible backing, never forget existing charges.
++not measured by this adapter. Account correlation and historical obligations
++cannot be silently changed. Current source/revision renewal may preserve compatible
++backing, never forget existing charges. The explicitly accepted monotonic v3
++resource upgrade below is the only additional profile compatibility rule.
++
++
++## Prepaid independent certificate verification
++
++[ADR-125](../decisions/125-prepaid-operation-certificate-verification.md) corrects
++retry work after positive certificate completion. `OperationCleanup.Advance` calls
++`ClaimOperationCertificateVerification` on the independent acknowledgement facet
++before any provider GET/unwrap. The SQL adapter locks current recovery, pool,
++account, operation and lifecycle in their existing order; it compares the original
++retirement and exact stored writer receipt and spends one of two attempts. Only
++the acknowledgement role can increment this counter. Source-managed new v3 rows
++start at zero; direct INSERT, decrement, jumps and combined claim/ack mutations
++are rejected. Producer, cleanup and finalizer credentials cannot acquire attempts.
++
++The returned deadline is the minimum of the original caller bound, the original
++five-second claim interval, current recovery freshness and the immutable certificate
++write end. After blocking locks and COMMIT it must still be current. The caller
++keeps it through provider verification and acknowledgement, without starting a new
++interval. Lost claim replies permit no provider call and remain spent; failed
++verification or acknowledgement does not reset either allowance. Current recovery,
++issuer/database incarnation and the original proof window remain mandatory.
++
++The v3 qualification reserves `21 + 3 * MaxPurgeLeases` full-transaction transitions
++per residual generation, retaining the two-generation multiplier and accepted
++footprint/copy bounds. Twenty-one includes all original sixteen fixed transitions,
++three optional overdue transitions and two verifier claims. H=0 also requires v3
++row/WAL qualification and explicit backing; it does not acquire a managed backup
++horizon. Certificate key/provider backing must cover the positive producer's fixed
++sign/wrap/readback plus both independent verification attempts. These are bounded
++mechanism counts, not measured provider throughput or production capacity claims.
++
++All pre48 rows are conservatively marked with two spent attempts by the constant
++column default. No individual backfill UPDATE changes their bindings or dates.
++Historical nil/v1/v2 policies remain structurally readable, but new healthy
++constructors and SQL admission reject those profiles. An already acknowledged
++historical certificate still follows its original terminal cleanup path. A pending
++historical verification receives no fresh allowance. The normal coordinator
++rejects such unacknowledged history before original purge or certificate creation,
++so it starts no doomed provider work and preserves the originals. Its unknown work
++and charge remain for qualified reconciliation; previously opted-in overdue-original
++cleanup retains its separate restrictive path.
++
++Accepted v3 policy may cover outstanding old profiles without converting their
++records. SQL compares the same normalized common profile used before48, allowing
++only recognized nil-H0/v1/v2/v3 qualification to advance to v3 with nondecreasing
++row footprint, WAL bound and copy counts. Root/lane/installation/store, backup
++identity/digest/horizon, maximum purge leases and overdue mode remain unchanged.
++The candidate must back the entire current pool, including outstanding and residual
++history. A new accepted qualification identity/digest can express the measured new
++layout; an ordinary source observation or migration cannot supply that acceptance.
++Unknown layouts, reduced coverage and unrelated profile changes deny. This does not
++accept old uncertain effects, move their dates or make their counters reusable.
++
++The application regression failed before the correction with eight provider calls
++and zero durable claims. Focused staged race tests cover acknowledgement/provider
++failure, unknown claim replies, claim/provider waits and cancellation. The real
++SQL/S3 fixture source additionally tests two concurrent claims, denied third,
++independent-role boundaries, exact original recovery expiry after a held pool lock,
++and actual certificate verification. A separate owned scratch database tests the
++actual47→48 migration and acknowledged historical cleanup with explicitly synthetic
++receipts. At this checkpoint those external additions are compile-qualified only;
++parent-owned fixture reports determine their actual result.
+ 
+ H is not just a backup TTL. PostgreSQL keeps deleted row versions under MVCC,
+ and ordinary vacuum makes space reusable rather than proving media erasure.
+--- /dev/null
++++ b/docs/decisions/125-prepaid-operation-certificate-verification.md
+@@ -0,0 +1,68 @@
++# ADR-125: Spend a bounded allowance before operation-certificate verification
++
++Status: Accepted design; staged component checks and actual provider qualification
++are distinguished in [the architecture contract](../architecture/operation-audit-lifecycle.md).
++
++## Context
++
++ADR-112's positive certificate writer prevents repeated creation, but its independent
++verification had no durable attempt counter. Once writer completion was stored, an
++unavailable acknowledgement allowed every cleanup retry to repeat GET/decryption.
++The failing regression performed eight verifier calls and eight failed acknowledgements
++with zero pre-provider claims. A finite write interval alone does not provide the
++explicitly reserved work allowance.
++
++## Decision
++
++The independent acknowledgement credential must first spend one of two immutable
++certificate-verification attempts under the existing recovery, pool, principal
++account, operation and lifecycle lock order. Match the exact positive completion,
++retirement and receipt. Return only the earliest original caller, current recovery,
++five-second observation and certificate deadline. Keep that same context through
++provider verification and acknowledgement. An uncertain claim reply grants no
++provider work; failed verification, lost acknowledgement and cancellation never
++refund or refill the counter. No additional key service or worker scheduler is added.
++
++Require the explicitly accepted `operation-audit-history/v3` qualification for new
++healthy admission, including zero-backup-horizon profiles. Its measured row/index/TOAST
++and whole-transaction WAL bounds must include the new counter. Per slot reserve two
++residual generations, 21 fixed transitions and three transitions per finite purge
++lease: the original sixteen, three reserved overdue transitions and two verifier
++claims. The fixed certificate work allowance includes both independent GET/unwrap
++attempts. Provider/IAM and backup qualification remain protected installation inputs,
++not claims established by this adapter or synthetic fixture numbers.
++
++Migration48 gives every existing lifecycle row a constant default of two spent
++attempts. It does not update individual old rows, replace policies, rewrite dates,
++create receipts or infer which past unacknowledged verifier calls completed. Old
++bindings remain readable. An already acknowledged certificate still permits the
++existing terminal-purge and SQL/history-retirement path. Old incomplete or uncertain
++records receive no new verification authority and remain conservatively charged.
++The normal coordinator rejects them before original purge or certificate creation;
++already opted-in overdue-original reconciliation stays a separate path.
++
++An installation can explicitly accept a covering v3 resource profile without
++waiting for old uncertain rows to disappear. The current accepted admission must
++cover every backed slot and every outstanding/residual profile. Keep root, lane,
++installation, store, backup identity/digest, horizon, purge limit and overdue mode
++unchanged; qualified row footprint, transaction WAL and copy counts can only grow.
++Qualification identity/digest changes require that independent acceptance. Source
++renewal fields and budgets retain their existing checks. Unknown layouts, downgrades,
++smaller backing and unrelated profile changes deny. The upgrade changes the resource
++coverage for new work; it never grants attempts to historical records or reanchors
++an obligation. Migration and ordinary observation cannot accept this upgrade.
++
++## Consequences
++
++One acknowledgement failure can no longer cause unbounded certificate decryption
++retries. Exhausted/unknown work remains an explicit reconciliation obligation; this
++change supplies neither a restart/restore bridge nor a way to erase uncertain spend.
++Historical managed backup/WAL cutoffs and independent finalization remain binding.
++
++The real SQL fixture uses a separately owned temporary database to apply actual
++migrations through47, admits synthetic old records through their active guards,
++then applies48. It checks conservative backfill, old acknowledged cleanup and
++explicit covering upgrades without disabling triggers or downgrading the harness
++database. Separate SQL/S3 source checks concurrent claims, provider failure,
++unknown-claim spend, roles and expiry after a blocking lock. Compile-only checks do
++not qualify those external paths. No public runtime is enabled by this correction.
+--- a/internal/adapters/postgres/custody.go
++++ b/internal/adapters/postgres/custody.go
+@@ -24,7 +24,7 @@
+ 	"github.com/jackc/pgx/v5/pgxpool"
+ )
+ 
+-const currentSchemaVersion = 47
++const currentSchemaVersion = 48
+ 
+ type Ledger struct{ pool *pgxpool.Pool }
+ 
+--- a/internal/adapters/postgres/operation_audit.go
++++ b/internal/adapters/postgres/operation_audit.go
+@@ -392,7 +392,7 @@
+ // Legacy construction rejects lifecycle-bearing admission; exact later reads
+ // and acknowledgements still consume the immutable stored binding.
+ func NewHealthyOperationJournal(ctx context.Context, pool *pgxpool.Pool, policy audit.OperationLifecyclePolicy, recovery *RecoveryTransactionGuard) (*OperationJournal, error) {
+-	if !policy.Valid() || recovery == nil || policy.InstallationID != recovery.installation {
++	if !policy.CertificateVerificationBacked() || recovery == nil || policy.InstallationID != recovery.installation {
+ 		return nil, app.ErrUnavailable
+ 	}
+ 	j, e := NewOperationJournal(ctx, pool, policy.RootID, policy.Lane, recovery)
+--- a/internal/adapters/postgres/operation_lifecycle.go
++++ b/internal/adapters/postgres/operation_lifecycle.go
+@@ -55,6 +55,10 @@
+ 	if !decode(d.OverduePurge, &s.OverduePurge) {
+ 		return s, app.ErrUnavailable
+ 	}
++	s.CertificateVerifyAttempts = int64(d.CertificateVerifyAttempts)
++	if s.CertificateVerifyAttempts < 0 || s.CertificateVerifyAttempts > 2 || !b.Policy.CertificateVerificationBacked() && s.CertificateVerifyAttempts != 2 {
++		return s, app.ErrUnavailable
++	}
+ 	s.CertificateStarted = d.CertificateStarted
+ 	s.TerminalAcknowledged = d.TerminalAcknowledgedAt.Valid
+ 	for _, phase := range []string{"intent", "outcome"} {
+@@ -400,6 +404,39 @@
+ 		return r.CertificateWriteUntil, nil
+ 	})
+ }
++
++// ClaimOperationCertificateVerification spends before provider I/O. The current
++// recovery observation, original caller interval and immutable certificate end
++// all survive blocking locks. Unknown transaction replies never return a permit.
++func (s *OperationLifecycles) ClaimOperationCertificateVerification(ctx context.Context, r value.OperationRetirement, receipt value.Receipt) (time.Time, error) {
++	if ctx == nil || ctx.Err() != nil || !r.Valid() || !receipt.ValidOperationRetirement(r.RootID, r.OperationID) {
++		return time.Time{}, app.ErrUnavailable
++	}
++	until := identity.Earlier(time.Now().UTC().Truncate(time.Microsecond).Add(5*time.Second), r.CertificateWriteUntil)
++	ctx, cancel := context.WithDeadline(ctx, until)
++	defer cancel()
++	if end, ok := ctx.Deadline(); ok {
++		until = identity.Earlier(until, end)
++	}
++	e := s.transaction(ctx, r.OperationID, func(q *custodydb.Queries, _ custodydb.OperationAudit, _ custodydb.OperationAuditLifecycle, state value.OperationLifecycleSnapshot, now, current time.Time) (time.Time, error) {
++		if !state.Intent.Lifecycle.Policy.CertificateVerificationBacked() || state.Retirement == nil || !sameAuditJSON(*state.Retirement, r) || state.CertificateWriter == nil || !sameAuditJSON(state.CertificateWriter.Receipt, receipt) || state.CertificateReceipt != nil || state.CertificateVerifyAttempts >= 2 || !state.OverdueSelectedAt.IsZero() {
++			return time.Time{}, app.ErrUnavailable
++		}
++		until = identity.Earlier(until, current)
++		if !now.Before(until) {
++			return time.Time{}, app.ErrUnavailable
++		}
++		n, e := q.ClaimOperationCertificateVerification(ctx, custodydb.ClaimOperationCertificateVerificationParams{RootID: id(r.RootID), OperationID: id(r.OperationID)})
++		if e != nil || n != 1 {
++			return time.Time{}, app.ErrUnavailable
++		}
++		return until, nil
++	})
++	if e != nil || ctx.Err() != nil || !time.Now().Before(until) {
++		return time.Time{}, app.ErrUnavailable
++	}
++	return until, nil
++}
+ func (s *OperationLifecycles) AcknowledgeOperationCertificate(ctx context.Context, r value.OperationRetirement, receipt value.Receipt) error {
+ 	if !r.Valid() || !receipt.ValidOperationRetirement(r.RootID, r.OperationID) {
+ 		return app.ErrUnavailable
+@@ -413,6 +450,9 @@
+ 				return time.Time{}, app.ErrUnavailable
+ 			}
+ 			return r.CertificateWriteUntil, nil
++		}
++		if !state.Intent.Lifecycle.Policy.CertificateVerificationBacked() || state.CertificateVerifyAttempts < 1 {
++			return time.Time{}, app.ErrUnavailable
+ 		}
+ 		b, _ := json.Marshal(receipt)
+ 		n, e := q.AckOperationCertificate(ctx, custodydb.AckOperationCertificateParams{RootID: id(r.RootID), OperationID: id(r.OperationID), CertificateReceipt: b})
+--- a/internal/application/audit/operation_lifecycle.go
++++ b/internal/application/audit/operation_lifecycle.go
+@@ -3,6 +3,7 @@
+ import (
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	value "asservat.local/asservat/internal/domain/audit"
++	"asservat.local/asservat/internal/domain/identity"
+ 	"context"
+ 	"crypto/sha256"
+ 	"encoding/json"
+@@ -25,7 +26,7 @@
+ }
+ 
+ func NewHealthyOperationAuditor(p value.OperationLifecyclePolicy, journal OperationJournal, acknowledgements OperationAcknowledgements, legacy OperationObjects, closed ClosedOperationObjects, completions OperationCompletions, now func() time.Time) (*HealthyOperationAuditor, error) {
+-	if !p.Valid() || journal == nil || acknowledgements == nil || legacy == nil || closed == nil || completions == nil || now == nil {
++	if !p.CertificateVerificationBacked() || journal == nil || acknowledgements == nil || legacy == nil || closed == nil || completions == nil || now == nil {
+ 		return nil, ErrUnavailable
+ 	}
+ 	if p.History != nil {
+@@ -59,7 +60,7 @@
+ // Configured validates immutable composition only. Current recovery/backing
+ // authority is still checked by every underlying operation.
+ func (s *HealthyOperationAuditor) Configured() bool {
+-	return s != nil && s.policy.Valid() && s.auditor.Journal != nil && s.auditor.Acknowledgements != nil && s.auditor.Objects != nil && s.auditor.Now != nil
++	return s != nil && s.policy.CertificateVerificationBacked() && s.auditor.Journal != nil && s.auditor.Acknowledgements != nil && s.auditor.Objects != nil && s.auditor.Now != nil
+ }
+ func (s *HealthyOperationAuditor) Begin(ctx context.Context, in value.OperationIntent) error {
+ 	if s == nil {
+@@ -157,6 +158,7 @@
+ 	RecordTerminalOperationPurge(context.Context, value.OperationPurgeLease) (value.OperationTerminalPurge, error)
+ }
+ type OperationLifecycleAcknowledgements interface {
++	ClaimOperationCertificateVerification(context.Context, value.OperationRetirement, value.Receipt) (time.Time, error)
+ 	AcknowledgeOperationCertificate(context.Context, value.OperationRetirement, value.Receipt) error
+ 	AcknowledgeTerminalOperationPurge(context.Context, value.OperationPurgeLease, value.OperationTerminalPurge) error
+ }
+@@ -188,6 +190,13 @@
+ 	}
+ 	state, e := s.Journal.ReadOperationLifecycle(ctx, id)
+ 	if e != nil {
++		return ErrUnavailable
++	}
++	// Historical unacknowledged records have no fresh verifier allowance.
++	// Do not destroy their originals or create a certificate that cannot be
++	// acknowledged. Already acknowledged history can still finish terminal
++	// cleanup; explicit overdue-original reconciliation is a separate path.
++	if state.CertificateReceipt == nil && (state.Intent.Lifecycle == nil || !state.Intent.Lifecycle.Policy.CertificateVerificationBacked()) {
+ 		return ErrUnavailable
+ 	}
+ 	if state.Retirement == nil {
+@@ -221,10 +230,21 @@
+ 			state.CertificateWriter = &c
+ 		}
+ 		receipt := state.CertificateWriter.Receipt
+-		if e = s.Verifier.VerifyOperationCertificate(ctx, r, receipt); e != nil {
+-			return ErrUnavailable
+-		}
+-		if e = s.Acknowledgements.AcknowledgeOperationCertificate(ctx, r, receipt); e != nil {
++		// Spend the independent verifier's original durable allowance before any
++		// provider read/unwrap. Unknown claim/acknowledgement replies stay spent.
++		deadline := identity.Earlier(time.Now().Add(5*time.Second), r.CertificateWriteUntil)
++		verification, stop := context.WithDeadline(ctx, deadline)
++		defer stop()
++		until, e := s.Acknowledgements.ClaimOperationCertificateVerification(verification, r, receipt)
++		if e != nil || verification.Err() != nil || !time.Now().Before(until) || until.After(deadline) {
++			return ErrUnavailable
++		}
++		verification, stopVerification := context.WithDeadline(verification, until)
++		defer stopVerification()
++		if e = s.Verifier.VerifyOperationCertificate(verification, r, receipt); e != nil || verification.Err() != nil {
++			return ErrUnavailable
++		}
++		if e = s.Acknowledgements.AcknowledgeOperationCertificate(verification, r, receipt); e != nil || verification.Err() != nil {
+ 			return ErrUnavailable
+ 		}
+ 	}
+--- a/internal/application/audit/operation_lifecycle_test.go
++++ b/internal/application/audit/operation_lifecycle_test.go
+@@ -11,7 +11,11 @@
+ )
+ 
+ func healthyPolicy(in value.OperationIntent) value.OperationLifecyclePolicy {
+-	return value.OperationLifecyclePolicy{RootID: in.RootID, Lane: value.OperationLane(in.Name), InstallationID: in.RootID, StoreID: in.RootID, PolicyID: in.RootID, BackupProfileID: in.RootID, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 10, MaxPurgeLeases: 16, CleanupBudgetSeconds: 10, ProofWindowSeconds: 60, ValidUntil: in.CreatedAt.Add(time.Hour)}
++	p := value.OperationLifecyclePolicy{RootID: in.RootID, Lane: value.OperationLane(in.Name), InstallationID: in.RootID, StoreID: in.RootID, PolicyID: in.RootID, BackupProfileID: in.RootID, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 10, MaxPurgeLeases: 16, CleanupBudgetSeconds: 10, ProofWindowSeconds: 60, ValidUntil: in.CreatedAt.Add(time.Hour)}
++	p.History = &value.OperationHistoryQualification{ID: in.RootID, Digest: artifact.Digest{4}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++	b, w := p.History.SlotBacking(p.MaxPurgeLeases)
++	p.BackupReservedBytes, p.WALReservedBytes = b*p.MetadataSlots, w*p.MetadataSlots
++	return p
+ }
+ 
+ type healthyFixture struct {
+@@ -112,7 +116,7 @@
+ 	in := auditIntent()
+ 	p := healthyPolicy(in)
+ 	p.BackupHorizonSeconds = 120
+-	p.History = &value.OperationHistoryQualification{ID: in.RootID, Digest: artifact.Digest{4}, Layout: value.OperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++	p.History = &value.OperationHistoryQualification{ID: in.RootID, Digest: artifact.Digest{4}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+ 	b, w := p.History.SlotBacking(p.MaxPurgeLeases)
+ 	p.BackupReservedBytes = b * p.MetadataSlots
+ 	p.WALReservedBytes = w * p.MetadataSlots
+@@ -142,7 +146,7 @@
+ 	in := auditIntent()
+ 	p := healthyPolicy(in)
+ 	p.BackupHorizonSeconds = 120
+-	p.History = &value.OperationHistoryQualification{ID: in.RootID, Digest: artifact.Digest{4}, Layout: value.OperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++	p.History = &value.OperationHistoryQualification{ID: in.RootID, Digest: artifact.Digest{4}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+ 	b, w := p.History.SlotBacking(p.MaxPurgeLeases)
+ 	p.BackupReservedBytes, p.WALReservedBytes = b*p.MetadataSlots, w*p.MetadataSlots
+ 	for _, edit := range []func(*value.OperationLifecyclePolicy){
+@@ -171,7 +175,7 @@
+ 	if e = gate.Begin(context.Background(), in); e != nil {
+ 		t.Fatal("caller changed frozen qualification", e)
+ 	}
+-	if f.snap.Intent.Lifecycle.Policy.History.Layout != value.OperationHistoryLayout {
++	if f.snap.Intent.Lifecycle.Policy.History.Layout != value.OperationVerificationHistoryLayout {
+ 		t.Fatal("policy retained mutable caller alias")
+ 	}
+ 	out := auditOutcome(in)
+@@ -198,3 +202,31 @@
+ 		t.Fatal("complete composition unavailable", e)
+ 	}
+ }
++
++func TestHealthyAdmissionRejectsHistoricalVerifierAllowances(t *testing.T) {
++	in := auditIntent()
++	f := &healthyFixture{operationFixture: &operationFixture{}}
++	for _, layout := range []string{"", value.OperationHistoryLayout, value.OperationOverdueHistoryLayout} {
++		p := healthyPolicy(in)
++		if layout == "" {
++			p.History = nil
++			p.BackupReservedBytes = 0
++			p.WALReservedBytes = 0
++		} else {
++			p.History.Layout = layout
++			p.BackupHorizonSeconds = 1
++			if layout == value.OperationOverdueHistoryLayout {
++				p.OverdueTerminal = value.OperationOverdueTerminal
++			}
++		}
++		if !p.Valid() {
++			t.Fatal("historical binding no longer readable", layout)
++		}
++		if _, e := BindOperationLifecycle(in, p); e != nil {
++			t.Fatal("historical binding cannot be reconstructed", e)
++		}
++		if _, e := NewHealthyOperationAuditor(p, f, f, f, f, f, time.Now); e != ErrUnavailable {
++			t.Fatal("old qualification acquired fresh verifier allowance", layout, e)
++		}
++	}
++}
+--- /dev/null
++++ b/internal/application/audit/operation_verification_budget_test.go
+@@ -0,0 +1,208 @@
++package audit
++
++import (
++	"context"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/audit"
++)
++
++// A positive joined certificate writer is already durable. The independent
++// acknowledgement is unavailable, so no retry may acquire an unbounded number
++// of decrypt/verification operations for that same original record.
++type verificationBudgetFixture struct {
++	OperationLifecycleJournal
++	OperationLifecycleAcknowledgements
++	OperationRetirementFinalizer
++	OperationCleanupObjects
++	OperationCleanupVerifier
++	snapshot                                value.OperationLifecycleSnapshot
++	claims, verifications, acknowledgements int
++	claimError, verifyError                 bool
++	purges                                  []string
++	certificateClaims                       int
++	claimHook                               func(context.Context) time.Time
++	verifyHook                              func(context.Context)
++}
++
++func (f *verificationBudgetFixture) ReadOperationLifecycle(context.Context, string) (value.OperationLifecycleSnapshot, error) {
++	return f.snapshot, nil
++}
++func (f *verificationBudgetFixture) VerifyOperationCertificate(ctx context.Context, _ value.OperationRetirement, _ value.Receipt) error {
++	f.verifications++
++	if f.verifyHook != nil {
++		f.verifyHook(ctx)
++	}
++	if f.verifyError {
++		return ErrUnavailable
++	}
++	return nil
++}
++func (f *verificationBudgetFixture) AcknowledgeOperationCertificate(context.Context, value.OperationRetirement, value.Receipt) error {
++	f.acknowledgements++
++	return ErrUnavailable
++}
++
++// The independently credentialed SQL facet implements this bounded pre-I/O
++// claim. A lost claim response remains spent and cannot create a fresh budget.
++func (f *verificationBudgetFixture) ClaimOperationCertificateVerification(ctx context.Context, _ value.OperationRetirement, _ value.Receipt) (time.Time, error) {
++	if f.claims >= 2 {
++		return time.Time{}, ErrUnavailable
++	}
++	f.claims++
++	if f.claimError {
++		return time.Time{}, ErrUnavailable
++	}
++	if f.claimHook != nil {
++		return f.claimHook(ctx), nil
++	}
++	return time.Now().Add(time.Second), nil
++}
++
++func verificationFixture(t *testing.T) (*verificationBudgetFixture, OperationCleanup, string) {
++	in := auditIntent()
++	var e error
++	in, e = BindOperationLifecycle(in, healthyPolicy(in))
++	if e != nil {
++		t.Fatal(e)
++	}
++	now := time.Now().UTC().Truncate(time.Microsecond)
++	r := value.OperationRetirement{
++		RootID: in.RootID, OperationID: in.ID, StoreID: in.RootID,
++		InstallationID: in.RootID, IssuerEpoch: in.ID,
++		PostmasterAt: now.Add(-time.Hour), DatabaseOID: 1,
++		ObjectsDigest: artifact.Digest{1}, WritersDigest: artifact.Digest{2},
++		PurgeFence: 1, PurgedAt: now, CertificateWriteUntil: now.Add(30 * time.Second),
++		CertificatePurgeAt: now.Add(time.Minute), LiveRetireBy: now.Add(2 * time.Minute),
++	}
++	if !r.Valid() {
++		t.Fatal("invalid fixture retirement")
++	}
++	receipt := receipt(in, "intent")
++	receipt.Key = value.OperationAuditKey(in.RootID, in.ID, "deletion-certificate")
++	c := value.OperationWriteCompletion{
++		Protocol: value.OperationWriterProtocol, RootID: in.RootID, OperationID: in.ID,
++		StoreID: in.RootID, Phase: "deletion-certificate", RecordDigest: OperationLifecycleDigest(r),
++		Receipt: receipt, StoredAt: now, ClosedAt: now,
++	}
++	if !c.Valid(in.RootID, in.ID, in.RootID, "deletion-certificate", r.PurgedAt, r.CertificateWriteUntil) {
++		t.Fatal("invalid fixture completion")
++	}
++	f := &verificationBudgetFixture{snapshot: value.OperationLifecycleSnapshot{Intent: in, Retirement: &r, CertificateStarted: true, CertificateWriter: &c}}
++	service := OperationCleanup{Journal: f, Acknowledgements: f, Finalizer: f, Objects: f, Verifier: f}
++	return f, service, in.ID
++}
++
++func TestOperationCertificateAcknowledgementFailureCannotRepeatUnboundedVerification(t *testing.T) {
++	f, service, id := verificationFixture(t)
++	for i := 0; i < 8; i++ {
++		if e := service.Advance(context.Background(), id); e == nil {
++			t.Fatal("unknown acknowledgement reported completion")
++		}
++	}
++	if f.verifications != 2 || f.claims != 2 || f.acknowledgements != 2 {
++		t.Fatalf("verification budget escaped: claims=%d provider_calls=%d acknowledgements=%d; expected two prepaid attempts", f.claims, f.verifications, f.acknowledgements)
++	}
++}
++
++func TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent(t *testing.T) {
++	for _, mode := range []string{"unknown-claim", "provider-failure"} {
++		t.Run(mode, func(t *testing.T) {
++			f, s, id := verificationFixture(t)
++			f.claimError = mode == "unknown-claim"
++			f.verifyError = mode == "provider-failure"
++			for i := 0; i < 8; i++ {
++				if e := s.Advance(context.Background(), id); e != ErrUnavailable {
++					t.Fatal(e)
++				}
++			}
++			want := 2
++			if f.claimError {
++				want = 0
++			}
++			if f.claims != 2 || f.verifications != want || f.acknowledgements != 0 {
++				t.Fatal("failed/unknown work refilled", f.claims, f.verifications, f.acknowledgements)
++			}
++		})
++	}
++}
++func TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider(t *testing.T) {
++	for _, mode := range []string{"claim-wait", "claim-extension", "provider-wait", "provider-cancel"} {
++		t.Run(mode, func(t *testing.T) {
++			f, s, id := verificationFixture(t)
++			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
++			defer cancel()
++			switch mode {
++			case "claim-wait":
++				f.claimHook = func(c context.Context) time.Time { <-c.Done(); return time.Now().Add(time.Second) }
++			case "claim-extension":
++				f.claimHook = func(context.Context) time.Time { return time.Now().Add(time.Minute) }
++			case "provider-wait":
++				f.verifyHook = func(c context.Context) { <-c.Done() }
++			case "provider-cancel":
++				f.verifyHook = func(context.Context) { cancel() }
++			}
++			if e := s.Advance(ctx, id); e != ErrUnavailable {
++				t.Fatal("expired/canceled verification succeeded", e)
++			}
++			if f.claims != 1 || f.acknowledgements != 0 {
++				t.Fatal("provider result escaped original context", f.claims, f.acknowledgements)
++			}
++			if (mode == "claim-wait" || mode == "claim-extension") && f.verifications != 0 {
++				t.Fatal("provider called without current permit")
++			}
++		})
++	}
++}
++
++func (f *verificationBudgetFixture) BeginOperationPurge(_ context.Context, _ string, phase string) (value.OperationPurgeLease, error) {
++	f.purges = append(f.purges, phase)
++	return value.OperationPurgeLease{}, ErrUnavailable
++}
++func (f *verificationBudgetFixture) ClaimOperationCertificate(context.Context, value.OperationRetirement) (bool, error) {
++	f.certificateClaims++
++	return false, ErrUnavailable
++}
++func TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork(t *testing.T) {
++	for _, phase := range []string{"before-original-purge", "before-certificate", "acknowledged"} {
++		t.Run(phase, func(t *testing.T) {
++			f, s, id := verificationFixture(t)
++			in := f.snapshot.Intent
++			in.Lifecycle = nil
++			p := healthyPolicy(in)
++			p.History = nil
++			p.BackupReservedBytes = 0
++			p.WALReservedBytes = 0
++			bound, e := BindOperationLifecycle(in, p)
++			if e != nil {
++				t.Fatal(e)
++			}
++			f.snapshot.Intent = bound
++			switch phase {
++			case "before-original-purge":
++				f.snapshot.Retirement = nil
++				f.snapshot.CertificateWriter = nil
++			case "before-certificate":
++				f.snapshot.CertificateWriter = nil
++			case "acknowledged":
++				r := f.snapshot.CertificateWriter.Receipt
++				f.snapshot.CertificateReceipt = &r
++			}
++			if e = s.Advance(context.Background(), id); e != ErrUnavailable {
++				t.Fatal(e)
++			}
++			if f.certificateClaims != 0 || f.verifications != 0 || f.claims != 0 {
++				t.Fatal("historical unsupported record started certificate work", f.certificateClaims, f.claims, f.verifications)
++			}
++			if phase == "acknowledged" {
++				if len(f.purges) != 1 || f.purges[0] != "terminal" {
++					t.Fatal("acknowledged historical terminal cleanup blocked", f.purges)
++				}
++			} else if len(f.purges) != 0 {
++				t.Fatal("unsupported unacknowledged history purged originals", f.purges)
++			}
++		})
++	}
++}
+--- a/internal/domain/audit/operation_lifecycle.go
++++ b/internal/domain/audit/operation_lifecycle.go
+@@ -8,6 +8,7 @@
+ 
+ const OperationWriterProtocol = "closed-operation-audit/v1"
+ const OperationHistoryLayout = "operation-audit-history/v1"
++const OperationVerificationHistoryLayout = "operation-audit-history/v3"
+ const OperationOverdueHistoryLayout = "operation-audit-history/v2"
+ const OperationOverdueTerminal = "overdue-original/v1"
+ 
+@@ -24,7 +25,7 @@
+ }
+ 
+ func (q OperationHistoryQualification) Valid() bool {
+-	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
++	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout || q.Layout == OperationVerificationHistoryLayout) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
+ }
+ func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal int64) {
+ 	// At most two residual generations overlap; every reuse waits through H.
+@@ -32,6 +33,9 @@
+ 	transitions := int64(16)
+ 	if q.Layout == OperationOverdueHistoryLayout {
+ 		transitions += 3
++	} else if q.Layout == OperationVerificationHistoryLayout {
++		// Includes the optional overdue branch and two irreversible verifier claims.
++		transitions += 5
+ 	}
+ 	return 2 * q.MaximumRowFootprintBytes * q.BackupCopies, 2 * q.MaximumTransitionWALBytes * q.WALCopies * (transitions + 3*leases)
+ }
+@@ -56,8 +60,8 @@
+ 	if p.MaxPurgeLeases < 2 || p.MaxPurgeLeases > 32 {
+ 		return false
+ 	}
+-	if p.BackupHorizonSeconds > 0 {
+-		if p.History == nil || !p.History.Valid() || (p.OverdueTerminal == "" && p.History.Layout != OperationHistoryLayout) || (p.OverdueTerminal != "" && p.History.Layout != OperationOverdueHistoryLayout) {
++	if p.BackupHorizonSeconds > 0 || p.History != nil && p.History.Layout == OperationVerificationHistoryLayout {
++		if p.History == nil || !p.History.Valid() || (p.History.Layout != OperationVerificationHistoryLayout && ((p.OverdueTerminal == "" && p.History.Layout != OperationHistoryLayout) || (p.OverdueTerminal != "" && p.History.Layout != OperationOverdueHistoryLayout))) {
+ 			return false
+ 		}
+ 		b, w := p.History.SlotBacking(p.MaxPurgeLeases)
+@@ -69,6 +73,12 @@
+ 		return false
+ 	}
+ 	return authorization.UUID(p.RootID) && (p.Lane == "normal" || p.Lane == "resolution") && authorization.UUID(p.InstallationID) && authorization.UUID(p.StoreID) && authorization.UUID(p.PolicyID) && authorization.UUID(p.BackupProfileID) && p.PolicyDigest != (artifact.Digest{}) && p.BackupProfileDigest != (artifact.Digest{}) && p.BackingRevision > 0 && p.BackingRevision <= 1<<60 && p.MetadataSlots > 0 && p.MetadataSlots <= 1000000000000 && p.BackupHorizonSeconds >= 0 && p.BackupHorizonSeconds <= 316224000 && p.CleanupBudgetSeconds > 0 && p.CleanupBudgetSeconds <= 86400 && p.ProofWindowSeconds > 0 && p.ProofWindowSeconds <= 316224000 && p.BackupReservedBytes >= 0 && p.WALReservedBytes >= 0 && (p.BackupHorizonSeconds == 0 || p.BackupReservedBytes > 0 && p.WALReservedBytes > 0) && microTime(p.ValidUntil)
++}
++
++// CertificateVerificationBacked selects new admission, including H=0. Valid
++// intentionally still reads historical bindings; it never upgrades them.
++func (p OperationLifecyclePolicy) CertificateVerificationBacked() bool {
++	return p.Valid() && p.History != nil && p.History.Layout == OperationVerificationHistoryLayout
+ }
+ 
+ type OperationLifecycleBinding struct {
+@@ -183,6 +193,7 @@
+ 	IntentWriter, OutcomeWriter *OperationWriteCompletion
+ 	Lease                       *OperationPurgeLease
+ 	Retirement                  *OperationRetirement
++	CertificateVerifyAttempts   int64
+ 	CertificateStarted          bool
+ 	CertificateWriter           *OperationWriteCompletion
+ 	CertificateReceipt          *Receipt
+--- /dev/null
++++ b/internal/domain/audit/operation_verification_test.go
+@@ -0,0 +1,51 @@
++package audit
++
++import (
++	"asservat.local/asservat/internal/domain/artifact"
++	"testing"
++	"time"
++)
++
++func TestOperationVerificationQualificationIsVersionedAndPrepaid(t *testing.T) {
++	id := "00000000-0000-4000-8000-000000000001"
++	p := OperationLifecyclePolicy{RootID: id, Lane: "normal", InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 3, MaxPurgeLeases: 2, CleanupBudgetSeconds: 1, ProofWindowSeconds: 1, ValidUntil: time.Now().UTC().Truncate(time.Microsecond).Add(time.Hour)}
++	if !p.Valid() || p.CertificateVerificationBacked() {
++		t.Fatal("historical H=0 binding changed authority")
++	}
++	q := OperationHistoryQualification{ID: id, Digest: artifact.Digest{3}, Layout: OperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++	p.History = &q
++	p.BackupHorizonSeconds = 1
++	for _, layout := range []string{OperationHistoryLayout, OperationOverdueHistoryLayout, OperationVerificationHistoryLayout} {
++		q.Layout = layout
++		p.OverdueTerminal = ""
++		fixed := int64(16)
++		if layout == OperationOverdueHistoryLayout {
++			p.OverdueTerminal = OperationOverdueTerminal
++			fixed = 19
++		}
++		if layout == OperationVerificationHistoryLayout {
++			fixed = 21
++		}
++		b, w := q.SlotBacking(p.MaxPurgeLeases)
++		if w != 2*q.MaximumTransitionWALBytes*q.WALCopies*(fixed+3*p.MaxPurgeLeases) {
++			t.Fatal("incorrect transition accounting", layout, w)
++		}
++		p.BackupReservedBytes, p.WALReservedBytes = b*p.MetadataSlots, w*p.MetadataSlots
++		if !p.Valid() || p.CertificateVerificationBacked() != (layout == OperationVerificationHistoryLayout) {
++			t.Fatal("layout authority mismatch", layout)
++		}
++	}
++	p.BackupHorizonSeconds = 0
++	if !p.CertificateVerificationBacked() {
++		t.Fatal("qualified zero-history admission rejected")
++	}
++	p.WALReservedBytes--
++	if p.Valid() {
++		t.Fatal("under-backed verifier transitions accepted")
++	}
++	p.WALReservedBytes++
++	q.Layout = "operation-audit-history/v4"
++	if p.Valid() {
++		t.Fatal("future/unsupported profile guessed")
++	}
++}
+--- a/internal/transport/presentation/operation_audit_healthy_test.go
++++ b/internal/transport/presentation/operation_audit_healthy_test.go
+@@ -44,6 +44,8 @@
+ 			CleanupBudgetSeconds: 1, ProofWindowSeconds: 1,
+ 			ValidUntil: c.Now().Add(time.Hour),
+ 		}
++		p.History = &audit.OperationHistoryQualification{ID: p.RootID, Digest: artifact.Digest{4}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1}
++		p.BackupReservedBytes, p.WALReservedBytes = p.History.SlotBacking(p.MaxPurgeLeases)
+ 		a, err := auditapp.NewHealthyOperationAuditor(p, j, j, j, j, j, c.Now)
+ 		if err != nil {
+ 			t.Fatal(err)
+--- /dev/null
++++ b/migrations/00048_operation_certificate_verification.sql
+@@ -0,0 +1,223 @@
++-- +goose Up
++-- Existing records have no remaining verifiable pre-I/O allowance. The constant
++-- default backfills logically without UPDATEs, replacing neither binding nor
++-- original receipt, completion, deadlines or already acknowledged cleanup.
++ALTER TABLE operation_audit_lifecycle ADD COLUMN certificate_verify_attempts bigint NOT NULL DEFAULT 2 CHECK(certificate_verify_attempts BETWEEN 0 AND 2);
++-- New rows can begin at zero ONLY through the source-managed v3 INSERT below.
++-- +goose StatementBegin
++CREATE FUNCTION operation_audit_profile_covers(candidate jsonb, prior jsonb) RETURNS boolean
++LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
++DECLARE q jsonb:=candidate->'History'; oldq jsonb:=prior->'History'; k text;
++BEGIN
++ -- This is only a structural resource-coverage predicate. The candidate still
++ -- needs independently accepted protected policy and current backing at INSERT.
++ IF candidate IS NULL OR prior IS NULL OR q->>'Layout' IS DISTINCT FROM 'operation-audit-history/v3' OR
++  (candidate-'History') IS DISTINCT FROM (prior-'History') THEN RETURN false; END IF;
++ IF oldq IS NULL THEN RETURN COALESCE((prior->>'BackupHorizonSeconds')::bigint=0,false); END IF;
++ IF oldq->>'Layout' IS NULL OR oldq->>'Layout' NOT IN ('operation-audit-history/v1','operation-audit-history/v2','operation-audit-history/v3') THEN RETURN false; END IF;
++ FOREACH k IN ARRAY ARRAY['MaximumRowFootprintBytes','MaximumTransitionWALBytes','BackupCopies','WALCopies'] LOOP
++  IF q->>k IS NULL OR oldq->>k IS NULL OR (q->>k)::bigint<(oldq->>k)::bigint THEN RETURN false; END IF;
++ END LOOP;
++ RETURN true;
++END $$;
++
++CREATE OR REPLACE FUNCTION create_operation_audit_lifecycle() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
++DECLARE b jsonb; p jsonb; t public.fleet_current_trust; a public.operation_audit_pool; n timestamptz:=clock_timestamp(); budget interval; horizon interval; proof interval;
++BEGIN
++ IF TG_RELID<>'public.operation_audit'::regclass OR TG_WHEN<>'AFTER' OR TG_OP<>'INSERT' OR TG_LEVEL<>'ROW' THEN RAISE EXCEPTION 'invalid audit lifecycle source' USING ERRCODE='23514'; END IF;
++ b:=NEW.intent->'Lifecycle';
++ IF b IS NULL THEN RETURN NEW; END IF;
++ p:=b->'Policy';
++ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=(p->>'InstallationID')::uuid FOR SHARE;
++ SELECT * INTO STRICT a FROM public.operation_audit_pool WHERE root_id=NEW.root_id AND lane=NEW.lane FOR UPDATE;
++ n:=clock_timestamp();
++ budget:=make_interval(secs=>(p->>'CleanupBudgetSeconds')::double precision);
++ horizon:=make_interval(secs=>(p->>'BackupHorizonSeconds')::double precision);
++ proof:=make_interval(secs=>(p->>'ProofWindowSeconds')::double precision);
++ IF (p ? 'OverdueTerminal' AND p->>'OverdueTerminal' IS DISTINCT FROM 'overdue-original/v1') OR b->>'Protocol' IS DISTINCT FROM 'closed-operation-audit/v1' OR jsonb_typeof(p)<>'object' OR
++  NOT(p ?& ARRAY['MaxPurgeLeases','RootID','Lane','InstallationID','StoreID','PolicyID','BackupProfileID','PolicyDigest','BackupProfileDigest','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','BackupHorizonSeconds','CleanupBudgetSeconds','ProofWindowSeconds','ValidUntil']) OR
++  (p->>'RootID')::uuid<>NEW.root_id OR p->>'Lane'<>NEW.lane OR (p->>'StoreID')::uuid IS NULL OR (p->>'PolicyID')::uuid IS NULL OR (p->>'BackupProfileID')::uuid IS NULL OR
++  jsonb_array_length(p->'PolicyDigest')<>32 OR jsonb_array_length(p->'BackupProfileDigest')<>32 OR
++  (p->>'BackingRevision')::bigint<>a.revision OR (p->>'MetadataSlots')::bigint<a.account_limit*a.records_per_account OR (p->>'MetadataSlots')::bigint>1000000000000 OR
++  budget<interval '1 second' OR budget>interval '1 day' OR horizon<interval '0 seconds' OR horizon>interval '3660 days' OR proof<interval '1 second' OR proof>interval '3660 days' OR
++  (p->>'BackupReservedBytes')::bigint<0 OR (p->>'WALReservedBytes')::bigint<0 OR horizon>interval '0 seconds' AND ((p->>'BackupReservedBytes')::bigint<=0 OR (p->>'WALReservedBytes')::bigint<=0) OR
++  n>=(p->>'ValidUntil')::timestamptz OR n>=NEW.request_until OR n>=a.valid_until OR t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR
++  (p->>'MaxPurgeLeases')::bigint NOT BETWEEN 2 AND 32 OR
++  (b->>'HistoryReleaseAt')::timestamptz<>NEW.retain_until-horizon-budget OR (b->>'HistoryDeleteBy')::timestamptz<>NEW.retain_until-horizon OR
++  (b->>'LiveRetireBy')::timestamptz<>NEW.retain_until-2*horizon-budget OR (b->>'CertificatePurgeAt')::timestamptz<>(b->>'LiveRetireBy')::timestamptz-budget OR
++  (b->>'OriginalPurgeAt')::timestamptz<>(b->>'CertificatePurgeAt')::timestamptz-proof-budget OR (b->>'OriginalPurgeAt')::timestamptz<=NEW.write_until THEN
++  RAISE EXCEPTION 'audit lifecycle backing unavailable' USING ERRCODE='23514'; END IF;
++ -- A qualification is an exact accepted layout/profile, with conservative
++ -- measured full-transaction bounds. Positive arbitrary byte counts are not a
++ -- qualification; source acceptance is deliberately outside this adapter.
++ IF p->'History' IS NULL OR p->'History'->>'Layout' IS DISTINCT FROM 'operation-audit-history/v3' OR
++   NOT(p->'History' ?& ARRAY['ID','Digest','Layout','MaximumRowFootprintBytes','MaximumTransitionWALBytes','BackupCopies','WALCopies']) OR
++   (p->'History'->>'ID')::uuid IS NULL OR jsonb_array_length(p->'History'->'Digest')<>32 OR
++   (p->'History'->>'MaximumRowFootprintBytes')::bigint NOT BETWEEN 131072 AND 16777216 OR
++   (p->'History'->>'MaximumTransitionWALBytes')::bigint NOT BETWEEN 131072 AND 67108864 OR
++   (p->'History'->>'BackupCopies')::bigint NOT BETWEEN 1 AND 64 OR (p->'History'->>'WALCopies')::bigint NOT BETWEEN 1 AND 64 OR
++   (p->>'BackupReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'MaximumRowFootprintBytes')::bigint*(p->'History'->>'BackupCopies')::bigint OR
++   (p->>'WALReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'MaximumTransitionWALBytes')::bigint*(p->'History'->>'WALCopies')::bigint*(21+3*(p->>'MaxPurgeLeases')::bigint) THEN
++   RAISE EXCEPTION 'audit history qualification unavailable' USING ERRCODE='23514'; END IF;
++
++ IF a.history_backing_until IS NOT NULL AND n<a.history_backing_until AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),a.history_profile) THEN
++  RAISE EXCEPTION 'residual audit history backing protected' USING ERRCODE='23514'; END IF;
++ -- Renewal may refresh a source/revision or increase backing. Outstanding
++ -- obligations cannot be moved to a smaller/different backup or account profile.
++ IF EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d WHERE d.root_id=NEW.root_id AND d.lane=NEW.lane AND
++   NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),((d.binding->'Policy') - ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']))) OR
++  EXISTS(SELECT 1 FROM public.operation_audit_history h WHERE h.root_id=NEW.root_id AND h.lane=NEW.lane AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),h.history_policy)) THEN
++  RAISE EXCEPTION 'outstanding audit history profile mismatch' USING ERRCODE='23514'; END IF;
++ IF horizon>interval '0 seconds' THEN
++  UPDATE public.operation_audit_pool SET
++   history_profile=p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds'],
++   history_backing_until=GREATEST(history_backing_until,NEW.retain_until)
++  WHERE root_id=NEW.root_id AND lane=NEW.lane;
++ END IF;
++ INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by,certificate_verify_attempts)
++ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
++ RETURN NEW;
++END $$;
++
++CREATE OR REPLACE FUNCTION guard_operation_audit_lifecycle() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
++DECLARE a public.operation_audit; t public.fleet_current_trust; n timestamptz; c jsonb; phase text; original jsonb;
++BEGIN
++ IF TG_RELID<>'public.operation_audit_lifecycle'::regclass OR TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' THEN RAISE EXCEPTION 'invalid audit lifecycle source' USING ERRCODE='23514'; END IF;
++ IF TG_OP='DELETE' THEN
++  IF OLD.finalization_xid IS DISTINCT FROM pg_current_xact_id() OR EXISTS(SELECT 1 FROM public.operation_audit WHERE id=OLD.operation_id) THEN RAISE EXCEPTION 'audit lifecycle retirement unavailable' USING ERRCODE='23514'; END IF;
++  RETURN OLD;
++ END IF;
++ SELECT * INTO STRICT a FROM public.operation_audit WHERE id=NEW.operation_id;
++ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
++ n:=clock_timestamp();
++ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR pg_postmaster_start_time()<>NEW.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid OR NEW.root_id<>a.root_id OR NEW.lane<>a.lane OR NEW.principal_digest<>a.principal_digest OR NEW.issuer_epoch<>a.issuer_epoch OR NEW.binding IS DISTINCT FROM a.intent->'Lifecycle' THEN RAISE EXCEPTION 'audit lifecycle recovery unavailable' USING ERRCODE='23514'; END IF;
++ IF TG_OP='INSERT' THEN
++  IF pg_trigger_depth()<2 OR NEW.certificate_verify_attempts<>0 OR NEW.binding->'Policy'->'History'->>'Layout' IS DISTINCT FROM 'operation-audit-history/v3' OR NEW.overdue_selected_at IS NOT NULL OR NEW.overdue_purge IS NOT NULL OR NEW.intent_completion IS NOT NULL OR NEW.outcome_completion IS NOT NULL OR NEW.lease IS NOT NULL OR NEW.retirement IS NOT NULL OR NEW.certificate_started OR NEW.certificate_completion IS NOT NULL OR NEW.certificate_receipt IS NOT NULL OR NEW.terminal_purge IS NOT NULL OR NEW.terminal_acknowledged_at IS NOT NULL OR NEW.finalization_xid IS NOT NULL THEN RAISE EXCEPTION 'audit lifecycle is source managed' USING ERRCODE='23514'; END IF;
++  RETURN NEW;
++ END IF;
++ IF ROW(NEW.operation_id,NEW.root_id,NEW.lane,NEW.principal_digest,NEW.installation_id,NEW.issuer_epoch,NEW.postmaster_at,NEW.database_oid,NEW.binding,NEW.original_purge_at,NEW.certificate_purge_at,NEW.live_retire_by) IS DISTINCT FROM ROW(OLD.operation_id,OLD.root_id,OLD.lane,OLD.principal_digest,OLD.installation_id,OLD.issuer_epoch,OLD.postmaster_at,OLD.database_oid,OLD.binding,OLD.original_purge_at,OLD.certificate_purge_at,OLD.live_retire_by) OR
++  OLD.intent_completion IS NOT NULL AND NEW.intent_completion IS DISTINCT FROM OLD.intent_completion OR OLD.outcome_completion IS NOT NULL AND NEW.outcome_completion IS DISTINCT FROM OLD.outcome_completion OR
++  OLD.overdue_selected_at IS NOT NULL AND NEW.overdue_selected_at IS DISTINCT FROM OLD.overdue_selected_at OR
++  OLD.retirement IS NOT NULL AND NEW.retirement IS DISTINCT FROM OLD.retirement OR OLD.certificate_started AND NOT NEW.certificate_started OR
++  OLD.certificate_completion IS NOT NULL AND NEW.certificate_completion IS DISTINCT FROM OLD.certificate_completion OR OLD.certificate_receipt IS NOT NULL AND NEW.certificate_receipt IS DISTINCT FROM OLD.certificate_receipt OR
++  OLD.certificate_acknowledged_at IS NOT NULL AND NEW.certificate_acknowledged_at IS DISTINCT FROM OLD.certificate_acknowledged_at OR
++  OLD.finalization_xid IS NOT NULL AND NEW.finalization_xid IS DISTINCT FROM OLD.finalization_xid THEN RAISE EXCEPTION 'immutable audit lifecycle' USING ERRCODE='23514'; END IF;
++ IF NEW.overdue_selected_at IS NOT NULL THEN
++  IF NEW.binding->'Policy'->>'OverdueTerminal' IS DISTINCT FROM 'overdue-original/v1' OR NEW.certificate_started OR NEW.certificate_completion IS NOT NULL OR NEW.certificate_receipt IS NOT NULL OR NEW.certificate_acknowledged_at IS NOT NULL OR NEW.terminal_purge IS NOT NULL THEN
++   RAISE EXCEPTION 'overdue certificate fence unavailable' USING ERRCODE='23514'; END IF;
++  IF OLD.overdue_selected_at IS NULL AND
++   (NEW.overdue_selected_at>n OR NEW.overdue_selected_at<NEW.certificate_purge_at-make_interval(secs=>(NEW.binding->'Policy'->>'ProofWindowSeconds')::double precision) OR
++    NEW.lease->>'Phase' IS DISTINCT FROM 'overdueOriginal' OR NEW.overdue_selected_at<>(NEW.lease->>'StartedAt')::timestamptz OR NEW.lease IS NOT DISTINCT FROM OLD.lease) THEN
++   RAISE EXCEPTION 'overdue mode must be atomically leased' USING ERRCODE='23514'; END IF;
++ ELSIF NEW.overdue_purge IS NOT NULL THEN RAISE EXCEPTION 'overdue proof without fence' USING ERRCODE='23514'; END IF;
++ FOREACH phase IN ARRAY ARRAY['intent','outcome','deletion-certificate'] LOOP
++  IF phase='intent' THEN c:=NEW.intent_completion;original:=OLD.intent_completion;
++  ELSIF phase='outcome' THEN c:=NEW.outcome_completion;original:=OLD.outcome_completion;
++  ELSE c:=NEW.certificate_completion;original:=OLD.certificate_completion;END IF;
++  IF c IS NOT NULL AND original IS NULL THEN
++   IF c->>'Protocol' IS DISTINCT FROM 'closed-operation-audit/v1' OR (c->>'RootID')::uuid<>NEW.root_id OR (c->>'OperationID')::uuid<>NEW.operation_id OR c->>'StoreID'<>NEW.binding->'Policy'->>'StoreID' OR c->>'Phase'<>phase OR
++    NOT(c ?& ARRAY['Protocol','RootID','OperationID','StoreID','Phase','RecordDigest','Receipt','StoredAt','ClosedAt']) OR
++    jsonb_array_length(c->'RecordDigest')<>32 OR c->'Receipt'->>'Key'<>'operation-audit/v1/'||NEW.root_id::text||'/'||NEW.operation_id::text||'/'||phase OR
++    (c->'Receipt'->>'Bytes')::bigint NOT BETWEEN 1 AND 65536 OR jsonb_array_length(c->'Receipt'->'SHA256')<>32 OR
++    (c->>'StoredAt')::timestamptz>(c->>'ClosedAt')::timestamptz OR (c->>'ClosedAt')::timestamptz>n OR
++    phase<>'deletion-certificate' AND (n>=a.write_until OR (c->>'StoredAt')::timestamptz<(a.intent->>'CreatedAt')::timestamptz OR (phase='intent' AND NOT a.intent_started) OR (phase='outcome' AND NOT a.outcome_started)) OR
++    phase='deletion-certificate' AND (NOT NEW.certificate_started OR n>=(NEW.retirement->>'CertificateWriteUntil')::timestamptz OR (c->>'StoredAt')::timestamptz<(NEW.retirement->>'PurgedAt')::timestamptz) THEN RAISE EXCEPTION 'positive audit writer completion unavailable' USING ERRCODE='23514'; END IF;
++  END IF;
++ END LOOP;
++ IF NEW.lease IS DISTINCT FROM OLD.lease THEN
++  -- Source-managed reset: cleanup has no UPDATE privilege on acknowledgements.
++  NEW.terminal_purge:=NULL; NEW.overdue_purge:=NULL; NEW.terminal_acknowledged_at:=NULL;
++  IF NEW.lease_fence>(NEW.binding->'Policy'->>'MaxPurgeLeases')::bigint OR NEW.lease_fence<>OLD.lease_fence+1 OR OLD.lease IS NOT NULL AND n<(OLD.lease->>'Until')::timestamptz OR NEW.finalization_xid IS NOT NULL OR
++   NOT(NEW.lease ?& ARRAY['RootID','OperationID','StoreID','InstallationID','IssuerEpoch','Phase','PostmasterAt','DatabaseOID','ObjectsDigest','WritersDigest','Fence','StartedAt','Until']) OR
++   (NEW.lease->>'RootID')::uuid<>NEW.root_id OR (NEW.lease->>'OperationID')::uuid<>NEW.operation_id OR NEW.lease->>'StoreID'<>NEW.binding->'Policy'->>'StoreID' OR (NEW.lease->>'InstallationID')::uuid<>NEW.installation_id OR (NEW.lease->>'IssuerEpoch')::uuid<>NEW.issuer_epoch OR
++   (NEW.lease->>'PostmasterAt')::timestamptz<>NEW.postmaster_at OR (NEW.lease->>'DatabaseOID')::oid<>NEW.database_oid OR (NEW.lease->>'Fence')::bigint<>NEW.lease_fence OR (NEW.lease->>'StartedAt')::timestamptz>n OR n>=(NEW.lease->>'Until')::timestamptz OR (NEW.lease->>'Until')::timestamptz>(NEW.lease->>'StartedAt')::timestamptz+interval '5 seconds' OR
++   a.intent_receipt IS NULL OR a.outcome_receipt IS NULL OR NEW.intent_completion->'Receipt' IS DISTINCT FROM a.intent_receipt OR NEW.outcome_completion->'Receipt' IS DISTINCT FROM a.outcome_receipt OR n<a.write_until OR
++   NEW.lease->>'Phase' NOT IN ('original','terminal','overdueOriginal') OR
++   NEW.lease->>'Phase'='original' AND (NEW.overdue_selected_at IS NOT NULL OR NEW.retirement IS NOT NULL OR n<NEW.original_purge_at OR n>=NEW.certificate_purge_at-make_interval(secs=>(NEW.binding->'Policy'->>'ProofWindowSeconds')::double precision)) OR
++   NEW.lease->>'Phase'='overdueOriginal' AND (NEW.overdue_selected_at IS NULL OR NEW.certificate_started OR n<NEW.certificate_purge_at-make_interval(secs=>(NEW.binding->'Policy'->>'ProofWindowSeconds')::double precision)) OR
++   NEW.lease->>'Phase'='terminal' AND (NEW.overdue_selected_at IS NOT NULL OR NEW.certificate_receipt IS NULL OR NEW.certificate_completion IS NULL OR n<NEW.certificate_purge_at) OR
++   NEW.terminal_purge IS NOT NULL OR NEW.terminal_acknowledged_at IS NOT NULL THEN RAISE EXCEPTION 'audit purge lease unavailable' USING ERRCODE='23514'; END IF;
++ ELSIF NEW.lease_fence<>OLD.lease_fence THEN RAISE EXCEPTION 'immutable audit purge fence' USING ERRCODE='23514'; END IF;
++ IF NEW.retirement IS NOT NULL AND OLD.retirement IS NULL THEN
++  IF NOT(NEW.retirement ?& ARRAY['RootID','OperationID','StoreID','InstallationID','IssuerEpoch','PostmasterAt','DatabaseOID','ObjectsDigest','WritersDigest','PurgeFence','PurgedAt','CertificateWriteUntil','CertificatePurgeAt','LiveRetireBy']) OR NEW.lease->>'Phase'<>'original' OR n>=(NEW.lease->>'Until')::timestamptz OR
++   (NEW.retirement->>'RootID')::uuid<>NEW.root_id OR (NEW.retirement->>'OperationID')::uuid<>NEW.operation_id OR NEW.retirement->>'StoreID'<>NEW.binding->'Policy'->>'StoreID' OR
++   (NEW.retirement->>'InstallationID')::uuid<>NEW.installation_id OR (NEW.retirement->>'IssuerEpoch')::uuid<>NEW.issuer_epoch OR (NEW.retirement->>'PostmasterAt')::timestamptz<>NEW.postmaster_at OR (NEW.retirement->>'DatabaseOID')::oid<>NEW.database_oid OR
++   (NEW.retirement->>'PurgeFence')::bigint<>NEW.lease_fence OR NEW.retirement->'ObjectsDigest' IS DISTINCT FROM NEW.lease->'ObjectsDigest' OR NEW.retirement->'WritersDigest' IS DISTINCT FROM NEW.lease->'WritersDigest' OR
++   (NEW.retirement->>'PurgedAt')::timestamptz<(NEW.lease->>'StartedAt')::timestamptz OR (NEW.retirement->>'PurgedAt')::timestamptz>n OR
++   (NEW.retirement->>'CertificateWriteUntil')::timestamptz>LEAST((NEW.retirement->>'PurgedAt')::timestamptz+interval '30 seconds',NEW.certificate_purge_at-make_interval(secs=>(NEW.binding->'Policy'->>'ProofWindowSeconds')::double precision)) OR n>=(NEW.retirement->>'CertificateWriteUntil')::timestamptz OR
++   (NEW.retirement->>'CertificatePurgeAt')::timestamptz<>NEW.certificate_purge_at OR (NEW.retirement->>'LiveRetireBy')::timestamptz<>NEW.live_retire_by THEN RAISE EXCEPTION 'audit purge result mismatch' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.certificate_started AND NOT OLD.certificate_started AND (NEW.retirement IS NULL OR n>=(NEW.retirement->>'CertificateWriteUntil')::timestamptz) THEN RAISE EXCEPTION 'audit certificate interval expired' USING ERRCODE='23514'; END IF;
++ -- Only the independent acknowledgement credential can UPDATE this column.
++ -- One exact stand-alone transition spends one attempt before provider I/O.
++ IF NEW.certificate_verify_attempts IS DISTINCT FROM OLD.certificate_verify_attempts THEN
++  IF NEW.certificate_verify_attempts<>OLD.certificate_verify_attempts+1 OR OLD.certificate_verify_attempts>=2 OR
++   (to_jsonb(NEW)-'certificate_verify_attempts') IS DISTINCT FROM (to_jsonb(OLD)-'certificate_verify_attempts') OR
++   NEW.binding->'Policy'->'History'->>'Layout' IS DISTINCT FROM 'operation-audit-history/v3' OR
++   NEW.overdue_selected_at IS NOT NULL OR NEW.retirement IS NULL OR NOT NEW.certificate_started OR NEW.certificate_completion IS NULL OR
++   NEW.certificate_receipt IS NOT NULL OR NEW.certificate_acknowledged_at IS NOT NULL OR
++   n>=(NEW.retirement->>'CertificateWriteUntil')::timestamptz THEN
++   RAISE EXCEPTION 'audit certificate verification attempt unavailable' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.certificate_receipt IS DISTINCT FROM OLD.certificate_receipt OR NEW.certificate_acknowledged_at IS DISTINCT FROM OLD.certificate_acknowledged_at THEN
++  IF NEW.binding->'Policy'->'History'->>'Layout' IS DISTINCT FROM 'operation-audit-history/v3' OR NEW.certificate_verify_attempts<1 OR NEW.certificate_receipt IS DISTINCT FROM NEW.certificate_completion->'Receipt' OR NEW.certificate_acknowledged_at IS NULL OR NEW.certificate_acknowledged_at>n OR NEW.certificate_acknowledged_at<(NEW.certificate_completion->>'ClosedAt')::timestamptz OR n>=(NEW.retirement->>'CertificateWriteUntil')::timestamptz THEN RAISE EXCEPTION 'audit certificate acknowledgement unavailable' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.lease IS NOT DISTINCT FROM OLD.lease AND NEW.terminal_purge IS DISTINCT FROM OLD.terminal_purge THEN
++  IF NOT(NEW.terminal_purge ?& ARRAY['RootID','OperationID','RetirementDigest','CertificateDigest','Fence','PurgedAt','LeaseUntil']) OR OLD.terminal_acknowledged_at IS NOT NULL OR NEW.terminal_purge IS NULL OR NEW.lease->>'Phase'<>'terminal' OR n>=(NEW.lease->>'Until')::timestamptz OR
++   (NEW.terminal_purge->>'RootID')::uuid<>NEW.root_id OR (NEW.terminal_purge->>'OperationID')::uuid<>NEW.operation_id OR (NEW.terminal_purge->>'Fence')::bigint<>NEW.lease_fence OR
++   (NEW.terminal_purge->>'PurgedAt')::timestamptz<(NEW.lease->>'StartedAt')::timestamptz OR (NEW.terminal_purge->>'PurgedAt')::timestamptz>n OR (NEW.terminal_purge->>'LeaseUntil')::timestamptz<>(NEW.lease->>'Until')::timestamptz THEN RAISE EXCEPTION 'terminal audit purge unavailable' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.lease IS NOT DISTINCT FROM OLD.lease AND NEW.overdue_purge IS DISTINCT FROM OLD.overdue_purge THEN
++  IF NEW.overdue_selected_at IS NULL OR NEW.overdue_purge IS NULL OR OLD.overdue_purge IS NOT NULL OR OLD.terminal_acknowledged_at IS NOT NULL OR NEW.lease->>'Phase' IS DISTINCT FROM 'overdueOriginal' OR
++   NOT(NEW.overdue_purge ?& ARRAY['RootID','OperationID','Mode','BindingDigest','ObjectsDigest','WritersDigest','Fence','SelectedAt','PurgedAt','LeaseUntil']) OR
++   (NEW.overdue_purge->>'RootID')::uuid<>NEW.root_id OR (NEW.overdue_purge->>'OperationID')::uuid<>NEW.operation_id OR NEW.overdue_purge->>'Mode' IS DISTINCT FROM 'overdue-original/v1' OR
++   jsonb_array_length(NEW.overdue_purge->'BindingDigest')<>32 OR NEW.overdue_purge->'ObjectsDigest' IS DISTINCT FROM NEW.lease->'ObjectsDigest' OR NEW.overdue_purge->'WritersDigest' IS DISTINCT FROM NEW.lease->'WritersDigest' OR
++   (NEW.overdue_purge->>'Fence')::bigint<>NEW.lease_fence OR (NEW.overdue_purge->>'SelectedAt')::timestamptz<>NEW.overdue_selected_at OR
++   (NEW.overdue_purge->>'PurgedAt')::timestamptz<(NEW.lease->>'StartedAt')::timestamptz OR (NEW.overdue_purge->>'PurgedAt')::timestamptz>n OR
++   (NEW.overdue_purge->>'LeaseUntil')::timestamptz<>(NEW.lease->>'Until')::timestamptz OR n>=(NEW.lease->>'Until')::timestamptz THEN
++   RAISE EXCEPTION 'overdue purge result mismatch' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.lease IS NOT DISTINCT FROM OLD.lease AND NEW.terminal_acknowledged_at IS DISTINCT FROM OLD.terminal_acknowledged_at THEN
++  IF NEW.overdue_selected_at IS NULL THEN original:=NEW.terminal_purge; ELSE original:=NEW.overdue_purge; END IF;
++  IF original IS NULL OR OLD.terminal_acknowledged_at IS NOT NULL OR NEW.terminal_acknowledged_at IS NULL OR NEW.terminal_acknowledged_at>n OR NEW.terminal_acknowledged_at<(original->>'PurgedAt')::timestamptz OR n>=(NEW.lease->>'Until')::timestamptz THEN RAISE EXCEPTION 'terminal audit acknowledgement unavailable' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF NEW.finalization_xid IS DISTINCT FROM OLD.finalization_xid AND (NEW.finalization_xid IS DISTINCT FROM pg_current_xact_id() OR NEW.terminal_acknowledged_at IS NULL OR n>=(NEW.lease->>'Until')::timestamptz) THEN RAISE EXCEPTION 'audit finalization unavailable' USING ERRCODE='23514'; END IF;
++ RETURN NEW;
++END $$;
++
++CREATE OR REPLACE FUNCTION guard_operation_audit_pool() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
++BEGIN
++ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'audit backing retirement unavailable' USING ERRCODE='23514'; END IF;
++ IF TG_OP='INSERT' THEN
++  IF NEW.proof_window_missed<>0 OR NEW.revision<>1 OR NEW.accounts<>0 OR NEW.history_profile IS NOT NULL OR NEW.history_backing_until IS NOT NULL THEN RAISE EXCEPTION 'invalid initial audit backing' USING ERRCODE='23514'; END IF;
++ ELSE
++  IF NEW.proof_window_missed<>OLD.proof_window_missed AND (pg_trigger_depth()<2 OR NEW.proof_window_missed<>LEAST(OLD.proof_window_missed+1,1152921504606846976)) THEN RAISE EXCEPTION 'proof window aggregate is source managed' USING ERRCODE='23514'; END IF;
++  IF ROW(NEW.root_id,NEW.lane,NEW.account_version) IS DISTINCT FROM ROW(OLD.root_id,OLD.lane,OLD.account_version) THEN
++   RAISE EXCEPTION 'immutable audit backing identity' USING ERRCODE='23514'; END IF;
++  IF ROW(NEW.history_profile,NEW.history_backing_until) IS DISTINCT FROM ROW(OLD.history_profile,OLD.history_backing_until) THEN
++   IF pg_trigger_depth()<2 OR NEW.history_profile IS NULL OR NEW.history_backing_until IS NULL OR
++    OLD.history_backing_until IS NOT NULL AND NEW.history_backing_until<OLD.history_backing_until OR
++    OLD.history_profile IS NOT NULL AND NEW.history_profile IS DISTINCT FROM OLD.history_profile AND
++     NOT public.operation_audit_profile_covers(NEW.history_profile,OLD.history_profile) AND
++     (clock_timestamp()<OLD.history_backing_until OR EXISTS(SELECT 1 FROM public.operation_audit_lifecycle WHERE root_id=OLD.root_id AND lane=OLD.lane) OR EXISTS(SELECT 1 FROM public.operation_audit_history WHERE root_id=OLD.root_id AND lane=OLD.lane)) THEN
++    RAISE EXCEPTION 'audit residual backing is source managed' USING ERRCODE='23514'; END IF;
++  END IF;
++  IF (NEW.account_limit<OLD.account_limit OR NEW.records_per_account<OLD.records_per_account) AND
++   ((OLD.history_backing_until IS NOT NULL AND clock_timestamp()<OLD.history_backing_until) OR
++    EXISTS(SELECT 1 FROM public.operation_audit_lifecycle WHERE root_id=OLD.root_id AND lane=OLD.lane AND (binding->'Policy'->>'BackupHorizonSeconds')::bigint>0) OR
++    EXISTS(SELECT 1 FROM public.operation_audit_history WHERE root_id=OLD.root_id AND lane=OLD.lane)) THEN
++   RAISE EXCEPTION 'audit residual backing cannot shrink' USING ERRCODE='23514'; END IF;
++  IF NEW.accounts<>OLD.accounts AND (pg_trigger_depth()<2 OR
++   (NEW.accounts<>OLD.accounts+1 AND NOT (NEW.accounts=OLD.accounts-1 AND
++    (EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d WHERE d.root_id=OLD.root_id AND d.lane=OLD.lane AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL) OR
++     EXISTS(SELECT 1 FROM public.operation_audit_history h WHERE h.root_id=OLD.root_id AND h.lane=OLD.lane AND h.drain_xid=pg_current_xact_id()))))) THEN
++   RAISE EXCEPTION 'audit accounts source managed' USING ERRCODE='23514'; END IF;
++  IF ROW(NEW.revision,NEW.paused,NEW.valid_until,NEW.account_limit,NEW.records_per_account,NEW.retained_seconds) IS DISTINCT FROM ROW(OLD.revision,OLD.paused,OLD.valid_until,OLD.account_limit,OLD.records_per_account,OLD.retained_seconds) AND
++   (NEW.revision<>OLD.revision+1 OR NEW.accounts<>OLD.accounts) THEN RAISE EXCEPTION 'audit backing revision mismatch' USING ERRCODE='23514'; END IF;
++ END IF;
++ IF EXISTS(SELECT 1 FROM public.operation_audit_account WHERE root_id=NEW.root_id AND lane=NEW.lane AND charged>NEW.records_per_account) THEN
++  RAISE EXCEPTION 'audit backing below retained spend' USING ERRCODE='23514'; END IF;
++ RETURN NEW;
++END $$;
++-- +goose StatementEnd
++REVOKE ALL ON FUNCTION operation_audit_profile_covers(jsonb,jsonb) FROM PUBLIC;
+--- a/migrations/queries/operation_audit_lifecycle.sql
++++ b/migrations/queries/operation_audit_lifecycle.sql
+@@ -31,3 +31,7 @@
+ ORDER BY eligible_at,release_at,delete_by,principal_digest LIMIT 16;
+ -- name: FinishOperationHistory :one
+ SELECT records::bigint,overdue::boolean FROM finish_operation_audit_history($1,$2,$3,$4,$5,$6);
++
++-- name: ClaimOperationCertificateVerification :execrows
++UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1
++WHERE root_id=$1 AND operation_id=$2 AND certificate_verify_attempts<2 AND certificate_receipt IS NULL;
+--- a/test/fixtures/sql/runtime-roles.sql
++++ b/test/fixtures/sql/runtime-roles.sql
+@@ -522,3 +522,7 @@
+ -- finite lease; the guard forbids it from installing an acknowledgement.
+ GRANT UPDATE(certificate_verify_attempts,certificate_receipt,certificate_acknowledged_at,terminal_acknowledged_at) ON download_stop_lifecycle TO download_stop_verify_runtime;
+ GRANT EXECUTE ON FUNCTION finish_download_stop_retirement(uuid,uuid,uuid),finish_download_stop_history(uuid,uuid,bytea,timestamptz,timestamptz,uuid) TO download_stop_retire_runtime;
++
++-- Independently credentialed pre-provider verification spend. Neither the
++-- producer nor cleanup may acquire, reset or erase these attempts.
++GRANT UPDATE(certificate_verify_attempts) ON operation_audit_lifecycle TO operation_audit_ack_runtime;
+--- a/test/integration/operation_audit_lifecycle_test.go
++++ b/test/integration/operation_audit_lifecycle_test.go
+@@ -25,6 +25,7 @@
+ // completion, acknowledgement, cleanup and finalization use distinct SQL roles.
+ // This fixture does not qualify production bucket IAM or bootstrap authority.
+ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s3admin *s3.Client, bucket string, create func(*testing.T, int64) captureAdmissionScenario) {
++	qualifyOperationVerificationMigration(t, ctx, admin, create)
+ 	for _, historySeconds := range []int64{0, 2} {
+ 		name := "operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend"
+ 		if historySeconds > 0 {
+@@ -53,10 +54,10 @@
+ 			}
+ 			policy := value.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "normal", InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 9, MaxPurgeLeases: 16, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: now.Add(time.Hour)}
+ 			policy.BackupHorizonSeconds = historySeconds
+-			if historySeconds > 0 {
++			{
+ 				// Fixture-only accepted qualification. This tests accounting, not actual
+ 				// pgBackRest/WAL retention or measured physical backup footprint.
+-				policy.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: value.OperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++				policy.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+ 				bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
+ 				policy.BackupReservedBytes, policy.WALReservedBytes = bb*policy.MetadataSlots, ww*policy.MetadataSlots
+ 			}
+@@ -231,6 +232,9 @@
+ 				sql string
+ 			}{
+ 				{jp, "UPDATE operation_audit_lifecycle SET certificate_started=true"},
++				{jp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
++				{dp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
++				{fp, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=certificate_verify_attempts+1"},
+ 				{dp, "UPDATE operation_audit_lifecycle SET terminal_acknowledged_at=clock_timestamp()"},
+ 				{dp, "UPDATE operation_audit_lifecycle SET certificate_receipt=certificate_receipt"},
+ 				{ap, "UPDATE operation_audit_lifecycle SET lease_fence=lease_fence+1"},
+@@ -301,12 +305,16 @@
+ 				if e = cleanup.RecordCertificateCompletion(ctx, r, c); e != nil {
+ 					t.Fatal("certificate completion", e)
+ 				}
+-				if e = verifier.VerifyOperationCertificate(ctx, r, c.Receipt); e != nil {
+-					t.Fatal("independent certificate verification", e)
+-				}
+-				if e = verified.AcknowledgeOperationCertificate(ctx, r, c.Receipt); e != nil {
+-					t.Fatal("certificate acknowledgement", e)
+-				}
++				mode := "one"
++				if in.ID == a.ID {
++					mode = "concurrent"
++				} else if in.ID == a2.ID {
++					mode = "unknown-claim"
++				} else if in.ID == b.ID {
++					mode = "blocked-expiry"
++				}
++				qualifyOperationCertificateVerification(t, ctx, admin, ap, verified, verifier, r, c.Receipt, mode)
++
+ 				observed(in, 1)
+ 				if !time.Now().Add(time.Duration(policy.ProofWindowSeconds) * time.Second).Before(r.CertificatePurgeAt) {
+ 					t.Fatal("minimum proof window was shortened")
+--- a/test/integration/operation_audit_overdue_test.go
++++ b/test/integration/operation_audit_overdue_test.go
+@@ -46,8 +46,8 @@
+ 				}
+ 			}
+ 			policy := value.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "normal", InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 8, MaxPurgeLeases: 16, CleanupBudgetSeconds: 2, ProofWindowSeconds: 1, ValidUntil: now.Add(time.Hour), BackupHorizonSeconds: h, OverdueTerminal: value.OperationOverdueTerminal}
+-			if h > 0 {
+-				policy.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{4}, Layout: value.OperationOverdueHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
++			{
++				policy.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{4}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+ 				bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
+ 				policy.BackupReservedBytes = bb * policy.MetadataSlots
+ 				policy.WALReservedBytes = ww * policy.MetadataSlots
+--- /dev/null
++++ b/test/integration/operation_verification_budget_test.go
+@@ -0,0 +1,156 @@
++package integration
++
++import (
++	"context"
++	"errors"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres"
++	app "asservat.local/asservat/internal/application/audit"
++	value "asservat.local/asservat/internal/domain/audit"
++	"github.com/jackc/pgx/v5/pgconn"
++	"github.com/jackc/pgx/v5/pgxpool"
++)
++
++// Called by the existing selected SQL/S3 lifecycle fixture after an actual
++// positive certificate completion. This is not bootstrap/profile qualification.
++func qualifyOperationCertificateVerification(t *testing.T, ctx context.Context, admin, ackPool *pgxpool.Pool, ack *postgres.OperationLifecycles, verifier app.OperationCleanupVerifier, r value.OperationRetirement, receipt value.Receipt, mode string) {
++	t.Helper()
++	count := func(want int64) {
++		t.Helper()
++		var got int64
++		if e := admin.QueryRow(ctx, "SELECT certificate_verify_attempts FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$2", r.RootID, r.OperationID).Scan(&got); e != nil || got != want {
++			t.Fatal("unexpected durable verifier spend", got, want, e)
++		}
++	}
++	count(0)
++	if e := ack.AcknowledgeOperationCertificate(ctx, r, receipt); e != app.ErrUnavailable {
++		t.Fatal("acknowledgement without prepaid verification", e)
++	}
++	// The UPDATE credential is intentionally independent, but cannot reset,
++	// jump, combine acknowledgement with spend, or spend before writer completion.
++	if _, e := ackPool.Exec(ctx, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=2 WHERE operation_id=$1", r.OperationID); e == nil {
++		t.Fatal("verifier jumped two claims")
++	}
++	count(0)
++	if mode == "blocked-expiry" {
++		// Refresh only the fixture observation; never change recovery acceptance.
++		refreshAuditFixtureRecovery(t, ctx, admin, r.InstallationID, 250*time.Millisecond)
++		lock, e := admin.Begin(ctx)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer lock.Rollback(ctx)
++		if _, e = lock.Exec(ctx, "SELECT 1 FROM operation_audit_pool WHERE root_id=$1 AND lane='normal' FOR UPDATE", r.RootID); e != nil {
++			t.Fatal(e)
++		}
++		end := time.Now().Add(time.Second)
++		done := make(chan error, 1)
++		go func() {
++			bounded, cancel := context.WithDeadline(ctx, end)
++			defer cancel()
++			_, err := ack.ClaimOperationCertificateVerification(bounded, r, receipt)
++			done <- err
++		}()
++		observed := false
++		for time.Now().Before(end) {
++			var waiting int
++			if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE usename='operation_audit_ack_runtime' AND cardinality(pg_blocking_pids(pid))>0").Scan(&waiting); e != nil {
++				t.Fatal(e)
++			}
++			if waiting > 0 {
++				observed = true
++				break
++			}
++			time.Sleep(5 * time.Millisecond)
++		}
++		if !observed {
++			t.Fatal("claim never reached blocked pool lock")
++		}
++		time.Sleep(275 * time.Millisecond)
++		if e = lock.Rollback(ctx); e != nil {
++			t.Fatal(e)
++		}
++		if e = <-done; e != app.ErrUnavailable {
++			t.Fatal("expired original recovery observation authorized claim", e)
++		}
++		count(0)
++		refreshAuditFixtureRecovery(t, ctx, admin, r.InstallationID, 30*time.Second)
++	}
++	claim := func() (time.Time, error) { return ack.ClaimOperationCertificateVerification(ctx, r, receipt) }
++	var until time.Time
++	var e error
++	if mode == "concurrent" {
++		type result struct {
++			until time.Time
++			err   error
++		}
++		done := make(chan result, 2)
++		for i := 0; i < 2; i++ {
++			go func() { u, e := claim(); done <- result{u, e} }()
++		}
++		for i := 0; i < 2; i++ {
++			x := <-done
++			if x.err != nil {
++				t.Fatal("concurrent prepaid verifier", x.err)
++			}
++			if until.IsZero() || x.until.Before(until) {
++				until = x.until
++			}
++		}
++		count(2)
++		if _, e = claim(); e != app.ErrUnavailable {
++			t.Fatal("third verifier claim succeeded", e)
++		}
++		// Actual S3 read/decryption failure still consumes its preceding claim.
++		bad := r
++		bad.WritersDigest[0] ^= 1
++		bounded, cancel := context.WithDeadline(ctx, until)
++		if e = verifier.VerifyOperationCertificate(bounded, bad, receipt); e == nil {
++			cancel()
++			t.Fatal("mismatched independent certificate verification succeeded")
++		}
++		cancel()
++	} else if mode == "unknown-claim" {
++		// Hide an actually committed claim response. The coordinator receives no
++		// permit and does no I/O; only the original second allowance remains.
++		if _, e = claim(); e != nil {
++			t.Fatal("lost-claim fixture commit", e)
++		}
++		count(1)
++		until, e = claim()
++		if e != nil {
++			t.Fatal("remaining verifier allowance", e)
++		}
++		count(2)
++		if _, e = claim(); e != app.ErrUnavailable {
++			t.Fatal("unknown claim reset attempts", e)
++		}
++	} else {
++		until, e = claim()
++		if e != nil {
++			t.Fatal("prepaid verifier claim", e)
++		}
++		count(1)
++	}
++	if !time.Now().Before(until) || until.After(r.CertificateWriteUntil) || until.After(time.Now().Add(5*time.Second)) {
++		t.Fatal("verification deadline extended")
++	}
++	bounded, cancel := context.WithDeadline(ctx, until)
++	defer cancel()
++	if e = verifier.VerifyOperationCertificate(bounded, r, receipt); e != nil {
++		t.Fatal("independent certificate verification", e)
++	}
++	if e = ack.AcknowledgeOperationCertificate(bounded, r, receipt); e != nil {
++		t.Fatal("certificate acknowledgement", e)
++	}
++	if _, e = claim(); e != app.ErrUnavailable {
++		t.Fatal("acknowledged certificate granted more verification", e)
++	}
++	_, e = ackPool.Exec(ctx, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=0 WHERE operation_id=$1", r.OperationID)
++	var pe *pgconn.PgError
++	if !errors.As(e, &pe) || pe.Code != "23514" {
++		t.Fatal("spent attempt reset not trigger-fenced", e)
++	}
++}
+--- /dev/null
++++ b/test/integration/operation_verification_migration_test.go
+@@ -0,0 +1,316 @@
++package integration
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"sort"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	app "asservat.local/asservat/internal/application/audit"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/audit"
++	"asservat.local/asservat/internal/domain/identity"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgxpool"
++)
++
++// Separately owned SQL-only compatibility database, following the control37
++// migration fixture. Real historical triggers remain enabled throughout. The
++// minimized completions/receipts below are explicitly synthetic; actual S3
++// certificate creation and independent verification run in the sibling case.
++func qualifyOperationVerificationMigration(t *testing.T, ctx context.Context, admin *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario) {
++	t.Run("operation-audit-verifier-migration-preserves-history-and-spend", func(t *testing.T) {
++		name := "operation_verifier_" + strings.ReplaceAll(custodyID(), "-", "")
++		if _, e := admin.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); e != nil {
++			t.Fatal(e)
++		}
++		cfg := admin.Config().Copy()
++		cfg.ConnConfig.Database = name
++		cfg.MaxConns = 1
++		var scratch *pgxpool.Pool
++		defer func() {
++			if scratch != nil {
++				scratch.Close()
++			}
++			cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			if _, e := admin.Exec(cleanup, "DROP DATABASE "+pgx.Identifier{name}.Sanitize()); e != nil {
++				t.Error("migration database cleanup", e)
++			}
++		}()
++		scratch, e := pgxpool.NewWithConfig(ctx, cfg)
++		if e != nil {
++			t.Fatal(e)
++		}
++		paths, e := filepath.Glob("../../migrations/[0-9]*.sql")
++		if e != nil {
++			t.Fatal(e)
++		}
++		sort.Strings(paths)
++		var migration []byte
++		for _, path := range paths {
++			v, e := strconv.Atoi(filepath.Base(path)[:5])
++			if e != nil {
++				t.Fatal(e)
++			}
++			body, e := os.ReadFile(path)
++			if e != nil {
++				t.Fatal(e)
++			}
++			if v == 48 {
++				migration = body
++				break
++			}
++			if _, e = scratch.Exec(ctx, string(body)); e != nil {
++				t.Fatalf("historical migration %d: %v", v, e)
++			}
++		}
++		if len(migration) == 0 {
++			t.Fatal("missing actual migration48")
++		}
++		exec := func(sql string, args ...any) {
++			t.Helper()
++			if _, e := scratch.Exec(ctx, sql, args...); e != nil {
++				t.Fatal("historical SQL transition", e)
++			}
++		}
++		encode := func(v any) []byte {
++			t.Helper()
++			b, e := json.Marshal(v)
++			if e != nil {
++				t.Fatal(e)
++			}
++			return b
++		}
++		now := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
++		wait := func(until time.Time) {
++			t.Helper()
++			timer := time.NewTimer(time.Until(until.Add(time.Millisecond)))
++			defer timer.Stop()
++			select {
++			case <-timer.C:
++			case <-ctx.Done():
++				t.Fatal(ctx.Err())
++			}
++		}
++		type historical struct {
++			in       value.OperationIntent
++			epoch    string
++			original []byte
++		}
++		var records []historical
++		insert := func(in value.OperationIntent, epoch string) error {
++			_, e := scratch.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,issuer_epoch,principal_digest,intent,request_until,write_until,retain_until) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", in.ID, in.RootID, epoch, in.PrincipalDigest[:], encode(in), in.RequestUntil, in.WriteUntil, in.RetainUntil)
++			return e
++		}
++		fresh := func(p value.OperationLifecyclePolicy) value.OperationIntent {
++			n := now()
++			id := custodyID()
++			in := value.OperationIntent{ID: id, RootID: p.RootID, TraceID: id, Name: "get_capture", InputFormat: "context-input/v1", MACVersion: "audit-v1", AccountVersion: "accounts-v1", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{1}, InputDigest: artifact.Digest{2}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(5 * time.Second), RetainUntil: n.Add(60 * time.Second)}
++			bound, e := app.BindOperationLifecycle(in, p)
++			if e != nil {
++				t.Fatal(e)
++			}
++			return bound
++		}
++		for _, layout := range []string{"", value.OperationHistoryLayout, value.OperationOverdueHistoryLayout} {
++			scenario := create(t, 1)
++			var initialAudit string
++			if e = admin.QueryRow(ctx, "SELECT initial_audit_id FROM permission_stream WHERE id=$1", scenario.a.RootID).Scan(&initialAudit); e != nil {
++				t.Fatal(e)
++			}
++			tx, e := scratch.Begin(ctx)
++			if e != nil {
++				t.Fatal(e)
++			}
++			for _, row := range []struct{ table, key string }{{"permission_stream", scenario.a.RootID}, {"authority_audit", initialAudit}} {
++				var raw []byte
++				if e = admin.QueryRow(ctx, "SELECT to_jsonb(t) FROM "+pgx.Identifier{row.table}.Sanitize()+" t WHERE id=$1", row.key).Scan(&raw); e != nil {
++					tx.Rollback(ctx)
++					t.Fatal(e)
++				}
++				if _, e = tx.Exec(ctx, "INSERT INTO "+pgx.Identifier{row.table}.Sanitize()+" SELECT (jsonb_populate_record(NULL::"+pgx.Identifier{row.table}.Sanitize()+",$1::jsonb)).*", raw); e != nil {
++					tx.Rollback(ctx)
++					t.Fatal(e)
++				}
++			}
++			if e = tx.Commit(ctx); e != nil {
++				t.Fatal(e)
++			}
++			epoch := custodyID()
++			// Only fixture recovery acceptance is synthesized, for this exact scratch
++			// database incarnation. Runtime observers cannot perform this transition.
++			exec("INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),$1,$2,'synthetic-verifier-migration',1,$3,false,false,statement_timestamp(),statement_timestamp()+interval '30 seconds')", scenario.recovery.installation, epoch, make([]byte, 32))
++			n := now()
++			exec("INSERT INTO operation_audit_pool(root_id,lane,account_version,revision,valid_until,account_limit,records_per_account,retained_seconds) VALUES($1,'normal','accounts-v1',1,$2,1,10,3600)", scenario.a.RootID, n.Add(time.Hour))
++			p := value.OperationLifecyclePolicy{RootID: scenario.a.RootID, Lane: "normal", InstallationID: scenario.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: 10, MaxPurgeLeases: 8, CleanupBudgetSeconds: 3, ProofWindowSeconds: 1, ValidUntil: n.Add(time.Hour)}
++			if layout != "" {
++				p.BackupHorizonSeconds = 2
++				p.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{3}, Layout: layout, MaximumRowFootprintBytes: 256 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 2}
++				bb, ww := p.History.SlotBacking(p.MaxPurgeLeases)
++				p.BackupReservedBytes, p.WALReservedBytes = bb*p.MetadataSlots, ww*p.MetadataSlots
++				if layout == value.OperationOverdueHistoryLayout {
++					p.OverdueTerminal = value.OperationOverdueTerminal
++				}
++			}
++			in := fresh(p)
++			if e = insert(in, epoch); e != nil {
++				t.Fatal("actual pre48 admission", layout, e)
++			}
++			records = append(records, historical{in, epoch, encode(in)})
++		}
++		// Prepare one independently acknowledged legacy certificate under the actual
++		// old guard. The only synthetic facts here are the explicit test receipts.
++		p := records[0].in.Lifecycle.Policy
++		in := fresh(p)
++		in.Lifecycle = nil
++		in.RetainUntil = in.CreatedAt.Add(20 * time.Second)
++		in, e = app.BindOperationLifecycle(in, p)
++		if e != nil {
++			t.Fatal(e)
++		}
++		if e = insert(in, records[0].epoch); e != nil {
++			t.Fatal(e)
++		}
++		receipts := []value.Receipt{}
++		completions := []value.OperationWriteCompletion{}
++		for _, phase := range []string{"intent", "outcome"} {
++			var record any = in
++			if phase == "intent" {
++				exec("UPDATE operation_audit SET intent_started=true WHERE id=$1", in.ID)
++			} else {
++				out := value.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{1}, OutputBytes: 1, MetadataUntil: in.RequestUntil, RecordedAt: now()}
++				record = out
++				exec("UPDATE operation_audit SET outcome=$2,outcome_started=true WHERE id=$1", in.ID, encode(out))
++			}
++			r := value.Receipt{Key: value.OperationAuditKey(in.RootID, in.ID, phase), ETag: "synthetic-migration", Bytes: 100, SHA256: artifact.Digest{1}}
++			c := value.OperationWriteCompletion{Protocol: value.OperationWriterProtocol, RootID: in.RootID, OperationID: in.ID, StoreID: p.StoreID, Phase: phase, RecordDigest: app.OperationLifecycleDigest(record), Receipt: r, StoredAt: now(), ClosedAt: now()}
++			exec("UPDATE operation_audit_lifecycle SET "+phase+"_completion=$2 WHERE operation_id=$1", in.ID, encode(c))
++			exec("UPDATE operation_audit SET "+phase+"_receipt=$2 WHERE id=$1", in.ID, encode(r))
++			receipts = append(receipts, r)
++			completions = append(completions, c)
++		}
++		var postmaster time.Time
++		var oid uint32
++		if e = scratch.QueryRow(ctx, "SELECT pg_postmaster_start_time(),oid FROM pg_database WHERE datname=current_database()").Scan(&postmaster, &oid); e != nil {
++			t.Fatal(e)
++		}
++		wait(in.Lifecycle.OriginalPurgeAt)
++		lease := value.OperationPurgeLease{RootID: in.RootID, OperationID: in.ID, StoreID: p.StoreID, InstallationID: p.InstallationID, IssuerEpoch: records[0].epoch, Phase: "original", PostmasterAt: postmaster, DatabaseOID: oid, ObjectsDigest: app.OperationLifecycleDigest(receipts), WritersDigest: app.OperationLifecycleDigest(completions), Fence: 1, StartedAt: now(), Until: now().Add(2 * time.Second)}
++		exec("UPDATE operation_audit_lifecycle SET lease=$2,lease_fence=1 WHERE operation_id=$1", in.ID, encode(lease))
++		r := value.OperationRetirement{RootID: in.RootID, OperationID: in.ID, StoreID: p.StoreID, InstallationID: p.InstallationID, IssuerEpoch: records[0].epoch, PostmasterAt: postmaster, DatabaseOID: oid, ObjectsDigest: lease.ObjectsDigest, WritersDigest: lease.WritersDigest, PurgeFence: 1, PurgedAt: now(), CertificateWriteUntil: in.Lifecycle.CertificatePurgeAt.Add(-time.Second), CertificatePurgeAt: in.Lifecycle.CertificatePurgeAt, LiveRetireBy: in.Lifecycle.LiveRetireBy}
++		exec("UPDATE operation_audit_lifecycle SET retirement=$2,certificate_started=true WHERE operation_id=$1", in.ID, encode(r))
++		receipt := value.Receipt{Key: value.OperationAuditKey(in.RootID, in.ID, "deletion-certificate"), ETag: "synthetic-migration", Bytes: 100, SHA256: artifact.Digest{3}}
++		completed := value.OperationWriteCompletion{Protocol: value.OperationWriterProtocol, RootID: in.RootID, OperationID: in.ID, StoreID: p.StoreID, Phase: "deletion-certificate", RecordDigest: app.OperationLifecycleDigest(r), Receipt: receipt, StoredAt: now(), ClosedAt: now()}
++		exec("UPDATE operation_audit_lifecycle SET certificate_completion=$2 WHERE operation_id=$1", in.ID, encode(completed))
++		exec("UPDATE operation_audit_lifecycle SET certificate_receipt=$2,certificate_acknowledged_at=clock_timestamp() WHERE operation_id=$1", in.ID, encode(receipt))
++		if _, e = scratch.Exec(ctx, string(migration)); e != nil {
++			t.Fatal("actual migration48", e)
++		}
++		var unspent int64
++		if e = scratch.QueryRow(ctx, "SELECT count(*) FROM operation_audit_lifecycle WHERE certificate_verify_attempts<>2").Scan(&unspent); e != nil || unspent != 0 {
++			t.Fatal("historical budget refilled", unspent, e)
++		}
++		for _, old := range records {
++			var raw []byte
++			if e = scratch.QueryRow(ctx, "SELECT intent FROM operation_audit WHERE id=$1", old.in.ID).Scan(&raw); e != nil {
++				t.Fatal(e)
++			}
++			var got value.OperationIntent
++			if json.Unmarshal(raw, &got) != nil || string(encode(got)) != string(old.original) {
++				t.Fatal("migration rewrote original binding")
++			}
++			if _, e = scratch.Exec(ctx, "UPDATE operation_audit_lifecycle SET certificate_verify_attempts=0 WHERE operation_id=$1", old.in.ID); e == nil {
++				t.Fatal("historical attempts reset")
++			}
++			bad := fresh(old.in.Lifecycle.Policy)
++			if e = insert(bad, old.epoch); e == nil {
++				t.Fatal("old profile admitted new unbacked record")
++			}
++			next := old.in.Lifecycle.Policy
++			next.History = &value.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 256 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 2}
++			bb, ww := next.History.SlotBacking(next.MaxPurgeLeases)
++			next.BackupReservedBytes, next.WALReservedBytes = bb*next.MetadataSlots, ww*next.MetadataSlots
++			wrong := next
++			wrong.StoreID = custodyID()
++			if e = insert(fresh(wrong), old.epoch); e == nil {
++				t.Fatal("upgrade moved retained store")
++			}
++			wrong = next
++			wrong.BackupHorizonSeconds++
++			if e = insert(fresh(wrong), old.epoch); e == nil {
++				t.Fatal("upgrade changed original backup horizon")
++			}
++			if old.in.Lifecycle.Policy.History != nil {
++				for _, edit := range []func(*value.OperationHistoryQualification){
++					func(q *value.OperationHistoryQualification) { q.MaximumRowFootprintBytes = 128 << 10 },
++					func(q *value.OperationHistoryQualification) { q.MaximumTransitionWALBytes = 128 << 10 },
++					func(q *value.OperationHistoryQualification) { q.BackupCopies = 1 },
++					func(q *value.OperationHistoryQualification) { q.WALCopies = 1 },
++				} {
++					reduced := next
++					q := *next.History
++					edit(&q)
++					reduced.History = &q
++					if e = insert(fresh(reduced), old.epoch); e == nil {
++						t.Fatal("upgrade reduced an outstanding qualification bound")
++					}
++				}
++			}
++			unsupported := fresh(next)
++			unsupported.Lifecycle.Policy.History.Layout = "operation-audit-history/v999"
++			if e = insert(unsupported, old.epoch); e == nil {
++				t.Fatal("SQL accepted unknown future layout")
++			}
++			underbacked := fresh(next)
++			underbacked.Lifecycle.Policy.WALReservedBytes--
++			if e = insert(underbacked, old.epoch); e == nil {
++				t.Fatal("SQL accepted under-backed v3 transitions")
++			}
++
++			admitted := fresh(next)
++			if e = insert(admitted, old.epoch); e != nil {
++				t.Fatal("explicit covering v3 acceptance failed", e)
++			}
++			var attempts int64
++			if e = scratch.QueryRow(ctx, "SELECT certificate_verify_attempts FROM operation_audit_lifecycle WHERE operation_id=$1", admitted.ID).Scan(&attempts); e != nil || attempts != 0 {
++				t.Fatal("new v3 did not get exact fresh allowance", attempts, e)
++			}
++			if old.in.Lifecycle.Policy.History != nil {
++				var layout string
++				if e = scratch.QueryRow(ctx, "SELECT history_profile->'History'->>'Layout' FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", old.in.RootID).Scan(&layout); e != nil || layout != value.OperationVerificationHistoryLayout {
++					t.Fatal("residual pool did not retain accepted covering profile", layout, e)
++				}
++			}
++			if e = scratch.QueryRow(ctx, "SELECT certificate_verify_attempts FROM operation_audit_lifecycle WHERE operation_id=$1", old.in.ID).Scan(&attempts); e != nil || attempts != 2 {
++				t.Fatal("profile upgrade refilled historical attempts", attempts, e)
++			}
++
++		}
++		// Existing acknowledgement remains sufficient for historical finalization;
++		// no decrypt, fresh counter, new proof dates or capability upgrade is needed.
++		wait(in.Lifecycle.CertificatePurgeAt)
++		lease.Phase = "terminal"
++		lease.Fence = 2
++		lease.StartedAt = now()
++		lease.Until = lease.StartedAt.Add(5 * time.Second)
++		lease.ObjectsDigest = app.OperationLifecycleDigest(append(receipts, receipt))
++		exec("UPDATE operation_audit_lifecycle SET lease=$2,lease_fence=2 WHERE operation_id=$1", in.ID, encode(lease))
++		terminal := value.OperationTerminalPurge{RootID: in.RootID, OperationID: in.ID, RetirementDigest: app.OperationLifecycleDigest(r), CertificateDigest: app.OperationLifecycleDigest(receipt), Fence: 2, PurgedAt: now(), LeaseUntil: lease.Until}
++		exec("UPDATE operation_audit_lifecycle SET terminal_purge=$2 WHERE operation_id=$1", in.ID, encode(terminal))
++		exec("UPDATE operation_audit_lifecycle SET terminal_acknowledged_at=clock_timestamp() WHERE operation_id=$1", in.ID)
++		var finished bool
++		if e = scratch.QueryRow(ctx, "SELECT finish_operation_audit_retirement($1,$2,$3)", in.RootID, in.ID, p.InstallationID).Scan(&finished); e != nil || !finished {
++			t.Fatal("acknowledged historical cleanup blocked", e)
++		}
++		var remaining int64
++		if e = scratch.QueryRow(ctx, "SELECT charged FROM operation_audit_account WHERE root_id=$1 AND lane='normal'", in.RootID).Scan(&remaining); e != nil || remaining != 2 {
++			t.Fatal("historical cleanup lost uncertain/new charges", remaining, e)
++		}
++	})
++}

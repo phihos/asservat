@@ -1,0 +1,6 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/download_sessions_test.go:558:14: assignment mismatch: 1 variable but f.runtime.CancelDownload returns 2 values
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

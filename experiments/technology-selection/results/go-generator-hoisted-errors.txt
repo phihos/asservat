@@ -1,0 +1,2 @@
+error generating code: error collecting component types: error generating Go types for component schemas: error converting Schema McpOutput_debugger_command to Go type: error merging schemas: error generating type for oneOf: error generating Go schema for property 'data': error generating Go schema for property 'rows': error resolving primitive type: error generating type for array: error resolving primitive type: error generating type for array: error resolving primitive type: unhandled Schema type: &[string number boolean]
+exit status 1

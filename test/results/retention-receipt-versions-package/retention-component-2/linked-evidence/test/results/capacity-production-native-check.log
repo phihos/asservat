@@ -1,0 +1,22 @@
+Fixture command failed: b AND v->'ReconciledAt'='null'::jsonb AND\n   (v->>'RevisionObservedAt')::timestamptz<=(old_value->>'ReconciledAt')::timestamptz AND (old_value->>'ReconciledAt')::timestamptz<=(v->>'ReservedAt')::timestamptz AND (v->>'RevisionObservedAt')::timestamptz<=n AND n<(v->>'RevisionUntil')::timestamptz AND (v->>'ReservedAt')::timestamptz<=n AND\n   (v->>'PlannedUntil')::timestamptz>(old_value->>'PlannedUntil')::timestamptz AND\n   (v->>'PlannedUntil')::timestamptz=(v->>'RevisionObservedAt')::timestamptz+make_interval(secs=>(new_row.root_plan->'Input'->>'AdmissionSeconds')::double precision);\n END IF;\n IF old_value->'ReconciledAt'<>'null'::jsonb AND v IS DISTINCT FROM old_value THEN RETURN false;END IF;\n FOREACH k IN ARRAY ARRAY['CaptureBackedAt','ReadyAt','ReconciledAt'] LOOP\n  IF old_value->k<>'null'::jsonb AND v->k IS DISTINCT FROM old_value->k THEN RETURN false;END IF;\n  IF v->k IS DISTINCT FROM old_value->k AND ((v->>k)::timestamptz>n OR k='CaptureBackedAt' AND NOT capture OR k<>'CaptureBackedAt' AND NOT general) THEN RETURN false;END IF;\n END LOOP;\n IF old_value->'ReconciledAt'<>'null'::jsonb AND v->'ReconciledDigest' IS DISTINCT FROM old_value->'ReconciledDigest' THEN RETURN false;END IF;\n RETURN true;\nEXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;\nEND $$;\nCREATE FUNCTION require_capacity_root_marker_closed() RETURNS trigger\nLANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$\nBEGIN\n IF TG_TABLE_SCHEMA<>'public' OR TG_RELID<>'public.capacity_source'::regclass OR TG_WHEN<>'AFTER' OR TG_LEVEL<>'ROW' OR TG_OP NOT IN ('INSERT','UPDATE') THEN RAISE EXCEPTION 'invalid capacity root marker source' USING ERRCODE='23514';END IF;\n IF EXISTS(SELECT 1 FROM public.capacity_source WHERE root_id=NEW.root_id AND root_mutation_xid IS NOT NULL) THEN RAISE EXCEPTION 'capacity root configuration remains open' USING ERRCODE='23514';END IF;\n RETURN NEW;\nEND $$;": ERROR: syntax error at end of input (SQLSTATE 42601)
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 241, in <module>
+    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation, args.connector_retirement))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 116, in main
+    report["migration"] = run([goose, "-dir", str(ROOT/"migrations"), "up"], env=env)
+                          ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-custody.py", line 23, in run
+    return subprocess.check_output(args, text=True, stderr=subprocess.PIPE, timeout=120, **kw).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/phil/.cache/asservat-build/bin/goose', '-dir', '/home/phil/Projekte/asservat/migrations', 'up']' returned non-zero exit status 1.
+{"terminalExit": 1, "testExit": 1, "passedEntries": 0, "sourceHashes": 1673, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

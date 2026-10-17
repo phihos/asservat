@@ -1,0 +1,6 @@
+=== RUN   TestNativeFinalMarkerDoesNotStartAuthorityWorkAfterFlush
+    terminal_test.go:102: normal peer close invalidated already flushed final marker native exchange unavailable
+--- FAIL: TestNativeFinalMarkerDoesNotStartAuthorityWorkAfterFlush (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	0.007s
+FAIL

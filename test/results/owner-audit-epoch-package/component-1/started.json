@@ -1,0 +1,41 @@
+{
+  "native": false,
+  "runtimeSelected": false,
+  "freeze": {
+    "source": "/home/phil/.cache/asservat-build/planning/owner-audit-inventory-20261013/epoch-source-checkpoint-3",
+    "manifest": "e30abd008e800b13fe8e1f8c44469aa4f70cef8f40c43762e59e4cd29dcff99a",
+    "draftBeforePath": "internal/domain/fleet/owner_audit_epoch_observation.go",
+    "draftBeforeSHA256": "8e18c5dc6bc2766109e0847fb8dbe794001e5681860ea8f6f2832a34b9abf098",
+    "dependencyCount": 4367,
+    "dependencies": "d81bd06aeed463e7b68857ad8d3946dcfd465bc64dbcfbc984271ac8b99cb170",
+    "runner": "559cc0a3503ff2e692a8d781fd4b30869e6721577532a702eb165b23b00fe192",
+    "freezer": "745e5b195747b62409d9ad706634ff5baa364c8a39a350f0c3be370a6cd48212",
+    "native": false,
+    "scope": "Unselected values and complete affected package checks; no production epoch implementation or SQL/runtime qualification"
+  },
+  "metadata": {
+    "manifest.json": "e30abd008e800b13fe8e1f8c44469aa4f70cef8f40c43762e59e4cd29dcff99a",
+    "dependency-args.json": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+    "inventory.json": "b866e6292cb3602a6def8e7e2ee461cf633076d59e6197aaa1802ffe17654b69",
+    "dependencies.json": "d81bd06aeed463e7b68857ad8d3946dcfd465bc64dbcfbc984271ac8b99cb170",
+    "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+    "freeze.json": "ed240c479ff71fe6e4f22b0baf021553ee8d5a8d171c427b9ba0c2565b563b38",
+    "run.py": "559cc0a3503ff2e692a8d781fd4b30869e6721577532a702eb165b23b00fe192",
+    "draft-before.go.txt": "8e18c5dc6bc2766109e0847fb8dbe794001e5681860ea8f6f2832a34b9abf098",
+    "REVIEW.md": "63012fdbdc9d6cf6d2226c5b1f494f7b392048de66700910f346ab744e42c0bf",
+    "SQL-PLAN.md": "ebcde42459c365b1911c278fb95617fc1c7233e188b1eb24fde678853ceba84f",
+    "INSTALLED-PATH.md": "e2598659eda1bb30a0b213db6dbc5777b58a44087afd304454a52475f060e5af",
+    "freeze.py": "745e5b195747b62409d9ad706634ff5baa364c8a39a350f0c3be370a6cd48212"
+  },
+  "before": {
+    "metadata": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "directories": []
+  },
+  "phases": [],
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "scratch": "/tmp/asservat-owner-epoch-component-jl12x5kj"
+}

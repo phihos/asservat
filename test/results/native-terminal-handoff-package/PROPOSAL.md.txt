@@ -1,0 +1,23 @@
+# Exact native completion handoff
+
+Source-only proposal, 2026-10-12. Live sources remain parent-owned. The six-file immediate-Joined scheduling change was reverted; this work preserves the original one-second scheduling backoff and 32768-conversation ceiling.
+
+## Evidence and contract
+
+The actual native run `native-interrupted-supervised-sources` returned Joined at log line 19 and immediately routed Hello2 to the old current SQL operation at lines 20-27. Router Attach denied the already-attached/closing entry. The restored delay subsequently passed native58306, but delay cannot prove closure. PrepareCurrent performs current metadata checks after Commit; its deferred attachedExchange.Close joins local registration before closing SQL. Observe has the same ordering; content acknowledges then closes.
+
+Keep the v1 bytes. Strengthen the existing final zero-byte Done: before producing it, the original hub must complete a fresh frame gate check and positively close the exact original SQL operation/reference/fence/lease sequence within its original deadline. Successful Done already represents successful completion, so this narrows its accepted production ordering without adding a frame, retry or new authority. Worker/connector still stop on uncertainty.
+
+The private registration retains an original-request-only completion callback. It cannot be reconstructed from a wire reference. SQL completion must verify the exact currently open row under its existing lock, preserve lease/operation deadlines through lock/commit, and require one acknowledged exact close. Zero affected rows, already closed, replacement, unknown commit or expired result cannot authorize Done. Idempotent restrictive cleanup remains separate and cannot close replacement generations. One original close write remains charged; no new row/table/refill.
+
+After positive restrictive closure, the existing full SQL-open frame check would correctly deny. Only a private hub terminal-send capability may emit the exact original zero-byte Done using the last complete gate's unextended deadline and known cancellation/shortening. No commands, data, metadata, keys or fresh effects use that path. Current TLS/operation checks precede closure; the terminal handoff is not renewed authorization. Unknown final delivery stays uncertain despite positive SQL closure.
+
+Application final metadata checks remain unchanged: PrepareCurrent final C03 and PermitDownloadMetadata, Observe final C03, and window outcome/accounting do not require the native-owner row to remain open. No final marker promises that a developer persisted bytes.
+
+Router registrations and handler slots stay charged until actual joined Close. The sequential application's return still follows that Close, so its next native operation registers after join. Concurrent attempts remain denied before SQL claim while the old router slot is occupied. An earlier worker poll can see only a genuine current SQL-closed NoCommand, never translated Attach failure. The worker retains its existing one-second throttle; correctness no longer depends on it.
+
+## Regression plan
+
+Actual two-hop HTTP/2 and product HubRouter/HubOperation/worker, synthetic authority and SQL ports explicitly. Hold exact closure beyond 1 second inside the original <=5-second interval. Before: worker completes while old SQL routing remains open; after: no Joined until positive close. Cover unavailable/unknown/expired close, known cancellation/shortening, lost final marker, exact old-generation closure and denied concurrent registration before joined close. Preserve existing nonterminal gates and terminal relay tests. SQL held-row/current-ref native qualification remains parent-owned.
+
+No new wire, migration, keys, scheduler, reconnect retry, deadline extension or public API is proposed.

@@ -1,0 +1,60 @@
+--- test/integration/native_exchange_test.go
++++ test/integration/native_exchange_test.go
+@@ -225,7 +225,7 @@
+ 		t.Fatal(e)
+ 	}
+ 	target := value.WorkerCredentialTarget{InstallationID: f.worker.Binding.InstallationID, SessionID: f.worker.Intent.SessionID, WorkerID: f.worker.Intent.ID, PodUID: f.worker.Binding.PodUID, CreatedAt: f.worker.Intent.CreatedAt, RunUntil: f.worker.Intent.RunUntil}
+-	result, e := evidence.NewRegionalContextResult(ctx, target, nativeReader, time.Now)
++	result, e := evidence.NewRegionalContextResult(ctx, target, nativeSQLReadDiagnostic{test: t, next: nativeReader}, time.Now)
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
+@@ -502,6 +502,39 @@
+ 	return client
+ }
+ 
++// Test-only phase diagnostics: frame kind, duration and fixed errors, no bytes,
++// credentials or authority changes. The underlying actual reader/stream is used.
++type nativeSQLReadDiagnostic struct {
++	test *testing.T
++	next evidence.NativeContextRead
++}
++
++func (d nativeSQLReadDiagnostic) ReadNativeContext(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, window string, until time.Time) ([]byte, error) {
++	started := time.Now()
++	d.test.Log("native read entered", time.Until(until))
++	body, err := d.next.ReadNativeContext(ctx, source, o, window, until)
++	d.test.Log("native read returned", time.Since(started), time.Until(until), err, ctx.Err())
++	return body, err
++}
++
++type nativeSQLStreamDiagnostic struct {
++	native.Stream
++	test *testing.T
++}
++
++func (d nativeSQLStreamDiagnostic) Receive(ctx context.Context) (contracts.NativeFrame, error) {
++	started := time.Now()
++	f, err := d.Stream.Receive(ctx)
++	d.test.Log("native frame received", f.Kind, time.Since(started), err, ctx.Err())
++	return f, err
++}
++func (d nativeSQLStreamDiagnostic) Send(ctx context.Context, f contracts.NativeFrame) error {
++	started := time.Now()
++	err := d.Stream.Send(ctx, f)
++	d.test.Log("native frame sent", f.Kind, time.Since(started), err, ctx.Err())
++	return err
++}
++
+ type nativeSQLWorkerOutcome struct {
+ 	result contracts.NativeConversationResult
+ 	err    error
+@@ -525,7 +558,7 @@
+ 			return e
+ 		}
+ 		if e == nil {
+-			disposition, e := native.RunWorkerConversation(ctx, stream, hello, target, key, result)
++			disposition, e := native.RunWorkerConversation(ctx, nativeSQLStreamDiagnostic{Stream: stream, test: t}, hello, target, key, result)
+ 			t.Log("native diagnostic worker conversation terminal", attempt, disposition.State, e)
+ 			joined <- nativeSQLWorkerOutcome{disposition, e}
+ 			if e != nil || disposition.State != contracts.NativeJoined {

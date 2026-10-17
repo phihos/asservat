@@ -1,0 +1,98 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000195",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "kind": "recordingPage",
+    "recordings": [
+      {
+        "recording_handle": "recording-synthetic-traffic",
+        "policy_uid": "policy-trigger-lifecycles-uid",
+        "policy_name": "trigger-lifecycles",
+        "pod_uid": "pod-uid",
+        "pod_name": "api-synthetic",
+        "action_id": "traffic",
+        "kind": "packetCapture",
+        "state": "Ready",
+        "available_before_seconds": 30,
+        "maximum_before": "30s",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "handle_expires_at": "2026-10-09T12:01:00Z",
+        "save_eligible": true,
+        "blockers": [],
+        "execution_authority": {
+          "mode": "team",
+          "executor": {
+            "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+            "subject": "policy:policy-trigger-lifecycles-uid",
+            "clientID": "policy-executor",
+            "identityType": "workload"
+          },
+          "continuesAfterCreatorLeaves": true,
+          "notAfter": "2026-11-08T12:00:00Z",
+          "limits": {
+            "maxExecutions": 100,
+            "maxBytes": 1099511627776,
+            "maxObservedBytes": 1099511627776
+          },
+          "state": "Ready",
+          "reasonCodes": [],
+          "ownerTeams": [
+            {
+              "kind": "Group",
+              "issuer": "https://identity.example.invalid/realms/company",
+              "id": "team-payments"
+            }
+          ]
+        }
+      },
+      {
+        "recording_handle": "recording-synthetic-syscalls",
+        "policy_uid": "policy-trigger-lifecycles-uid",
+        "policy_name": "trigger-lifecycles",
+        "pod_uid": "pod-uid",
+        "pod_name": "api-synthetic",
+        "action_id": "syscalls",
+        "kind": "syscallTrace",
+        "state": "Ready",
+        "available_before_seconds": 30,
+        "maximum_before": "30s",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "handle_expires_at": "2026-10-09T12:01:00Z",
+        "save_eligible": true,
+        "blockers": [],
+        "execution_authority": {
+          "mode": "team",
+          "executor": {
+            "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+            "subject": "policy:policy-trigger-lifecycles-uid",
+            "clientID": "policy-executor",
+            "identityType": "workload"
+          },
+          "continuesAfterCreatorLeaves": true,
+          "notAfter": "2026-11-08T12:00:00Z",
+          "limits": {
+            "maxExecutions": 100,
+            "maxBytes": 1099511627776,
+            "maxObservedBytes": 1099511627776
+          },
+          "state": "Ready",
+          "reasonCodes": [],
+          "ownerTeams": [
+            {
+              "kind": "Group",
+              "issuer": "https://identity.example.invalid/realms/company",
+              "id": "team-payments"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

@@ -1,0 +1,9 @@
+# V2 regional selected-owner bound propagation
+
+Source-only follow-up, not yet compiled or tested. Existing v1/public ports are unchanged. This is separate from the pending receiver candidate.
+
+The integrated v2 channel retained a shorter current owner cutoff in c.until but used the older metadata call for the subsequent candidate read and the pre-check local until for result restriction. Final validity still denied expired authority; the defect permits subsequent I/O with a wider context and can return an intermediate result dated beyond the newly observed cap.
+
+The candidate always derives the next selected-owner candidate/SQL call from the retained minimum, passes the actual bounded metadata context to its post-check, and restricts the returned metadata result using the new retained cutoff. No source refresh, retries, deadline extension, SQL query or rate change.
+
+Qualification must first run the new focused tests against the recorded original product file, then the correction plus affected operation/channel regressions. Original input and post-lock expiry checks stay mandatory. No build is authorized during the parent native/diagnostic hold.

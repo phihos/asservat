@@ -1,0 +1,130 @@
+{{- include "asservat.bootstrap.validate" . -}}
+{{- if .Values.bootstrap.enabled }}
+{{- $b := .Values.bootstrap }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ printf "%s-bootstrap" $b.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    asservat.io/private-role: bootstrap-runner
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: hook-succeeded
+    asservat.io/bootstrap-runner: four-command/v1
+    asservat.io/bootstrap-input: {{ include "asservat.bootstrap.inputDigest" . | quote }}
+spec:
+  serviceAccountName: {{ printf "%s-bootstrap-runner" $b.name }}
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  restartPolicy: Never
+  activeDeadlineSeconds: 1800
+  terminationGracePeriodSeconds: 15
+  {{- if $b.registrySecret }}
+  imagePullSecrets:
+    - name: {{ $b.registrySecret | quote }}
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  initContainers:
+    - name: produce
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, initial-bootstrap]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-bootstrap-work
+        - name: producer-input
+          mountPath: /run/asservat/initial-bootstrap
+          readOnly: true
+    - name: schema
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, initial-bootstrap-schema]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-schema
+          subPath: projection/schema
+          readOnly: true
+        - name: ddl-input
+          mountPath: /run/asservat/initial-schema-private
+          readOnly: true
+    - name: prepare
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, initial-bootstrap-prepare]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-preparer
+          subPath: projection/preparer
+          readOnly: true
+  containers:
+    - name: retire
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, initial-bootstrap-retire]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-bootstrap-work
+        - name: retirement-input
+          mountPath: /run/asservat/initial-bootstrap
+          readOnly: true
+  volumes:
+    - name: scratch
+      emptyDir:
+        medium: Memory
+        sizeLimit: 8Mi
+    - name: producer-input
+      projected:
+        defaultMode: 0440
+        sources: {{ include "asservat.bootstrap.commonProjection" . | nindent 10 }}
+          - secret:
+              name: {{ $b.secrets.producer | quote }}
+              optional: true
+              items:
+                - key: postgres-administrator.json
+                  path: postgres-administrator.json
+                - key: provider-material.json
+                  path: provider-material.json
+          {{- if $b.registrySecret }}
+          - secret:
+              name: {{ $b.registrySecret | quote }}
+              optional: true
+              items:
+                - key: .dockerconfigjson
+                  path: .dockerconfigjson
+          {{- end }}
+    - name: retirement-input
+      projected:
+        defaultMode: 0440
+        sources: {{ include "asservat.bootstrap.commonProjection" . | nindent 10 }}
+          - secret:
+              name: {{ $b.secrets.retirement | quote }}
+              optional: true
+              items:
+                - key: postgres-administrator.json
+                  path: postgres-administrator.json
+    - name: ddl-input
+      secret:
+        secretName: {{ $b.secrets.schema | quote }}
+        defaultMode: 0440
+        optional: true
+        items:
+          - key: postgres-ddl.json
+            path: postgres-ddl.json
+{{- end }}

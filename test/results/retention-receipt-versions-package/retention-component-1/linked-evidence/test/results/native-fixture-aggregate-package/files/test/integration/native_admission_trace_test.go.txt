@@ -1,0 +1,128 @@
+package integration
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	value "asservat.local/asservat/internal/domain/authorization"
+)
+
+// Temporary fixture-only timings. No IDs, credentials, errors or metadata are
+// retained. The original callbacks see the exact original context/values and
+// run exactly once. This observer adds no API/SQL traffic or background owner.
+type nativeAdmissionTrace struct {
+	mu                     sync.Mutex
+	started, outer, worker time.Time
+	events                 [16]nativeAdmissionTraceEvent
+	total                  int
+	firstError             *nativeAdmissionTraceEvent
+}
+type nativeAdmissionTraceEvent struct {
+	Number                     int
+	Step, Kind                 string
+	AtMS, ElapsedMS            int64
+	CallerBound                bool
+	CallerStartMS, CallerEndMS int64
+	OuterEndMS, WorkerEndMS    int64
+	LeaseBound                 bool
+	LeaseEndMS                 int64
+	OK, Cancelled              bool
+}
+
+func newNativeAdmissionTrace(ctx context.Context, worker time.Time) *nativeAdmissionTrace {
+	outer, _ := ctx.Deadline()
+	return &nativeAdmissionTrace{started: time.Now(), outer: outer, worker: worker}
+}
+func (t *nativeAdmissionTrace) record(ctx context.Context, step string, kind value.NativeOperationKind, started, lease time.Time, err error) {
+	if t == nil {
+		return
+	}
+	ended := time.Now()
+	deadline, bounded := ctx.Deadline()
+	e := nativeAdmissionTraceEvent{Step: step, Kind: string(kind), AtMS: started.Sub(t.started).Milliseconds(), ElapsedMS: ended.Sub(started).Milliseconds(), CallerBound: bounded, OK: err == nil, Cancelled: ctx.Err() != nil}
+	if bounded {
+		e.CallerStartMS, e.CallerEndMS = deadline.Sub(started).Milliseconds(), deadline.Sub(ended).Milliseconds()
+	}
+	if !t.outer.IsZero() {
+		e.OuterEndMS = t.outer.Sub(ended).Milliseconds()
+	}
+	e.WorkerEndMS = t.worker.Sub(ended).Milliseconds()
+	if !lease.IsZero() {
+		e.LeaseBound, e.LeaseEndMS = true, lease.Sub(ended).Milliseconds()
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.total++
+	e.Number = t.total
+	t.events[(t.total-1)%len(t.events)] = e
+	if err != nil && t.firstError == nil {
+		first := e
+		t.firstError = &first
+	}
+}
+func (t *nativeAdmissionTrace) mark(ctx context.Context, step string) {
+	t.record(ctx, step, "", time.Now(), time.Time{}, nil)
+}
+func (t *nativeAdmissionTrace) report(test *testing.T) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	test.Log("native callback trace total", t.total, "omitted", max(0, t.total-len(t.events)))
+	if t.firstError != nil {
+		test.Logf("native callback trace first error %+v", *t.firstError)
+	}
+	for i := max(0, t.total-len(t.events)); i < t.total; i++ {
+		test.Logf("native callback trace %+v", t.events[i%len(t.events)])
+	}
+}
+func (t *nativeAdmissionTrace) registrar(next evidence.NativeExchangeRegistrar) evidence.NativeExchangeRegistrar {
+	if t == nil {
+		return next
+	}
+	return nativeAdmissionTraceRegistrar{next: next, trace: t}
+}
+
+type nativeAdmissionTraceRegistrar struct {
+	next  evidence.NativeExchangeRegistrar
+	trace *nativeAdmissionTrace
+}
+
+func (r nativeAdmissionTraceRegistrar) RegisterNativeExchange(ctx context.Context, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, current func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+	kind := in.Operation.Kind
+	if before != nil {
+		original := before
+		before = func(call context.Context, origin evidence.NativeOrigin) error {
+			started := time.Now()
+			err := original(call, origin)
+			r.trace.record(call, "before", kind, started, origin.Lease.Until, err)
+			return err
+		}
+	}
+	if current != nil {
+		original := current
+		current = func(call context.Context, origin evidence.NativeOrigin) (value.NativeLease, error) {
+			started := time.Now()
+			lease, err := original(call, origin)
+			r.trace.record(call, "current", kind, started, origin.Lease.Until, err)
+			return lease, err
+		}
+	}
+	if in.Complete != nil {
+		original := in.Complete
+		in.Complete = func(call context.Context, lease value.NativeLease) error {
+			started := time.Now()
+			err := original(call, lease)
+			r.trace.record(call, "complete", kind, started, lease.Until, err)
+			return err
+		}
+	}
+	started := time.Now()
+	pending, err := r.next.RegisterNativeExchange(ctx, in, before, current)
+	r.trace.record(ctx, "register", kind, started, in.Operation.Until, err)
+	return pending, err
+}

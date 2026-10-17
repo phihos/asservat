@@ -1,0 +1,30 @@
+deployment.apps/sink restarted
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+deployment "sink" successfully rolled out
+{
+  "attachments": 1,
+  "generations": [
+    {
+      "Generation": 1,
+      "Peer": "10.42.0.4",
+      "Packets": 85,
+      "StartMS": 96,
+      "EndMS": 18052
+    },
+    {
+      "Generation": 2,
+      "Peer": "10.42.0.6",
+      "Packets": 0,
+      "StartMS": 5464,
+      "EndMS": 18052
+    }
+  ],
+  "limitation": "Kubernetes relist + standalone TCX observer; NOT integrated Gadget emission or production watch/freshness authorization",
+  "programID": 122
+}
+panic: expected traffic under two different actual Service endpoint generations
+
+goroutine 1 [running]:
+main.main()
+	/home/phil/Projekte/asservat/experiments/feasibility/go/cmd/mapprobe/main.go:112 +0xaeb

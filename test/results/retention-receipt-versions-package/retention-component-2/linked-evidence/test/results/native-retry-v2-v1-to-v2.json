@@ -1,0 +1,21 @@
+{
+  "v1_manifest_sha256": "8d532a0e1182f5a548070cdbaa6ec2fcbbed6c94da2d1199fff3442614f50b5b",
+  "scope": "Only native-link requested/stale-Ready UI eligibility, meaningful regression and simplified copy; all Go/query/native fixture bytes unchanged.",
+  "files": [
+    {
+      "path": "web/src/evidence/EvidenceWorkspace.test.tsx",
+      "v1_sha256": "d7fa154c85da24f1d8bb34d8e898e6e9198185d1ebb28c7bce8c3e8f8ed02e6c",
+      "v2_sha256": "718a0bb06918b717076154dc338ef0b86b2622583f596d1502fb917429dbb2be"
+    },
+    {
+      "path": "web/src/evidence/EvidenceWorkspace.tsx",
+      "v1_sha256": "25382b27fb61b918f144b8c0d9c763801fd70281756eea4dad5d8dc347e935ad",
+      "v2_sha256": "f7ff8366cfbfd6a80cdfdd74a733b1c9611fe3a13561b1467a0511b52f421a02"
+    },
+    {
+      "path": "web/src/evidence/evidence.ts",
+      "v1_sha256": "3e5bf710774c11e1d5c2961ce7ba8ab90bf46eb5e887fc876899024a3ca25bf2",
+      "v2_sha256": "6f3384adefcd3d610ed67d63f413f41b7bd0711b1b07a7820e5d92b60aa8f33e"
+    }
+  ]
+}

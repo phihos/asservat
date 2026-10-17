@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend
+--- PASS: TestContextAdmissionWithRealServices (61.04s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-healthy-two-object-peak-finite-accounts-and-uncertain-spend (29.97s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-backed-history-cooling-mixed-dates-and-uncertain-spend (30.71s)
+PASS
+ok  	asservat.local/asservat/test/integration	62.095s

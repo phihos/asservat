@@ -1,0 +1,6 @@
+=== RUN   TestWorkerOwnerAuditSelectsPendingOnlyAfterFIFOAndIndependentNotice
+    worker_owner_audit_test.go:382: candidate selected while FIFO blocked
+--- FAIL: TestWorkerOwnerAuditSelectsPendingOnlyAfterFIFOAndIndependentNotice (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.005s
+FAIL

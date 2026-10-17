@@ -1,0 +1,8 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:102: native original helper Pod mode=regional original=true phase=Pending status-count=1
+    federation_regional_native_test.go:102: native original input materialization expired regional
+    direct_observation_native_fixture_test.go:191: native original helper Pod mode=regional original=true phase=Pending status-count=1
+--- FAIL: TestFederationRegionalProductWithRealKubernetes (127.54s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	127.593s
+FAIL

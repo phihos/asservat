@@ -1,0 +1,10 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/cursor.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/adapters/objectstore/framed/cursor.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/cursor_test.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/adapters/objectstore/framed/cursor_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/decode.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/adapters/objectstore/framed/decode.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/framed/reader_boundary_test.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/adapters/objectstore/framed/reader_boundary_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/artifact/framed_read_work.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/domain/artifact/framed_read_work.go",
+    "/home/phil/Projekte/asservat/internal/domain/artifact/framed_read_work_test.go": "/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/changes/internal/domain/artifact/framed_read_work_test.go"
+  }
+}

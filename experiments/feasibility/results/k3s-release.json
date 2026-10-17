@@ -1,0 +1,15 @@
+{
+  "tag": "v1.37.1+k3s1",
+  "source": "https://api.github.com/repos/k3s-io/k3s/releases/latest",
+  "assets": [
+    {
+      "name": "k3s",
+      "browser_download_url": "https://github.com/k3s-io/k3s/releases/download/v1.37.1%2Bk3s1/k3s"
+    },
+    {
+      "name": "sha256sum-amd64.txt",
+      "browser_download_url": "https://github.com/k3s-io/k3s/releases/download/v1.37.1%2Bk3s1/sha256sum-amd64.txt"
+    }
+  ],
+  "sha256": "92b94582eb7b34a8cf532e6006842b9ed215a6783cf56a3dd6271fd35243b2c0"
+}

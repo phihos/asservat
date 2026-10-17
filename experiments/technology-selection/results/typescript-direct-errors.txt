@@ -1,0 +1,10 @@
+../../../../tmp/asservat-browser-types.d.ts(3636,9): error TS2502: 'Contract_trigger_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5037,9): error TS2502: 'Contract_guidance_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5177,9): error TS2502: 'Contract_capture_history_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5446,9): error TS2502: 'Contract_syscall_results_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5516,9): error TS2502: 'Contract_action_lifecycle_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5576,9): error TS2502: 'Contract_capture_assessment_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(5701,9): error TS2502: 'Contract_recording_save_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(6152,9): error TS2502: 'Contract_internal_work_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(6351,9): error TS2502: 'Contract_artifact_download_schema' is referenced directly or indirectly in its own type annotation.
+../../../../tmp/asservat-browser-types.d.ts(6395,9): error TS2502: 'Contract_investigation_access_schema' is referenced directly or indirectly in its own type annotation.

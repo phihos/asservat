@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/bootstrap	2.054s
+ok  	asservat.local/asservat/internal/adapters/kms	0.023s
+?   	asservat.local/asservat/internal/adapters/mounts	[no test files]
+ok  	asservat.local/asservat/internal/adapters/mtls	5.471s
+ok  	asservat.local/asservat/internal/adapters/objectstore	0.012s [no tests to run]

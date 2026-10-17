@@ -1,0 +1,694 @@
+--- a/docs/architecture/owner-startup.md
++++ b/docs/architecture/owner-startup.md
+@@ -81,3 +81,32 @@
+ only the closed diagnostic record, discards unrelated output and preserves the
+ failure. These reads are diagnostics, never identity or availability proof.
+ Component and installed qualification for this diagnostic change are pending.
++
++## Original launch receipt convergence
++
++[ADR-164](../decisions/164-owner-launch-receipt-convergence.md) distinguishes a
++started original Pod from the installer's later acknowledgement of its launch.
++The observation-mode loader may passively await only a fully valid original
++launch whose receipt is absent. It retains the entire first pending public
++journal state. The sole permitted transition is that launch's receipt appearing;
++changed claims, siblings, root identities, mounted projections or dates deny.
++
++The loader retains its original thirty-second startup deadline. Passive reads
++of the exact original journal are spaced by 250 ms and individually bounded by
++five seconds, the original caller and resource-root end. No SQL credential,
++key/provider action, identity activation or request serving occurs while pending.
++A read failure is terminal; this is not a retry policy for arbitrary failures.
++After convergence, the full guard, token, immutable projection, Deployment,
++original live Pod and journal bracket must succeed with a new at-most-five-second
++proof before credentials are used. The first positive receipt and complete
++state are pinned across that proof; another receipt cannot be adopted. That
++proof does not renew any original
++installation claim or effect attempt. Ordinary runtime Verify remains a single
++bounded proof, without waiting. Expiry/cancellation retains a nonzero startup exit.
++
++The focused before regression runs the actual projection producer under the
++existing synthetic provider/API/SQL fixture: its legitimate pending launch is
++rejected as changed, while its completed original receipt is accepted. This
++establishes the interleaving defect, not unique attribution of the native13
++journal-state diagnostic. Corrected component and installed qualification remain
++pending; earlier failing runs are retained.
+--- a/docs/decisions/164-owner-launch-receipt-convergence.md
++++ b/docs/decisions/164-owner-launch-receipt-convergence.md
+@@ -0,0 +1,64 @@
++# ADR-164 — Passive convergence of the original owner launch receipt
++
++Date: 2026-10-14. Status: accepted; implementation staged, qualification pending.
++Requirements: REQ-DEP-003 and REQ-FED-001; existing SC-DEP-003 / SC-FED-001
++and TASK-03 / TASK-11 retain traceability ownership.
++
++## Problem and evidence
++
++The installed owner may begin executing immediately after the original guarded
++Deployment's single zero-to-one transition. Its installer records the launch
++receipt in a separate later bounded operation. The runtime reader previously
++classified a valid original launch awaiting that receipt as changed and exited.
++ADR-162 explicitly allows the launched process to exist before read-only
++finalization; finalization is not a process-start barrier.
++
++The exact before regression, `owner-launch-receipt-before-1`, runs the actual
++provider projection producer against the runtime journal reader using the
++existing synthetic API/SQL/provider fixture. The pending child fails with the
++old changed classification; the acknowledged-original-launch control passes.
++Native13 failed at initial-journal/journal-state after all eight execution and
++finalization pairs passed. The unit evidence proves a legal failing interleaving;
++it does not uniquely identify which compound predicate native13 encountered.
++
++## Decision
++
++The observation-mode startup loader may passively await only the receipt of its
++fully validated original launch. The private pending classification follows
++complete original journal shape, provider selection, resource UID, child and
++role-root validation. It yields no identity proof or authority.
++
++Pin the entire first pending public journal state in process memory. Read only
++the original journal, at most once per 250 ms, with each read bounded by five
++seconds and the unchanged original thirty-second startup caller/resource-root
++end. The only permitted change is the original launch receipt becoming present.
++Reject changed claims, siblings, roots, dates and any malformed/unavailable read.
++No CREATE, CAS, launch retry, SQL credential use, key/provider action, activation
++or serving is performed while waiting. No private credential bytes are retained
++in pending state.
++
++After the receipt appears, perform the complete existing native verification
++under a new at-most-five-second proof bounded by that same startup caller:
++current native protection, original Pod-bound token, exact mounted immutable
++projections, original Deployment/account/Pod chain, and before/after journal and
++guard checks. Pin the complete first observed positive receipt and state across this full
++proof; it cannot adopt another valid receipt for the same operation. Only
++that complete current proof allows subsequent SQL credential verification.
++
++The passive waiting interval and fresh authority observation are separate.
++Neither alters any installation claim, effect cutoff, spend, original UID or
++resource version. Original runtime Verify remains a non-waiting single proof.
++No persistent recovery journal or restart producer is introduced. Failure or
++cancellation preserves the nonzero startup exit and joined loader cleanup.
++
++## Validation boundary
++
++Preserve the before failure and positive completed control. Corrected tests must
++cover actual producer/reader compatibility; pending-to-receipt convergence;
++unchanged whole-state pins; substitution before the final authority read; guard
++or token loss after passive convergence; repeated pending observations; read and
++caller expiry; failed fresh authority; and no positive result from pending alone.
++The installed original owner fixture must still pass all original setup,
++projection, launch and identity outcomes with unchanged rates, attempt bounds
++and fixture ceilings before deployed availability is claimed. Helm/public
++collection remains disabled until its separate slice requirements pass.
+--- a/docs/decisions/README.md
++++ b/docs/decisions/README.md
+@@ -1,4 +1,9 @@
+ # Decision records
++
++[ADR-164 — Passive convergence of the original owner launch receipt](164-owner-launch-receipt-convergence.md)
++separates a pending original launch from current identity authority, preserving
++the original startup interval and requiring complete post-wait verification.
++Implementation is staged; corrected qualification remains pending.
+ 
+ [ADR-162 — Read-only finalization of original owner projection effects](162-owner-projection-read-only-finalization.md)
+ selects mandatory independent verification after each original bounded effect.
+--- a/internal/adapters/kubernetes/owner_identity_objects_test.go
++++ b/internal/adapters/kubernetes/owner_identity_objects_test.go
+@@ -190,7 +190,7 @@
+ 				}
+ 				expected := map[string]OwnerIdentityReadCheck{
+ 					"missing-child-marker": ownerReadCredentialsMetadata, "swapped-child-marker": ownerReadConfigurationMetadata,
+-					"missing-projection-receipt": ownerReadJournalState, "missing-launch-receipt": ownerReadJournalState,
++					"missing-projection-receipt": ownerReadJournalState, "missing-launch-receipt": ownerReadLaunchReceipt,
+ 					"journal-replacement": ownerReadJournalMetadata, "role-root-substitution": ownerReadJournalState,
+ 					"mutable-provider": ownerReadCredentialsMetadata, "provider-replacement": ownerReadCredentialsMetadata,
+ 					"different-mounted-credential": ownerReadCredentialsContent, "extra-mounted-credential": ownerReadCredentialsMetadata,
+--- a/internal/adapters/kubernetes/owner_identity_provider_journal_test.go
++++ b/internal/adapters/kubernetes/owner_identity_provider_journal_test.go
+@@ -1,16 +1,16 @@
+ package kubernetes
+ 
+ import (
+-    "bytes"
+-    "context"
+-    "encoding/json"
+-    "errors"
+-    "testing"
+-    "time"
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"testing"
++	"time"
+ 
+-    "asservat.local/asservat/internal/contracts"
+-    cfg "asservat.local/asservat/internal/domain/configuration"
+-    core "k8s.io/api/core/v1"
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	core "k8s.io/api/core/v1"
+ )
+ 
+ // The existing synthetic provider/API/SQL fixture runs the actual complete
+@@ -19,46 +19,58 @@
+ // This proves producer/reader compatibility and the launch interleaving only,
+ // not native admission, provider authorization or deployed startup availability.
+ func TestOwnerIdentityProviderJournalAcrossOriginalLaunchReceipt(t *testing.T) {
+-    f := newOwnerProjectionOperationFixture(t)
+-    out := projectionFinalizeThrough(t, f, 7)
+-    if out.Status != OwnerProjectionAdvancePending || out.Snapshot.State.OwnerLaunch == nil || out.Snapshot.State.OwnerLaunch.Receipt != nil || f.launches.Load() != 1 {
+-        t.Fatal("actual original launch did not precede its separate receipt")
+-    }
+-    path := "/api/v1/namespaces/" + f.resources.initial.Namespace.Name + "/configmaps/" + out.Snapshot.State.OwnerIdentity.Receipt.Configuration.Name
+-    f.api.mu.Lock()
+-    raw, err := json.Marshal(f.api.objects[path])
+-    f.api.mu.Unlock()
+-    if err != nil { t.Fatal("mounted original configuration encoding", err) }
+-    var config core.ConfigMap
+-    if json.Unmarshal(raw, &config) != nil { t.Fatal("mounted original configuration decoding") }
+-    input, err := contracts.DecodeOwnerDeployment(bytes.NewBufferString(config.Data["deployment.json"]))
+-    if err != nil || input.Observation == nil || input.Observation.Activation == nil {
+-        t.Fatal("mounted original activation", err)
+-    }
+-    reader := &InstalledOwnerIdentityReader{client: f.root.bridge.source.client, input: input, activation: *input.Observation.Activation}
+-    t.Run("pending-original-launch", func(t *testing.T) {
+-        call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+-        defer cancel()
+-        before := projectionEffectCounts(f)
+-        _, err := reader.journal(call)
+-        if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) {
+-            t.Fatalf("valid original launch awaiting its receipt must be unavailable, not changed: %v", err)
+-        }
+-        if projectionEffectCounts(f) != before { t.Fatal("startup reader performed an effect") }
+-    })
+-    // Continue the actual producer once even if the pending assertion failed:
+-    // the complete control independently identifies which side is incompatible.
+-    if err := f.projection.ExecuteLaunch(context.Background()); err != nil { t.Fatal("original receipt execution", err) }
+-    complete, err := f.projection.Finalize(context.Background())
+-    if err != nil || complete.Status != OwnerProjectionAdvanceComplete || complete.Snapshot.State.OwnerLaunch.Receipt == nil {
+-        t.Fatal("original receipt finalization", err)
+-    }
+-    t.Run("acknowledged-original-launch", func(t *testing.T) {
+-        call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+-        defer cancel()
+-        before := projectionEffectCounts(f)
+-        state, err := reader.journal(call)
+-        if err != nil || !equalJSON(state, complete.Snapshot.State) { t.Fatal("actual completed provider journal rejected", err) }
+-        if projectionEffectCounts(f) != before { t.Fatal("startup reader performed an effect") }
+-    })
++	f := newOwnerProjectionOperationFixture(t)
++	out := projectionFinalizeThrough(t, f, 7)
++	if out.Status != OwnerProjectionAdvancePending || out.Snapshot.State.OwnerLaunch == nil || out.Snapshot.State.OwnerLaunch.Receipt != nil || f.launches.Load() != 1 {
++		t.Fatal("actual original launch did not precede its separate receipt")
++	}
++	path := "/api/v1/namespaces/" + f.resources.initial.Namespace.Name + "/configmaps/" + out.Snapshot.State.OwnerIdentity.Receipt.Configuration.Name
++	f.api.mu.Lock()
++	raw, err := json.Marshal(f.api.objects[path])
++	f.api.mu.Unlock()
++	if err != nil {
++		t.Fatal("mounted original configuration encoding", err)
++	}
++	var config core.ConfigMap
++	if json.Unmarshal(raw, &config) != nil {
++		t.Fatal("mounted original configuration decoding")
++	}
++	input, err := contracts.DecodeOwnerDeployment(bytes.NewBufferString(config.Data["deployment.json"]))
++	if err != nil || input.Observation == nil || input.Observation.Activation == nil {
++		t.Fatal("mounted original activation", err)
++	}
++	reader := &InstalledOwnerIdentityReader{client: f.root.bridge.source.client, input: input, activation: *input.Observation.Activation}
++	t.Run("pending-original-launch", func(t *testing.T) {
++		call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++		defer cancel()
++		before := projectionEffectCounts(f)
++		_, err := reader.journal(call)
++		if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) {
++			t.Fatalf("valid original launch awaiting its receipt must be unavailable, not changed: %v", err)
++		}
++		if projectionEffectCounts(f) != before {
++			t.Fatal("startup reader performed an effect")
++		}
++	})
++	// Continue the actual producer once even if the pending assertion failed:
++	// the complete control independently identifies which side is incompatible.
++	if err := f.projection.ExecuteLaunch(context.Background()); err != nil {
++		t.Fatal("original receipt execution", err)
++	}
++	complete, err := f.projection.Finalize(context.Background())
++	if err != nil || complete.Status != OwnerProjectionAdvanceComplete || complete.Snapshot.State.OwnerLaunch.Receipt == nil {
++		t.Fatal("original receipt finalization", err)
++	}
++	t.Run("acknowledged-original-launch", func(t *testing.T) {
++		call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++		defer cancel()
++		before := projectionEffectCounts(f)
++		state, err := reader.journal(call)
++		if err != nil || !equalJSON(state, complete.Snapshot.State) {
++			t.Fatal("actual completed provider journal rejected", err)
++		}
++		if projectionEffectCounts(f) != before {
++			t.Fatal("startup reader performed an effect")
++		}
++	})
+ }
+--- a/internal/adapters/kubernetes/owner_identity_reader.go
++++ b/internal/adapters/kubernetes/owner_identity_reader.go
+@@ -81,7 +81,7 @@
+ 	}
+ 	check = ownerReadJournalState
+ 	v, e := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(obj.Data["state.json"]))
+-	if e != nil || v.Format != contracts.InitialRuntimeResourcesFormat || !ownerProviderJournalBound(s.input, a, v) || v.SetupID != in.ResourceSetupID || v.BindingDigest != in.ResourceBinding || !v.CreatedAt.Equal(a.ResourcesCreatedAt) || !v.Until.Equal(a.ResourcesUntil) || len(v.Objects) != len(initialRuntimeResourceItems) || !workerProjectionStateValid(in.InstallationID, v, s.client.now()) || v.OwnerIdentity == nil || v.OwnerIdentity.Receipt == nil || v.OwnerLaunch == nil || v.OwnerLaunch.Receipt == nil || v.OwnerIdentity.RoleRoot != a.RoleRoot || v.OwnerIdentity.RoleSetupID != a.RoleSetupID {
++	if e != nil || v.Format != contracts.InitialRuntimeResourcesFormat || !ownerProviderJournalBound(s.input, a, v) || v.SetupID != in.ResourceSetupID || v.BindingDigest != in.ResourceBinding || !v.CreatedAt.Equal(a.ResourcesCreatedAt) || !v.Until.Equal(a.ResourcesUntil) || len(v.Objects) != len(initialRuntimeResourceItems) || !workerProjectionStateValid(in.InstallationID, v, s.client.now()) || v.OwnerIdentity == nil || v.OwnerIdentity.Receipt == nil || v.OwnerLaunch == nil || v.OwnerIdentity.RoleRoot != a.RoleRoot || v.OwnerIdentity.RoleSetupID != a.RoleSetupID {
+ 		return zero, cfg.ErrChanged
+ 	}
+ 	check = ownerReadJournalReceipts
+@@ -102,6 +102,10 @@
+ 	if v.OwnerIdentity.Receipt.Configuration.Name != n.OwnerInputs || v.OwnerIdentity.Receipt.Credentials.Name != n.OwnerProviders {
+ 		return zero, cfg.ErrChanged
+ 	}
++	if v.OwnerLaunch.Receipt == nil {
++		check = ownerReadLaunchReceipt
++		return zero, &ownerLaunchReceiptPending{state: v}
++	}
+ 	return v, nil
+ }
+ 
+@@ -109,6 +113,10 @@
+ // native Secret and checks the original positive launch. Current configuration,
+ // recovery, exact SQL roles and process registration remain later prerequisites.
+ func (s *InstalledOwnerIdentityReader) Verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (result time.Time, err error) {
++	return s.verify(ctx, manifest, mounted, nil)
++}
++
++func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte, expected *contracts.InitialRuntimeResourceState) (result time.Time, err error) {
+ 	check := ownerReadInput
+ 	defer ownerReadAnnotate(&check, &err)
+ 	if s == nil || ctx == nil || ctx.Err() != nil || manifest.Format != contracts.OwnerIdentityCredentialManifestFormat || !equalJSON(manifest.Input, s.activation.Input) || manifest.RootUID != s.activation.RoleRoot.UID || manifest.SetupID != s.activation.RoleSetupID {
+@@ -151,6 +159,9 @@
+ 	if e != nil {
+ 		return time.Time{}, e
+ 	}
++	if expected != nil && !equalJSON(*expected, before) {
++		return time.Time{}, cfg.ErrChanged
++	}
+ 	check = ownerReadProjections
+ 	if e = s.projections(call, before, manifest, mounted); e != nil {
+ 		return time.Time{}, e
+--- a/internal/adapters/kubernetes/owner_identity_reader_test.go
++++ b/internal/adapters/kubernetes/owner_identity_reader_test.go
+@@ -11,6 +11,7 @@
+ 	"testing"
+ 	"time"
+ 
++	cfg "asservat.local/asservat/internal/domain/configuration"
+ 	admission "k8s.io/api/admissionregistration/v1"
+ 	apps "k8s.io/api/apps/v1"
+ 	auth "k8s.io/api/authentication/v1"
+@@ -22,7 +23,7 @@
+ )
+ 
+ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
+-	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "token-read-error", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled"} {
++	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "token-read-error", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled", "startup-pending", "startup-guard-lost", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-regressed", "startup-receipt-replaced"} {
+ 		t.Run(mode, func(t *testing.T) {
+ 			x := newOwnerIdentityObjectFixture(t)
+ 			in := x.reader.input
+@@ -55,13 +56,44 @@
+ 			payload, _ := json.Marshal(map[string]int64{"iat": start.Add(-time.Second).Unix(), "exp": start.Add(5 * time.Minute).Unix()})
+ 			token := []byte("e30." + base64.RawURLEncoding.EncodeToString(payload) + ".synthetic-signature")
+ 			var reviews atomic.Int32
++			startupMode := strings.HasPrefix(mode, "startup-")
++			receipt := x.state.OwnerLaunch.Receipt
++			if startupMode && mode != "startup-receipt-regressed" {
++				x.state.OwnerLaunch.Receipt = nil
++				x.writeJournal(t)
++			}
++			var journalReads atomic.Int32
+ 			deploymentPath := "/apis/apps/v1/namespaces/" + in.Namespace.Name + "/deployments/" + a.Input.Deployment.Name
+ 			x.extra = func(w http.ResponseWriter, r *http.Request) bool {
+ 				switch r.URL.Path {
++				case "/api/v1/namespaces/" + in.Namespace.Name + "/secrets/" + a.Input.Resources.Name:
++					n := int32(0)
++					if startupMode {
++						n = journalReads.Add(1)
++					}
++					if n == 3 && mode == "startup-receipt-replaced" {
++						x.state.OwnerLaunch.Receipt.ResourceVersion += "x"
++						x.writeJournal(t)
++					}
++					if n == 3 && mode == "startup-after-receipt-changed" {
++						x.state.OwnerLaunch.Until = x.state.OwnerLaunch.Until.Add(-time.Microsecond)
++						x.writeJournal(t)
++					}
++					if n == 2 {
++						if mode == "startup-receipt-regressed" {
++							x.state.OwnerLaunch.Receipt = nil
++						} else if mode == "startup-launch-replaced" {
++							x.state.OwnerLaunch.OperationID = ownerID(3900)
++						} else {
++							x.state.OwnerLaunch.Receipt = receipt
++						}
++						x.writeJournal(t)
++					}
++					return false
+ 				case "/api/v1/namespaces/" + in.Namespace.Name:
+ 					permissionReply(w, ns)
+ 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + g.Name:
+-					if mode == "guard-missing" || mode == "guard-lost" && reviews.Load() >= 2 {
++					if mode == "guard-missing" || mode == "guard-lost" && reviews.Load() >= 2 || mode == "startup-guard-lost" && reviews.Load() >= 1 {
+ 						http.NotFound(w, r)
+ 					} else {
+ 						permissionReply(w, policy)
+@@ -99,7 +131,7 @@
+ 					if mode == "wrong-token-account" {
+ 						reply.Status.User.UID = ownerID(3501)
+ 					}
+-					if mode == "token-revoked" && n == 2 {
++					if (mode == "token-revoked" || mode == "startup-token-revoked") && n == 2 {
+ 						reply.Status.Authenticated = false
+ 					}
+ 					if mode == "late-guard" && n == 2 {
+@@ -135,20 +167,31 @@
+ 			if mode == "cancelled" {
+ 				end()
+ 			}
+-			until, e := reader.Verify(ctx, x.manifest, x.mounted)
+-			if mode == "valid" {
++			verify := reader.Verify
++			if startupMode {
++				verify = reader.VerifyStartup
++			}
++			until, e := verify(ctx, x.manifest, x.mounted)
++			if mode == "startup-receipt-regressed" && journalReads.Load() != 2 {
++				t.Fatal("receipt regression was treated as retryable pending", journalReads.Load())
++			}
++			if mode == "startup-pending" && (journalReads.Load() != 4 || reviews.Load() != 3) {
++				t.Fatal("pending startup omitted full fresh native proof", journalReads.Load(), reviews.Load())
++			}
++			if mode == "valid" || mode == "startup-pending" {
+ 				if e != nil || !until.After(time.Now()) || until.After(verifyStart.Add(5*time.Second)) {
+ 					t.Fatal("current original Pod/guard unavailable", e)
+ 				}
+ 			} else if e == nil {
+ 				t.Fatal("unavailable/replaced/revoked proof accepted")
+ 			}
+-			if mode != "valid" {
++			if mode != "valid" && mode != "startup-pending" && mode != "startup-launch-replaced" {
+ 				expected := map[string]OwnerIdentityReadCheck{
+ 					"guard-missing": ownerReadInitialGuard, "guard-lost": ownerReadFinalGuard, "allowing-probe": ownerReadInitialGuard,
+ 					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview, "token-revoked": ownerReadFinalTokenReview,
+ 					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
+ 					"late-guard": ownerReadFinalDeployment, "cancelled": ownerReadInput,
++					"startup-guard-lost": ownerReadInitialGuard, "startup-token-revoked": ownerReadInitialTokenReview, "startup-after-receipt-changed": ownerReadInitialJournal, "startup-receipt-regressed": ownerReadFinalJournal, "startup-receipt-replaced": ownerReadInitialJournal,
+ 				}[mode]
+ 				var failure *OwnerIdentityReadFailure
+ 				if !errors.As(e, &failure) || failure.Check() != expected {
+@@ -158,6 +201,9 @@
+ 					t.Fatal("original token error identity lost")
+ 				}
+ 			}
++			if mode == "startup-launch-replaced" && !errors.Is(e, cfg.ErrChanged) {
++				t.Fatal("pending launch replacement did not deny", e)
++			}
+ 			if e != nil && strings.Contains(e.Error(), string(token)) {
+ 				t.Fatal("token leaked")
+ 			}
+--- a/internal/adapters/kubernetes/owner_identity_startup.go
++++ b/internal/adapters/kubernetes/owner_identity_startup.go
+@@ -0,0 +1,119 @@
++package kubernetes
++
++import (
++	"context"
++	"errors"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// This is a passive installation state, never a current identity proof. Only
++// journal() creates it after checking the complete original journal shape and
++// pins. Its private public-state value contains no credential material.
++type ownerLaunchReceiptPending struct {
++	state contracts.InitialRuntimeResourceState
++}
++
++func (*ownerLaunchReceiptPending) Error() string { return "original owner launch receipt pending" }
++func (*ownerLaunchReceiptPending) Unwrap() error { return cfg.ErrUnavailable }
++
++// Compare the entire first pending public state. Only the original launch's
++// receipt may appear; even valid unrelated journal progress cannot be adopted.
++func ownerLaunchReceiptTransition(original, current contracts.InitialRuntimeResourceState) bool {
++	if original.OwnerLaunch == nil || original.OwnerLaunch.Receipt != nil || current.OwnerLaunch == nil {
++		return false
++	}
++	launch := *current.OwnerLaunch
++	launch.Receipt = nil
++	current.OwnerLaunch = &launch
++	return equalJSON(original, current)
++}
++
++// VerifyStartup permits passive convergence of one original launch receipt
++// within the caller's existing startup deadline (at most thirty seconds). It
++// never renews a launch/effect attempt or uses SQL/provider credentials while
++// pending. Runtime Verify remains one bounded proof with no convergence loop.
++func (s *InstalledOwnerIdentityReader) VerifyStartup(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (time.Time, error) {
++	if s == nil || ctx == nil || ctx.Err() != nil {
++		return time.Time{}, cfg.ErrInvalid
++	}
++	startup, cancel := context.WithDeadline(ctx, s.client.now().Add(30*time.Second))
++	defer cancel()
++	until, err := s.Verify(startup, manifest, mounted)
++	var pending *ownerLaunchReceiptPending
++	// A completed journal that loses its receipt during Verify is Changed;
++	// it must never be reclassified as a newly pending installation.
++	if !errors.As(err, &pending) || errors.Is(err, cfg.ErrChanged) || errors.Is(err, cfg.ErrDenied) || errors.Is(err, cfg.ErrInvalid) {
++		return until, err
++	}
++	return awaitOwnerLaunchReceipt(startup, pending.state, s.client.now, s.journal,
++		func(call context.Context, completed contracts.InitialRuntimeResourceState) (time.Time, error) {
++			return s.verify(call, manifest, mounted, &completed)
++		})
++}
++
++// read is only the exact original journal GET; verify is the full native
++// guard/token/object/Pod/journal bracket. The separate arguments make explicit
++// that passive observations cannot yield authority, even after a receipt.
++func awaitOwnerLaunchReceipt(ctx context.Context, original contracts.InitialRuntimeResourceState, now func() time.Time,
++	read func(context.Context) (contracts.InitialRuntimeResourceState, error), verify func(context.Context, contracts.InitialRuntimeResourceState) (time.Time, error)) (time.Time, error) {
++	if ctx == nil || now == nil || read == nil || verify == nil || original.OwnerLaunch == nil || original.OwnerLaunch.Receipt != nil {
++		return time.Time{}, cfg.ErrInvalid
++	}
++	parentEnd, ok := ctx.Deadline()
++	if !ok {
++		return time.Time{}, cfg.ErrInvalid
++	}
++	end := identity.Earlier(parentEnd, original.Until)
++	bounded, cancel := context.WithDeadline(ctx, end)
++	defer cancel()
++	for {
++		if err := initialHandoverDeadline(bounded, now, end); err != nil {
++			return time.Time{}, err
++		}
++		timer := time.NewTimer(250 * time.Millisecond)
++		select {
++		case <-bounded.Done():
++			timer.Stop()
++			return time.Time{}, errors.Join(cfg.ErrUnavailable, bounded.Err())
++		case <-timer.C:
++		}
++		call, stop := context.WithDeadline(bounded, identity.Earlier(end, now().Add(5*time.Second)))
++		current, err := read(call)
++		callEnd, _ := call.Deadline()
++		deadlineErr := initialHandoverDeadline(call, now, callEnd)
++		stop()
++		if deadlineErr != nil {
++			return time.Time{}, deadlineErr
++		}
++		var pending *ownerLaunchReceiptPending
++		if errors.As(err, &pending) {
++			current = pending.state
++		} else if err != nil {
++			return time.Time{}, err
++		}
++		if !ownerLaunchReceiptTransition(original, current) {
++			return time.Time{}, cfg.ErrChanged
++		}
++		if pending != nil {
++			continue
++		}
++		if current.OwnerLaunch.Receipt == nil {
++			return time.Time{}, cfg.ErrChanged
++		}
++		// A fresh full proof is mandatory after convergence, retaining the
++		// first positive receipt, entire completed state and unchanged startup
++		// deadline. A different receipt cannot be selected during that proof.
++		until, err := verify(bounded, current)
++		if err != nil {
++			return time.Time{}, err
++		}
++		if err = initialHandoverDeadline(bounded, now, identity.Earlier(until, end)); err != nil {
++			return time.Time{}, err
++		}
++		return until, nil
++	}
++}
+--- a/internal/adapters/kubernetes/owner_identity_startup_test.go
++++ b/internal/adapters/kubernetes/owner_identity_startup_test.go
+@@ -0,0 +1,119 @@
++package kubernetes
++
++import (
++	"context"
++	"errors"
++	"reflect"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++func TestOwnerStartupPassiveLaunchReceiptPinsAndBounds(t *testing.T) {
++	for _, mode := range []string{"complete", "two-pending", "still-pending", "changed-launch", "changed-sibling", "read-error", "authority-error", "expired-proof", "cancelled", "root-expired", "blocked-read-expired"} {
++		t.Run(mode, func(t *testing.T) {
++			x := newOwnerIdentityObjectFixture(t)
++			complete := x.state
++			launch := *complete.OwnerLaunch
++			launch.Receipt = nil
++			original := complete
++			original.OwnerLaunch = &launch
++			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++			defer cancel()
++			var offset atomic.Int64
++			now := func() time.Time { return time.Now().Add(time.Duration(offset.Load())) }
++			if mode == "cancelled" {
++				cancel()
++			}
++			if mode == "root-expired" {
++				original.Until = now().Add(-time.Second)
++			}
++			if mode == "blocked-read-expired" {
++				var stop context.CancelFunc
++				ctx, stop = context.WithTimeout(ctx, 300*time.Millisecond)
++				defer stop()
++			}
++			reads, verifies := 0, 0
++			read := func(call context.Context) (contracts.InitialRuntimeResourceState, error) {
++				reads++
++				deadline, ok := call.Deadline()
++				parent, _ := ctx.Deadline()
++				if !ok || deadline.After(parent) || deadline.After(now().Add(5*time.Second)) {
++					t.Fatal("passive read extended original deadline")
++				}
++				switch mode {
++				case "two-pending":
++					if reads < 3 {
++						return contracts.InitialRuntimeResourceState{}, &ownerLaunchReceiptPending{state: original}
++					}
++				case "still-pending":
++					// Original caller cancellation interrupts the subsequent
++					// passive wait; the pending state itself yields no proof.
++					cancel()
++					return contracts.InitialRuntimeResourceState{}, &ownerLaunchReceiptPending{state: original}
++				case "changed-launch":
++					changed := *complete.OwnerLaunch
++					changed.OperationID = ownerID(4001)
++					complete.OwnerLaunch = &changed
++				case "changed-sibling":
++					complete.SetupID = ownerID(4002)
++				case "read-error":
++					return contracts.InitialRuntimeResourceState{}, cfg.ErrUnavailable
++				case "blocked-read-expired":
++					<-call.Done()
++					// A backend returning an apparently positive late result
++					// cannot rescue the original read/caller deadline.
++					return complete, nil
++				}
++				return complete, nil
++			}
++			verify := func(call context.Context, expected contracts.InitialRuntimeResourceState) (time.Time, error) {
++				verifies++
++				if !equalJSON(expected, complete) || expected.OwnerLaunch.Receipt == nil {
++					t.Fatal("full proof did not receive exact first completed receipt")
++				}
++				if mode == "authority-error" {
++					return time.Time{}, cfg.ErrDenied
++				}
++				if mode == "expired-proof" {
++					return now().Add(-time.Microsecond), nil
++				}
++				until, _ := call.Deadline()
++				return until, nil
++			}
++			until, err := awaitOwnerLaunchReceipt(ctx, original, now, read, verify)
++			if mode == "complete" || mode == "two-pending" {
++				wantReads := 1
++				if mode == "two-pending" {
++					wantReads = 3
++				}
++				if err != nil || !until.After(now()) || reads != wantReads || verifies != 1 {
++					t.Fatal("receipt did not require independent authority", reads, verifies, err)
++				}
++			} else {
++				if err == nil || !until.IsZero() {
++					t.Fatal("unavailable transition returned authority")
++				}
++				want := 0
++				if mode == "authority-error" || mode == "expired-proof" {
++					want = 1
++				}
++				if verifies != want {
++					t.Fatal("authority ran before exact convergence", reads, verifies)
++				}
++				if (mode == "changed-launch" || mode == "changed-sibling") && !errors.Is(err, cfg.ErrChanged) {
++					t.Fatal("changed pending source classification", err)
++				}
++				if mode == "authority-error" && !errors.Is(err, cfg.ErrDenied) {
++					t.Fatal("current authority refusal changed", err)
++				}
++			}
++			if !reflect.DeepEqual(original.OwnerLaunch, &launch) {
++				t.Fatal("comparison mutated original launch")
++			}
++		})
++	}
++}
+--- a/internal/bootstrap/owner_observation_deployment.go
++++ b/internal/bootstrap/owner_observation_deployment.go
+@@ -128,7 +128,7 @@
+ 		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+ 	phase = startupNativeIdentity
+-	identityUntil, err := identityReader.Verify(startup, manifest, mounted)
++	identityUntil, err := identityReader.VerifyStartup(startup, manifest, mounted)
+ 	if err != nil || !time.Now().Before(identityUntil) {
+ 		return nil, errors.Join(mounts.ErrUnavailable, err)
+ 	}
+--- a/specs/deployment-profiles.md
++++ b/specs/deployment-profiles.md
+@@ -77,6 +77,20 @@
+ Given a local developer authorized through a group AccessBinding and a separate authorized reviewer, when the developer connects an MCP client, then authentication uses browser login and scoped tokens, and the same evidence rules apply as with SSO. Removing group membership or disabling the account blocks dependent access within the specified freshness bounds. Recreating the same username does not inherit the deleted subject's grants, ownership or shares.
+ 
+ ## REQ-DEP-003 — Local key services with unchanged evidence isolation
++
++[ADR-164](../docs/decisions/164-owner-launch-receipt-convergence.md) permits
++observation-mode owner startup to wait passively for the acknowledged receipt of
++its exact original launch. It MUST retain its original thirty-second startup
++caller, the complete first pending public journal state and every original
++identity/claim/date; only that launch receipt may appear. Pending state MUST NOT
++authorize SQL credential use, provider/key actions, activation or serving. Read
++failures or other changes MUST deny. After bounded journal-only convergence, a
++complete fresh native identity proof of at most five seconds MUST precede
++credential use, including current guard/token/projection/Deployment/original Pod
++and unchanged journal checks. The complete first observed positive receipt and
++state MUST remain exact through that proof. Neither waiting nor fresh proof renews an effect
++attempt, selects a replacement or retries uncertain writes. Ordinary runtime
++identity verification remains non-waiting.
+ 
+ [ADR-126 connector process identity](../docs/architecture/connector-renewal.md)
+ MUST keep the logical installation/cluster/peer account stable across ordinary

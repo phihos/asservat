@@ -1,0 +1,22 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait
+--- PASS: TestContextAdmissionWithRealServices (13.54s)
+    --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation (13.16s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs (2.06s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change (1.51s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change (1.43s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs (1.42s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs (1.48s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs (1.63s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source (1.44s)
+        --- PASS: TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait (2.17s)
+PASS
+ok  	asservat.local/asservat/test/integration	14.596s

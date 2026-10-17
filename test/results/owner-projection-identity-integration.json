@@ -1,0 +1,9 @@
+{
+  "scope": "Exact original OwnerProjectionOperation receiver, five boundary checks; component evidence only.",
+  "paths": 3,
+  "dependenciesVerified": 2593,
+  "manifestSHA256": "92586dc39d1d098a31c9f5805ff166c18cf56c05733489d8d17894e116a5df26",
+  "resultSHA256": "769f16ec62a09fc3322e987b017aa2fa8497c42fd6af578b5afb0768cab55063",
+  "terminal": 0,
+  "nativeQualification": false
+}

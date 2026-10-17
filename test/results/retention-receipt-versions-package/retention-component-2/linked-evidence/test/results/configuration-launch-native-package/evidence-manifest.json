@@ -1,0 +1,12 @@
+{
+  "PLAN.md": "54934ac77ba2a4652de05643d8b6494ce44109c76a3bc57e43b6e2a91fec55df",
+  "changes/test/integration/configuration_launch_kube_test.go": "afe6f23838dc4cff71bb3aad68658eceace3195401d28f5eeb1b2090e992cad6",
+  "changes/test/integration/configuration_launched_inventory_test.go": "560431d86063aaaaa8362527267377cff6637a3d8c9b2a4841ca5b3bd5112323",
+  "changes/test/integration/configuration_runtime_roles_test.go": "231b759938d7ee28fc2c965ea5653d2c0c733bb227ed98fbef28fafcf708d141",
+  "changes/test/integration/initial_installation_test.go": "dd9efa9bd3f76d7bddb3c256c58edda01c0fca8c3f0a09b9043fca81f0fa50d9",
+  "compile.log": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+  "dependencies.json": "4021928b35062d6532ff81abd90353cbe55cb874056a929d3faea978c8c75abf",
+  "manifest.json": "6f16370352c876cb59071b6bbe3d376e62bdb9fc41f176d2419c8d6530aea073",
+  "result.json": "060136444eb70a64e41c47dd88b635cd66ad2d69a4f5b5b97e1e2308c78498bd",
+  "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

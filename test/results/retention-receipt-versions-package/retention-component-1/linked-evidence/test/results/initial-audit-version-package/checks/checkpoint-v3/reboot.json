@@ -1,0 +1,8 @@
+{
+  "bootID": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "interruptedHandle": 45687,
+  "priorTerminal": "unknown; handle absent after confirmed reboot",
+  "priorTmpEvidence": "lost; no test verdict retained",
+  "nonSourceExclusion": "core.4751 appeared after reboot; metadata only inspected, contents untouched",
+  "payloadManifestSHA256": "f61487b611b9e94f9e10228727727745873496a916bdf29a3bc30d7190f29e9e"
+}

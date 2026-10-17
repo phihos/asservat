@@ -1,0 +1,4 @@
+# asservat.local/asservat/internal/adapters/kubernetes
+internal/adapters/kubernetes/owner_projection_preflight_source.go:19:2: "k8s.io/apimachinery/pkg/apis/meta/v1" imported as meta and not used
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

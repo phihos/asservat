@@ -1,0 +1,48 @@
+{
+  "status": "staged revision6; database recovery three phases pass; preview regression reproduced and correction integrated but qualification pending; root integration/canonical validation pending",
+  "files": [
+    {
+      "path": "docs/implementation-progress.md",
+      "base_sha256": "0317c7c4a0b5d6fc798c4ec6a3ac9ee3b0ca1db8bbcf23508fc5605fc3152694",
+      "sha256": "e7e1a84b1ad3a8cfedade4c08105a9310420f24b63b9f9efc2d8cb310c8e263e"
+    },
+    {
+      "path": "docs/decisions/161-fleet-observation-separation.md",
+      "base_sha256": "ebdbba0ab17688c8e80ff1bd826e435a35483de0bd0b4428625f05b35aad90b9",
+      "sha256": "2b65248bf483fefcd188557e102b5cc5a9bbed287f05f905bcaa460fd970f868"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "base_sha256": "3cc7d63f3ae11ecc5847e18783de6c34e502477df93a8d5378f5e63b55cf811c",
+      "sha256": "73dcc0273012cd864ce77e63b74bbbc6d285439f43749939910ee1537066c5a3"
+    },
+    {
+      "path": "docs/architecture/fleet-observation.md",
+      "base_sha256": "2631e2ea8647d2978a5875aafe3a1fcf36f9871ad2f0803a9e894f5fc458305a",
+      "sha256": "1816d5d7510abbd510d72e9076d3f1cc7dc2a2f482c4ad6baf0605752ca6fa6c"
+    }
+  ],
+  "patch_sha256": "8c0ac06646a6eb906e696364cc34823b714e06a5823dc6552cecdd0bc0f2eb67",
+  "evidence_sha256": {
+    "test/results/fleet-freshness-native-1/result.json": "4669ff39bbd250f2304672854d737d048d4401c092efc68a80fd1c811b158128",
+    "test/results/fleet-freshness-component-1/result.json": "4661efff0e86deaa583f0c7090a6a6c9fd3dd80ef60ce2c574f406e2d231bbcb",
+    "test/results/fleet-freshness-component-2/result.json": "ce97963ed92d6444ab569ee3642f27ae14fad588051fb837d3c9c775b76546e4",
+    "test/results/fleet-freshness-initial-installation-1/result.json": "315dd3858965a4cdf11d0b99fc9ce8e10c3a5bc388fa3de622de1b22fbe466e8",
+    "test/results/runtime-provider-owner-native-11/result.json": "d900b2fe3a34a3b45bb37fa3d1725d38825da3da5f6cb22abc8133ca3861d859",
+    "test/results/public-context-journey-native-3/result.json": "34456bd682c02f7576d8adc37bd6029e1e34fa80c9dc26ec93f3a0d0d8197985",
+    "/home/phil/.cache/asservat-build/planning/product-sql-budget-review-20261014/FINDINGS.md": "441688ebe686ec20fcd62b2b5fef7a69493fea9124b7ab5f225c33f645c773f9",
+    "/home/phil/.cache/asservat-build/planning/owner-native11-review-20261014/verification.json": "205ee4d7d018bbe3a41f061138e74274924c32e292ed64132c8bdb81efc80e84",
+    "/home/phil/.cache/asservat-build/planning/owner-bridge-sql59-fixtures-20261014/manifest.json": "a67138ec2445d35f2f93d5393db8e0760b2c42b1ffe3d9751b1a9e9bd8c6b55c",
+    "/home/phil/.cache/asservat-build/planning/owner-bridge-sql59-fixtures-20261014/independent-review.json": "d84388e669c4675c5be02528771bebe6154cefd561b2654ff6bce37bb9b00c47",
+    "test/results/public-context-journey-component-7/result.json": "584320de34978652bdc1e78b7720cc1890eea7ea731974da74c5493e9bbaa166",
+    "test/results/public-context-journey-native-4/result.json": "5fceb63afbbfd1e4d3a4fd91eeeb2a0eb8695b59f2b60b7dbdac01721c89be7e",
+    "test/results/fleet-freshness-initial-installation-2/result.json": "1784481ab4e17c16e5e1e578ed48a0dd2da5e5d18ec22fdfb2e2986947ae1360",
+    "/home/phil/.cache/asservat-build/planning/fleet-freshness-native-verification-20261014/initial-installation-2-verification.json": "b15fe8e9e9b2bd8abc7e04df8cd1d182e9d3f0d10d57d04427d72f27af3e5ed4",
+    "test/results/fleet-freshness-fleet-1/result.json": "5594a0e024bd67aa5b78f3fbb19086848a84f43dbc6afea0bb20ebe710d3c3f3",
+    "/home/phil/.cache/asservat-build/planning/public-context-journey-diagnostics-20261014/native4-independent-verification.json": "b9be99595b24b1f545f361346ea4dd2de773210c0ad0b342eee510fb49dad013",
+    "test/results/fleet-freshness-database-recovery-1/result.json": "13b0cc7a8a0e744884e4d2484d5d70eca8edeb63cd19997fe72cc2c0210b8634",
+    "/home/phil/.cache/asservat-build/planning/fleet-freshness-native-verification-20261014/fleet-freshness-database-recovery-1-verification.json": "98a95387d74d68801f21d5ce9f7615de7998f6df464a4f93c0c864d0b6359cbf"
+  },
+  "no_runtime_contract_change": true,
+  "preserves_prior_chronology": true
+}

@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/contracts/cluster_observation_routing.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/files/internal/contracts/cluster_observation_routing.go",
+    "/home/phil/Projekte/asservat/internal/contracts/cluster_observation_routing_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/files/internal/contracts/cluster_observation_routing_test.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/cluster_observation_routing.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/files/internal/domain/fleet/cluster_observation_routing.go",
+    "/home/phil/Projekte/asservat/internal/domain/fleet/cluster_observation_routing_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-contract-20261013/checkpoint-v1/files/internal/domain/fleet/cluster_observation_routing_test.go"
+  }
+}

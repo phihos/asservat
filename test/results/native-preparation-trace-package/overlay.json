@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/context_native_content_test.go": "/home/phil/.cache/asservat-build/planning/native-preparation-trace-20261012/changes/test/integration/context_native_content_test.go",
+    "/home/phil/Projekte/asservat/test/integration/native_preparation_trace_test.go": "/home/phil/.cache/asservat-build/planning/native-preparation-trace-20261012/changes/test/integration/native_preparation_trace_test.go"
+  }
+}

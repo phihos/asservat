@@ -1,0 +1,10 @@
+NAMESPACE            NAME                                                                READY   STATUS    RESTARTS   AGE   IP           NODE                                        NOMINATED NODE   READINESS GATES
+kube-system          coredns-559f6c778d-ht8gv                                            1/1     Running   0          12s   10.244.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          coredns-559f6c778d-qprcf                                            1/1     Running   0          12s   10.244.0.4   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          etcd-asservat-startup-0f8708da32-control-plane                      1/1     Running   0          21s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          kindnet-xh2bm                                                       1/1     Running   0          12s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          kube-apiserver-asservat-startup-0f8708da32-control-plane            1/1     Running   0          21s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          kube-controller-manager-asservat-startup-0f8708da32-control-plane   1/1     Running   0          21s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          kube-proxy-4224c                                                    1/1     Running   0          12s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+kube-system          kube-scheduler-asservat-startup-0f8708da32-control-plane            1/1     Running   0          21s   172.18.0.3   asservat-startup-0f8708da32-control-plane   <none>           <none>
+local-path-storage   local-path-provisioner-75f7fc7dc5-5p6q9                             1/1     Running   0          12s   10.244.0.2   asservat-startup-0f8708da32-control-plane   <none>           <none>

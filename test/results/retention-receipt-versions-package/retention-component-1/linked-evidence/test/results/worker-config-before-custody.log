@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-missing-configuration
+    download_sessions_test.go:184: constructor profile authorized dispatch without accepted configuration
+--- FAIL: TestContextAdmissionWithRealServices (1.31s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-missing-configuration (1.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.363s
+FAIL

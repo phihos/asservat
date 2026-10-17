@@ -1,0 +1,59 @@
+# Accepted owner reader diagnostics — source-only v1
+
+No workspace edits, tests, builds or service operations were performed. Only these four payloads are staged outside the workspace. `gofmt` completed on the staged files; qualification remains unrun. `manifest.json` binds exact live bases and payloads; `review.patch` is the complete change. `source-evidence.json` records the 27 read source/evidence hashes.
+
+## Scope and actual failure
+
+Native owner3 failed at `selection.phase-two: selection.initial-native: native.accepted-read`. This branch precedes the native accepted-observation validity/equality/original checks. Its existing normalization discards the inner reader failure, so the actual refusing SQL predicate remains unknown. Earlier constructor and selection API-call deadlines did not expire on return; that does not prove current SQL owner/fleet freshness.
+
+`ReadOwnerConfiguration` performs exactly:
+
+1. `ShareFleetTrust` on `fleet_current_trust`, FOR SHARE.
+2. `ShareOwnerConfiguration`, FOR SHARE.
+3. Original source UID and nonzero head generation checks.
+4. Exact source/generation immutable revision read.
+5. Snapshot decoding, pinned configuration match, suspension, generation, issuer, audit decoding and receipt match, in this order.
+6. One existing `CurrentTime` query.
+7. Original `recoveryState(trust, head.ObservedAt, n)`.
+8. Original final owner observation validity with `min(head.FreshUntil, recovery.FreshUntil)`.
+
+The recovery helper first rejects suspended/effectively recovery-blocked fleet state, then fleet freshness. Its returned proof also starts at **owner head ObservedAt** and ends at `min(owner start + 5s, fleet expiry)`. Therefore a failure in recovery can still arise from an old owner observation; this has its own `recovery-proof-interval` diagnostic. The fleet view's single recovery Boolean incorporates persisted recovery plus PostgreSQL process/database incarnation and standby state; the diagnostic does not claim to distinguish those components.
+
+## Changed implementation
+
+- The existing reader's transaction callback is extracted into a private method so meaningful tests call its actual generated queries and branches. SQL text, arguments, query order, locks, retries, timeouts, cancellation, predicate order and clock count remain unchanged.
+- Each exact failing statement/predicate stores two bounded enums only. Recovery/interval diagnostic classification uses the already-returned rows and the original SQL timestamp after the existing predicate fails. It grants no authority and performs no extra reads or clock samples.
+- The outer error wraps **only** `Ledger.transaction`'s sanitized error. No raw driver error, row, token, SQL text, ID or timestamp is retained in the diagnostic. `errors.Is` retains the former sanitized result.
+- `Ledger` is unchanged. Local diagnostic state is cleared at each callback entry and successful exit. Query failures with the only retryable SQLSTATEs (40001/40P01) clear detail before returning the original error. Thus a later Begin/SET failure cannot inherit an earlier query label, and a COMMIT failure remains generic. Exhausted retryable errors intentionally report `transaction/unspecified`; no false claim identifies a prior attempt as the decisive statement.
+- The native fixture wraps its existing concrete `*postgres.OwnerConfigurations` with a delegate that calls it exactly once with the same context, logs only the exact exported diagnostic enum values through `errors.As`, then returns observation/error unchanged. Its lifetime remains the root's original lifetime. No production Kubernetes error chain, normalization, public interface or domain type changes.
+
+The diagnostic's public Go type is `*postgres.OwnerConfigurationReadFailure`, with `Check() OwnerConfigurationReadCheck` and `Reason() OwnerConfigurationReadReason`. Both enums' `String` methods are closed fixed tables; unknown values render `unknown`.
+
+Key readings:
+
+| Check | Reason | Meaning of this actual read |
+| --- | --- | --- |
+| `share-fleet` / `share-owner` | `lock-timeout`, `permission`, `query-cancelled`, `deadline`, `driver`, etc. | Exact failed row query; no later sampling |
+| `fleet-interval` | `expired-interval` | Fleet observation expired at the original SQL timestamp |
+| `recovery-proof-interval` | `expired-interval` | Fleet passed; owner-start-derived recovery bound failed |
+| `owner-interval` | `closed-interval` | Final accepted owner interval was closed/fenced |
+| `owner-interval` | `expired-interval` | Final accepted owner cutoff expired |
+| `recovery-blocked` | `predicate` | Derived view recovery flag was set; underlying component unspecified |
+| `transaction` | `unspecified` | No safe final statement classification, including retry or commit boundaries |
+
+## Refresh and lock analysis
+
+The installed worker uses independent fleet and owner source loops, each with its original five-second bound and a one-second delay after the previous iteration finishes. Owner audit runs independently of source refresh. Native source readers preserve their first source interval and exact final source/token/guard brackets; none of the SQL observers creates replacement source dates.
+
+The bridge's `WithInitialRuntimeBridge` holds the same fleet row FOR SHARE across the native operation and its joined result check. The fleet observer takes FOR UPDATE to persist its independently read current source. Owner observation and current reads take fleet FOR SHARE before the owner head. ADR155's classified unchanged-source lock contention preserves the old cutoff without renewal; it is not a successful observation. An owner observation failure can additionally fence the owner head under its existing rules.
+
+Owner3 has actual worker FOR UPDATE lock timeouts, so a refresh conflict exists. Whether the decisive accepted read failed on its own SQL lock, fleet expiry, recovery-proof bound, or owner fence/expiry is **not established by the current log**. This patch deliberately changes no structural locking or freshness and exists to identify that branch. The parent's separate same-row SQL regression can consume this exact diagnostic.
+
+## Proposed qualification, not yet run
+
+- Targeted package tests `TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock`, `TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset`, `TestOwnerConfigurationReadDiagnosticRecoveryParityAndErrorIdentity` under the allocated isolated runner.
+- Existing owner selection/native diagnostic package regressions and affected PostgreSQL package tests, with race checking where the approved runner specifies it.
+- Integration package compile/typecheck for the native fixture delegate; existing SQL owner configuration/native affected suites as allocated.
+- The actual original installed owner continuation, recording the first emitted `actual accepted owner SQL read refused` check/reason and retaining every original failure, exact source/harness manifests and terminal cleanup.
+
+Tests use synthetic rows through the real generated query object; they verify the exact ordered statements/bindings and one database clock, ordered multi-fault predicate priority, fleet versus owner deadline equality/fences, retry state clearing, query error normalization, fixed rendering and all sanitized sentinel identities. They do not claim real PostgreSQL contention or an installed success; those require the native runs.

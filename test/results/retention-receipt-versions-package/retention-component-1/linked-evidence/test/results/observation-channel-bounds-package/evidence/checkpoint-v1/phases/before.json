@@ -1,0 +1,42 @@
+{
+  "phase": "before",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-channel-bounds-20261013/checkpoint-v1/before-overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^TestOperationChannel(CarriesSelectedOwnerCutoffs|ExpiredRetainedCutoffDeniesBeforeAnotherRead|OriginalSelectedCutoffSurvivesKeyLockWait)$",
+    "-v",
+    "./internal/adapters/mtls"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 1,
+  "expectedExit": 1,
+  "expectedFailureOccurrences": null,
+  "seconds": 4.553,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "payloadSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "classification": "potentialPersonalData",
+  "mayContain": [
+    "userContent",
+    "credentials",
+    "personalIdentifiers"
+  ],
+  "expiresAt": "2026-10-09T17:55:00Z",
+  "deleteBy": "2026-10-09T18:00:00Z",
+  "deletionState": "overdue",
+  "automaticDeletion": true,
+  "managedCopiesOnly": true,
+  "externalCopiesRecallable": false,
+  "handlingCodes": [
+    "minimizeCapture",
+    "restrictAccess",
+    "preferApprovedExtracts",
+    "reviewBeforeSharing",
+    "approvedClientsOnly",
+    "externalCopiesNotRecalled"
+  ],
+  "preservationException": false,
+  "asOf": "2026-10-09T18:10:00Z"
+}

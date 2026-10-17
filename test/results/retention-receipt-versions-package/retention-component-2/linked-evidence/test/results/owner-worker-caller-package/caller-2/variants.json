@@ -1,0 +1,42 @@
+[
+  {
+    "variant": "before-final-journal",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller.go",
+    "sha256": "df4b639562cbf406027b2dcb763ac06840cc95cc064ad5bbb8cbdf0fa6f6762d"
+  },
+  {
+    "variant": "before-final-journal",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go",
+    "sha256": "b661a959351cd4df6afbbc9153d0a1e5671c4ded8f6f2ef54da0135ff4278334"
+  },
+  {
+    "variant": "before-final-journal",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go",
+    "sha256": "c3b2552c9921b442c3f6f7d710818b4c09dc67c858b933960f3174cc156e3f93"
+  },
+  {
+    "variant": "before-final-journal",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go",
+    "sha256": "6cf467c81490757d1839c20c262850a9bf982d145f45c5986db948318dbb2beb"
+  },
+  {
+    "variant": "before-classification",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller.go",
+    "sha256": "4eefa3810db170b078f510d92d701d3ceb0da25ca1517d548e6e921ced8cebee"
+  },
+  {
+    "variant": "before-classification",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go",
+    "sha256": "b661a959351cd4df6afbbc9153d0a1e5671c4ded8f6f2ef54da0135ff4278334"
+  },
+  {
+    "variant": "before-classification",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go",
+    "sha256": "05a98cd14a5e3d0b528882638b03ba92c8cf12adea21ec003a9d80ed443c7b4f"
+  },
+  {
+    "variant": "before-classification",
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go",
+    "sha256": "6cf467c81490757d1839c20c262850a9bf982d145f45c5986db948318dbb2beb"
+  }
+]

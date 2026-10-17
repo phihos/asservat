@@ -1,0 +1,568 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"reflect"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+// PublicRuntimeRoleRoot is a separate post-activation installer compartment.
+// Only an actual administrator and the original native namespace guard can
+// read/change it. It does not reuse or revive the retired initial manager.
+// No SQL privilege or recovery authority is derived from this Secret.
+type PublicRuntimeRoleRoot struct {
+	client         *PermissionClient
+	protection     *OwnerWorkloadProtection
+	configurations fleetapp.OwnerConfigurationReader
+	input          contracts.PublicRuntimeRoles
+	ctx            context.Context
+	cancel         context.CancelFunc
+	mu             sync.Mutex
+	closed, busy   bool
+	joined         sync.WaitGroup
+}
+
+func NewPublicRuntimeRoleRoot(ctx context.Context, client *PermissionClient, protection *OwnerWorkloadProtection, configurations fleetapp.OwnerConfigurationReader, input contracts.PublicRuntimeRoles) (*PublicRuntimeRoleRoot, error) {
+	digest, err := hex.DecodeString(input.LayoutDigest)
+	if ctx == nil || ctx.Err() != nil || client == nil || protection == nil || protection.observer == nil || configurations == nil || !authorization.UUID(input.OwnerConfigurationUID) || input.Format != contracts.PublicRuntimeRolesFormat || !authorization.UUID(input.InstallationID) || !authorization.UUID(input.InitialClaimID) || !authorization.UUID(input.ClusterID) || !authorization.UUID(input.Namespace.UID) || input.Namespace.Name == "" || err != nil || len(digest) != 32 || hex.EncodeToString(digest) != input.LayoutDigest || client.clusterID != input.ClusterID || client.control.Name != input.Namespace.Name || client.control.UID != input.Namespace.UID || protection.plan.ControlNamespace != client.control {
+		return nil, cfg.ErrInvalid
+	}
+	if input.Worker != (contracts.PublicRuntimeWorkerBinding{}) && !publicRuntimeWorkerBindingValid(input) {
+		return nil, cfg.ErrInvalid
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &PublicRuntimeRoleRoot{client: client, protection: protection, configurations: configurations, input: input, ctx: root, cancel: cancel}, nil
+}
+func (s *PublicRuntimeRoleRoot) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+}
+func (s *PublicRuntimeRoleRoot) enter(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	return bounded, func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+	}, nil
+}
+func (s *PublicRuntimeRoleRoot) name() string {
+	return "asservat-public-roles-" + strings.ReplaceAll(s.input.InstallationID, "-", "")
+}
+func (s *PublicRuntimeRoleRoot) path() string {
+	return "/api/v1/namespaces/" + s.input.Namespace.Name + "/secrets"
+}
+func (s *PublicRuntimeRoleRoot) current(ctx context.Context) (time.Time, error) {
+	configuration, err := s.configurations.ReadOwnerConfiguration(ctx)
+	if err != nil || !configuration.Valid(s.client.now()) || configuration.Configuration.Suspended || configuration.Configuration.Revision.UID != s.input.OwnerConfigurationUID {
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	pool := configuration.Configuration.Pool
+	if pool.InstallationID != s.input.InstallationID || pool.ClusterID != s.input.ClusterID || pool.Namespace != s.input.Namespace.Name || pool.NamespaceUID != s.input.Namespace.UID || pool.Deployment != s.protection.plan.Deployment || pool.DeploymentUID != s.protection.plan.DeploymentUID {
+		return time.Time{}, cfg.ErrChanged
+	}
+	ctx, original := context.WithDeadline(ctx, configuration.FreshUntil)
+	defer original()
+	_, until, err := s.protection.Current(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	raw, err := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/selfsubjectreviews").Body(&auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}).MaxRetries(0).DoRaw(bounded)
+	var who auth.SelfSubjectReview
+	if err != nil || permissionJSON(raw, permissionPageBytes, 131072) != nil || strictGuardJSON(raw, &who) != nil {
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	allowed := false
+	for _, actor := range s.protection.plan.Administrators {
+		allowed = allowed || actorMatches(actor, who.Status.UserInfo)
+	}
+	if !allowed || bounded.Err() != nil || !s.client.now().Before(until) {
+		return time.Time{}, cfg.ErrDenied
+	}
+	reader := &OwnerEndpoints{client: s.client, pool: pool}
+	deployment, err := ownerResource[apps.Deployment](reader, bounded, "/apis/apps/v1/namespaces/"+pool.Namespace+"/deployments/"+pool.Deployment, "apps/v1", "Deployment")
+	if err != nil || !publicRoleDeploymentBound(deployment, pool) {
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	if s.input.Worker != (contracts.PublicRuntimeWorkerBinding{}) {
+		if err = s.currentWorker(bounded); err != nil {
+			return time.Time{}, err
+		}
+	}
+	last, err := s.configurations.ReadOwnerConfiguration(bounded)
+	until = identity.Earlier(until, identity.Earlier(configuration.FreshUntil, last.FreshUntil))
+	if err != nil || !last.Valid(s.client.now()) || !configuration.Configuration.Equal(last.Configuration) || bounded.Err() != nil || !s.client.now().Before(until) {
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	return until, nil
+}
+
+// This first installed profile supports at most two desired hubs and two
+// additional retained processes during rollout/closure. The role limit itself
+// remains the final cluster-wide connection bound, including stalled old Pods.
+func publicRoleDeploymentBound(d apps.Deployment, p fleet.OwnerPool) bool {
+	if !ownerMetadata(d.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || d.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || d.Spec.Replicas == nil || *d.Spec.Replicas < 0 || *d.Spec.Replicas > 2 {
+		return false
+	}
+	// ADR-184: zero replicas only for the inert original Recreate owner, so
+	// public roles can precede its one launch.
+	if *d.Spec.Replicas == 0 {
+		return d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType && d.Spec.Strategy.RollingUpdate == nil
+	}
+	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+		return d.Spec.Strategy.RollingUpdate == nil
+	}
+	if d.Spec.Strategy.Type != apps.RollingUpdateDeploymentStrategyType || d.Spec.Strategy.RollingUpdate == nil || d.Spec.Strategy.RollingUpdate.MaxSurge == nil {
+		return false
+	}
+	surge, err := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxSurge, int(*d.Spec.Replicas), true)
+	return err == nil && surge >= 0 && int(*d.Spec.Replicas)+surge <= contracts.PublicRuntimeRetainedHubProcesses
+}
+func runtimeRoleStateValid(input contracts.PublicRuntimeRoles, v contracts.PublicRuntimeRoleState, now time.Time) bool {
+	if v.Format != contracts.PublicRuntimeRoleStateFormat || v.Input != input || !authorization.UUID(v.OperationID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) {
+		return false
+	}
+	if v.MAC.InputVersion != v.OperationID+"-input/v1" || v.MAC.AccountVersion != v.OperationID+"-account/v1" || len(v.MAC.InputKey) != 32 || len(v.MAC.AccountKey) != 32 || bytes.Equal(v.MAC.InputKey, v.MAC.AccountKey) || bytes.Equal(v.MAC.InputKey, make([]byte, 32)) || bytes.Equal(v.MAC.AccountKey, make([]byte, 32)) {
+		return false
+	}
+	purposes := contracts.PublicRuntimeRolePurposes()
+	if len(v.Roles) != len(purposes) {
+		return false
+	}
+	passwords := map[string]bool{}
+	ids := map[string]bool{v.OperationID: true}
+	oids := map[uint32]bool{}
+	for n, role := range v.Roles {
+		b, err := base64.RawURLEncoding.DecodeString(role.Password)
+		valid := err == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == role.Password && !bytes.Equal(b, v.MAC.InputKey) && !bytes.Equal(b, v.MAC.AccountKey)
+		clear(b)
+		if role.Purpose != purposes[n] || !valid || passwords[role.Password] {
+			return false
+		}
+		passwords[role.Password] = true
+		if c := role.Claim; c != nil {
+			if publicRuntimeWorkerPurpose(role.Purpose) && !publicRuntimeWorkerBindingValid(input) {
+				return false
+			}
+			if !authorization.UUID(c.OperationID) || ids[c.OperationID] || c.DatabaseOID == 0 || c.PostmasterAt.Year() < 2020 || c.PostmasterAt.After(c.ClaimedAt) || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(now) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.After(c.ClaimedAt) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || c.Until.After(v.Until) {
+				return false
+			}
+			ids[c.OperationID] = true
+		}
+		if r := role.Receipt; r != nil {
+			// Exact purpose-derived name and SQL privileges are independently verified
+			// by the SQL producer. The root cannot assign or choose a different role.
+			ordinal, known := contracts.PublicRuntimeRoleOrdinal(role.Purpose)
+			expected := "as_" + strings.ReplaceAll(input.InstallationID, "-", "") + "_pub_" + string([]byte{'0' + byte(ordinal/10), '0' + byte(ordinal%10)})
+			if !known || role.Claim == nil || r.RoleName != expected || r.RoleOID == 0 || r.RoleOID == 10 || oids[r.RoleOID] || r.LayoutDigest != input.LayoutDigest {
+				return false
+			}
+			oids[r.RoleOID] = true
+		}
+	}
+	for _, p := range []*contracts.PublicRuntimeProjectionClaim{v.Projection, v.FederationProjection} {
+		if p == nil {
+			continue
+		}
+		if !authorization.UUID(p.OperationID) || ids[p.OperationID] || p.ClaimedAt.Before(v.CreatedAt) || p.ClaimedAt.After(now) || !p.ClaimedAt.Equal(p.ClaimedAt.Truncate(time.Microsecond)) || !p.Until.After(p.ClaimedAt) || p.Until.Sub(p.ClaimedAt) > 5*time.Second || p.Until.After(v.Until) || p.SecretUID != "" && !authorization.UUID(p.SecretUID) {
+			return false
+		}
+		ids[p.OperationID] = true
+		for _, r := range v.Roles {
+			if r.Receipt == nil {
+				return false
+			}
+		}
+	}
+	if !capacitySetupStateValid(v, now) {
+		return false
+	}
+	return true
+}
+func (s *PublicRuntimeRoleRoot) decode(raw []byte, started, until time.Time) (contracts.PublicRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	if permissionJSON(raw, permissionPageBytes, 131072) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	var object core.Secret
+	if strictGuardJSON(raw, &object) != nil || object.APIVersion != "v1" || object.Kind != "Secret" || object.Namespace != s.input.Namespace.Name || object.Name != s.name() || !authorization.UUID(string(object.UID)) || object.ResourceVersion == "" || object.DeletionTimestamp != nil || len(object.OwnerReferences) != 0 || len(object.Finalizers) != 0 || object.Type != core.SecretTypeOpaque || object.Immutable != nil && *object.Immutable || len(object.Data) != 1 || len(object.StringData) != 0 {
+		return zero, nil, cfg.ErrChanged
+	}
+	data, ok := object.Data["state.json"]
+	if !ok {
+		return zero, nil, cfg.ErrChanged
+	}
+	state, err := contracts.DecodePublicRuntimeRoleState(bytes.NewReader(data))
+	if err != nil || !runtimeRoleStateValid(s.input, state, s.client.now()) {
+		return zero, nil, cfg.ErrChanged
+	}
+	if !s.client.now().Before(until) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	return contracts.PublicRuntimeRoleSnapshot{State: state, UID: string(object.UID), ResourceVersion: object.ResourceVersion, ObservedAt: started, ValidUntil: until}, &object, nil
+}
+
+// ADR-186: one role's root steps share one opening proof. The operation keeps
+// that proof's original deadline; it is never renewed.
+type publicRoleOperationKey struct{}
+type publicRoleOperation struct {
+	until time.Time
+	// The opening proof's accepted owner configuration and guard version, so a
+	// projection inside the operation starts as already proven.
+	configuration fleet.OwnerConfiguration
+	guardVersion  string
+}
+
+func publicRoleOperationOf(ctx context.Context) *publicRoleOperation {
+	op, _ := ctx.Value(publicRoleOperationKey{}).(*publicRoleOperation)
+	return op
+}
+
+// WithPublicRoleOperation runs one role's claim, role step and completion
+// under one full current proof, bounded to five seconds. The completion
+// proves again after the role step's blocking work.
+func (s *PublicRuntimeRoleRoot) WithPublicRoleOperation(ctx context.Context, run func(context.Context) error) error {
+	if s == nil || run == nil || ctx == nil || ctx.Err() != nil || publicRoleOperationOf(ctx) != nil {
+		return cfg.ErrUnavailable
+	}
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	until, err := s.current(bounded)
+	if err != nil {
+		return err
+	}
+	if d, ok := bounded.Deadline(); ok && d.Before(until) {
+		until = d
+	}
+	op, end := context.WithDeadline(bounded, until)
+	defer end()
+	c, err := s.configurations.ReadOwnerConfiguration(op)
+	if err != nil || !c.Valid(s.client.now()) {
+		return cfg.ErrUnavailable
+	}
+	g := s.protection
+	version, err := checkAdmissionGuard(op, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
+	if err != nil {
+		return err
+	}
+	return run(context.WithValue(op, publicRoleOperationKey{}, &publicRoleOperation{until: until, configuration: c.Configuration.Clone(), guardVersion: version}))
+}
+
+func (s *PublicRuntimeRoleRoot) read(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	started := s.client.now()
+	if op := publicRoleOperationOf(ctx); op != nil {
+		return s.readInOperation(ctx, op, started)
+	}
+	until, err := s.current(ctx)
+	if err != nil {
+		return zero, nil, err
+	}
+	if d, ok := ctx.Deadline(); ok && d.Before(until) {
+		until = d
+	}
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	raw, err := s.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(bounded)
+	if err != nil {
+		return zero, nil, err
+	}
+	out, object, err := s.decode(raw, started, until)
+	if err != nil {
+		return zero, nil, err
+	}
+	after, err := s.current(bounded)
+	if after.Before(until) {
+		until = after
+	}
+	out.ValidUntil = until
+	if err != nil || bounded.Err() != nil || !s.client.now().Before(until) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	return out, object, nil
+}
+
+// readInOperation fetches the journal under the operation's opening proof
+// and original deadline (ADR-186).
+func (s *PublicRuntimeRoleRoot) readInOperation(ctx context.Context, op *publicRoleOperation, started time.Time) (contracts.PublicRuntimeRoleSnapshot, *core.Secret, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	until := op.until
+	if d, ok := ctx.Deadline(); ok && d.Before(until) {
+		until = d
+	}
+	if !s.client.now().Before(until) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	raw, err := s.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(bounded)
+	if err != nil {
+		return zero, nil, err
+	}
+	out, object, err := s.decode(raw, started, until)
+	if err != nil {
+		return zero, nil, err
+	}
+	if bounded.Err() != nil || !s.client.now().Before(until) {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	out.ValidUntil = until
+	return out, object, nil
+}
+
+func (s *PublicRuntimeRoleRoot) ReadPublicRuntimeRoles(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	out, _, err := s.read(ctx)
+	return out, err
+}
+
+// Open is called only after the SQL installer independently checked current
+// activation. Existing state always wins; it never imports replacement passwords.
+func (s *PublicRuntimeRoleRoot) OpenPublicRuntimeRoles(ctx context.Context) (contracts.PublicRuntimeRoleSnapshot, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer end()
+	out, _, err := s.read(ctx)
+	if err == nil {
+		return out, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return zero, err
+	}
+	until, err := s.current(ctx)
+	if err != nil {
+		return zero, err
+	}
+	bounded, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	now := s.client.now().UTC().Truncate(time.Microsecond)
+	state := contracts.PublicRuntimeRoleState{Format: contracts.PublicRuntimeRoleStateFormat, Input: s.input, OperationID: uuid.NewString(), CreatedAt: now, Until: now.Add(30 * time.Minute)}
+	state.MAC = contracts.PublicAuditKeyMaterial{InputVersion: state.OperationID + "-input/v1", AccountVersion: state.OperationID + "-account/v1", InputKey: make([]byte, 32), AccountKey: make([]byte, 32)}
+	defer clear(state.MAC.InputKey)
+	defer clear(state.MAC.AccountKey)
+	if _, err = rand.Read(state.MAC.InputKey); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	if _, err = rand.Read(state.MAC.AccountKey); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
+		var p [32]byte
+		if _, err = rand.Read(p[:]); err != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		state.Roles = append(state.Roles, contracts.PublicRuntimeRoleMaterial{Purpose: purpose, Password: base64.RawURLEncoding.EncodeToString(p[:])})
+		clear(p[:])
+	}
+	if !runtimeRoleStateValid(s.input, state, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	b, err := json.Marshal(state)
+	if err != nil || len(b) > contracts.PublicRuntimeRoleMaxBytes {
+		return zero, cfg.ErrUnavailable
+	}
+	defer clear(b)
+	object := &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: s.name(), Namespace: s.input.Namespace.Name}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": b}}
+	raw, err := s.client.api.Post().AbsPath(s.path()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
+	if err != nil {
+		// Original named lookup only. No SQL claim exists in a new root, and no
+		// missing/unknown CREATE is reissued in this call.
+		out, _, lookup := s.read(bounded)
+		if lookup != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		return out, nil
+	}
+	out, _, err = s.decode(raw, now, until)
+	if err != nil || !reflect.DeepEqual(out.State, state) {
+		return zero, cfg.ErrChanged
+	}
+	// Independently read exact server identity/content under the same interval.
+	observed, _, err := s.read(bounded)
+	if err != nil || observed.UID != out.UID || !reflect.DeepEqual(observed.State, state) {
+		return zero, cfg.ErrChanged
+	}
+	return observed, nil
+}
+func (s *PublicRuntimeRoleRoot) ClaimPublicRuntimeRole(ctx context.Context, purpose string, database uint32, postmaster time.Time) (contracts.PublicRuntimeRoleSnapshot, bool, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+	defer end()
+	old, object, err := s.read(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+	n := slices.Index(contracts.PublicRuntimeRolePurposes(), purpose)
+	if n < 0 || database == 0 || postmaster.Year() < 2020 {
+		return zero, false, cfg.ErrInvalid
+	}
+	if publicRuntimeWorkerPurpose(purpose) && !publicRuntimeWorkerBindingValid(s.input) {
+		return zero, false, cfg.ErrDenied
+	}
+	if old.State.Roles[n].Claim != nil {
+		return old, false, nil
+	}
+	now := s.client.now().UTC().Truncate(time.Microsecond)
+	until := old.ValidUntil
+	if old.State.Until.Before(until) {
+		until = old.State.Until
+	}
+	until = until.UTC().Truncate(time.Microsecond)
+	if !now.Before(until) || postmaster.After(now) {
+		return zero, false, cfg.ErrUnavailable
+	}
+	next := old.State
+	next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), old.State.Roles...)
+	next.Roles[n].Claim = &contracts.PublicRuntimeRoleClaim{OperationID: uuid.NewString(), ClaimedAt: now, Until: until, DatabaseOID: database, PostmasterAt: postmaster.UTC()}
+	got, err := s.update(ctx, old, object, next, until)
+	if err != nil {
+		return zero, false, err
+	}
+	return got, true, nil
+}
+func (s *PublicRuntimeRoleRoot) CompletePublicRuntimeRole(ctx context.Context, original contracts.PublicRuntimeRoleSnapshot, purpose string, receipt contracts.PublicRuntimeRoleReceipt) error {
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
+	// ADR-186: the role step's blocking work intervened; prove again before
+	// the completing write, never beyond the operation's original deadline.
+	if publicRoleOperationOf(ctx) != nil {
+		until, e := s.current(ctx)
+		if e != nil {
+			return e
+		}
+		var narrow context.CancelFunc
+		ctx, narrow = context.WithDeadline(ctx, until)
+		defer narrow()
+	}
+	old, object, err := s.read(ctx)
+	if err != nil {
+		return err
+	}
+	n := slices.Index(contracts.PublicRuntimeRolePurposes(), purpose)
+	if n < 0 || old.UID != original.UID || old.State.OperationID != original.State.OperationID || len(original.State.Roles) != len(old.State.Roles) || old.State.Roles[n].Claim == nil || !reflect.DeepEqual(old.State.Roles[n].Claim, original.State.Roles[n].Claim) || old.State.Roles[n].Password != original.State.Roles[n].Password {
+		return cfg.ErrChanged
+	}
+	if current := old.State.Roles[n].Receipt; current != nil {
+		if *current == receipt {
+			return nil
+		}
+		return cfg.ErrChanged
+	}
+	next := old.State
+	next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), old.State.Roles...)
+	next.Roles[n].Receipt = &receipt
+	if !runtimeRoleStateValid(s.input, next, s.client.now()) {
+		return cfg.ErrInvalid
+	}
+	if _, err = s.update(ctx, old, object, next, old.ValidUntil); err != nil {
+		return err
+	}
+	// The completing write stays bracketed: an unknown outcome here is replayed
+	// by lookup, which accepts only the exact stored receipt.
+	if publicRoleOperationOf(ctx) != nil {
+		if _, err = s.current(ctx); err != nil {
+			return cfg.ErrUnavailable
+		}
+	}
+	return nil
+}
+func (s *PublicRuntimeRoleRoot) update(ctx context.Context, old contracts.PublicRuntimeRoleSnapshot, object *core.Secret, next contracts.PublicRuntimeRoleState, until time.Time) (contracts.PublicRuntimeRoleSnapshot, error) {
+	var zero contracts.PublicRuntimeRoleSnapshot
+	bounded, end := context.WithDeadline(ctx, until)
+	defer end()
+	if bounded.Err() != nil || !s.client.now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	b, err := json.Marshal(next)
+	if err != nil || len(b) > contracts.PublicRuntimeRoleMaxBytes {
+		return zero, cfg.ErrUnavailable
+	}
+	defer clear(b)
+	object = object.DeepCopy()
+	object.Data = map[string][]byte{"state.json": b}
+	raw, err := s.client.api.Put().AbsPath(s.path()+"/"+s.name()).Param("fieldValidation", "Strict").Body(object).MaxRetries(0).DoRaw(bounded)
+	// Even an exact lookup after an uncertain CAS cannot positively acknowledge
+	// the first claim. Callers must reopen read-only and never repeat SQL creation.
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	out, _, err := s.decode(raw, old.ObservedAt, until)
+	if err != nil || out.UID != old.UID || out.ResourceVersion == old.ResourceVersion || !reflect.DeepEqual(out.State, next) || bounded.Err() != nil {
+		return zero, cfg.ErrChanged
+	}
+	// ADR-186: inside a role operation the opening proof precedes the claim
+	// write and the completion brackets its own write; outside, every write is
+	// bracketed here.
+	if publicRoleOperationOf(ctx) != nil {
+		return out, nil
+	}
+	after, err := s.current(bounded)
+	if err != nil || !s.client.now().Before(after) {
+		return zero, cfg.ErrUnavailable
+	}
+	if after.Before(out.ValidUntil) {
+		out.ValidUntil = after
+	}
+	return out, nil
+}

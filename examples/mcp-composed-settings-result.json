@@ -1,0 +1,312 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "captureSettings",
+    "capture_id": "00000000-0000-4000-8000-000000000140",
+    "cluster_id": "00000000-0000-4000-8000-000000000001",
+    "namespace_uid": "namespace-payments-uid",
+    "accepted_at": "2026-10-09T12:00:00Z",
+    "expires_at": "2026-10-16T11:55:00Z",
+    "settings_digest": "2e9c9017f6cd6f45a869eec7c49838357a3174deda4f7b85ebf07fbfcba36442",
+    "original_execution_digest": "ba6268c735150eccd8a9a519d1c056cd8efb49b191d24a2007e5115c1b75d113",
+    "settings": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "StatefulSet",
+          "name": "ledger",
+          "uid": "workload-ledger-uid"
+        },
+        "maxPods": 1,
+        "selection": "lowestOrdinal",
+        "adoption": "pinUID",
+        "ordinals": [
+          0
+        ]
+      },
+      "recipe_spec": {
+        "description": "Expanded capture profile composition fixture.",
+        "actions": [
+          {
+            "id": "a005bdfce57635c5dabddbdd6",
+            "kind": "packetCapture",
+            "parameters": {
+              "profile": {
+                "kind": "httpHeaders",
+                "protocol": "http1",
+                "projectionRef": {
+                  "name": "http-response-headers",
+                  "version": "v1"
+                },
+                "maxFlows": 1024,
+                "maxHeaderBytes": 32768,
+                "maxReassemblyBytesPerFlow": 262144,
+                "maxReassemblyBytes": 16777216,
+                "idleTimeout": "30s"
+              },
+              "before": "30s",
+              "after": "30s",
+              "ring": {
+                "maxAge": "30s",
+                "maxBytes": 16777216,
+                "segmentBytes": 4194304,
+                "maxSegments": 4,
+                "medium": "memory"
+              },
+              "peers": {
+                "entries": [
+                  {
+                    "cidrs": [
+                      "0.0.0.0/0",
+                      "::/0"
+                    ]
+                  }
+                ],
+                "protocol": "tcp",
+                "resolution": "frozen",
+                "maxEndpoints": 1,
+                "maxStaleness": "5s"
+              },
+              "maxFrozenBytes": 67108864,
+              "maxConcurrentSnapshots": 1,
+              "filter": "tcp port 8080"
+            },
+            "required": true,
+            "impact": "sensitiveRead",
+            "limits": {
+              "maxBytes": 67108864,
+              "timeout": "90s"
+            },
+            "executionMode": "ongoing"
+          },
+          {
+            "id": "a5b186fa2f944fc675c96fcc2",
+            "kind": "syscallTrace",
+            "parameters": {
+              "processes": "allPodProcesses",
+              "mode": "metadata",
+              "before": "30s",
+              "after": "10s",
+              "syscalls": {
+                "mode": "all"
+              },
+              "result": "all",
+              "ring": {
+                "maxAge": "30s",
+                "maxBytes": 8388608,
+                "segmentBytes": 2097152,
+                "maxSegments": 4,
+                "medium": "memory"
+              },
+              "maxFrozenBytes": 16777216,
+              "maxConcurrentSnapshots": 1,
+              "maxEvents": 100000,
+              "maxEventsPerSecond": 10000,
+              "maxTrackedThreads": 4096
+            },
+            "required": true,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 16777216,
+              "timeout": "20s"
+            },
+            "executionMode": "ongoing"
+          },
+          {
+            "id": "adf187502ec3e8884310b85cf",
+            "kind": "processSnapshot",
+            "parameters": {
+              "include": [
+                "identity",
+                "status",
+                "cgroups"
+              ]
+            },
+            "required": true,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 1048576,
+              "timeout": "5s"
+            },
+            "executionMode": "onTrigger"
+          },
+          {
+            "id": "a7e5c90417a8841bef4f7993c",
+            "kind": "networkSnapshot",
+            "parameters": {
+              "include": [
+                "sockets",
+                "counters",
+                "socketOwners"
+              ]
+            },
+            "required": false,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 1048576,
+              "timeout": "5s"
+            },
+            "executionMode": "onTrigger"
+          }
+        ],
+        "maxTotalBytes": 100663296,
+        "maxDuration": "120s"
+      },
+      "dependency_pins": [
+        {
+          "role": "captureProfile",
+          "digest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26",
+          "source": {
+            "clusterID": "00000000-0000-4000-8000-000000000010",
+            "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "resourceUID": "fixture-http-headers-v1"
+          }
+        },
+        {
+          "role": "captureProfile",
+          "digest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e",
+          "source": {
+            "clusterID": "00000000-0000-4000-8000-000000000010",
+            "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "resourceUID": "fixture-process-context-v1"
+          }
+        },
+        {
+          "role": "captureProfile",
+          "digest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180",
+          "source": {
+            "clusterID": "00000000-0000-4000-8000-000000000010",
+            "namespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "resourceUID": "fixture-syscall-activity-v1"
+          }
+        },
+        {
+          "role": "collectionCeiling",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "role": "recipe",
+          "digest": "4a06dfe8ac66ff7970962d1a4a1af21b2c46cbdb3b89bdd3e09a7d18b56e40a9"
+        },
+        {
+          "role": "retention",
+          "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+        }
+      ],
+      "requested_retention": "24h",
+      "profile_composition": {
+        "authored": {
+          "components": [
+            {
+              "id": "http",
+              "profileRef": {
+                "catalog": "builtin",
+                "name": "http-headers",
+                "version": "v1"
+              },
+              "overrides": [
+                {
+                  "actionID": "http",
+                  "field": "packetFilter",
+                  "value": "tcp port 8080"
+                }
+              ]
+            },
+            {
+              "id": "calls",
+              "profileRef": {
+                "catalog": "builtin",
+                "name": "syscall-activity",
+                "version": "v1"
+              }
+            },
+            {
+              "id": "context",
+              "profileRef": {
+                "catalog": "builtin",
+                "name": "process-context",
+                "version": "v1"
+              }
+            }
+          ],
+          "maxTotalBytes": 100663296,
+          "maxDuration": "120s"
+        },
+        "resolvedProfiles": [
+          {
+            "componentID": "http",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "http-headers",
+              "version": "v1"
+            },
+            "sourceUID": "fixture-http-headers-v1",
+            "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+            "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
+          },
+          {
+            "componentID": "calls",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "syscall-activity",
+              "version": "v1"
+            },
+            "sourceUID": "fixture-syscall-activity-v1",
+            "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+            "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
+          },
+          {
+            "componentID": "context",
+            "profileRef": {
+              "catalog": "builtin",
+              "name": "process-context",
+              "version": "v1"
+            },
+            "sourceUID": "fixture-process-context-v1",
+            "sourceClusterID": "00000000-0000-4000-8000-000000000010",
+            "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
+            "definitionDigest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e"
+          }
+        ],
+        "actionMap": [
+          {
+            "componentID": "http",
+            "localActionID": "http",
+            "actionID": "a005bdfce57635c5dabddbdd6",
+            "deduplicated": false
+          },
+          {
+            "componentID": "calls",
+            "localActionID": "syscalls",
+            "actionID": "a5b186fa2f944fc675c96fcc2",
+            "deduplicated": false
+          },
+          {
+            "componentID": "context",
+            "localActionID": "processes",
+            "actionID": "adf187502ec3e8884310b85cf",
+            "deduplicated": false
+          },
+          {
+            "componentID": "context",
+            "localActionID": "sockets",
+            "actionID": "a7e5c90417a8841bef4f7993c",
+            "deduplicated": false
+          }
+        ]
+      }
+    },
+    "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000140"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

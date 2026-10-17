@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "path": "scripts/helm_registry.py",
+      "before": "fb589b725d563804e3feebf46644bcf31aaeb04ba738567eadc35a56fff240f5",
+      "after": "29c070386bac695acbde02e0002d68e56912be3126071cd4d1d529531b406821"
+    },
+    {
+      "path": "scripts/test-context-storage.py",
+      "before": "765eeacefba7b6599c37516d837533fc7627b646361a69d58b5ad517f6377e49",
+      "after": "c3920def48228ebc11484d226e03f4db2294c70c54dc181363704672adaf608f"
+    },
+    {
+      "path": "scripts/test-helm-bootstrap-selection.py",
+      "before": "6a939f510c666855369e41f851ed22d38f3fb128e5d866cdc7b531b9d314a67a",
+      "after": "79a3de7fbc3dcbcad2b8a09f53a2b3f1518f63e9320b931623be4cb372860fcb"
+    }
+  ],
+  "scope": "owned fixture image identity and setup-failure source provenance",
+  "productChanges": false
+}

@@ -1,0 +1,44 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 7b727e74-2f91-43b8-aef6-f3889818200c image docker.io/library/asservat-context-worker@sha256:f7bdb67c1796fb7aeeb8144f98458b63dd3f4dea00cfe91410cd6edc4018c46e exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-nfk307k0-0", namespace "bootstrap-chain-10000000", installation "1ed4f666-e48b-44b5-9907-4916e5b7ce9c": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-9f4f54df2c36b4a50a80f60a18d4ac7743a6bcc07b349f989f6ea77869ee79c9-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-9f4f54df2c36b4a50a80f60a18d4ac7743a6bcc07b349f989f6ea77869ee79c9-audit-wrap
+        created: sys/policies/acl/asservat-configuration-9f4f54df2c36b4a50a80f60a18d4ac7743a6bcc07b349f989f6ea77869ee79c9-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-9f4f54df2c36b4a50a80f60a18d4ac7743a6bcc07b349f989f6ea77869ee79c9-audit-unwrap
+        created: sys/policies/acl/asservat-1ed4f666e48b44b599074916e5b7ce9c-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:299: continuation produce 
+    installer_continuation_native_test.go:299: continuation continue installer continuation: resources/audit-secrets done in 4ms
+        installer continuation: resources/producer done in 640ms
+        installer continuation: resources/journal done in 1.95s
+        installer continuation: resources/advance done in 1m1.753s
+        installer continuation: resources/inventory done in 649ms
+        installer continuation: bridge/observer done in 21ms
+        installer continuation: bridge/protection done in 0s
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.233s
+        installer continuation: bridge/probe done in 3.451s
+        installer continuation: bridge/retained done in 4.899s
+        installer continuation: worker/configuration-documents done in 1ms
+        installer continuation: worker/outbox done in 4ms
+        installer continuation: worker/inbox done in 2.003s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 2ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 7ms
+        installer continuation stopped at worker/roles-provision/complete:configuration-fleet after current=1ms claim=1.8s role=3.18s authenticate=3.185s stop=4.049s, 951ms, operation 951ms left (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (399.32s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (21.60s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (92.66s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	399.374s
+FAIL

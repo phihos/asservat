@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+# Process core dumps may contain memory contents; never commit them.
+core
+core.[0-9]*
+/asservat
+*.test
+web/node_modules/
+web/dist/
+.remember/

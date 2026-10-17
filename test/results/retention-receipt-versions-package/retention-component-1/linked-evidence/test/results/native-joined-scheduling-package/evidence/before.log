@@ -1,0 +1,6 @@
+=== RUN   TestWorkerNativeJoinedDoesNotSpendNextCommandBudgetOnIdleWait
+    download_worker_native_scheduling_test.go:38: positive Join consumed the next original command interval in idle backoff
+--- FAIL: TestWorkerNativeJoinedDoesNotSpendNextCommandBudgetOnIdleWait (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.050s
+FAIL

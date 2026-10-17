@@ -1,0 +1,5 @@
+--- FAIL: TestInitialBootstrapScratchCreatesPrivateOwnedChild (0.00s)
+    initial_bootstrap_scratch_test.go:28: protected mounted file unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.011s
+FAIL

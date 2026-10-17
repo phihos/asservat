@@ -1,0 +1,61 @@
+{
+  "manifest_sha256": "f521ed7a61a6237bd2dc63a435c7808b497d517cf4d76504daa5215a53e63b91",
+  "dependencies_sha256": "f4d39253034fd9d45eef6324f8bf7c871ffdea2871f30d9defd4ebb3af4effcd",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-path-2/overlay.json",
+        "-run",
+        "^$",
+        "-vet=off",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 43.458822715998394
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-path-2/overlay.json",
+        "-race",
+        "-count=1",
+        "-v",
+        "-timeout=180s",
+        "-run",
+        "^TestConfigurationRole(Source|Root|Operation)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 1,
+      "seconds": 86.88861342499149
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/public-context-startup-20261012/checks/configuration-path-2/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "seconds": 1.8306304549914785
+    }
+  ],
+  "terminal_exit": 1,
+  "source_changes": [],
+  "checked_payloads": 50,
+  "checked_dependencies": 2077
+}

@@ -1,0 +1,22 @@
+{
+  "docs/architecture/cluster-observations.md": "a86cbb52be4237f829dcf18c90110a62c3b3d2477bb5ae424b8cf5618468a7da",
+  "docs/decisions/144-cluster-local-observations.md": "91d6089567c30de0e6b22ff54c82d2922d73e4ddcd07a10be00d1e848d1c1d54",
+  "docs/decisions/150-operation-owned-native-observation-proof.md": "c31acd13b5abc358f4b4feb328af64a437c7b0ba88ee5c431feada625a5d9f88",
+  "internal/adapters/kubernetes/cluster_observation_caller.go": "10bcfd120256ac51507e6f388ce4a8dbd70f4d40fb3e76490b3c30fc16ae4867",
+  "internal/adapters/kubernetes/owner_local_observation_operation.go": "bd5cb5574d0ca299ab75eebdc875938171f501ae573f88394faff51058264055",
+  "internal/adapters/kubernetes/owner_local_observation_operation_test.go": "81ba8fb4cabc6f2ec30d5c5dd44fa9edb82ba89e4a0a8524ac8633f25e87636d",
+  "internal/adapters/kubernetes/owner_observation_candidates.go": "1ef94784f1f00c70baa52cebc7ffea73f4bf1b59a4eb78afd166eb48bd09fe45",
+  "internal/adapters/kubernetes/owner_observation_dial_candidates.go": "1cdbf64954042d9608669f05b89a3218c56f8b8e9c84047fba626d06f6002edf",
+  "internal/adapters/kubernetes/owner_observation_dial_candidates_test.go": "31478dcfa154711fb2734e42012e4c5952ca37e392e330e14a25e171c0ae4839",
+  "internal/adapters/kubernetes/owner_observation_operation.go": "230d64599cb5522d77924da9594af0e098ec70027e9e1554408580bb4b377f75",
+  "internal/bootstrap/cluster_observation_operation_client.go": "88654dacde6ff80924dae91a323593eb539935d2b68f8fe78045571bbf961ef3",
+  "internal/bootstrap/cluster_observation_operation_client_test.go": "3372a874182f93f23939f21a60d5b66f75d041f4aefa0dd06a420d7030d5bd96",
+  "internal/bootstrap/owner_local_observation_pending.go": "76dc7689f07de01f94c5984c3fc4918423a49afea06f1ef47c1226f73e08432d",
+  "internal/bootstrap/owner_local_observation_pending_test.go": "ca5eedc5d6bc91e8716314a822f797ab4855ad5e3e8751118b338ab313904bdc",
+  "internal/bootstrap/owner_local_observation_receiver.go": "01e8bc85fd2ffab153efadf8e33e453a72f840272507e68e0214a76fa0cfac1a",
+  "internal/bootstrap/owner_local_observation_receiver_test.go": "e3c91253a8bdfbaafc786f9bc32c56cb737c4522af00a3f71039634ef8dcde2f",
+  "internal/contracts/observation_local_operation.go": "9a36ff603633cecd7043d6373057394a775a36f903870316abaf408c90bf5f2e",
+  "internal/contracts/observation_local_operation_test.go": "87d681ff128cd6b9053a70b52527183748bd5691206e36f4703bda80a272c714",
+  "internal/transport/clusterobservation/hub_operation_holder.go": "5a6f539e62955907f4bb784994dc56e0bd43d650a81d2081454e10f4c3ca4b07",
+  "internal/transport/clusterobservation/hub_operation_holder_available_test.go": "e50e9ef3f97f75f82ec88140c69c760efd7cd91a7fd9ed06886c6854e01a45b2"
+}

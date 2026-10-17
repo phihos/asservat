@@ -1,0 +1,21 @@
+{
+  "pins": {
+    "manifest.json": "7b0ecade4073c62afd3c1a69a8a94170c264857ee55af6df4131474fb762408a",
+    "dependencies.json": "c6c64b969ef7925e51d2b178d8c8663f21ff31b519e47f93aa6af50a4e90b7b4",
+    "args.json": "694f7c46c35eb3ea65c81046e34f75d8480323f2e894adf2318e6cf0b91dabfd",
+    "before.go.txt": "5a1fec843b52ef3d0f3b3767651ffabbcbc36160a841e61c798621235a3f2228",
+    "run.py": "81abb50b990c1d84948934642b23185a86c17faf5ebd0d6e8020bc397501f8f9"
+  },
+  "native": false,
+  "beforeVariant": "Exact integrated read-only inventory before symmetric latest-data/current-absence correction; no runtime authority/retirement consumer.",
+  "phases": [],
+  "before": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-owner-inventory-native-component-nn3kez_g"
+}

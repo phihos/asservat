@@ -1,0 +1,499 @@
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/bracket-id
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/channel
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-request
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-ordinal
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/early-final
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/missing-final
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/native-before-request
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/native-renewal
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/value-before-native
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/false-value-date
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/workload-date
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/source-renewal
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-roles
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-roots
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/expired
+=== RUN   TestObservationOperationValueSeparatesDatesAndFinalPhase/server-leaf
+--- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/bracket-id (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/channel (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-request (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-ordinal (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/early-final (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/missing-final (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/native-before-request (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/native-renewal (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/value-before-native (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/false-value-date (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/workload-date (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/source-renewal (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-roles (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/wrong-roots (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/expired (0.00s)
+    --- PASS: TestObservationOperationValueSeparatesDatesAndFinalPhase/server-leaf (0.00s)
+=== RUN   TestObservationOperationValueContinuityAndCaps
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-bracket
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-channel
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-process
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-source
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-backing
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-native-start
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-leaf
+=== RUN   TestObservationOperationValueContinuityAndCaps/new-workload
+=== RUN   TestObservationOperationValueContinuityAndCaps/longer-source
+--- PASS: TestObservationOperationValueContinuityAndCaps (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-bracket (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-channel (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-process (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-source (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-backing (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-native-start (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-leaf (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/new-workload (0.00s)
+    --- PASS: TestObservationOperationValueContinuityAndCaps/longer-source (0.00s)
+=== RUN   TestObservationOperationOwnerFactsCloneAndNativeScope
+--- PASS: TestObservationOperationOwnerFactsCloneAndNativeScope (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/application/fleet	1.008s [no tests to run]
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/valid
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/suspended
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring-live
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-retiring
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-overdue
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-budget
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/public-layout
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/short-backing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-suspended
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/duplicate
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/trailing
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-root
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-cluster
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-peer
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/invalid-role
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/same-role
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/empty-roots
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wrong-root
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wildcard
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/ip-name
+=== RUN   TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/mixed-case-name
+--- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority (1.07s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/valid (0.05s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/suspended (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/retiring-live (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-retiring (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-overdue (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-budget (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/public-layout (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/short-backing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/unknown (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/missing-suspended (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/duplicate (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/trailing (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-root (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-cluster (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/foreign-peer (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/invalid-role (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/same-role (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/empty-roots (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wrong-root (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/wildcard (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/ip-name (0.04s)
+    --- PASS: TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority/mixed-case-name (0.04s)
+=== RUN   TestConnectorObservationOperationFourActualValues
+--- PASS: TestConnectorObservationOperationFourActualValues (1.79s)
+=== RUN   TestConnectorObservationOperationSourceMutationCloses
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/roles
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/backing
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/revision
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/roots
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/suspended
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/retiring
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/deployment
+=== RUN   TestConnectorObservationOperationSourceMutationCloses/source-unknown
+--- PASS: TestConnectorObservationOperationSourceMutationCloses (4.30s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/roles (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/backing (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/revision (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/roots (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/suspended (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/retiring (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/deployment (0.54s)
+    --- PASS: TestConnectorObservationOperationSourceMutationCloses/source-unknown (0.54s)
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/source-guard
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/source-denial
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/workload-guard
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/workload-denial
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/account
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/pod
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/template
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/review
+=== RUN   TestConnectorObservationOperationFinalNativeMutationCloses/expiry
+--- PASS: TestConnectorObservationOperationFinalNativeMutationCloses (9.96s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/source-guard (0.79s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/source-denial (0.90s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/workload-guard (1.09s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/workload-denial (1.19s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/account (1.28s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/pod (1.39s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/template (1.38s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/review (1.24s)
+    --- PASS: TestConnectorObservationOperationFinalNativeMutationCloses/expiry (0.70s)
+=== RUN   TestConnectorObservationOperationCloseJoinsValueRead
+--- PASS: TestConnectorObservationOperationCloseJoinsValueRead (0.34s)
+=== RUN   TestConnectorObservationOperationFinalValueFollowsNativeBracket
+--- PASS: TestConnectorObservationOperationFinalValueFollowsNativeBracket (1.79s)
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/0
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/2
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/4
+=== RUN   TestConnectorObservationOperationOrdinalCannotBeReused/5
+--- PASS: TestConnectorObservationOperationOrdinalCannotBeReused (0.95s)
+    --- PASS: TestConnectorObservationOperationOrdinalCannotBeReused/0 (0.24s)
+    --- PASS: TestConnectorObservationOperationOrdinalCannotBeReused/2 (0.24s)
+    --- PASS: TestConnectorObservationOperationOrdinalCannotBeReused/4 (0.24s)
+    --- PASS: TestConnectorObservationOperationOrdinalCannotBeReused/5 (0.24s)
+=== RUN   TestConnectorObservationOperationCurrentCallerOnlyShortens
+--- PASS: TestConnectorObservationOperationCurrentCallerOnlyShortens (0.54s)
+=== RUN   TestConnectorObservationOperationCallerCancellationJoins
+--- PASS: TestConnectorObservationOperationCallerCancellationJoins (0.33s)
+=== RUN   TestConnectorObservationOperationConcurrentReadClosesBoth
+--- PASS: TestConnectorObservationOperationConcurrentReadClosesBoth (0.34s)
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/root
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/process
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/unbounded
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/cancelled
+=== RUN   TestConnectorObservationOperationWrongBeginHasNoIO/expired
+--- PASS: TestConnectorObservationOperationWrongBeginHasNoIO (0.73s)
+    --- PASS: TestConnectorObservationOperationWrongBeginHasNoIO/root (0.15s)
+    --- PASS: TestConnectorObservationOperationWrongBeginHasNoIO/process (0.15s)
+    --- PASS: TestConnectorObservationOperationWrongBeginHasNoIO/unbounded (0.15s)
+    --- PASS: TestConnectorObservationOperationWrongBeginHasNoIO/cancelled (0.14s)
+    --- PASS: TestConnectorObservationOperationWrongBeginHasNoIO/expired (0.14s)
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking/expired
+=== RUN   TestConnectorObservationOperationRequiresCurrentBacking/deployment-budget
+--- PASS: TestConnectorObservationOperationRequiresCurrentBacking (0.78s)
+    --- PASS: TestConnectorObservationOperationRequiresCurrentBacking/expired (0.39s)
+    --- PASS: TestConnectorObservationOperationRequiresCurrentBacking/deployment-budget (0.39s)
+=== RUN   TestConnectorObservationOperationBackingExpiryOnlyShortens
+--- PASS: TestConnectorObservationOperationBackingExpiryOnlyShortens (0.39s)
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late
+=== RUN   TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled
+--- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection (7.76s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/valid (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/configuration-changed (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/revoked-review (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/lost-protection (0.12s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/roles-changed (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/observation/cancelled (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/valid (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/pending (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/not-ready (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/status-change (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/short-token (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cached-configuration (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/invalid-csr (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/same-key (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/foreign-binding (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/suspended (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-unavailable (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-changed (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/configuration-expired (0.07s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/missing-protection (0.08s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/lost-protection (0.12s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-audience (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbound (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/path-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/denied-review (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/revoked-review (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/duplicate-exp (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/expired-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unbounded-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-read-error (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/token-error-redaction (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/whitespace-token (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-namespace (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-live-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-deployment (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-replica (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-owner (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/two-owners (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/wrong-selector (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/unassigned (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-network (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-pid (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/host-ipc (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/injected-process (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/deleted-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/failed-pod (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/scaled-down (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/template-account (0.09s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/spec-changed (0.10s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/late (0.37s)
+    --- PASS: TestConnectorProcessProofBeforeReadinessAndCurrentProtection/cancelled (0.07s)
+=== RUN   TestObservationOperationPortsKeepConcreteNativeBrackets
+=== RUN   TestObservationOperationPortsKeepConcreteNativeBrackets/owner
+=== RUN   TestObservationOperationPortsKeepConcreteNativeBrackets/regional
+--- PASS: TestObservationOperationPortsKeepConcreteNativeBrackets (2.26s)
+    --- PASS: TestObservationOperationPortsKeepConcreteNativeBrackets/owner (0.47s)
+    --- PASS: TestObservationOperationPortsKeepConcreteNativeBrackets/regional (1.79s)
+=== RUN   TestObservationOperationPortsInvalidOpenReturnsNil
+--- PASS: TestObservationOperationPortsInvalidOpenReturnsNil (0.00s)
+=== RUN   TestOwnerObservationOperationRealBoundaries
+--- PASS: TestOwnerObservationOperationRealBoundaries (0.47s)
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/deployment
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/template
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/unknown
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/namespace
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/service-port
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/replica
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/ready
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/expired
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/late-final
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/controller
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding
+=== RUN   TestOwnerObservationOperationFinalChangeIsTerminal/account
+--- PASS: TestOwnerObservationOperationFinalChangeIsTerminal (3.40s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/deployment (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/template (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/unknown (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/namespace (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-delete (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint (0.13s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/endpoint-incomplete (0.17s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-warning (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/service-port (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/replica (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/pod-spec (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/ready (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/expired (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/late-final (0.47s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-accepted (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/controller (0.22s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/guard-binding (0.10s)
+    --- PASS: TestOwnerObservationOperationFinalChangeIsTerminal/account (0.11s)
+=== RUN   TestOwnerObservationOperationCloseJoinsRead
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/close
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/caller-cancel
+=== RUN   TestOwnerObservationOperationCloseJoinsRead/original-cancel
+--- PASS: TestOwnerObservationOperationCloseJoinsRead (0.31s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/close (0.11s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/caller-cancel (0.10s)
+    --- PASS: TestOwnerObservationOperationCloseJoinsRead/original-cancel (0.10s)
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/no-deadline
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/cancelled
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-root
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/expired
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/overlong
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/duplicate
+=== RUN   TestOwnerObservationOperationRejectsWrongOriginal/empty
+--- PASS: TestOwnerObservationOperationRejectsWrongOriginal (0.07s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/no-deadline (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/cancelled (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-root (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/expired (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/overlong (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/wrong-pool (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/duplicate (0.00s)
+    --- PASS: TestOwnerObservationOperationRejectsWrongOriginal/empty (0.00s)
+=== RUN   TestOwnerObservationOperationIdenticalIDsAreIndependent
+--- PASS: TestOwnerObservationOperationIdenticalIDsAreIndependent (1.17s)
+=== RUN   TestOwnerObservationOperationTwoExactProcesses
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/different-pods
+=== RUN   TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process
+--- PASS: TestOwnerObservationOperationTwoExactProcesses (1.24s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/different-pods (0.77s)
+    --- PASS: TestOwnerObservationOperationTwoExactProcesses/same-pod-different-process (0.47s)
+=== RUN   TestOwnerObservationOperationInitialReadChangesDeny
+--- PASS: TestOwnerObservationOperationInitialReadChangesDeny (0.09s)
+=== RUN   TestOwnerObservationOperationConcurrentFinalCannotReuse
+--- PASS: TestOwnerObservationOperationConcurrentFinalCannotReuse (0.10s)
+=== RUN   TestOwnerObservationOperationFinalCallerOnlyShortens
+--- PASS: TestOwnerObservationOperationFinalCallerOnlyShortens (0.47s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	41.693s
+=== RUN   TestConnectorObservationOperationRegistryActualOrderedSourceCalls
+--- PASS: TestConnectorObservationOperationRegistryActualOrderedSourceCalls (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-error
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/bad-first
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-error
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revoked
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-leaf
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-process
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revision
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-expired
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-oversize
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-malformed
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-revision
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roles
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-backing
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roots
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-channel
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-bracket
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/source-process
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/early-final
+=== RUN   TestConnectorObservationOperationRegistryFailuresRetainPhase/missing-final
+--- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase (0.01s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-error (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/bad-first (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-error (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revoked (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-leaf (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-process (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-revision (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-expired (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-oversize (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/sql-malformed (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-revision (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roles (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-backing (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-roots (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-channel (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-bracket (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/source-process (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/early-final (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryFailuresRetainPhase/missing-final (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/sql-wait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/source-wait
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/native
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/source
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/workload
+=== RUN   TestConnectorObservationOperationRegistryDeadlineAfterWait/sql
+--- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait (0.12s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/sql-wait (0.06s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/source-wait (0.06s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/native (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/source (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/workload (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryDeadlineAfterWait/sql (0.00s)
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/missing-deadline
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/cancelled
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/root
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/leaf
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/server
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/ordinal
+=== RUN   TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/expired
+--- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/missing-deadline (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/cancelled (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/root (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/leaf (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/server (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/ordinal (0.00s)
+    --- PASS: TestConnectorObservationOperationRegistryOriginalBindingBeforeIO/expired (0.00s)
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled
+=== RUN   TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching
+--- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/root (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/source (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/revision (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cluster (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/issuer (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/roots (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/controller (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/suspended (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/leaf-binding (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/server-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/expired-leaf (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/cancelled (0.00s)
+    --- PASS: TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO/matching (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.169s

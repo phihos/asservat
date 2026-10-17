@@ -1,0 +1,121 @@
+{
+  "observed_at": "2026-10-09T18:24:50.642605+00:00",
+  "scope": "Synthetic dependency experiments only; no live interfaces, real evidence, cluster or production implementation.",
+  "environment": {
+    "go": "go version go1.27.1-X:nodwarf5 linux/amd64",
+    "node": "v26.10.0",
+    "npm": "12.2.0",
+    "libpcap": "1.11.0"
+  },
+  "runs": [
+    {
+      "id": "go-dependencies",
+      "exit": 0,
+      "result": "Six tests pass; all 41 schemas compile locally; see log for sampled behavior and limitations",
+      "log": "go-tests.txt"
+    },
+    {
+      "id": "web-static-build",
+      "exit": 0,
+      "result": "React/Aria/Query static bundle; use-client bundler warnings retained; no SSR/RSC selected",
+      "log": "web-build.txt"
+    },
+    {
+      "id": "ts-direct-generate",
+      "exit": 0,
+      "result": "Generated text; compile check below failed",
+      "log": "typescript-generation.txt"
+    },
+    {
+      "id": "ts-direct-check",
+      "exit": 2,
+      "result": "Ten recursive self-reference TS2502 errors; excluded from baseline",
+      "log": "typescript-direct-errors.txt"
+    },
+    {
+      "id": "ts-hoisted-generate",
+      "exit": 0,
+      "result": "Generate from locally hoisted references",
+      "log": "typescript-hoisted-generation.txt"
+    },
+    {
+      "id": "ts-hoisted-check",
+      "exit": 0,
+      "result": "Strict tsc without skipLibCheck passes",
+      "log": "typescript-hoisted-check.txt"
+    },
+    {
+      "id": "go-direct-generate",
+      "exit": 1,
+      "result": "Nested definition reference not supported",
+      "log": "go-generator-direct-errors.txt"
+    },
+    {
+      "id": "go-hoisted-generate",
+      "exit": 1,
+      "result": "Multi-type schema union unsupported; do not weaken schemas",
+      "log": "go-generator-hoisted-errors.txt"
+    },
+    {
+      "id": "npm-initial-resolve",
+      "exit": 1,
+      "result": "TS7 conflicts with generator TS5 peer range; corrected locked set uses TS5.9.3",
+      "log": "npm-initial-error.txt"
+    }
+  ],
+  "input_sha256": {
+    "experiments/technology-selection/go/canonical_test.go": "b10b3adf73d5f20bf8d6e7afcd1eb6e936b1178e333aaf0e68e3dbeb2d9849e1",
+    "experiments/technology-selection/go/contracts_test.go": "447b5df4d2a0a97c3fa549579c00a93cc53add0c562b069cd402be43afc21c41",
+    "experiments/technology-selection/go/dependencies_test.go": "a7fb2d2143d717fb8a727088681242ece1eafe8ba3eba08259ba3f6d69e95941",
+    "experiments/technology-selection/go/ranges_test.go": "2963b7dc6e22fdfd111dcbf3d24859871663c35a2b5c1995c4875ddf90faca5d",
+    "experiments/technology-selection/go/go.mod": "c51d8ee72c9954cbb351471a2f6fae90194d8cf187ff4376aebd52b29d486d35",
+    "experiments/technology-selection/go/go.sum": "b417f970f31439b6355705255c9942f1b176f756a9b766cb0ca6bc23b0b49be2",
+    "experiments/technology-selection/web/package.json": "346e86059b2abd85664f99e30ce4c624c1c2f63f163f8d6cf3669a84aee7c6f1",
+    "experiments/technology-selection/web/package-lock.json": "75a74056c1d5ccf43fef86234694fb2bb2e9c677132b605e6850736490736ba1",
+    "experiments/technology-selection/web/main.tsx": "51f01aa6c14951a4efd1f93978006655a21e2757ce527b6a292b7f917ab63ecd",
+    "experiments/technology-selection/web/index.html": "ab61a893daac1e4b4f8494178c1031fe16547f87df40803e27feac0ea615269b",
+    "experiments/technology-selection/contracts/bundle.py": "75d46a4303c687de6a8a4e2e67aed5a8bcb87d125122288d02f96ffbbc102bdc",
+    "docs/interfaces/browser-openapi.yaml": "f6a37e8d5a031c827942fa37e233d71ebe4638d03f7dc9bdd329e7177ddae589",
+    "specs/contracts/access-binding.schema.json": "7227ff2d779f0affa00045af2cba7c93b2a13a6a4b8b3c546dfb5e5c4da0cec3",
+    "specs/contracts/action-lifecycle.schema.json": "7be07e84a1d6cf6f35770f08d0766f1ff1172fab14c461fe6684c98b355f879e",
+    "specs/contracts/action.schema.json": "d11434144490f04ff3862ca2c5187dff4c2e3a96d8deb3bbcb365a0e12fd72fb",
+    "specs/contracts/approval-policy.schema.json": "96973d4acb53664c9d8e07f3f439a0a9b7e434ab2a9177144f95ef8e92c37487",
+    "specs/contracts/artifact-download.schema.json": "78c02d44166f1714258aaa21f3741f838c15874eef2e58cbf6a405baf0230406",
+    "specs/contracts/budget-policy.schema.json": "f7b60a145236fd70efe6fed49358d43cc7077edfd356bb8a28a5e0eff483a23f",
+    "specs/contracts/capture-assessment.schema.json": "998cff37ecbbb6d34388944d1923c5874ff82094f6c3de5f3caa089893f33320",
+    "specs/contracts/capture-composition.schema.json": "83dc6993a5410fb0feb8dc0bfdd81df2b50546df20f055a9d3daa1b9a0df4639",
+    "specs/contracts/capture-history.schema.json": "472443189c6a7aa3771f5252c41379f886be82b995fab8964fc7311723fee9a9",
+    "specs/contracts/capture-profile.schema.json": "2de9bce9d8e11eaeb5d9bfa8e908da8df14035923ed2e4cc0faa5c8f1beffa2a",
+    "specs/contracts/capture.schema.json": "d0db3ea09c9b8653001dca30b4a9a3686b02abe188fc664b7b3d6a8d62684ef3",
+    "specs/contracts/collection-scope.schema.json": "cf4abf9ca7253af365038926f739632e3ecf74e3b1829b0fce68fc59d0e0ce2f",
+    "specs/contracts/common.schema.json": "c91fd4c8d651c2e0c82eddacba0af34ccb744d00c44cf88b5e6edc6bca8fb49b",
+    "specs/contracts/event.schema.json": "fa6a1d96f00ade1069476b8c2fa2d3df5840dd16a58b8d3a4486099088060179",
+    "specs/contracts/grant.schema.json": "349f74a84af95711dd1978f5883c0bb1e9abd4b68862a30134bf86f5563181d9",
+    "specs/contracts/guidance.schema.json": "c526b7027eb6694bd9d419d87792793fca13ebc69688362b556ac48321fc32bb",
+    "specs/contracts/internal-work.schema.json": "7e99eb54fdf76b6524ff701e625fa3aa63981f0143adf655cdc82a2d6dc7d5ee",
+    "specs/contracts/investigation-access.schema.json": "a16d86097d478cc63158d2824fcee853567e96993cc14aefcdecaa2863a44b32",
+    "specs/contracts/live-watch.schema.json": "1d926f329e57384037228ee6979477a055cec9fd274ad0793791db29509ba6f2",
+    "specs/contracts/management.schema.json": "9f8ca93be22ecea99514b0494f9257c7d56030a95c85a0595a17839148443dee",
+    "specs/contracts/manifest.schema.json": "5c31ffdbcd756081bd09f3e89fa5da5149f95f742241b79066aa5865a1a43718",
+    "specs/contracts/mcp-result.schema.json": "bab8d98d6041f2972cc7eac76beb6de46c5034d170bd32ea732daea846ac74d5",
+    "specs/contracts/namespace-permission-example.schema.json": "d7f0b10ac89c95d342444d0749fc2fa41fc1d1d9f27bbc6d52f5eece5f9969f2",
+    "specs/contracts/packet-capture.schema.json": "31f741e2917d027150d86cac629ad17194b5760fe53c41f46940053d429f2b2c",
+    "specs/contracts/permission-common.schema.json": "034f6445ee8a1386a3ebe9c2d4165f885531cc732de4158d8a09b33370044ed1",
+    "specs/contracts/permission-source.schema.json": "13f67e7fbd4d68fe67171a0405c9bd1f3fa346efd86490947b984f40a840f61b",
+    "specs/contracts/policy.schema.json": "e8db58976be96667c0363a2950e0c99e3e67a63e22379b388760ca7b2bfa6d15",
+    "specs/contracts/preset-input.schema.json": "9c3c47ff6955cfe68430592320b1ddc4edeb9775ef1f0e4be56d18083f501975",
+    "specs/contracts/privacy-common.schema.json": "e6371756d1fa250618ee902031696d6401ad53e0a4694c9d3393f8c15a394fbe",
+    "specs/contracts/profile.schema.json": "dc7e530f9d2aa3778dbc747538d39831c3efb6184ee08e8b5e7d0d3781b2394e",
+    "specs/contracts/recipe.schema.json": "5358df9cc9139a32c524ed437e81fb54fe1304941b1f5fdfef2570d929714800",
+    "specs/contracts/recording-save.schema.json": "ec60c60a8e87add20833cde3c09e193b43b8bd6ce8f1fb0769dbba0039a9fcca",
+    "specs/contracts/retention-policy.schema.json": "97e88e9ee6b89d8ee44a0825b56a7370eb44a877460ca4986c7b5f54994a5fd9",
+    "specs/contracts/share.schema.json": "54cee7633f34ce2a74b3adabdc41fdd34d4dd44ce73949fc3a6d6d7dba023bdd",
+    "specs/contracts/sharing-intent.schema.json": "b559c7dce0a88d96b32697e715b23663ff11419e10a98fca5b3e1153ec7fb8a8",
+    "specs/contracts/sharing-request.schema.json": "efedcb24e187858fbe36a1efea6a9f0a77d5aff07d89e6392751a9ac3b6b89bc",
+    "specs/contracts/storage-pool.schema.json": "b114b4eb12528ceb155484346567129237c2ad27ba6e9ab6c479536b592028f9",
+    "specs/contracts/syscall-results.schema.json": "8cda89c17d0a977f5f9d38224723d809b81f9aa4c58d2dd9d894e6d62c1b5d98",
+    "specs/contracts/syscall-trace.schema.json": "33000fd444b0794e3b1a15a6d5635a2082a257d50fd63ed0d29aef35f22f8413",
+    "specs/contracts/target.schema.json": "2888867d81f5bcbd8b2ae628b59287a500123c3b89beb7729e1ca9595834bed5",
+    "specs/contracts/trigger.schema.json": "96cdc3e342ac7c16b4bcd3260b6763cef076bbaf148c72b9c4488e056b553fb0"
+  }
+}

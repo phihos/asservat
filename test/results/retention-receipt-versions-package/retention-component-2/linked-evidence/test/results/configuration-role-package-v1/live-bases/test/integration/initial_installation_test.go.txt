@@ -1,0 +1,516 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/url"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Explicit synthetic Kubernetes boundary. Native record/admission/UID tests are
+// separate; this fixture never claims to attest an actual installation Pod.
+type initialWitnessFixture struct {
+	mu    sync.Mutex
+	scope value.InstallationWitnessScope
+	claim *value.InitialActivationClaim
+}
+
+func (f *initialWitnessFixture) ReadInstallationWitness(context.Context) (value.InstallationWitness, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	w := value.InstallationWitness{Scope: f.scope, ResourceVersion: "1", ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
+	if f.claim != nil {
+		c := *f.claim
+		w.Claim = &c
+	}
+	return w, nil
+}
+func (f *initialWitnessFixture) ConsumeInstallationWitness(ctx context.Context, c value.InitialActivationClaim) (value.InstallationWitness, error) {
+	f.mu.Lock()
+	if !c.Current(time.Now()) || f.claim != nil && !f.claim.Same(c) {
+		f.mu.Unlock()
+		return value.InstallationWitness{}, value.ErrDenied
+	}
+	f.claim = &c
+	f.mu.Unlock()
+	return f.ReadInstallationWitness(ctx)
+}
+
+type initialAdminFixture struct{ a value.Administration }
+
+func (f *initialAdminFixture) FleetAdministration(context.Context) (value.Administration, error) {
+	a := f.a
+	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
+	return a, nil
+}
+
+type initialAuditFailure struct {
+	*objectstore.InitialInstallationObjects
+	fail bool
+}
+
+func (f *initialAuditFailure) WriteInitialInstallation(ctx context.Context, r audit.InitialInstallation) (audit.Receipt, error) {
+	if f.fail {
+		return audit.Receipt{}, value.ErrUnavailable
+	}
+	return f.InitialInstallationObjects.WriteInitialInstallation(ctx, r)
+}
+
+func TestInitialInstallationWithRealServices(t *testing.T) {
+	native := os.Getenv("ASSERVAT_INITIAL_INSTALLATION_NATIVE") == "1"
+	if os.Getenv("ASSERVAT_INITIAL_INSTALLATION") != "1" && !native {
+		t.Skip("run make initial-installation-integration on its own fresh fixtures")
+	}
+	var f fixture
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if native {
+		path = os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+	}
+	b, e := os.ReadFile(path)
+	if e != nil || json.Unmarshal(b, &f) != nil {
+		t.Fatal("fixture unavailable")
+	}
+	ctx, end := context.WithTimeout(context.Background(), 180*time.Second)
+	defer end()
+	admin, e := pgxpool.New(ctx, f.Postgres)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer admin.Close()
+	// Dedicated owned database only; there must be no earlier installation state.
+	var count int
+	if e = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM fleet_trust)+(SELECT count(*) FROM fleet_initial_activation)").Scan(&count); e != nil || count != 0 {
+		t.Fatal("fixture not pristine", e)
+	}
+	_, e = admin.Exec(ctx, `CREATE ROLE initial_prepare LOGIN PASSWORD 'synthetic-initial';
+ CREATE ROLE initial_audit LOGIN PASSWORD 'synthetic-initial';
+ CREATE ROLE initial_activate LOGIN PASSWORD 'synthetic-initial';
+ GRANT USAGE ON SCHEMA public TO initial_prepare,initial_audit,initial_activate;
+ GRANT SELECT,MAINTAIN ON ALL TABLES IN SCHEMA public TO initial_prepare,initial_activate;
+ GRANT INSERT ON fleet_initial_activation TO initial_prepare;
+ GRANT UPDATE(singleton) ON fleet_initial_activation TO initial_prepare;
+ GRANT INSERT(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until) ON fleet_trust TO initial_prepare;
+ GRANT SELECT ON goose_db_version,fleet_initial_activation TO initial_audit;
+ GRANT UPDATE(audit_receipt_json) ON fleet_initial_activation TO initial_audit;
+ GRANT UPDATE(activated_at) ON fleet_initial_activation TO initial_activate;
+ GRANT UPDATE(suspended,recovery_blocked,activated_postmaster_at,activated_database_oid,observed_at,fresh_until) ON fleet_trust TO initial_activate;`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	u, e := url.Parse(f.Postgres)
+	if e != nil {
+		t.Fatal(e)
+	}
+	address, tlsConfig := pgTLSBridge(t, u.Host)
+	pools := map[string]*pgxpool.Pool{}
+	for _, name := range []string{"prepare", "audit", "activate"} {
+		cfg, e := pgxpool.ParseConfig("postgres://initial_" + name + ":synthetic-initial@" + address + "/custody_test?sslmode=disable")
+		if e != nil {
+			t.Fatal(e)
+		}
+		cfg.ConnConfig.TLSConfig = tlsConfig
+		cfg.ConnConfig.Fallbacks = nil
+		cfg.MaxConns = 4
+		p, e := pgxpool.NewWithConfig(ctx, cfg)
+		if e != nil {
+			t.Fatal(e)
+		}
+		t.Cleanup(p.Close)
+		pools[name] = p
+	}
+	request(t, f.KMS, "synthetic-root", "sys/mounts/initial-transit", map[string]any{"type": "transit"}, 204)
+	request(t, f.KMS, "synthetic-root", "initial-transit/keys/audit", map[string]any{"type": "aes256-gcm96"}, 200)
+	tokens := map[string]string{}
+	for _, op := range []string{"encrypt", "decrypt"} {
+		name := "initial-" + op
+		request(t, f.KMS, "synthetic-root", "sys/policies/acl/"+name, map[string]any{"policy": `path "initial-transit/` + op + `/audit" { capabilities=["update"] }`}, 204)
+		tokens[op] = request(t, f.KMS, "synthetic-root", "auth/token/create", map[string]any{"policies": []string{name}, "no_default_policy": true, "ttl": "15m"}, 200)["auth"].(map[string]any)["client_token"].(string)
+	}
+	keyBridge := tlsBridge(t, f.KMS)
+	seal, e := kms.NewSealer(keyBridge.URL, tokens["encrypt"], "initial-transit", "audit", keyBridge.Client())
+	if e != nil {
+		t.Fatal(e)
+	}
+	open, e := kms.NewOpener(keyBridge.URL, tokens["decrypt"], "initial-transit", "audit", keyBridge.Client())
+	if e != nil {
+		t.Fatal(e)
+	}
+	bridge := tlsBridge(t, f.S3)
+	creds := credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", "")
+	bucket := "initial-installation"
+	s3admin := s3.New(s3.Options{Region: "us-east-1", BaseEndpoint: aws.String(bridge.URL), UsePathStyle: true, Credentials: creds, HTTPClient: bridge.Client()})
+	if _, e = s3admin.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); e != nil {
+		t.Fatal(e)
+	}
+	store, e := objectstore.New(bridge.URL, "us-east-1", bucket, creds, bridge.Client())
+	if e != nil {
+		t.Fatal(e)
+	}
+	objects := &objectstore.InitialInstallationObjects{Store: store, Seal: seal, Open: open}
+	type lab struct {
+		scope          value.InstallationWitnessScope
+		w              *initialWitnessFixture
+		a              *initialAdminFixture
+		prep, ack, act *postgres.InitialInstallations
+		service        app.InitialInstaller
+	}
+	setup := func(t *testing.T) *lab {
+		t.Helper()
+		s := &lab{scope: value.InstallationWitnessScope{InstallationID: custodyID(), IssuerEpoch: custodyID(), ClusterID: custodyID(), Namespace: "control", NamespaceUID: custodyID(), Name: "witness", UID: custodyID(), WriterAccount: "installer", WriterAccountUID: custodyID()}}
+		s.w = &initialWitnessFixture{scope: s.scope}
+		s.a = &initialAdminFixture{a: value.Administration{InstallationID: s.scope.InstallationID, IssuerEpoch: s.scope.IssuerEpoch, Issuer: "https://id.example.test", Revision: identity.Revision{UID: "initial-fleet", Generation: 1, Digest: artifact.Digest{1}}, Clients: []string{"console"}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}}
+		for name, dst := range map[string]**postgres.InitialInstallations{"prepare": &s.prep, "audit": &s.ack, "activate": &s.act} {
+			var e error
+			*dst, e = postgres.NewInitialInstallations(ctx, pools[name], s.scope, artifact.Digest{2})
+			if e != nil {
+				t.Fatal(e)
+			}
+		}
+		s.service = app.InitialInstaller{Witness: s.w, Consume: s.w, Administration: s.a, Preparation: s.prep, Objects: objects, Acknowledgements: s.ack, Activation: s.act, Now: time.Now}
+		t.Cleanup(func() {
+			if _, e := admin.Exec(context.Background(), "DELETE FROM fleet_initial_activation WHERE installation_id=$1", s.scope.InstallationID); e != nil {
+				t.Error(e)
+			}
+			if _, e := admin.Exec(context.Background(), "DELETE FROM fleet_trust WHERE installation_id=$1", s.scope.InstallationID); e != nil {
+				t.Error(e)
+			}
+		})
+		return s
+	}
+	inputs := func(s *lab) (value.InstallationWitness, value.Administration) {
+		w, _ := s.w.ReadInstallationWitness(ctx)
+		a, _ := s.a.FleetAdministration(ctx)
+		return w, a
+	}
+	prepare := func(t *testing.T, s *lab) audit.InitialInstallation {
+		t.Helper()
+		w, a := inputs(s)
+		r, e := s.prep.PrepareInitialInstallation(ctx, w, a)
+		if e != nil {
+			t.Fatal("prepare", e)
+		}
+		return r
+	}
+	pending := func(t *testing.T, s *lab) {
+		t.Helper()
+		var blocked bool
+		e := admin.QueryRow(ctx, "SELECT recovery_blocked AND activated_postmaster_at IS NULL FROM fleet_trust WHERE installation_id=$1", s.scope.InstallationID).Scan(&blocked)
+		if e != nil || !blocked {
+			t.Fatal("unaudited root activated", e)
+		}
+	}
+	publish := func(t *testing.T, s *lab, r audit.InitialInstallation) {
+		t.Helper()
+		receipt, e := objects.WriteInitialInstallation(ctx, r)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = s.ack.AcknowledgeInitialInstallation(ctx, r, receipt); e != nil {
+			t.Fatal(e)
+		}
+	}
+	t.Run("audit-witness-and-later-recovery-block", func(t *testing.T) {
+		s := setup(t)
+		history := newInitialHistoryFixture(t, ctx, admin, address, tlsConfig, s.scope, artifact.Digest{2})
+		history.expect(t, ctx, app.InitialInstallationMissing, nil)
+		r := prepare(t, s)
+		history.expect(t, ctx, app.InitialInstallationPrepared, &r)
+		pending(t, s)
+		w, a := inputs(s)
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("unconsumed witness activated")
+		}
+		s.w.ConsumeInstallationWitness(ctx, r.Claim)
+		w, a = inputs(s)
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("missing audit activated")
+		}
+		pending(t, s)
+		publish(t, s, r)
+		history.expect(t, ctx, app.InitialInstallationAudited, &r)
+		w, a = inputs(s)
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e != nil {
+			t.Fatal("activate", e)
+		}
+		reader, e := postgres.NewRecoveryReader(ctx, pools["activate"], s.scope.InstallationID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e = reader.RecoveryState(ctx); e != nil {
+			t.Fatal("accepted current root unavailable", e)
+		}
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e != nil {
+			t.Fatal("exact commit replay", e)
+		}
+		if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		w, a = inputs(s)
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("retry cleared later recovery block")
+		}
+		if _, e = reader.RecoveryState(ctx); e == nil {
+			t.Fatal("blocked root active")
+		}
+		history.expect(t, ctx, app.InitialInstallationActivated, &r)
+		history.qualifyBoundsAndRole(t, ctx, admin, s.scope.InstallationID)
+	})
+	t.Run("interrupted-audit-resumes-same-attempt", func(t *testing.T) {
+		s := setup(t)
+		interrupted := &initialAuditFailure{objects, true}
+		s.service.Objects = interrupted
+		if _, e = s.service.Activate(ctx); e == nil {
+			t.Fatal("audit failure ignored")
+		}
+		pending(t, s)
+		first, _ := s.w.ReadInstallationWitness(ctx)
+		if first.Claim == nil {
+			t.Fatal("failed audit refunded consumption")
+		}
+		interrupted.fail = false
+		r, e := s.service.Activate(ctx)
+		if e != nil || !first.Claim.Same(r.Claim) {
+			t.Fatal("failed exact resume", e)
+		}
+	})
+	t.Run("concurrent-preparations-retain-one-attempt", func(t *testing.T) {
+		s := setup(t)
+		// Competing requests share the same independent source observation.
+		// Older observations must not supersede a later root watermark merely
+		// because their goroutine acquires the table lock later.
+		w, a := inputs(s)
+		var wg sync.WaitGroup
+		results := make(chan audit.InitialInstallation, 4)
+		errs := make(chan error, 4)
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r, e := s.prep.PrepareInitialInstallation(ctx, w, a)
+				results <- r
+				errs <- e
+			}()
+		}
+		wg.Wait()
+		close(results)
+		close(errs)
+		for e := range errs {
+			if e != nil {
+				t.Fatal(e)
+			}
+		}
+		var first *value.InitialActivationClaim
+		for r := range results {
+			if first == nil {
+				c := r.Claim
+				first = &c
+			} else if !first.Same(r.Claim) {
+				t.Fatal("multiple initial attempts")
+			}
+		}
+	})
+	t.Run("older-observation-cannot-replace-preparation-watermark", func(t *testing.T) {
+		s := setup(t)
+		w, a := inputs(s)
+		first, err := s.prep.PrepareInitialInstallation(ctx, w, a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		older := a
+		older.ObservedAt = older.ObservedAt.Add(-time.Millisecond)
+		older.FreshUntil = older.FreshUntil.Add(-time.Millisecond)
+		if _, err = s.prep.PrepareInitialInstallation(ctx, w, older); err == nil {
+			t.Fatal("older observation replaced current preparation")
+		}
+		again, err := s.prep.PrepareInitialInstallation(ctx, w, a)
+		if err != nil || !first.Claim.Same(again.Claim) {
+			t.Fatal("unchanged current attempt did not resume", err)
+		}
+	})
+	t.Run("existing-state-before-or-after-preparation-denies", func(t *testing.T) {
+		s := setup(t)
+		id := custodyID()
+		insert := func() {
+			t.Helper()
+			if _, e := admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$1,1,clock_timestamp()+interval '1 hour',0,0)", id); e != nil {
+				t.Fatal(e)
+			}
+		}
+		remove := func() {
+			t.Helper()
+			if _, e := admin.Exec(ctx, "DELETE FROM custody_pool WHERE id=$1", id); e != nil {
+				t.Fatal(e)
+			}
+		}
+		t.Cleanup(remove)
+		insert()
+		w, a := inputs(s)
+		if _, e = s.prep.PrepareInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("nonempty database prepared")
+		}
+		remove()
+		r := prepare(t, s)
+		s.w.ConsumeInstallationWitness(ctx, r.Claim)
+		publish(t, s, r)
+		insert()
+		w, a = inputs(s)
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("state appeared before final activation")
+		}
+		pending(t, s)
+	})
+	t.Run("consumed-witness-cannot-recreate-lost-sql", func(t *testing.T) {
+		s := setup(t)
+		r := prepare(t, s)
+		s.w.ConsumeInstallationWitness(ctx, r.Claim)
+		if _, e = admin.Exec(ctx, "DELETE FROM fleet_initial_activation WHERE installation_id=$1", s.scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		w, a := inputs(s)
+		if _, e = s.prep.PrepareInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("consumed witness recreated SQL attempt")
+		}
+		pending(t, s)
+	})
+	t.Run("schema-inventory-and-row-security-deny", func(t *testing.T) {
+		s := setup(t)
+		if _, e = admin.Exec(ctx, "CREATE TABLE unexpected_initial_state(id integer)"); e != nil {
+			t.Fatal(e)
+		}
+		w, a := inputs(s)
+		_, e = s.prep.PrepareInitialInstallation(ctx, w, a)
+		if e == nil {
+			t.Fatal("unknown table accepted")
+		}
+		if _, e = admin.Exec(ctx, "DROP TABLE unexpected_initial_state; ALTER TABLE custody_pool ENABLE ROW LEVEL SECURITY"); e != nil {
+			t.Fatal(e)
+		}
+		t.Cleanup(func() {
+			_, e := admin.Exec(context.Background(), "ALTER TABLE custody_pool DISABLE ROW LEVEL SECURITY")
+			if e != nil {
+				t.Error(e)
+			}
+		})
+		w, a = inputs(s)
+		if _, e = s.prep.PrepareInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("row security hid prior state")
+		}
+	})
+	t.Run("source-or-incarnation-substitution-denies", func(t *testing.T) {
+		s := setup(t)
+		r := prepare(t, s)
+		s.w.ConsumeInstallationWitness(ctx, r.Claim)
+		publish(t, s, r)
+		w, a := inputs(s)
+		a.Revision.Generation++
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("new source activated old attempt")
+		}
+		w, a = inputs(s)
+		w.Claim.Database.DatabaseOID++
+		if e = s.act.ActivateInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("different database activated")
+		}
+		pending(t, s)
+	})
+	t.Run("original-deadline-survives-lock-wait", func(t *testing.T) {
+		s := setup(t)
+		tx, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer tx.Rollback(context.Background())
+		if _, e = tx.Exec(ctx, "LOCK TABLE fleet_trust IN ACCESS EXCLUSIVE MODE"); e != nil {
+			t.Fatal(e)
+		}
+		w, a := inputs(s)
+		w.FreshUntil = w.ObservedAt.Add(100 * time.Millisecond)
+		if _, e = s.prep.PrepareInitialInstallation(ctx, w, a); e == nil {
+			t.Fatal("expired observation renewed after lock")
+		}
+		if e = tx.Rollback(ctx); e != nil {
+			t.Fatal(e)
+		}
+		var n int
+		if e = admin.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", s.scope.InstallationID).Scan(&n); e != nil || n != 0 {
+			t.Fatal("expired attempt persisted", e)
+		}
+	})
+	t.Run("purpose-roles-cannot-cross-write", func(t *testing.T) {
+		for _, attempt := range []struct{ role, sql string }{{"prepare", "UPDATE fleet_trust SET recovery_blocked=false"}, {"prepare", "UPDATE fleet_initial_activation SET audit_receipt_json='x'"}, {"audit", "UPDATE fleet_trust SET recovery_blocked=false"}, {"activate", "UPDATE fleet_initial_activation SET audit_receipt_json='x'"}, {"prepare", "DELETE FROM custody_pool"}, {"activate", "TRUNCATE custody_pool"}, {"prepare", "CREATE TABLE forbidden_initial(id int)"}} {
+			_, e = pools[attempt.role].Exec(ctx, attempt.sql)
+			var denied *pgconn.PgError
+			if !errors.As(e, &denied) || denied.Code != "42501" {
+				t.Fatal("expected SQL privilege denial", attempt.role, attempt.sql, e)
+			}
+		}
+	})
+	if native {
+		for _, mode := range []string{"valid", "missing-guard", "unbound", "wrong-sql-role"} {
+			t.Run("installer-pod-"+mode, func(t *testing.T) {
+				nativeInitialInstallerPod(t, ctx, f, admin, tokens, bucket, mode, address, tlsConfig)
+			})
+		}
+		t.Run("native-witness-source-and-provider-composition", func(t *testing.T) {
+			s := setup(t)
+			w, source, removeProtection := nativeInitialInstallationInputs(t, ctx, f)
+			s.scope = w.scope
+			for name, dst := range map[string]**postgres.InitialInstallations{"prepare": &s.prep, "audit": &s.ack, "activate": &s.act} {
+				var err error
+				*dst, err = postgres.NewInitialInstallations(ctx, pools[name], s.scope, artifact.Digest{2})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			service := app.InitialInstaller{Witness: w.reader, Consume: w.consumer, Administration: source, Preparation: s.prep, Objects: objects, Acknowledgements: s.ack, Activation: s.act, Now: time.Now}
+			r, err := service.Activate(ctx)
+			if err != nil {
+				t.Fatal("native initial activation", err)
+			}
+			observed, err := w.reader.ReadInstallationWitness(ctx)
+			if err != nil || observed.Claim == nil || !observed.Claim.Same(r.Claim) {
+				t.Fatal("native witness not consumed", err)
+			}
+			reader, err := postgres.NewRecoveryReader(ctx, pools["activate"], s.scope.InstallationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = reader.RecoveryState(ctx); err != nil {
+				t.Fatal("native activation unavailable", err)
+			}
+			if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.scope.InstallationID); err != nil {
+				t.Fatal(err)
+			}
+			removeProtection()
+			if _, err = service.Activate(ctx); err == nil {
+				t.Fatal("missing source guard accepted")
+			}
+			if _, err = reader.RecoveryState(ctx); err == nil {
+				t.Fatal("native retry cleared recovery")
+			}
+			t.Log("actual protected witness and fleet ConfigMaps, real API identities/admission, SQL/S3/OpenBao activation composed; credentials and installation plan are still fixture-provisioned, not an installer Pod")
+		})
+	}
+	t.Run("production-sql-role-provisioning-and-retirement", func(t *testing.T) { qualifyInitialSQLRoles(t, ctx, admin, address, tlsConfig) })
+	t.Log("real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified")
+}

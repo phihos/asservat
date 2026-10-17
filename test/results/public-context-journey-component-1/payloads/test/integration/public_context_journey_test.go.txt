@@ -1,0 +1,329 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	captureapp "asservat.local/asservat/internal/application/capture"
+	catalogapp "asservat.local/asservat/internal/application/catalog"
+	"asservat.local/asservat/internal/application/evidence"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	identities "asservat.local/asservat/internal/application/identity"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/bootstrap"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Both transport-shaped identities resolve the same explicit fixture principal,
+// with one original login end. Revocation is checked by the actual C02 request
+// owner/live reader, not implemented as a successful fake operations result.
+type publicJourneyIdentity struct {
+	nativeDownloadTestIdentity
+	denied atomic.Bool
+}
+
+func (s *publicJourneyIdentity) Resolve(ctx context.Context, token string) (identity.Identity, error) {
+	if s.denied.Load() {
+		return identity.Identity{}, identity.ErrDenied
+	}
+	return s.nativeDownloadTestIdentity.Resolve(ctx, token)
+}
+
+type publicJourneySessions struct {
+	nativeContentSessions
+	identity *publicJourneyIdentity
+}
+
+func (s publicJourneySessions) Resolve(c context.Context, cookie string, refresh bool) (identities.SessionView, error) {
+	if s.identity.denied.Load() {
+		return identities.SessionView{}, identity.ErrDenied
+	}
+	return s.nativeContentSessions.Resolve(c, cookie, refresh)
+}
+
+func publicJourneyData[T any](t *testing.T, name string, reply presentation.OperationReply, err error) T {
+	t.Helper()
+	var zero T
+	publicJourneyRequire(t, name, err)
+	var envelope struct {
+		Status string          `json:"status"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || !time.Now().Before(reply.ValidUntil) {
+		t.Fatalf("%s did not return a current successful envelope: %s", name, reply.Body)
+	}
+	publicJourneyRequire(t, name+" data", json.Unmarshal(envelope.Data, &zero))
+	return zero
+}
+func publicJourneyInput(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+	b, e := json.Marshal(v)
+	publicJourneyRequire(t, "operation input", e)
+	return b
+}
+
+// One actual guarded Kubernetes target -> signed outbound regional start ->
+// SQL52 admission/audit -> original encrypted objects -> independent publication
+// -> shared case/progress/resolution -> real authenticated native HTTP download.
+// The shared browser/MCP application operations are created ONCE before Preview.
+// This does not test an installed bootstrap graph, real SSO, or the MCP wire.
+func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture fixture, n *nativeAPIEnvironment, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, artifactKeys *publicContextJourneyKeys, runner executionapp.APIContextRunner, collector *nativeAPICollector) {
+	t.Helper()
+	s.nativeSources = startNativeScenarioSources(t, parent, admin, s)
+	defer s.nativeSources.Close()
+	ctx := s.nativeSources.ctx
+	// This owner is now the sole observation writer. Acquisition, publication and
+	// download consume accepted read-only sources, avoiding observer/read races.
+	retained := nativeFixtureAcceptedRetention(s)
+	retention := privacyapp.RetentionResolver{Policies: retained, RetainedPolicies: retained, Now: time.Now}
+	runner.Retention = retention
+	regional := newRegionalAPIStartFixture(t, ctx, fixture, n, s, admin, poolFor, store, keys, runner)
+	actor := s.a.Eligibility.VerifiedIdentity
+	actor.Scopes = []string{"evidence:capture", "evidence:read", "evidence:download"}
+	loginUntil := time.Now().UTC().Add(2 * time.Minute)
+	identitySource := &publicJourneyIdentity{nativeDownloadTestIdentity: nativeDownloadTestIdentity{actor, loginUntil}}
+	initial, e := identitySource.Resolve(ctx, "synthetic-reference")
+	publicJourneyRequire(t, "fixture initial identity", e)
+	sessions := publicJourneySessions{nativeContentSessions{workerBrowserSession{initial, loginUntil, 5 * time.Second}}, identitySource}
+	current := func(call context.Context, browserIdentity bool) identities.CurrentIdentity {
+		t.Helper()
+		if browserIdentity {
+			c, _, e := identities.NewBrowserRequest(call, sessions, strings.Repeat("s", 43), false, time.Now)
+			publicJourneyRequire(t, "browser current request", e)
+			return c
+		}
+		c, _, e := identities.NewBearerRequest(call, identitySource, "synthetic-reference", time.Now)
+		publicJourneyRequire(t, "MCP-shaped current request", e)
+		return c
+	}
+	native := newPublicJourneyNative(t, ctx, s, admin, poolFor, store, keys, artifactKeys, actor, loginUntil)
+	open := func(r, p string) *pgxpool.Pool { v := poolFor(r, p); t.Cleanup(v.Close); return v }
+	investigation, intents := nativeContinuationApplicationServices(t, ctx, n, s, admin, poolFor, store, keys)
+	investigation.Retention = retention
+	investigation.Resolution, e = postgres.NewContextRequestResolutions(ctx, open("context_request_resolution_runtime", "synthetic-context-request-resolution"), s.a.RootID, s.recovery.guard)
+	publicJourneyRequire(t, "request resolution", e)
+	progress, e := postgres.NewContextProgressReads(ctx, open("context_progress_read_runtime", "synthetic-context-progress-read"), s.a.RootID, s.recovery.guard)
+	publicJourneyRequire(t, "progress", e)
+	casePool := open("context_case_read_runtime", "synthetic-context-case-read")
+	routes, e := postgres.NewContextCaseReads(ctx, casePool, s.a.RootID, s.recovery.guard)
+	publicJourneyRequire(t, "case routes", e)
+	processing, e := postgres.NewProcessingReads(ctx, casePool, s.a.RootID, s.recovery.guard)
+	publicJourneyRequire(t, "case processing", e)
+	catalog, e := postgres.NewContextPublications(ctx, open("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID)
+	publicJourneyRequire(t, "case catalog", e)
+	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: catalog, Retention: retention, Processing: processing, Now: time.Now}
+	bridge := regional.bridge
+	bridge.Capabilities = nil
+	bridge.Recovery = nil
+	server := httptest.NewUnstartedServer(nil)
+	server.EnableHTTP2 = true
+	t.Cleanup(server.Close)
+	origin := "https://" + server.Listener.Addr().String()
+	operations, e := bootstrap.NewPublicContextOperations(bootstrap.PublicContextOperationsConfig{RootID: s.a.RootID, InstallationID: s.recovery.installation, PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: custodyID}, bootstrap.PublicContextOperationServices{Investigation: investigation, Intents: intents, Regional: bridge, Progress: captureapp.ContextProgressService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Reader: progress}, Cases: cases, Downloads: native.coordinator, Native: native.services})
+	publicJourneyRequire(t, "one complete public operation assembly", e)
+	// Fund the finite whole journey up front, preserving processing revision and
+	// spend. No replenishment is performed once the first public operation begins.
+	shared := nativeOperationAuditServices(t, t, ctx, s.a.RootID, s.recovery.installation, s.a.Registration.StoreID, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, admin, poolFor, store, keys, operations, 32)
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: actor.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: actor.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, shared, native.services.Runtime, native.services.Transfer)
+	publicJourneyRequire(t, "shared authenticated native GET", e)
+	var completed <-chan struct{}
+	server.Config.Handler, completed = nativeContentJoinedHandler(handler)
+	server.StartTLS()
+	call := func(name string, input any, browserIdentity bool) (presentation.OperationReply, error) {
+		return shared.Call(ctx, current(ctx, browserIdentity), name, publicJourneyInput(t, input))
+	}
+	previewInput := map[string]any{"target_ref": presentation.WorkloadReference{ClusterID: n.target.ClusterID, Namespace: n.target.Namespace, Kind: n.target.Kind, Name: n.target.Name}, "preset_ref": presentation.PresetReference{Name: "pod-status", Version: "v1"}, "requested_retention_seconds": 3600}
+	reply, e := call("preview_capture", previewInput, true)
+	preview := publicJourneyData[presentation.ContextPreviewData](t, "browser preview", reply, e)
+	if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || collector.calls.Load() != 0 {
+		t.Fatal("preview collected or failed to pin one original Pod")
+	}
+	key := "public-journey-original-capture"
+	request := map[string]any{"preview_id": preview.PreviewID, "idempotency_key": key}
+	regional.standby(t, ctx)
+	reply, e = call("request_capture", request, true)
+	accepted := publicJourneyData[presentation.ContextAcceptedData](t, "browser first request", reply, e)
+	regional.joined(t, ctx)
+	if collector.calls.Load() != 1 || accepted.CaptureID == "" {
+		t.Fatal("first shared request did not collect once")
+	}
+	reply, e = call("resolve_capture_request", request, false)
+	resolved := publicJourneyData[presentation.ContextResolutionData](t, "MCP-shaped accepted resolution", reply, e)
+	if resolved.State != "accepted" || resolved.ContextAcceptedData == nil || resolved.CaptureID != accepted.CaptureID {
+		t.Fatal("resolution replaced the original capture", resolved.State)
+	}
+	reply, e = call("request_capture", request, true)
+	replayed := publicJourneyData[presentation.ContextAcceptedData](t, "passive same-key request", reply, e)
+	if replayed.CaptureID != accepted.CaptureID || collector.calls.Load() != 1 {
+		t.Fatal("same-key request repeated acquisition or changed capture")
+	}
+	// The public reply carries no object receipt. Read only the original stored
+	// copies from its ordinary SQL read role, then publish independently.
+	var encoded []byte
+	publicJourneyRequire(t, "original stored capture", open("api_execution_read_runtime", "synthetic-api-execution-read").QueryRow(ctx, "SELECT copies_json FROM context_execution WHERE root_id=$1 AND capture_id=$2 AND phase='stored'", s.a.RootID, accepted.CaptureID).Scan(&encoded))
+	var copies artifact.Copies
+	publicJourneyRequire(t, "original copies", json.Unmarshal(encoded, &copies))
+	clear(encoded)
+	bound, e := store.ForCustody(s.a.Registration.StoreID)
+	publicJourneyRequire(t, "original custody", e)
+	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	publication := func(r, p string) *postgres.ContextPublications {
+		v, e := postgres.NewContextPublications(ctx, open(r, p), s.a.RootID, guards)
+		publicJourneyRequire(t, r, e)
+		return v
+	}
+	verify := publication("context_verify_runtime", "synthetic-context-verify")
+	audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
+	publish := publication("context_publish_runtime", "synthetic-context-publish")
+	gate, e := postgres.NewAPIContextPublicationGate(ctx, open("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, retention, s.recovery.reader)
+	publicJourneyRequire(t, "independent publication gate", e)
+	verifier, e := objectstore.NewContextVerifier(bound, artifactKeys.seal)
+	publicJourneyRequire(t, "original artifact verifier", e)
+	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
+	published, e := publisher.Publish(ctx, accepted.CaptureID, copies)
+	publicJourneyRequire(t, "independent original publication", e)
+	if published.Expectation.CaptureUID != accepted.CaptureID || published.Expectation.PodUID != preview.SelectedPods[0].UID || published.Copies != copies {
+		t.Fatal("publication changed original capture/Pod/copies")
+	}
+	reply, e = call("get_capture", map[string]string{"capture_id": accepted.CaptureID}, true)
+	progressData := publicJourneyData[presentation.ContextProgressData](t, "browser progress", reply, e)
+	if progressData.CaseID != published.Expectation.CaseID {
+		t.Fatal("progress did not link the original published case")
+	}
+	reply, e = call("get_case", map[string]string{"case_id": progressData.CaseID}, false)
+	caseData := publicJourneyData[presentation.ContextCaseData](t, "MCP-shaped case", reply, e)
+	artifactID := published.Expectation.Registration.Location.ArtifactID
+	if len(caseData.Artifacts) != 1 || caseData.Artifacts[0].ArtifactID != artifactID || caseData.Case.CaseID != published.Expectation.CaseID {
+		t.Fatal("shared case changed original artifact")
+	}
+	downloadInput := map[string]string{"artifact_id": artifactID, "idempotency_key": "public-journey-original-download"}
+	reply, e = call("prepare_artifact_download", downloadInput, false)
+	pending := publicJourneyData[presentation.ContextDownloadData](t, "first real pending preparation", reply, e)
+	if !pending.ContinuePreparation || pending.State != artifact.DownloadPreparing || pending.ArtifactID != artifactID || pending.ContentPath != "" {
+		t.Fatal("first preparation manufactured ready bytes", pending.State)
+	}
+	original, e := native.runtime.LookupDownload(ctx, pending.DownloadID, actor.Principal)
+	publicJourneyRequire(t, "original pending session", e)
+	credential := native.credentialClient(t, ctx, pending.DownloadID)
+	// A deliberate continuation of an acknowledged Pending response. This is not
+	// an automatic retry of an uncertain write, nor a replacement session/worker.
+	type operationResult struct {
+		reply presentation.OperationReply
+		err   error
+	}
+	continuation, stopContinuation := context.WithCancel(ctx)
+	done := make(chan operationResult, 1)
+	continuationIdentity := current(continuation, false)
+	raw := publicJourneyInput(t, downloadInput)
+	go func() {
+		r, e := shared.Call(continuation, continuationIdentity, "prepare_artifact_download", raw)
+		done <- operationResult{r, e}
+	}()
+	joinedRequest := false
+	defer func() {
+		stopContinuation()
+		if !joinedRequest {
+			<-done
+		}
+	}()
+	native.enrollAndStart(t, ctx, credential)
+	outcome := <-done
+	joinedRequest = true
+	stopContinuation()
+	ready := publicJourneyData[presentation.ContextDownloadData](t, "original preparation continuation", outcome.reply, outcome.err)
+	if ready.DownloadID != original.ID || ready.ArtifactID != artifactID || ready.State != artifact.DownloadReady || ready.SizeBytes == nil || ready.ContentPath == "" {
+		t.Fatal("continued preparation changed original identity or remained unavailable", ready.State)
+	}
+	same, e := native.runtime.LookupDownload(ctx, original.ID, actor.Principal)
+	publicJourneyRequire(t, "original ready session", e)
+	if same.ID != original.ID || same.Scope != original.Scope || !same.CreatedAt.Equal(original.CreatedAt) || !same.Deadline.Equal(original.Deadline) {
+		t.Fatal("continuation replaced or renewed original session")
+	}
+	requestHTTP := func(auth bool) *http.Response {
+		t.Helper()
+		r, e := http.NewRequestWithContext(ctx, http.MethodGet, origin+ready.ContentPath, nil)
+		publicJourneyRequire(t, "native GET request", e)
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		if auth {
+			r.AddCookie(&http.Cookie{Name: browser.SessionCookie, Value: strings.Repeat("s", 43)})
+		}
+		out, e := server.Client().Do(r)
+		publicJourneyRequire(t, "native HTTPS GET", e)
+		return out
+	}
+	denied := requestHTTP(false)
+	deniedBody, e := io.ReadAll(io.LimitReader(denied.Body, 64<<10))
+	denied.Body.Close()
+	waitContextNativeHTTP(t, ctx, completed)
+	if e != nil || denied.StatusCode == http.StatusOK || bytes.Equal(deniedBody, collector.native) {
+		t.Fatal("anonymous native evidence access")
+	}
+	clear(deniedBody)
+	response := requestHTTP(true)
+	body, e := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
+	response.Body.Close()
+	waitContextNativeHTTP(t, ctx, completed)
+	defer clear(body)
+	digest := sha256.Sum256(body)
+	if e != nil || response.StatusCode != http.StatusOK || response.ProtoMajor != 2 || !bytes.Equal(body, collector.native) || int64(len(body)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 || response.Header.Get("ETag") != ready.ETag {
+		t.Fatal("authenticated native bytes differ from the original Kubernetes capture", response.StatusCode, len(body), e)
+	}
+	requireContextNativeJoined(t, native.joined, native.target, 3)
+	native.closeWorker()
+	completedSession, e := native.runtime.LookupDownload(ctx, original.ID, actor.Principal)
+	publicJourneyRequire(t, "completed original session", e)
+	if completedSession.State != artifact.DownloadCompleted || completedSession.Scope != original.Scope {
+		t.Fatal("native completion changed original session")
+	}
+	reply, e = call("cancel_artifact_download", map[string]string{"download_id": original.ID, "idempotency_key": "public-journey-stop"}, true)
+	stopped := publicJourneyData[presentation.ContextDownloadCancelData](t, "browser prepaid Stop", reply, e)
+	if stopped.DownloadID != original.ID || stopped.AuditState != "recorded" {
+		t.Fatal("original Stop lacked acknowledged audit", stopped)
+	}
+	retainedSession, e := native.runtime.LookupDownload(ctx, original.ID, actor.Principal)
+	publicJourneyRequire(t, "retained original Stop", e)
+	if retainedSession.ChargedRead != completedSession.ChargedRead || retainedSession.ChargedOutput != completedSession.ChargedOutput || !retainedSession.Deadline.Equal(original.Deadline) {
+		t.Fatal("Stop refunded spend or renewed original session")
+	}
+	oldBrowser, oldBearer := current(ctx, true), current(ctx, false)
+	identitySource.denied.Store(true)
+	for _, request := range []struct {
+		name    string
+		input   any
+		current identities.CurrentIdentity
+	}{{"get_case", map[string]string{"case_id": published.Expectation.CaseID}, oldBearer}, {"get_capture", map[string]string{"capture_id": accepted.CaptureID}, oldBrowser}, {"get_artifact_download", map[string]string{"download_id": original.ID}, oldBearer}} {
+		if result, err := shared.Call(ctx, request.current, request.name, publicJourneyInput(t, request.input)); err == nil && len(result.Body) != 0 {
+			t.Fatal("revoked current identity received metadata", request.name)
+		}
+	}
+	denied = requestHTTP(true)
+	deniedBody, e = io.ReadAll(io.LimitReader(denied.Body, 64<<10))
+	denied.Body.Close()
+	waitContextNativeHTTP(t, ctx, completed)
+	if e != nil || denied.StatusCode != http.StatusUnauthorized || bytes.Equal(deniedBody, collector.native) {
+		t.Fatal("revoked current identity received native evidence", denied.StatusCode)
+	}
+	clear(deniedBody)
+	var captures, artifacts, sessionsCount, workers, keysUsed int
+	publicJourneyRequire(t, "one original identity chain", admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_capture WHERE root_id=$1),(SELECT count(*) FROM context_catalog WHERE root_id=$1),(SELECT count(*) FROM artifact_download WHERE allocation_id=$2),(SELECT count(*) FROM download_worker WHERE root_id=$1),(SELECT used_roles FROM download_key_binding WHERE session_id=$3)`, s.a.RootID, native.allocation.ID, original.ID).Scan(&captures, &artifacts, &sessionsCount, &workers, &keysUsed))
+	if captures != 1 || artifacts != 1 || sessionsCount != 1 || workers != 1 || keysUsed != 7 || collector.calls.Load() != 1 {
+		t.Fatal("journey replaced/reseeded identities or repeated acquisition", captures, artifacts, sessionsCount, workers, keysUsed, collector.calls.Load())
+	}
+	t.Logf("one shared factory before preview; browser/MCP-shaped current requests; real first regional capture, accepted resolution, independent publication, progress/case, original pending continuation, authenticated h2 native bytes=%d, prepaid Stop and current-identity denial; synthetic bootstrap/human/Pod/Job/CA/backing, no installed journey or MCP-wire claim", len(body))
+}

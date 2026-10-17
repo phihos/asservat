@@ -1,0 +1,1956 @@
+--- /dev/null
++++ b/docs/decisions/139-shared-native-context-start-listener.md
+@@ -0,0 +1,17 @@
++# ADR-139: Share the accepted native port with live context start
++
++Status: accepted for implementation; combined native qualification remains pending.
++
++ADR-135's connector opens its live context-start exchange at the audited owner's existing `nativePort`. ADR-122's concrete server previously accepted only native evidence conversations and capped every socket at ten seconds. Replacing that server with a permissive fixture handler would not establish a usable installed composition.
++
++Add a closed `ServeWithContextStart` composition for the existing native handler and the fixed context-start handler on that same port. Both use the activated owner server key and protected connector TLS roots. Each handler independently checks its current exact peer, process and operation; dispatching by path supplies none of those authorities. The ordinary `Serve` entry point retains its ten-second native behavior.
++
++The immutable socket acceptance time anchors every bound. Shared sockets get at most two seconds for TLS and initial headers, ten seconds for native exchange or thirty seconds for context-start residency. Certificate expiry and application proofs can shorten those intervals. Classification, handshake completion, current reads and reconnects cannot renew the original acceptance instant. Request contexts and joined close callbacks interrupt non-I/O work as well as blocked reads and writes. Passive context standby contains no human authority; signed work and identity/effect checks retain their separate original five-second limits.
++
++Native and context sockets have separate finite reservations, with a whole-process raw connection ceiling of sixty-four before TLS. A context standby cannot consume the native purpose's reserved admitted slots. Closing sockets remain charged to their purpose until their actual handler and socket join. Each accepted socket handles one request, including denial; neither sequential HTTP/2 reuse nor an unknown path can obtain another conversation or a longer interval. Existing per-cluster standby/capture and per-operation limits remain in force.
++
++The owning runtime cancels and closes keys, routers and listeners before joining every started renewal, readiness and serving child. A shutdown timer cannot prove that a child stopped and cannot report completed cleanup while it still owns work. External process termination is a separate orchestration outcome, not successful joined shutdown or permission to extend an original grant.
++
++Protected typed `OwnerNativeRuntimeConfig` may add a context-start router and exact admitted connector profiles. It uses the existing port and serving identity. Absence retains the ordinary native path. This increment does not supply the missing protected loader projections, work-signing/trust producer or deployed regional startup, and does not enable public collection.
++
++The combined fixture must use this actual server, real SQL52 admission and intent publication, actual regional API/local start gates, encrypted storage and independent publication/native verification. Initial human, route, connector process/source and signing roots remain explicit synthetic fixtures. Separate first-request and explicit same-key continuation selections report their exact passing subtest; a direct API-runner test is not a signed-exchange result. Qualification is recorded in [implementation progress](../implementation-progress.md), not inferred from this decision.
+--- a/internal/bootstrap/owner_native.go
++++ b/internal/bootstrap/owner_native.go
+@@ -13,6 +13,7 @@
+ 	"asservat.local/asservat/internal/contracts"
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	authorization "asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/transport/contextstart"
+ 	native "asservat.local/asservat/internal/transport/native"
+ )
+ 
+@@ -23,12 +24,28 @@
+ 	Peers                    *mtls.NativePeerChecks
+ 	ConnectorRoots           *x509.CertPool
+ 	Connections, Concurrency int
++	ContextStarts            *OwnerContextStartRuntimeConfig
++}
++
++// OwnerContextStartRuntimeConfig is installation-owned input for the two fixed
++// purposes on the already accepted NativePort. Router is the same request-owned
++// router used by RegionalAPIContextStart; this gives no public caller a route.
++// Current profile/registry checks remain in ContextStartIngress. The existing
++// protected loader does not yet provision this optional composition.
++type OwnerContextStartRuntimeConfig struct {
++	RootID                 string
++	Router                 *contextstart.Router
++	Admissions             []mtls.ContextStartConnectorAdmission
++	Connections, Preflight int
+ }
+ type ownerNativeRuntime struct {
+-	roots       *x509.CertPool
+-	router      *native.HubRouter
+-	handler     *native.Handler
+-	connections int
++	roots            *x509.CertPool
++	router           *native.HubRouter
++	handler          *native.Handler
++	connections      int
++	starts           *contextstart.Handler
++	startRouter      *contextstart.Router
++	startConnections int
+ }
+ 
+ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *app.OwnerAuthenticator) (*ownerNativeRuntime, error) {
+@@ -59,7 +76,26 @@
+ 		router.Close()
+ 		return nil, err
+ 	}
+-	return &ownerNativeRuntime{c.ConnectorRoots.Clone(), router, handler, c.Connections}, nil
++	out := &ownerNativeRuntime{roots: c.ConnectorRoots.Clone(), router: router, handler: handler, connections: c.Connections}
++	if c.ContextStarts != nil {
++		start := c.ContextStarts
++		if !authorization.UUID(start.RootID) || start.Router == nil || start.Connections < 1 || start.Connections > 64 || start.Preflight < 1 || start.Preflight > start.Connections || c.Connections+start.Connections > 64 {
++			router.Close()
++			return nil, artifact.ErrInvalid
++		}
++		ingress, e := mtls.NewContextStartIngress(start.RootID, r.server, auth, start.Admissions, time.Now)
++		if e != nil {
++			router.Close()
++			return nil, e
++		}
++		h, e := contextstart.NewHandler(net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), start.Router, ingress, start.Preflight)
++		if e != nil {
++			router.Close()
++			return nil, e
++		}
++		out.starts, out.startRouter, out.startConnections = h, start.Router, start.Connections
++	}
++	return out, nil
+ }
+ 
+ // RegisterNativeExchange retains the actual original request closure in this
+--- a/internal/bootstrap/owner_runtime.go
++++ b/internal/bootstrap/owner_runtime.go
+@@ -150,25 +150,37 @@
+ 	return s != nil && !now.Before(s.observed) && now.Before(s.until)
+ }
+ 
++// stop removes readiness, cancels work and disables retained keys before any
++// joined shutdown can block on a child that has not yet returned.
++func (r *OwnerRuntime) stop() {
++	if r == nil {
++		return
++	}
++	r.ready.Store(nil)
++	if r.cancel != nil {
++		r.cancel()
++	}
++	if r.forwarder != nil {
++		r.forwarder.Close()
++	}
++	if r.server != nil {
++		r.server.Close()
++	}
++	if r.client != nil {
++		r.client.Close()
++	}
++}
++
+ func (r *OwnerRuntime) Close() {
+ 	if r == nil {
+ 		return
+ 	}
+-	r.ready.Store(nil)
+-	if r.cancel != nil {
+-		r.cancel()
+-	}
++	r.stop()
+ 	if r.native != nil {
+ 		r.native.router.Close()
+-	}
+-	if r.forwarder != nil {
+-		r.forwarder.Close()
+-	}
+-	if r.server != nil {
+-		r.server.Close()
+-	}
+-	if r.client != nil {
+-		r.client.Close()
++		if r.native.startRouter != nil {
++			r.native.startRouter.Close()
++		}
+ 	}
+ }
+ 
+@@ -227,21 +239,18 @@
+ 	running := 0
+ 	launch := func(f func() error) { running++; go func() { finished <- f() }() }
+ 	defer func() {
+-		r.Close()
++		r.stop()
+ 		listener.Close()
+ 		if nativeListener != nil {
+ 			nativeListener.Close()
+ 		}
+-		deadline := time.NewTimer(6 * time.Second)
+-		defer deadline.Stop()
++		r.Close()
++		// Cancellation and socket/key closure remove effect authority first.
++		// A timeout cannot establish that an already-started child terminated.
++		// Process-level forced termination is distinct from joined Run return.
+ 		for running > 0 {
+-			select {
+-			case <-finished:
+-				running--
+-			case <-deadline.C:
+-				result = value.ErrUnavailable
+-				return
+-			}
++			<-finished
++			running--
+ 		}
+ 	}()
+ 	identityReady := make(chan app.OwnerCredentialStatus, 1)
+@@ -261,6 +270,9 @@
+ 	launch(func() error { return ownerrelay.Serve(r.root, listener, r.roots, r.server, r.handler, r.connections) })
+ 	if nativeListener != nil {
+ 		launch(func() error {
++			if r.native.starts != nil {
++				return native.ServeWithContextStart(r.root, nativeListener, r.native.roots, r.server, r.native.handler, r.native.starts, r.native.connections, r.native.startConnections)
++			}
+ 			return native.Serve(r.root, nativeListener, r.native.roots, r.server, r.native.handler, r.native.connections)
+ 		})
+ 	}
+--- /dev/null
++++ b/internal/bootstrap/owner_runtime_join_test.go
+@@ -0,0 +1,74 @@
++package bootstrap
++
++import (
++	"context"
++	"errors"
++	"sync"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/domain/fleet"
++)
++
++func TestOwnerRuntimeJoinsBlockedChildAfterCancellation(t *testing.T) {
++	fixture, config, listener := newRuntimeFixture(t)
++	entered, release := make(chan struct{}), make(chan struct{})
++	var once sync.Once
++	// The independently called readiness reader deliberately ignores cancellation
++	// until a positive test-owned release. This is not a new authority provider.
++	fixture.mutateProof = func(*fleet.OwnerEnrollmentProof) { once.Do(func() { close(entered) }); <-release }
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	runtime, e := NewOwnerRuntime(ctx, config)
++	if e != nil {
++		close(release)
++		t.Fatal(e)
++	}
++	finished := make(chan error, 1)
++	go func() { finished <- runtime.Run(listener) }()
++	joined := false
++	t.Cleanup(func() {
++		cancel()
++		select {
++		case <-release:
++		default:
++			close(release)
++		}
++		if !joined {
++			<-finished
++		}
++		runtime.Close()
++	})
++	select {
++	case <-entered:
++	case <-time.After(3 * time.Second):
++		t.Fatal("readiness child did not enter")
++	}
++	cancel()
++	// Cross the old six-second detach timeout only after the actual blocked child
++	// is known to exist. No sleep substitutes for that ownership handshake.
++	oldTimeout := time.NewTimer(6250 * time.Millisecond)
++	defer oldTimeout.Stop()
++	select {
++	case e := <-finished:
++		joined = true
++		t.Fatal("Run returned while original child remained blocked", e)
++	case <-oldTimeout.C:
++	}
++	if runtime.Ready() {
++		t.Fatal("cancelled runtime retained readiness")
++	}
++	if _, _, e := runtime.server.ReadinessRequest(); e == nil {
++		t.Fatal("cancelled runtime retained server key authority")
++	}
++	close(release)
++	select {
++	case e := <-finished:
++		joined = true
++		if !errors.Is(e, context.Canceled) {
++			t.Fatal(e)
++		}
++	case <-time.After(time.Second):
++		t.Fatal("released child did not join")
++	}
++}
+--- a/internal/transport/native/server.go
++++ b/internal/transport/native/server.go
+@@ -14,6 +14,7 @@
+ 	"time"
+ 
+ 	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/transport/contextstart"
+ 	"golang.org/x/net/netutil"
+ )
+ 
+@@ -28,7 +29,24 @@
+ // serves the exact native Handler with h2/TLS1.3 only. Handshake admission does
+ // not replace the handler's current per-frame SQL, proof and serving checks.
+ func Serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, connections int) error {
+-	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 || credentials == nil || handler == nil || connections < 1 || connections > 64 || cap(handler.slots) > connections {
++	return serve(ctx, listener, roots, credentials, handler, nil, connections, 0)
++}
++
++// ServeWithContextStart shares the accepted native port between exactly two
++// private purposes. The same serving identity and connector roots apply at TLS;
++// each handler independently proves its exact current operation. Purpose socket
++// reservations are disjoint and remain charged until the owned socket and its
++// handler have joined. No request chooses an endpoint, lifetime or handler.
++func ServeWithContextStart(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
++	if starts == nil || startConnections < 1 || startConnections > 64 || nativeConnections < 1 || nativeConnections+startConnections > 64 {
++		return contracts.ErrNativeProtocol
++	}
++	return serve(ctx, listener, roots, credentials, handler, starts, nativeConnections, startConnections)
++}
++
++func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
++	connections := nativeConnections + startConnections
++	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 || credentials == nil || handler == nil || nativeConnections < 1 || connections > 64 || cap(handler.slots) > nativeConnections {
+ 		return contracts.ErrNativeProtocol
+ 	}
+ 	host, _, err := net.SplitHostPort(handler.host)
+@@ -37,7 +55,14 @@
+ 	}
+ 	root, cancel := context.WithCancel(ctx)
+ 	defer cancel()
+-	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root}
++	residency := 10 * time.Second
++	prelude := time.Duration(0)
++	if starts != nil {
++		residency, prelude = 30*time.Second, 2*time.Second
++	}
++	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root, residency: residency, prelude: prelude}
++	nativeSlots := make(chan struct{}, nativeConnections)
++	startSlots := make(chan struct{}, startConnections)
+ 	defer owned.Close()
+ 	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots.Clone(), SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
+ 	// net/http may prepare compatibility ALPN entries internally. Enforce the
+@@ -84,7 +109,7 @@
+ 	}
+ 	protocols := &http.Protocols{}
+ 	protocols.SetHTTP2(true)
+-	server := &http.Server{TLSConfig: config, Protocols: protocols, HTTP2: &http.HTTP2Config{MaxConcurrentStreams: 1, MaxDecoderHeaderTableSize: 4096, MaxEncoderHeaderTableSize: 4096, MaxReadFrameSize: 16 << 10, MaxReceiveBufferPerConnection: 64 << 10, MaxReceiveBufferPerStream: 64 << 10}, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: time.Second, MaxHeaderBytes: 8 << 10, ErrorLog: log.New(io.Discard, "", 0)}
++	server := &http.Server{TLSConfig: config, Protocols: protocols, HTTP2: &http.HTTP2Config{MaxConcurrentStreams: 1, MaxDecoderHeaderTableSize: 4096, MaxEncoderHeaderTableSize: 4096, MaxReadFrameSize: 16 << 10, MaxReceiveBufferPerConnection: 64 << 10, MaxReceiveBufferPerStream: 64 << 10}, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: residency, WriteTimeout: residency, IdleTimeout: time.Second, MaxHeaderBytes: 8 << 10, ErrorLog: log.New(io.Discard, "", 0)}
+ 	server.BaseContext = func(net.Listener) context.Context { return root }
+ 	server.ConnContext = func(_ context.Context, c net.Conn) context.Context {
+ 		if t, ok := c.(*tls.Conn); ok {
+@@ -96,12 +121,25 @@
+ 		stop()
+ 		return denied
+ 	}
++	// Close only after net/http finishes the one response, including END_STREAM.
++	// Closing in Handler's defer could truncate that response. The first idle
++	// state before any request does not close a standby awaiting its headers.
++	server.ConnState = func(c net.Conn, state http.ConnState) {
++		if state != http.StateIdle {
++			return
++		}
++		if t, ok := c.(*tls.Conn); ok {
++			if b, ok := t.NetConn().(*nativeConn); ok && b.request.Load() {
++				_ = b.Close()
++			}
++		}
++	}
+ 	var mu sync.Mutex
+ 	var requests sync.WaitGroup
+ 	closing := false
+ 	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		connection, ok := r.Context().Value(nativeConnectionKey{}).(*nativeConn)
+-		if !ok || !connection.request.CompareAndSwap(false, true) {
++		if !ok || !connection.beginRequest() {
+ 			// One conversation per accepted socket, including denied requests. HTTP/2
+ 			// concurrency limits alone would permit unbounded sequential attempts.
+ 			if ok {
+@@ -109,8 +147,44 @@
+ 			}
+ 			return
+ 		}
++		defer close(connection.handlerDone)
++		selected, lifetime, slots := http.Handler(handler), 10*time.Second, nativeSlots
++		if starts != nil && r.RequestURI == contracts.APIContextStartPath {
++			selected, lifetime, slots = starts, 30*time.Second, startSlots
++		} else if r.RequestURI != handler.path {
++			unavailable(w)
++			return
++		}
++		select {
++		case slots <- struct{}{}:
++			connection.mu.Lock()
++			connection.release = func() { <-slots }
++			connection.mu.Unlock()
++		default:
++			unavailable(w)
++			return
++		}
++		if connection.finishPrelude() != nil || connection.shorten(connection.accepted.Add(lifetime)) != nil {
++			return
++		}
++		connection.mu.Lock()
++		until := connection.until
++		connection.mu.Unlock()
++		call, end := context.WithDeadline(r.Context(), until)
++		interrupted := make(chan struct{})
++		stopCall := context.AfterFunc(call, func() {
++			connection.cancel()
++			_ = connection.Conn.Close()
++			close(interrupted)
++		})
++		defer func() {
++			if !stopCall() {
++				<-interrupted
++			}
++			end()
++		}()
+ 		mu.Lock()
+-		if closing || root.Err() != nil {
++		if closing || root.Err() != nil || call.Err() != nil {
+ 			mu.Unlock()
+ 			unavailable(w)
+ 			return
+@@ -118,7 +192,7 @@
+ 		requests.Add(1)
+ 		mu.Unlock()
+ 		defer requests.Done()
+-		handler.ServeHTTP(w, r)
++		selected.ServeHTTP(w, r.WithContext(call))
+ 	})
+ 	callback := make(chan struct{})
+ 	stop := context.AfterFunc(root, func() { _ = server.Close(); close(callback) })
+@@ -146,7 +220,8 @@
+ 
+ type nativeListener struct {
+ 	net.Listener
+-	root context.Context
++	root               context.Context
++	residency, prelude time.Duration
+ }
+ 
+ func (l *nativeListener) Accept() (net.Conn, error) {
+@@ -154,9 +229,23 @@
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	until := time.Now().Add(10 * time.Second)
++	accepted := time.Now()
++	residency := l.residency
++	if residency == 0 {
++		residency = 10 * time.Second
++	}
++	until := accepted.Add(residency)
+ 	ctx, cancel := context.WithDeadline(l.root, until)
+-	c := &nativeConn{Conn: raw, ctx: ctx, cancel: cancel, until: until, callback: make(chan struct{})}
++	c := &nativeConn{Conn: raw, ctx: ctx, cancel: cancel, accepted: accepted, until: until, callback: make(chan struct{}), handlerDone: make(chan struct{})}
++	if l.prelude > 0 {
++		c.preludeDone = make(chan struct{})
++		timer := time.AfterFunc(time.Until(accepted.Add(l.prelude)), func() {
++			cancel()
++			_ = raw.Close()
++			close(c.preludeDone)
++		})
++		c.stopPrelude = timer.Stop
++	}
+ 	c.stop = context.AfterFunc(ctx, func() { _ = raw.Close(); close(c.callback) })
+ 	if ctx.Err() != nil || raw.SetDeadline(until) != nil {
+ 		_ = c.Close()
+@@ -167,29 +256,73 @@
+ 
+ type nativeConn struct {
+ 	net.Conn
+-	ctx      context.Context
+-	cancel   context.CancelFunc
+-	mu       sync.Mutex
+-	until    time.Time
+-	stop     func() bool
+-	callback chan struct{}
+-	once     sync.Once
+-	err      error
+-	request  atomic.Bool
++	ctx         context.Context
++	cancel      context.CancelFunc
++	mu          sync.Mutex
++	accepted    time.Time
++	until       time.Time
++	stopPrelude func() bool
++	preludeDone chan struct{}
++	handlerDone chan struct{}
++	release     func()
++	closing     bool
++	stop        func() bool
++	callback    chan struct{}
++	once        sync.Once
++	err         error
++	request     atomic.Bool
+ }
+ 
+ type nativeConnectionKey struct{}
++
++// beginRequest and Close serialize the boundary before any purpose slot can be
++// acquired. A close racing the first HTTP request must either join that request
++// or prevent it; it cannot complete and leave a later slot permanently charged.
++func (c *nativeConn) beginRequest() bool {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	return !c.closing && c.ctx.Err() == nil && c.request.CompareAndSwap(false, true)
++}
+ 
+ func (c *nativeConn) Close() error {
+ 	c.once.Do(func() {
++		c.mu.Lock()
++		c.closing = true
++		requested := c.request.Load()
++		c.mu.Unlock()
+ 		c.cancel()
++		_ = c.finishPrelude()
+ 		c.err = c.Conn.Close()
+ 		if !c.stop() {
+ 			<-c.callback
+ 		}
++		if requested {
++			<-c.handlerDone
++		}
++		c.mu.Lock()
++		release := c.release
++		c.release = nil
++		c.mu.Unlock()
++		if release != nil {
++			release()
++		}
+ 	})
+ 	return c.err
+ }
++
++// finishPrelude joins the fixed original TLS/header timer. A timer that already
++// fired cannot be replaced by observing a valid path or by a later TLS result.
++func (c *nativeConn) finishPrelude() error {
++	c.mu.Lock()
++	stop, done := c.stopPrelude, c.preludeDone
++	c.stopPrelude = nil
++	c.mu.Unlock()
++	if stop != nil && !stop() {
++		<-done
++	}
++	return c.ctx.Err()
++}
++
+ func (c *nativeConn) shorten(until time.Time) error {
+ 	c.mu.Lock()
+ 	defer c.mu.Unlock()
+--- /dev/null
++++ b/internal/transport/native/server_context_test.go
+@@ -0,0 +1,203 @@
++package native_test
++
++import (
++	"context"
++	"crypto/tls"
++	"errors"
++	"io"
++	"net"
++	"net/http"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/mtls"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/transport/contextstart"
++	native "asservat.local/asservat/internal/transport/native"
++)
++
++// Only the current authority is synthetic. The shared production listener,
++// actual TLS/h2, both exact handlers and original socket clocks are exercised.
++type sharedStartIngress struct{ calls atomic.Int64 }
++
++func (s *sharedStartIngress) AuthenticateContextStart(ctx context.Context, peer *tls.ConnectionState, hello contracts.APIContextHello) (fleet.APIContextReceiver, contextstart.ReceiverCheck, error) {
++	s.calls.Add(1)
++	if ctx.Err() != nil || peer == nil || peer.NegotiatedProtocol != "h2" || len(peer.VerifiedChains) == 0 {
++		return fleet.APIContextReceiver{}, nil, fleet.ErrDenied
++	}
++	c := fleet.APIContextChannel{RootID: nativeID, ExchangeID: hello.Channel.ExchangeID, Challenge: nativeID, Hub: fleet.OwnerBinding{InstallationID: nativeID, ClusterID: nativeID, IssuerEpoch: nativeID, PodUID: nativeID, ProcessEpoch: nativeID}, Connector: fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: nativeID, ClusterID: nativeID, IssuerEpoch: nativeID, PeerID: nativeID, Role: fleet.ConnectorPeer}, PodUID: nativeID, ProcessEpoch: nativeID}, ConnectorLeaf: artifact.Digest{1}, Executor: fleet.APIContextExecutor{NamespaceUID: nativeID, AccountUID: nativeID, PodUID: nativeID, ProcessEpoch: "22222222-2222-4222-8222-222222222222", StartupDigest: artifact.Digest{2}, ImageDigest: artifact.Digest{3}}}
++	check := func(call context.Context) (fleet.APIContextReceiver, error) {
++		n := time.Now()
++		return fleet.APIContextReceiver{Channel: c, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, call.Err()
++	}
++	r, e := check(ctx)
++	return r, check, e
++}
++func TestNativeSharedPortActualH2StandbyAndIndependentPurpose(t *testing.T) {
++	certificate, clientCertificate, roots := testCertificates(t)
++	listener, e := net.Listen("tcp", "127.0.0.1:0")
++	if e != nil {
++		t.Fatal(e)
++	}
++	router, e := contextstart.NewRouter(contextstart.RouterLimits{Standby: 2, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: nativeID, Standby: 2, Captures: 1}}})
++	if e != nil {
++		t.Fatal(e)
++	}
++	ingress := &sharedStartIngress{}
++	starts, e := contextstart.NewHandler(listener.Addr().String(), router, ingress, 2)
++	if e != nil {
++		t.Fatal(e)
++	}
++	admission := &syntheticAdmission{closed: make(chan struct{}), serve: func(c context.Context, s native.Stream) error {
++		if e := s.Send(c, contracts.NativeFrame{Kind: contracts.NativeCommandFrame, Payload: []byte(`{}`)}); e != nil {
++			return e
++		}
++		<-s.Context().Done()
++		return s.Context().Err()
++	}}
++	handler, e := native.NewHandler(contracts.NativeWorkerPath, listener.Addr().String(), admission, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 16*time.Second)
++	done := make(chan error, 1)
++	go func() {
++		done <- native.ServeWithContextStart(ctx, listener, roots, syntheticServingCertificate{certificate}, handler, starts, 1, 1)
++	}()
++	t.Cleanup(func() {
++		cancel()
++		router.Close()
++		if e := <-done; !errors.Is(e, context.Canceled) && !errors.Is(e, context.DeadlineExceeded) {
++			t.Error(e)
++		}
++	})
++	open := func(id string) (*http.Response, func()) {
++		t.Helper()
++		read, write := io.Pipe()
++		tr := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{clientCertificate}, MinVersion: tls.VersionTLS13}, ForceAttemptHTTP2: true, DisableKeepAlives: true}
++		call, stop := context.WithCancel(ctx)
++		req, e := http.NewRequestWithContext(call, http.MethodPost, "https://"+listener.Addr().String()+contracts.APIContextStartPath, read)
++		if e != nil {
++			t.Fatal(e)
++		}
++		req.Header.Set("Content-Type", contracts.APIContextStartMedia)
++		req.Header.Set("Accept", contracts.APIContextStartMedia)
++		hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contracts.APIContextChannel{ExchangeID: id}})
++		if e != nil {
++			t.Fatal(e)
++		}
++		wrote := make(chan error, 1)
++		go func() {
++			wrote <- contracts.WriteAPIContextFrame(write, contracts.APIContextFrame{Kind: contracts.APIContextHelloFrame, Payload: hello})
++		}()
++		response, e := tr.RoundTrip(req)
++		closeAll := func() {
++			stop()
++			read.Close()
++			write.Close()
++			if response != nil {
++				response.Body.Close()
++			}
++			tr.CloseIdleConnections()
++		}
++		if e != nil {
++			closeAll()
++			<-wrote
++			t.Fatal("actual shared h2 POST", e)
++		}
++		if e = <-wrote; e != nil && response.StatusCode == http.StatusOK {
++			closeAll()
++			t.Fatal("hello write", e)
++		}
++		return response, closeAll
++	}
++	response, stop := open(nativeID)
++	defer stop()
++	if response.StatusCode != http.StatusOK || response.ProtoMajor != 2 {
++		t.Fatal("context-start exact handler unavailable", response.StatusCode)
++	}
++	ended := make(chan error, 1)
++	go func() { var b [1]byte; _, e := response.Body.Read(b[:]); ended <- e }()
++	// Actual standby must outlive the native purpose's original ten-second cap.
++	// This is passive residency; no work, human identity or grant is refreshed.
++	timer := time.NewTimer(10500 * time.Millisecond)
++	defer timer.Stop()
++	select {
++	case e := <-ended:
++		t.Fatal("context standby inherited native lifetime", e)
++	case <-timer.C:
++	case <-ctx.Done():
++		t.Fatal(ctx.Err())
++	}
++	rejected, closeRejected := open("33333333-3333-4333-8333-333333333333")
++	if rejected.StatusCode == http.StatusOK || ingress.calls.Load() != 1 {
++		closeRejected()
++		t.Fatal("context purpose exceeded its separately reserved slot", rejected.StatusCode, ingress.calls.Load())
++	}
++	closeRejected()
++	client, e := mtls.NewNativeClient("https://"+listener.Addr().String()+contracts.NativeWorkerPath, &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{clientCertificate}})
++	if e != nil {
++		t.Fatal(e)
++	}
++	stream, e := client.Open(ctx, workerHello())
++	if e != nil {
++		t.Fatal("standby exhausted independent native purpose", e)
++	}
++	// The socket/test lifetime is not a native frame lease. NativeClientStream
++	// requires the same at-most-five-second frame bound as the exact handler.
++	read, endRead := context.WithTimeout(ctx, 4*time.Second)
++	frame, e := stream.Receive(read)
++	endRead()
++	clear(frame.Payload)
++	stream.Close()
++	if e != nil || frame.Kind != contracts.NativeCommandFrame || admission.calls.Load() != 1 {
++		t.Fatal("native purpose did not use exact unchanged handler", e)
++	}
++	stop()
++	select {
++	case <-ended:
++	case <-ctx.Done():
++		t.Fatal("standby reader failed to join")
++	}
++}
++func TestNativeSharedPortUnclassifiedSocketExpires(t *testing.T) {
++	server, _, roots := testCertificates(t)
++	listener, e := net.Listen("tcp", "127.0.0.1:0")
++	if e != nil {
++		t.Fatal(e)
++	}
++	router, e := contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: nativeID, Standby: 1, Captures: 1}}})
++	if e != nil {
++		t.Fatal(e)
++	}
++	starts, e := contextstart.NewHandler(listener.Addr().String(), router, &sharedStartIngress{}, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	handler, e := native.NewHandler(contracts.NativeWorkerPath, listener.Addr().String(), &syntheticAdmission{closed: make(chan struct{})}, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	done := make(chan error, 1)
++	go func() {
++		done <- native.ServeWithContextStart(ctx, listener, roots, syntheticServingCertificate{server}, handler, starts, 1, 1)
++	}()
++	defer func() { cancel(); router.Close(); <-done }()
++	socket, e := net.Dial("tcp", listener.Addr().String())
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer socket.Close()
++	socket.SetReadDeadline(time.Now().Add(3 * time.Second))
++	n := time.Now()
++	var b [1]byte
++	_, e = socket.Read(b[:])
++	elapsed := time.Since(n)
++	if e == nil || elapsed > 2800*time.Millisecond {
++		t.Fatal("unclassified raw socket outlived original two-second admission", elapsed, e)
++	}
++}
+--- /dev/null
++++ b/internal/transport/native/server_lifetime_test.go
+@@ -0,0 +1,115 @@
++package native
++
++import (
++	"context"
++	"net"
++	"sync"
++	"testing"
++	"time"
++)
++
++type deadlineRecorder struct {
++	net.Conn
++	mu  sync.Mutex
++	end time.Time
++}
++
++func (c *deadlineRecorder) SetDeadline(v time.Time) error {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	c.end = v
++	return nil
++}
++func (c *deadlineRecorder) SetReadDeadline(v time.Time) error  { return c.SetDeadline(v) }
++func (c *deadlineRecorder) SetWriteDeadline(v time.Time) error { return c.SetDeadline(v) }
++func (c *deadlineRecorder) deadline() time.Time                { c.mu.Lock(); defer c.mu.Unlock(); return c.end }
++func lifetimeConnection(t *testing.T, lifetime time.Duration) (*nativeConn, *deadlineRecorder) {
++	t.Helper()
++	a, b := net.Pipe()
++	t.Cleanup(func() { a.Close(); b.Close() })
++	n := time.Now()
++	ctx, stop := context.WithDeadline(context.Background(), n.Add(lifetime))
++	raw := &deadlineRecorder{Conn: a}
++	c := &nativeConn{Conn: raw, ctx: ctx, cancel: stop, accepted: n, until: n.Add(lifetime), callback: make(chan struct{}), handlerDone: make(chan struct{})}
++	c.stop = context.AfterFunc(ctx, func() { raw.Close(); close(c.callback) })
++	t.Cleanup(func() {
++		if c.request.Load() {
++			select {
++			case <-c.handlerDone:
++			default:
++				close(c.handlerDone)
++			}
++		}
++		c.Close()
++	})
++	return c, raw
++}
++func TestNativePurposeOriginalAcceptedDeadlineCannotRenew(t *testing.T) {
++	for _, lifetime := range []time.Duration{10 * time.Second, 30 * time.Second} {
++		t.Run(lifetime.String(), func(t *testing.T) {
++			c, raw := lifetimeConnection(t, 30*time.Second)
++			want := c.accepted.Add(lifetime)
++			if e := c.shorten(want); e != nil {
++				t.Fatal(e)
++			}
++			for _, v := range []time.Time{{}, want.Add(time.Hour)} {
++				for _, set := range []func(time.Time) error{c.SetDeadline, c.SetReadDeadline, c.SetWriteDeadline} {
++					if e := set(v); e != nil || !raw.deadline().Equal(want) {
++						t.Fatal("socket deadline exceeded original accepted bound", e)
++					}
++				}
++			}
++			earlier := want.Add(-time.Second)
++			if e := c.shorten(earlier); e != nil {
++				t.Fatal(e)
++			}
++			if e := c.shorten(want); e != nil || !raw.deadline().Equal(earlier) {
++				t.Fatal("later purpose/handshake extended shortened bound", e)
++			}
++		})
++	}
++}
++func TestNativePurposeClosingRetainsReservationUntilHandlerJoin(t *testing.T) {
++	c, _ := lifetimeConnection(t, 30*time.Second)
++	slots := make(chan struct{}, 1)
++	slots <- struct{}{}
++	if !c.beginRequest() {
++		t.Fatal("original request refused")
++	}
++	c.mu.Lock()
++	c.release = func() { <-slots }
++	c.mu.Unlock()
++	done := make(chan struct{})
++	go func() { c.Close(); close(done) }()
++	<-c.ctx.Done()
++	if c.beginRequest() {
++		t.Fatal("closing original socket admitted another request")
++	}
++	select {
++	case <-done:
++		t.Fatal("close returned before joined handler")
++	default:
++	}
++	select {
++	case slots <- struct{}{}:
++		t.Fatal("closing purpose slot was prematurely reused")
++	default:
++	}
++	close(c.handlerDone)
++	<-done
++	if len(slots) != 0 {
++		t.Fatal("joined purpose slot did not release")
++	}
++	if c.beginRequest() {
++		t.Fatal("closed socket admitted another conversation")
++	}
++}
++func TestNativePurposeCloseBeforeFirstRequestCannotStrandSlot(t *testing.T) {
++	c, _ := lifetimeConnection(t, 30*time.Second)
++	if e := c.Close(); e != nil {
++		t.Fatal(e)
++	}
++	if c.beginRequest() {
++		t.Fatal("completed socket close raced into a later handler")
++	}
++}
+--- a/scripts/test-context-storage.py
++++ b/scripts/test-context-storage.py
+@@ -42,7 +42,11 @@
+     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
+ 
+ 
+-def qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False):
++def qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None):
++    if regional_context_start is not None:
++        if regional_context_start not in ("first", "continuation") or test_pattern is not None or any((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)):
++            raise ValueError("Regional context qualification owns its exact test selection")
++        return "^TestContextAdmissionWithRealServices$/^native-regional-api-" + regional_context_start + "$", 2
+     if sum((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)) > 1:
+         raise ValueError("Select exactly one installation qualification")
+     if initial_handover or initial_schema_handover or initial_bootstrap_chain or helm_bootstrap:
+@@ -53,10 +57,10 @@
+     return test_pattern, 2
+ 
+ 
+-def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False):
++def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None):
+     env = base.copy()
+     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
+-    for key in ("ASSERVAT_INITIAL_HANDOVER_NATIVE", "ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE", "ASSERVAT_HELM_BOOTSTRAP_NATIVE"):
++    for key in ("ASSERVAT_INITIAL_HANDOVER_NATIVE", "ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE", "ASSERVAT_HELM_BOOTSTRAP_NATIVE", "ASSERVAT_CONTEXT_REGIONAL_START_NATIVE"):
+         env.pop(key, None)
+     if initial_handover:
+         env["ASSERVAT_INITIAL_HANDOVER_NATIVE"] = "1"
+@@ -66,6 +70,10 @@
+         env["ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE"] = "1"
+     if helm_bootstrap:
+         env["ASSERVAT_HELM_BOOTSTRAP_NATIVE"] = "1"
++    if regional_context_start is not None:
++        if regional_context_start not in ("first", "continuation"):
++            raise ValueError("Invalid regional context qualification")
++        env["ASSERVAT_CONTEXT_REGIONAL_START_NATIVE"] = regional_context_start
+     env["TMPDIR"] = str(work)
+     return env
+ 
+@@ -81,8 +89,8 @@
+     run(["docker", "exec", pgname, "psql", "-U", "postgres", "-d", "custody_test", "-v", "ON_ERROR_STOP=1", "-c", (ROOT/"test/fixtures/sql/runtime-roles.sql").read_text()])
+ 
+ 
+-def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False):
+-    test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)
++def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None):
++    test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start)
+     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
+     cache.mkdir(parents=True, exist_ok=True)
+     with tempfile.TemporaryDirectory(prefix="context-", dir=cache) as directory:
+@@ -94,7 +102,7 @@
+         worker_tag = None
+         registry = None
+         registry_nodes = []
+-        report = {"scope": "component integration, not S-02 release acceptance", "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
++        report = {"scope": "component integration, not S-02 release acceptance", "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+         exit_code = 1
+         try:
+             report["goVersion"] = run(["go", "version"])
+@@ -244,7 +252,7 @@
+             path = work/"fixtures.json"
+             path.touch(mode=0o600)
+             path.write_text(json.dumps(fixture))
+-            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)
++            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start)
+ 
+             command = ["go", "test", "-race", "-count=1", "-v"]
+             if test_pattern:
+@@ -271,6 +279,9 @@
+                 passed = [name for name in passed if "/" in name]
+             report["passedTests"] = passed
+             if not passed:
++                exit_code = 1
++            if regional_context_start and "TestContextAdmissionWithRealServices/native-regional-api-" + regional_context_start not in passed:
++                report["missingRequiredRegionalContextStart"] = True
+                 exit_code = 1
+             if initial_schema_handover and "TestInitialSchemaHandoverWithRealServices" not in passed:
+                 report["missingRequiredSchemaHandover"] = True
+@@ -360,6 +371,7 @@
+     parser.add_argument("--initial-schema-handover", action="store_true", help="Qualify product schema initialization and original activation handover on an empty database; no fixture migrations or runtime grants.")
+     parser.add_argument("--initial-bootstrap-chain", action="store_true", help="Qualify all four fixed bootstrap commands in a Restricted runner and the original activation Pod on an empty database.")
+     parser.add_argument("--helm-bootstrap", action="store_true", help="Actual chart/four-command empty-database chain with authenticated TLS registry and two owned cold-image nodes.")
++    parser.add_argument("--regional-context-start", choices=("first", "continuation"), help="Qualify actual signed same-port H2 context start with SQL52/API/storage; owns its exact fresh-fixture test selection.")
+     args = parser.parse_args()
+     if (args.initial_handover or args.initial_schema_handover or args.initial_bootstrap_chain) and args.test_pattern is not None:
+         parser.error("Installation qualification cannot be combined with --run")
+@@ -368,4 +380,4 @@
+     if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
+         parser.error("--run must contain 1 to 256 characters")
+     (ROOT/"test/results").mkdir(parents=True, exist_ok=True)
+-    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap))
++    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start))
+--- /dev/null
++++ b/scripts/test-regional-context-selection.py
+@@ -0,0 +1,57 @@
++#!/usr/bin/env python3
++"""Pure qualification selection tests; no services or native fixtures."""
++import importlib.util
++from pathlib import Path
++import unittest
++
++spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
++fixture = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(fixture)
++
++
++class RegionalContextSelection(unittest.TestCase):
++    def test_exact_first_and_continuation_selection(self):
++        for mode in ("first", "continuation"):
++            self.assertEqual(
++                fixture.qualification_selection(None, False, False, regional_context_start=mode),
++                ("^TestContextAdmissionWithRealServices$/^native-regional-api-" + mode + "$", 2),
++            )
++
++    def test_conflicting_or_unknown_selection_is_refused(self):
++        for arguments in (
++            ("TestOther", False, False, False, False, "first"),
++            (None, True, False, False, False, "first"),
++            (None, False, True, False, False, "first"),
++            (None, False, False, True, False, "first"),
++            (None, False, False, False, True, "first"),
++            (None, False, False, False, False, "native-api-runner"),
++        ):
++            with self.assertRaises(ValueError):
++                fixture.qualification_selection(*arguments)
++
++    def test_inherited_flags_cannot_change_ordinary_or_selected_run(self):
++        flags = {
++            "ASSERVAT_CONTEXT_REGIONAL_START_NATIVE": "first",
++            "ASSERVAT_INITIAL_HANDOVER_NATIVE": "1",
++            "ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE": "1",
++            "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE": "1",
++            "ASSERVAT_HELM_BOOTSTRAP_NATIVE": "1",
++        }
++        ordinary = fixture.qualification_environment(flags, Path("fixture"), Path("work"), False, False)
++        self.assertFalse(any(key in ordinary for key in flags))
++        selected = fixture.qualification_environment(
++            flags, Path("fixture"), Path("work"), False, False, regional_context_start="continuation"
++        )
++        self.assertEqual(
++            {key: selected[key] for key in flags if key in selected},
++            {"ASSERVAT_CONTEXT_REGIONAL_START_NATIVE": "continuation"},
++        )
++        self.assertEqual(flags["ASSERVAT_CONTEXT_REGIONAL_START_NATIVE"], "first")
++
++    def test_ordinary_runner_selection_is_unchanged(self):
++        pattern = "^TestContextAdmissionWithRealServices$/^native-api-runner$"
++        self.assertEqual(fixture.qualification_selection(pattern, False, False), (pattern, 2))
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/test/integration/api_execution_native_test.go
++++ b/test/integration/api_execution_native_test.go
+@@ -399,7 +399,7 @@
+ 	return b, e
+ }
+ 
+-func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64, func(context.Context) (targets.PodResolution, error), artifact.Digest) captureAdmissionScenario) {
++func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64, func(context.Context) (targets.PodResolution, error), artifact.Digest) captureAdmissionScenario, regionalMode string) {
+ 	t.Helper()
+ 	n := newNativeAPIEnvironment(t, ctx, f)
+ 	source := func(c context.Context) (targets.PodResolution, error) { return n.resolver.ResolveWorkload(c, n.target) }
+@@ -449,6 +449,49 @@
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++
++	// All fixture authority/backing is established before the human admission.
++	// Processing initialization only needs the installation storage placement;
++	// no capture acceptance, effect or authority is synthesized here.
++	initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, artifact.ContextExpectation{Registration: s.a.Registration})
++	p := func(user, password string) *pgxpool.Pool { return poolFor(user, password) }
++	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
++	x := func(user, password string) *postgres.APIContextExecutions {
++		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, guards)
++		if e != nil {
++			t.Fatal(e)
++		}
++		return v
++	}
++	prepare, execute, read := x("api_execution_prepare_runtime", "synthetic-api-execution-prepare"), x("api_execution_runtime", "synthetic-api-execution"), x("api_execution_read_runtime", "synthetic-api-execution-read")
++	local, err := kube.NewAPIStartPreparer(n.capacityGuard, "api-execution-start", n.startPin)
++	if err != nil {
++		t.Fatal(err)
++	}
++	journal, err := kube.NewStartJournal(n.executor, n.plan.ClusterID, n.control, time.Now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	rawCollector, err := kube.NewAPIContextClient(n.executor)
++	if err != nil {
++		t.Fatal(err)
++	}
++	collector := &nativeAPICollector{inner: rawCollector}
++	defer func() { clear(collector.native) }()
++	bound, err := store.ForCustody(s.a.Registration.StoreID)
++	if err != nil {
++		t.Fatal(err)
++	}
++	producer, err := objectstore.NewContextProducer(bound, keys, time.Now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Local: local, Starts: journal, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
++	var regional *regionalAPIStartFixture
++	if regionalMode != "" {
++		regional = newRegionalAPIStartFixture(t, ctx, f, n, s, admin, poolFor, store, keys, runner)
++	}
++	refreshPermissions()
+ 	start := &nativeContinuationStart{}
+ 	submission := nativeContinuationSubmission(t, ctx, n, s, admin, poolFor, store, keys, start)
+ 	freshCaller := func(owner context.Context) identities.CurrentIdentity {
+@@ -466,67 +509,76 @@
+ 	if err != nil {
+ 		t.Fatal("actual C09 preview", err)
+ 	}
++	if regionalMode == "first" {
++		start.regional = regional
++		regional.standby(t, ctx)
++	}
+ 	initialContext, stopInitial := context.WithCancel(ctx)
+ 	initialCaller := freshCaller(initialContext)
+ 	requestStarted := time.Now()
+ 	accepted, initialErr := submission.Request(initialContext, initialCaller, preview.Preview.ID, s.a.IdempotencyKey)
+ 	t.Logf("native continuation initial request elapsed=%s accepted=%t start-calls=%d error=%v", time.Since(requestStarted), accepted.CaptureID != "", start.calls, initialErr)
+ 	stopInitial()
+-	if initialErr == nil || accepted.CaptureID != preview.Preview.CaptureID || start.calls != 1 {
++	if accepted.CaptureID != preview.Preview.CaptureID || start.calls != 1 || (regionalMode == "first") != (initialErr == nil) {
+ 		diagnoseNativeContinuation(t, ctx, admin, s.a.RootID, preview.Preview.ID)
+-		t.Fatal("initial request did not stop after current52 acknowledgement before unavailable regional start", initialErr, start.calls)
+-	}
++		t.Fatal("original request did not retain its expected admission/start disposition", initialErr, start.calls)
++	}
++	if regionalMode == "first" {
++		regional.joined(t, ctx)
++		if collector.calls.Load() != 1 {
++			t.Fatal("first live signed request did not collect exactly once")
++		}
++	}
++
+ 	if _, err = submission.Continue(ctx, initialCaller, preview.Preview.ID, s.a.IdempotencyKey); err == nil || start.calls != 1 {
+ 		t.Fatal("cancelled original caller resumed acquisition", err)
+ 	}
+-	initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
+-	p := func(user, password string) *pgxpool.Pool { return poolFor(user, password) }
+-	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+-	x := func(user, password string) *postgres.APIContextExecutions {
+-		v, e := postgres.NewAPIContextExecutions(ctx, p(user, password), s.a.RootID, guards)
+-		if e != nil {
+-			t.Fatal(e)
+-		}
+-		return v
+-	}
+-	prepare, execute, read := x("api_execution_prepare_runtime", "synthetic-api-execution-prepare"), x("api_execution_runtime", "synthetic-api-execution"), x("api_execution_read_runtime", "synthetic-api-execution-read")
+-	local, err := kube.NewAPIStartPreparer(n.capacityGuard, "api-execution-start", n.startPin)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	journal, err := kube.NewStartJournal(n.executor, n.plan.ClusterID, n.control, time.Now)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	rawCollector, err := kube.NewAPIContextClient(n.executor)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	collector := &nativeAPICollector{inner: rawCollector}
+-	defer func() { clear(collector.native) }()
+-	bound, err := store.ForCustody(accepted.Expectation.Registration.StoreID)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	producer, err := objectstore.NewContextProducer(bound, keys, time.Now)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	runner := executionapp.APIContextRunner{Read: read, Prepare: prepare, Record: execute, Process: n.process, Local: local, Starts: journal, Targets: n.resolver, Eligibility: authapp.Evaluator{Permissions: s.p, Now: time.Now}, Capabilities: nativeAPICapability{s.a.Plan.Input.Capability}, Retention: nativeAPIRetention{s.retention}, Recovery: s.recovery.reader, Output: producer, Collector: collector, Now: time.Now}
++
+ 	refreshPermissions()
+ 	requestContext, cancel := context.WithCancel(ctx)
+ 	defer cancel()
+ 	current := freshCaller(requestContext)
+-	start.runner = &runner
++	if regional != nil {
++		start.regional = regional
++	} else {
++		start.runner = &runner
++	}
++	priorCaptures := collector.calls.Load()
+ 	passive, err := submission.Request(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
+-	if err != nil || passive.CaptureID != accepted.CaptureID || !passive.Replay || start.calls != 1 || collector.calls.Load() != 0 {
++	if err != nil || passive.CaptureID != accepted.CaptureID || !passive.Replay || start.calls != 1 || collector.calls.Load() != priorCaptures {
+ 		t.Fatal("historical accepted request triggered acquisition", err)
+ 	}
+-	continued, err := submission.Continue(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
++	if regionalMode != "first" {
++		if regional != nil {
++			regional.standby(t, ctx)
++		}
++		continued, e := submission.Continue(requestContext, current, preview.Preview.ID, s.a.IdempotencyKey)
++		if e != nil || continued.CaptureID != accepted.CaptureID || continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || collector.calls.Load() != 1 {
++			t.Fatalf("explicit native continuation calls=%d error=%v", collector.calls.Load(), e)
++		}
++		if regional != nil {
++			regional.joined(t, ctx)
++		}
++	}
+ 	result := start.result
+-	if err != nil || continued.CaptureID != accepted.CaptureID || continued.Expectation.Registration != accepted.Expectation.Registration || continued.ScopeDigest != accepted.ScopeDigest || result.State != "StoredPendingVerification" || collector.calls.Load() != 1 {
+-		t.Fatalf("explicit native continuation state=%s calls=%d error=%v", result.State, collector.calls.Load(), err)
+-	}
++	if regional != nil {
++		// The wire carries no object receipts. Read exactly the immutable SQL
++		// execution result using its ordinary independently verified query.
++		var raw []byte
++		if e := p("api_execution_read_runtime", "synthetic-api-execution-read").QueryRow(ctx, "SELECT copies_json FROM context_execution WHERE root_id=$1 AND capture_id=$2 AND phase='stored'", s.a.RootID, accepted.CaptureID).Scan(&raw); e != nil {
++			t.Fatal("exact stored regional result", e)
++		}
++		if json.Unmarshal(raw, &result.Copies) != nil {
++			t.Fatal("regional SQL copies encoding")
++		}
++		clear(raw)
++		result.State = "StoredPendingVerification"
++		t.Logf("actual regional signed H2 start elapsed=%s calls=%d", regional.lastDuration, regional.calls)
++	}
++	if result.State != "StoredPendingVerification" || collector.calls.Load() != 1 {
++		t.Fatal("completed result unavailable", result.State)
++	}
++
+ 	var originalBinding, originalProcess []byte
+ 	if err = admin.QueryRow(ctx, "SELECT binding_json,process_json FROM context_execution WHERE capture_id=$1", accepted.CaptureID).Scan(&originalBinding, &originalProcess); err != nil {
+ 		t.Fatal("original execution binding", err)
+@@ -614,5 +666,5 @@
+ 	if err = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM context_execution WHERE capture_id=$1),(SELECT count(*) FROM context_catalog WHERE capture_id=$1),(SELECT charged_objects FROM custody_allocation WHERE id=$2)", accepted.CaptureID, accepted.Expectation.Registration.AllocationID).Scan(&executions, &catalog, &objects); err != nil || executions != 1 || catalog != 1 || objects != 4 {
+ 		t.Fatal("one effect/custody accounting", err, executions, catalog, objects)
+ 	}
+-	t.Logf("actual C09 preview/request, passive replay and explicit fresh-current same-key continuation; current52 acknowledged encrypted intent pair; actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; %d native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority", len(collector.native))
+-}
++	t.Logf("regional-mode=%s; actual C09 preview/request, passive replay and explicit fresh-current same-key continuation; current52 acknowledged encrypted intent pair; actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; %d native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority", regionalMode, len(collector.native))
++}
+--- a/test/integration/capture_admission_test.go
++++ b/test/integration/capture_admission_test.go
+@@ -282,8 +282,16 @@
+ 		return createForTargetWithControl(t, slots, full, replay, nil, artifact.Digest{})
+ 	}
+ 	if native != nil {
+-		t.Run("native-api-runner", func(t *testing.T) {
+-			qualifyNativeAPIExecution(t, ctx, *native, admin, poolFor, store, keys, createForTarget)
++		regional := os.Getenv("ASSERVAT_CONTEXT_REGIONAL_START_NATIVE")
++		name := "native-api-runner"
++		if regional != "" {
++			if regional != "first" && regional != "continuation" {
++				t.Fatal("invalid owned regional qualification selection")
++			}
++			name = "native-regional-api-" + regional
++		}
++		t.Run(name, func(t *testing.T) {
++			qualifyNativeAPIExecution(t, ctx, *native, admin, poolFor, store, keys, createForTarget, regional)
+ 		})
+ 		return
+ 	}
+--- a/test/integration/context_continuation_native_test.go
++++ b/test/integration/context_continuation_native_test.go
+@@ -22,13 +22,17 @@
+ // This only retains the actual runner result for the existing independent
+ // publication assertions. It supplies no authorization or synthetic execution.
+ type nativeContinuationStart struct {
+-	runner *executionapp.APIContextRunner
+-	result executionapp.ContextResult
+-	calls  int
++	runner   *executionapp.APIContextRunner
++	regional captureapp.ContextAcceptedStart
++	result   executionapp.ContextResult
++	calls    int
+ }
+ 
+ func (s *nativeContinuationStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
+ 	s.calls++
++	if s.regional != nil {
++		return s.regional.StartContext(ctx, current, id)
++	}
+ 	if s.runner == nil {
+ 		return value.ErrUnavailable
+ 	}
+--- /dev/null
++++ b/test/integration/context_start_exchange_test.go
+@@ -0,0 +1,338 @@
++package integration
++
++import (
++	"context"
++	"crypto"
++	"crypto/ed25519"
++	"crypto/rand"
++	"crypto/tls"
++	"crypto/x509"
++	"net"
++	"net/url"
++	"strconv"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/jose"
++	"asservat.local/asservat/internal/adapters/mtls"
++	"asservat.local/asservat/internal/adapters/objectstore"
++	"asservat.local/asservat/internal/adapters/postgres"
++	executionapp "asservat.local/asservat/internal/application/execution"
++	fleetapp "asservat.local/asservat/internal/application/fleet"
++	identities "asservat.local/asservat/internal/application/identity"
++	"asservat.local/asservat/internal/bootstrap"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	fleet "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"asservat.local/asservat/internal/transport/contextstart"
++	native "asservat.local/asservat/internal/transport/native"
++	"github.com/jackc/pgx/v5/pgxpool"
++)
++
++// This fixture route/protection source is deliberately synthetic. The address
++// belongs to the owned fixture bridge; actual owner registration/configuration,
++// certificate verification and the fixed production dial path remain real.
++type contextStartTestRoutes struct {
++	sql     *contextStartOwnerSQL
++	owner   fleet.OwnerBinding
++	address string
++}
++
++func (s contextStartTestRoutes) CurrentOwnerRoute(ctx context.Context, b fleet.OwnerBinding) (fleet.OwnerRoute, error) {
++	n := time.Now().UTC()
++	if b != s.owner {
++		return fleet.OwnerRoute{}, fleet.ErrDenied
++	}
++	o, e := s.sql.lab.reader.ReadOwnerConfiguration(ctx)
++	if e != nil {
++		return fleet.OwnerRoute{}, e
++	}
++	until := identity.Earlier(n.Add(5*time.Second), o.FreshUntil)
++	endpoint := fleet.OwnerEndpoint{Binding: b, Pool: o.Configuration.Pool, Pod: "synthetic-owner", ReplicaSetUID: o.Configuration.Pool.DeploymentUID, Addresses: []string{s.address}, ObservedAt: n, FreshUntil: until}
++	return fleet.OwnerRoute{Configuration: o, Endpoint: endpoint, ObservedAt: n, FreshUntil: until}, nil
++}
++func (s contextStartTestRoutes) ReadOwnerProtection(ctx context.Context, p fleet.OwnerPool) (fleet.OwnerProtection, error) {
++	n := time.Now().UTC()
++	if ctx.Err() != nil || p != s.sql.config.Pool {
++		return fleet.OwnerProtection{}, fleet.ErrDenied
++	}
++	return fleet.OwnerProtection{Pool: p, Digest: artifact.Digest{31}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
++}
++
++type contextStartTestProof func(context.Context, fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error)
++
++func (f contextStartTestProof) ReadConnectorProcessProof(c context.Context, r fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error) {
++	return f(c, r)
++}
++
++type contextStartTestTrust func(context.Context) (fleet.APIContextWorkTrust, error)
++
++func (f contextStartTestTrust) APIContextWorkTrust(c context.Context) (fleet.APIContextWorkTrust, error) {
++	return f(c)
++}
++
++type contextStartUnusedNative struct{}
++
++func (contextStartUnusedNative) OpenNative(context.Context, *tls.ConnectionState, contracts.NativeHello) (native.Conversation, error) {
++	return nil, artifact.ErrDownloadUnavailable
++}
++
++// Start is the real synchronous application bridge. This tap counts invocations
++// and duration only; it cannot start a runner, supply a result or replace peers.
++type regionalAPIStartFixture struct {
++	bridge       bootstrap.RegionalAPIContextStart
++	client       *mtls.ContextStartClient
++	candidates   *postgres.OwnerEnrollments
++	owner        fleet.OwnerBinding
++	verifier     fleetapp.APIContextWorkVerifier
++	runner       executionapp.APIContextRunner
++	calls        int
++	lastDuration time.Duration
++	regional     chan error
++}
++
++func (s *regionalAPIStartFixture) StartContext(c context.Context, i identities.CurrentIdentity, id string) error {
++	s.calls++
++	n := time.Now()
++	defer func() { s.lastDuration = time.Since(n) }()
++	return s.bridge.StartContext(c, i, id)
++}
++func (s *regionalAPIStartFixture) standby(t *testing.T, ctx context.Context) {
++	t.Helper()
++	if s.regional != nil {
++		t.Fatal("fixture attempted to replace an unjoined conversation")
++	}
++	n := time.Now()
++	candidates, e := s.candidates.ReadContextStartOwners(ctx)
++	if e != nil || len(candidates.Owners) != 1 || candidates.Owners[0] != s.owner {
++		t.Fatal("actual SQL exact owner discovery", e)
++	}
++	standby, stop := context.WithTimeout(ctx, 30*time.Second)
++	exchange, e := s.client.OpenDiscovered(standby, s.owner, candidates)
++	if e != nil {
++		stop()
++		t.Fatalf("actual shared NativePort standby elapsed=%s error=%v", time.Since(n), e)
++	}
++	s.regional = make(chan error, 1)
++	go func() {
++		defer stop()
++		s.regional <- bootstrap.ServeRegionalAPIContextExchange(exchange, s.verifier, s.runner)
++	}()
++	t.Logf("actual SQL discovery and original H2 standby setup elapsed=%s", time.Since(n))
++}
++func (s *regionalAPIStartFixture) joined(t *testing.T, ctx context.Context) {
++	t.Helper()
++	if s.regional == nil {
++		return
++	}
++	select {
++	case e := <-s.regional:
++		s.regional = nil
++		if e != nil {
++			t.Fatal("regional signed exchange did not positively finish", e)
++		}
++	case <-ctx.Done():
++		t.Fatal("regional child did not join", ctx.Err())
++	}
++}
++
++// It intentionally runs in the fixture process. API target/process/local
++// admission use the actual Pod-bound reader; connector enrollment proof and
++// owner route/protection are synthetic roots, never described as deployed proof.
++func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n *nativeAPIEnvironment, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, runner executionapp.APIContextRunner) *regionalAPIStartFixture {
++	t.Helper()
++	// Determine the owned bridge's local address without sending a datagram or
++	// permitting a production route override. Bind only that one actual address.
++	provider, e := url.Parse(f.S3)
++	if e != nil {
++		t.Fatal(e)
++	}
++	probe, e := net.Dial("udp", net.JoinHostPort(provider.Hostname(), "8333"))
++	if e != nil {
++		t.Fatal(e)
++	}
++	localIP := probe.LocalAddr().(*net.UDPAddr).IP.String()
++	probe.Close()
++	if !fleet.OwnerAddress(localIP) {
++		t.Fatal("owned bridge lacks a routable local address")
++	}
++	listener, e := net.Listen("tcp", net.JoinHostPort(localIP, "0"))
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(func() { listener.Close() })
++	port := listener.Addr().(*net.TCPAddr).Port
++	ca, key := connectorSQLCA(t)
++	roots := x509.NewCertPool()
++	roots.AddCert(ca)
++	pool := fleet.OwnerPool{InstallationID: s.recovery.installation, ClusterID: custodyID(), IssuerEpoch: s.a.Recovery.IssuerEpoch, Namespace: "synthetic-hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: port}
++	if port == pool.Port {
++		pool.Port = 8445
++	}
++	config := fleet.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{21}}, ProtectionDigest: artifact.Digest{22}, IssuerRoots: [][]byte{ca.Raw}}
++	lab := &ownerConfigLab{admin: admin, audit: &objectstore.OwnerConfigurationAuditObjects{Store: store, Seal: keys, Open: keys}}
++	configured := func(role, password string) (*pgxpool.Pool, *postgres.OwnerConfigurations) {
++		p := poolFor(role, password)
++		t.Cleanup(p.Close)
++		v, e := postgres.NewOwnerConfigurations(ctx, p, pool.InstallationID, pool.ClusterID, pool.NamespaceUID, config.Revision.UID)
++		if e != nil {
++			t.Fatal(e)
++		}
++		return p, v
++	}
++	lab.writerPool, lab.writer = configured("owner_configuration_runtime", "synthetic-owner-configuration")
++	lab.ackPool, lab.ack = configured("owner_configuration_audit_runtime", "synthetic-owner-configuration-audit")
++	lab.readerPool, lab.reader = configured("owner_configuration_read_runtime", "synthetic-owner-configuration-read")
++	sql := newContextStartOwnerSQL(t, ctx, lab, config, contextStartOwnerIssuer{ca, key})
++	owner := fleet.OwnerBinding{InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, PodUID: custodyID(), ProcessEpoch: custodyID()}
++	serving, e := mtls.NewOwnerCredentials(owner, "server", roots, sql.coordinator(), sql.reader, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(serving.Close)
++	if e = serving.Enroll(ctx); e != nil {
++		t.Fatal("actual scoped SQL/S3 owner enrollment", e)
++	}
++	sql.closeEffects() // No fixture renewal or effect-role pooling during the request.
++	// Fixture source observation is renewed independently, not by a peer read.
++	// Each SQL/transport check still retains the original observation deadline.
++	loop, stopLoop := context.WithCancel(ctx)
++	loopDone := make(chan error, 1)
++	go func() {
++		ticker := time.NewTicker(time.Second)
++		defer ticker.Stop()
++		for {
++			select {
++			case <-loop.Done():
++				loopDone <- nil
++				return
++			case <-ticker.C:
++				if _, e := sql.refresh(loop, 5*time.Second); e != nil {
++					if loop.Err() != nil {
++						e = nil
++					}
++					loopDone <- e
++					return
++				}
++			}
++		}
++	}()
++	t.Cleanup(func() {
++		stopLoop()
++		if e := <-loopDone; e != nil && ctx.Err() == nil {
++			t.Error("synthetic source observation failed", e)
++		}
++	})
++	routes := contextStartTestRoutes{sql, owner, localIP}
++	owners := &fleetapp.OwnerAuthenticator{Registry: sql.reader, Routes: routes, Protection: routes, Now: time.Now}
++	clientCA, clientKey := connectorSQLCA(t)
++	serverCA, serverKey := connectorSQLCA(t)
++	observed, e := runner.Process.ReadAPIProcess(ctx)
++	if e != nil {
++		t.Fatal("real local process before standby", e)
++	}
++	b := observed.Binding
++	profile := fleet.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{23}}, ProtectionDigest: artifact.Digest{24}, ServerName: "regional.fixture.invalid", Deployment: fleet.ConnectorDeployment{Namespace: n.control.Name, NamespaceUID: b.NamespaceUID, ServiceAccount: n.plan.Account, AccountUID: b.AccountUID, Deployment: "synthetic-connector", DeploymentUID: custodyID(), ServingSlots: 1, RetainedProcesses: 2}, ClientIssuerRoots: [][]byte{clientCA.Raw}, ServerIssuerRoots: [][]byte{serverCA.Raw}}
++	source := &contextStartConnectorFixture{profile: profile, clientCA: clientCA, serverCA: serverCA, clientKey: clientKey, serverKey: serverKey, issued: map[string]fleet.IssuedConnectorCredential{}, origins: map[artifact.Digest]fleet.ConnectorProcessIdentity{}}
++	source.proof = contextStartTestProof(func(c context.Context, r fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error) {
++		started := time.Now().UTC()
++		p, e := runner.Process.ReadAPIProcess(c)
++		if e != nil || p.Binding.PodUID != r.Process.PodUID || p.Binding != b {
++			return fleet.ConnectorProcessProof{}, fleet.ErrDenied
++		}
++		config, e := source.ReadConnectorIdentitySource(c)
++		if e != nil {
++			return fleet.ConnectorProcessProof{}, e
++		}
++		client, e := mtls.EnrollmentKey(r.ClientCSRDER)
++		if e != nil {
++			return fleet.ConnectorProcessProof{}, e
++		}
++		server, e := mtls.EnrollmentKey(r.ServerCSRDER)
++		if e != nil {
++			return fleet.ConnectorProcessProof{}, e
++		}
++		until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(p.ValidUntil, config.Observation.FreshUntil))
++		return fleet.ConnectorProcessProof{Process: r.Process, Configuration: config.Observation, Pod: n.pod.Name, ReplicaSet: "synthetic-connector-rs", ReplicaSetUID: profile.Deployment.DeploymentUID, ClientKeyDigest: client, ServerKeyDigest: server, TokenDigest: artifact.Digest{25}, WorkloadDigest: artifact.Digest{26}, ProtectionDigest: artifact.Digest{27}, ObservedAt: started, FreshUntil: until}, nil
++	})
++	connector, e := mtls.NewConnectorProcessCredentials(ctx, profile, b.PodUID, source, source, source, source, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(connector.Close)
++	if e = connector.Reconcile(ctx); e != nil {
++		t.Fatal("synthetic connector registration with actual process-owned keys", e)
++	}
++	router, e := contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: b.ClusterID, Standby: 1, Captures: 1}}})
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(router.Close)
++	ingress, e := mtls.NewContextStartIngress(s.a.RootID, serving, owners, []mtls.ContextStartConnectorAdmission{{Profile: profile, Executor: mtls.ContextStartExecutorPin{NamespaceUID: b.NamespaceUID, AccountUID: b.AccountUID, StartupDigest: b.StartupDigest, ImageDigest: b.ImageDigest}, Source: source, Registry: source}}, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	name, e := mtls.OwnerServerName(owner)
++	if e != nil {
++		t.Fatal(e)
++	}
++	host := net.JoinHostPort(name, strconv.Itoa(port))
++	handler, e := contextstart.NewHandler(host, router, ingress, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	nativeHandler, e := native.NewHandler(contracts.NativeOwnerPath, host, contextStartUnusedNative{}, 1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	connectorRoots := x509.NewCertPool()
++	connectorRoots.AddCert(clientCA)
++	live, cancel := context.WithCancel(ctx)
++	serverDone := make(chan error, 1)
++	go func() {
++		serverDone <- native.ServeWithContextStart(live, listener, connectorRoots, serving, nativeHandler, handler, 1, 1)
++	}()
++	t.Cleanup(func() {
++		cancel()
++		router.Close()
++		if e := <-serverDone; e != context.Canceled && e != context.DeadlineExceeded {
++			t.Error("shared listener shutdown", e)
++		}
++	})
++	client, e := mtls.NewContextStartClient(ctx, s.a.RootID, pool, roots, routes, owners, connector, runner.Process, 1, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(client.Close)
++	public, private, e := ed25519.GenerateKey(rand.Reader)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(func() { clear(private) })
++	issued := time.Now().UTC()
++	trust := contextStartTestTrust(func(c context.Context) (fleet.APIContextWorkTrust, error) {
++		if c.Err() != nil {
++			return fleet.APIContextWorkTrust{}, c.Err()
++		}
++		now := time.Now().UTC()
++		return fleet.APIContextWorkTrust{RootID: s.a.RootID, InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, Trust: fleet.WorkTrust{Revision: identity.Revision{UID: "synthetic-work-trust", Generation: 1, Digest: artifact.Digest{28}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Keys: []fleet.WorkKey{{ID: "synthetic-work", ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PublicKey: public, NotBefore: issued.Add(-time.Second), NotAfter: issued.Add(time.Hour)}}}}, nil
++	})
++	signer, e := jose.NewAPIContextWorkSignatures(trust, "synthetic-work", func(context.Context) crypto.Signer { return private }, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	verifier, e := jose.NewAPIContextWorkSignatures(trust, "", nil, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	out := &regionalAPIStartFixture{bridge: bootstrap.RegionalAPIContextStart{Read: runner.Read, Capabilities: runner.Capabilities, Recovery: runner.Recovery, Signer: signer, Router: router, Now: time.Now}, client: client, candidates: sql.reader, owner: owner, verifier: verifier, runner: runner}
++	t.Cleanup(func() {
++		client.Close()
++		if out.regional != nil {
++			<-out.regional
++			out.regional = nil
++		}
++	})
++	return out
++}
+--- /dev/null
++++ b/test/integration/context_start_owners_test.go
+@@ -0,0 +1,381 @@
++package integration
++
++import (
++	"context"
++	"crypto/ecdsa"
++	"crypto/rand"
++	"crypto/sha256"
++	"crypto/x509"
++	"encoding/json"
++	"errors"
++	"math/big"
++	"net/url"
++	"os"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/mtls"
++	"asservat.local/asservat/internal/adapters/objectstore"
++	"asservat.local/asservat/internal/adapters/postgres"
++	app "asservat.local/asservat/internal/application/fleet"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/audit"
++	value "asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++	"github.com/jackc/pgx/v5/pgconn"
++	"github.com/jackc/pgx/v5/pgxpool"
++)
++
++// This private fixture CA signs only exact already-spent SQL permits. It is not
++// a production bootstrap/provider. Actual X509 verification, SQL roles/spend,
++// encrypted object audit and activation remain the production components.
++type contextStartOwnerIssuer struct {
++	ca  *x509.Certificate
++	key *ecdsa.PrivateKey
++}
++
++func (s contextStartOwnerIssuer) SignOwnerCertificate(ctx context.Context, p value.OwnerCertificatePermit, csr []byte) (value.IssuedOwnerCertificate, error) {
++	var zero value.IssuedOwnerCertificate
++	if ctx.Err() != nil || !p.Valid(time.Now()) {
++		return zero, value.ErrDenied
++	}
++	request, e := x509.ParseCertificateRequest(csr)
++	if e != nil || request.CheckSignature() != nil {
++		return zero, value.ErrDenied
++	}
++	key, e := mtls.EnrollmentKey(csr)
++	if e != nil || key != p.PublicKeyDigest {
++		return zero, value.ErrDenied
++	}
++	uri, e := mtls.OwnerURI(p.Binding)
++	if e != nil {
++		return zero, e
++	}
++	eku := x509.ExtKeyUsageClientAuth
++	template := &x509.Certificate{SerialNumber: big.NewInt(time.Now().UnixNano()), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, URIs: []*url.URL{uri}, NotBefore: p.CheckedAt.UTC().Truncate(time.Second).Add(-time.Second), NotAfter: p.CertificateNotAfter}
++	if p.Usage == "server" {
++		eku = x509.ExtKeyUsageServerAuth
++		name, e := mtls.OwnerServerName(p.Binding)
++		if e != nil {
++			return zero, e
++		}
++		template.DNSNames = []string{name}
++	}
++	template.ExtKeyUsage = []x509.ExtKeyUsage{eku}
++	der, e := x509.CreateCertificate(rand.Reader, template, s.ca, request.PublicKey, s.key)
++	if e != nil || ctx.Err() != nil || !p.Valid(time.Now()) {
++		return zero, value.ErrUnavailable
++	}
++	return value.IssuedOwnerCertificate{Certificate: value.OwnerCertificate{Binding: p.Binding, Usage: p.Usage, Digest: sha256.Sum256(der), NotBefore: template.NotBefore, NotAfter: template.NotAfter}, DER: der, ChainDER: [][]byte{s.ca.Raw}}, nil
++}
++
++type contextStartOwnerSQL struct {
++	lab                                    *ownerConfigLab
++	config                                 value.OwnerConfiguration
++	writer, ack, activate, reader, cleanup *postgres.OwnerEnrollments
++	readPool                               *pgxpool.Pool
++	effectPools                            []*pgxpool.Pool
++	audit                                  *objectstore.OwnerEnrollmentAuditObjects
++	issuer                                 contextStartOwnerIssuer
++	verifier                               *mtls.OwnerPeerVerifier
++}
++
++func newContextStartOwnerSQL(t *testing.T, ctx context.Context, lab *ownerConfigLab, c value.OwnerConfiguration, issuer contextStartOwnerIssuer) *contextStartOwnerSQL {
++	t.Helper()
++	s := &contextStartOwnerSQL{lab: lab, config: c, issuer: issuer}
++	ledger := func(role, password string) *postgres.OwnerEnrollments {
++		pc := lab.writerPool.Config()
++		pc.ConnConfig.User = role
++		pc.ConnConfig.Password = password
++		pc.MaxConns = 2
++		pool, e := pgxpool.NewWithConfig(ctx, pc)
++		if e != nil {
++			t.Fatal(e)
++		}
++		t.Cleanup(pool.Close)
++		if role == "owner_enrollment_read_runtime" {
++			s.readPool = pool
++		} else {
++			s.effectPools = append(s.effectPools, pool)
++		}
++		v, e := postgres.NewOwnerEnrollments(ctx, pool, c.Pool.InstallationID, c.Pool.ClusterID, c.Pool.NamespaceUID, c.Revision.UID, custodyID)
++		if e != nil {
++			t.Fatal(e)
++		}
++		return v
++	}
++	s.writer = ledger("owner_enrollment_runtime", "synthetic-owner-enrollment")
++	s.ack = ledger("owner_enrollment_audit_runtime", "synthetic-owner-enrollment-audit")
++	s.activate = ledger("owner_enrollment_activate_runtime", "synthetic-owner-enrollment-activate")
++	s.reader = ledger("owner_enrollment_read_runtime", "synthetic-owner-enrollment-read")
++	s.cleanup = ledger("owner_enrollment_cleanup_runtime", "synthetic-owner-enrollment-cleanup")
++	s.audit = &objectstore.OwnerEnrollmentAuditObjects{Store: lab.audit.Store, Seal: lab.audit.Seal, Open: lab.audit.Open}
++	roots := x509.NewCertPool()
++	roots.AddCert(issuer.ca)
++	var e error
++	s.verifier, e = mtls.NewOwnerPeerVerifier(roots, c.Pool.InstallationID, c.Pool.ClusterID, c.Pool.IssuerEpoch, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	return s
++}
++
++// Short combined fixtures retain only current read authority after initial enrollment.
++func (s *contextStartOwnerSQL) closeEffects() {
++	for _, p := range s.effectPools {
++		p.Close()
++	}
++	s.effectPools = nil
++}
++func (s *contextStartOwnerSQL) refresh(ctx context.Context, lifetime time.Duration) (value.OwnerConfigurationObservation, error) {
++	if _, e := s.lab.admin.Exec(ctx, "UPDATE fleet_trust SET observed_at=statement_timestamp(),fresh_until=statement_timestamp()+interval '30 seconds' WHERE installation_id=$1", s.config.Pool.InstallationID); e != nil {
++		return value.OwnerConfigurationObservation{}, e
++	}
++	n := time.Now().UTC().Truncate(time.Microsecond)
++	o := value.OwnerConfigurationObservation{Configuration: s.config.Clone(), ObservedAt: n, FreshUntil: n.Add(lifetime)}
++	r, ack, e := s.lab.writer.ObserveOwnerConfiguration(ctx, o)
++	if e != nil {
++		return o, e
++	}
++	if !ack {
++		r, e = s.lab.audit.WriteOwnerConfiguration(ctx, s.config)
++		if e != nil {
++			return o, e
++		}
++		if e = s.lab.ack.AcknowledgeOwnerConfiguration(ctx, s.config, r); e != nil {
++			return o, e
++		}
++	}
++	return s.lab.reader.ReadOwnerConfiguration(ctx)
++}
++func (s *contextStartOwnerSQL) proof(ctx context.Context, r value.OwnerEnrollmentRequest) (value.OwnerEnrollmentProof, error) {
++	n := time.Now().UTC()
++	o, e := s.refresh(ctx, 5*time.Second)
++	if e != nil {
++		return value.OwnerEnrollmentProof{}, e
++	}
++	key, e := mtls.EnrollmentKey(r.CSRDER)
++	if e != nil {
++		return value.OwnerEnrollmentProof{}, e
++	}
++	return value.OwnerEnrollmentProof{Binding: r.Binding, Usage: r.Usage, Configuration: o, Pod: "synthetic-owner", ReplicaSet: "synthetic-owner-rs", ReplicaSetUID: s.config.Pool.DeploymentUID, PublicKeyDigest: key, TokenDigest: artifact.Digest{1}, WorkloadDigest: artifact.Digest{2}, ProtectionDigest: artifact.Digest{3}, ObservedAt: n, FreshUntil: identity.Earlier(n.Add(5*time.Second), o.FreshUntil)}, nil
++}
++func (s *contextStartOwnerSQL) coordinator() *app.OwnerEnrollmentCoordinator {
++	return &app.OwnerEnrollmentCoordinator{Verifier: s.verifier, Proofs: ownerProofFunction(s.proof), Ledger: s.writer, Activation: s.activate, Audit: s.audit, Acknowledgements: s.ack, Issuer: s.issuer, Now: time.Now}
++}
++
++func TestContextStartOwnersWithRealServices(t *testing.T) {
++	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
++	if path == "" {
++		path = os.Getenv("ASSERVAT_FLEET_FIXTURES")
++	}
++	if path == "" {
++		t.Skip("owned SQL/S3 fixture required")
++	}
++	raw, e := os.ReadFile(path)
++	var f fixture
++	if e != nil || json.Unmarshal(raw, &f) != nil {
++		t.Fatal("fixture unavailable")
++	}
++	clear(raw)
++	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
++	defer end()
++	ca, key := connectorSQLCA(t)
++	pool := value.OwnerPool{InstallationID: custodyID(), ClusterID: custodyID(), IssuerEpoch: custodyID(), Namespace: "hub", NamespaceUID: custodyID(), Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 8443, NativePort: 8444}
++	c := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{ca.Raw}}
++	l := ownerConfigurationLab(t, ctx, f, c)
++	s := newContextStartOwnerSQL(t, ctx, l, c, contextStartOwnerIssuer{ca, key})
++	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
++		t.Fatal("missing current configuration yielded candidates")
++	}
++	read := func(want int) value.APIContextOwnerCandidates {
++		t.Helper()
++		if _, e = s.refresh(ctx, 5*time.Second); e != nil {
++			t.Fatal(e)
++		}
++		v, e := s.reader.ReadContextStartOwners(ctx)
++		if e != nil || !v.Valid(time.Now()) || len(v.Owners) != want {
++			t.Fatal("exact complete candidate count", want, len(v.Owners), e)
++		}
++		return v
++	}
++	read(0)
++	binding := value.OwnerBinding{InstallationID: pool.InstallationID, ClusterID: pool.ClusterID, IssuerEpoch: pool.IssuerEpoch, PodUID: custodyID(), ProcessEpoch: custodyID()}
++	req := value.OwnerEnrollmentRequest{Binding: binding, Usage: "server", CSRDER: connectorSQLCSR(t)}
++	proof, e := s.proof(ctx, req)
++	if e != nil {
++		t.Fatal(e)
++	}
++	enrollment, _, _, e := s.writer.ClaimOwnerEnrollment(ctx, proof)
++	if e != nil {
++		t.Fatal(e)
++	}
++	read(0) // unaudited enrollment
++	receipt, e := s.audit.WriteOwnerEnrollment(ctx, enrollment)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = s.ack.AcknowledgeOwnerEnrollment(ctx, enrollment, receipt); e != nil {
++		t.Fatal(e)
++	}
++	read(0) // no issued certificate
++	proof, e = s.proof(ctx, req)
++	if e != nil {
++		t.Fatal(e)
++	}
++	progress, e := s.writer.PrepareOwnerCertificate(ctx, proof)
++	if e != nil || !progress.MaySign {
++		t.Fatal("positive original signing claim", e)
++	}
++	issued, e := s.issuer.SignOwnerCertificate(ctx, progress.Attempt.Permit, req.CSRDER)
++	if e != nil {
++		t.Fatal(e)
++	}
++	issued, e = s.verifier.CheckOwnerCertificateCurrent(progress.Attempt.Permit, req.CSRDER, issued.DER, issued.ChainDER, proof.Configuration)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = s.writer.StoreOwnerCertificate(ctx, progress.Attempt, issued); e != nil {
++		t.Fatal(e)
++	}
++	read(0) // result without independent audit
++	record := audit.OwnerCertificate{Attempt: progress.Attempt, Certificate: issued.Certificate}
++	receipt, e = s.audit.WriteOwnerCertificate(ctx, record)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if e = s.ack.AcknowledgeOwnerCertificate(ctx, record, receipt); e != nil {
++		t.Fatal(e)
++	}
++	read(0) // acknowledged certificate is still not activated
++	proof, e = s.proof(ctx, req)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if _, e = s.activate.ActivateOwnerCertificate(ctx, proof, progress.Attempt); e != nil {
++		t.Fatal(e)
++	}
++	if got := read(1); got.Owners[0] != binding {
++		t.Fatal("candidate changed process")
++	}
++	clientReq := req
++	clientReq.Usage = "client"
++	clientReq.CSRDER = connectorSQLCSR(t)
++	if _, e = s.coordinator().Enroll(ctx, clientReq); e != nil {
++		t.Fatal("separate real client purpose", e)
++	}
++	read(1)
++	t.Run("reader-has-no-effect-role", func(t *testing.T) {
++		_, e := s.readPool.Exec(ctx, "UPDATE hub_owner_enrollment SET retired_at=clock_timestamp() WHERE id=$1", enrollment.ID)
++		var pg *pgconn.PgError
++		if !errors.As(e, &pg) || pg.Code != "42501" {
++			t.Fatal("reader write was not an actual privilege denial")
++		}
++	})
++	t.Run("complete-overflow-is-unavailable", func(t *testing.T) {
++		var extra []value.OwnerEnrollment
++		for range 16 {
++			r := req
++			r.Binding.PodUID = custodyID()
++			r.Binding.ProcessEpoch = custodyID()
++			r.CSRDER = connectorSQLCSR(t)
++			cert, e := s.coordinator().Enroll(ctx, r)
++			if e != nil {
++				t.Fatal("bounded actual extra enrollment", e)
++			}
++			registration, e := s.reader.ReadOwnerRegistration(ctx, cert.Certificate)
++			if e != nil {
++				t.Fatal(e)
++			}
++			extra = append(extra, registration.Enrollment)
++		}
++		if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
++			t.Fatal("seventeen owners returned an incomplete successful list")
++		}
++		for _, v := range extra {
++			if e = s.cleanup.RetireOwnerEnrollment(ctx, v); e != nil {
++				t.Fatal(e)
++			}
++		}
++		read(1)
++	})
++	t.Run("original-observation-expires-behind-real-lock", func(t *testing.T) {
++		o, e := s.refresh(ctx, 350*time.Millisecond)
++		if e != nil {
++			t.Fatal(e)
++		}
++		tx, e := l.admin.Begin(ctx)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer tx.Rollback(context.Background())
++		var pid int32
++		if e = tx.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&pid); e != nil {
++			t.Fatal(e)
++		}
++		if _, e = tx.Exec(ctx, "SELECT 1 FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE", pool.InstallationID, pool.ClusterID); e != nil {
++			t.Fatal(e)
++		}
++		call, cancel := context.WithCancel(ctx)
++		result := make(chan error, 1)
++		joined := false
++		go func() { _, e := s.reader.ReadContextStartOwners(call); result <- e }()
++		defer func() {
++			cancel()
++			_ = tx.Rollback(context.Background())
++			if !joined {
++				<-result
++			}
++		}()
++		for {
++			var waiting bool
++			e = l.admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE usename='owner_enrollment_read_runtime' AND $1=ANY(pg_blocking_pids(pid)))", pid).Scan(&waiting)
++			if e != nil {
++				t.Fatal(e)
++			}
++			if waiting {
++				break
++			}
++			if !time.Now().Before(o.FreshUntil) {
++				t.Fatal("reader did not reach actual held row")
++			}
++			time.Sleep(time.Millisecond)
++		}
++		timer := time.NewTimer(time.Until(o.FreshUntil) + 20*time.Millisecond)
++		select {
++		case <-timer.C:
++		case <-ctx.Done():
++			timer.Stop()
++			t.Fatal(ctx.Err())
++		}
++		if e = tx.Rollback(ctx); e != nil {
++			t.Fatal(e)
++		}
++		e = <-result
++		joined = true
++		if e == nil {
++			t.Fatal("blocked read renewed original current observation")
++		}
++		read(1)
++	})
++	t.Run("retired-server-client-alone-not-candidate", func(t *testing.T) {
++		if e = s.cleanup.RetireOwnerEnrollment(ctx, enrollment); e != nil {
++			t.Fatal(e)
++		}
++		read(0)
++	})
++	if e = l.writer.FenceOwnerConfiguration(ctx, time.Now()); e != nil {
++		t.Fatal(e)
++	}
++	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
++		t.Fatal("configuration fence yielded successful discovery")
++	}
++	read(0)
++	if _, e = l.admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", pool.InstallationID); e != nil {
++		t.Fatal(e)
++	}
++	if _, e = s.reader.ReadContextStartOwners(ctx); e == nil {
++		t.Fatal("recovery fence yielded successful discovery")
++	}
++	t.Log("actual separately credentialed SQL/S3 discovery; missing/audit/activation/purpose/retirement/overflow/privilege and proven held-row original-expiry checks; CA/native proof and initial accepted recovery remain synthetic")
++}

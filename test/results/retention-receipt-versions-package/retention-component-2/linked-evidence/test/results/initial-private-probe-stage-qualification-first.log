@@ -1,0 +1,6 @@
+asservat.local/asservat/internal/adapters/providerconfig: /home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/pkg/tool/linux_amd64/vet: chdir /home/phil/Projekte/asservat/internal/adapters/providerconfig: no such file or directory
+ok  	asservat.local/asservat/internal/adapters/kubernetes	26.749s
+ok  	asservat.local/asservat/internal/bootstrap	1.086s
+ok  	asservat.local/asservat/internal/contracts	1.024s [no tests to run]
+ok  	asservat.local/asservat/test/integration	1.060s [no tests to run]
+FAIL

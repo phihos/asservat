@@ -1,0 +1,44 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/overlay.json",
+    "./internal/contracts",
+    "./internal/adapters/kubernetes",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation",
+    "./internal/bootstrap"
+  ],
+  "exit": 0,
+  "expectedExit": 0,
+  "seconds": 7.432,
+  "before": {
+    "reusedEvidence": [],
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "reusedEvidence": [],
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "topLevelPass": 0,
+  "namedPass": 0,
+  "skips": 0,
+  "failureMarker": null,
+  "markerOccurrences": null
+}

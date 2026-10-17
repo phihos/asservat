@@ -1,0 +1,188 @@
+# ADR-149 — Fresh provider-installed worker and owner pair
+
+Status: selected under continued implementation authorization; versioned audit storage is an explicit maintainer requirement. Requirements: REQ-DEP-001, REQ-DEP-003 and REQ-DEP-005. Component implementation is integrated; complete installed qualification remains pending.
+
+## Original profile selection
+
+Only these original resource-layout pairs are supported:
+
+| Worker | Owner | Meaning |
+| --- | --- | --- |
+| omitted | omitted | Original legacy resources |
+| `asservat-hub-worker-installed/v1` | omitted | Original installed worker |
+| `asservat-hub-worker-installed/v1` | `asservat-owner-installed/v1` | Original installed worker and owner |
+| `asservat-hub-worker-installed/v2` | `asservat-owner-installed/v2` | Fresh provider-installed pair |
+
+One new constructor selects the last pair before the first of the same nineteen original resource claims. There is no worker2-only profile, mixed v1/v2 pair, profile inference from projected filenames, in-place template upgrade, or reinterpretation of an existing receipt. Optional fields remain omitted from original v1 serialization and binding preimages. Every runtime consumer must reject a declared but unsupported or incomplete selection before credentials or effects.
+
+The original resource state and binding include two purpose-fixed public selections: workerProvider and ownerProvider. Each contains exact auth mount/accessor plus its original dedicated audit Secret name/UID. The actual ServiceAccount UID is taken from the original CREATE receipt before deriving the full provider profile and its deterministic complete-scope recipe. The original owner source also declares nativeCandidateLimit1024, derived from the retained registration ceiling; it does not change connection/process concurrency or the legacy context-start candidate query.
+
+The planned observation composition, whose separate decision and contract integration remain pending, uses the existing required OwnerObservationBootstrap.Format field: the fixed owner-observation/v2 format explicitly selects its operation-owned original and final native brackets for this same fresh pair. Owner-observation/v1 remains unchanged. The regional installed receipt/input must independently pin matching connector-observation/v2 semantics, and CapacityLocalOwner retains the complete original OwnerDeployment instead of a duplicate selector. This introduces neither another layout variant nor an independently editable negotiation field, and is never inferred from nativeCandidateLimit. Complete frozen constructors/codecs and original-five-second native composition remain prerequisites; the current unintegrated component snapshots do not yet select that protocol.
+
+## Bootstrap order and separate credentials
+
+The worker's selected audit Secret uses the existing fixed WorkerProviders name. The owner uses the new fixed `asservat-<hyphenless installation>-owner-audit` name because its OwnerProviders name remains the immutable SQL identity projection. The Secrets may first be allocated protected and empty so their actual UIDs can enter the resource binding before account/source creation. Empty content is unavailable material, never a fake usable credential or readiness assertion. Exact one-key material is required before publication/launch and on current runtime reads. Credential bytes, hashes of those bytes and projected JWTs never enter the original resource journal or public profile.
+
+Worker2 retains its three separate immutable configuration SQL credentials and fixed optional capacity/cleanup subroots. Its mandatory dedicated audit key is configuration-audit-storage.json and its own native600-second projected JWT has the fixed configuration-provider audience. It removes the legacy wrapping/unwrapping token projection. Owner2 retains owner-roles.json and four purpose-separated SQL credentials in the original immutable identity Secret. Its separate mandatory audit key is provider-audit-storage.json; its own600-second projected JWT has the fixed owner-provider audience. Legacy layouts retain their original static-token filenames and behavior.
+
+Configuration is launched first from its concrete retained-bridge predecessor; it cannot require accepted-owner SQL or its own already-launched worker proof to produce its missing inputs. The protected installer owns the fixed WorkerInputs claim/ConfigMap producer and its exact configuration-launch connection. Later capacity/cleanup activation still requires their independent original positive receipts/current roots and cannot start from optional-file existence. Owner provider publication follows actual accepted current owner configuration and verified original four SQL roles. Existing independently claimed Secret and ConfigMap children, joined receipt and one-use zero-to-one launch retain lookup-only uncertainty and the original resource30-minute end.
+
+## Provider setup and current runtime
+
+Protected installation emits an automation-ready exact recipe for the separately administered provider. It does not blindly adopt/upsert an existing mount or role, install an IAM service, put administrative credentials into runtime, or revive retired initial credentials. A concrete pinned-TLS SetupReader makes only finite allowlisted named GETs under one original interval of at most five seconds. Its opaque result binds exact public input/profile, pool and roots and exposes only its original observation/end plus a scope match. Configuration/owner publication consumes that exact result alongside independent current native/recovery/SQL proof. Provider inspection runs before acquiring the bridge's SQL locks; this adds no provider-I/O exception to runtime transactions or the administrator bridge.
+
+Runtime uses standard Kubernetes-auth service tokens, with purpose-separated generated policies and four owner/two configuration single-flight token owners. Protected setup verifies mount and role recipes; login, positive renewal and bounded reconciliation verify each token's effective policy identity and finite lease. Crypto effects only borrow an acknowledged original lease and preserve existing native/SQL/certificate/permit gates. No per-effect recipe GET, implicit authentication, unknown-login token adoption, or instantaneous detection of provider-administrator policy changes is claimed. A rotated projected JWT is read for fresh login; it does not replace the JWT retained by the provider for an existing token's renewal. Unknown issuance remains bounded by the retained replica/process profile, finite backoff and configured external provider policy, without a new global token ledger.
+
+Current storage material is a dedicated explicit operator-selected scoped Secret. The producer publishes the required exact policy/capability recipe from actual acknowledged source identities; external IAM creation/rotation stays provider/operator owned. Runtime independently verifies native original Secret UID, one-key construction, current guard and equality of the actual mounted bytes before using material. Filesystem timestamps or metadata-only API access do not prove credential authority. Local-key/small deployment profiles remain separate supported design requirements; selecting this explicit OpenBao profile does not silently replace them.
+
+## Intrinsic audit version semantics
+
+The fresh worker2+owner2 pair selects `NewVersionedAudit` for both configuration and owner encrypted audit. The maintainer explicitly selected required versioned audit storage without an additional service, with every version tracked and deleted. This supersedes the earlier reversible implementation assumption; it does not qualify a backend or installed workflow. The original paired layout, journal binding and receipt identities carry this contract. There is no independently editable capability flag, detected mode, fallback to version-optional storage, or change to the original worker/owner v1 bytes or replay. Initial installer
+adapter enforcement is separately strengthened by [ADR-151](151-initial-audit-version-requirement.md).
+
+[ADR-151](151-initial-audit-version-requirement.md) now requires immutable versions
+for every active recognized initial-installer format. Fresh bootstrap v4 binds
+preparation services v2 and installer v2 before effects; historical input bytes
+remain unchanged and never select a weaker audit adapter. Missing/null versions
+deny without fallback. This component enforcement does not qualify restart/restore
+or complete physical-copy accounting; native initial-installation qualification
+is recorded independently.
+
+Product writes remain conditional creates. Successful writes and audit readback must return a nonempty, non-`null` immutable version; retained reads select that original version and compare its returned identity. Missing versions deny acknowledgement even when physical storage may already exist. They do not release the reservation, retry the write or reset its original attempt. The public setup artifacts require `PutObject`, `GetObject` and `GetObjectVersion` for the exact existing audit prefixes, with runtime object/version deletion and versioning or policy administration denied. Every physical version, delete marker and unfinished multipart write remains within explicit spend and uncertainty accounting until independently verified retirement. Independent cleanup retains its separate inventory/deletion credential and writer-closure protocol; removing metadata or only the latest version never proves deletion of the managed audit copy.
+
+An added latest version cannot change bytes of the acknowledged original version. It can prevent a latest-object reconciliation from succeeding; such failure remains unavailable and never selects a replacement receipt. The supported product path keeps conditional writes, original uncertain outcomes and prepaid audit capacity. A compromised credential's ability to add arbitrary versions is not claimed bounded by IAM, just as a create-only prefix does not bound malicious creation of arbitrary new keys. Qualification must establish the actual scoped policy, legitimate operation and uncertainty accounting, complete version/delete-marker/multipart cleanup, and recovery reads of original versions before installed enablement. No global provider-token or object ledger is introduced by this choice.
+
+Pinned SeaweedFS experiments distinguish these properties: the standard policy condition requiring `s3:if-none-match` refused a legitimate conditional write; separate immutable-version probes and the concrete SDK/audit test passed with synthetic administrator setup. One immediate original-version GET after restart returned 500 while bucket listing was already ready, and a later separate restart passed. Neither result permits deadline extension or treating bucket-list readiness as original-version availability. Subsequent owned scoped-IAM tests establish the exact runtime prefix/foreign-key denials and separate physical version/marker/multipart retirement component, as recorded in docs/research/audit-storage-qualification.md. They still do not establish installed producer/accounting or restart/restore composition. The earlier immediate-read failure remains evidence, not a passing availability result.
+
+## Qualification and limits
+
+The fresh native bootstrap-to-worker-input continuation now passes, as recorded
+in [implementation progress](../implementation-progress.md) and
+[the exact run report](../../test/results/provider-pair-native-3/result.json).
+It uses the actual original bootstrap/activation, nineteen resource receipts,
+retained guard handover, scoped versioned audit backend, named provider
+inspection and SQL3 producer with unchanged original client aliases and bounds.
+Deployments remain at zero replicas. This adds native input-producer evidence;
+runtime launch, sustained provider refresh, owner input/startup, initial/recovery
+version enforcement and complete copy accounting remain unqualified.
+
+The pure owner recipe move has five fixed original-function golden outputs and passing recipe/control/lifetime/effect races; actual pinned provider authentication, named read-only setup inspection and leased first effects were separately qualified. The owner-material-2 component passed 34 named tests, including the complete current material read over loopback TLS with synthetic native facts and same-UID rotation. The schema-join-1 component passed the actual specification, architecture and design gates over 120 schemas and 10,482 assertions, with all 2,813 authored dependencies unchanged. These results do not qualify v2 installed startup. The fresh pair still needs the composed actual source/guard/placeholder-to-material flow, rejected mixed selectors before effects, unknown child and launch replay, v1 byte/replay regressions, actual nineteen-resource roundtrip, scoped storage qualification, producer-to-runtime startup, rotation and joined shutdown. The owner-versioned-1 component passed its controlled version-optional failing-before regression, all 26 named corrected storage/artifact/legacy tests and affected compile/vet with 2,085 dependencies unchanged. This is a focused adapter-selection result, not installed storage qualification. Public collection remains disabled until the full installed workflow passes. No rolling migration or timed kubelet token-rotation claim follows from a short fixture.
+
+## Purpose-fixed original operation phases
+
+The fresh owner installer uses a concrete, operation-owned native bracket before role locks, actual full mutable native reads after those locks, and a second independent native bracket before completion. Original v1 methods and authority remain unchanged. A public one-use claim may precede final role verification, but that claim alone grants no credential delivery, CREATE, launch or refund. Exactly verified four-role SQL provenance and the actual post-lock source, guard, object and administrator checks precede the one permitted effect. Provider setup inspection stays outside SQL locks.
+
+The SQL adapter imports the concrete Kubernetes operation handle within C-21; there is no reverse import. The handle is minted only by the original root inside a joined operation and binds the exact root pointer, private derived context, original scope, phase and earliest retained end. Zero, copied, cross-call, concurrent, expired or out-of-order use denies before effects. This deliberate fixed coupling avoids a caller-built proof DTO, generic callback or a legacy source interface returning retained data as current authority. Every admitted shorter context permanently narrows the handle and returned observations, and cancellation is rechecked after the phase mutex. Closure cancels and joins admitted native work before releasing owned dependencies.
+
+Fresh creation returns an exact pending result. A subsequent independently current phase may only inspect the original object and acknowledge a receipt, including after the old CREATE interval expires when the original root still permits receipt persistence. That acknowledgement is current observation, never evidence that CREATE happened within an old interval, and never renews an attempt. A known spent attempt with no dispatched effect, an unknown result with no verified original object, and original-root expiry are explicit stopped installation outcomes. The fixed automatic driver has finite normal phases and at most one inspect-only recovery of an uncertain phase; it cannot poll indefinitely or reopen creation.
+
+Request counts are implementation targets only. Qualification must preserve real shared limiter aliases, drained buckets and the original remaining accepted SQL interval, including a source already about one second old. No on-demand fixture refresh, new clients, widened five-second bounds or sleep-to-refill may disguise unavailable composition. The owner-operation-1 component passes the concrete native constructor and original role phase methods over an explicitly synthetic API/SQL boundary, including final denial and phase deadline regressions. The projection/launch/finite-driver component follow-up is now integrated with passing scoped tests; real PostgreSQL composition, shared20QPS drained-bucket availability, ordinary aged accepted observations and installed process startup remain unqualified. The exact tested scopes and subsequent refinements remain in docs/implementation-progress.md.
+
+## Original owner bootstrap selection
+
+The fresh pair allocates its permission-root name and initial logical connector peer names through one optional `ownerBootstrap` continuation in the original resource journal. Allocation is public provenance only: it creates no permission stream, connector registration, process epoch, certificate, capacity or recovery authority. Actual permission acceptance and SQL49 enrollment remain independently required.
+
+The original journal stays bounded at32KiB. Its compact parent claim binds the issuer epoch, ordered cluster/peer IDs, exact per-peer root-bundle digests, existing public PKI mount choice and finite connection/concurrency settings. Full roots and the exact original installer format/resource scope live in one fixed immutable `owner-bootstrap.json` ConfigMap child under the same protected namespace. The aggregate child and generated deployment inputs retain the existing256KiB bound; the initial batch retains1..16 peers. A changed namespace/account/source scope produces distinct fixed PKI role names. Different peers' roots are never unioned.
+
+The parent selection and child CREATE admission have distinct persisted attempts. Only an acknowledged first child CAS permits its one named CREATE under that child's original end. CREATE returns pending. A later independently current read may acknowledge the original immutable object; the observation is not evidence of timely CREATE and does not renew the attempt. Lost claim/CREATE replies allow only exact lookup. Locally uncertain receipt writes receive one lookup, not another write in the same driver. Both actual native brackets and the existing administrator/recovery bridge remain mandatory. The automatic driver performs at most three normal phases and one inspection; missing original outcomes or root expiry produce a stopped installation.
+
+The generated owner deployment takes permission root and logical peers from the completed original selection and takes endpoints, complete guards/probes/history/Lease, Service/account/source/template and image from the actual original installation. It does not invent future Pod/process facts. Projection initial, post-lock and final checks compare the complete selected input and actually read the exact immutable selection child. Runtime input/journal matching retains the same allocation; it adds no private credential journal access. All declared request counts and original accepted-source remaining bounds still need full native measurement.
+
+This initial batch is not a permanent multi-cluster ceiling. Later enrollment has a separate bounded protected regional plan/journal tied to the stable installation and permission root, real namespace/account/settings receipts and actual permission/source/SQL49 activation. A later peer requires a positively acknowledged observation backend/rollout update; it cannot silently expand the old immutable bootstrap allowlist, rerun initial activation or revive retired initial credentials. That later producer is a separate incomplete continuation, not a generic registry introduced here.
+
+The owner selection producer and generator are integrated with passing component
+race, schema and architecture checks; see [the integration record](../../test/results/owner-bootstrap-selection-integration.json).
+Those checks use synthetic current native/SQL authority and do not establish
+real SQL4 production or installed owner startup. Existing native worker-input
+evidence predates this allocation. No runtime selector is enabled. Original
+installer formats and receipts are not reinterpreted; ADR-151 separately requires
+valid immutable audit versions at active installer boundaries.
+
+## Fresh worker runtime admission
+
+The fresh worker owns one bounded FIFO with exactly five purpose slots: wrapping
+credential refresh, unwrapping credential refresh, owner-configuration audit,
+capacity source observation, and capture cleanup. Each purpose has one ticket,
+pending or active; five tickets total and at most one globally active. Duplicate
+same-purpose admission fails. The separate audit notification is not a ticket.
+A ticket is process admission, never authority. Its original queue wait is at
+most five seconds, additionally bounded by the existing outer caller. Provider
+maintenance and owner audit wait for one acknowledged independent fleet SQL
+observation whose original read began after FIFO grant; queue plus source wait
+retain that same scheduling end. This notice is not recovery or acceptance
+authority and never triggers a new source loop or SQL poll. It caps subsequent
+work at that original source expiry. Only then is one actual recovery proof or
+owner audit candidate selected. Actual current checks may return an earlier
+end or fail; selected authority is never retried or replaced. Capacity retains
+its original observer caller end while queued; cleanup selects its actual
+lifecycle authority after admission. No expired waiter succeeds or receives a replacement deadline.
+A cancelled active owner retains its slot until its actual work joins.
+
+Fleet and owner source observation remain independent at their original
+five-second call bound and one-second delay after completion. Owner audit has
+one immutable selected record and at most one unselected notification; only a
+newer independently observed notification of the same revision can replace that
+pending notification. Known source change, failure, or expiry cancels selected
+work and clears pending work before negative SQL fencing can block. Unknown
+audit effects stay uncertain; neither a queue nor a later observation refunds
+spend or rewrites the selected record. A later exact recovery uses the existing
+versioned audit protocol and its original semantic identity.
+
+Missing capacity and cleanup projections are observed with non-authorizing
+fixed-journal hints. No optional file can select authority. A positive original
+receipt starts its purpose-specific native operation before opening scoped
+credentials, followed by a genuine final check before starting the child. Fresh
+capacity observation acquires its ticket before the original source observer,
+uses one private per-call observer copy, and performs its final native check
+before actual SQL acceptance. Failure uses the same original recovery/CAS
+invalidation; it cannot persist acceptance and then merely report an outer
+error. Child deadline shortening also reaches the original SQL commit context.
+
+Cleanup scheduling remains a bounded read without effect authority; each
+selected lifecycle action obtains its own current native/recovery checks after
+admission. History ReleaseAt/DeleteBy stay exact obligations, not authority
+which disappears when overdue. Existing SQL decides overdue release under
+current recovery, without refunding uncertainty or replacing original identities.
+
+The separate command candidate selects only a fully decoded worker2 input, its
+exact provider recipe/provenance and existing downward-API Pod UID. Invalid or
+partial provider selection denies; it never falls back to static credentials.
+The original no-provider command path remains unchanged. This candidate is not
+an enabled installation: real generated-worker launch, scoped provider effects,
+aged accepted source, first versioned encrypted audit and SQL29 acceptance must
+pass together before runtime selection is integrated. Active capacity readiness
+and cleanup progress require their own real producer/actor qualification.
+
+The 40-observer/9-probe refresh/audit and 21-observer/3-probe optional-child
+operation counts are source-derived targets, not sustained capacity. Both
+independent eight-observer source loops, pending hints, real provider HTTP and
+four recovery reads must be present in qualification with the original shared clients and persisted source ages. The failed 20-QPS/Burst20
+candidate is immutable evidence: a stored-source unwrap pair expired after
+3.143707 seconds before provider HTTP or real recovery reads. It does not
+qualify startup, readiness or cleanup progress.
+
+The separately reviewed B+A candidate assigns exactly the existing worker2
+observer 40 QPS with burst 20. The worker probe, Lease client, capacity observer,
+capacity probe and processing probe remain 20 QPS/burst 20. There are still six
+clients, no per-operation or actor-specific bucket, no configurable rate field,
+and no change to v1 defaults. HWORK's conservative aggregate envelope becomes
+140 QPS/burst 120 per retained process, or 280 QPS/burst 240 for both retained
+processes. Lease ownership does not remove closing processes from this charge.
+This is not the entire installation budget; owner/installer and regional traffic
+require additional cluster-load qualification. Further rate/burst changes need
+a new reviewed feasibility case, not an adjustment after a failing check.
+
+Provider renewal is not a five-second heartbeat: healthy one-second scheduling
+checks use no native requests, and ordinary credentials become due after up to
+120 seconds or their earlier original provider cutoff. Both independent source
+loops retain actual-call plus one-second cadence. Capacity and nonempty cleanup
+add real recurring work. Measure offered load, accepted-capacity expiry gaps,
+cleanup backlog, rare coincident maintenance and first owner audit. Finite FIFO
+fairness and isolated counts cannot establish sustainable readiness. All
+selected authority, source, material, recovery and actual post-effect bounds
+remain at their original maximum five seconds.
+
+B+A is a staged implementation experiment, not installed enablement or a passing
+availability claim. The next real generated-worker transition must use actual
+SQL29 observation and exact-version encrypted audit; active capacity, cleanup,
+retained-process overlap and cluster pressure remain further required gates.

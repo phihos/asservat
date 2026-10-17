@@ -1,0 +1,18 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+=== RUN   TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock
+=== RUN   TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation
+=== RUN   TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+    download_response_test.go:175: intent acknowledgement custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (21.20s)
+    --- PASS: TestContextAdmissionWithRealServices/download-concurrent-preparation-one-reservation-and-restart (1.14s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.08s)
+    --- PASS: TestContextAdmissionWithRealServices/download-one-active-generation-and-expiry-after-lock (0.75s)
+    --- PASS: TestContextAdmissionWithRealServices/download-old-result-cannot-take-over-new-generation (0.69s)
+    --- PASS: TestContextAdmissionWithRealServices/download-control-original-replay-and-current-metadata (16.12s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-response-window-accounting (1.05s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	21.252s
+FAIL

@@ -1,0 +1,25 @@
+{
+  "status": "source review only; no builds or native runs",
+  "files": {
+    "changes/docs/decisions/153-operation-owned-connector-enrollment.md": "1e00cccb6acf52386dad438a781086890b6538e5c4299aeb656c462d15fdae4f",
+    "changes/internal/adapters/kubernetes/connector_identity.go": "534ef67d6321c55f61dfc4b3e80f344462e29ac6c4a062a269861fd3cd220a50",
+    "changes/internal/adapters/kubernetes/connector_lifecycle_native.go": "be97e2993783a86ed9e57d52f9906d86f5675d70f01dcc5122ffe6e6455fbfb3",
+    "changes/internal/adapters/kubernetes/connector_lifecycle_nested_regression_test.go": "ff65d5282fde7cabeddcc620a6f982f35e84902200e818997d1f5c8ec77d96d7",
+    "changes/internal/adapters/kubernetes/connector_lifecycle_operation.go": "e0c89a355b6537e549a71dafe2da51b9509e274bbe0a91aafb63992724e5a2f6",
+    "changes/internal/adapters/kubernetes/connector_lifecycle_operation_test.go": "b180a6402b5f00f753c802c56f0f803568ced54735244f49b0ba2add7fcbf256",
+    "changes/internal/adapters/kubernetes/connector_process.go": "afe56e75aae3fc1dab5faafbbe00a1484e5d7184ccd5a9074dca57ba8acf6e2a",
+    "changes/internal/application/fleet/connector_lifecycle_effects.go": "e1030cd44c282af536d9bf87fadb5ed8c704c7998bf4689f6ec92a9e86096b87",
+    "changes/internal/application/fleet/connector_lifecycle_effects_test.go": "33c2d96ccb7b80a7a01a864e4a99454960eccd0ae305a204776e972fda31d52e",
+    "changes/internal/application/fleet/connector_lifecycle_operation.go": "06d4e93f4b79f2a1143720d5e4043f7aab211038f56b3cb661cbf54f12373c68",
+    "changes/internal/application/fleet/connector_process.go": "c4847855034c7fb2325e6b680c596b06f660ce94624f9b325ea141b21f6f460e",
+    "changes/internal/application/fleet/connector_renewal.go": "58e4efd14c3e7d321f930bffabaeb2ee64625a37c11a1ccf96707a6123a13a6b",
+    "changes/internal/domain/fleet/connector_lifecycle_operation.go": "a467403999f5627d3b941bbd87564b37f259a91bf4346e37f84d4e5bf355c4ef",
+    "before/internal/adapters/kubernetes/connector_lifecycle_nested_regression_test.go": "002cc8bdaa6ac86bf0550541aa12ea4a7379265f2b3bfbf4c1d78ecd7609f628",
+    "TYPED-BOUNDARY.md": "ef71073de864b29021368171f9638cfddd7ae863068cf68384418bf391b3e87c",
+    "PROPOSAL.md": "c5618689e9960fe787d06d02e4810a010c6444a77312186f2e3198c43fb44c4c",
+    "source-evidence.json": "0a70334925949365869e800b091ff46a317e3fcfbea8f314baae315c927e7621",
+    "extraction-bases.json": "839c83f40047f1891ad242119ab4c368ecd89af50f77157ca53aface8ec60eca"
+  },
+  "new_runtime_selection": false,
+  "live_changes": false
+}

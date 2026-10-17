@@ -1,0 +1,74 @@
+{
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "runnerSHA256": "3d1ce33092136d689e33b221afaac8a51258961ee2b87f8133e9af46b1605c44",
+  "sourceCount": 2298,
+  "sourceSnapshotSHA256": "1bcb877a1998952aec06c5da3532ffe7bda44336998e5d337d443483634362eb",
+  "scope": "Original direct HWORK to exact holder A to regional R reference fixture, actual Restricted Pods in two owned clusters and retained clients; original five-second operations, thirty-second Reconcile/socket, eight-minute fixture and ten-minute aggregate Go unchanged. Real native Kubernetes, SQL and encrypted S3 audit with explicitly synthetic original setup roots and fixtureIssuer. No installed selection, real provider latency, full installed HWORK background, sustained availability or public runtime qualification.",
+  "qualificationLimits": {
+    "syntheticSetupRoots": true,
+    "fixtureIssuer": true,
+    "fullInstalledHWORKBackground": false,
+    "runtimeSelection": false
+  },
+  "phases": [
+    {
+      "name": "direct",
+      "command": [
+        "python3",
+        "scripts/test-context-storage.py",
+        "--run",
+        "^TestDirectHolderObservationWithRealKubernetes$"
+      ],
+      "exit": 1,
+      "seconds": 153.707,
+      "diskBeforeBytes": 422035447808,
+      "tmpFreeBeforeBytes": 16731344896,
+      "sourceSnapshotUnchanged": true,
+      "requiredPassedTests": [
+        "TestDirectHolderObservationWithRealKubernetes",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+        "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+      ],
+      "passedTests": [],
+      "missingRequiredTests": [
+        "TestDirectHolderObservationWithRealKubernetes",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-candidates",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-namespace-guard",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-workload",
+        "TestDirectHolderObservationWithRealKubernetes/capacity-workload-candidates",
+        "TestDirectHolderObservationWithRealKubernetes/changed-original-regional-template-denies"
+      ],
+      "validationErrors": [
+        "native test exit missing or nonzero",
+        "missing required selected PASS names"
+      ],
+      "harnessSourceMismatches": [],
+      "harnessSourceFileSetMismatch": [],
+      "sourceUnchanged": true,
+      "helperIdentity": {
+        "helperSHA256": "becaee35b138eb2e6bf7f9920b3168f66253823272cab1bb6680665088bf69d5",
+        "runtimeSelection": false,
+        "setupAuthority": "synthetic installer/issuer acceptance; actual API/SQL/S3/TLS path",
+        "fullInstalledHWORKBackground": false
+      },
+      "buildScratchRemoved": true,
+      "cleanupFailures": [],
+      "testExit": 1,
+      "archiveHashes": {
+        "harness.log": "dbf60749d00b58fbbbd48a6ded853fc7bc9c9fd3213126d763a4f457ebd9eefe",
+        "context-storage.log": "18d4c0382a03cdb6318031a5f9645393320cb1cfe66e228909a09cbf423be4a1",
+        "context-storage-environment.json": "cc44d4f43ac2ab55cc35fa19eb6f4e76eb0da7807daae87be62a9223b631e2f3",
+        "context-storage-kubelet.log": "c4ba6347fe75bc486834a125e445f8422fc192a965d43b26e144d67e4b43386b",
+        "context-storage-postgres.log": "2154eda7f2654d42e70362970ea1d1d08db0d7e07a5ba52c39b3ce1cd60aaa33"
+      }
+    }
+  ],
+  "scratch": "/home/phil/.cache/asservat-build/direct-observation-native-4-tmp",
+  "native": true,
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "exit": 1
+}

@@ -1,0 +1,324 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/bootstrap"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	privacyvalue "asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/transport/keyservice"
+	native "asservat.local/asservat/internal/transport/native"
+	workertransport "asservat.local/asservat/internal/transport/worker"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+// The artifact backend is chosen BEFORE acquisition. The same protected wrapped
+// keys are subsequently consumed through the actual remote three-slot A-KEY
+// service; no captured object is re-encrypted or replaced for this fixture.
+type publicContextJourneyKeys struct {
+	scope   value.KeyScope
+	seal    *kms.LocalKeyBackend
+	backend *kms.LocalOperations
+}
+
+func newPublicContextJourneyKeys(t *testing.T, installation string) *publicContextJourneyKeys {
+	scope, seal, backend := localDownloadKeys(t, installation)
+	return &publicContextJourneyKeys{scope, seal, backend}
+}
+func publicJourneyRequire(t *testing.T, stage string, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(stage, err)
+	}
+}
+
+// This is precisely the existing synthetic Job/Pod fixture, serialized because
+// the live requesting operation and the emulated acquisition process overlap.
+// It does not invent a download/session: Create receives the actual SQL intent.
+type publicJourneyJobs struct {
+	mu    sync.Mutex
+	inner syntheticDownloadJobs
+}
+
+func (j *publicJourneyJobs) snapshot() value.DownloadWorker {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.worker
+}
+func (j *publicJourneyJobs) CreateDownloadWorker(c context.Context, v value.DownloadWorkerLaunch) (value.DownloadWorkerJob, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.CreateDownloadWorker(c, v)
+}
+func (j *publicJourneyJobs) FindDownloadWorkerJob(c context.Context, v value.DownloadWorkerIntent) (value.DownloadWorkerJob, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.FindDownloadWorkerJob(c, v)
+}
+func (j *publicJourneyJobs) ObserveDownloadWorker(c context.Context, v value.DownloadWorkerIntent, b value.DownloadWorkerJob) (value.DownloadWorker, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.ObserveDownloadWorker(c, v, b)
+}
+func (j *publicJourneyJobs) ObserveDownloadWorkerTermination(c context.Context, v value.DownloadWorker) (value.DownloadWorkerTermination, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.ObserveDownloadWorkerTermination(c, v)
+}
+func (j *publicJourneyJobs) RetireDownloadWorker(c context.Context, v value.DownloadWorkerTermination) (value.DownloadWorkerRetirement, error) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.inner.RetireDownloadWorker(c, v)
+}
+
+type publicJourneyEnrollmentProof struct {
+	jobs  *publicJourneyJobs
+	token evidence.DownloadPeerToken
+}
+
+func (p publicJourneyEnrollmentProof) ReadWorkerEnrollmentProof(c context.Context, s, w string, k artifact.Digest) (value.WorkerEnrollmentProof, error) {
+	worker := p.jobs.snapshot()
+	if !worker.Valid() {
+		return value.WorkerEnrollmentProof{}, artifact.ErrDownloadUnavailable
+	}
+	if p.token == nil {
+		return (syntheticWorkerEnrollmentProof{worker}).ReadWorkerEnrollmentProof(c, s, w, k)
+	}
+	return (channelSQLProof{p.token, worker}).ReadWorkerEnrollmentProof(c, s, w, k)
+}
+
+type publicJourneyNativeProof struct {
+	jobs  *publicJourneyJobs
+	token evidence.DownloadPeerToken
+}
+
+func (p publicJourneyNativeProof) ReadDownloadPeerProof(c context.Context, s string, k value.KeyPeer) (value.KeyWorkerProof, error) {
+	return (nativeSQLProof{p.jobs.snapshot(), p.token}).ReadDownloadPeerProof(c, s, k)
+}
+
+// All pools are purpose-specific existing fixture roles. Native readers, key
+// ledgers, dispatch, enrollment and transfer are real product implementations;
+// accepted bootstrap/backing, readiness, human/Pod proof, Job API and CA remain
+// explicitly synthetic. This is NOT the protected installed OwnerRuntime graph.
+type publicJourneyNative struct {
+	services         bootstrap.ContextNativeDownloadServices
+	coordinator      evidence.ContextDownloadCoordinator
+	gate             authapp.ContextDownloadAuthority
+	runtime, audit   *postgres.Downloads
+	allocation       artifact.DownloadAllocation
+	profile          value.DownloadWorkerProfile
+	jobs             *publicJourneyJobs
+	enrollment       workerEnrollmentFixture
+	enrollmentRouter *evidence.WorkerEnrollmentRouter
+	requestOwners    *postgres.WorkerOwners
+	origins          evidence.NativeOrigins
+	router           *native.HubRouter
+	keyAuthority     *postgres.NativeKeyAuthority
+	keys             *publicContextJourneyKeys
+	store            *objectstore.Store
+	storeID          string
+	target           value.WorkerCredentialTarget
+	joined           <-chan nativeSQLWorkerOutcome
+	closeWorker      func()
+}
+
+func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, artifactKeys *publicContextJourneyKeys, actor identity.Identity, loginUntil time.Time) *publicJourneyNative {
+	t.Helper()
+	open := func(r, p string) *pgxpool.Pool { v := poolFor(r, p); t.Cleanup(v.Close); return v }
+	root, installation := s.a.RootID, s.recovery.installation
+	g := postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+	f := &publicJourneyNative{keys: artifactKeys, store: store, storeID: s.a.Registration.StoreID, jobs: &publicJourneyJobs{}}
+	makeDownloads := func(r, p string) *postgres.Downloads {
+		v, e := postgres.NewDownloads(ctx, open(r, p), root, g)
+		publicJourneyRequire(t, r, e)
+		return v
+	}
+	f.runtime = makeDownloads("download_runtime", "synthetic-download")
+	f.audit = makeDownloads("download_audit_runtime", "synthetic-download-audit")
+	configPool := open("download_config_runtime", "synthetic-download-config")
+	defer configPool.Close() // No backing configuration writes after this setup phase.
+	config, e := postgres.NewDownloads(ctx, configPool, root, g)
+	publicJourneyRequire(t, "download backing configuration", e)
+	f.allocation = artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: s.a.Registration.Location.ClusterID, NamespaceUID: s.a.Plan.Input.Target.Target().NamespaceUID, WorkloadUID: s.a.Plan.Input.Target.Target().WorkloadUID, OutputLimit: 1 << 20, ReadLimit: 256 << 20, SessionLimit: 64, ValidUntil: time.Now().UTC().Add(30 * time.Minute).Truncate(time.Microsecond)}
+	publicJourneyRequire(t, "original download allocation", config.BindDownloadAllocation(ctx, f.allocation))
+	f.profile = syntheticWorkerProfile(installation)
+	f.profile.StoreCredentialSecret, f.profile.StoreCredentialSecretUID = "synthetic-native-store", custodyID()
+	catalogPool := open("context_catalog_read_runtime", "synthetic-context-read")
+	catalog, e := postgres.NewContextPublications(ctx, catalogPool, root)
+	publicJourneyRequire(t, "download catalog", e)
+	processing, e := postgres.NewProcessingReads(ctx, catalogPool, root, s.recovery.guard)
+	publicJourneyRequire(t, "download processing", e)
+	path := syntheticDownloadPlacement(s.a.Registration)
+	path.AcquisitionClusterID, path.ConnectorClusterID, path.WorkerConfiguration = f.profile.ClusterID, f.profile.ClusterID, f.profile.Configuration
+	policy := processingTestPolicy{privacyvalue.DownloadPolicy{RootID: root, InstallationID: installation, RecoveryEpoch: s.a.Recovery.IssuerEpoch, Revision: identity.Revision{UID: path.ID, Generation: 1, Digest: artifact.Digest{87}}, ProtectionDigest: artifact.Digest{88}, PermittedRegions: []string{"synthetic-region"}, Paths: []privacyvalue.DownloadPath{path}, Clients: []privacyvalue.DownloadClient{{Issuer: actor.Principal.Issuer, ID: actor.Principal.ClientID, Kind: actor.Principal.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []privacyvalue.ProcessingOperator{{Issuer: actor.Principal.Issuer, ClientID: actor.Principal.ClientID, Kind: "Group", ID: "synthetic-privacy"}}}}
+	f.gate = authapp.ContextDownloadAuthority{RootID: root, Identities: nativeDownloadTestIdentity{actor, loginUntil}, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureAcceptedRetention(s), Now: time.Now}, Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policy, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
+	_, configuration, observer, _ := acceptedWorkerConfiguration(t, ctx, poolFor, store, keys, f.profile, s.a.Recovery.IssuerEpoch)
+	s.nativeSources.SetWorker(t, observer.Observe)
+	makeWorkers := func(r, p string) *postgres.DownloadWorkers {
+		v, e := postgres.NewDownloadWorkers(ctx, open(r, p), root, f.profile, g)
+		publicJourneyRequire(t, r, e)
+		return v
+	}
+	workers := makeWorkers("download_worker_runtime", "synthetic-download-worker")
+	workerAck := makeWorkers("download_worker_audit_runtime", "synthetic-download-worker-audit")
+	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: f.jobs, Audit: &objectstore.DownloadWorkerAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: workerAck, Authority: f.gate, CurrentAuthority: f.gate, Profile: f.profile, Now: time.Now}
+	bindContextNativeStopFixture(t, ctx, config, f.allocation, installation, f.storeID, g, poolFor)
+	nativeSQLRoles(t, ctx, admin)
+	contextNativeSQLRoles(t, ctx, admin)
+	owners, e := postgres.NewNativeOwners(ctx, open("native_owner_runtime", "synthetic-native-owner"), root, f.profile, g)
+	publicJourneyRequire(t, "native owners", e)
+	readers, e := postgres.NewNativeReaders(ctx, open("native_metadata_runtime", "synthetic-native-metadata"), root, installation, g)
+	publicJourneyRequire(t, "native readers", e)
+	historyPool := open("native_history_runtime", "synthetic-native-history")
+	defer historyPool.Close()
+	history, e := postgres.NewNativeHistory(ctx, historyPool, root)
+	publicJourneyRequire(t, "native history", e)
+	backing := value.NativeBacking{AllocationID: f.allocation.ID, RootID: root, PolicyID: custodyID(), PolicyDigest: artifact.Digest{77}, Rows: 2, Keys: 2, TransitionsPerRow: 8, BackupBytes: 16 << 20, WALBytes: 16 << 20, CleanupSeconds: 30, ValidUntil: f.allocation.ValidUntil, RetireBy: f.allocation.ValidUntil.Add(30 * time.Second), History: value.NativeHistoryQualification{ID: custodyID(), Digest: artifact.Digest{78}, RowBytes: 64 << 10, TransitionWALBytes: 64 << 10, BackupCopies: 1, WALCopies: 1}}
+	publicJourneyRequire(t, "original native backing", history.InstallNativeBacking(ctx, backing))
+	historyPool.Close() // This fixture uses the role only for its initial backing.
+	bind := open("native_key_bind_runtime", "synthetic-native-bind")
+	prepKeys, e := postgres.NewDownloadKeys(ctx, bind, root, artifactKeys.scope, g)
+	publicJourneyRequire(t, "preparation keys", e)
+	windowKeys, e := postgres.NewNativeKeys(ctx, bind, root, f.profile, artifactKeys.scope, g)
+	publicJourneyRequire(t, "window keys", e)
+	f.keyAuthority, e = postgres.NewNativeKeyAuthority(ctx, open("native_key_read_runtime", "synthetic-native-read"), root, f.profile, artifactKeys.scope, g)
+	publicJourneyRequire(t, "key authority", e)
+	f.enrollment = newWorkerEnrollmentServices(t, ctx, poolFor, root, installation, f.profile, publicJourneyEnrollmentProof{jobs: f.jobs}, g, store, keys, f.gate)
+	f.enrollmentRouter, e = evidence.NewWorkerEnrollmentRouter(ctx, installation, f.enrollment.bindings, time.Now, 1)
+	publicJourneyRequire(t, "enrollment router", e)
+	t.Cleanup(f.enrollmentRouter.Close)
+	f.requestOwners, e = postgres.NewWorkerOwners(ctx, open("worker_owner_runtime", "synthetic-worker-owner"), root, f.profile, g)
+	publicJourneyRequire(t, "request owners", e)
+	ownerPod, epoch := custodyID(), custodyID()
+	requests := &evidence.WorkerRequestOwners{Router: f.enrollmentRouter, Store: f.requestOwners, PodUID: ownerPod, ProcessEpoch: epoch, NewID: custodyID}
+	first, e := postgres.NewFirstContextPreparations(f.runtime)
+	publicJourneyRequire(t, "first preparation", e)
+	responses, e := postgres.NewFirstContextResponses(f.runtime)
+	publicJourneyRequire(t, "first response", e)
+	firstOwners, e := postgres.NewFirstContextNativeOperations(owners)
+	publicJourneyRequire(t, "first native owner", e)
+	f.origins = evidence.NativeOrigins{Locators: readers, Operations: readers, Proofs: func(token evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
+		return publicJourneyNativeProof{f.jobs, token}, nil
+	}, Now: time.Now}
+	f.router, e = native.NewHubRouter(1)
+	publicJourneyRequire(t, "native router", e)
+	t.Cleanup(f.router.Close)
+	enrollment := *f.enrollment.service
+	enrollment.CurrentAuthority = f.gate
+	runtime, e := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{loginUntil}, Profile: f.profile, Configuration: configuration, Workers: workers, Preparation: first, Dispatcher: dispatch, Enrollments: enrollment, Proofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
+		return publicJourneyEnrollmentProof{f.jobs, token}, nil
+	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: artifactKeys.scope, Owners: firstOwners, Fences: owners, Origins: f.origins, Registrar: f.router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID})
+	publicJourneyRequire(t, "native runtime before any session", e)
+	t.Cleanup(runtime.Close)
+	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.storeID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
+	publicJourneyRequire(t, "original content control backing", config.BindDownloadControlAllocation(ctx, control))
+	objects, e := objectstore.NewDownloadWindowAuditObjects(store, f.storeID, keys, keys)
+	publicJourneyRequire(t, "content audit", e)
+	plans, e := postgres.NewContextDownloadPlans(ctx, open("native_plan_runtime", "synthetic-native-plan"), root, installation, f.profile, configuration, postgres.ContextDownloadPlanLimits{OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4, Duration: time.Minute})
+	publicJourneyRequire(t, "download plans", e)
+	f.coordinator = evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Recovery: s.recovery.reader, Routes: f.runtime, Sources: f.runtime, Authority: f.gate, Sessions: f.runtime, Plans: plans, Now: time.Now, NewID: custodyID}
+	stopLedger, e := postgres.NewDownloadStops(ctx, open("download_stop_runtime", "synthetic-download-stop"), root)
+	publicJourneyRequire(t, "stop restrictions", e)
+	stopWriter, e := postgres.NewDownloadStops(ctx, open("download_stop_writer_runtime", "synthetic-download-stop-writer"), root, s.recovery.guard)
+	publicJourneyRequire(t, "stop writer", e)
+	stopAck, e := postgres.NewDownloadStops(ctx, open("download_stop_ack_runtime", "synthetic-download-stop-ack"), root, s.recovery.guard)
+	publicJourneyRequire(t, "stop acknowledgements", e)
+	f.services = bootstrap.ContextNativeDownloadServices{Runtime: runtime, Transfer: evidence.DownloadResponseTransfer{Sessions: first, Responses: responses, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}, Stop: evidence.ContextDownloadStopCoordinator{Ledger: stopNativeLedger{stopLedger, stopWriter}, Acknowledgements: stopAck, Objects: &objectstore.DownloadStopObjects{Store: store, Seal: keys, Open: keys, StoreID: f.storeID}, Active: runtime, Now: time.Now}}
+	return f
+}
+
+// Set up the real credential channel after the first Prepare has actually
+// dispatched its worker. Enroll waits for a real current-request owner; it never
+// publishes one, preactivates a certificate or retries an uncertain POST.
+func (f *publicJourneyNative) credentialClient(t *testing.T, ctx context.Context, session string) *mtls.WorkerCredentials {
+	t.Helper()
+	w := f.jobs.snapshot()
+	if !w.Valid() || w.Intent.SessionID != session || w.Intent.Profile != f.profile {
+		t.Fatal("actual first preparation did not dispatch its original worker")
+	}
+	f.target = value.WorkerCredentialTarget{InstallationID: w.Binding.InstallationID, SessionID: session, WorkerID: w.Intent.ID, PodUID: w.Binding.PodUID, CreatedAt: w.Intent.CreatedAt, RunUntil: w.Intent.RunUntil}
+	h, e := workertransport.NewHandler(f.target.InstallationID, f.enrollmentRouter, time.Now, 1)
+	publicJourneyRequire(t, "worker credential handler", e)
+	server, roots := channelServer(t, h)
+	ca := x509.NewCertPool()
+	ca.AddCert(f.enrollment.issuer.ca)
+	c, e := mtls.NewWorkerCredentials(server.URL, f.target, roots, ca, newWorkerChannelFixture(t), time.Now)
+	publicJourneyRequire(t, "process credential client", e)
+	t.Cleanup(c.Close)
+	return c
+}
+func (f *publicJourneyNative) enrollAndStart(t *testing.T, ctx context.Context, c *mtls.WorkerCredentials) {
+	t.Helper()
+	e := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, time.Second, true, func(call context.Context) (bool, error) {
+		_, err := f.requestOwners.ReadWorkerOwner(call, f.target.SessionID, f.target.WorkerID)
+		return err == nil, nil
+	})
+	publicJourneyRequire(t, "actual requesting owner became current", e)
+	publicJourneyRequire(t, "actual routed enrollment", c.Enroll(ctx))
+	certificate := *channelCert(t, c)
+	peer, e := c.Peer()
+	publicJourneyRequire(t, "current worker peer", e)
+	digest, e := c.PublicKeyDigest()
+	publicJourneyRequire(t, "original worker public key", e)
+	keyTLS := newKeyTLSFor(t, f.target.InstallationID, "artifact", f.keyAuthority, f.keys.backend, func(http.Handler) http.Handler {
+		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keys.scope, Authority: f.keyAuthority, Backend: fixtureConfiguredKeyBackend{f.keys.backend}, Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
+		publicJourneyRequire(t, "actual key handler", e)
+		return h
+	})
+	keyTLS.server.TLS.ClientCAs.AddCert(f.enrollment.issuer.ca)
+	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: keyTLS.roots, Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS13}, DisableKeepAlives: true}
+	t.Cleanup(transport.CloseIdleConnections)
+	bound, e := f.store.ForCustody(f.storeID)
+	publicJourneyRequire(t, "original artifact store", e)
+	reader, e := objectstore.NewNativeContextReader(bound, f.keys.scope, keyTLS.server.URL, &http.Client{Transport: transport, Timeout: 5 * time.Second})
+	publicJourneyRequire(t, "native reader", e)
+	result, e := evidence.NewRegionalContextResult(ctx, f.target, reader, time.Now)
+	publicJourneyRequire(t, "regional result", e)
+	t.Cleanup(func() {
+		result.Close()
+		publicJourneyRequire(t, "regional result joined", result.Wait(context.Background()))
+	})
+	connectorCertificate := nativeSQLConnectorCertificate(t, nativeExchangeFixture{worker: f.jobs.snapshot(), enrollment: f.enrollment})
+	connectorVerifier, e := mtls.NewPeerVerifier(keyTLS.roots, f.target.InstallationID, fleet.ConnectorPeer, time.Now)
+	publicJourneyRequire(t, "connector TLS verifier", e)
+	hub := &nativeSQLAdmission{test: t, side: "hub", origins: f.origins, peer: peer, router: f.router, leaf: certificate.Certificate[0], connectorVerifier: connectorVerifier, connectorDigest: sha256.Sum256(connectorCertificate.Certificate[0])}
+	upstream := nativeSQLServer(t, contracts.NativeOwnerPath, hub, connectorCertificate, keyTLS)
+	connector := &nativeSQLAdmission{test: t, side: "connector", origins: f.origins, peer: peer, upstream: upstream, verifier: f.enrollment.issuer.verifier}
+	client := nativeSQLServer(t, contracts.NativeWorkerPath, connector, certificate, keyTLS)
+	call, cancel := context.WithDeadline(ctx, f.target.RunUntil)
+	done := make(chan error, 1)
+	joined := make(chan nativeSQLWorkerOutcome, 3)
+	f.joined = joined
+	go func() { done <- nativeSQLWorkerLoop(t, call, client, f.target, digest, result, joined) }()
+	var once sync.Once
+	f.closeWorker = func() {
+		once.Do(func() {
+			cancel()
+			err := <-done
+			if err != nil && !errors.Is(err, context.Canceled) {
+				t.Error("native acquisition terminated", err)
+			}
+		})
+	}
+	t.Cleanup(f.closeWorker)
+}

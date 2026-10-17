@@ -1,0 +1,103 @@
+package contracts
+
+import (
+	"io"
+	"time"
+)
+
+// Private owner identity credentials are separate from public investigation,
+// configuration observation and regional observation backend credentials.
+const OwnerIdentityRoleManifestFile = "owner-roles.json"
+const OwnerIdentityRoleConnections = PublicRuntimeRetainedHubProcesses + 1
+const OwnerIdentityRolesFormat = "asservat-owner-identity-roles/v1"
+const OwnerIdentityRoleStateFormat = "asservat-owner-identity-role-state/v1"
+const OwnerIdentityCredentialManifestFormat = "asservat-owner-identity-credentials/v1"
+const OwnerIdentityRoleMaxBytes = 32 << 10
+
+func OwnerIdentityRolePurposes() []string {
+	return []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"}
+}
+
+// OwnerIdentityProjectionFiles are the identity projection's files: the
+// manifest and one SQL login per purpose, in purpose order.
+func OwnerIdentityProjectionFiles() []string {
+	out := []string{OwnerIdentityRoleManifestFile}
+	for _, purpose := range OwnerIdentityRolePurposes() {
+		out = append(out, "sql-"+purpose+".json")
+	}
+	return out
+}
+
+func OwnerIdentityRoleOrdinal(purpose string) (int, bool) {
+	switch purpose {
+	case "enrollment":
+		return 0, true
+	case "audit":
+		return 1, true
+	case "activation":
+		return 2, true
+	case "registry":
+		return 3, true
+	case "routing":
+		return 4, true
+	case "native-read":
+		return 5, true
+	default:
+		return 0, false
+	}
+}
+
+// Original private producer input, generated from the completed installation
+// bridge and current accepted owner source. Runtime receives this public scope
+// only inside a receipt-owned manifest; there is no administrator credential.
+type OwnerIdentityRoles struct {
+	Format                string                `json:"format"`
+	InstallationID        string                `json:"installationID"`
+	InitialClaimID        string                `json:"initialClaimID"`
+	ClusterID             string                `json:"clusterID"`
+	Namespace             WorkerObjectReference `json:"namespace"`
+	OwnerConfigurationUID string                `json:"ownerConfigurationUID"`
+	Resources             WorkerObjectReference `json:"resources"`
+	ResourceSetupID       string                `json:"resourceSetupID"`
+	ResourceBinding       string                `json:"resourceBinding"`
+	OwnerLayout           string                `json:"ownerLayout"`
+	Deployment            WorkerObjectReference `json:"deployment"`
+	ServiceAccount        WorkerObjectReference `json:"serviceAccount"`
+	LayoutDigest          string                `json:"layoutDigest"`
+}
+
+type OwnerIdentityRoleState struct {
+	Format      string                      `json:"format"`
+	Input       OwnerIdentityRoles          `json:"input"`
+	OperationID string                      `json:"operationID"`
+	CreatedAt   time.Time                   `json:"createdAt"`
+	Until       time.Time                   `json:"until"`
+	Roles       []PublicRuntimeRoleMaterial `json:"roles"`
+}
+
+type OwnerIdentityRoleSnapshot struct {
+	State                OwnerIdentityRoleState
+	UID, ResourceVersion string
+	ValidUntil           time.Time
+}
+
+type OwnerIdentityCredentialManifest struct {
+	Format  string                         `json:"format"`
+	Input   OwnerIdentityRoles             `json:"input"`
+	RootUID string                         `json:"rootUID"`
+	SetupID string                         `json:"setupID"`
+	Roles   []PublicRuntimeCredentialProof `json:"roles"`
+}
+
+func DecodeOwnerIdentityCredentialManifest(r io.Reader) (OwnerIdentityCredentialManifest, error) {
+	return decodeClosedRPC[OwnerIdentityCredentialManifest](r, OwnerIdentityRoleMaxBytes)
+}
+
+func DecodeOwnerIdentityRoleState(r io.Reader) (OwnerIdentityRoleState, error) {
+	return decodeClosedRPC[OwnerIdentityRoleState](r, OwnerIdentityRoleMaxBytes)
+}
+
+func (OwnerIdentityRoleState) String() string      { return "protected owner identity role state" }
+func (OwnerIdentityRoleState) GoString() string    { return "protected owner identity role state" }
+func (OwnerIdentityRoleSnapshot) String() string   { return "protected owner identity role snapshot" }
+func (OwnerIdentityRoleSnapshot) GoString() string { return "protected owner identity role snapshot" }

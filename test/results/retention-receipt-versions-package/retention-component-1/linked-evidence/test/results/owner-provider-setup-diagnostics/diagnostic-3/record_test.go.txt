@@ -1,0 +1,14 @@
+package providerconfig
+import ("encoding/json"; "os"; "testing"; "time";"crypto/ecdsa";"crypto/elliptic";"crypto/rand";"crypto/x509";"encoding/pem";"asservat.local/asservat/internal/adapters/mtls";"asservat.local/asservat/internal/domain/fleet";"github.com/google/uuid")
+func TestRecordSyntheticProviderSetupProbe(t *testing.T) {
+ f:=newSetupFixture(t)
+ recipe,e:=OwnerSetupRecipeFor(f.in,f.profile,f.pool,f.roots,time.Now());if e!=nil {t.Fatal(e)}
+ file,e:=os.OpenFile(os.Getenv("ASSERVAT_SETUP_PROBE_OUTPUT"),os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600);if e!=nil {t.Fatal(e)}
+ defer file.Close()
+ key,e:=ecdsa.GenerateKey(elliptic.P256(),rand.Reader);if e!=nil {t.Fatal(e)}
+ csr,e:=x509.CreateCertificateRequest(rand.Reader,&x509.CertificateRequest{},key);if e!=nil {t.Fatal(e)}
+ binding:=fleet.OwnerBinding{InstallationID:f.pool.InstallationID,ClusterID:f.pool.ClusterID,IssuerEpoch:f.pool.IssuerEpoch,PodUID:uuid.NewString(),ProcessEpoch:uuid.NewString()}
+ dns,e:=mtls.OwnerServerName(binding);if e!=nil {t.Fatal(e)};uri,e:=mtls.OwnerURI(binding);if e!=nil {t.Fatal(e)}
+ v:=struct {OwnerSetupRecipe;ProbeCSR,ProbeDNS,ProbeURI string}{recipe,string(pem.EncodeToMemory(&pem.Block{Type:"CERTIFICATE REQUEST",Bytes:csr})),dns,uri.String()}
+ if e=json.NewEncoder(file).Encode(v);e!=nil {t.Fatal(e)}
+}

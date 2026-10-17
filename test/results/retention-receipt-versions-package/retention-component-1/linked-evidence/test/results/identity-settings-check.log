@@ -1,0 +1,42 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-permissions.py
+Permission Kubernetes component exit: 0
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 5 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/kms	1.044s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.484s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.769s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.456s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.402s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.588s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.020s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.015s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	1.025s
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+ok  	asservat.local/asservat/internal/application/identity	1.023s
+ok  	asservat.local/asservat/internal/application/privacy	1.023s
+?   	asservat.local/asservat/internal/contracts	[no test files]
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+?   	asservat.local/asservat/internal/domain/audit	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.027s
+ok  	asservat.local/asservat/internal/domain/configuration	1.024s
+ok  	asservat.local/asservat/internal/domain/identity	1.024s
+ok  	asservat.local/asservat/test/integration	1.057s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 23 packages, 54 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /tmp/asservat-openapi-validation/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 4 files match sqlc v1.31.1
+/tmp/asservat-openapi-validation/bin/python scripts/check-specs.py
+PASS: 44 schemas, 48 MCP tools, 156 examples, 171 requirements, 171 scenarios, 11 tasks, 935 local links, 329 rejected invalid examples (7207 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/tmp/asservat-openapi-validation/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 10, "components": 24, "interfaces": 13, "domainEntitiesMapped": 47, "requirementsMapped": 171, "positiveChecks": 838, "rejectedInvalidCases": 120}

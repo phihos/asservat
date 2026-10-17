@@ -1,0 +1,6 @@
+--- FAIL: TestInitialHandoverStagingConditionalConflictDoesNotRenewAuthority (0.33s)
+    --- FAIL: TestInitialHandoverStagingConditionalConflictDoesNotRenewAuthority/exact-conflict (0.33s)
+        initial_preparer_conflicts_test.go:246: exact conflict was not recovered permission configuration unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.337s
+FAIL

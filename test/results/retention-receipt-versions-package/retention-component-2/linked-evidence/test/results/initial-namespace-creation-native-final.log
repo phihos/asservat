@@ -1,0 +1,5 @@
+=== RUN   TestInitialNamespaceProtectionWithRealKubernetes
+    initial_namespace_test.go:271: product creator installs policy/binding before a fresh namespace; exact retained identities resume without writes; replacement/request collisions deny; staging denies RBAC-permitted writes, Pod creation and token minting; final input proof remains independent; no provider credentials or activation
+--- PASS: TestInitialNamespaceProtectionWithRealKubernetes (7.14s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.193s

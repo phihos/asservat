@@ -1,0 +1,40 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    native_exchange_test.go:438: native diagnostic worker opening 0
+    download_sessions_test.go:648: native diagnostic preparation started
+    native_exchange_test.go:360: native diagnostic connector admission entered
+    native_exchange_test.go:361: native diagnostic connector admission terminal 14.342969ms no native command admitted
+    native_exchange_test.go:440: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:438: native diagnostic worker opening 1
+    native_exchange_test.go:360: native diagnostic connector admission entered
+    native_exchange_test.go:387: native diagnostic connector origin accepted 3.916084702s
+    native_exchange_test.go:360: native diagnostic hub admission entered
+    native_exchange_test.go:376: native diagnostic hub origin accepted 3.882638133s
+    native_exchange_test.go:361: native diagnostic hub admission terminal 450.292111ms <nil>
+    native_exchange_test.go:361: native diagnostic connector admission terminal 561.918354ms <nil>
+    native_exchange_test.go:440: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:447: native diagnostic worker conversation terminal 1 Joined <nil>
+    download_sessions_test.go:648: native diagnostic preparation terminal <nil>
+    native_exchange_test.go:438: native diagnostic worker opening 2
+    native_exchange_test.go:360: native diagnostic connector admission entered
+    native_exchange_test.go:387: native diagnostic connector origin accepted 3.280111783s
+    native_exchange_test.go:360: native diagnostic hub admission entered
+    native_exchange_test.go:376: native diagnostic hub origin accepted 3.248798852s
+    native_exchange_test.go:361: native diagnostic hub admission terminal 438.925873ms <nil>
+    native_exchange_test.go:361: native diagnostic connector admission terminal 555.068765ms <nil>
+    native_exchange_test.go:440: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:447: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:438: native diagnostic worker opening 3
+    native_exchange_test.go:360: native diagnostic connector admission entered
+    native_exchange_test.go:387: native diagnostic connector origin accepted 3.166407544s
+    native_exchange_test.go:360: native diagnostic hub admission entered
+    native_exchange_test.go:376: native diagnostic hub origin accepted 3.135101724s
+    native_exchange_test.go:361: native diagnostic hub admission terminal 457.873591ms <nil>
+    native_exchange_test.go:361: native diagnostic connector admission terminal 571.429612ms <nil>
+    native_exchange_test.go:440: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:447: native diagnostic worker conversation terminal 3 Joined <nil>
+    download_sessions_test.go:648: actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=352; synthetic identity/issuer/Pod/bootstrap facts
+--- PASS: TestContextAdmissionWithRealServices (10.45s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-exchange (10.10s)
+PASS
+ok  	asservat.local/asservat/test/integration	11.502s

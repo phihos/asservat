@@ -1,0 +1,115 @@
+{
+  "scope": "Dependency-only compile snapshot; no integrated/native qualification; unfinished postgres/bootstrap excluded",
+  "files": [
+    {
+      "path": "internal/application/audit/operation_mac.go",
+      "sha256": "fd91011d8882777bbcf6e0b7a1fdd3f5464b1b2c5701ab38286b08482ac1e4a6",
+      "base_sha256": "3c2dc89c8f9ba1b967fdb93f9838d5b340b02c65a15a412e7f0c726e6c4e5209"
+    },
+    {
+      "path": "internal/application/evidence/context_download_attachment.go",
+      "sha256": "d411249ae104b913286e0245eb17e5be2698ded42410c5baf12078184931d8ae",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_active.go",
+      "sha256": "45955b7c3effbe78a6e298e76eab9254f5d5d52a40ee3f493db58c4b15f1b4e7",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_active_test.go",
+      "sha256": "e7949818f3af0f2edc3663ba31caee6e7cb9ba4cb3118e74f71d2dd39f3028ae",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_metadata.go",
+      "sha256": "f4d7d2b846ec85e34e27f2ceee0594f5c0dfedfa8606002ee67da1e64cdc8a9c",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_metadata_test.go",
+      "sha256": "f3a81250dca5d6d29e1bfe2dd5a4dfebbfd77f1097a7ed8625ae2f0cb6157950",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_response.go",
+      "sha256": "6f006efd5401256b43c311f16c584aefc7f2ac0c12fd0278e3ec6a7bd8d53f85",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_runtime.go",
+      "sha256": "91fe3a3161eaea1e2a6d3a2c9cef9663334e3313c9c013c2b736a2bff8261bb1",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/context_native_runtime_test.go",
+      "sha256": "8bec238a48481338f99281a7aeaa308650738e812a192cc74a5d6b1c828c95c7",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/download_content_audit.go",
+      "sha256": "b2a2d93a6f32ea2b5de27bc66bed3c696ad453bf6171908cd9313e892ff6cb45",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/download_content_audit_test.go",
+      "sha256": "b7b6773afddf625c4ac0880c99f12ec90a1ef21404aa44959ca99ce2e58ea684",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/download_dispatch.go",
+      "sha256": "37bf7aceca669892bdaf7b08806d7f99e5aa63490a5b7bff4040f4c52e81b584",
+      "base_sha256": "022c5ad1f49b2b50b74f44d0c8b59adbb4d74770e27a4478bb2825f1f8a50bd4"
+    },
+    {
+      "path": "internal/application/evidence/download_response_transfer.go",
+      "sha256": "d257b10d668fa70860f848613e345161495a91bc1c6cfbe153025d8a9c65b3f7",
+      "base_sha256": "0911738dd8763051db1a02d92b9108941169662bc7dc446a0501cde12b29a75a"
+    },
+    {
+      "path": "internal/application/evidence/download_stop.go",
+      "sha256": "b2dd2a8c6d4061e0739fe7d70e028ef506802fa084d06f3b988d83d0eeeefeb0",
+      "base_sha256": "06ba77fb125242a3a9e6318b06b891fed489405e5fb21b2c303800eab90e61b1"
+    },
+    {
+      "path": "internal/application/evidence/download_worker_pending.go",
+      "sha256": "ea52f4bd11c0d08af6c50399e7fbf6893af1666111d23dc3bfb46683f7358339",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/application/evidence/download_worker_pending_test.go",
+      "sha256": "c1166e84cf1536ef7f2b82990784567ef8719c9e724f195adeef415371710c2b",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/domain/audit/connector_operation.go",
+      "sha256": "f90a156a24fd8f6cd9a85a17fa16d7f13094903b657956449a6b7332e428537f",
+      "base_sha256": "2c0ba6f51511abc43d61cdb363fa3e53ee198f3f33205946e2de8935c0eb90b4"
+    },
+    {
+      "path": "internal/domain/audit/operation.go",
+      "sha256": "d57f4bbee6afc526ec8508bc71ad828383cf03d778ca09654abf633c85ed4ac4",
+      "base_sha256": "27f13860b5824ac9be9371545bd6baac4dab8ed3908139e049c4d5ee68daec6a"
+    },
+    {
+      "path": "internal/transport/browser/download_content.go",
+      "sha256": "93656a937e956faa30e68a0407309bafc50d4010fb5505bdee83ef65783fa418",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/transport/browser/download_content_test.go",
+      "sha256": "a657c0536f6880bd584834b496b372571bb70f6fe2736041d03cbd43eeebeffd",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/transport/presentation/download_content_audit.go",
+      "sha256": "27cecfb99579e418c793c3d71a4d8c87d344274c74a1f9122cd552f00618b008",
+      "base_sha256": null
+    },
+    {
+      "path": "internal/transport/presentation/download_content_audit_test.go",
+      "sha256": "06aae547226377c3e0f1e75adef252db76ce18fab9b134785a120210de0ccff0",
+      "base_sha256": null
+    }
+  ]
+}

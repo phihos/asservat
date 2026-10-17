@@ -1,0 +1,12 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    context_continuation_native_test.go:125: native continuation stage=lookup elapsed=6.969877ms found=false accepted=false error=<nil>
+    context_continuation_native_test.go:131: native continuation stage=reviewed-admission elapsed=28.849261ms accepted=false error=context admission unavailable
+    capture_admission_test.go:286: native continuation initial request elapsed=415.800818ms accepted=false start-calls=0 error=context admission unavailable
+    capture_admission_test.go:286: native continuation retained-state previews=1 closed=0 captures=0 pending=0 audited=0 pairs=0 bindings=0 diagnostic-error=<nil>
+    capture_admission_test.go:286: initial request did not stop after current52 acknowledgement before unavailable regional start context admission unavailable 0
+--- FAIL: TestContextAdmissionWithRealServices (5.09s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-api-runner (4.99s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.140s
+FAIL

@@ -1,0 +1,21 @@
+{
+  "pins": {
+    "manifest.json": "ecfa23db4b82a5400a6a8bb7717e31f592818ea45b37a31e9bed319b3026c53e",
+    "dependencies.json": "7686b652d43ea65b307c05dd4cdaea3e16fe948c637f3288dd2b64036e831e22",
+    "args.json": "a7329bf9cae9580d4ea62e0212c95a930649955cfdb82903ec166bfce9952b4a",
+    "before.go.txt": "c237647ea53dd826aa6272b34ed315c616e36e62f5beb07e3e3a57e3e819f71e",
+    "run.py": "1f0493fde446d6b341fce12bb82ef4fb8a5408b45efa0ca0c635a51ca1c63759"
+  },
+  "native": false,
+  "beforeVariant": "Prior unrun draft only; no prior production vulnerability claim.",
+  "phases": [],
+  "before": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-owner-inventory-vt7np83v"
+}

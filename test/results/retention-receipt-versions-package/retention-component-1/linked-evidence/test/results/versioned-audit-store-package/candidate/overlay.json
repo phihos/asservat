@@ -1,0 +1,7 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/authority.go": "/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/files/internal/adapters/objectstore/authority.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/s3.go": "/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/files/internal/adapters/objectstore/s3.go",
+    "/home/phil/Projekte/asservat/internal/adapters/objectstore/versioned_audit_test.go": "/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/files/internal/adapters/objectstore/versioned_audit_test.go"
+  }
+}

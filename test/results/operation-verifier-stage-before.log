@@ -1,0 +1,5 @@
+--- FAIL: TestOperationCertificateAcknowledgementFailureCannotRepeatUnboundedVerification (0.00s)
+    operation_verification_budget_test.go:79: verification budget escaped: claims=0 provider_calls=8 acknowledgements=8; expected two prepaid attempts
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.006s
+FAIL

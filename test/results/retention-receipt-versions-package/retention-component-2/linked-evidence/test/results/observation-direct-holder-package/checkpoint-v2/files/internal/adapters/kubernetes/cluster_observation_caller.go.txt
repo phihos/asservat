@@ -1,0 +1,236 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"slices"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+// ClusterObservationCallerAdmission accepts only the installer-pinned local
+// HWORK workload. It does not discover/adopt a current account or Deployment.
+type ClusterObservationCallerAdmission struct {
+	client     *PermissionClient
+	protection *OwnerWorkloadProtection
+	pin        value.ClusterObservationCallerPin
+}
+
+var _ app.ClusterObservationCallerReader = (*ClusterObservationCallerAdmission)(nil)
+
+func NewClusterObservationCallerAdmission(c *PermissionClient, g *OwnerWorkloadProtection, p value.ClusterObservationCallerPin) (*ClusterObservationCallerAdmission, error) {
+	if c == nil || g == nil || g.observer != c || !p.Valid() || c.clusterID != p.ClusterID || c.control != p.Namespace || g.plan.ControlNamespace != p.Namespace || g.digest != p.ProtectionDigest || len(validation.IsDNS1123Label(p.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(p.Account)) != 0 || len(validation.IsDNS1123Subdomain(p.Deployment)) != 0 {
+		return nil, cfg.ErrInvalid
+	}
+	// Namespace protection can probe the separate hub Deployment. It must not
+	// be mistaken for pinning this caller's HWORK controller or template.
+	if p.DeploymentUID == g.plan.DeploymentUID {
+		return nil, cfg.ErrInvalid
+	}
+	return &ClusterObservationCallerAdmission{c, g, p}, nil
+}
+
+func (s *ClusterObservationCallerAdmission) review(ctx context.Context, token []byte, podUID string) (string, error) {
+	p := s.pin
+	audience := value.ClusterObservationAudience(p.InstallationID)
+	body, e := json.Marshal(auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Spec: auth.TokenReviewSpec{Token: string(token), Audiences: []string{audience}}})
+	defer clear(body)
+	if e != nil {
+		return "", value.ErrDenied
+	}
+	raw, e := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/tokenreviews").Body(body).MaxRetries(0).DoRaw(ctx)
+	defer clear(raw)
+	if e != nil || permissionJSON(raw, 64<<10, 16384) != nil {
+		return "", value.ErrDenied
+	}
+	var r auth.TokenReview
+	if json.Unmarshal(raw, &r) != nil || r.APIVersion != "authentication.k8s.io/v1" || r.Kind != "TokenReview" || !r.Status.Authenticated || r.Status.Error != "" || !slices.Equal(r.Status.Audiences, []string{audience}) {
+		return "", value.ErrDenied
+	}
+	u := r.Status.User
+	if u.Username != "system:serviceaccount:"+p.Namespace.Name+":"+p.Account || u.UID != p.AccountUID || len(u.Extra["authentication.kubernetes.io/pod-name"]) != 1 || len(u.Extra["authentication.kubernetes.io/pod-uid"]) != 1 || u.Extra["authentication.kubernetes.io/pod-uid"][0] != podUID {
+		return "", value.ErrDenied
+	}
+	groups := slices.Clone(u.Groups)
+	slices.Sort(groups)
+	want := []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + p.Namespace.Name}
+	if !slices.Equal(groups, want) {
+		return "", value.ErrDenied
+	}
+	for _, admin := range s.protection.plan.Administrators {
+		if actorMatches(admin, u) {
+			return "", value.ErrDenied
+		}
+	}
+	name := u.Extra["authentication.kubernetes.io/pod-name"][0]
+	if len(validation.IsDNS1123Subdomain(name)) != 0 {
+		return "", value.ErrDenied
+	}
+	return name, nil
+}
+
+type clusterObservationWorkload struct {
+	ReplicaSet, ReplicaSetUID string
+	Digest                    artifact.Digest
+}
+
+func (s *ClusterObservationCallerAdmission) live(ctx context.Context, name, uid string) (clusterObservationWorkload, error) {
+	var zero clusterObservationWorkload
+	p := s.pin
+	ns, e := s.client.namespace(ctx, p.Namespace)
+	if e != nil || ns.Deleting {
+		return zero, value.ErrUnavailable
+	}
+	return s.liveObjects(ctx, name, uid, false)
+}
+
+// liveObjects shares only the existing concrete object reads/validation. The
+// ordinary full caller reader keeps its original namespace/read sequence.
+// The fixed local-operation boundary can instead bracket these reads with its
+// own actual namespace/guard reads and require a second identical Pod response.
+func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, name, uid string, stabilize bool) (clusterObservationWorkload, error) {
+	var zero clusterObservationWorkload
+	p := s.pin
+	r := &OwnerEndpoints{client: s.client}
+	base := "/api/v1/namespaces/" + p.Namespace.Name + "/"
+	appsBase := "/apis/apps/v1/namespaces/" + p.Namespace.Name + "/"
+	a, e := ownerResource[core.ServiceAccount](r, ctx, base+"serviceaccounts/"+p.Account, "v1", "ServiceAccount")
+	if e != nil || !ownerMetadata(a.ObjectMeta, p.Namespace.Name, p.Account, p.AccountUID) {
+		return zero, value.ErrUnavailable
+	}
+	d, e := ownerResource[apps.Deployment](r, ctx, appsBase+"deployments/"+p.Deployment, "apps/v1", "Deployment")
+	if e != nil || !ownerMetadata(d.ObjectMeta, p.Namespace.Name, p.Deployment, p.DeploymentUID) || d.Spec.Replicas == nil || *d.Spec.Replicas < 1 || d.Spec.Template.Spec.ServiceAccountName != p.Account {
+		return zero, value.ErrUnavailable
+	}
+	pod, e := ownerResource[core.Pod](r, ctx, base+"pods/"+name, "v1", "Pod")
+	if e != nil || !ownerMetadata(pod.ObjectMeta, p.Namespace.Name, name, uid) || pod.Spec.ServiceAccountName != p.Account || pod.Spec.NodeName == "" || pod.Status.Phase != core.PodRunning || !ownerEnrollmentSelector(d.Spec.Selector, pod.Labels) {
+		return zero, value.ErrUnavailable
+	}
+	ref, ok := ownerController(pod.OwnerReferences, "ReplicaSet", "apps/v1")
+	if !ok {
+		return zero, value.ErrUnavailable
+	}
+	rs, e := ownerResource[apps.ReplicaSet](r, ctx, appsBase+"replicasets/"+ref.Name, "apps/v1", "ReplicaSet")
+	if e != nil || !ownerMetadata(rs.ObjectMeta, p.Namespace.Name, ref.Name, string(ref.UID)) || rs.Spec.Replicas == nil || *rs.Spec.Replicas < 1 || !ownerEnrollmentSelector(rs.Spec.Selector, pod.Labels) {
+		return zero, value.ErrUnavailable
+	}
+	owner, ok := ownerController(rs.OwnerReferences, "Deployment", "apps/v1")
+	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID {
+		return zero, value.ErrUnavailable
+	}
+	// Reuse the existing exact API-defaulted template comparison, including all
+	// projections, command, image, labels and annotations. Its digest format is
+	// explicitly pinned by the installer; it grants no API-execution capability.
+	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest) != nil {
+		return zero, cfg.ErrChanged
+	}
+	if stabilize {
+		last, err := ownerResource[core.Pod](r, ctx, base+"pods/"+name, "v1", "Pod")
+		if err != nil || last.ResourceVersion != pod.ResourceVersion || !equalJSON(last, pod) {
+			return zero, cfg.ErrChanged
+		}
+	}
+	raw, e := json.Marshal(struct {
+		Pin                      value.ClusterObservationCallerPin
+		PodUID, ReplicaSetUID    string
+		Pod                      core.PodSpec
+		ReplicaSet               apps.ReplicaSetSpec
+		Deployment               apps.DeploymentSpec
+		Labels, Annotations      map[string]string
+		PodOwners, ReplicaOwners []meta.OwnerReference
+	}{p, uid, string(rs.UID), pod.Spec, rs.Spec, d.Spec, pod.Labels, pod.Annotations, pod.OwnerReferences, rs.OwnerReferences})
+	if e != nil || len(raw) > 128<<10 {
+		return zero, value.ErrUnavailable
+	}
+	canonical := jsontext.Value(raw)
+	if canonical.Canonicalize() != nil {
+		return zero, value.ErrUnavailable
+	}
+	h := sha256.New()
+	h.Write([]byte("asservat-cluster-observation-caller/v1\x00"))
+	h.Write(canonical)
+	out := clusterObservationWorkload{ReplicaSet: rs.Name, ReplicaSetUID: string(rs.UID)}
+	copy(out.Digest[:], h.Sum(nil))
+	return out, nil
+}
+
+func (s *ClusterObservationCallerAdmission) ObserveClusterObservationCaller(ctx context.Context, token []byte, podUID string, request value.ClusterObservationRequest) (value.ClusterObservationCaller, error) {
+	var zero value.ClusterObservationCaller
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(podUID) || len(token) < 1 || len(token) > 16<<10 || !bytes.Equal(bytes.TrimSpace(token), token) {
+		return zero, value.ErrDenied
+	}
+	start := s.client.now()
+	if !request.Valid(start) || request.RootID != s.pin.RootID {
+		return zero, value.ErrDenied
+	}
+	token = bytes.Clone(token)
+	defer clear(token)
+	until := identity.Earlier(start.Add(5*time.Second), request.NotAfter)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	var stops []context.CancelFunc
+	defer func() {
+		for i := len(stops) - 1; i >= 0; i-- {
+			stops[i]()
+		}
+	}()
+	narrow := func(d time.Time) {
+		until = identity.Earlier(until, d)
+		var c context.CancelFunc
+		call, c = context.WithDeadline(call, until)
+		stops = append(stops, c)
+	}
+	guard, end, e := s.protection.Current(call)
+	if e != nil || guard != s.pin.ProtectionDigest {
+		return zero, value.ErrUnavailable
+	}
+	narrow(end)
+	name, e := s.review(call, token, podUID)
+	if e != nil {
+		return zero, value.ErrDenied
+	}
+	expires, e := reviewedTokenExpiry(token, s.client.now())
+	if e != nil {
+		return zero, value.ErrDenied
+	}
+	narrow(expires)
+	before, e := s.live(call, name, podUID)
+	if e != nil {
+		return zero, e
+	}
+	again, e := s.review(call, token, podUID)
+	if e != nil || again != name {
+		return zero, value.ErrDenied
+	}
+	after, e := s.live(call, name, podUID)
+	if e != nil || after != before {
+		return zero, cfg.ErrChanged
+	}
+	final, end, e := s.protection.Current(call)
+	if e != nil || final != guard {
+		return zero, value.ErrUnavailable
+	}
+	narrow(end)
+	out := value.ClusterObservationCaller{Pin: s.pin, Pod: name, PodUID: podUID, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, WorkloadDigest: before.Digest, ObservedAt: start, FreshUntil: until}
+	if call.Err() != nil || !out.Matches(request, s.client.now()) {
+		return zero, value.ErrUnavailable
+	}
+	return out, nil
+}

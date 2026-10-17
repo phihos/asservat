@@ -1,0 +1,32 @@
+--- test/integration/context_native_content_test.go
++++ test/integration/context_native_content_test.go
+@@ -185,21 +185,24 @@
+ 	}
+ 	session, e := f.runtime.LookupDownload(ctx, target.SessionID, f.worker.Intent.Authority.Scope.Principal)
+ 	if e != nil {
+-		t.Fatal(e)
+-	}
++		t.Fatal("native context initial session lookup", e)
++	}
++	t.Log("native context initial session resolved")
+ 	if _, found, e := runtime.ReadPreparedContextDownload(ctx, current(), session); e != nil || found {
+ 		t.Fatal("pending read started metadata", found, e)
+ 	}
++	t.Log("native context pending metadata read completed")
+ 	source, e := f.runtime.ReadContextDownloadSource(ctx, f.authority())
+ 	if e != nil {
+-		t.Fatal(e)
+-	}
++		t.Fatal("native context initial source lookup", e)
++	}
++	t.Log("native context initial source resolved")
+ 	if result, e := runtime.ContinueContextDownload(ctx, current(), session, source); e != nil || result.Pending {
+ 		t.Fatal("original preparation continuation", result, e)
+ 	}
+ 	source, e = f.runtime.ReadContextDownloadSource(ctx, f.authority())
+ 	if e != nil {
+-		t.Fatal(e)
++		t.Fatal("native context source lookup before replay", e)
+ 	}
+ 	if _, e = runtime.ContinueContextDownload(ctx, current(), session, source); e != nil {
+ 		t.Fatal("positive committed original preparation replay", e)

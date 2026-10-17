@@ -1,0 +1,12 @@
+{
+  "captured_utc": "2026-10-12T11:29:31.932453+00:00",
+  "payload_paths": 17,
+  "dependencies": 1427,
+  "all_bases_match": true,
+  "fixture_cookie_join_integrated_sha256": "ae793feb079252dcce198d9456625d09976362e2b2d474c8914986bdb4cf7095",
+  "post139_retested": false,
+  "active_builds": false,
+  "new_native_selectors": "compiled only, unrun",
+  "version": 2,
+  "v2_ui_checked": true
+}

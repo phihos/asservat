@@ -1,0 +1,205 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// ConfigurationWorkerProviderOperation owns one initial/final native pair.
+// Only this reader can create it. It does not implement a general source port,
+// accept caller-built facts or renew its original interval. Credential control
+// belongs between the two actual brackets, with separate current SQL recovery.
+type ConfigurationWorkerProviderOperation struct {
+	self     *ConfigurationWorkerProviderOperation
+	reader   *ConfigurationWorkerProviderReader
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	until    time.Time
+	started  time.Time
+	busy     bool
+	closed   bool
+	finished bool
+	changed  chan struct{}
+	epoch    string
+	manifest contracts.ConfigurationRuntimeCredentialManifest
+	mounted  map[string][]byte
+	initial  configurationProviderNative
+	tokens   *configurationWorkerTokenInterval
+}
+
+func (s *ConfigurationWorkerProviderReader) BeginConfigurationProviderOperation(ctx context.Context, epoch string, manifest contracts.ConfigurationRuntimeCredentialManifest, mounted map[string][]byte) (*ConfigurationWorkerProviderOperation, error) {
+	if !s.providerClientsBound() || ctx == nil || ctx.Err() != nil || !authorization.UUID(epoch) {
+		return nil, cfg.ErrUnavailable
+	}
+	started := s.worker.client.now()
+	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	until, _ := call.Deadline()
+	p := &ConfigurationWorkerProviderOperation{reader: s, ctx: call, cancel: cancel, until: until, started: started,
+		changed: make(chan struct{}), epoch: epoch, mounted: make(map[string][]byte, len(mounted))}
+	p.self = p
+	complete := false
+	defer func() {
+		if !complete {
+			p.Close()
+		}
+	}()
+	// Own all caller bytes. A changed caller map cannot redefine the material
+	// that must still match the actual mounted/API values after provider I/O.
+	if len(mounted) != 5 {
+		return nil, cfg.ErrChanged
+	}
+	for name, value := range mounted {
+		if len(value) == 0 || len(value) > contracts.ConfigurationRuntimeRoleMaxBytes {
+			return nil, cfg.ErrChanged
+		}
+		p.mounted[name] = bytes.Clone(value)
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil || len(raw) > contracts.ConfigurationRuntimeRoleMaxBytes || json.Unmarshal(raw, &p.manifest) != nil {
+		return nil, cfg.ErrChanged
+	}
+	call, p.tokens, err = s.beginTokenInterval(call)
+	if err != nil {
+		return nil, err
+	}
+	p.ctx = call
+	p.initial, err = s.readConfigurationProviderNative(call, p.started, epoch, p.manifest, p.mounted, true)
+	if err == nil {
+		err = p.tokens.mountedCurrent(call)
+	}
+	if err != nil {
+		return nil, err
+	}
+	p.until = identity.Earlier(p.until, p.initial.until)
+	if initialHandoverDeadline(call, s.worker.client.now, p.until) != nil {
+		return nil, cfg.ErrUnavailable
+	}
+	complete = true
+	return p, nil
+}
+
+// FreshUntil is only the already established original bound. It cannot supply
+// a native result or replace the final independent observation.
+func (p *ConfigurationWorkerProviderOperation) FreshUntil() time.Time {
+	if p == nil || p.self != p {
+		return time.Time{}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed || p.ctx.Err() != nil {
+		return time.Time{}
+	}
+	return p.until
+}
+
+// MatchesOwnerConfiguration binds the audit's already-observed exact source
+// to this operation's actual initial ConfigMap. It does not read or refresh a
+// source, and grants no authority after the original interval or Close.
+func (p *ConfigurationWorkerProviderOperation) MatchesOwnerConfiguration(c fleet.OwnerConfiguration) bool {
+	if p == nil || p.self != p || !c.Valid() {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return !p.closed && p.ctx.Err() == nil && p.reader.worker.client.now().Before(p.until) && p.initial.owner.Equal(c)
+}
+
+func (s *ConfigurationWorkerProviderReader) FinishConfigurationProviderOperation(ctx context.Context, p *ConfigurationWorkerProviderOperation) (time.Time, error) {
+	if p == nil || p.self != p || p.reader != s || ctx == nil || !s.providerClientsBound() {
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	p.mu.Lock()
+	if deadline, ok := ctx.Deadline(); ok {
+		p.until = identity.Earlier(p.until, deadline)
+	}
+	if p.closed || p.finished || p.busy || ctx.Err() != nil || p.ctx.Err() != nil || !s.worker.client.now().Before(p.until) {
+		p.mu.Unlock()
+		return time.Time{}, cfg.ErrUnavailable
+	}
+	p.busy = true
+	p.finished = true // one final attempt, including unknown or blocked reads
+	until := p.until
+	p.mu.Unlock()
+	call, cancel := context.WithDeadline(p.ctx, until)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { cancel(); close(joined) })
+	defer func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		p.mu.Lock()
+		p.busy = false
+		close(p.changed)
+		p.changed = make(chan struct{})
+		p.mu.Unlock()
+	}()
+	last, err := s.readConfigurationProviderNative(call, p.started, p.epoch, p.manifest, p.mounted, false)
+	if err == nil {
+		err = p.tokens.mountedCurrent(call)
+	}
+	if err == nil && !configurationProviderNativeEqual(p.initial, last) {
+		err = cfg.ErrChanged
+	}
+	p.mu.Lock()
+	if !last.until.IsZero() {
+		p.until = identity.Earlier(p.until, last.until)
+	}
+	until = p.until
+	if p.closed || p.ctx.Err() != nil || ctx.Err() != nil || call.Err() != nil || !s.worker.client.now().Before(until) {
+		err = cfg.ErrUnavailable
+	}
+	if err != nil {
+		p.cancel()
+	}
+	p.mu.Unlock()
+	if err != nil {
+		return time.Time{}, err
+	}
+	return until, nil
+}
+
+// Close cancels and joins the admitted final read before wiping local copies.
+// Copies of the exported wrapper cannot cancel or consume the original.
+func (p *ConfigurationWorkerProviderOperation) Close() {
+	if p == nil || p.self != p {
+		return
+	}
+	p.mu.Lock()
+	p.closed = true
+	p.cancel()
+	for p.busy {
+		changed := p.changed
+		p.mu.Unlock()
+		<-changed
+		p.mu.Lock()
+	}
+	for _, value := range p.mounted {
+		clear(value)
+	}
+	p.mounted = nil
+	p.mu.Unlock()
+	p.tokens.close()
+}
+
+func (s *ConfigurationWorkerProviderReader) providerClientsBound() bool {
+	return s != nil && s.worker != nil && s.worker.client != nil && s.worker.guard != nil &&
+		s.fleet != nil && s.fleet.settings != nil && s.fleet.protection != nil && s.fleet.protection.configMapProtection != nil &&
+		s.owner != nil && s.owner.protection != nil && s.owner.protection.configMapProtection != nil &&
+		s.worker.client.workerToken != nil && s.worker.guard.probe != nil && s.worker.guard.probe.workerToken != nil &&
+		s.worker.client.workerToken.file == "kube-observer.token" && s.worker.guard.probe.workerToken.file == "kube-probe.token" &&
+		s.worker.client.workerToken.files == s.worker.guard.probe.workerToken.files &&
+		s.worker.guard.observer == s.worker.client && s.worker.guard.probe != s.worker.client &&
+		s.fleet.settings.client == s.worker.client && s.fleet.protection.observer == s.worker.client && s.owner.client == s.worker.client && s.owner.protection.observer == s.worker.client &&
+		s.fleet.protection.probe == s.worker.guard.probe && s.owner.protection.probe == s.worker.guard.probe
+}

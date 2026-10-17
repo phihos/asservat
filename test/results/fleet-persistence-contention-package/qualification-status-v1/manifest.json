@@ -1,0 +1,30 @@
+[
+  {
+    "path": "docs/decisions/155-unchanged-fleet-persistence-contention.md",
+    "base_sha256": "e7f3f62206c6932d093af7bd571593823cbf3c745bb1368a6b252d7fba8977c4",
+    "payload_sha256": "cccefd7fcf00c3becf84cae60a7d846e88552d3c19a621325221a36e989ca029",
+    "patch": "docs__decisions__155-unchanged-fleet-persistence-contention.md.patch",
+    "patch_sha256": "f739f3dbe8ba0c31fd6692f349f47c7d9ee762e37e9c9bb5657dcfc308d2001d"
+  },
+  {
+    "path": "docs/decisions/README.md",
+    "base_sha256": "9fa13385f39ccc6d7ea30632f35ffa4ba1637a2c95de2935e661346f87f2ec36",
+    "payload_sha256": "99e93a59b4d7a2e248d5f4aa6a8d1a7335584cab65b581c75e036a4a5b6915e6",
+    "patch": "docs__decisions__README.md.patch",
+    "patch_sha256": "36e20b98f695a2a174463976e713550b82627dc698c59aa4d3fe0f6294e25e20"
+  },
+  {
+    "path": "docs/architecture/fleet-observation.md",
+    "base_sha256": "c64a13efd24f4de11df17a0027417c8a27dabe80401e63f4e89fbed49c572830",
+    "payload_sha256": "f325980cd1a3c84ee37e51d7cde755be39d6e1d3762b7cf45da516a4d12daf86",
+    "patch": "docs__architecture__fleet-observation.md.patch",
+    "patch_sha256": "ae3073662fba4da9845c8e09bac0b40655d51abb44c5132a39eeac7e866bdae9"
+  },
+  {
+    "path": "docs/architecture/configuration-reconciliation.md",
+    "base_sha256": "efc012909d644833f59430044d3e69ba901769a4a36e104453a56e327dd946d2",
+    "payload_sha256": "5f07b127da8c2e832adf9a6ef633dfcea514af1506924eed3b231c1e51d993a6",
+    "patch": "docs__architecture__configuration-reconciliation.md.patch",
+    "patch_sha256": "228a0e41697ef5c36fe2dcd75ca7ccaea05748ea57559fb7df1e5e0b8d5fb49e"
+  }
+]

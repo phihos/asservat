@@ -1,0 +1,18 @@
+--- before
++++ after
+@@ -642,9 +642,14 @@
+ }
+ func nativeContentAuditFixture(t *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
+ 	t.Helper()
++	return nativeContentAuditFixtureOwned(t, t, ctx, f, inner)
++}
++
++func nativeContentAuditFixtureOwned(t, owner *testing.T, ctx context.Context, f nativeExchangeFixture, inner *presentation.InvestigationOperations) *presentation.AuditedOperations {
++	t.Helper()
+ 	open := func(role, password string) *pgxpool.Pool {
+ 		p := f.poolFor(role, password)
+-		t.Cleanup(p.Close)
++		owner.Cleanup(p.Close)
+ 		return p
+ 	}
+ 	cp := open("operation_audit_config_runtime", "synthetic-operation-config")

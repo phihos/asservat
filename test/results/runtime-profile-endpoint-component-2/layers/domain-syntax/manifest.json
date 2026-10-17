@@ -1,0 +1,37 @@
+{
+  "status": "frozen source-only correction; gofmt succeeded; no builds/tests executed",
+  "failedResult": "test/results/runtime-profile-endpoint-component-1/result.json",
+  "failedResultSHA256": "65987978004328490d58af449b0bbfccdd596fffe8b6b344a2c18a071182dfad",
+  "baseEndpointManifestSHA256": "777fcdd9e0a6b6f3fb7cbc76bb71f18a96abe8adfae0a617909e2f5bae1ef4c4",
+  "scope": "Pure bounded HTTP Host, DNS-label and public port-name value syntax; architecture gate unchanged",
+  "files": [
+    {
+      "path": "internal/domain/planning/go_profile_endpoint.go",
+      "baseSHA256": "e613a3ff37dda2d17973901fac7be1ef3dcf175fd85915e9f5587228ed54b8be",
+      "payloadSHA256": "04f2c4e1b236e61d4afc5e82f9ca9b999fc6489ebf352892a0d1e8d266ba8b77"
+    },
+    {
+      "path": "internal/domain/planning/go_profile_endpoint_test.go",
+      "baseSHA256": "79f95f52b5604dfaf1b562fe508676ad5e440721f1eaff858febd2399fad98be",
+      "payloadSHA256": "fb9de82a478050624a9abda9da71159130a046e42d98234548f13e773dbf694c"
+    },
+    {
+      "path": "internal/domain/targets/profile_network.go",
+      "baseSHA256": "1a404a8242adcf2df44b46c6f1651aa5502f332c93b828927c45db1afe624813",
+      "payloadSHA256": "c0361f267c3c245b1269ea887315b8181d81abd18987886e5c57849625b2e2a9"
+    },
+    {
+      "path": "internal/domain/targets/profile_network_test.go",
+      "baseSHA256": "053d126dbbc083e47f7144d792a8ffd5e1e91172358d51b02949435b2bdfa870",
+      "payloadSHA256": "94b53c3687e584f6f234cfa3b3ac3525ee9e324f508fff2c05183fa0767ab1fd"
+    }
+  ],
+  "patchSHA256": "9ae3357054f79d757047cec9099166c3f5173fdb2e43fbc2d6ce2d90ff98b6d9",
+  "newTests": [
+    "TestGoEndpointHostSyntax",
+    "TestProfilePortNameMatchesPublicSyntax"
+  ],
+  "domainGateSHA256": "da1671fc6c1a9788d414e5d09e3546adcba6c926e6bc264cfaab44ea05e32355",
+  "dependenciesChanged": false,
+  "publicCapabilitiesEnabled": false
+}

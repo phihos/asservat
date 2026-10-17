@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-preparation-private.schema.json",
+  "title": "Private producer-owned initial preparation progress",
+  "description": "One UID-pinned mutable bootstrap Secret; at most16KiB. Contains private credential replies, never public/audit data. Root binding, anchor, issuance and optional original SQL state intent/receipt are monotonic; runtime checks exact compiled plan, original <=5s claim, <=605s outer lifetime, current token authentication and Secret binding. Initial bootstrap supplies only format/installationID/requestID. Final clearing requires separately qualified retirement and irreversible native inert state. Explicit provider continuation retains one original issuer identity and two one-use claims/positive replies plus exact immutable final projection. Original dates never renew; runtime reserves maximum private reply size before issuance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "requestID"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-preparation-private/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "rootUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "planDigest": {
+      "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchorOperationID"
+      ],
+      "properties": {
+        "anchorOperationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "anchor": {
+          "$ref": "https://asservat.io/spec/v1/initial-preparation-root.schema.json#/properties/creates/items/properties/receipt"
+        },
+        "issue": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "audience",
+            "startedAt",
+            "until",
+            "expiresBefore"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "audience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\u0000-\\u0020\\u007f-\\u009f]*(?![\\s\\S])"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "expiresBefore": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "response": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "token",
+                "expiresAt"
+              ],
+              "properties": {
+                "token": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 8192,
+                  "pattern": "^[A-Za-z0-9_.-]+(?![\\s\\S])"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                }
+              }
+            }
+          }
+        },
+        "createClosed": {
+          "const": true
+        }
+      },
+      "dependentRequired": {
+        "issue": [
+          "anchor"
+        ],
+        "createClosed": [
+          "anchor"
+        ]
+      }
+    },
+    "sql": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "secret": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "createClosed": {
+          "const": true
+        }
+      },
+      "dependentRequired": {
+        "createClosed": [
+          "secret"
+        ]
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileDigest",
+        "parent"
+      ],
+      "properties": {
+        "profileDigest": {
+          "$ref": "https://asservat.io/spec/v1/initial-sql-credentials.schema.json#/properties/planDigest"
+        },
+        "parent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accessor",
+            "issuedAt",
+            "expiresAt"
+          ],
+          "properties": {
+            "accessor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[!-~]+$"
+            },
+            "issuedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        },
+        "wrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "startedAt",
+            "until",
+            "expiresBefore"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "expiresBefore": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "response": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "token",
+                "accessor",
+                "issuedAt",
+                "expiresAt"
+              ],
+              "properties": {
+                "token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "pattern": "^[!-~]+$"
+                },
+                "accessor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[!-~]+$"
+                },
+                "issuedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                }
+              }
+            }
+          }
+        },
+        "unwrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "startedAt",
+            "until",
+            "expiresBefore"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "expiresBefore": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "response": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "token",
+                "accessor",
+                "issuedAt",
+                "expiresAt"
+              ],
+              "properties": {
+                "token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024,
+                  "pattern": "^[!-~]+$"
+                },
+                "accessor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[!-~]+$"
+                },
+                "issuedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                }
+              }
+            }
+          }
+        },
+        "projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationID"
+          ],
+          "properties": {
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "secret": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "uid"
+              ],
+              "properties": {
+                "name": {
+                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+                },
+                "uid": {
+                  "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                }
+              }
+            },
+            "createClosed": {
+              "const": true
+            }
+          },
+          "dependentRequired": {
+            "createClosed": [
+              "secret"
+            ]
+          }
+        }
+      },
+      "dependentRequired": {
+        "unwrap": [
+          "wrap"
+        ],
+        "projection": [
+          "unwrap",
+          "wrap"
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "unwrap"
+            ]
+          },
+          "then": {
+            "properties": {
+              "wrap": {
+                "required": [
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "projection"
+            ]
+          },
+          "then": {
+            "properties": {
+              "unwrap": {
+                "required": [
+                  "response"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "dependentRequired": {
+    "rootUID": [
+      "planDigest"
+    ],
+    "planDigest": [
+      "rootUID"
+    ],
+    "probe": [
+      "rootUID",
+      "planDigest"
+    ],
+    "sql": [
+      "probe",
+      "rootUID",
+      "planDigest"
+    ],
+    "providers": [
+      "sql",
+      "probe",
+      "rootUID",
+      "planDigest"
+    ]
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "sql"
+        ]
+      },
+      "then": {
+        "properties": {
+          "probe": {
+            "required": [
+              "issue"
+            ],
+            "properties": {
+              "issue": {
+                "required": [
+                  "response"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "providers"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sql": {
+            "required": [
+              "secret"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

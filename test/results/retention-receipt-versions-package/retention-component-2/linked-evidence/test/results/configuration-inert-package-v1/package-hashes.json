@@ -1,0 +1,22 @@
+{
+  "HANDOFF.md": "676ff3ded240803cf02eb209cb173c306fae552d0b8b35132a5e038c7909c3d5",
+  "changes/docs/architecture/configuration-credential-provisioning.md": "9d1d8ba5924e1341f81c8be1ccae5418761fd288050a207b25d0e9e17794f7bc",
+  "changes/internal/adapters/kubernetes/configuration_role_inert_test.go": "b4ac187e8e499ce92e7409a341ea538bad02b5102bedc77997ed94adb468b037",
+  "changes/internal/adapters/kubernetes/configuration_role_source.go": "6d150969c227f70fdee2a9df39431af5ad5757f32b917dca322ded641b78e24b",
+  "changes/internal/adapters/kubernetes/configuration_role_source_path_test.go": "f68904df666f016fc63c3af471bf58bdebc172f6226ab28ab9bd87f689b89873",
+  "evidence/inert-1/before-overlay.json": "a2740b2993180670432d9dec7cc6ef718b0f830c0674ebdeaa1779099ad7388f",
+  "evidence/inert-1/before.log": "fc3535c0fd992f5de469907c1a8dcee1dde826de44ce44c5c23a60317cdbd4be",
+  "evidence/inert-1/compile.log": "3d81193d9fc9a9900bc84b994cabac65318e4e78ae3406d0b29afaefbfa3a011",
+  "evidence/inert-1/dependencies.json": "c94190bd63772bd22a28b526f6764b5860f99176a742af461a839af39fa7e92e",
+  "evidence/inert-1/manifest.json": "cbd8bd73cda0f64897025d00e90cffdfe9dbc32d270fac5bb088d71ea974a8f4",
+  "evidence/inert-1/overlay.json": "bd9c7b5d3911471503f1067c2aa758c5b370a40d9230c7996dc7f3e1da251720",
+  "evidence/inert-1/race.log": "8ea2bf440a93fe11a7907ff424ff6f1a2e0ab12a2afa5de7306a454b766276f9",
+  "evidence/inert-1/result.json": "116bdf1552e9ccc199631f0587f1aa67372aaade47d933fa22c304f7c4cff998",
+  "evidence/inert-1/run.py": "7c9fbb24df4d12e2d5e6d59b924679da56c3b35daf555e164d8712d6ff2a4b88",
+  "evidence/inert-1/source/internal/adapters/kubernetes/configuration_role_inert_test.go": "b4ac187e8e499ce92e7409a341ea538bad02b5102bedc77997ed94adb468b037",
+  "evidence/inert-1/source/internal/adapters/kubernetes/configuration_role_source.go": "6d150969c227f70fdee2a9df39431af5ad5757f32b917dca322ded641b78e24b",
+  "evidence/inert-1/source/internal/adapters/kubernetes/configuration_role_source_path_test.go": "f68904df666f016fc63c3af471bf58bdebc172f6226ab28ab9bd87f689b89873",
+  "evidence/inert-1/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "inert.patch": "45ec3a0b3a4c0973a05bdcc9a88242f04d4bd74ab32b94f93690c31c6d12028d",
+  "manifest.json": "32fa89261ef02b3e08894dd09d6d9fd0fbd18dbd67a4579b6563a2789c90dc77"
+}

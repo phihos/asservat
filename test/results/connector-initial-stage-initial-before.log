@@ -1,0 +1,5 @@
+--- FAIL: TestConnectorIdentityUsesProcessOwnedCertificate (0.00s)
+    connector_credentials_test.go:225: production process-owned callback rejected signed control work rejected
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.067s
+FAIL

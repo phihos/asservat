@@ -1,0 +1,35 @@
+# Legacy owner deployment and router lifetime handoff
+
+Session 50006 ended with exit 0. This standalone six-path checkpoint fixes legacy OwnerDeployment shutdown and accounts for existing WorkerRequestOwners SQL calls through shutdown. It does not depend on the unintegrated fresh-v2 foundation or enable a runtime profile.
+
+## Changed behavior
+
+Run admission and Close serialize under the deployment mutex. Close cancels the original runtime/router, waits for every admitted Run, then joins the router before closing pools and transports. Run releases its own registration before deferred Close, avoiding a self-wait. Close-before-Run and concurrent Close are covered.
+
+WorkerEnrollmentRouter.Close remains signal-only for callbacks and reentrancy. Its additive CloseAndJoin waits for registration, active delivery and the private lifetime owners of existing Claim, locator-read and restrictive-release SQL wrappers. Admission occurs under the same closed mutex. New SQL wrapper calls after closure deny; a release never issued remains occupied through its original expiry. Already admitted release keeps its original five-second bound; Claim and lookup observe original cancellation. No authority or effect deadline is added.
+
+## Exact qualification
+
+Runner: `python3 checks/legacy-1/run.py` from the stage, sequentially with GOMAXPROCS=2, GOFLAGS=-p=2 and the explicit checkpoint tmp directory. The Go test timeout is 90 seconds and each runner phase is capped at 180 seconds.
+
+| Phase | Actual exit | Seconds | Result |
+|---|---:|---:|---|
+| Two-package compile | 0 | 9.700 | Current overlay compiles |
+| Original deployment before | 1 | 29.021 | Both named early-close/closed-admission defects reproduced |
+| Router wait reversal before | 1 | 3.024 | Registration, busy enrollment and all three SQL wrapper joins fail as intended |
+| Corrected focused races | 0 | 31.711 | 33 top-level tests, 110 named PASS entries; no skips or failures |
+| Two-package vet | 0 | 2.326 | Passed |
+
+Affected packages are internal/application/evidence and internal/bootstrap. Exact commands, outputs and expected-before matching are in result.json and evidence/. Before deployment uses the actual original file. Router before removes only the newly added wait while preserving accounting; it is controlled mitigation-reversal evidence for that new join API.
+
+All six payloads, their three original bases, 2,091 frozen dependencies and auxiliary inputs matched before and after every phase and at terminal. The original dependency delta from observation join-1 records only previously integrated parent paths. Parent's two subsequent documentation updates were outside this Go dependency snapshot. No live source was changed by this job.
+
+Manifest SHA256: cfdba935d1f844629074d78bc9093408d29ed6176710088f3066a1e4d1282f0d
+
+Dependencies SHA256: 98d8969f04dbe25dd4ae42dfa7346ba8d6bcef6cedcdd0df5dc35d59d7bfdb28
+
+Runner SHA256: 7680e11a95a1bce8b0c007052afd857218c3aa2505861b14e34fa00ef99486c1
+
+## Boundaries and next work
+
+Readiness uses the actual legacy runtime/process-key implementation with synthetic current registry/proof ports. SQL wrapper blocking uses component stores; no native SQL/Kubernetes test ran. Tests include explicit release and joined handler/goroutine cleanup. The distinct seven-path observation/provider join-1 remains a separate qualified package. Parent review/integration precedes broader gates. Fresh owner Publish/Launch API-rate mapping is next source-only work; complete installed-v2 composition remains pending.

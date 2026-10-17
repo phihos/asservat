@@ -1,0 +1,43 @@
+# Actual first-context capacity joins consumed by ADR140
+
+Current code map for the parent's protected capacity producer. These are existing consumers, not source acceptance or a claim that their present write facets are safe provisioning.
+
+| Consumer | Required retained input and exact join |
+|---|---|
+| `postgres.NewContextStorageReader(pool, permissionRoot)` | `context_storage_binding` keyed root/target cluster/namespace UID/workload UID, binding the permanent context allocation and exact accepted source revision; `custody_pool` + `custody_allocation` with service class `context`, store ID, original validity/counters; `context_control_pool(root)` and `context_control_account(root,allocation)` must both be configured/current, not paused. |
+| `postgres.NewAuditedContextAdmissions(...root,MAC,guards)` | Above plus SQL52 `capture_operation_pool(root)` and workload/allocation account, all eight fixed source/admit/journal/ack/cleanup/verify/retire/read role pins under accepted recovery. `CaptureAccount(installation,root,permanentAllocation)` derives the stable account. `Records` covers the full context-control account limit. Pool policy/qualification is `capture-intent-history/v1`; caller cannot select another account or reserve extra records. |
+| `postgres.NewContextDownloadPlans(...root,installation,WorkerProfile,WorkerConfigurations,limits)` | Exactly one `download_allocation` for the same root/target cluster/namespace UID/workload UID (LIMIT2 rejects ambiguity). Its ID joins `download_control_allocation`, `download_native_backing`, `download_stop_backing`, all with the same permission root. `download_stop_pool(root)` pins installation/audit store/policy/backup policy. The plan preserves `HardUntil = min(allocation.ValidUntil, control.ValidUntil, native.ValidUntil, StopPool.ValidUntil)`. Accepted worker configuration remains a separate exact current input. |
+| `NewContextNativeDownloadRuntime(owner,workers,FirstContextPreparations,configuration,FirstContextNativeOperations,FirstContextResponses,config,transfer,stop)` | Actual owner process/native router; same accepted worker profile/root/install; paired SQL exclusions for Observe and content; actual dispatcher/enrollment/key binding facets. Native preparation bindings are separate from response/window identities. `KeyScope` is exact artifact-purpose installation/store/key configuration; neither quota nor source digest creates unwrap authority. |
+| Preparation and content audit | Original preparation intent/outcome use the existing download batch/audit ports. SQL42 responses/windows additionally require `DownloadControlAllocation.AuditStoreID`, response/window counts and `AuditWriteUntil`; per window two fixed audit objects each capped `DownloadWindowAuditBytes = 128KiB`. Response+window charges cannot be released merely because local owners close. |
+| Restrictive Stop | `DownloadStopBacking` reserves original allocation slots inside the root `DownloadStopPool`; `DownloadStopLifecyclePolicy.SlotBacking()` supplies cipher, key-attempt, backup and WAL costs. Pool has the separately accepted lifecycle/backup qualification, full original hold and cleanup periods. SQL restrictive state precedes audit and actual active cancellation/join. |
+| Public operation audit | Normal and resolution lanes in `operation_audit_pool(root,lane)` with fixed human accounts and purpose-specific `HealthyOperationAuditor` policies. Preparation/status/GET preflight require finite paid slots; window pairs own body outcomes. No public polling call may create another capacity/account root. |
+| Browser refresh | Existing browser root/session capacity plus exact SQL43 download consumers. One session-owned refresh process, max16 exact accepted download consumers, current response lease after original scheduling grace. No extra evidence capacity or credential-refresh permission from GET. |
+
+Fixed original per-session default for first context: 4096-byte maximum artifact, 8192 output bytes, 12MiB conservative read ceiling, two content responses/windows and four window objects (512KiB maximum window audit bytes). Native backing funds one retained rendezvous row, two content key rows and 10 transitions per row; preparation has its separate binding. Nine total data/index/manifest unwrap slots across preparation plus two content reads are conservative, not a refill. Admission request count must also cover the original preparation; routine warm status polls consume no new native transitions. Cold metadata lookup remains paid and cannot contend with an unclosed/failed response.
+
+Native `NativeBacking.Valid` arithmetic is explicit: backup >= `2*History.RowBytes*BackupCopies*(Rows+Keys)`; WAL >= `History.TransitionWALBytes*WALCopies*((TransitionsPerRow+4)*Rows+8*Keys)`. `RetireBy` is original `ValidUntil + 2*BackupHorizon + CleanupSeconds`. This structural arithmetic is not independently accepted backend qualification.
+
+Processing initialization/restriction and public preparation/status/content
+preflight must consume **one independently accepted normal-lane audit profile
+per permission root**. Separate components or evidence stores do not create
+separate normal lanes. While any original rows remain, SQL49 preserves the
+installation/root/lane, audit `StoreID`, `BackupProfileID` and its digest,
+`BackupHorizonSeconds`, `MaxPurgeLeases` and `OverdueTerminal`, including H=0.
+Equal history layout or larger capacity alone is insufficient. An explicitly
+accepted compatible revision may grow the allowed source/capacity fields, but
+does not rewrite existing row dates, policy bindings or spent counters.
+
+ADR140's processing and public audit constructors must receive that same
+protected accepted profile from ADR141. The runtime must not discover or adopt
+it using fixture administrator queries. Both also retain the original stable
+account key and version from the installation role root (currently SetupID),
+so initialization cannot create another per-human account namespace. Required
+native composition: initialize processing then invoke public content under
+the same profile; changed audit StoreID or BackupProfileID must fail without
+quota/row changes; compatible accepted growth must retain original dates/spend.
+These effect constructors are still pending; this is a required composition
+boundary, not an implemented or qualified producer.
+
+Stop pool requires `RetainedSeconds > 2*H + 3*CleanupBudget + ProofWindow + 30`, and per-slot `SlotBacking` totals. The entire installation's pool/account/session multiplicity must be funded before selection; the per-session numbers cannot promise more logical slots than root physical/history backing.
+
+Open limits: download-window pair/object/history cleanup remains an explicit enablement prerequisite. The 4KiB path does not qualify generic 1TiB streaming or slow-reader throughput. Protected processing initialization, exact current path environment, source/retention/permission continuity and worker/issuer provisioning are independent requirements, not inferred from any capacity insertion. No source writer or public route is enabled by this map.

@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+    api_execution_test.go:294: ERROR: retention decision mismatch (SQLSTATE P0001)
+--- FAIL: TestContextAdmissionWithRealServices (1.74s)
+    --- FAIL: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (1.40s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.795s
+FAIL

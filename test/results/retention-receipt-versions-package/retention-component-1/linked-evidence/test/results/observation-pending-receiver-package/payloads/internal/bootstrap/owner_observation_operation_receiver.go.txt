@@ -1,0 +1,426 @@
+package bootstrap
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	wire "asservat.local/asservat/internal/transport/clusterobservation"
+)
+
+// OwnerObservationOperationReceiver is the closed v2 common-SNI locator GET
+// and exact-SNI one-use claim POST composition. It does not select a listener,
+// installed profile, arbitrary route or retry. Its concrete dependencies come
+// only from the original accepted backend. Pending slots retain uncertain
+// deliveries until the original end; active HTTP work has a separate same-size
+// process ceiling. Neither promises installation-wide capacity.
+type OwnerObservationOperationReceiver struct {
+	root                                         context.Context
+	cancel                                       context.CancelFunc
+	pin                                          value.OwnerObservationPin
+	binding                                      value.OwnerBinding
+	server                                       *mtls.OwnerCredentials
+	verifier                                     *mtls.OwnerPeerVerifier
+	registry                                     app.OwnerCertificateRegistry
+	native                                       app.OwnerNativeObservationOperations
+	holder                                       *wire.HubObservationOperationHolder
+	pending                                      *ownerObservationPending
+	commonName, commonHost, exactName, exactHost string
+	now                                          func() time.Time
+	mu                                           sync.Mutex
+	closed                                       bool
+	active, maximum                              int
+	joined                                       sync.WaitGroup
+}
+type ownerRoutingNativeReader struct {
+	reader *kube.OwnerObservationOperationReader
+}
+
+func (r ownerRoutingNativeReader) OpenOwnerObservationOperation(ctx context.Context, q value.OwnerObservationRequest, peers []value.OwnerBinding) (app.OwnerNativeObservationOperation, error) {
+	return r.reader.Begin(ctx, q, peers)
+}
+
+func NewOwnerObservationOperationReceiver(ctx context.Context, pin value.OwnerObservationPin, server *mtls.OwnerCredentials, roots *x509.CertPool, registry *postgres.OwnerEnrollments, native *kube.OwnerObservationOperationReader, holder *wire.HubObservationOperationHolder, maximum int, now func() time.Time) (*OwnerObservationOperationReceiver, error) {
+	if registry == nil || native == nil {
+		return nil, value.ErrInvalid
+	}
+	return newOwnerObservationOperationReceiver(ctx, pin, server, roots, registry, ownerRoutingNativeReader{native}, holder, maximum, now)
+}
+
+// The private port seam is for deterministic failure tests, never deployment
+// input. The public constructor accepts only the concrete scoped SQL/native
+// adapters. The native operation itself is not supplied by an HTTP value.
+func newOwnerObservationOperationReceiver(ctx context.Context, pin value.OwnerObservationPin, server *mtls.OwnerCredentials, roots *x509.CertPool, registry app.OwnerCertificateRegistry, native app.OwnerNativeObservationOperations, holder *wire.HubObservationOperationHolder, maximum int, now func() time.Time) (*OwnerObservationOperationReceiver, error) {
+	if ctx == nil || ctx.Err() != nil || !pin.Valid() || pin.Pool.NativeCandidateLimit == 0 || server == nil || roots == nil || registry == nil || native == nil || holder == nil || maximum < 1 || maximum > 16 || now == nil {
+		return nil, value.ErrInvalid
+	}
+	leaf, err := server.ServingCertificate()
+	if err != nil || leaf.Usage != "server" || leaf.Binding.InstallationID != pin.Pool.InstallationID || leaf.Binding.ClusterID != pin.Pool.ClusterID || leaf.Binding.IssuerEpoch != pin.Pool.IssuerEpoch {
+		return nil, value.ErrInvalid
+	}
+	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pin.Pool, now)
+	if err != nil {
+		return nil, err
+	}
+	common, ce := mtls.OwnerBootstrapServerName(pin.Pool)
+	exact, ee := mtls.OwnerServerName(leaf.Binding)
+	if ce != nil || ee != nil {
+		return nil, value.ErrInvalid
+	}
+	root, cancel := context.WithCancel(ctx)
+	pending, err := newOwnerObservationPending(root, pin, leaf.Binding, maximum, now)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	port := strconv.Itoa(pin.Pool.NativePort)
+	return &OwnerObservationOperationReceiver{root: root, cancel: cancel, pin: pin, binding: leaf.Binding, server: server, verifier: verifier, registry: registry, native: native, holder: holder, pending: pending, commonName: common, commonHost: net.JoinHostPort(common, port), exactName: exact, exactHost: net.JoinHostPort(exact, port), maximum: maximum, now: now}, nil
+}
+func (h *OwnerObservationOperationReceiver) enter() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.root.Err() != nil || h.active >= h.maximum {
+		return false
+	}
+	h.active++
+	h.joined.Add(1)
+	return true
+}
+func (h *OwnerObservationOperationReceiver) leave() {
+	h.mu.Lock()
+	h.active--
+	h.mu.Unlock()
+	h.joined.Done()
+}
+func (h *OwnerObservationOperationReceiver) Close() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.closed = true
+	h.cancel()
+	h.mu.Unlock()
+	h.pending.Close()
+	h.joined.Wait()
+}
+func (h *OwnerObservationOperationReceiver) CommonAuthority() string {
+	if h == nil {
+		return ""
+	}
+	return h.commonHost
+}
+func (h *OwnerObservationOperationReceiver) ExactAuthority() string {
+	if h == nil {
+		return ""
+	}
+	return h.exactHost
+}
+func ownerOperationHeader(r *http.Request, key, want string) bool {
+	v := r.Header.Values(key)
+	return len(v) == 1 && v[0] == want
+}
+func ownerOperationUnavailable(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	http.Error(w, "unavailable", http.StatusServiceUnavailable)
+}
+
+func (h *OwnerObservationOperationReceiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h == nil || r == nil || r.URL == nil || r.Body == nil || r.TLS == nil || !r.TLS.HandshakeComplete || r.TLS.DidResume || r.TLS.Version != tls.VersionTLS13 || r.TLS.NegotiatedProtocol != "h2" || r.ProtoMajor != 2 || r.URL.Host != "" || r.URL.Scheme != "" || r.URL.User != nil || r.URL.RawPath != "" || r.URL.Fragment != "" || r.URL.RequestURI() != r.RequestURI || len(r.TransferEncoding) != 0 {
+		ownerOperationUnavailable(w)
+		return
+	}
+	lookup := r.Method == http.MethodGet && r.URL.Path == contracts.ClusterObservationOperationLocatorPath && r.TLS.ServerName == h.commonName && r.Host == h.commonHost && r.ContentLength == 0 && len(r.Header.Values("Content-Type")) == 0 && ownerOperationHeader(r, "Accept", contracts.ClusterObservationOperationLocatorMediaType)
+	claim := r.Method == http.MethodPost && r.RequestURI == contracts.ClusterObservationOperationClaimPath && r.URL.Path == contracts.ClusterObservationOperationClaimPath && r.URL.RawQuery == "" && r.TLS.ServerName == h.exactName && r.Host == h.exactHost && r.ContentLength > 0 && r.ContentLength <= contracts.ClusterObservationClaimBytes && ownerOperationHeader(r, "Content-Type", contracts.ClusterObservationOperationClaimMediaType) && ownerOperationHeader(r, "Accept", contracts.ClusterObservationOperationClaimMediaType)
+	if !lookup && !claim {
+		ownerOperationUnavailable(w)
+		return
+	}
+	for _, key := range []string{"Authorization", "Cookie", "Origin", "Referer", "Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Content-Encoding", "Idempotency-Key", "X-Idempotency-Key"} {
+		if len(r.Header.Values(key)) != 0 {
+			ownerOperationUnavailable(w)
+			return
+		}
+	}
+	end, finite := r.Context().Deadline()
+	if !finite || !h.now().Before(end) || end.After(h.now().Add(5*time.Second)) || !h.enter() {
+		ownerOperationUnavailable(w)
+		return
+	}
+	defer h.leave()
+	call, cancel := context.WithDeadline(r.Context(), end)
+	defer cancel()
+	rootDone := make(chan struct{})
+	stopRoot := context.AfterFunc(h.root, func() { cancel(); close(rootDone) })
+	defer func() {
+		if !stopRoot() {
+			<-rootDone
+		}
+	}()
+	control := http.NewResponseController(w)
+	if control.SetReadDeadline(end) != nil || control.SetWriteDeadline(end) != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	ioDone := make(chan struct{})
+	stopIO := context.AfterFunc(call, func() {
+		_ = control.SetReadDeadline(time.Now())
+		_ = control.SetWriteDeadline(time.Now())
+		_ = r.Body.Close()
+		close(ioDone)
+	})
+	defer func() {
+		if !stopIO() {
+			<-ioDone
+		}
+	}()
+	defer r.Body.Close()
+	var q value.ClusterObservationLocatorQuery
+	var input value.ClusterObservationClaim
+	if lookup {
+		v, err := contracts.DecodeClusterObservationOperationLocatorTarget(r.RequestURI)
+		q = value.ClusterObservationLocatorQuery{RootID: v.RootID, ClusterID: v.ClusterID, RequestID: v.RequestID, Challenge: v.Challenge, RequestedAt: ownerOperationTime(v.RequestedAt), NotAfter: ownerOperationTime(v.NotAfter)}
+		if err != nil || !q.Valid(h.now()) {
+			ownerOperationUnavailable(w)
+			return
+		}
+	} else {
+		body, err := io.ReadAll(io.LimitReader(r.Body, contracts.ClusterObservationClaimBytes+1))
+		defer clear(body)
+		if err != nil || len(body) != int(r.ContentLength) || call.Err() != nil {
+			ownerOperationUnavailable(w)
+			return
+		}
+		v, err := contracts.DecodeClusterObservationOperationClaim(body)
+		request, _, re := wire.ParseRequest(v.Request, h.now())
+		input = value.ClusterObservationClaim{Request: request, Locator: ownerOperationLocator(v.Locator)}
+		if err != nil || re != nil || !input.Matches(h.binding, h.now()) {
+			ownerOperationUnavailable(w)
+			return
+		}
+		q = request.LocatorQuery()
+		end = identity.Earlier(end, input.Locator.Interval.FreshUntil)
+	}
+	end = identity.Earlier(end, q.NotAfter)
+	if q.RootID != h.pin.RootID || call.Err() != nil || !h.now().Before(end) {
+		ownerOperationUnavailable(w)
+		return
+	}
+	bounded, stop := context.WithDeadline(call, end)
+	defer stop()
+	narrowDone := make(chan struct{})
+	stopNarrow := context.AfterFunc(bounded, func() {
+		_ = control.SetReadDeadline(time.Now())
+		_ = control.SetWriteDeadline(time.Now())
+		_ = r.Body.Close()
+		close(narrowDone)
+	})
+	defer func() {
+		if !stopNarrow() {
+			<-narrowDone
+		}
+	}()
+	if control.SetReadDeadline(end) != nil || control.SetWriteDeadline(end) != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	if lookup {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1))
+		defer clear(body)
+		if err != nil || len(body) != 0 || bounded.Err() != nil {
+			ownerOperationUnavailable(w)
+			return
+		}
+	}
+	// Strict verified actual TLS before any SQL/native I/O or map reservation.
+	sender, err := h.verifier.VerifyClient(r.TLS)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	server, err := h.server.ServingCertificate()
+	if err != nil || server.Binding != h.binding {
+		ownerOperationUnavailable(w)
+		return
+	}
+	if lookup {
+		h.locate(w, r, bounded, control, q, sender, server)
+	} else {
+		h.claim(w, r, bounded, control, input, sender, server)
+	}
+}
+func (h *OwnerObservationOperationReceiver) locate(w http.ResponseWriter, r *http.Request, ctx context.Context, control *http.ResponseController, q value.ClusterObservationLocatorQuery, sender, server value.OwnerCertificate) {
+	e, err := h.pending.reserve(ctx, q, sender, server)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	defer e.finishGET()
+	request := value.OwnerObservationRequest{RootID: q.RootID, ID: q.RequestID, Challenge: q.Challenge, RequestedAt: q.RequestedAt, NotAfter: q.NotAfter}
+	routing, err := mtls.NewOwnerObservationRoutingAdmission(e.work, h.pin, request, h.server, h.registry, r.TLS, h.now)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	retained := false
+	defer func() {
+		if !retained {
+			routing.Close()
+		}
+	}()
+	begin, peers, err := routing.NativeInput(e.work)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	native, err := h.native.OpenOwnerObservationOperation(begin, request, peers)
+	if err != nil {
+		if native != nil {
+			native.Close()
+		}
+		_, _, _ = routing.Complete(e.work, nil)
+		ownerOperationUnavailable(w)
+		return
+	}
+	_, end, err := routing.Complete(e.work, native)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	lookup, stop := context.WithDeadline(e.work, end)
+	defer stop()
+	local, err := h.holder.Lookup(lookup, q.RootID, q.ClusterID)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	end = identity.Earlier(end, local.FreshUntil)
+	// This root survives successful GET output and retains both the original
+	// native proof and exact spent socket. A temporary lookup context cannot
+	// become its parent because that context is cancelled on GET return.
+	reserved, err := h.holder.ReserveLocator(e.work, local, q)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	defer func() {
+		if !retained {
+			reserved.Close()
+		}
+	}()
+	end = identity.Earlier(end, reserved.Until())
+	locator := value.ClusterObservationLocator{RootID: q.RootID, ClusterID: q.ClusterID, RequestID: q.RequestID, Challenge: q.Challenge, Holder: h.binding, ExchangeID: local.ExchangeID, Sequence: local.Sequence, Interval: value.ClusterObservationInterval{ObservedAt: local.ObservedAt, FreshUntil: end}}
+	if !locator.Matches(q, h.binding, h.now()) || ctx.Err() != nil || lookup.Err() != nil || e.retain(locator, routing, reserved) != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	retained = true
+	body, err := contracts.EncodeClusterObservationOperationLocator(ownerOperationLocatorWire(locator))
+	defer clear(body)
+	if err != nil || control.SetWriteDeadline(end) != nil || ctx.Err() != nil || !h.now().Before(end) {
+		ownerOperationUnavailable(w)
+		return
+	}
+	// Mark before exposing headers or bytes. Unknown output remains charged;
+	// only GET cancellation detaches, never the original operation deadline.
+	if _, err = e.possibleDelivery(); err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	ownerOperationWrite(w, control, contracts.ClusterObservationOperationLocatorMediaType, body)
+}
+func (h *OwnerObservationOperationReceiver) claim(w http.ResponseWriter, r *http.Request, ctx context.Context, control *http.ResponseController, input value.ClusterObservationClaim, sender, server value.OwnerCertificate) {
+	pending, err := h.pending.claim(ctx, input, sender, server)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	defer pending.Close()
+	op, end, err := pending.routing.Claim(pending.call, r.TLS)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	call, stop := context.WithDeadline(pending.call, end)
+	defer stop()
+	if pending.reservation == nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	selected, err := pending.reservation.Select(call, input.Request)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	standby, ok := selected.Conversation().(*regionalObservationOperationStandby)
+	if !ok || standby.bind(op) != nil {
+		selected.Close()
+		ownerOperationUnavailable(w)
+		return
+	}
+	result, err := selected.Observe()
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	end = identity.Earlier(end, result.Interval.FreshUntil)
+	final, stopFinal := context.WithDeadline(call, end)
+	defer stopFinal()
+	ownerEnd, err := pending.routing.Final(final)
+	if err != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	end = identity.Earlier(end, ownerEnd)
+	result = result.Restrict(input.Request.RequestedAt, end)
+	digest, de := wire.RequestDigest(input.Request)
+	if de != nil || !result.Matches(input.Request, digest, h.now()) {
+		ownerOperationUnavailable(w)
+		return
+	}
+	body, err := contracts.EncodeClusterObservationResult(wire.ResultWire(result))
+	defer clear(body)
+	if err != nil || final.Err() != nil || !h.now().Before(end) || control.SetWriteDeadline(end) != nil {
+		ownerOperationUnavailable(w)
+		return
+	}
+	ownerOperationWrite(w, control, contracts.ClusterObservationOperationClaimMediaType, body)
+}
+func ownerOperationWrite(w http.ResponseWriter, c *http.ResponseController, media string, body []byte) {
+	w.Header().Set("Content-Type", media)
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if n, err := w.Write(body); err != nil || n != len(body) {
+		return
+	}
+	_ = c.Flush()
+}
+func ownerOperationTime(raw string) time.Time {
+	v, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil || v.UTC().Format(time.RFC3339Nano) != raw {
+		return time.Time{}
+	}
+	return v
+}
+func ownerOperationLocator(v contracts.ClusterObservationOperationLocator) value.ClusterObservationLocator {
+	h := v.Holder
+	return value.ClusterObservationLocator{RootID: v.RootID, ClusterID: v.ClusterID, RequestID: v.RequestID, Challenge: v.Challenge, Holder: value.OwnerBinding{InstallationID: h.InstallationID, ClusterID: h.ClusterID, IssuerEpoch: h.IssuerEpoch, PodUID: h.PodUID, ProcessEpoch: h.ProcessEpoch}, ExchangeID: v.ExchangeID, Sequence: v.Sequence, Interval: value.ClusterObservationInterval{ObservedAt: ownerOperationTime(v.ObservedAt), FreshUntil: ownerOperationTime(v.FreshUntil)}}
+}
+func ownerOperationLocatorWire(v value.ClusterObservationLocator) contracts.ClusterObservationOperationLocator {
+	out := contracts.ClusterObservationOperationLocator(wire.LocatorWire(v))
+	out.Format = contracts.ClusterObservationOperationLocatorFormat
+	return out
+}

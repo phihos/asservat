@@ -1,0 +1,63 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 12 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.678s
+ok  	asservat.local/asservat/internal/adapters/kms	1.944s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	17.520s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.853s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.810s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.277s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.426s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.929s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.020s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+?   	asservat.local/asservat/internal/application/audit	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.033s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/capture	[no test files]
+ok  	asservat.local/asservat/internal/application/configuration	2.209s
+ok  	asservat.local/asservat/internal/application/evidence	1.083s
+ok  	asservat.local/asservat/internal/application/execution	1.034s
+ok  	asservat.local/asservat/internal/application/fleet	1.027s
+ok  	asservat.local/asservat/internal/application/identity	1.021s
+ok  	asservat.local/asservat/internal/application/planning	1.051s
+ok  	asservat.local/asservat/internal/application/privacy	1.028s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	2.060s
+?   	asservat.local/asservat/internal/contracts	[no test files]
+ok  	asservat.local/asservat/internal/domain/artifact	1.009s
+ok  	asservat.local/asservat/internal/domain/audit	1.010s
+ok  	asservat.local/asservat/internal/domain/authorization	1.423s
+?   	asservat.local/asservat/internal/domain/capture	[no test files]
+ok  	asservat.local/asservat/internal/domain/configuration	1.008s
+?   	asservat.local/asservat/internal/domain/execution	[no test files]
+ok  	asservat.local/asservat/internal/domain/fleet	1.010s
+ok  	asservat.local/asservat/internal/domain/identity	1.010s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.012s
+?   	asservat.local/asservat/internal/domain/targets	[no test files]
+ok  	asservat.local/asservat/internal/transport/browser	1.027s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+ok  	asservat.local/asservat/test/integration	1.994s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 57, in <module>
+    raise ValueError(f"Domain import is not a pure value utility: {imported}")
+ValueError: Domain import is not a pure value utility: net/netip
+make: *** [Makefile:42: go-architecture-check] Error 1

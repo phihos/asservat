@@ -1,0 +1,508 @@
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/lost-reply
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/sibling-change
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim-replacement
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt-replacement
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/inventory-change
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/unchanged-resource-version
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-api-version
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-kind
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/close-during-CAS
+--- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt (0.91s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim (0.10s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt (0.10s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/lost-reply (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/sibling-change (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim-replacement (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt-replacement (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/inventory-change (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/unchanged-resource-version (0.09s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-api-version (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-kind (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/close-during-CAS (0.08s)
+=== RUN   TestInitialBootstrapAdmissionMatchesWithoutPolicyVariables
+--- PASS: TestInitialBootstrapAdmissionMatchesWithoutPolicyVariables (0.04s)
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/false
+=== RUN   TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/true
+--- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate (2.87s)
+    --- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/false (1.47s)
+    --- PASS: TestInitialBootstrapCopyCASUnknownCannotBecomeFreshCreate/true (1.41s)
+=== RUN   TestInitialBootstrapCopySanitizationIsOneExactImmutableCAS
+--- PASS: TestInitialBootstrapCopySanitizationIsOneExactImmutableCAS (1.46s)
+=== RUN   TestInitialBootstrapCopyCASRetainsOriginalCancellation
+--- PASS: TestInitialBootstrapCopyCASRetainsOriginalCancellation (1.41s)
+=== RUN   TestInitialBootstrapCopyGuardLostClaimNeverPostsOrReclaims
+--- PASS: TestInitialBootstrapCopyGuardLostClaimNeverPostsOrReclaims (1.51s)
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/original
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/original
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/original
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/original
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-mark
+--- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery (8.75s)
+    --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false (2.26s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/original (0.35s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-mark (0.10s)
+    --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true (2.11s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/original (0.20s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-mark (0.10s)
+    --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false (2.26s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/original (0.35s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-mark (0.10s)
+    --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true (2.11s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/original (0.20s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-mark (0.10s)
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-positive-removal
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-original-create
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-guard
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/replaced-seed
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/malformed-claim
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-manager
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-copy-mark
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/changed-public-copy
+=== RUN   TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/future-completion
+--- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts (0.03s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-positive-removal (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-original-create (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-guard (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/replaced-seed (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/malformed-claim (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-manager (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/missing-copy-mark (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/changed-public-copy (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts/future-completion (0.00s)
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/renew-interval
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-delete-rv
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/alias-guard
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-manager-close
+=== RUN   TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/extra-claim-field
+--- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS (0.02s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/renew-interval (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-delete-rv (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/alias-guard (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/wrong-manager-close (0.00s)
+    --- PASS: TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS/extra-claim-field (0.00s)
+=== RUN   TestInitialBootstrapV3DoesNotRewriteLegacyGuardOrPrelude
+--- PASS: TestInitialBootstrapV3DoesNotRewriteLegacyGuardOrPrelude (0.11s)
+=== RUN   TestInitialBootstrapObserverRefreshesExpiredCredentialWithoutPrivateReads
+--- PASS: TestInitialBootstrapObserverRefreshesExpiredCredentialWithoutPrivateReads (2.60s)
+=== RUN   TestInitialBootstrapObserverCloseJoinsRefreshAndDeniesRetainedSource
+--- PASS: TestInitialBootstrapObserverCloseJoinsRefreshAndDeniesRetainedSource (0.85s)
+=== RUN   TestInitialBootstrapObserverFinalReadRetainsOriginalDeadline
+--- PASS: TestInitialBootstrapObserverFinalReadRetainsOriginalDeadline (3.08s)
+=== RUN   TestInitialBootstrapObserverProjectionCannotCarryPrivateMaterial
+--- PASS: TestInitialBootstrapObserverProjectionCannotCarryPrivateMaterial (0.00s)
+=== RUN   TestInitialBootstrapPassiveReplayNeverReadsBroadSeed
+=== RUN   TestInitialBootstrapPassiveReplayNeverReadsBroadSeed/manager-retired-false
+=== RUN   TestInitialBootstrapPassiveReplayNeverReadsBroadSeed/manager-retired-true
+--- PASS: TestInitialBootstrapPassiveReplayNeverReadsBroadSeed (1.91s)
+    --- PASS: TestInitialBootstrapPassiveReplayNeverReadsBroadSeed/manager-retired-false (0.96s)
+    --- PASS: TestInitialBootstrapPassiveReplayNeverReadsBroadSeed/manager-retired-true (0.96s)
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/legacy-seed-is-not-adopted
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/unsupported-negotiation
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/unknown-annotation
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/changed-history-uid
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/changed-final-metadata
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/wrong-original-seed
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/full-secret-response
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/missing-history
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/missing-locator-existing-root
+=== RUN   TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/oversized-locator
+--- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt (2.05s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/legacy-seed-is-not-adopted (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/unsupported-negotiation (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/unknown-annotation (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/changed-history-uid (0.13s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/changed-final-metadata (0.95s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/wrong-original-seed (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/full-secret-response (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/missing-history (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/missing-locator-existing-root (0.12s)
+    --- PASS: TestInitialBootstrapPassiveMetadataCannotFallbackOrAdopt/oversized-locator (0.12s)
+=== RUN   TestInitialBootstrapPassiveMissingLocatorRequiresAbsentEffectRoots
+--- PASS: TestInitialBootstrapPassiveMissingLocatorRequiresAbsentEffectRoots (0.12s)
+=== RUN   TestInitialBootstrapPassiveFinalReadPreservesCancellation
+--- PASS: TestInitialBootstrapPassiveFinalReadPreservesCancellation (0.95s)
+=== RUN   TestInitialBootstrapPassiveReceiptCannotBeReplacedOrReset
+--- PASS: TestInitialBootstrapPassiveReceiptCannotBeReplacedOrReset (0.01s)
+=== RUN   TestInitialBootstrapPassiveLostCreateRestartIsExactLookupOnly
+--- PASS: TestInitialBootstrapPassiveLostCreateRestartIsExactLookupOnly (3.16s)
+=== RUN   TestInitialBootstrapPassiveLostLocatorCASReopensWithoutBroadSeed
+--- PASS: TestInitialBootstrapPassiveLostLocatorCASReopensWithoutBroadSeed (2.53s)
+=== RUN   TestInitialBootstrapPassiveNewCopyCannotOutliveOriginalSetup
+--- PASS: TestInitialBootstrapPassiveNewCopyCannotOutliveOriginalSetup (0.44s)
+=== RUN   TestInitialBootstrapProjectionSurvivesSetupRetirementWithoutNewPins
+--- PASS: TestInitialBootstrapProjectionSurvivesSetupRetirementWithoutNewPins (0.00s)
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/operation
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/extra-key
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/namespace
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/mutable
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/owner
+--- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/operation (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/extra-key (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/namespace (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/mutable (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/owner (0.00s)
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-1
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-2
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-3
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-4
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-root
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-default
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role/name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role_name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-2
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-3
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-4
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-root
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-default
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role/name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role_name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-3
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-4
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-root
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-default
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role/name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role_name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-3-4
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-root
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-default
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role/name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role_name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-root
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-default
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role/name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role_name
+=== RUN   TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects (0.06s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-1 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-2 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-3 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-4 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0- (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-root (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-default (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role/name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role_name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-2 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-3 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-4 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1- (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-root (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-default (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role/name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role_name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-3 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-4 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2- (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-root (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-default (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role/name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role_name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-3-4 (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3- (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-root (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-default (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role/name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role_name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4- (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-root (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-default (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role/name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role_name (0.00s)
+    --- PASS: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.00s)
+=== RUN   TestInitialBootstrapRouterRecoversProtectedPreSeedVersion
+--- PASS: TestInitialBootstrapRouterRecoversProtectedPreSeedVersion (2.51s)
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/missing-binding
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/changed-policy
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/known-root
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/old-v1
+=== RUN   TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/unknown-read
+--- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude (1.48s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/missing-binding (0.61s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/changed-policy (0.34s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/known-root (0.12s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/old-v1 (0.30s)
+    --- PASS: TestInitialBootstrapRouterDoesNotUpgradePartialPrelude/unknown-read (0.12s)
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/#00
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/account
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/binding
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/anchor
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/copy-marker
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/private-copy
+=== RUN   TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/target
+--- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence (2.96s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/#00 (0.76s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/account (0.31s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/binding (0.66s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/anchor (0.52s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/copy-marker (0.47s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/private-copy (0.12s)
+    --- PASS: TestInitialBootstrapRouterFreshRequiresWholeFixedAbsence/target (0.12s)
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/#00
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/wrong-uid
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/full-secret
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/unknown-digest
+=== RUN   TestInitialBootstrapRouterSeedMetadataCannotFallback/unsupported
+--- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback (0.61s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/#00 (0.13s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/wrong-uid (0.12s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/full-secret (0.12s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/unknown-digest (0.12s)
+    --- PASS: TestInitialBootstrapRouterSeedMetadataCannotFallback/unsupported (0.12s)
+=== RUN   TestInitialBootstrapRouterRetainsParentDeadline
+--- PASS: TestInitialBootstrapRouterRetainsParentDeadline (0.07s)
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/extra-mount
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/missing-first-status
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/wrong-status-category
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/different-command
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/extra-pull-secret
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/half-deleted
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/unexpected-owner
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/running
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/node-lost
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/restart
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/unknown-end
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/future-end
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/wrong-image
+=== RUN   TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/different-source
+--- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded (0.02s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/extra-mount (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/missing-first-status (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/wrong-status-category (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/different-command (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/extra-pull-secret (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/half-deleted (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/unexpected-owner (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/running (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/node-lost (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/restart (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/unknown-end (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/future-end (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/wrong-image (0.00s)
+    --- PASS: TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded/different-source (0.00s)
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/terminal
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/active
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/absent
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/changed-input
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/lost-delete-reply
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/canceled-final-read
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/changed-original-bytes
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/missing-original
+=== RUN   TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/latest-only
+--- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS (0.10s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/terminal (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/active (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/absent (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/changed-input (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/lost-delete-reply (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/canceled-final-read (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/changed-original-bytes (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/missing-original (0.01s)
+    --- PASS: TestInitialBootstrapRunnerResumeOnlyDeletesExactTerminalCAS/latest-only (0.01s)
+=== RUN   TestInitialBootstrapRunnerHasOnlyFiniteSeparatedInputCompartments
+--- PASS: TestInitialBootstrapRunnerHasOnlyFiniteSeparatedInputCompartments (0.00s)
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-role
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-password
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/replace-create-receipt
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-close-id
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-role-name
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-database
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/renew-login
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/reopen
+=== RUN   TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/renew-close
+--- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager (0.02s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-role (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-password (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/replace-create-receipt (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-close-id (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-role-name (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/new-database (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/renew-login (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/reopen (0.00s)
+    --- PASS: TestInitialBootstrapClosingCannotReissueOrRenewOriginalManager/renew-close (0.00s)
+=== RUN   TestInitialBootstrapElapsedTimeCannotCompleteClosure
+--- PASS: TestInitialBootstrapElapsedTimeCannotCompleteClosure (0.00s)
+=== RUN   TestInitialBootstrapPrivateFormattingAndMaterialValidation
+--- PASS: TestInitialBootstrapPrivateFormattingAndMaterialValidation (0.00s)
+=== RUN   TestInitialBootstrapAdmissionHasNoReservedCELVariable
+--- PASS: TestInitialBootstrapAdmissionHasNoReservedCELVariable (0.03s)
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes/caller_input_ownership
+--- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes (2.51s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fourth_source (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_arbitrary_name (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/fleet_original_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/missing_third (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_without_capacity (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/third_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/capacity_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/owner_original_account_UID (0.02s)
+    --- PASS: TestInitialRuntimeBridgeInstalledOriginalSourceProbes/caller_input_ownership (0.00s)
+=== RUN   TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions
+--- PASS: TestInitialRuntimeBridgePreservesOriginalPodAndBindingRestrictions (0.00s)
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy
+=== RUN   TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target
+--- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_administrators (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/different_namespace (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/missing_history (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/old_writer_as_owner_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/history_as_source_probe (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/extra_source_proof (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/legacy (0.00s)
+    --- PASS: TestInitialRuntimeBridgeRejectsInconsistentOriginalScope/new_history_target (0.00s)
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse
+=== RUN   TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit
+--- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts (0.01s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/future_claim (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_original_generation (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/different_receipt_UID (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/retained_digest_substituted (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/new_binding (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/unacknowledged_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/missing_predecessor (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/receipt_before_update (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/renewed_setup (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/operation_reuse (0.00s)
+    --- PASS: TestInitialRuntimeBridgeOriginalClaimsAndFiniteReceipts/six-second_permit (0.00s)
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation
+=== RUN   TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read
+--- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState (0.48s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-probe-pending (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/exact-retained-pending (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-probe (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/unclaimed-retained (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/old-after-receipt (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/wrong-operation (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/replaced-policy (0.04s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/changed-shape (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/extra-generation (0.05s)
+    --- PASS: TestInitialRuntimeBridgeCannotSelectPolicyFromUnacknowledgedState/expired-read (0.07s)
+=== RUN   TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority
+--- PASS: TestInitialRuntimeBridgeCanonicalDigestHasNoPolicyStatusAuthority (0.00s)
+=== RUN   TestLegacyInputOwnershipBootstrapConstructor
+--- PASS: TestLegacyInputOwnershipBootstrapConstructor (0.12s)
+=== RUN   TestLegacyInputOwnershipBootstrapObserver
+--- PASS: TestLegacyInputOwnershipBootstrapObserver (0.08s)
+=== RUN   TestLegacyInputOwnershipBootstrapState
+--- PASS: TestLegacyInputOwnershipBootstrapState (0.04s)
+=== RUN   TestLegacyInputOwnershipCleanupConstructor
+--- PASS: TestLegacyInputOwnershipCleanupConstructor (0.06s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	47.035s

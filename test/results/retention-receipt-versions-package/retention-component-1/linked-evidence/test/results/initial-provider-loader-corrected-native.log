@@ -1,0 +1,11 @@
+=== RUN   TestInitialPreparationProvidersWithRealServices
+=== RUN   TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain
+=== NAME  TestInitialPreparationProvidersWithRealServices
+    initial_preparer_provider_test.go:256: actual preparation Run permission configuration unavailable
+--- FAIL: TestInitialPreparationProvidersWithRealServices (62.53s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationProvidersWithRealServices/healthy-native-request-drain (0.90s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	62.581s
+FAIL

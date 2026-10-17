@@ -1,0 +1,9 @@
+{
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/public_runtime_worker_test.go",
+      "base_sha256": "bb2be7fe31e231cf918bed04a3ebcd34a35d40579d198294988218b26df1bd70",
+      "payload_sha256": "62b47a991574cc0b0f95bc44a7640f7ac29a50cc20b54ae73a895351059e9c86"
+    }
+  ]
+}

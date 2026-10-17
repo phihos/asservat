@@ -1,0 +1,24 @@
+--- FAIL: TestSigningKeyPinsVersionPurposeAndProviderOutput (0.00s)
+    --- FAIL: TestSigningKeyPinsVersionPurposeAndProviderOutput/valid (0.00s)
+panic: runtime error: invalid memory address or nil pointer dereference [recovered, repanicked]
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x657d00]
+
+goroutine 9 [running]:
+testing.tRunner.func1.2({0xef1c30, 0xfdca50})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2125 +0x232
+testing.tRunner.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2128 +0x329
+panic({0xef1c30?, 0xfdca50?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/panic.go:859 +0x125
+crypto/ed25519.(*Options).HashFunc(0x74843ef169?)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/ed25519/ed25519.go:138
+asservat.local/asservat/internal/adapters/kms.(*requestSigner).Sign(0x7484667ef8, {0x101b8e0?, 0x3b9aca00?}, {0x7484667e62, 0x5, 0x5}, {0xf69a98, 0x0})
+	/home/phil/Projekte/asservat/internal/adapters/kms/signing.go:59 +0x9d
+asservat.local/asservat/internal/adapters/kms.TestSigningKeyPinsVersionPurposeAndProviderOutput.func1(0x7484558d88)
+	/home/phil/Projekte/asservat/internal/adapters/kms/signing_test.go:84 +0x38a
+testing.tRunner(0x7484558d88, 0x74843e6fa0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0xea
+created by testing.(*T).Run in goroutine 8
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0x4d4
+FAIL	asservat.local/asservat/internal/adapters/kms	0.007s
+FAIL

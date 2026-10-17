@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:263: GC live Pod edit did not reach exact namespace denial pods "executor" is forbidden: ValidatingAdmissionPolicy 'api-execution-native' with binding 'api-execution-native' denied request: Asservat regional API execution namespace requires its exact administrator or bounded role operation.
+--- FAIL: TestContextAdmissionWithRealServices (4.26s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-api-runner (4.21s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	4.320s
+FAIL

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "$id": "https://asservat.io/spec/v1/public-audit-keys.schema.json",
+  "title": "Protected public audit HMAC projection",
+  "description": "Original installation seeds; not artifact wrapping keys or current authority. No public logging/audit/SQL serialization. The immutable projection binds original protected root/setup identities and independent input/account versions. Backup/restore preserves these original values; no automatic rekey.",
+  "required": [
+    "format",
+    "installationID",
+    "rootUID",
+    "setupID",
+    "material"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-public-audit-keys/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "rootUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "material": {
+      "$ref": "#/$defs/material"
+    }
+  },
+  "$defs": {
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputVersion",
+        "accountVersion",
+        "inputKey",
+        "accountKey"
+      ],
+      "properties": {
+        "inputVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "accountVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "inputKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        },
+        "accountKey": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      }
+    }
+  }
+}

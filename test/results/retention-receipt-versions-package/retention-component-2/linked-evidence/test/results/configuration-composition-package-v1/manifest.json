@@ -1,0 +1,47 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "files": [
+    {
+      "path": "cmd/asservat/main.go",
+      "base_sha256": "4527f65c3a73efaad12b7fb7751dd2c72b4c812219ae1f144c663a6b9ab4dae2",
+      "payload_sha256": "b63b8a04297d9252fc08460e21c06be5fa49957756670d6d11bba914257def97",
+      "bytes": 4535
+    },
+    {
+      "path": "docs/architecture/configuration-credential-provisioning.md",
+      "base_sha256": "938d2446e57d599144b830ae1a4465a7c53b028f4e91413d6477ab8b16cf7d67",
+      "payload_sha256": "008429e72fd0ea1904147a430821b3833e112f4675aabe9207ca0ac61163a29e",
+      "bytes": 7545
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_workload.go",
+      "base_sha256": null,
+      "payload_sha256": "595ba4608c362eb47686b66d30ba1713411a572fb52d2357871096b259e1a246",
+      "bytes": 2123
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_workload_test.go",
+      "base_sha256": null,
+      "payload_sha256": "cd5de1a55e64f2999041e65857c643ed2d537e16a2bd6644886fe5a630d33905",
+      "bytes": 2775
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_inputs.go",
+      "base_sha256": null,
+      "payload_sha256": "51b06ddd852438f5760769bbf048debf7b1c5b5c7022a65f247c783b24d1e663",
+      "bytes": 3445
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_inputs_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8c818703675c3bbb2ce8f5f81a0459487d2320822ceed3f18a78b314877b3493",
+      "bytes": 4120
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_installer_test.go",
+      "base_sha256": null,
+      "payload_sha256": "460066a4bf927406279d62cb6090fa0231631dc3533bcf82e81c246cbf5c2e7a",
+      "bytes": 5349
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "integratedAt": "2026-10-13T12:07:57.388050+00:00",
+  "paths": [
+    {
+      "path": "docs/architecture/capacity-production.md",
+      "baseSHA256": "d0d14a60420acfd196225eb675e92190299cf98887f42334c5ed9a4cae37e9e7",
+      "payloadSHA256": "c40dfd7a596570a3b4b85eb4b987d7f5678126d6e4244f9f93ee2856bda4bc16"
+    },
+    {
+      "path": "internal/adapters/postgres/capacity_session_reads.go",
+      "baseSHA256": null,
+      "payloadSHA256": "76a08b678f6878280665eb76b2468dab67967e2ba8e26d333b8c283771404aa7"
+    },
+    {
+      "path": "internal/adapters/postgres/capacity_session_reads_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "5dacafb00f42e070baca8ff1df48601bf2f22e05aff7c6a82f3ba0e3d563a7e4"
+    },
+    {
+      "path": "internal/adapters/postgres/context_native_control.go",
+      "baseSHA256": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+      "payloadSHA256": "b001e4165894b48e87156d01a6523d1d6c5fc1fa16e34fbefb89a00a1795b9bc"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/download_response.sql.go",
+      "baseSHA256": "1618f1f7a02f275ad6aba7d7ae8d302d4bdd32cc2942de399e08a183bc76e807",
+      "payloadSHA256": "7e6dfe9fb39d41ce7ce1f329cd29f0d834d90144befcfbb7a8518d633c848598"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/native_exchange.sql.go",
+      "baseSHA256": "2f2c89b9d1129797bcf76b928f2dbd934b9e7caafe2c74d30841931b1bc216e6",
+      "payloadSHA256": "9b39a2e15acb9dd84bec1cfb3cea29407426511ce1c4a387eec2728c44373dd9"
+    },
+    {
+      "path": "internal/adapters/postgres/download_response_window.go",
+      "baseSHA256": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+      "payloadSHA256": "63c37d20916a79c0d25bfe70a638fc8d0774ff8ca3567a35a037d5dd788d9498"
+    },
+    {
+      "path": "migrations/queries/download_response.sql",
+      "baseSHA256": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+      "payloadSHA256": "f4141ba1bc187be44e680802ccddfb6ccb860c9814a53813984d4ef64faac0ed"
+    },
+    {
+      "path": "migrations/queries/native_exchange.sql",
+      "baseSHA256": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+      "payloadSHA256": "776c6af5d0fe52083f257f065bc536a5eb7591cf19dc8ae69d304fe52f5ff431"
+    },
+    {
+      "path": "test/integration/capacity_session_test.go",
+      "baseSHA256": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054",
+      "payloadSHA256": "4d80820e6071a460eefc41199366cdf85d5344f0acff79c3b16e3a9e42ffb9a4"
+    }
+  ],
+  "fixtureGrant": {
+    "path": "test/fixtures/sql/runtime-roles.sql",
+    "baseSHA256": "f22a6ad9a579fba303af5248145689db6c90970c186584b2c0a6c066e0ec43a4",
+    "payloadSHA256": "18405c9b5993749d67d4adfaa596b65750babf190deb593709459c5068de61c1",
+    "reason": "Real full-custody run denied ReadManagedCapacityAdmission for capture_operation_admit_runtime. Match existing production capture-admit grant at public_runtime_role_plan.go:103; no runtime grant change."
+  },
+  "dependenciesVerified": 2154,
+  "source": "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013",
+  "manifestSHA256": "aaef41b2cbfb3553f1b070329c3ecf7f0993f87a93779a4188d196b22038a525",
+  "archive": {
+    "files/test/integration/capacity_session_test.go.txt": "4d80820e6071a460eefc41199366cdf85d5344f0acff79c3b16e3a9e42ffb9a4",
+    "files/docs/architecture/capacity-production.md.txt": "c40dfd7a596570a3b4b85eb4b987d7f5678126d6e4244f9f93ee2856bda4bc16",
+    "files/internal/adapters/postgres/context_native_control.go.txt": "b001e4165894b48e87156d01a6523d1d6c5fc1fa16e34fbefb89a00a1795b9bc",
+    "files/internal/adapters/postgres/download_response_window.go.txt": "63c37d20916a79c0d25bfe70a638fc8d0774ff8ca3567a35a037d5dd788d9498",
+    "files/internal/adapters/postgres/capacity_session_reads.go.txt": "76a08b678f6878280665eb76b2468dab67967e2ba8e26d333b8c283771404aa7",
+    "files/internal/adapters/postgres/capacity_session_reads_test.go.txt": "5dacafb00f42e070baca8ff1df48601bf2f22e05aff7c6a82f3ba0e3d563a7e4",
+    "files/internal/adapters/postgres/custodydb/download_response.sql.go.txt": "7e6dfe9fb39d41ce7ce1f329cd29f0d834d90144befcfbb7a8518d633c848598",
+    "files/internal/adapters/postgres/custodydb/native_exchange.sql.go.txt": "9b39a2e15acb9dd84bec1cfb3cea29407426511ce1c4a387eec2728c44373dd9",
+    "files/migrations/queries/native_exchange.sql": "776c6af5d0fe52083f257f065bc536a5eb7591cf19dc8ae69d304fe52f5ff431",
+    "files/migrations/queries/download_response.sql": "f4141ba1bc187be44e680802ccddfb6ccb860c9814a53813984d4ef64faac0ed",
+    "bases/test/integration/capacity_session_test.go.txt": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054",
+    "bases/docs/architecture/capacity-production.md.txt": "d0d14a60420acfd196225eb675e92190299cf98887f42334c5ed9a4cae37e9e7",
+    "bases/internal/adapters/postgres/context_native_control.go.txt": "9d09e809483de93b5535c1fe92f48f7034af7cb9e167bfc6f338021c2b7b0492",
+    "bases/internal/adapters/postgres/download_response_window.go.txt": "74056b2b8b611d2c01542b1467e631a55023e4df8c5580f781970553149a15b5",
+    "bases/internal/adapters/postgres/custodydb/download_response.sql.go.txt": "1618f1f7a02f275ad6aba7d7ae8d302d4bdd32cc2942de399e08a183bc76e807",
+    "bases/internal/adapters/postgres/custodydb/native_exchange.sql.go.txt": "2f2c89b9d1129797bcf76b928f2dbd934b9e7caafe2c74d30841931b1bc216e6",
+    "bases/migrations/queries/native_exchange.sql": "6fc93844572fba278b6abd4e0ad64cc90f863313e77e25b511119395d1266fad",
+    "bases/migrations/queries/download_response.sql": "f18b260ddfe6601b123923048101530531b8e667931b77c07e5b9fb268a55779",
+    "checks-1/dependencies.json": "f524f7fbadced8f059228a78c13161d7333b3122b8740cd4ceafaf780392b64c",
+    "checks-1/payload.json": "54a6f317a91a8b5204784e88c661f492b86063ef9d163f98d3e4610dd27dbc4b",
+    "checks-1/compile.log": "a076687a0f24437e5395b82cc4ef8927faefcebd7ca047d7678431f240a7910a",
+    "checks-1/races.log": "92041890ac630283e9d46c7aeabec4021158e6e81f48ace893f2441c8c255f50",
+    "checks-1/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "checks-1/result.json": "e426b8d961a5d221de8cdf9b30f63ea6973a569c9f19c52cf1296733479f42da",
+    "checks-2/payload.json": "1c939797364e695138124b24f24c54d31c588a9b322ae7d9a47f35fb243f5dbf",
+    "checks-2/compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+    "checks-2/result.json": "1c8f4fa24dcda6ffcdb12c6cd2c8232eabda9fa5029333bd3986213ab4b05547",
+    "manifest.json": "aaef41b2cbfb3553f1b070329c3ecf7f0993f87a93779a4188d196b22038a525",
+    "generation.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "overlay.json": "9d41317ce99eb3d4c12d5f15eb39706652e3bd2633272001d6dc8648660c20b3"
+  },
+  "scope": "Ordinary-SELECT session projections reuse existing digest validation; no SQL helper EXECUTE or definer changes. Component compile/races/vet pass; new read-only-role managed-session regression compiled, native pending."
+}

@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-26",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass of ADR-189 with ADR-191. The continuation provisioned all 68 public roles, including permission-accept and permission-audit, then ran the owner selection. It applied the shipped-CRD permission guard and published the permission projection under one retained bracket. The launched hub-worker's fourth child then opened the projection and verified both logins. It ran the binding reconciler against the actual guard (non-administrator dry-run CREATE denied) and published the authority audits through the provider-held audit credential under authority/v1/. Permission stream 091d0d24-... was fresh with 2 acknowledged authority audits. The bootstrap hook replay and the second continuation then passed unchanged (ADR-187). Subtest 474.0 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; empty binding set (no initial review). No retention/cleanup of the authority outbox yet (ADR-189 decision 8), no capacity, no public workflow.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

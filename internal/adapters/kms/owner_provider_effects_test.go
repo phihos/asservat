@@ -1,0 +1,284 @@
+package kms
+
+import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+type ownerEffectFixture struct {
+	mu                       sync.Mutex
+	effects                  *ownerProviderEffects
+	pool                     value.OwnerPool
+	roots                    [][]byte
+	logins, lookups, revokes int
+	failLogins               int // transient provider refusals before success
+	calls                    map[string]int
+	cipher                   string
+	issue                    map[string]time.Time
+	rolePurpose              map[string]string
+}
+
+// withPublic adds an ADR-182 public section with its pinned recipe.
+func newOwnerEffectFixture(t *testing.T, withPublic ...bool) *ownerEffectFixture {
+	t.Helper()
+	tlsFixture := newOwnerProviderControlFixture(t)
+	in, account, secret, now := ownerProviderRecipeInput(t)
+	in.KeyService.Endpoint, in.KeyService.Roots = tlsFixture.server.URL, [][]byte{tlsFixture.server.Certificate().Raw}
+	recipe, err := OwnerProviderRecipeFor(in, "owner-auth", "auth_kubernetes_original", account, secret, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var public [4]providerconfig.OwnerProviderRoleRecipe
+	if len(withPublic) == 1 && withPublic[0] {
+		in.Public = &contracts.OwnerPublicDeployment{SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"}, WorkSigning: contracts.OwnerPublicSigning{Mount: "work-transit", Name: "work", Version: 1, PublicKey: make([]byte, 32)}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000000009", Roots: in.KeyService.Roots}}
+		roles, digest, err := providerconfig.OwnerPublicProviderRecipeFor(in, recipe.Profile, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		in.Public.ProviderRecipeSHA256, public = digest, roles
+	}
+	const id = "10000000-0000-4000-8000-000000000008"
+	pool := value.OwnerPool{InstallationID: in.InstallationID, ClusterID: in.ClusterID, IssuerEpoch: id, Namespace: in.Namespace.Name, NamespaceUID: in.Namespace.UID, Service: "owner", ServiceUID: id, Deployment: "owner", DeploymentUID: id, ServiceAccount: account.Name, AccountUID: account.UID, Port: 8443, NativePort: 9444, NativeBootstrap: value.OwnerBootstrapProfile}
+	f := &ownerEffectFixture{pool: pool, roots: in.KeyService.Roots, calls: map[string]int{}, issue: map[string]time.Time{}, rolePurpose: map[string]string{}}
+	for _, role := range recipe.Roles {
+		f.rolePurpose[role.Name] = role.Purpose
+	}
+	for _, role := range public {
+		if role.Name != "" {
+			f.rolePurpose[role.Name] = role.Purpose
+		}
+	}
+	tlsFixture.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		at := time.Now()
+		role := r.Header.Get("X-Vault-Token")
+		meta := func(role string) map[string]string {
+			return map[string]string{"role": role, "service_account_name": account.Name, "service_account_uid": account.UID, "service_account_namespace": in.Namespace.Name, "service_account_secret_name": ""}
+		}
+		switch r.Method + " " + r.URL.Path {
+		case "POST /v1/auth/owner-auth/login":
+			var input map[string]string
+			if json.NewDecoder(r.Body).Decode(&input) != nil || f.rolePurpose[input["role"]] == "" || input["jwt"] == "" || role != "" {
+				w.WriteHeader(403)
+				return
+			}
+			if f.failLogins > 0 {
+				f.failLogins--
+				w.WriteHeader(503)
+				return
+			}
+			role = input["role"]
+			f.logins++
+			f.issue[role] = at.Truncate(time.Second)
+			auth := ownerProviderAuthReply{ClientToken: role, Accessor: "accessor-" + role, Policies: []string{role}, TokenPolicies: []string{role}, Metadata: meta(role), Orphan: true, EntityID: id, LeaseDuration: 300, Renewable: true, Type: "service"}
+			_ = json.NewEncoder(w).Encode(ownerProviderControlReply{Auth: &auth})
+		case "GET /v1/auth/token/lookup-self":
+			issued, known := f.issue[role]
+			if !known {
+				w.WriteHeader(403)
+				return
+			}
+			f.lookups++
+			v := initialTokenLookup{ID: role, Accessor: "accessor-" + role, Policies: []string{role}, Path: "auth/owner-auth/login", Meta: meta(role), Display: "kubernetes-original-owner", Orphan: true, Creation: issued.Unix(), CreationTTL: 300, Expire: issued.Add(300 * time.Second), TTL: int64(issued.Add(300*time.Second).Sub(at) / time.Second), MaxTTL: 900, Entity: id, Type: "service", Renewable: true, Issued: issued}
+			raw, _ := json.Marshal(v)
+			_ = json.NewEncoder(w).Encode(ownerProviderControlReply{Data: raw})
+		case "POST /v1/auth/token/revoke-self":
+			f.revokes++
+			w.WriteHeader(204)
+		default:
+			purpose := f.rolePurpose[role]
+			want := map[string]string{"audit-wrap": "/v1/audit/encrypt/owner", "audit-unwrap": "/v1/audit/decrypt/owner", "server-sign": "/v1/owner-pki/sign/server", "client-sign": "/v1/owner-pki/sign/client",
+				"browser-seal": "/v1/browser-transit/encrypt/sessions", "browser-open": "/v1/browser-transit/decrypt/sessions", "work-sign": "/v1/work-transit/sign/work", "worker-issue": "/v1/worker-pki/sign/worker"}[purpose]
+			if purpose == "" || r.Method != http.MethodPost || r.URL.Path != want {
+				t.Error("cross-purpose credential reached provider")
+				w.WriteHeader(403)
+				return
+			}
+			f.calls[purpose]++
+			var input map[string]json.RawMessage
+			if json.NewDecoder(r.Body).Decode(&input) != nil {
+				w.WriteHeader(400)
+				return
+			}
+			switch purpose {
+			case "audit-wrap", "browser-seal":
+				if json.Unmarshal(input["plaintext"], &f.cipher) != nil {
+					w.WriteHeader(400)
+					return
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"ciphertext": "synthetic-ciphertext"}})
+			case "audit-unwrap", "browser-open":
+				var cipher string
+				_ = json.Unmarshal(input["ciphertext"], &cipher)
+				if cipher != "synthetic-ciphertext" {
+					w.WriteHeader(400)
+					return
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"plaintext": f.cipher}})
+			default:
+				// Unknown provider outcome: the maintained issuer must not replay it.
+				w.WriteHeader(503)
+			}
+		}
+	})
+	issuerRoots := x509.NewCertPool()
+	issuerRoots.AddCert(tlsFixture.server.Certificate())
+	jwt := func(context.Context) ([]byte, error) {
+		return ownerProviderTestJWT(time.Now().Add(600 * time.Second)), nil
+	}
+	proof := func(ctx context.Context) (time.Time, error) { return time.Now().Add(5 * time.Second), ctx.Err() }
+	f.effects, err = newOwnerProviderEffects(context.Background(), in, recipe.Profile, pool, issuerRoots, jwt, proof, tlsFixture.server.Client(), 2, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := f.effects.close(context.Background()); err != nil {
+			t.Error("effects cleanup did not join", err)
+		}
+	})
+	return f
+}
+
+func TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath(t *testing.T) {
+	f := newOwnerEffectFixture(t)
+	if _, err := f.effects.seal.Seal(context.Background(), []byte("synthetic-keyset"), []byte("binding")); err == nil {
+		t.Fatal("uninitialized effect authenticated")
+	}
+	f.mu.Lock()
+	before := f.logins + f.lookups + len(f.calls)
+	f.mu.Unlock()
+	if before != 0 {
+		t.Fatal("effect dispatched control/provider work without acknowledged lease")
+	}
+	for _, slot := range []*ownerProviderLifetime{f.effects.lifetimes.auditWrap, f.effects.lifetimes.auditUnwrap, f.effects.lifetimes.serverSign, f.effects.lifetimes.clientSign} {
+		if err := slot.refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sealed, err := f.effects.seal.Seal(context.Background(), []byte("synthetic-keyset"), []byte("binding"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := f.effects.open.Open(context.Background(), sealed, []byte("binding"))
+	if err != nil || string(opened) != "synthetic-keyset" {
+		t.Fatal("maintained transit codec did not roundtrip", err)
+	}
+	clear(opened)
+	if _, err = f.effects.open.Open(context.Background(), sealed, []byte("changed-binding")); err == nil {
+		t.Fatal("existing binding verification disappeared")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.logins != 4 || f.lookups != 4 || f.calls["audit-wrap"] != 1 || f.calls["audit-unwrap"] != 2 {
+		t.Fatal("effect authenticated or crossed fixed purpose")
+	}
+}
+
+func TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow(t *testing.T) {
+	f := newOwnerEffectFixture(t)
+	if err := f.effects.lifetimes.auditWrap.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/v1/audit/decrypt/owner", "/v1/auth/token/create", "/v1/audit/encrypt/other", "/v1/audit/encrypt/owner?extra=1"} {
+		r := f.effects.seal.client.NewRequest(http.MethodPost, path)
+		if response, err := f.effects.seal.client.RawRequestWithContext(context.Background(), r); err == nil {
+			if response != nil && response.Body != nil {
+				_ = response.Body.Close()
+			}
+			t.Fatal("fixed leased client accepted another effect")
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.logins != 1 || f.lookups != 1 || len(f.calls) != 0 {
+		t.Fatal("path rejection disclosed credential or did extra control")
+	}
+}
+
+func TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning(t *testing.T) {
+	f := newOwnerEffectFixture(t)
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := mtls.EnrollmentKey(csr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, which := range []struct {
+		slot   *ownerProviderLifetime
+		issuer *OwnerCertificateIssuer
+		usage  string
+	}{{f.effects.lifetimes.serverSign, f.effects.server, "server"}, {f.effects.lifetimes.clientSign, f.effects.client, "client"}} {
+		if err = which.slot.refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC()
+		epoch, end, _ := value.OwnerCertificateWindow(now)
+		const id = "10000000-0000-4000-8000-000000000008"
+		config := value.OwnerConfiguration{Pool: f.pool, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: f.roots}
+		permit := value.OwnerCertificatePermit{ID: id, Binding: value.OwnerBinding{InstallationID: f.pool.InstallationID, ClusterID: f.pool.ClusterID, IssuerEpoch: f.pool.IssuerEpoch, PodUID: id, ProcessEpoch: id}, Usage: which.usage, PublicKeyDigest: digest, EnrollmentAudit: artifact.Digest{3}, Configuration: value.OwnerConfigurationObservation{Configuration: config, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Recovery: value.RecoveryState{InstallationID: f.pool.InstallationID, IssuerEpoch: f.pool.IssuerEpoch, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Epoch: epoch, Ordinal: 1, CheckedAt: now, SignBefore: now.Add(5 * time.Second), CertificateNotAfter: end}
+		if _, err = which.issuer.SignOwnerCertificate(context.Background(), permit, csr); err != ErrKeyService {
+			t.Fatal("unknown signing response or original permit mismatch", err)
+		}
+		permit.EnrollmentAudit = artifact.Digest{}
+		if _, err = which.issuer.SignOwnerCertificate(context.Background(), permit, csr); err == nil {
+			t.Fatal("unacknowledged signing permit reached provider")
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.logins != 2 || f.lookups != 2 || f.calls["server-sign"] != 1 || f.calls["client-sign"] != 1 {
+		t.Fatal("unknown signing replayed or current permit check disappeared")
+	}
+}
+
+// ADR-182: a pinned public recipe adds four separately authenticated
+// purposes, each confined to its own provider path; none exists without it.
+func TestOwnerProviderPublicPurposesAreSeparateAndConfined(t *testing.T) {
+	plain := newOwnerEffectFixture(t)
+	if plain.effects.browserSeal != nil || plain.effects.work != nil || plain.effects.worker != nil || len(plain.effects.lifetimes.all()) != 4 {
+		t.Fatal("public purposes without a public recipe")
+	}
+	f := newOwnerEffectFixture(t, true)
+	if f.effects.browserSeal == nil || f.effects.browserOpen == nil || f.effects.work == nil || f.effects.worker == nil || len(f.effects.lifetimes.all()) != 8 {
+		t.Fatal("public purposes missing")
+	}
+	for _, slot := range f.effects.lifetimes.public {
+		if err := slot.refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sealed, err := f.effects.browserSeal.Seal(context.Background(), []byte("synthetic-session"), []byte("binding"))
+	if err != nil {
+		t.Fatal("browser seal", err)
+	}
+	opened, err := f.effects.browserOpen.Open(context.Background(), sealed, []byte("binding"))
+	if err != nil || string(opened) != "synthetic-session" {
+		t.Fatal("browser open", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.calls["browser-seal"] != 1 || f.calls["browser-open"] != 1 || f.calls["audit-wrap"] != 0 {
+		t.Fatal("public purpose reached another path", f.calls)
+	}
+}

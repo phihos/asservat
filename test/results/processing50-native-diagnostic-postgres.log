@@ -1,0 +1,290 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-12 05:48:33.847 UTC [127] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 05:48:33.847 UTC [127] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 05:48:33.858 UTC [133] LOG:  database system was shut down at 2026-10-12 05:48:31 UTC
+2026-10-12 05:48:33.870 UTC [127] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-12 05:48:34.026 UTC [127] LOG:  received fast shutdown request
+.2026-10-12 05:48:34.028 UTC [127] LOG:  aborting any active transactions
+2026-10-12 05:48:34.029 UTC [127] LOG:  background worker "logical replication launcher" (PID 136) exited with exit code 1
+2026-10-12 05:48:34.029 UTC [131] LOG:  shutting down
+2026-10-12 05:48:34.032 UTC [131] LOG:  checkpoint starting: shutdown immediate
+2026-10-12 05:48:34.975 UTC [131] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.028 s, sync=0.901 s, total=0.946 s; sync files=303, longest=0.124 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-12 05:48:34.987 UTC [127] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-12 05:48:35.047 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-12 05:48:35.047 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-12 05:48:35.047 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-12 05:48:35.049 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-12 05:48:35.057 UTC [197] LOG:  database system was shut down at 2026-10-12 05:48:34 UTC
+2026-10-12 05:48:35.062 UTC [1] LOG:  database system is ready to accept connections
+2026-10-12 05:48:35.104 UTC [202] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-12 05:48:35.104 UTC [202] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-12 05:48:44.499 UTC [219] ERROR:  permission denied for table permission_stream
+2026-10-12 05:48:44.499 UTC [219] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-12 05:48:44.499 UTC [219] ERROR:  permission denied for table context_storage_binding
+2026-10-12 05:48:44.499 UTC [219] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-12 05:48:44.500 UTC [219] ERROR:  permission denied for table context_capture
+2026-10-12 05:48:44.500 UTC [219] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-12 05:48:44.500 UTC [219] ERROR:  permission denied for table context_capture
+2026-10-12 05:48:44.500 UTC [219] STATEMENT:  DELETE FROM context_capture
+2026-10-12 05:48:46.040 UTC [233] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.040 UTC [233] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.040 UTC [233] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.040 UTC [233] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.040 UTC [233] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.040 UTC [233] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.040 UTC [233] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.040 UTC [233] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.056 UTC [235] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.056 UTC [235] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.056 UTC [235] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.056 UTC [235] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.056 UTC [235] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.056 UTC [235] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.057 UTC [235] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.057 UTC [235] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.072 UTC [236] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.072 UTC [236] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.072 UTC [236] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.072 UTC [236] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.073 UTC [236] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.073 UTC [236] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.073 UTC [236] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.073 UTC [236] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.093 UTC [237] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.093 UTC [237] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.094 UTC [237] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.094 UTC [237] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.094 UTC [237] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.094 UTC [237] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.094 UTC [237] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.094 UTC [237] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.095 UTC [234] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.095 UTC [234] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.095 UTC [234] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.095 UTC [234] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.095 UTC [234] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.095 UTC [234] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.095 UTC [234] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.095 UTC [234] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.096 UTC [230] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.096 UTC [230] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.096 UTC [230] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.096 UTC [230] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.096 UTC [230] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.096 UTC [230] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.096 UTC [230] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.096 UTC [230] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.097 UTC [232] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:46.097 UTC [232] STATEMENT:  SELECT * FROM operation_audit LIMIT 1
+2026-10-12 05:48:46.097 UTC [232] ERROR:  permission denied for table operation_audit_account
+2026-10-12 05:48:46.097 UTC [232] STATEMENT:  SELECT * FROM operation_audit_account LIMIT 1
+2026-10-12 05:48:46.097 UTC [232] ERROR:  permission denied for table connector_identity_root
+2026-10-12 05:48:46.097 UTC [232] STATEMENT:  SELECT * FROM connector_identity_root LIMIT 1
+2026-10-12 05:48:46.097 UTC [232] ERROR:  permission denied for table connector_identity_process
+2026-10-12 05:48:46.097 UTC [232] STATEMENT:  SELECT * FROM connector_identity_process LIMIT 1
+2026-10-12 05:48:46.732 UTC [240] ERROR:  connector process proof unavailable
+2026-10-12 05:48:46.732 UTC [240] CONTEXT:  PL/pgSQL function public.lock_connector_process_current(uuid,jsonb,boolean) line 16 at RAISE
+	PL/pgSQL function public.read_connector_process_admission(uuid,uuid,jsonb) line 4 at assignment
+2026-10-12 05:48:46.732 UTC [240] STATEMENT:  -- name: ReadConnectorProcessAdmission :one
+	SELECT read_connector_process_admission($1::uuid,$2::uuid,$3::jsonb)::jsonb
+	
+2026-10-12 05:48:46.734 UTC [238] ERROR:  connector backing candidate already spent
+2026-10-12 05:48:46.734 UTC [238] CONTEXT:  PL/pgSQL function public.stage_connector_identity(uuid,jsonb,jsonb) line 38 at RAISE
+2026-10-12 05:48:46.734 UTC [238] STATEMENT:  -- name: StageConnectorIdentity :one
+	SELECT stage_connector_identity($1::uuid,$2::jsonb,$3::jsonb)::boolean
+	
+2026-10-12 05:48:46.736 UTC [238] ERROR:  connector backing candidate already spent
+2026-10-12 05:48:46.736 UTC [238] CONTEXT:  PL/pgSQL function public.stage_connector_identity(uuid,jsonb,jsonb) line 38 at RAISE
+2026-10-12 05:48:46.736 UTC [238] STATEMENT:  -- name: StageConnectorIdentity :one
+	SELECT stage_connector_identity($1::uuid,$2::jsonb,$3::jsonb)::boolean
+	
+2026-10-12 05:48:46.739 UTC [240] ERROR:  connector process proof unavailable
+2026-10-12 05:48:46.739 UTC [240] CONTEXT:  PL/pgSQL function public.lock_connector_process_current(uuid,jsonb,boolean) line 16 at RAISE
+	PL/pgSQL function public.read_connector_process_admission(uuid,uuid,jsonb) line 4 at assignment
+2026-10-12 05:48:46.739 UTC [240] STATEMENT:  -- name: ReadConnectorProcessAdmission :one
+	SELECT read_connector_process_admission($1::uuid,$2::uuid,$3::jsonb)::jsonb
+	
+2026-10-12 05:48:47.500 UTC [245] ERROR:  connector process proof unavailable
+2026-10-12 05:48:47.500 UTC [245] CONTEXT:  PL/pgSQL function public.lock_connector_process_current(uuid,jsonb,boolean) line 16 at RAISE
+	PL/pgSQL function public.read_connector_process_admission(uuid,uuid,jsonb) line 4 at assignment
+2026-10-12 05:48:47.500 UTC [245] STATEMENT:  -- name: ReadConnectorProcessAdmission :one
+	SELECT read_connector_process_admission($1::uuid,$2::uuid,$3::jsonb)::jsonb
+	
+2026-10-12 05:48:47.502 UTC [243] ERROR:  connector restrictive transition backing exhausted
+2026-10-12 05:48:47.502 UTC [243] CONTEXT:  PL/pgSQL function public.guard_connector_identity_profile() line 16 at RAISE
+	SQL statement "UPDATE public.connector_identity_profile SET blocked=true,fenced=true WHERE root_id=r AND peer_id=peer"
+	PL/pgSQL function public.stage_connector_identity(uuid,jsonb,jsonb) line 62 at SQL statement
+2026-10-12 05:48:47.502 UTC [243] STATEMENT:  -- name: StageConnectorIdentity :one
+	SELECT stage_connector_identity($1::uuid,$2::jsonb,$3::jsonb)::boolean
+	
+2026-10-12 05:48:47.510 UTC [245] ERROR:  connector process proof unavailable
+2026-10-12 05:48:47.510 UTC [245] CONTEXT:  PL/pgSQL function public.lock_connector_process_current(uuid,jsonb,boolean) line 16 at RAISE
+	PL/pgSQL function public.read_connector_process_admission(uuid,uuid,jsonb) line 4 at assignment
+2026-10-12 05:48:47.510 UTC [245] STATEMENT:  -- name: ReadConnectorProcessAdmission :one
+	SELECT read_connector_process_admission($1::uuid,$2::uuid,$3::jsonb)::jsonb
+	
+2026-10-12 05:48:47.572 UTC [235] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:47.572 UTC [235] STATEMENT:  SELECT (SELECT intent FROM operation_audit LIMIT 1) FROM connector_operation_audit
+2026-10-12 05:48:47.574 UTC [235] ERROR:  connector writer cannot acknowledge itself
+2026-10-12 05:48:47.574 UTC [235] CONTEXT:  PL/pgSQL function public.guard_connector_audit_access() line 24 at RAISE
+2026-10-12 05:48:47.574 UTC [235] STATEMENT:  UPDATE connector_operation_audit SET id='20000000-0000-4000-8000-000000000001' WHERE id='10000000-0000-4000-8000-000000000026' RETURNING intent
+2026-10-12 05:48:47.574 UTC [235] ERROR:  permission denied for view connector_operation_lifecycle
+2026-10-12 05:48:47.574 UTC [235] STATEMENT:  UPDATE connector_operation_lifecycle SET intent_completion='{}' WHERE operation_id='10000000-0000-4000-8000-000000000026'
+2026-10-12 05:48:47.574 UTC [235] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.574 UTC [235] STATEMENT:  INSERT INTO connector_operation_audit SELECT * FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.575 UTC [235] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.575 UTC [235] STATEMENT:  DELETE FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.575 UTC [235] ERROR:  permission denied to set role "postgres"
+2026-10-12 05:48:47.575 UTC [235] STATEMENT:  SET ROLE postgres
+2026-10-12 05:48:47.581 UTC [236] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:47.581 UTC [236] STATEMENT:  SELECT (SELECT intent FROM operation_audit LIMIT 1) FROM connector_operation_audit
+2026-10-12 05:48:47.582 UTC [236] ERROR:  connector writer cannot acknowledge itself
+2026-10-12 05:48:47.582 UTC [236] CONTEXT:  PL/pgSQL function public.guard_connector_audit_access() line 24 at RAISE
+2026-10-12 05:48:47.582 UTC [236] STATEMENT:  UPDATE connector_operation_audit SET id='20000000-0000-4000-8000-000000000001' WHERE id='10000000-0000-4000-8000-000000000026' RETURNING intent
+2026-10-12 05:48:47.582 UTC [236] ERROR:  permission denied for view connector_operation_lifecycle
+2026-10-12 05:48:47.582 UTC [236] STATEMENT:  UPDATE connector_operation_lifecycle SET intent_completion='{}' WHERE operation_id='10000000-0000-4000-8000-000000000026'
+2026-10-12 05:48:47.583 UTC [236] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.583 UTC [236] STATEMENT:  INSERT INTO connector_operation_audit SELECT * FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.583 UTC [236] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.583 UTC [236] STATEMENT:  DELETE FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.583 UTC [236] ERROR:  permission denied to set role "postgres"
+2026-10-12 05:48:47.583 UTC [236] STATEMENT:  SET ROLE postgres
+2026-10-12 05:48:47.589 UTC [237] ERROR:  permission denied for table operation_audit
+2026-10-12 05:48:47.589 UTC [237] STATEMENT:  SELECT (SELECT intent FROM operation_audit LIMIT 1) FROM connector_operation_audit
+2026-10-12 05:48:47.591 UTC [237] ERROR:  connector writer cannot acknowledge itself
+2026-10-12 05:48:47.591 UTC [237] CONTEXT:  PL/pgSQL function public.guard_connector_audit_access() line 24 at RAISE
+2026-10-12 05:48:47.591 UTC [237] STATEMENT:  UPDATE connector_operation_audit SET id='20000000-0000-4000-8000-000000000001' WHERE id='10000000-0000-4000-8000-000000000026' RETURNING intent
+2026-10-12 05:48:47.591 UTC [237] ERROR:  permission denied for view connector_operation_lifecycle
+2026-10-12 05:48:47.591 UTC [237] STATEMENT:  UPDATE connector_operation_lifecycle SET intent_completion='{}' WHERE operation_id='10000000-0000-4000-8000-000000000026'
+2026-10-12 05:48:47.591 UTC [237] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.591 UTC [237] STATEMENT:  INSERT INTO connector_operation_audit SELECT * FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.591 UTC [237] ERROR:  permission denied for view connector_operation_audit
+2026-10-12 05:48:47.591 UTC [237] STATEMENT:  DELETE FROM connector_operation_audit RETURNING intent
+2026-10-12 05:48:47.591 UTC [237] ERROR:  permission denied to set role "postgres"
+2026-10-12 05:48:47.591 UTC [237] STATEMENT:  SET ROLE postgres
+2026-10-12 05:48:47.727 UTC [251] ERROR:  permission denied for table context_catalog
+2026-10-12 05:48:47.727 UTC [251] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-12 05:48:47.728 UTC [251] ERROR:  permission denied for table context_verification
+2026-10-12 05:48:47.728 UTC [251] STATEMENT:  UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:47.743 UTC [252] ERROR:  permission denied for table context_verification
+2026-10-12 05:48:47.743 UTC [252] STATEMENT:  UPDATE context_verification SET authority_digest=authority_digest
+2026-10-12 05:48:47.744 UTC [252] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:47.744 UTC [252] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 05:48:47.759 UTC [253] ERROR:  permission denied for table context_verification
+2026-10-12 05:48:47.759 UTC [253] STATEMENT:  UPDATE context_verification SET expectation_digest=expectation_digest
+2026-10-12 05:48:47.774 UTC [254] ERROR:  permission denied for table context_catalog
+2026-10-12 05:48:47.774 UTC [254] STATEMENT:  UPDATE context_catalog SET published_at=clock_timestamp()
+2026-10-12 05:48:48.850 UTC [263] ERROR:  permission denied for table processing_root
+2026-10-12 05:48:48.850 UTC [263] STATEMENT:  UPDATE processing_root SET initialized_at=clock_timestamp()
+2026-10-12 05:48:48.850 UTC [263] ERROR:  permission denied for table processing_rule
+2026-10-12 05:48:48.850 UTC [263] STATEMENT:  DELETE FROM processing_rule
+2026-10-12 05:48:48.850 UTC [263] ERROR:  permission denied for table processing_rule
+2026-10-12 05:48:48.850 UTC [263] STATEMENT:  UPDATE processing_rule SET state='released'
+2026-10-12 05:48:48.850 UTC [263] ERROR:  permission denied for table context_processing
+2026-10-12 05:48:48.850 UTC [263] STATEMENT:  INSERT INTO context_processing SELECT * FROM context_processing LIMIT 0
+2026-10-12 05:48:48.851 UTC [263] ERROR:  permission denied for table processing_decision
+2026-10-12 05:48:48.851 UTC [263] STATEMENT:  INSERT INTO processing_decision SELECT * FROM processing_decision LIMIT 0
+2026-10-12 05:48:49.689 UTC [276] FATAL:  remaining connection slots are reserved for roles with the SUPERUSER attribute
+2026-10-12 05:48:49.708 UTC [277] ERROR:  permission denied for table artifact_download
+2026-10-12 05:48:49.708 UTC [277] STATEMENT:  UPDATE artifact_download SET deadline=deadline
+2026-10-12 05:48:49.708 UTC [277] ERROR:  permission denied for table fleet_trust
+2026-10-12 05:48:49.708 UTC [277] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-12 05:48:49.708 UTC [277] ERROR:  permission denied for table fleet_trust
+2026-10-12 05:48:49.708 UTC [277] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=issuer_epoch
+2026-10-12 05:48:49.709 UTC [277] ERROR:  permission denied for table fleet_trust
+2026-10-12 05:48:49.709 UTC [277] STATEMENT:  UPDATE fleet_trust SET fresh_until=clock_timestamp()
+2026-10-12 05:48:49.723 UTC [278] ERROR:  permission denied for table fleet_trust
+2026-10-12 05:48:49.723 UTC [278] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-12 05:48:49.724 UTC [277] ERROR:  permission denied for table download_batch
+2026-10-12 05:48:49.724 UTC [277] STATEMENT:  UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.724 UTC [277] ERROR:  permission denied for table download_allocation
+2026-10-12 05:48:49.724 UTC [277] STATEMENT:  UPDATE download_allocation SET output_limit=output_limit
+2026-10-12 05:48:49.739 UTC [279] ERROR:  permission denied for table artifact_download
+2026-10-12 05:48:49.739 UTC [279] STATEMENT:  UPDATE artifact_download SET charged_output=0
+2026-10-12 05:48:49.739 UTC [279] ERROR:  permission denied for table download_batch
+2026-10-12 05:48:49.739 UTC [279] STATEMENT:  UPDATE download_batch SET outcome_json=outcome_json
+2026-10-12 05:48:49.754 UTC [280] ERROR:  permission denied for table artifact_download
+2026-10-12 05:48:49.754 UTC [280] STATEMENT:  UPDATE artifact_download SET state='Ready'
+2026-10-12 05:48:49.785 UTC [281] ERROR:  permission denied for table retention_decision
+2026-10-12 05:48:49.785 UTC [281] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.786 UTC [281] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:49.786 UTC [281] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 05:48:49.801 UTC [282] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:49.801 UTC [282] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-12 05:48:49.802 UTC [282] ERROR:  permission denied for table retention_decision
+2026-10-12 05:48:49.802 UTC [282] STATEMENT:  UPDATE retention_decision SET decision_json=decision_json
+2026-10-12 05:48:49.816 UTC [283] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:49.816 UTC [283] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-12 05:48:49.833 UTC [284] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.833 UTC [284] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-12 05:48:49.833 UTC [284] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.833 UTC [284] STATEMENT:  UPDATE retention_source SET protection_digest=protection_digest
+2026-10-12 05:48:49.833 UTC [284] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 05:48:49.833 UTC [284] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.833 UTC [284] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 05:48:49.833 UTC [284] STATEMENT:  DELETE FROM retention_checkpoint
+2026-10-12 05:48:49.848 UTC [285] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 05:48:49.848 UTC [285] STATEMENT:  UPDATE retention_checkpoint SET transition_json=transition_json
+2026-10-12 05:48:49.848 UTC [285] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.848 UTC [285] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-12 05:48:49.848 UTC [284] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:49.848 UTC [284] STATEMENT:  UPDATE custody_attempt SET effective_delete_by=delete_by
+2026-10-12 05:48:49.863 UTC [286] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.863 UTC [286] STATEMENT:  UPDATE retention_source SET fresh_until=clock_timestamp()
+2026-10-12 05:48:49.863 UTC [286] ERROR:  permission denied for table retention_catchup
+2026-10-12 05:48:49.863 UTC [286] STATEMENT:  UPDATE retention_catchup SET completed_at=clock_timestamp()
+2026-10-12 05:48:49.864 UTC [286] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 05:48:49.864 UTC [286] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.864 UTC [286] ERROR:  permission denied for table retention_decision
+2026-10-12 05:48:49.864 UTC [286] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.880 UTC [287] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.880 UTC [287] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-12 05:48:49.880 UTC [287] ERROR:  permission denied for table retention_source
+2026-10-12 05:48:49.880 UTC [287] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-12 05:48:49.880 UTC [287] ERROR:  permission denied for table retention_checkpoint
+2026-10-12 05:48:49.880 UTC [287] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.881 UTC [287] ERROR:  permission denied for table retention_decision
+2026-10-12 05:48:49.881 UTC [287] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-12 05:48:49.881 UTC [287] ERROR:  permission denied for table custody_attempt
+2026-10-12 05:48:49.881 UTC [287] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-12 05:48:49.881 UTC [287] ERROR:  permission denied for table retention_catchup
+2026-10-12 05:48:49.881 UTC [287] STATEMENT:  DELETE FROM retention_catchup

@@ -1,0 +1,44 @@
+{
+  "integratedAt": 1791862542.074513,
+  "session": 64523,
+  "files": [
+    {
+      "path": "test/integration/versioned_audit_storage_test.go",
+      "base": null,
+      "sha256": "ab124314fc77c937a50f2afd1e54313da3b6e1d26bf09e208f40ed67be0179ec"
+    }
+  ],
+  "compile": {
+    "checks": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-native-20261013/overlay.json",
+          "-run",
+          "^$",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 11.631
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-native-20261013/overlay.json",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 2.12
+      }
+    ],
+    "terminalExit": 0,
+    "payloadSHA256": "ab124314fc77c937a50f2afd1e54313da3b6e1d26bf09e208f40ed67be0179ec",
+    "dependenciesSHA256": "6ad26ab7351d6cbfbe6314f352ca50ac421e9930f01e611d47525792f089c9a4",
+    "nativeExecuted": false
+  },
+  "native": "pending"
+}

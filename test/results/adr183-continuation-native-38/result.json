@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-38",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure. The owner started and stayed ready (no provider-prime exit). After the capacity projection was published the hub-worker restarted 5 times, each time printing 'service stopped at startup (unavailable)' after acquiring its Lease; no capacity_workload row was created. The Lease runner discarded the work's error, so the child step never reached the stop message. It now reports the work's fixed step, or 'lease' when leadership ended, and an early nil child return is named.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

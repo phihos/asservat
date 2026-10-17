@@ -1,0 +1,79 @@
+{
+  "mode": "owner",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair",
+    "--runtime-provider-worker",
+    "--runtime-provider-owner"
+  ],
+  "runnerSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 2497,
+  "sourceSnapshotSHA256": "48e0dc30d6c21046b401b7cce7f37e314955ebb212535726091d123273dc15e2",
+  "expectedHarnessSourceCount": 2300,
+  "requiredPassedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "expectedSkippedTests": [],
+  "scratch": "/home/phil/.cache/asservat-build/runtime-provider-owner-native-5-tmp",
+  "validationErrors": [
+    "gate command failed",
+    "missing required selected PASS names",
+    "native test exit/source stability failed"
+  ],
+  "processJoined": true,
+  "diskBeforeBytes": 428226621440,
+  "tmpFreeBeforeBytes": 16779960320,
+  "commandExit": 1,
+  "seconds": 553.787,
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "missingRequiredTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity"
+  ],
+  "cleanupFailures": [],
+  "testExit": 1,
+  "exactHarnessSources": true,
+  "ownedDockerCleanup": {
+    "container": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "network": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "volume": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "image": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "kindNodes": {
+      "exit": 0,
+      "remainingNames": []
+    }
+  },
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "48e0dc30d6c21046b401b7cce7f37e314955ebb212535726091d123273dc15e2",
+    "expected-harness-sources.json": "23ef11229129d0bfa62e793d08c6752323c9f3e1ae35566fddcf157e927a3c97",
+    "gate.log": "7200312114c4ba2fd2efd8a11ddb3372f9fd9d5bc92c00944e966838822ac3b8",
+    "context-storage.log": "b10e9bbc9076934c2fcfa8b9d83a32f70726534614df456ebacc57f9c40d9a9c",
+    "context-storage-environment.json": "e5a0fd4c2c34b0d21d12ab4faedc78db1232692f61556b6059ee370a288ffdc2",
+    "context-storage-kubelet.log": "64ad0d8704614735fa7a2d66ed2464713baf97517b827608d5b3c002b255ccfe",
+    "context-storage-postgres.log": "d703e7ec1c317705b069983b0d7f85cc844055ac9fbda8604bd8ff637dd91215"
+  },
+  "exit": 1
+}

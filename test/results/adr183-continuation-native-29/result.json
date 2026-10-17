@@ -1,0 +1,13 @@
+{
+  "name": "adr183-continuation-native-29",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [],
+  "result": "Diagnostic fixture run. The kind node could not pull registry.k8s.io/pause (ErrImagePull, DeadlineExceeded). Containers on the shared 'kind' Docker network had no IPv4 or IPv6 egress, while the default bridge and a freshly created network reached the registry (HTTP 401 in 0.1 s). The shared network's host rules are stale. Other projects' stopped containers exist, so the shared network was not recreated. The harness now creates an owned, labeled kind network per run (KIND_EXPERIMENTAL_DOCKER_NETWORK) and removes it in its cleanup.",
+  "scope": "Infrastructure only; no product code ran.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "environment": "environment.json"
+}

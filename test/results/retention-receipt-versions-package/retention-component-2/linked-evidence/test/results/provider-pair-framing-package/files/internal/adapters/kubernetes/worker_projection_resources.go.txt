@@ -1,0 +1,94 @@
+package kubernetes
+
+import (
+	"context"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+)
+
+// A projection publisher borrows this lifetime through its final effect and
+// readback, not just through the individual journal reads. It grants no source
+// authority and never moves the caller's original deadline.
+func (s *InitialRuntimeResources) borrowWorkerProjection(ctx context.Context) (context.Context, func(), error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.closed || s.ctx == nil || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return nil, nil, cfg.ErrUnavailable
+	}
+	s.joined.Add(1)
+	s.mu.Unlock()
+	live, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	return live, func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+		s.joined.Done()
+	}, nil
+}
+
+// This concrete administrator helper runs only inside bridge.operation. It
+// cannot accept a callback, change SQL, relax the old resource producer's
+// current() check or serve a runtime reader. Later purpose-fixed projection
+// writers share the exact retained-phase proof and original resource decoder.
+func (s *InitialRuntimeBridge) readInstalledWorkerResources(ctx context.Context, resources *InitialRuntimeResources, original contracts.PublicRuntimeWorkerBinding) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, error) {
+	var zero contracts.InitialRuntimeResourceSnapshot
+	if s == nil || s.source == nil || resources == nil || ctx == nil || ctx.Err() != nil || resources.preparer != s.preparer ||
+		resources.rootUID != s.rootUID || !equalJSON(resources.initial, s.initial) ||
+		resources.workerLayout == "" || resources.workerLayout != original.WorkerLayout || !initialRuntimeProviderSelectionValid(resources.initial.InstallationID, resources.workerLayout, resources.ownerLayout, resources.workerProvider, resources.ownerProvider) ||
+		original.Resources.Name != resources.name() || !authorization.UUID(original.Resources.UID) ||
+		!authorization.UUID(original.ResourceSetupID) || original.ResourceBinding != resources.binding ||
+		original.Configuration != s.source.input {
+		return zero, nil, cfg.ErrChanged
+	}
+	// The bridge owns the outer operation. Also retain the borrowed resource
+	// parser through cancellation/join so its Close cannot race an API read.
+	live, finish, err := resources.borrowWorkerProjection(ctx)
+	if err != nil {
+		return zero, nil, err
+	}
+	defer finish()
+	before, _, _, phase, err := s.readCurrent(live)
+	if err != nil || phase != 2 || before.State.Probe == nil || before.State.Probe.Receipt == nil || before.State.Retained == nil || before.State.Retained.Receipt == nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	live, end := context.WithDeadline(live, before.ValidUntil)
+	defer end()
+	snapshot, object, err := resources.read(live)
+	if err != nil || snapshot.UID != original.Resources.UID || snapshot.State.SetupID != original.ResourceSetupID ||
+		snapshot.State.BindingDigest != original.ResourceBinding || snapshot.State.WorkerLayout != original.WorkerLayout ||
+		len(snapshot.State.Objects) != contracts.InitialRuntimeResourceCount || s.deadline(live) != nil {
+		return zero, nil, cfg.ErrChanged
+	}
+	for _, item := range []struct {
+		index int
+		name  string
+		want  contracts.PublicRuntimeWorkerObject
+	}{{1, resources.names.Worker, original.Account}, {11, resources.names.Worker, original.Deployment}, {13, resources.names.Lease, original.Lease}} {
+		c := snapshot.State.Objects[item.index]
+		if c.Receipt == nil || item.want.Reference.Name != item.name || c.OperationID != item.want.OperationID || c.TemplateDigest != item.want.TemplateDigest || c.Receipt.UID != item.want.Reference.UID {
+			return zero, nil, cfg.ErrChanged
+		}
+	}
+	if snapshot.State.Objects[18].Receipt == nil {
+		return zero, nil, cfg.ErrChanged
+	}
+	after, _, _, phase, err := s.readCurrent(live)
+	if err != nil || phase != 2 || after.UID != before.UID || !equalJSON(after.State, before.State) || s.deadline(live) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	snapshot.ValidUntil = identity.Earlier(snapshot.ValidUntil, identity.Earlier(before.ValidUntil, after.ValidUntil))
+	if initialHandoverDeadline(live, s.source.client.now, snapshot.ValidUntil) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	return snapshot, object, nil
+}

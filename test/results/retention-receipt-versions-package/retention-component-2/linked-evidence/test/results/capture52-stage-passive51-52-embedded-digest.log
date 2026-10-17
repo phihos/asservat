@@ -1,0 +1,5 @@
+=== RUN   TestInitialSchemaEmbeddedBundleAndClosedAnnotations
+    initial_schema_test.go:19: actual embedded schema head=52 digest=eeac831739ef12bff1d88427ef4c0751b78684f81e7d527d57b1ced2fd7eb32b
+--- PASS: TestInitialSchemaEmbeddedBundleAndClosedAnnotations (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	0.007s

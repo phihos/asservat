@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/domain/audit	(cached) [no tests to run]
+ok  	asservat.local/asservat/internal/application/audit	(cached) [no tests to run]
+ok  	asservat.local/asservat/internal/application/fleet	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached) [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.012s [no tests to run]

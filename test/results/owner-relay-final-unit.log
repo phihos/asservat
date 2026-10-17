@@ -1,0 +1,10 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/owner_credentials_test.go:307:2: undefined: cf
+internal/adapters/mtls/owner_credentials_test.go:315:27: undefined: cf
+internal/adapters/mtls/owner_credentials_test.go:350:210: undefined: cf
+ok  	asservat.local/asservat/internal/application/evidence	1.057s
+ok  	asservat.local/asservat/internal/application/fleet	1.017s
+ok  	asservat.local/asservat/internal/domain/authorization	1.389s
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	(cached)
+FAIL

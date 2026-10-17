@@ -1,0 +1,5 @@
+{
+  "internal/adapters/mtls/connector_observation_connection_test.go": "c0192d0b2d01a3efa40f872f0ae9b7526c7ad91af03241cc0ea0d560d2ed828f",
+  "internal/adapters/mtls/connector_operation_connection_test.go": "8f140b3952faf40970741159e7bc8d84008819066162886a044535d03e307e3e",
+  "internal/adapters/mtls/owner_observation_dial_test.go": "0c24f6d07edb0ae4b64cdb72490da38e6ccf11bb3f68bc11692aaeb4ab25e1b0"
+}

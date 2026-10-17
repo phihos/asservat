@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/hub-worker-activation.schema.json",
+  "title": "Original installed worker activation provenance",
+  "description": "Original fixed public resource journal and current native workload guard pins. Pending effects retain the original thirty-minute journal end; completed receipts are historical provenance only and require fresh current checks on restart. No credentials, arbitrary subsystem, source acceptance or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "resources",
+    "setupID",
+    "bindingDigest",
+    "workerLayout",
+    "createdAt",
+    "until",
+    "deployment",
+    "serviceAccount",
+    "ownerDeployment",
+    "workloadGuard",
+    "configurationProbes",
+    "schedulingLeases",
+    "initialHistoryProbe"
+  ],
+  "properties": {
+    "resources": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "bindingDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "workerLayout": {
+      "const": "asservat-hub-worker-installed/v1"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deployment": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "serviceAccount": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "ownerDeployment": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "workloadGuard": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+    },
+    "configurationProbes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/configurationProbes/items"
+      }
+    },
+    "schedulingLeases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/schedulingLeases/items"
+      }
+    },
+    "initialHistoryProbe": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/initialHistoryProbe"
+    },
+    "capacityProbe": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/capacityProbe"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "capacityProbe"
+        ]
+      },
+      "then": {
+        "properties": {
+          "configurationProbes": {
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "configurationProbes": {
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    }
+  ]
+}

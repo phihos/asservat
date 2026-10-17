@@ -1,0 +1,4 @@
+=== RUN   TestDecoderExpansionBound
+--- PASS: TestDecoderExpansionBound (0.01s)
+PASS
+ok  	asservat.local/experiments/feasibility	0.011s

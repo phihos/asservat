@@ -1,0 +1,14 @@
+--- a/internal/bootstrap/installed_hub_worker.go
++++ b/internal/bootstrap/installed_hub_worker.go
+@@ -14,8 +14,9 @@
+ // InstalledHubWorkerDeployment owns the three fixed A-HWORK children. Only
+ // configuration starts with the initial projection. Capacity and cleanup wait
+ // independently for their original journal's positively completed receipts.
+-// This constructor is not selected by the command until the complete protected
+-// provider/projection handoff has been qualified.
++// The private hub-worker command selects this composition for the complete
++// protected provider layout. Native startup and active-actor qualification
++// remain pending; no Helm or public collection is enabled.
+ type InstalledHubWorkerDeployment struct{ capacity *CapacityHubWorkerDeployment }
+ 
+ func NewInstalledHubWorkerDeployment(ctx context.Context, files *os.Root) (*InstalledHubWorkerDeployment, error) {

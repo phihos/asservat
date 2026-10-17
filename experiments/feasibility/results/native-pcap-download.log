@@ -1,0 +1,5 @@
+=== RUN   TestGadgetArtifactNativeDownload
+    storage_test.go:400: actual Gadget PCAPNG -> encrypted multipart S3 -> authenticated TLS native download: 101968 bytes SHA256 00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f
+--- PASS: TestGadgetArtifactNativeDownload (0.22s)
+PASS
+ok  	asservat.local/experiments/feasibility	0.229s

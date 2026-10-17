@@ -1,0 +1,11 @@
+# ADR-053 — Explicit Keycloak access-token profile
+
+Date: 2026-10-10. Status: explicitly selected by the maintainer as the first supported/tested provider for browser sign-in and MCP access. Local access-token qualification has passed; this does not qualify an operator's realm or enable public login.
+
+Extend ADR-049 with a separately configured `keycloak-rs256/v1` profile. Preserve the default RFC 9068 adapter; never guess a profile from a token. Keycloak uses `JWT` in the header, signed `typ=Bearer` and `azp` for the originating client. Require the fixed API audience, issuer, algorithm, bounded key snapshot and original timestamps as before. Reject ID/refresh tokens, conflicting `client_id`, delegated/impersonated credentials, unsupported proof-of-possession and ambiguous claims.
+
+Use Keycloak's existing User Attribute mapper with aggregation to emit the dedicated `asservat_groups` claim. A configured group receives its native UUID as an administrator-controlled `asservat_group_id` attribute; rename does not change that value. Recreated groups receive new UUIDs. No custom Java provider is required. Do not treat display names, full paths or arbitrary user-editable attributes as stable membership. The realm profile must make the attribute administrator-only, disable unmanaged attributes, and restrict group/mapper/client administration. Missing dedicated membership means an empty group set, never a fallback to `groups`; organization and workload eligibility still apply.
+
+Separate human authorization-code/PKCE clients from service-account clients. Qualified configuration must disable cross-class issuance, unwanted exchange, self-registration and untrusted identity brokering; Asservat never infers human status from a username. Other operators may retain another qualified IdP/profile. Keycloak remains a reference, not a bundled mandatory service or a new runtime Admin API dependency.
+
+Provider qualification must exercise real TLS tokens, current groups on refresh, attribute write protection and client classes. The [provider contract](../architecture/keycloak-profile.md) records results and limits. These checks do not replace protected installation configuration, current permission projections, session CSRF, assurance/step-up or MCP authorization.

@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-6",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Phase 1 again complete; the SQL role producer constructor (including its current-trust check) succeeded and the continuation stopped inside ConfigurationRuntimeSQLRoles.Provision (unavailable). Run 7 adds fixed provisioning sub-steps (current/open/claim/role/authenticate/complete/verify with the fixed purpose name) to the stop message.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

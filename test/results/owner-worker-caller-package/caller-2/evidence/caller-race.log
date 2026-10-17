@@ -1,0 +1,38 @@
+=== RUN   TestOwnerBootstrapWorkerCallerOriginalReceipts
+--- PASS: TestOwnerBootstrapWorkerCallerOriginalReceipts (4.28s)
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/missing_launch_receipt
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/role_root_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/launch_marker
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_account_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/template_annotation
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/image
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/guard_receipt
+--- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement (28.63s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/missing_launch_receipt (4.31s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/role_root_UID (3.49s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/launch_marker (3.51s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_UID (3.42s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_account_UID (3.44s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/template_annotation (3.48s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/image (3.49s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/guard_receipt (3.48s)
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/guard_lost
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/child_replaced
+--- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent (10.74s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed (3.60s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/guard_lost (3.52s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/child_replaced (3.62s)
+=== RUN   TestOwnerBootstrapWorkerCallerCloseAndCopyDeny
+--- PASS: TestOwnerBootstrapWorkerCallerCloseAndCopyDeny (3.60s)
+=== RUN   TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead
+--- PASS: TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead (3.58s)
+=== RUN   TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable
+--- PASS: TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable (3.57s)
+=== RUN   TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable
+--- PASS: TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable (3.59s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	59.054s

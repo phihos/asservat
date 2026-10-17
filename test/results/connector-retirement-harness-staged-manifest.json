@@ -1,0 +1,17 @@
+[
+  {
+    "path": "scripts/test-custody.py",
+    "base_sha256": "dc920ab87516e952e2e25e155f1d5b9f7cee222b3e4fe80e1610d0a4324b9313",
+    "sha256": "b84ad4eb2a2a93deb9d1002b66146f2d50ea377bb56a661f03fae3e7e42d34c5"
+  },
+  {
+    "path": "Makefile",
+    "base_sha256": "3d19b6a82b0b538948b4aa18831dc919275033afe90518bae9a0949f22b633b4",
+    "sha256": "164280c13000ceb54e1d954ba186e4c8f08a41b215bf9650b21e800fbdb8027b"
+  },
+  {
+    "path": "docs/validation.md",
+    "base_sha256": "763c4bfe0bf1cbd1e3aaa0e0df4f081d1282aa1d7ef49708145319610d12c47e",
+    "sha256": "cb8a8267eaf0d756ebfc2ceca4120df2fb7adc4e1225ed2519ab6e4341281ca7"
+  }
+]

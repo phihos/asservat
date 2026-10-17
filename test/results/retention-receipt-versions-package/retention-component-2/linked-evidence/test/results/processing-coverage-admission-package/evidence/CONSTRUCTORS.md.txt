@@ -1,0 +1,53 @@
+# Constructor inventory and qualification scope
+
+Live source search (internal + test Go, excluding retained result evidence):
+
+1. `internal/application/capture/context_investigation_test.go:61` is the sole
+   application fixture literal. Its explicit synthetic coverage port is added
+   only in `context_processing_test.go`. ContextSubmission, continuation,
+   diagnostic, resolution, target and preview tests all reuse this fixture.
+   The fixture clock now starts at a current microsecond instant so the new
+   original absolute context deadline is usable; tests still control subsequent
+   fake-clock advances and changes. It does not issue production authority.
+2. `test/integration/context_continuation_native_test.go:107` builds the actual
+   native C09 path. It now supplies `postgres.ProcessingReads` using the existing
+   test catalog reader's processing SELECT/recovery privileges. The same native
+   setup has independently initialized processing before preview. This is an
+   actual SQL reader in a fixture, not a claim that installed role15 composition
+   exists. Its native selector must be requalified after this change.
+3. No live bootstrap or production `ContextInvestigation` literal exists. The
+   installed public graph remains incomplete. It must supply its original fixed
+   purpose15 reader before public enablement; this package does not invent a
+   fallback or report that boundary complete. The SQL54 native capacity helper
+   separately uses the actually created fixed purpose15 and purpose40 roles.
+
+The next local qualification must run the full application/capture and
+transport/presentation race suites, not only new selectors. Compile integration
+and run the existing bootstrap tests because construction may remain type-correct
+while rejecting a missing mandatory port. No new synthetic production fallback.
+
+Candidate-v1 was frozen before the parent's requested plain outward copy. It
+has no build or native result. A distinct v2 will preserve it and change only
+that reviewed copy/test plus any separately recorded source review correction.
+
+Planned one sequential bounded job, only after parent allocation:
+
+- Verify original bases, payloads and all dependencies.
+- Failing-before application race test uses the original live Preview/Request
+  bodies plus the new field declaration solely for fixture type compatibility.
+  `TestContextProcessingCoveragePrecedesPreviewAndAdmission` must reach an actual
+  assertion failure; compilation failure does not count.
+- Corrected full races in application/capture, transport/presentation and
+  bootstrap; focused processing predicate/grant races in adapters/postgres and
+  domain/capture tests; integration compile with no fixture environment.
+- Affected vet and Go/design architecture checks in the allocated sequential job;
+  no sqlc is necessary.
+- Verify unchanged hashes, real exit values and joined terminal state.
+
+Parent-owned actual qualification: the full original
+`TestCapacityProducerWithRealPostgres` selector must retain the existing healthy
+publication/original-session path and add specific purpose15/40 insufficient
+coverage, exact no-charge state and permission-lock expiry negatives. This uses
+real SQL52/54 but keeps original human, target and backend-history facts
+explicitly synthetic. It neither qualifies continuous history replenishment nor
+enables the installed public workflow.

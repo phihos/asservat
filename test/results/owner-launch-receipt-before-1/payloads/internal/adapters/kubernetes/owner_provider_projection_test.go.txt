@@ -1,0 +1,183 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// Public input/credential shape only: these fixtures do not satisfy native or
+// SQL current proof and cannot create a successful opaque provider setup check.
+func providerOwnerProjectionFixture(t *testing.T) (*OwnerIdentityRoleRoot, contracts.OwnerDeployment, contracts.OwnerIdentityActivation, contracts.OwnerIdentityRoleSnapshot) {
+	t.Helper()
+	r, in, state := ownerProjectionOriginalInputFixture(t)
+	r.resources.workerLayout = contracts.HubWorkerProviderInstalledLayout
+	r.resources.ownerLayout = contracts.OwnerProviderInstalledLayout
+	r.input.OwnerLayout = contracts.OwnerProviderInstalledLayout
+	r.resources.workerProvider = &contracts.ConfigurationProviderSelection{AuthMount: "configuration", AuthMountAccessor: "auth_configuration", AuditCredentials: contracts.WorkerObjectReference{Name: r.resources.names.WorkerProviders, UID: ownerID(14931)}}
+	r.resources.ownerProvider = &contracts.OwnerProviderSelection{AuthMount: "owner", AuthMountAccessor: "auth_owner", AuditCredentials: contracts.WorkerObjectReference{Name: contracts.OwnerProviderAuditSecretName(in.InstallationID), UID: ownerID(14932)}}
+	recipe, err := providerconfig.OwnerProviderRecipeFor(in, "owner", "auth_owner", r.input.ServiceAccount, r.resources.ownerProvider.AuditCredentials, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.ProviderAuthentication = &recipe.Profile
+	a := contracts.OwnerIdentityActivation{Input: r.input, RoleRoot: state.OwnerIdentity.RoleRoot, RoleSetupID: state.OwnerIdentity.RoleSetupID, ResourcesCreatedAt: state.CreatedAt, ResourcesUntil: state.Until}
+	_, private, now := ownerIdentityPrivateStateFixture(t)
+	private.Input, private.OperationID = r.input, a.RoleSetupID
+	for i := range private.Roles {
+		role := &private.Roles[i]
+		ordinal, _ := contracts.OwnerIdentityRoleOrdinal(role.Purpose)
+		role.Receipt = &contracts.PublicRuntimeRoleReceipt{RoleName: fmt.Sprintf("as_%s_own_%02d", strings.ReplaceAll(in.InstallationID, "-", ""), ordinal), RoleOID: uint32(14910 + i), LayoutDigest: r.input.LayoutDigest}
+	}
+	roles := contracts.OwnerIdentityRoleSnapshot{State: private, UID: a.RoleRoot.UID, ValidUntil: now.Add(time.Second)}
+	return r, in, a, roles
+}
+
+func TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects(t *testing.T) {
+	r, in, _, _ := providerOwnerProjectionFixture(t)
+	v := &ownerProjectionNoEffects{}
+	if !ownerIdentityProjectionInputBound(r, in, time.Now()) {
+		t.Fatal("original v2 public input denied")
+	}
+	if _, err := NewOwnerIdentityProjection(r, v, in, OwnerIdentityProviderMaterial{}); err == nil {
+		t.Fatal("legacy constructor selected v2 provider")
+	}
+	if _, err := NewProviderOwnerIdentityProjection(r, v, in, nil); err == nil {
+		t.Fatal("missing concrete setup reader accepted")
+	}
+	for name, mutate := range map[string]func(*contracts.OwnerDeployment){
+		"omission":        func(v *contracts.OwnerDeployment) { v.ProviderAuthentication = nil },
+		"accessor":        func(v *contracts.OwnerDeployment) { v.ProviderAuthentication.AuthMountAccessor = "other" },
+		"account":         func(v *contracts.OwnerDeployment) { v.ProviderAuthentication.ServiceAccount.UID = ownerID(14990) },
+		"selected-secret": func(v *contracts.OwnerDeployment) { v.ProviderAuthentication.AuditCredentials.UID = ownerID(14990) },
+		"recipe":          func(v *contracts.OwnerDeployment) { v.ProviderAuthentication.RecipeSHA256 = strings.Repeat("1", 64) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, _ := json.Marshal(in)
+			var bad contracts.OwnerDeployment
+			_ = json.Unmarshal(raw, &bad)
+			mutate(&bad)
+			if ownerIdentityProjectionInputBound(r, bad, time.Now()) {
+				t.Fatal("changed provider selected original projection")
+			}
+		})
+	}
+	if v.calls != 0 {
+		t.Fatal("constructor reached credential effects")
+	}
+	legacy, old, _ := ownerProjectionOriginalInputFixture(t)
+	old.ProviderAuthentication = in.ProviderAuthentication
+	if _, err := NewOwnerIdentityProjection(legacy, v, old, OwnerIdentityProviderMaterial{}); err == nil {
+		t.Fatal("legacy silently ignored recognized profile")
+	}
+}
+
+func TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe(t *testing.T) {
+	_, in, a, roles := providerOwnerProjectionFixture(t)
+	out, _, data, digest, err := ownerIdentityProjectionMaterial(in, a, roles, OwnerIdentityProviderMaterial{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearRuntimeProjection(data)
+	if len(data) != 5 || out.ProviderAuthentication == nil || out.Observation.Activation == nil || digest == "" {
+		t.Fatal("v2 projection incomplete")
+	}
+	for _, key := range []string{contracts.OwnerIdentityRoleManifestFile, "sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json"} {
+		if len(data[key]) == 0 {
+			t.Fatal("missing original SQL projection", key)
+		}
+	}
+	if in.Observation.Activation != nil {
+		t.Fatal("caller public input mutated")
+	}
+	for name, material := range map[string]OwnerIdentityProviderMaterial{
+		"wrap": {WrapToken: "synthetic-wrap"}, "unwrap": {OpenToken: "synthetic-open"}, "server": {ServerToken: "synthetic-server"}, "client": {ClientToken: "synthetic-client"}, "storage": {Audit: contracts.OwnerStorageCredential{AccessKeyID: "synthetic", SecretAccessKey: "synthetic"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, bytes, _, e := ownerIdentityProjectionMaterial(in, a, roles, material, time.Now()); e == nil {
+				clearRuntimeProjection(bytes)
+				t.Fatal("legacy private material copied into v2")
+			}
+		})
+	}
+	changed := roles
+	raw, _ := json.Marshal(roles.State)
+	_ = json.Unmarshal(raw, &changed.State)
+	clear(raw)
+	changed.State.Roles[0].Password = changed.State.Roles[1].Password // invalid private state still rejects
+	if _, _, bad, _, e := ownerIdentityProjectionMaterial(in, a, changed, OwnerIdentityProviderMaterial{}, time.Now()); e == nil {
+		clearRuntimeProjection(bad)
+		t.Fatal("invalid SQL private state admitted")
+	}
+	b, _ := json.Marshal(out)
+	if bytes.Contains(b, []byte(roles.State.Roles[0].Password)) {
+		t.Fatal("public input leaked credential")
+	}
+}
+
+func TestProviderOwnerAuditPlaceholderNeverBecomesUsableMaterial(t *testing.T) {
+	for _, raw := range [][]byte{nil, []byte(`{}`), []byte(`{"accessKeyID":"x","secretAccessKey":"","sessionToken":""}`), []byte(`{"accessKeyID":"x","secretAccessKey":"y"}`), []byte(`{"accessKeyID":"x","secretAccessKey":"y","sessionToken":"","extra":"unexpected"}`)} {
+		if ownerProviderAuditMaterial(raw) {
+			t.Fatal("pending or unsupported material became ready")
+		}
+	}
+	if !ownerProviderAuditMaterial([]byte(`{"accessKeyID":"synthetic","secretAccessKey":"synthetic","sessionToken":""}`)) {
+		t.Fatal("fixed material shape rejected")
+	}
+	// A caller timestamp/empty opaque check cannot authorize even a local step.
+	r, in, _, _ := providerOwnerProjectionFixture(t)
+	s := &OwnerIdentityProjection{root: r, input: in}
+	if s.providerCheckValid(context.Background(), ownerIdentityProviderObservation{until: time.Now().Add(time.Second)}) {
+		t.Fatal("timestamp substituted provider inspection")
+	}
+}
+
+func TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts(t *testing.T) {
+	for _, legacy := range []bool{true, false} {
+		t.Run(fmt.Sprintf("legacy-%t", legacy), func(t *testing.T) {
+			_, in, a, roles := providerOwnerProjectionFixture(t)
+			material := OwnerIdentityProviderMaterial{}
+			if legacy {
+				in.ProviderAuthentication = nil
+				a.Input.OwnerLayout = contracts.OwnerInstalledLayout
+				roles.State.Input = a.Input
+				material = OwnerIdentityProviderMaterial{Audit: contracts.OwnerStorageCredential{AccessKeyID: "synthetic", SecretAccessKey: "synthetic"}, WrapToken: "wrap", OpenToken: "open", ServerToken: "server", ClientToken: "client"}
+			}
+			before, err := json.Marshal(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, _, data, _, err := ownerIdentityProjectionMaterial(in, a, roles, material, time.Now())
+			defer clearRuntimeProjection(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertOriginal := func() {
+				t.Helper()
+				after, err := json.Marshal(in)
+				if err != nil || !bytes.Equal(before, after) {
+					t.Fatal("projection changed caller input")
+				}
+			}
+			assertOriginal()
+			// The generated output owns nested pointers, lists and byte slices.
+			// Mutating it after publication preparation must not mutate inputs.
+			out.Observation.Peers[0].Roots[0][0] ^= 1
+			out.Kubernetes.Roots[0][0] ^= 1
+			out.ConfigurationProbes[0].ConfigMap = "changed"
+			out.InitialHistoryProbe.Configuration = "changed"
+			out.CapacityProbe.ServiceAccount.UID = ownerID(14995)
+			if out.ProviderAuthentication != nil {
+				out.ProviderAuthentication.AuthMountAccessor = "changed"
+			}
+			assertOriginal()
+		})
+	}
+}

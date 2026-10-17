@@ -1,0 +1,1568 @@
+--- /dev/null
++++ b/docs/architecture/initial-sql-provisioning.md
+@@ -0,0 +1,74 @@
++# Original initial SQL provisioning
++
++This continues ADR-123 through the actual private `initial-prepare` command. It
++uses the existing ADR-100 SQL role provisioner and ADR-120 original credential
++binder; it does not activate the installation or approve database recovery.
++
++An explicit `sqlMaterial` reference selects the immutable, installation/request
++bound bootstrap material. The material Secret is supplied by the protected
++bootstrap and pinned by UID; the producer does not generate another password or
++adopt a replacement. The first credential binding retains this reference, the
++full startup digest containing the actual gated Pod UID, and the original
++fifteen-minute interval. Subsequent calls cannot select another material source
++or extend the interval. This selection remains independent of PostgreSQL role
++creation and never claims that external administrator credentials were issued by
++Asservat.
++
++Before a preparation mutation, the command validates all local public provider
++settings, independently reads the exact immutable material UID and validates its
++three distinct unissued password values, and loads the fixed `sql-maintenance.json` credential with the existing protected
++mount and TLS connection builder. A bounded read-only provider check
++requires the supported non-superuser CREATEROLE profile. These maintenance
++credentials remain in the bootstrap process and never enter the activation Pod.
++
++The command reads the nine acknowledged public inputs and current original gated
++Pod. It returns a defensive copy of those public values with the original short
++observation deadline. Pending public CREATE operations cannot be completed by
++this read path. The existing original probe supplies the independent target
++namespace enforcement check; it never inherits the administrator bearer wrapper.
++Every actual credential effect reacquires its own current guard and retains that
++original deadline through blocking work.
++
++The private state has one additional closed SQL intent and optional target Secret
++receipt. Only an acknowledged first CAS permits the existing Secret producer's
++one CREATE. An uncertain intent response grants no CREATE; when the intent is
++present, retries perform exact-content GET only. A missing target remains
++unresolved. The known target UID is immutable. The SQL payload must match the
++original material, startup digest and credential dates before the claim, and an
++expired original interval cannot admit a new credential Secret effect. The
++private document contains no target payload hash. The target Secret is immutable
++and uses the fixed `<credentials>-sql` key; it is separate from the future final
++provider projection. This adds one bounded target object and one private receipt,
++not another public create journal entry.
++
++The actual PostgreSQL provisioner receives the retained original credentials under
++the original current Kubernetes lease. Its existing transaction and role checks
++preserve all-or-none preparation/audit/activation role identity, exact passwords,
++finite validity, pristine requirements and retained-role retirement semantics.
++An unknown or late COMMIT is not reported as successful setup. Retrying uses the
++same role names and material and never treats absence as permission to recreate
++an activated installation. Final current checks do not renew the earlier lease.
++
++This checkpoint does not create OpenBao or S3 credentials, assemble the activation
++Pod's final provider Secret, remove staging protection, ungate the Pod, observe
++activation, or retire issued credentials. Those producer steps remain required.
++The original probe and SQL credential expirations also remain binding; recovery
++across a completed, failed or expired activation attempt must preserve its actual
++historical disposition and cannot mint a fresh witness by resetting setup.
++
++Focused race tests cover prepared-input UID replacement and post-read expiry,
++independent returned slices, pre-effect immutable material checks, concurrent SQL
++Secret claims, lost claim/create/receipt replies, and original expiry after the
++Secret response. The wider Initial* Kubernetes/bootstrap/contract selection and
++integration-source compilation also pass, including the retained legacy policy
++golden checks. Schema checks use the repository validation environment with
++format checking. Actual commands and measured times accompany the frozen handoff.
++
++`TestInitialPreparationSQLWithRealKubernetesPostgres` composes the native preparer,
++probe, original material binder, target Secret and scoped SQL role manager, tests
++unchanged role verifiers/deadlines on replay, and checks that retired roles cannot
++be revived. Its trusted fixture supplies private/material roots and maintenance
++grants; public unused provider endpoints are explicitly synthetic. The Pod stays
++gated and no activation is expected. This new external test is unrun at handoff;
++it must pass on its own fresh owned context fixture before native qualification
++is claimed. It does not run the installed command or qualify provider handover.
+--- a/internal/adapters/kubernetes/initial_credentials.go
++++ b/internal/adapters/kubernetes/initial_credentials.go
+@@ -215,3 +215,41 @@
+ 	}
+ 	return payload, nil
+ }
++
++// ResolveCreate is exclusively a read of an original unresolved CREATE. Its
++// caller must retain the original exact payload under its own durable one-use
++// claim. Missing or mismatching state does not grant permission to send again.
++func (s *InitialCredentialStateStore) ResolveCreate(ctx context.Context, payload []byte) (contracts.WorkerObjectReference, error) {
++	var zero contracts.WorkerObjectReference
++	if s == nil || ctx == nil || len(payload) == 0 || len(payload) > 4096 {
++		return zero, cfg.ErrInvalid
++	}
++	payload = append([]byte(nil), payload...)
++	defer clear(payload)
++	if !s.payload(payload) {
++		return zero, cfg.ErrInvalid
++	}
++	until, e := s.current(ctx, true)
++	if e != nil {
++		return zero, e
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	raw, e := s.protection.guard.observer.raw(ctx, "/api/v1/namespaces/"+s.protection.plan.ControlNamespace.Name+"/secrets/"+s.name, nil)
++	if e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	defer clear(raw)
++	stored, e := s.secret(raw, "")
++	if e != nil {
++		return zero, e
++	}
++	defer clear(stored.Data["state.json"])
++	if !bytes.Equal(stored.Data["state.json"], payload) {
++		return zero, cfg.ErrChanged
++	}
++	if _, e = s.current(ctx, true); e != nil || ctx.Err() != nil || !s.protection.guard.observer.now().Before(until) {
++		return zero, cfg.ErrUnavailable
++	}
++	return contracts.WorkerObjectReference{Name: s.name, UID: string(stored.UID)}, nil
++}
+--- a/internal/adapters/kubernetes/initial_credentials_test.go
++++ b/internal/adapters/kubernetes/initial_credentials_test.go
+@@ -30,7 +30,7 @@
+ )
+ 
+ func TestInitialCredentialStateNativeGuardAndUncertainCreate(t *testing.T) {
+-	for _, mode := range []string{"valid", "lost-reply", "different-content", "wrong-admin", "launched-pod", "missing-guard", "guard-lost-after-write", "expired-after-write", "forbidden-post", "history-terminal-pod", "history-wrong-witness", "history-expired-final", "history-missing-guard", "history-wrong-admin"} {
++	for _, mode := range []string{"valid", "lost-reply", "different-content", "wrong-admin", "launched-pod", "missing-guard", "guard-lost-after-write", "expired-after-write", "forbidden-post", "history-terminal-pod", "history-wrong-witness", "history-expired-final", "history-missing-guard", "history-wrong-admin", "resolve-existing", "resolve-missing", "resolve-different"} {
+ 		t.Run(mode, func(t *testing.T) {
+ 			w, err := BuildInitialInstallerWorkload(initialWorkloadPlan())
+ 			if err != nil {
+@@ -151,9 +151,13 @@
+ 						}
+ 					} else {
+ 						reads.Add(1)
++						if mode == "resolve-missing" {
++							status(404, meta.StatusReasonNotFound, "secrets", "")
++							return
++						}
+ 					}
+ 					value := append([]byte(nil), state...)
+-					if mode == "different-content" {
++					if mode == "different-content" || mode == "resolve-different" {
+ 						value = append([]byte(" "), value...)
+ 					}
+ 					permissionReply(out, core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: "sql-state", Namespace: "install", UID: types.UID(ownerID(11)), ResourceVersion: "1"}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"state.json": value}})
+@@ -197,6 +201,19 @@
+ 				}
+ 				return
+ 			}
++			if strings.HasPrefix(mode, "resolve-") {
++				got, e := s.ResolveCreate(context.Background(), state)
++				if (e == nil) != (mode == "resolve-existing") {
++					t.Fatal("unexpected read-only resolution", mode, e)
++				}
++				if e == nil && got != ref("sql-state", 11) {
++					t.Fatal("wrong original Secret reference")
++				}
++				if posts.Load() != 0 || reads.Load() != 1 {
++					t.Fatal("resolution repeated issuance or skipped original lookup", posts.Load(), reads.Load())
++				}
++				return
++			}
+ 			got, err := s.Create(context.Background(), state)
+ 			good := mode == "valid" || mode == "lost-reply"
+ 			if (err == nil) != good {
+--- a/internal/adapters/kubernetes/initial_preparer_credentials_test.go
++++ b/internal/adapters/kubernetes/initial_preparer_credentials_test.go
+@@ -35,6 +35,10 @@
+ func newPreparationBindingFixture(t *testing.T) *preparationBindingFixture {
+ 	t.Helper()
+ 	f, p := activationPreparerFixture(t)
++	return preparationBindingFixtureFrom(t, f, p)
++}
++func preparationBindingFixtureFrom(t *testing.T, f *preparerFixture, p *InitialPreparer) *preparationBindingFixture {
++	t.Helper()
+ 	root, e := p.PrepareGatedPod(context.Background())
+ 	if e != nil {
+ 		t.Fatal(e)
+@@ -84,6 +88,7 @@
+ 	f.store(inputPath, inputRaw)
+ 	f.store(secretPath, secretRaw)
+ 	out := &preparationBindingFixture{f: f, config: c, password: material, input: contracts.WorkerObjectReference{Name: c.Configuration, UID: f.objects[inputPath]["metadata"].(map[string]any)["uid"].(string)}, material: contracts.WorkerObjectReference{Name: secret.Name, UID: f.objects[secretPath]["metadata"].(map[string]any)["uid"].(string)}}
++	prior := f.extra
+ 	f.extra = func(w http.ResponseWriter, r *http.Request) bool {
+ 		if r.URL.Path == "/apis/authentication.k8s.io/v1/selfsubjectreviews" && r.Header.Get("Authorization") == "Bearer target-probe" {
+ 			who := auth.SelfSubjectReview{}
+@@ -102,6 +107,9 @@
+ 		if r.URL.Path == inputPath && r.Method == "PUT" && r.URL.Query().Get("dryRun") == "All" {
+ 			f.status(w, 403, meta.StatusReasonForbidden, "configmaps", "ValidatingAdmissionPolicy '"+wp.Name+"' with binding '"+wp.Name+"' denied request: "+initialWorkloadDenial)
+ 			return true
++		}
++		if prior != nil {
++			return prior(w, r)
+ 		}
+ 		return false
+ 	}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_observation.go
+@@ -0,0 +1,81 @@
++package kubernetes
++
++import (
++	"context"
++	"encoding/json"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++// InitialPreparedInputs is public provenance plus its original current read
++// bound. It cannot activate SQL or substitute for the independent final guards.
++type InitialPreparedInputs struct {
++	Configuration contracts.InitialInstaller
++	Input         contracts.WorkerObjectReference
++	ValidUntil    time.Time
++}
++
++// ReadPreparedInputs performs only exact reads of the acknowledged original
++// nine inputs and gated Pod. It never completes a pending CREATE, chooses a new
++// identity or extends an earlier observation's deadline.
++func (s *InitialPreparer) ReadPreparedInputs(ctx context.Context) (InitialPreparedInputs, error) {
++	var zero InitialPreparedInputs
++	if s == nil || s.services == nil || ctx == nil {
++		return zero, cfg.ErrInvalid
++	}
++	ctx, joined, e := s.ownPodRequest(ctx)
++	if e != nil {
++		return zero, e
++	}
++	defer joined()
++	until, e := s.current(ctx)
++	if e != nil {
++		return zero, e
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	root, _, e := s.originalPrivateScope(ctx)
++	if e != nil {
++		return zero, e
++	}
++	if root.Activation.Inputs == nil || root.Activation.Inputs.IntentDigest != preparationDigest(*s.services) || len(root.Activation.Inputs.Creates) != 9 {
++		return zero, cfg.ErrChanged
++	}
++	for i, entry := range root.Activation.Inputs.Creates {
++		if entry.Receipt == nil {
++			return zero, cfg.ErrUnavailable
++		}
++		object, e := s.publicInputResource(root, i)
++		if e != nil || entry.SpecDigest != object.digest {
++			return zero, cfg.ErrChanged
++		}
++		raw, e := s.creator.raw(ctx, object.path+"/"+entry.Name, nil)
++		if e != nil {
++			return zero, cfg.ErrUnavailable
++		}
++		if _, e = s.verifyPublicInput(raw, object, entry); e != nil {
++			return zero, e
++		}
++	}
++	config, e := s.inputConfiguration(root)
++	if e != nil {
++		return zero, e
++	}
++	// Return an independent public value; provider roots must not alias the
++	// constructor-owned immutable desired services through a returned slice.
++	raw, e := json.Marshal(config)
++	if e != nil {
++		return zero, cfg.ErrInvalid
++	}
++	var independent contracts.InitialInstaller
++	if json.Unmarshal(raw, &independent) != nil {
++		return zero, cfg.ErrInvalid
++	}
++	if e = s.finish(ctx, until); e != nil {
++		return zero, e
++	}
++	input := root.Activation.Inputs.Creates[8]
++	return InitialPreparedInputs{Configuration: independent, Input: contracts.WorkerObjectReference{Name: input.Name, UID: input.Receipt.UID}, ValidUntil: until}, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_observation_test.go
+@@ -0,0 +1,69 @@
++package kubernetes
++
++import (
++	"context"
++	"net/http"
++	"testing"
++	"time"
++)
++
++func TestInitialPreparedInputReadKeepsOriginalPinsAndIndependentValues(t *testing.T) {
++	f, p := finalInputFixture(t, "healthy")
++	root, e := p.PrepareFinalInputs(context.Background())
++	if e != nil {
++		t.Fatal(e)
++	}
++	before := map[string]int{}
++	f.mu.Lock()
++	for k, v := range f.posts {
++		before[k] = v
++	}
++	f.mu.Unlock()
++	got, e := p.ReadPreparedInputs(context.Background())
++	if e != nil || got.Input.UID != root.Activation.Inputs.Creates[8].Receipt.UID || got.Configuration.Pod.UID != root.Activation.Pod.Receipt.UID || !time.Now().Before(got.ValidUntil) {
++		t.Fatal("original public inputs unavailable", e)
++	}
++	got.Configuration.Postgres.Roots[0][0] ^= 0xff
++	again, e := p.ReadPreparedInputs(context.Background())
++	if e != nil {
++		t.Fatal("returned value mutated retained producer settings", e)
++	}
++	if got.Configuration.Postgres.Roots[0][0] == again.Configuration.Postgres.Roots[0][0] {
++		t.Fatal("returned provider roots alias producer")
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	if !equalJSON(before, f.posts) {
++		t.Fatal("read issued preparation effects")
++	}
++}
++func TestInitialPreparedInputReadRejectsReplacementAndExpiredObservation(t *testing.T) {
++	for _, mode := range []string{"replacement", "late-final-read"} {
++		t.Run(mode, func(t *testing.T) {
++			f, p := finalInputFixture(t, "healthy")
++			if _, e := p.PrepareFinalInputs(context.Background()); e != nil {
++				t.Fatal(e)
++			}
++			path := "/api/v1/namespaces/initial-target/configmaps/inputs"
++			f.mu.Lock()
++			if mode == "replacement" {
++				f.objects[path]["metadata"].(map[string]any)["uid"] = ownerID(999)
++			} else {
++				prior := f.extra
++				f.extra = func(w http.ResponseWriter, r *http.Request) bool {
++					if r.Method == "GET" && r.URL.Path == path {
++						permissionReply(w, f.objects[path])
++						f.shift = 6 * time.Second
++						return true
++					}
++					return prior != nil && prior(w, r)
++				}
++			}
++			f.mu.Unlock()
++			got, e := p.ReadPreparedInputs(context.Background())
++			if e == nil || got.Input.UID != "" {
++				t.Fatal("replacement or expired read returned input authority")
++			}
++		})
++	}
++}
+--- a/internal/adapters/kubernetes/initial_preparer_private.go
++++ b/internal/adapters/kubernetes/initial_preparer_private.go
+@@ -23,10 +23,18 @@
+ 		return false
+ 	}
+ 	if v.RootUID == "" {
+-		return v.PlanDigest == "" && v.Probe == nil
++		return v.PlanDigest == "" && v.Probe == nil && v.SQL == nil
+ 	}
+ 	if !authorization.UUID(v.RootUID) || v.PlanDigest != preparationPlanDigest(s.plan) {
+ 		return false
++	}
++	if v.SQL != nil {
++		if v.Probe == nil || v.Probe.Issue == nil || v.Probe.Issue.Response == nil || !authorization.UUID(v.SQL.OperationID) || v.SQL.OperationID == v.Probe.AnchorOperationID || v.SQL.OperationID == v.Probe.Issue.ID {
++			return false
++		}
++		if v.SQL.Secret != nil && (v.SQL.Secret.Name != s.plan.Workload.Credentials+"-sql" || !authorization.UUID(v.SQL.Secret.UID)) {
++			return false
++		}
+ 	}
+ 	if v.Probe == nil {
+ 		return true
+@@ -86,7 +94,8 @@
+ }
+ 
+ // The state machine is closed: root binding, one anchor intent/receipt and one
+-// token claim/response. Exact idempotent copies are allowed, but no transition
++// token claim/response, then one SQL-state intent/receipt. Exact idempotent
++// copies are allowed, but no transition
+ // removes a claim, replaces an identity, renews a deadline or rewrites a token.
+ func (s *InitialPreparer) privateTransition(old, next contracts.InitialPreparationPrivateState) bool {
+ 	if !s.validPrivateState(old) || !s.validPrivateState(next) {
+@@ -126,6 +135,16 @@
+ 	if i.Response == nil {
+ 		i.Response = next.Probe.Issue.Response
+ 		return i.Response != nil && equalJSON(copy, next)
++	}
++	if old.SQL == nil {
++		copy.SQL = next.SQL
++		return next.SQL != nil && next.SQL.Secret == nil && equalJSON(copy, next)
++	}
++	if old.SQL.Secret == nil && next.SQL != nil {
++		sql := *old.SQL
++		sql.Secret = next.SQL.Secret
++		copy.SQL = &sql
++		return sql.Secret != nil && equalJSON(copy, next)
+ 	}
+ 	return false
+ }
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_sql.go
+@@ -0,0 +1,110 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"encoding/hex"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++)
++
++// InitialPreparedSQLState is exact immutable private persistence provenance.
++// It is not SQL provisioning, activation or current recovery authority.
++type InitialPreparedSQLState struct {
++	Secret     contracts.WorkerObjectReference
++	ValidUntil time.Time
++}
++
++// PersistSQLState preserves one original target Secret CREATE across process
++// loss. The actual SQL codec belongs to the caller; this boundary independently
++// matches its passwords/dates/plan to the original retained material and binding.
++func (b *InitialPreparationCredentialBinder) PersistSQLState(ctx context.Context, payload []byte) (InitialPreparedSQLState, error) {
++	var zero InitialPreparedSQLState
++	if b == nil || ctx == nil || !b.preparer.PrivateInputsEnabled() || len(payload) == 0 || len(payload) > 4096 {
++		return zero, cfg.ErrInvalid
++	}
++	s := b.preparer
++	ctx, joined, e := s.ownPodRequest(ctx)
++	if e != nil {
++		return zero, e
++	}
++	defer joined()
++	payload = append([]byte(nil), payload...)
++	defer clear(payload)
++	material, binding, until, e := b.Bind(ctx)
++	if e != nil {
++		return zero, e
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	value, e := contracts.DecodeInitialSQLCredentialState(bytes.NewReader(payload))
++	if e != nil || value.Format != contracts.InitialSQLCredentialsFormat || value.InstallationID != s.plan.InstallationID || value.PlanDigest != binding.StartupDigest || value.PlanDigest != hex.EncodeToString(b.plan[:]) || !value.NotBefore.Equal(binding.NotBefore) || !value.NotAfter.Equal(binding.NotAfter) || value.Preparation.Password != material.PreparationPassword || value.Audit.Password != material.AuditPassword || value.Activation.Password != material.ActivationPassword {
++		return zero, cfg.ErrChanged
++	}
++	if now := s.protection.observer.now(); now.Before(value.NotBefore) || !now.Before(value.NotAfter) {
++		return zero, cfg.ErrUnavailable
++	}
++	root, _, e := s.originalPrivateScope(ctx)
++	if e != nil {
++		return zero, e
++	}
++	private, state, e := s.readPrivate(ctx)
++	if e != nil || state.RootUID != root.RootUID || state.Probe == nil || state.Probe.Issue == nil || state.Probe.Issue.Response == nil {
++		return zero, cfg.ErrChanged
++	}
++	store := &InitialCredentialStateStore{protection: b.current.protection, inputUID: b.current.inputUID, installation: b.current.installation, plan: b.plan, name: s.plan.Workload.Credentials + "-sql"}
++	fresh := false
++	if state.SQL == nil {
++		id, e := prepUUID()
++		if e != nil {
++			return zero, e
++		}
++		next := state
++		next.SQL = &contracts.InitialPreparationSQLState{OperationID: id}
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, e
++		}
++		fresh = true
++		private, state, e = s.readPrivate(ctx)
++		if e != nil {
++			return zero, e
++		}
++	}
++	var ref contracts.WorkerObjectReference
++	if state.SQL.Secret != nil {
++		ref = *state.SQL.Secret
++		raw, e := store.Read(ctx, ref)
++		defer clear(raw)
++		if e != nil {
++			return zero, e
++		}
++		if !bytes.Equal(raw, payload) {
++			return zero, cfg.ErrChanged
++		}
++	} else {
++		if fresh {
++			ref, e = store.Create(ctx, payload)
++		} else {
++			ref, e = store.ResolveCreate(ctx, payload)
++		}
++		if e != nil {
++			return zero, e
++		}
++		next := state
++		sql := *state.SQL
++		sql.Secret = &ref
++		next.SQL = &sql
++		if e = s.writePrivate(ctx, private, state, next, until); e != nil {
++			return zero, e
++		}
++	}
++	if _, e = b.current.current(ctx, true); e != nil {
++		return zero, e
++	}
++	if e = s.finish(ctx, until); e != nil {
++		return zero, e
++	}
++	return InitialPreparedSQLState{Secret: ref, ValidUntil: until}, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_preparer_sql_test.go
+@@ -0,0 +1,216 @@
++package kubernetes
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"io"
++	"net/http"
++	"strings"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	core "k8s.io/api/core/v1"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++)
++
++func initialSQLPreparationFixture(t *testing.T) (*preparationBindingFixture, *InitialPreparationCredentialBinder, []byte) {
++	t.Helper()
++	probe, p := newPrivatePreparationFixture(t, "")
++	token, e := p.PrepareProbe(context.Background())
++	clear(token.Token)
++	if e != nil {
++		t.Fatal(e)
++	}
++	f := preparationBindingFixtureFrom(t, probe.f, p)
++	b := f.binder(t)
++	material, binding, _, e := b.Bind(context.Background())
++	if e != nil {
++		t.Fatal(e)
++	}
++	v := contracts.InitialSQLCredentialState{Format: contracts.InitialSQLCredentialsFormat, InstallationID: f.config.InstallationID, PlanDigest: binding.StartupDigest, NotBefore: binding.NotBefore, NotAfter: binding.NotAfter, Preparation: contracts.OwnerSQLCredential{Username: "prepare", Password: material.PreparationPassword}, Audit: contracts.OwnerSQLCredential{Username: "audit", Password: material.AuditPassword}, Activation: contracts.OwnerSQLCredential{Username: "activate", Password: material.ActivationPassword}}
++	raw, e := json.Marshal(v)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(func() { clear(raw) })
++	return f, b, raw
++}
++
++func TestInitialSQLPreparationPersistsOriginalSecretOnce(t *testing.T) {
++	f, b, payload := initialSQLPreparationFixture(t)
++	first, e := b.PersistSQLState(context.Background(), payload)
++	if e != nil {
++		t.Fatal(e)
++	}
++	replay, e := f.binder(t).PersistSQLState(context.Background(), payload)
++	if e != nil || replay.Secret != first.Secret || !time.Now().Before(replay.ValidUntil) {
++		t.Fatal("original SQL Secret replay", e)
++	}
++	f.f.mu.Lock()
++	defer f.f.mu.Unlock()
++	if f.f.posts["/api/v1/namespaces/initial-target/secrets/credentials-sql"] != 1 {
++		t.Fatal("SQL Secret CREATE repeated")
++	}
++}
++
++func TestInitialSQLPreparationUnknownEffectsNeverCreateAgain(t *testing.T) {
++	for _, mode := range []string{"claim-before", "claim-after", "create-before", "create-after", "receipt-before", "receipt-after"} {
++		t.Run(mode, func(t *testing.T) {
++			f, b, payload := initialSQLPreparationFixture(t)
++			var creates atomic.Int32
++			var injected atomic.Bool
++			f.f.client.Wrap(func(next http.RoundTripper) http.RoundTripper {
++				return prepActivationRoundTrip(func(r *http.Request) (*http.Response, error) {
++					isCreate := r.Method == "POST" && r.URL.Path == "/api/v1/namespaces/initial-target/secrets"
++					if isCreate {
++						creates.Add(1)
++					}
++					selected := isCreate && strings.HasPrefix(mode, "create-")
++					if r.Method == "PUT" && r.URL.Path == "/api/v1/namespaces/bootstrap/secrets/private-progress" {
++						raw, _ := io.ReadAll(r.Body)
++						r.Body = io.NopCloser(bytes.NewReader(raw))
++						defer clear(raw)
++						var secret core.Secret
++						_ = json.Unmarshal(raw, &secret)
++						state, _ := contracts.DecodeInitialPreparationPrivateState(bytes.NewReader(secret.Data["state.json"]))
++						selected = state.SQL != nil && ((state.SQL.Secret == nil && strings.HasPrefix(mode, "claim-")) || (state.SQL.Secret != nil && strings.HasPrefix(mode, "receipt-")))
++						for _, data := range secret.Data {
++							clear(data)
++						}
++					}
++					if selected && injected.CompareAndSwap(false, true) {
++						if strings.HasSuffix(mode, "-after") {
++							reply, e := next.RoundTrip(r)
++							if e != nil {
++								return reply, e
++							}
++							reply.Body.Close()
++						}
++						raw, _ := json.Marshal(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonServiceUnavailable, Code: 503})
++						return &http.Response{StatusCode: 503, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(bytes.NewReader(raw)), ContentLength: int64(len(raw)), Request: r}, nil
++					}
++					return next.RoundTrip(r)
++				})
++			})
++			b = f.binder(t)
++			_, firstErr := b.PersistSQLState(context.Background(), payload)
++			if (firstErr == nil) != (mode == "create-after") {
++				t.Fatal("unexpected first uncertain effect disposition", mode, firstErr)
++			}
++			got, replayErr := f.binder(t).PersistSQLState(context.Background(), payload)
++			// A lost claim before persistence has no surviving SQL intent; the next call
++			// can obtain its first acknowledged claim. An existing claim never does so.
++			resolves := mode == "claim-before" || mode == "create-after" || strings.HasPrefix(mode, "receipt-")
++			if (replayErr == nil) != resolves {
++				t.Fatal("unexpected original effect lookup", mode, replayErr)
++			}
++			if replayErr == nil && got.Secret.UID == "" {
++				t.Fatal("lost original SQL Secret identity")
++			}
++			expected := int32(1)
++			if mode == "claim-after" {
++				expected = 0
++			}
++			if creates.Load() != expected {
++				t.Fatal("unknown SQL effect repeated", mode, creates.Load())
++			}
++		})
++	}
++}
++
++func TestInitialSQLPreparationRejectsChangedOrExpiredOriginalState(t *testing.T) {
++	for _, mode := range []string{"password", "expired", "private-uid", "target-uid"} {
++		t.Run(mode, func(t *testing.T) {
++			f, b, payload := initialSQLPreparationFixture(t)
++			if mode == "target-uid" {
++				if _, e := b.PersistSQLState(context.Background(), payload); e != nil {
++					t.Fatal(e)
++				}
++			}
++			f.f.mu.Lock()
++			switch mode {
++			case "password":
++				var v contracts.InitialSQLCredentialState
++				_ = json.Unmarshal(payload, &v)
++				v.Preparation.Password = "different"
++				payload, _ = json.Marshal(v)
++			case "expired":
++				f.f.shift = 16 * time.Minute
++			case "private-uid":
++				f.f.objects[b.preparer.privatePath()]["metadata"].(map[string]any)["uid"] = ownerID(990)
++			case "target-uid":
++				f.f.objects["/api/v1/namespaces/initial-target/secrets/credentials-sql"]["metadata"].(map[string]any)["uid"] = ownerID(990)
++			}
++			before := f.f.posts["/api/v1/namespaces/initial-target/secrets/credentials-sql"]
++			f.f.mu.Unlock()
++			if _, e := b.PersistSQLState(context.Background(), payload); e == nil {
++				t.Fatal("changed or expired state accepted")
++			}
++			f.f.mu.Lock()
++			defer f.f.mu.Unlock()
++			if f.f.posts["/api/v1/namespaces/initial-target/secrets/credentials-sql"] != before {
++				t.Fatal("rejected input caused credential CREATE")
++			}
++		})
++	}
++}
++
++func TestInitialSQLPreparationConcurrentClaimCreatesAtMostOnce(t *testing.T) {
++	f, _, payload := initialSQLPreparationFixture(t)
++	var wg sync.WaitGroup
++	var successes atomic.Int32
++	for range 4 {
++		b := f.binder(t)
++		wg.Go(func() {
++			if _, e := b.PersistSQLState(context.Background(), payload); e == nil {
++				successes.Add(1)
++			}
++		})
++	}
++	wg.Wait()
++	if successes.Load() == 0 {
++		t.Fatal("no acknowledged claim completed")
++	}
++	f.f.mu.Lock()
++	defer f.f.mu.Unlock()
++	if f.f.posts["/api/v1/namespaces/initial-target/secrets/credentials-sql"] != 1 {
++		t.Fatal("concurrent private claims repeated CREATE")
++	}
++}
++
++func TestInitialSQLPreparationPreservesOriginalLeaseAfterSecretCreate(t *testing.T) {
++	f, _, payload := initialSQLPreparationFixture(t)
++	var once atomic.Bool
++	f.f.client.Wrap(func(next http.RoundTripper) http.RoundTripper {
++		return prepActivationRoundTrip(func(r *http.Request) (*http.Response, error) {
++			result, e := next.RoundTrip(r)
++			if e == nil && r.Method == "POST" && r.URL.Path == "/api/v1/namespaces/initial-target/secrets" && once.CompareAndSwap(false, true) {
++				f.f.mu.Lock()
++				f.f.shift = 6 * time.Second
++				f.f.mu.Unlock()
++			}
++			return result, e
++		})
++	})
++	b := f.binder(t)
++	first, e := b.PersistSQLState(context.Background(), payload)
++	if e == nil || !first.ValidUntil.IsZero() {
++		t.Fatal("late Secret create returned a renewed effect lease")
++	}
++	f.f.mu.Lock()
++	f.f.shift = 0
++	f.f.mu.Unlock()
++	got, e := f.binder(t).PersistSQLState(context.Background(), payload)
++	if e != nil || got.Secret.UID == "" {
++		t.Fatal("exact original Secret could not be reconciled", e)
++	}
++	f.f.mu.Lock()
++	defer f.f.mu.Unlock()
++	if f.f.posts["/api/v1/namespaces/initial-target/secrets/credentials-sql"] != 1 {
++		t.Fatal("late result caused another Secret create")
++	}
++}
+--- a/internal/adapters/kubernetes/initial_sql_material.go
++++ b/internal/adapters/kubernetes/initial_sql_material.go
+@@ -59,27 +59,55 @@
+ 	if e != nil || root.RootUID == "" || root.Phase == "declaring" {
+ 		return zero, time.Time{}, cfg.ErrUnavailable
+ 	}
+-	raw, e := p.creator.raw(ctx, "/api/v1/namespaces/"+p.plan.BootstrapNamespace.Name+"/secrets/"+s.ref.Name, nil)
++	m, e := s.readPinnedMaterial(ctx)
+ 	if e != nil {
+-		return zero, time.Time{}, cfg.ErrUnavailable
+-	}
+-	defer clear(raw)
+-	var secret core.Secret
+-	if strictGuardJSON(raw, &secret) != nil {
+-		return zero, time.Time{}, cfg.ErrChanged
+-	}
+-	for _, b := range secret.Data {
+-		defer clear(b)
+-	}
+-	if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Type != core.SecretTypeOpaque || !ownerMetadata(secret.ObjectMeta, p.plan.BootstrapNamespace.Name, s.ref.Name, s.ref.UID) || secret.Immutable == nil || !*secret.Immutable || len(secret.OwnerReferences) != 0 || len(secret.Data) != 1 || len(secret.StringData) != 0 {
+-		return zero, time.Time{}, cfg.ErrChanged
+-	}
+-	m, e := contracts.DecodeInitialSQLMaterial(bytes.NewReader(secret.Data["material.json"]))
+-	if e != nil || !initialMaterialValid(m, p.plan.InstallationID, p.plan.RequestID) {
+-		return zero, time.Time{}, cfg.ErrChanged
++		return zero, time.Time{}, e
+ 	}
+ 	if e = p.finish(ctx, until); e != nil {
+ 		return zero, time.Time{}, e
+ 	}
+ 	return m, until, nil
+ }
++
++// CheckInitialSQLMaterial validates only the protected, unissued input before
++// any preparation mutation. It creates/adopts nothing and returns no credential,
++// original-root binding, validity interval, or provisioning authority.
++func (s *InitialSQLMaterialReader) CheckInitialSQLMaterial(ctx context.Context) error {
++	if s == nil || s.preparer == nil || ctx == nil {
++		return cfg.ErrInvalid
++	}
++	until, e := s.preparer.current(ctx)
++	if e != nil {
++		return e
++	}
++	ctx, end := context.WithDeadline(ctx, until)
++	defer end()
++	if _, e = s.readPinnedMaterial(ctx); e != nil {
++		return e
++	}
++	return s.preparer.finish(ctx, until)
++}
++func (s *InitialSQLMaterialReader) readPinnedMaterial(ctx context.Context) (contracts.InitialSQLMaterial, error) {
++	var zero contracts.InitialSQLMaterial
++	p := s.preparer
++	raw, e := p.creator.raw(ctx, "/api/v1/namespaces/"+p.plan.BootstrapNamespace.Name+"/secrets/"+s.ref.Name, nil)
++	if e != nil {
++		return zero, cfg.ErrUnavailable
++	}
++	defer clear(raw)
++	var secret core.Secret
++	if strictGuardJSON(raw, &secret) != nil {
++		return zero, cfg.ErrChanged
++	}
++	for _, b := range secret.Data {
++		defer clear(b)
++	}
++	if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Type != core.SecretTypeOpaque || !ownerMetadata(secret.ObjectMeta, p.plan.BootstrapNamespace.Name, s.ref.Name, s.ref.UID) || secret.Immutable == nil || !*secret.Immutable || len(secret.OwnerReferences) != 0 || len(secret.Data) != 1 || len(secret.StringData) != 0 {
++		return zero, cfg.ErrChanged
++	}
++	m, e := contracts.DecodeInitialSQLMaterial(bytes.NewReader(secret.Data["material.json"]))
++	if e != nil || !initialMaterialValid(m, p.plan.InstallationID, p.plan.RequestID) {
++		return zero, cfg.ErrChanged
++	}
++	return m, nil
++}
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_sql_material_preflight_test.go
+@@ -0,0 +1,52 @@
++package kubernetes
++
++import (
++	"context"
++	"encoding/base64"
++	"encoding/json"
++	"testing"
++)
++
++func TestInitialSQLMaterialPreflightNeedsNoRootOrMutation(t *testing.T) {
++	for _, mode := range []string{"valid", "duplicate-password", "wrong-uid"} {
++		t.Run(mode, func(t *testing.T) {
++			f := newPreparationBindingFixture(t)
++			p := f.f.preparer(t)
++			defer p.Close()
++			reader, e := NewInitialSQLMaterialReader(p, f.material)
++			if e != nil {
++				t.Fatal(e)
++			}
++			f.f.mu.Lock()
++			delete(f.f.objects, "/api/v1/namespaces/bootstrap/configmaps/prepare")
++			object := f.f.objects["/api/v1/namespaces/bootstrap/secrets/initial-material"]
++			if mode == "wrong-uid" {
++				object["metadata"].(map[string]any)["uid"] = ownerID(990)
++			}
++			if mode == "duplicate-password" {
++				v := f.password
++				v.AuditPassword = v.PreparationPassword
++				raw, _ := json.Marshal(v)
++				object["data"].(map[string]any)["material.json"] = base64.StdEncoding.EncodeToString(raw)
++				clear(raw)
++			}
++			before := map[string]int{}
++			for k, v := range f.f.posts {
++				before[k] = v
++			}
++			f.f.mu.Unlock()
++			e = reader.CheckInitialSQLMaterial(context.Background())
++			if (e == nil) != (mode == "valid") {
++				t.Fatal("wrong preflight disposition", mode, e)
++			}
++			if _, _, e = reader.ReadInitialSQLMaterial(context.Background()); e == nil {
++				t.Fatal("preflight manufactured an original root binding")
++			}
++			f.f.mu.Lock()
++			defer f.f.mu.Unlock()
++			if !equalJSON(before, f.f.posts) {
++				t.Fatal("preflight caused an effect")
++			}
++		})
++	}
++}
+--- a/internal/bootstrap/initial_preparer.go
++++ b/internal/bootstrap/initial_preparer.go
+@@ -11,8 +11,12 @@
+ 
+ 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+ 	"asservat.local/asservat/internal/adapters/mounts"
++	"asservat.local/asservat/internal/adapters/postgres"
+ 	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/authorization"
+ 	cfg "asservat.local/asservat/internal/domain/configuration"
++	"github.com/jackc/pgx/v5/pgxpool"
++	"k8s.io/apimachinery/pkg/util/validation"
+ )
+ 
+ const InitialPreparerRoot = "/run/asservat/initial-preparer"
+@@ -22,12 +26,15 @@
+ // continuation can issue its original bounded probe token; it does not activate
+ // SQL, schedule the installation Pod or enable public collection.
+ type InitialPreparationDeployment struct {
+-	root     context.Context
+-	cancel   context.CancelFunc
+-	once     sync.Once
+-	running  atomic.Bool
+-	inputs   *providerInputs
+-	preparer *kube.InitialPreparer
++	root        context.Context
++	cancel      context.CancelFunc
++	once        sync.Once
++	running     atomic.Bool
++	inputs      *providerInputs
++	preparer    *kube.InitialPreparer
++	sqlMaterial *contracts.WorkerObjectReference
++	sqlPool     *pgxpool.Pool
++	sqlRoles    *postgres.InitialSQLRoles
+ }
+ 
+ func NewInitialPreparationDeployment(ctx context.Context, files *os.Root) (*InitialPreparationDeployment, error) {
+@@ -41,6 +48,9 @@
+ 	defer clear(raw)
+ 	c, e := contracts.DecodeInitialPreparer(bytes.NewReader(raw))
+ 	if e != nil || c.Format != contracts.InitialPreparerFormat || c.Plan.PrivateState != nil && c.Services == nil {
++		return nil, mounts.ErrUnavailable
++	}
++	if c.SQLMaterial != nil && (c.Plan.PrivateState == nil || c.Services == nil || !authorization.UUID(c.SQLMaterial.UID) || len(validation.IsDNS1123Subdomain(c.SQLMaterial.Name)) != 0 || c.SQLMaterial.Name == c.Plan.PrivateState.Name) {
+ 		return nil, mounts.ErrUnavailable
+ 	}
+ 	h, e := ownerHTTP(c.Kubernetes.Endpoint, c.Kubernetes.Roots)
+@@ -70,6 +80,33 @@
+ 	d.preparer, e = kube.NewInitialPreparer(adminConfig, admin, probe, c)
+ 	if e != nil {
+ 		return nil, e
++	}
++	if c.SQLMaterial != nil {
++		material := *c.SQLMaterial
++		d.sqlMaterial = &material
++		reader, e := kube.NewInitialSQLMaterialReader(d.preparer, material)
++		if e != nil {
++			return nil, e
++		}
++		if e = reader.CheckInitialSQLMaterial(root); e != nil {
++			return nil, e
++		}
++		in.postgresEndpoint = c.Services.Postgres
++		// The existing connection builder reads the fixed protected credential and
++		// validates all local fields before any preparation mutation. This maintenance
++		// connection is confined to this bootstrap and never projected into the Pod.
++		config, e := in.sqlConfig(root, "sql-maintenance.json")
++		if e != nil {
++			return nil, e
++		}
++		d.sqlPool, e = pgxpool.NewWithConfig(root, config)
++		if e != nil {
++			return nil, mounts.ErrUnavailable
++		}
++		d.sqlRoles, e = postgres.NewInitialSQLRoles(root, d.sqlPool, c.Plan.InstallationID)
++		if e != nil {
++			return nil, e
++		}
+ 	}
+ 	if root.Err() != nil {
+ 		return nil, mounts.ErrUnavailable
+@@ -104,11 +141,14 @@
+ 				}
+ 			}
+ 		}
+-		if e == nil && d.preparer.PrivateInputsEnabled() {
++		if e == nil && d.preparer.PrivateInputsEnabled() && d.sqlMaterial == nil {
+ 			probe, err := d.preparer.PrepareProbe(ctx)
+ 			clear(probe.Token)
+ 			e = err
+ 		}
++		if e == nil && d.sqlMaterial != nil {
++			e = d.prepareSQL(ctx)
++		}
+ 		if e == nil {
+ 			e = d.preparer.DrainPodCreateRequests(ctx)
+ 		}
+@@ -128,6 +168,9 @@
+ 		}
+ 		if d.preparer != nil {
+ 			d.preparer.Close()
++		}
++		if d.sqlPool != nil {
++			d.sqlPool.Close()
+ 		}
+ 		if d.inputs != nil {
+ 			d.inputs.closeHTTP()
+--- /dev/null
++++ b/internal/bootstrap/initial_preparer_sql.go
+@@ -0,0 +1,97 @@
++package bootstrap
++
++import (
++	"context"
++	"encoding/hex"
++	"net/http"
++	"time"
++
++	kube "asservat.local/asservat/internal/adapters/kubernetes"
++	"asservat.local/asservat/internal/adapters/mounts"
++	"asservat.local/asservat/internal/adapters/postgres"
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"k8s.io/client-go/rest"
++)
++
++// prepareSQL composes the original private material and current native guards
++// with the existing scoped SQL provisioner. It neither creates provider tokens
++// nor changes the activation witness, staging protection or Pod scheduling gate.
++func (d *InitialPreparationDeployment) prepareSQL(ctx context.Context) error {
++	if d == nil || d.sqlMaterial == nil || d.sqlRoles == nil {
++		return mounts.ErrUnavailable
++	}
++	observed, e := d.preparer.ReadPreparedInputs(ctx)
++	if e != nil {
++		return e
++	}
++	probe, e := d.preparer.PrepareProbe(ctx)
++	if e != nil {
++		return e
++	}
++	defer clear(probe.Token)
++	// The configuration is immutable public provenance; Bind independently reads
++	// and checks its exact original UID/guard/Pod before issuing any fresh lease.
++	c := observed.Configuration
++	ctx, end := context.WithDeadline(ctx, probe.ExpiresAt)
++	defer end()
++	ns := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
++	adminConfig := d.inputs.kubernetes("administrator-token")
++	admin, e := kube.NewPermissionClient(adminConfig, c.ClusterID, ns, time.Now)
++	if e != nil {
++		return e
++	}
++	// Do not copy the administrator bearer wrapper into the target probe client.
++	// The only credential here is the exact original authenticated token.
++	probeConfig := &rest.Config{Host: adminConfig.Host, TLSClientConfig: adminConfig.TLSClientConfig, BearerToken: string(probe.Token), WrapTransport: func(t http.RoundTripper) http.RoundTripper {
++		d.inputs.mu.Lock()
++		d.inputs.transports = append(d.inputs.transports, t)
++		d.inputs.mu.Unlock()
++		return t
++	}}
++	targetProbe, e := kube.NewPermissionClient(probeConfig, c.ClusterID, ns, time.Now)
++	if e != nil {
++		return e
++	}
++	binder, e := kube.NewInitialPreparationCredentialBinder(d.preparer, admin, targetProbe, c, observed.Input.UID, *d.sqlMaterial)
++	if e != nil {
++		return e
++	}
++	material, binding, _, e := binder.Bind(ctx)
++	if e != nil {
++		return e
++	}
++	credentials, e := postgres.BindInitialSQLMaterial(material, c.InstallationID, material.RequestID, binding.NotBefore, binding.NotAfter)
++	if e != nil {
++		return e
++	}
++	raw, e := hex.DecodeString(binding.StartupDigest)
++	if e != nil || len(raw) != 32 {
++		return mounts.ErrUnavailable
++	}
++	var digest artifact.Digest
++	copy(digest[:], raw)
++	payload, e := postgres.EncodeInitialSQLCredentials(credentials, digest)
++	if e != nil {
++		return e
++	}
++	defer clear(payload)
++	stored, e := binder.PersistSQLState(ctx, payload)
++	if e != nil {
++		return e
++	}
++	// Keep the original independent Kubernetes lease through SQL locks/COMMIT and
++	// the fresh credential authentication checks. A lost/late reply stays uncertain.
++	effect, done := context.WithDeadline(ctx, stored.ValidUntil)
++	defer done()
++	if e = d.sqlRoles.Provision(effect, credentials); e != nil {
++		return e
++	}
++	if _, _, _, e = binder.Bind(effect); e != nil {
++		return e
++	}
++	if effect.Err() != nil || !time.Now().Before(stored.ValidUntil) {
++		return mounts.ErrUnavailable
++	}
++	return nil
++}
+--- a/internal/contracts/initial_preparation_private.go
++++ b/internal/contracts/initial_preparation_private.go
+@@ -13,12 +13,13 @@
+ // Initial bootstrap supplies only Format/InstallationID/RequestID. The producer
+ // freezes the actual root binding before any credential issuance.
+ type InitialPreparationPrivateState struct {
+-	Format         string                   `json:"format"`
+-	InstallationID string                   `json:"installationID"`
+-	RequestID      string                   `json:"requestID"`
+-	RootUID        string                   `json:"rootUID,omitempty"`
+-	PlanDigest     string                   `json:"planDigest,omitempty"`
+-	Probe          *InitialPreparationProbe `json:"probe,omitempty"`
++	SQL            *InitialPreparationSQLState `json:"sql,omitempty"`
++	Format         string                      `json:"format"`
++	InstallationID string                      `json:"installationID"`
++	RequestID      string                      `json:"requestID"`
++	RootUID        string                      `json:"rootUID,omitempty"`
++	PlanDigest     string                      `json:"planDigest,omitempty"`
++	Probe          *InitialPreparationProbe    `json:"probe,omitempty"`
+ }
+ 
+ type InitialPreparationProbe struct {
+@@ -52,3 +53,10 @@
+ func (InitialPreparationProbeIssue) GoString() string    { return "protected initial probe issuance" }
+ func (InitialPreparationProbeResponse) String() string   { return "protected initial probe credential" }
+ func (InitialPreparationProbeResponse) GoString() string { return "protected initial probe credential" }
++
++// One original immutable target-state CREATE. This records private persistence,
++// never proof of SQL activation or permission to reissue/reset credentials.
++type InitialPreparationSQLState struct {
++	OperationID string                 `json:"operationID"`
++	Secret      *WorkerObjectReference `json:"secret,omitempty"`
++}
+--- a/internal/contracts/initial_preparer.go
++++ b/internal/contracts/initial_preparer.go
+@@ -44,13 +44,14 @@
+ }
+ 
+ type InitialPreparer struct {
+-	Services   *InitialPreparationServices `json:"services,omitempty"`
+-	Format     string                      `json:"format"`
+-	Plan       InitialPreparationPlan      `json:"plan"`
+-	RootUID    string                      `json:"rootUID"`
+-	Continuity OwnerDeploymentGuard        `json:"continuity"`
+-	Staging    OwnerDeploymentGuard        `json:"staging"`
+-	Kubernetes OwnerProviderEndpoint       `json:"kubernetes"`
++	SQLMaterial *WorkerObjectReference      `json:"sqlMaterial,omitempty"`
++	Services    *InitialPreparationServices `json:"services,omitempty"`
++	Format      string                      `json:"format"`
++	Plan        InitialPreparationPlan      `json:"plan"`
++	RootUID     string                      `json:"rootUID"`
++	Continuity  OwnerDeploymentGuard        `json:"continuity"`
++	Staging     OwnerDeploymentGuard        `json:"staging"`
++	Kubernetes  OwnerProviderEndpoint       `json:"kubernetes"`
+ }
+ 
+ // Entries use ADR-102's one-pending-intent representation. An acknowledged
+--- a/specs/contracts/initial-preparation-private.schema.json
++++ b/specs/contracts/initial-preparation-private.schema.json
+@@ -2,7 +2,7 @@
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://asservat.io/spec/v1/initial-preparation-private.schema.json",
+   "title": "Private producer-owned initial preparation progress",
+-  "description": "One UID-pinned mutable bootstrap Secret; at most16KiB. Contains private credential replies, never public/audit data. Root binding, anchor and issuance are monotonic; runtime checks exact compiled plan, original <=5s claim, <=605s outer lifetime, current token authentication and Secret binding. Initial bootstrap supplies only format/installationID/requestID. Final clearing requires separately qualified retirement and irreversible native inert state.",
++  "description": "One UID-pinned mutable bootstrap Secret; at most16KiB. Contains private credential replies, never public/audit data. Root binding, anchor, issuance and optional original SQL state intent/receipt are monotonic; runtime checks exact compiled plan, original <=5s claim, <=605s outer lifetime, current token authentication and Secret binding. Initial bootstrap supplies only format/installationID/requestID. Final clearing requires separately qualified retirement and irreversible native inert state.",
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+@@ -103,6 +103,34 @@
+           "anchor"
+         ]
+       }
++    },
++    "sql": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "operationID"
++      ],
++      "properties": {
++        "operationID": {
++          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++        },
++        "secret": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": [
++            "name",
++            "uid"
++          ],
++          "properties": {
++            "name": {
++              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
++            },
++            "uid": {
++              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++            }
++          }
++        }
++      }
+     }
+   },
+   "dependentRequired": {
+@@ -115,6 +143,36 @@
+     "probe": [
+       "rootUID",
+       "planDigest"
++    ],
++    "sql": [
++      "probe",
++      "rootUID",
++      "planDigest"
+     ]
+-  }
++  },
++  "allOf": [
++    {
++      "if": {
++        "required": [
++          "sql"
++        ]
++      },
++      "then": {
++        "properties": {
++          "probe": {
++            "required": [
++              "issue"
++            ],
++            "properties": {
++              "issue": {
++                "required": [
++                  "response"
++                ]
++              }
++            }
++          }
++        }
++      }
++    }
++  ]
+ }
+--- a/specs/contracts/initial-preparer.schema.json
++++ b/specs/contracts/initial-preparer.schema.json
+@@ -168,6 +168,43 @@
+     },
+     "services": {
+       "$ref": "https://asservat.io/spec/v1/initial-preparation-services.schema.json"
++    },
++    "sqlMaterial": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "name",
++        "uid"
++      ],
++      "properties": {
++        "name": {
++          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
++        },
++        "uid": {
++          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
++        }
++      }
+     }
+-  }
++  },
++  "allOf": [
++    {
++      "if": {
++        "required": [
++          "sqlMaterial"
++        ]
++      },
++      "then": {
++        "required": [
++          "services"
++        ],
++        "properties": {
++          "plan": {
++            "required": [
++              "privateState"
++            ]
++          }
++        }
++      }
++    }
++  ]
+ }
+--- /dev/null
++++ b/test/integration/initial_preparer_sql_test.go
+@@ -0,0 +1,305 @@
++package integration
++
++import (
++	"context"
++	"encoding/base64"
++	"encoding/hex"
++	"encoding/json"
++	"encoding/pem"
++	"errors"
++	"net/url"
++	"os"
++	"strings"
++	"testing"
++	"time"
++
++	kube "asservat.local/asservat/internal/adapters/kubernetes"
++	"asservat.local/asservat/internal/adapters/postgres"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"github.com/jackc/pgx/v5/pgxpool"
++	auth "k8s.io/api/authentication/v1"
++	core "k8s.io/api/core/v1"
++	apierrors "k8s.io/apimachinery/pkg/api/errors"
++	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/client-go/kubernetes"
++	"k8s.io/client-go/rest"
++	"k8s.io/utils/ptr"
++)
++
++// The fixture supplies protected bootstrap private/material roots and a scoped
++// maintenance credential. Actual preparer, native independent guards, original
++// probe, credential binding/Secret and SQL provisioning are product components.
++// No provider credential issuance, Pod handover or activation is claimed here.
++func TestInitialPreparationSQLWithRealKubernetesPostgres(t *testing.T) {
++	var materialRef contracts.WorkerObjectReference
++	setup := func(ctx context.Context, kc *rest.Config, api kubernetes.Interface, plan *contracts.InitialPreparationPlan) {
++		body, _ := json.Marshal(contracts.InitialPreparationPrivateState{Format: contracts.InitialPreparationPrivateFormat, InstallationID: plan.InstallationID, RequestID: plan.RequestID})
++		private, e := api.CoreV1().Secrets(plan.BootstrapNamespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "private-progress", Annotations: map[string]string{"asservat.io/installation-id": plan.InstallationID, "asservat.io/preparation-request": plan.RequestID}}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": body}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture private root", e)
++		}
++		plan.PrivateState = &contracts.WorkerObjectReference{Name: private.Name, UID: string(private.UID)}
++		account, e := api.CoreV1().ServiceAccounts(plan.BootstrapNamespace.Name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "fixture-audience"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal(e)
++		}
++		response, e := api.CoreV1().ServiceAccounts(account.Namespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600)), BoundObjectRef: &auth.BoundObjectReference{APIVersion: "v1", Kind: "Secret", Name: private.Name, UID: private.UID}}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture audience unavailable")
++		}
++		parts := strings.Split(response.Status.Token, ".")
++		if len(parts) != 3 {
++			t.Fatal("fixture audience syntax")
++		}
++		raw, e := base64.RawURLEncoding.DecodeString(parts[1])
++		if e != nil {
++			t.Fatal("fixture audience encoding")
++		}
++		defer clear(raw)
++		var claims struct {
++			Audience []string `json:"aud"`
++		}
++		if json.Unmarshal(raw, &claims) != nil || len(claims.Audience) != 1 {
++			t.Fatal("fixture audience profile")
++		}
++		plan.ProbeAudience = claims.Audience[0]
++		// Random retained values use the existing maintained credential generator;
++		// the product binder below supplies the actual original fifteen-minute dates.
++		seed, e := postgres.NewInitialSQLCredentials(plan.InstallationID, time.Now())
++		if e != nil {
++			t.Fatal(e)
++		}
++		material := contracts.InitialSQLMaterial{Format: contracts.InitialSQLMaterialFormat, InstallationID: plan.InstallationID, RequestID: plan.RequestID, PreparationPassword: seed.Preparation.Password, AuditPassword: seed.Audit.Password, ActivationPassword: seed.Activation.Password}
++		raw, e = json.Marshal(material)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer clear(raw)
++		secret, e := api.CoreV1().Secrets(plan.BootstrapNamespace.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "sql-material"}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"material.json": raw}}, meta.CreateOptions{})
++		if e != nil {
++			t.Fatal("fixture immutable material", e)
++		}
++		materialRef = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
++	}
++	initialPreparationSupervisorNativePlan(t, true, false, setup, func(ctx context.Context, kc *rest.Config, api kubernetes.Interface, admin, probe *kube.PermissionClient, c contracts.InitialPreparer) {
++		var f fixture
++		raw, e := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
++		if e != nil || json.Unmarshal(raw, &f) != nil || f.Postgres == "" {
++			t.Fatal("SQL fixture unavailable")
++		}
++		sql, e := pgxpool.New(ctx, f.Postgres)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer sql.Close()
++		u, e := url.Parse(f.Postgres)
++		if e != nil {
++			t.Fatal("fixture SQL endpoint")
++		}
++		address, tlsConfig := pgTLSBridge(t, u.Host)
++		maintenance := initialSQLMaintenance(t, ctx, sql, address, tlsConfig)
++		defer maintenance.Close()
++		manager, e := postgres.NewInitialSQLRoles(ctx, maintenance, c.Plan.InstallationID)
++		if e != nil {
++			t.Fatal("scoped maintenance", e)
++		}
++		native := rest.CopyConfig(kc)
++		if e = rest.LoadTLSFiles(native); e != nil {
++			t.Fatal(e)
++		}
++		block, _ := pem.Decode(native.CAData)
++		if block == nil {
++			t.Fatal("fixture root")
++		}
++		roots := [][]byte{block.Bytes}
++		var fleet contracts.FleetSettings
++		raw, e = os.ReadFile("../../examples/fleet-settings.json")
++		if e != nil || json.Unmarshal(raw, &fleet) != nil {
++			t.Fatal("fixture fleet", e)
++		}
++		fleet.InstallationID = c.Plan.InstallationID
++		// Public provider placeholders are not used for provider I/O in this component
++		// test. Actual SQL goes through the separate TLS bridge and scoped role above.
++		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: roots}, Postgres: contracts.OwnerPostgresEndpoint{Host: "sql.example.test", Port: 5432, Database: "asservat", Roots: roots, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://audit.example.test", Roots: roots, Region: "test", Bucket: "audit"}, KeyService: contracts.ConfigurationKeyService{Endpoint: "https://keys.example.test", Roots: roots, AuditMount: "transit", AuditKey: "audit"}}
++		c.SQLMaterial = &materialRef
++		// Exact fixture-owned policy teardown, independent of product handover.
++		t.Cleanup(func() {
++			clean, end := context.WithTimeout(context.Background(), 15*time.Second)
++			defer end()
++			for _, name := range []string{c.Plan.Workload.FleetGuard, c.Plan.Workload.WitnessGuard, c.Plan.Workload.WorkloadGuard} {
++				b, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(clean, name, meta.GetOptions{})
++				if e == nil {
++					if b.Annotations["asservat.io/installation-id"] != c.Plan.InstallationID || b.Annotations["asservat.io/preparation-request"] != c.Plan.RequestID {
++						t.Error("foreign policy binding")
++						continue
++					}
++					if e = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(clean, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &b.UID}}); e != nil && !apierrors.IsNotFound(e) {
++						t.Error(e)
++					}
++				} else if !apierrors.IsNotFound(e) {
++					t.Error(e)
++				}
++				p, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(clean, name, meta.GetOptions{})
++				if e == nil {
++					if p.Annotations["asservat.io/installation-id"] != c.Plan.InstallationID || p.Annotations["asservat.io/preparation-request"] != c.Plan.RequestID {
++						t.Error("foreign policy")
++						continue
++					}
++					if e = api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(clean, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &p.UID}}); e != nil && !apierrors.IsNotFound(e) {
++						t.Error(e)
++					}
++				} else if !apierrors.IsNotFound(e) {
++					t.Error(e)
++				}
++			}
++		})
++		p, e := kube.NewInitialPreparer(native, admin, probe, c)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer p.Close()
++		materialReader, e := kube.NewInitialSQLMaterialReader(p, materialRef)
++		if e != nil {
++			t.Fatal(e)
++		}
++		if e = materialReader.CheckInitialSQLMaterial(ctx); e != nil {
++			t.Fatal("material preflight", e)
++		}
++		end := time.Now().Add(30 * time.Second)
++		for {
++			_, e = p.PrepareFinalInputs(ctx)
++			if e == nil {
++				break
++			}
++			if !errors.Is(e, kube.ErrInitialPreparationPolicyPending) || !time.Now().Before(end) {
++				t.Fatal("public inputs", e)
++			}
++			select {
++			case <-ctx.Done():
++				t.Fatal(ctx.Err())
++			case <-time.After(50 * time.Millisecond):
++			}
++		}
++		observed, e := p.ReadPreparedInputs(ctx)
++		if e != nil {
++			t.Fatal("current public inputs", e)
++		}
++		issued, e := p.PrepareProbe(ctx)
++		if e != nil {
++			t.Fatal("original native probe", e)
++		}
++		defer clear(issued.Token)
++		ns := cfg.NamespaceRef{Name: observed.Configuration.Namespace.Name, UID: observed.Configuration.Namespace.UID}
++		targetAdmin, e := kube.NewPermissionClient(native, c.Plan.ClusterID, ns, time.Now)
++		if e != nil {
++			t.Fatal(e)
++		}
++		targetConfig := &rest.Config{Host: native.Host, TLSClientConfig: rest.TLSClientConfig{CAData: native.CAData}, BearerToken: string(issued.Token)}
++		targetProbe, e := kube.NewPermissionClient(targetConfig, c.Plan.ClusterID, ns, time.Now)
++		if e != nil {
++			t.Fatal(e)
++		}
++		binder, e := kube.NewInitialPreparationCredentialBinder(p, targetAdmin, targetProbe, observed.Configuration, observed.Input.UID, materialRef)
++		if e != nil {
++			t.Fatal("credential binder", e)
++		}
++		material, binding, _, e := binder.Bind(ctx)
++		if e != nil {
++			t.Fatal("original binding", e)
++		}
++		credentials, e := postgres.BindInitialSQLMaterial(material, c.Plan.InstallationID, c.Plan.RequestID, binding.NotBefore, binding.NotAfter)
++		if e != nil {
++			t.Fatal(e)
++		}
++		bytes, e := hex.DecodeString(binding.StartupDigest)
++		if e != nil || len(bytes) != 32 {
++			t.Fatal("startup digest")
++		}
++		var digest artifact.Digest
++		copy(digest[:], bytes)
++		payload, e := postgres.EncodeInitialSQLCredentials(credentials, digest)
++		if e != nil {
++			t.Fatal(e)
++		}
++		defer clear(payload)
++		stored, e := binder.PersistSQLState(ctx, payload)
++		if e != nil {
++			t.Fatal("original SQL Secret", e)
++		}
++		provision := func() error {
++			effect, done := context.WithDeadline(ctx, stored.ValidUntil)
++			defer done()
++			if e := manager.Provision(effect, credentials); e != nil {
++				return e
++			}
++			_, _, _, e := binder.Bind(effect)
++			if e != nil {
++				return e
++			}
++			if !time.Now().Before(stored.ValidUntil) {
++				return cfg.ErrUnavailable
++			}
++			return nil
++		}
++		if e = provision(); e != nil {
++			t.Fatal("current bounded SQL provisioning", e)
++		}
++		t.Run("original-secret-and-role-replay", func(t *testing.T) {
++			replay, e := binder.PersistSQLState(ctx, payload)
++			if e != nil || replay.Secret != stored.Secret {
++				t.Fatal("Secret replay changed UID", e)
++			}
++			stored = replay
++			var before string
++			var until time.Time
++			if e = sql.QueryRow(ctx, "SELECT rolpassword,rolvaliduntil FROM pg_authid WHERE rolname=$1", credentials.Preparation.Username).Scan(&before, &until); e != nil {
++				t.Fatal("fixture role snapshot")
++			}
++			if e = provision(); e != nil {
++				t.Fatal("exact SQL replay", e)
++			}
++			var same bool
++			if e = sql.QueryRow(ctx, "SELECT rolpassword=$2 AND rolvaliduntil=$3 FROM pg_authid WHERE rolname=$1", credentials.Preparation.Username, before, until).Scan(&same); e != nil || !same || !until.Equal(binding.NotAfter) {
++				t.Fatal("SQL replay renewed original values")
++			}
++		})
++		t.Run("wrong-original-password-cannot-replace-state", func(t *testing.T) {
++			other, e := postgres.NewInitialSQLCredentials(credentials.InstallationID, time.Now())
++			if e != nil {
++				t.Fatal(e)
++			}
++			wrong := credentials
++			wrong.Preparation.Password = other.Preparation.Password
++			bad, e := postgres.EncodeInitialSQLCredentials(wrong, digest)
++			if e != nil {
++				t.Fatal("valid changed credential encoding", e)
++			}
++			defer clear(bad)
++			if _, e = binder.PersistSQLState(ctx, bad); e == nil {
++				t.Fatal("changed material accepted")
++			}
++		})
++		t.Run("retired-roles-cannot-be-revived", func(t *testing.T) {
++			if e = manager.Retire(ctx, credentials); e != nil {
++				t.Fatal("retire", e)
++			}
++			if e = manager.Provision(ctx, credentials); e == nil {
++				t.Fatal("retired SQL authority revived")
++			}
++			var live int
++			if e = sql.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname=ANY($1) AND rolcanlogin", []string{credentials.Preparation.Username, credentials.Audit.Username, credentials.Activation.Username}).Scan(&live); e != nil || live != 0 {
++				t.Fatal("retired role login remains", e)
++			}
++		})
++		pod, e := api.CoreV1().Pods(ns.Name).Get(ctx, c.Plan.Workload.Name, meta.GetOptions{})
++		if e != nil || len(pod.Spec.SchedulingGates) != 1 || pod.Spec.NodeName != "" || pod.Status.StartTime != nil {
++			t.Fatal("SQL preparation launched Pod", e)
++		}
++		var activated int
++		if e = sql.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", c.Plan.InstallationID).Scan(&activated); e != nil || activated != 0 {
++			t.Fatal("SQL preparation activated", e)
++		}
++	})
++}

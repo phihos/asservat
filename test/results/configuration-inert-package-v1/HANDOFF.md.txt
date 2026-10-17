@@ -1,0 +1,19 @@
+# Configuration credential inert Deployment correction
+
+Four paths, additive to the integrated ADR140 configuration components. No
+SQL migration, role grant, schema or command-switch change. The root may observe
+an exact explicit desired0 Deployment while credential projection is missing.
+Rollout bounds still use future desired1; exact spec/RV changes invalidate the
+current operation. It creates no Pod and does not implement launch/replay.
+
+Verification is immutable run87334: original predicate fails exit1 at the
+expected inert-phase assertion; affected compile0; focused Kubernetes races0
+(43.075s package,51.142s phase); Kubernetes vet0. The result includes all exact
+commands, manifest/dependency hashes and unchanged1372 dependencies. API
+enforcement and SQL receipts remain synthetic. No native fixture was run.
+
+Apply only after checking every original/payload hash in manifest.json. Exclude
+evidence/source copies from live integration. No shared generated outputs.
+Parent runs integrated gates/native qualification; successful launch replay and
+the complete protected generated installer/public runtime graph remain owned
+ADR140 work. In particular no strict hub-worker command switch is included.

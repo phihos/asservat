@@ -1,0 +1,16 @@
+{
+  "boundary": "These results retain their exact v2 dependency snapshot. Current root dependency changes are recorded separately; no claim that v2 checked the new global tree.",
+  "notReused": "Kubernetes race package failed at 180-second aggregate timeout; vet/architecture unrun",
+  "reusedResults": "all-five-package compile; intended first-error BEFORE; exact four passing package race results (contracts, mtls, clusterobservation, bootstrap), 100 top-level / 339 named passes",
+  "sha256": {
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/RESULT.json": "c91c1a37ca8d4ba352031275f48a2a0d1e4085038aa0b6a30bcd63f64f36e34c",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/before.json": "fffb70d5551b17a24fdfaee9a8c76af986b8af610f230f819a2f1fe57a87b89d",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/before.log": "73941eeea6d007d21a091ba834d43f49070b6ecc62f244fe5972a6624f29dc5f",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/compile.json": "5b69dab54b0d5826fb8c50d0a34dfd113ab1d1368bbcfc41e25639e95b006c8a",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/compile.log": "9c335cc1792293e19c1779b2aeef0558b216ae2d35a16442e849f691a8bb9d09",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/race.json": "56a7001ac95761556b496d9cba0fac785cbf893d4416ceca8e6352628fe2958e",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/race.log": "eb091c0a5d943180c26851cae7df380507a1c4da23157c4d769760a29b4486f6",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2/evidence/scratch-cleanup.json": "96c84064d26520f824e2269fdfb620995077b38608a67a59d7387e240b849ee2"
+  },
+  "sourceCheckpoint": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v2"
+}

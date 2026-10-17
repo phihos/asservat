@@ -1,0 +1,17 @@
+[
+  {
+    "path": "docs/architecture/native-exchange.md",
+    "base": "2f1d862f98a03daebc8fb46dbdbcf46d5ce6e1495cbfd770844fb3b79e7d4522",
+    "sha256": "10bf8f54f5aeede42f666b1e692476c4b274662d212d0b4e572385576f8e4edc"
+  },
+  {
+    "path": "internal/transport/native/handler.go",
+    "base": "86e3281409143617101eaabf4640b5af2f07dab956277234e1db86c546539d18",
+    "sha256": "ea99ec192d9fd9a5149f81795a96378472cd2fc3bcafa91b149d6a0ffbf3ea2c"
+  },
+  {
+    "path": "internal/transport/native/terminal_test.go",
+    "base": null,
+    "sha256": "7cb6272d1fc782462115287d928132ae6d480ca78b484e9cd0ebef0211855606"
+  }
+]

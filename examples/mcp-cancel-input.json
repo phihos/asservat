@@ -1,0 +1,5 @@
+{
+  "capture_id": "00000000-0000-4000-8000-000000000031",
+  "expected_revision": 2,
+  "idempotency_key": "synthetic-cancel-1"
+}

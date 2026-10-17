@@ -1,0 +1,8 @@
+--- FAIL: TestContextDownloadContinuationHonorsOriginalTransferDeadline (0.00s)
+    context_download_control_test.go:433: continuation extended original transfer deadline {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} 2026-10-11 18:51:29.173172 +0000 UTC download unavailable
+    context_download_control_test.go:430: expired source read continued preparation {{  {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC} download unavailable [identity recovery lookup-key identity authority runtime-check source continue identity authority metadata-read observe]
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.007s
+FAIL
+
+EXIT=1

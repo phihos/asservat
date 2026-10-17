@@ -1,0 +1,77 @@
+{
+  "manifest": [
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_launch.go",
+      "base_sha256": null,
+      "payload_sha256": "ff7d6330ec2f583f0331bc5083c8608d9fc28c9f3ccb8026381398cc1ee41d37"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+      "base_sha256": null,
+      "payload_sha256": "6bf13e0d0d23417091a0e92eb3f575c3717d9d60937843ada6bc356e3aa1e4f0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_material.go",
+      "base_sha256": null,
+      "payload_sha256": "aee70370baaef8eeee6b8c1d5f8ff1caf74e36181d3a7b7cb7711d672f316bb6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_objects.go",
+      "base_sha256": null,
+      "payload_sha256": "fe7c1a1f69da9ed21fa690307856d182612aa83631b227ce576fcaa27fd328b2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_objects_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8d0f257169f91ff2e8b0b399a26f96d410c953080c559606cfc548253a98be26"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_transition.go",
+      "base_sha256": null,
+      "payload_sha256": "f6d3c1fb6b7b8d58b9f06693febb693651cfb776350d8aaa5a0c2f55e4101a66"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_transition_test.go",
+      "base_sha256": null,
+      "payload_sha256": "dd4b1bbfbe2cfdf98935629a745ee353a1938f74a51169b8b836d14ba5dbae5a"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_role_source.go",
+      "base_sha256": null,
+      "payload_sha256": "cd50ec9d39a0e46d5ea0a95fe760ef277a3aaed8710eb90bf7e792a2de89515e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "da14cb9110cf59e89be6bc0bbb9280191ee653d9467c3dcb18c8084b0fb4fd6b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_roles_test.go",
+      "base_sha256": null,
+      "payload_sha256": "16d866ab685bd6f90c9a70a0bb0d415ddf73f39713590eb7cc238635b2add1bd"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_identity_roles.go",
+      "base_sha256": null,
+      "payload_sha256": "055695a005e2da02bea8f1f1cd9f55e91ffc0c62ad12d009873362b09637b7b1"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner.go",
+      "base_sha256": null,
+      "payload_sha256": "f3f3a15979f8910e3c791c63ce68998c57ab400fc3ae37dd2b77ea75fd510dbf"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_test.go",
+      "base_sha256": null,
+      "payload_sha256": "71ec680bddcc0e1242132806eccf82c7a635b83ed7db4afc784267ba2e2f9346"
+    }
+  ],
+  "dependencies": 1864,
+  "reviewedDependencyDrift": {
+    "test/integration/capacity_sql_matrix_test.go": {
+      "before": "6854eaf76adf815f1f04c8d39a0ceeb65afd3204bde939452eee49715b1570fd",
+      "after": "55f9656075af7f417b39e9d734fe42e570d88e509c2b15b73c84ea634fccc50d"
+    }
+  },
+  "scope": "13 original owner role/projection/launch components; full native producer/installed activation remains pending"
+}

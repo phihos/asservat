@@ -1,0 +1,6 @@
+{
+  "path": "test/integration/retention_effect_fixture_test.go",
+  "before": "c3f4b3c88e406b5b1684b4cfa923b3840c82efa579d18dc310543523c18af1ae",
+  "after": "bba253cdfa3a5c55750eb83ff8a756be4f5912dcba223d420b70be7bab1ff021",
+  "change": "Close initial retention audit and catch-up pools before returning the fixture; retain source and reader pools."
+}

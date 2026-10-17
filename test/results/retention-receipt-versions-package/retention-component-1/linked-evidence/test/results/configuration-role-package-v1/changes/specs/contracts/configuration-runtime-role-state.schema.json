@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-runtime-role-state.schema.json",
+  "title": "Original one-use configuration role creation state",
+  "description": "Private protected Secret; only fixed three-role credentials and original current-source claims. No public/audit-input/account/evidence keys. Original claim and projection CREATE replies remain one-use; unknown results permit exact lookup only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "input",
+    "operationID",
+    "createdAt",
+    "until",
+    "roles"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-configuration-runtime-role-state/v1"
+    },
+    "input": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json"
+    },
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "password"
+        ],
+        "properties": {
+          "purpose": {
+            "enum": [
+              "configuration-fleet",
+              "configuration-source",
+              "configuration-audit"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "claim": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationID",
+              "claimedAt",
+              "until",
+              "databaseOID",
+              "postmasterAt",
+              "sources"
+            ],
+            "properties": {
+              "operationID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "claimedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "databaseOID": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4294967295
+              },
+              "postmasterAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sources": {
+                "$ref": "#/$defs/sources"
+              }
+            }
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "roleName",
+              "roleOID",
+              "layoutDigest"
+            ],
+            "properties": {
+              "roleName": {
+                "type": "string",
+                "pattern": "^as_[0-9a-f]{32}_cfg_0[0-2]$"
+              },
+              "roleOID": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4294967295
+              },
+              "layoutDigest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "dependentRequired": {
+          "receipt": [
+            "claim"
+          ]
+        }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "secretUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sourceRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "generation",
+        "digest",
+        "observedAt",
+        "freshUntil"
+      ],
+      "properties": {
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "freshUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installationID",
+        "clusterID",
+        "issuerEpoch",
+        "namespaceUID",
+        "deploymentUID",
+        "accountUID",
+        "workloadDigest",
+        "guardDigest",
+        "fleet",
+        "owner",
+        "observedAt",
+        "freshUntil"
+      ],
+      "properties": {
+        "installationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "clusterID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "issuerEpoch": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "namespaceUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "deploymentUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "accountUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "workloadDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "guardDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fleet": {
+          "$ref": "#/$defs/sourceRevision"
+        },
+        "owner": {
+          "$ref": "#/$defs/sourceRevision"
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "freshUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

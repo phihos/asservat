@@ -1,0 +1,148 @@
+=== RUN   TestOwnerBootstrapProtectedSourceCapabilityAndDigest
+=== RUN   TestOwnerBootstrapProtectedSourceCapabilityAndDigest/unknown
+=== RUN   TestOwnerBootstrapProtectedSourceCapabilityAndDigest/empty
+=== RUN   TestOwnerBootstrapProtectedSourceCapabilityAndDigest/null
+=== RUN   TestOwnerBootstrapProtectedSourceCapabilityAndDigest/missing-port
+--- PASS: TestOwnerBootstrapProtectedSourceCapabilityAndDigest (0.06s)
+    --- PASS: TestOwnerBootstrapProtectedSourceCapabilityAndDigest/unknown (0.00s)
+    --- PASS: TestOwnerBootstrapProtectedSourceCapabilityAndDigest/empty (0.00s)
+    --- PASS: TestOwnerBootstrapProtectedSourceCapabilityAndDigest/null (0.00s)
+    --- PASS: TestOwnerBootstrapProtectedSourceCapabilityAndDigest/missing-port (0.00s)
+=== RUN   TestOwnerBootstrapOriginalAllocationAndGeneratedInput
+--- PASS: TestOwnerBootstrapOriginalAllocationAndGeneratedInput (3.63s)
+=== RUN   TestOwnerBootstrapUnknownClaimCannotIssueCreate
+=== RUN   TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-uncommitted
+=== RUN   TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-committed
+=== RUN   TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-uncommitted
+=== RUN   TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-committed
+--- PASS: TestOwnerBootstrapUnknownClaimCannotIssueCreate (11.88s)
+    --- PASS: TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-uncommitted (2.87s)
+    --- PASS: TestOwnerBootstrapUnknownClaimCannotIssueCreate/parent-committed (2.86s)
+    --- PASS: TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-uncommitted (3.15s)
+    --- PASS: TestOwnerBootstrapUnknownClaimCannotIssueCreate/child-committed (2.99s)
+=== RUN   TestOwnerBootstrapLostCreateAndReceiptRemainExact
+=== RUN   TestOwnerBootstrapLostCreateAndReceiptRemainExact/create
+=== RUN   TestOwnerBootstrapLostCreateAndReceiptRemainExact/receipt
+--- PASS: TestOwnerBootstrapLostCreateAndReceiptRemainExact (6.98s)
+    --- PASS: TestOwnerBootstrapLostCreateAndReceiptRemainExact/create (3.50s)
+    --- PASS: TestOwnerBootstrapLostCreateAndReceiptRemainExact/receipt (3.48s)
+=== RUN   TestOwnerBootstrapFinalGuardAndChildReplacementDeny
+--- PASS: TestOwnerBootstrapFinalGuardAndChildReplacementDeny (3.19s)
+=== RUN   TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect
+--- PASS: TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect (2.60s)
+=== RUN   TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority
+--- PASS: TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority (0.02s)
+=== RUN   TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt
+--- PASS: TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt (3.08s)
+=== RUN   TestOwnerBootstrapUnknownParentPinsExactLocalAllocation
+--- PASS: TestOwnerBootstrapUnknownParentPinsExactLocalAllocation (2.70s)
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/issuer
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/trust
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pki-role
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pool-budget
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/permission-root
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/logical-peer
+=== RUN   TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/cluster
+--- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution (3.23s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/issuer (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/trust (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pki-role (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/pool-budget (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/permission-root (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/logical-peer (0.00s)
+    --- PASS: TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution/cluster (0.00s)
+=== RUN   TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim
+--- PASS: TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim (5.33s)
+=== RUN   TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers
+--- PASS: TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers (3.23s)
+=== RUN   TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes
+--- PASS: TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes (0.02s)
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-operation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-operation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/selected-provider
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/issuer-allocation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/zero-digest
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/late-receipt
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unbounded-connections
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/duplicate-peer-allocation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/cleanup-object
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unfinished-original
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/mixed-layout
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/original-operation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/child-operation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/peer-allocation
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-root
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/root-window
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-sql
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/long-child
+=== RUN   TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/path-mount
+--- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims (0.32s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-operation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-operation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/selected-provider (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/issuer-allocation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/zero-digest (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/late-receipt (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unbounded-connections (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/duplicate-peer-allocation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/cleanup-object (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/unfinished-original (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/mixed-layout (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/original-operation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/child-operation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/peer-allocation (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/capacity-root (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/root-window (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/worker-sql (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/long-child (0.02s)
+    --- PASS: TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims/path-mount (0.02s)
+=== RUN   TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission
+--- PASS: TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission (0.05s)
+=== RUN   TestOwnerBootstrapWorkerCallerOriginalReceipts
+--- PASS: TestOwnerBootstrapWorkerCallerOriginalReceipts (3.57s)
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/missing_launch_receipt
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/role_root_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/launch_marker
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_account_UID
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/template_annotation
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/image
+=== RUN   TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/guard_receipt
+--- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement (27.38s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/missing_launch_receipt (3.43s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/role_root_UID (3.42s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/launch_marker (3.45s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_UID (3.36s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/worker_account_UID (3.36s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/template_annotation (3.45s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/image (3.45s)
+    --- PASS: TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement/guard_receipt (3.46s)
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/guard_lost
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/child_replaced
+--- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent (10.58s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed (3.56s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/guard_lost (3.47s)
+    --- PASS: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/child_replaced (3.54s)
+=== RUN   TestOwnerBootstrapWorkerCallerCloseAndCopyDeny
+--- PASS: TestOwnerBootstrapWorkerCallerCloseAndCopyDeny (3.55s)
+=== RUN   TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead
+--- PASS: TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead (3.55s)
+=== RUN   TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable
+--- PASS: TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable (3.54s)
+=== RUN   TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable
+--- PASS: TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable (3.56s)
+=== RUN   TestProviderOwnerInstallationRunsFiniteOriginalSequence
+--- PASS: TestProviderOwnerInstallationRunsFiniteOriginalSequence (9.18s)
+=== RUN   TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling
+--- PASS: TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling (3.51s)
+=== RUN   TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection
+--- PASS: TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection (6.31s)
+=== RUN   TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork
+--- PASS: TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork (3.52s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	125.596s

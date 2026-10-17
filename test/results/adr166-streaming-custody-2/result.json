@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestCustodyWithRealServices$"
+  ],
+  "exit": 1,
+  "seconds": 34.327,
+  "requiredPassed": [
+    "TestCustodyWithRealServices",
+    "TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166)"
+  ],
+  "missing": [
+    "TestCustodyWithRealServices",
+    "TestCustodyWithRealServices/bounded_streaming_custody_(ADR-166)"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "failed"
+}

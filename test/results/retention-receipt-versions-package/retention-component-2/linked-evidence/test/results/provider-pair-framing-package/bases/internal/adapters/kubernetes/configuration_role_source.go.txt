@@ -1,0 +1,232 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+// ConfigurationRoleSource is only the actual protected credential-bootstrap
+// source reader. It cannot supply an accepted OwnerConfiguration or update SQL
+// freshness. Its concrete sources cannot be replaced with an installation JSON
+// callback. Original activation/recovery checks remain in the SQL producer.
+type ConfigurationRoleSource struct {
+	client     *PermissionClient
+	protection *OwnerWorkloadProtection
+	fleet      *ProtectedFleetSettings
+	owner      *OwnerConfigurationSource
+	input      contracts.ConfigurationRuntimeRoles
+}
+
+func NewConfigurationRoleSource(client *PermissionClient, protection *OwnerWorkloadProtection, fleetSource *ProtectedFleetSettings, owner *OwnerConfigurationSource, in contracts.ConfigurationRuntimeRoles) (*ConfigurationRoleSource, error) {
+	digest, e := hex.DecodeString(in.LayoutDigest)
+	if client == nil || protection == nil || fleetSource == nil || fleetSource.settings == nil || owner == nil || in.Format != contracts.ConfigurationRuntimeRolesFormat || !authorization.UUID(in.InstallationID) || !authorization.UUID(in.InitialClaimID) || !authorization.UUID(in.ClusterID) || e != nil || len(digest) != 32 || hex.EncodeToString(digest) != in.LayoutDigest {
+		return nil, cfg.ErrInvalid
+	}
+	for _, ref := range []contracts.WorkerObjectReference{in.Namespace, in.Deployment, in.ServiceAccount, in.FleetSource, in.OwnerSource} {
+		if !installationRefValid(ref.Name, ref.UID) || !authorization.UUID(ref.UID) {
+			return nil, cfg.ErrInvalid
+		}
+	}
+	if in.FleetSource.UID == in.OwnerSource.UID || in.FleetSource.Name == in.OwnerSource.Name || client.clusterID != in.ClusterID || client.control != (cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}) || protection.plan.ControlNamespace != client.control || protection.observer != client || fleetSource.settings.client != client || owner.client != client || fleetSource.settings.installation != in.InstallationID || owner.installation != in.InstallationID || fleetSource.settings.name != in.FleetSource.Name || fleetSource.settings.uid != in.FleetSource.UID || owner.name != in.OwnerSource.Name || owner.uid != in.OwnerSource.UID {
+		return nil, cfg.ErrInvalid
+	}
+	return &ConfigurationRoleSource{client: client, protection: protection, fleet: fleetSource, owner: owner, input: in}, nil
+}
+
+func (s *ConfigurationRoleSource) readConfigurationRoleSource(ctx context.Context) (configurationRoleObserved, error) {
+	var zero configurationRoleObserved
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	started := s.client.now()
+	live, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer cancel()
+	until, _ := live.Deadline()
+	// Every child deadline is joined at method exit; no fresh five-second start
+	// is introduced across later source/API reads.
+	var ends []context.CancelFunc
+	narrow := func(next time.Time) {
+		if next.Before(until) {
+			until = next
+			var end context.CancelFunc
+			live, end = context.WithDeadline(live, until)
+			ends = append(ends, end)
+		}
+	}
+	defer func() {
+		for n := len(ends) - 1; n >= 0; n-- {
+			ends[n]()
+		}
+	}()
+	ns, e := s.client.namespace(live, s.client.control)
+	if e != nil || ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	before, e := s.configurationRoleGuardVersions(live)
+	if e != nil {
+		return zero, e
+	}
+	// These three exact enforcement proofs are bracketed by the complete guard
+	// checks in this method. Calling each nested Current reader would repeat
+	// the same namespace/guard I/O without adding another authority fact.
+	if e = s.protection.prove(live, started); e != nil {
+		return zero, e
+	}
+	if e = s.fleet.protection.prove(live); e != nil {
+		return zero, e
+	}
+	if e = s.owner.protection.prove(live); e != nil {
+		return zero, e
+	}
+	guard := s.protection.digest
+	raw, e := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/selfsubjectreviews").Body(&auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}).MaxRetries(0).DoRaw(live)
+	var who auth.SelfSubjectReview
+	if e != nil || permissionJSON(raw, permissionPageBytes, 131072) != nil || strictGuardJSON(raw, &who) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	administrator := false
+	for _, a := range s.protection.plan.Administrators {
+		administrator = administrator || actorMatches(a, who.Status.UserInfo)
+	}
+	if !administrator {
+		return zero, cfg.ErrDenied
+	}
+	f, e := s.fleet.settings.FleetAdministration(live)
+	if e != nil || !f.Valid(s.client.now()) || f.Suspended {
+		return zero, cfg.ErrUnavailable
+	}
+	narrow(f.FreshUntil)
+	ownerStarted := s.client.now()
+	o, rootsUntil, e := s.owner.snapshot(live)
+	o.ProtectionDigest = s.owner.protection.digest
+	ownerUntil := identity.Earlier(ownerStarted.Add(5*time.Second), rootsUntil)
+	if e != nil || !o.Valid() || o.Suspended || !identity.Fresh(ownerStarted, ownerUntil, s.client.now(), 5*time.Second) {
+		return zero, cfg.ErrUnavailable
+	}
+	narrow(ownerUntil)
+	p := o.Pool
+	if p.InstallationID != s.input.InstallationID || p.ClusterID != s.input.ClusterID || p.NamespaceUID != s.input.Namespace.UID || p.Namespace != s.input.Namespace.Name || p.Deployment != s.protection.plan.Deployment || p.DeploymentUID != s.protection.plan.DeploymentUID || f.IssuerEpoch != p.IssuerEpoch {
+		return zero, cfg.ErrChanged
+	}
+	reader := &OwnerEndpoints{client: s.client, pool: p}
+	d, e := ownerResource[apps.Deployment](reader, live, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
+	if e != nil || !configurationRoleDeploymentBound(d, s.input) {
+		return zero, cfg.ErrUnavailable
+	}
+	account, e := ownerResource[core.ServiceAccount](reader, live, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+	if e != nil || !ownerMetadata(account.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) {
+		return zero, cfg.ErrChanged
+	}
+	// The actual probes above supplied the complete enforcement proofs.
+	// Repeat the exact values here, then validate all guard versions below;
+	// do not recursively repeat the complete negative-proof graph.
+	f2, e := s.fleet.settings.FleetAdministration(live)
+	if e != nil || f2.Suspended || !f2.Valid(s.client.now()) || f2.Revision != f.Revision || f2.IssuerEpoch != f.IssuerEpoch || f2.InstallationID != f.InstallationID {
+		return zero, cfg.ErrChanged
+	}
+	narrow(f2.FreshUntil)
+	o2, lastRootsUntil, e := s.owner.snapshot(live)
+	o2.ProtectionDigest = o.ProtectionDigest
+	if e != nil || !o2.Equal(o) {
+		return zero, cfg.ErrChanged
+	}
+	narrow(lastRootsUntil)
+	d2, e := ownerResource[apps.Deployment](reader, live, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
+	if e != nil || !configurationRoleDeploymentBound(d2, s.input) || !equalJSON(d.Spec, d2.Spec) || d.ResourceVersion != d2.ResourceVersion {
+		return zero, cfg.ErrChanged
+	}
+	account2, e := ownerResource[core.ServiceAccount](reader, live, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+	if e != nil || !ownerMetadata(account2.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) || account2.ResourceVersion != account.ResourceVersion {
+		return zero, cfg.ErrChanged
+	}
+	versions, e := s.configurationRoleGuardVersions(live)
+	if e != nil || versions != before {
+		return zero, cfg.ErrChanged
+	}
+	ns, e = s.client.namespace(live, s.client.control)
+	if e != nil || ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	if live.Err() != nil || !s.client.now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	encoded, e := json.Marshal(d.Spec)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	digest := sha256.Sum256(encoded)
+	rev := func(r identity.Revision, start, end time.Time) contracts.ConfigurationRoleSourceRevision {
+		return contracts.ConfigurationRoleSourceRevision{UID: r.UID, Generation: r.Generation, Digest: hex.EncodeToString(r.Digest[:]), ObservedAt: start.UTC(), FreshUntil: end.UTC()}
+	}
+	out := contracts.ConfigurationRoleObservation{InstallationID: s.input.InstallationID, ClusterID: s.input.ClusterID, IssuerEpoch: f.IssuerEpoch, NamespaceUID: s.input.Namespace.UID, DeploymentUID: s.input.Deployment.UID, AccountUID: s.input.ServiceAccount.UID, WorkloadDigest: hex.EncodeToString(digest[:]), GuardDigest: hex.EncodeToString(guard[:]), Fleet: rev(f.Revision, f.ObservedAt, f.FreshUntil), Owner: rev(o.Revision, ownerStarted, ownerUntil), ObservedAt: started.UTC(), FreshUntil: until.UTC()}
+	if guard == (artifact.Digest{}) || !identity.Fresh(out.ObservedAt, out.FreshUntil, s.client.now(), 5*time.Second) {
+		return zero, cfg.ErrUnavailable
+	}
+	return configurationRoleObserved{observation: out, deploymentVersion: d.ResourceVersion, accountVersion: account.ResourceVersion, guards: versions}, nil
+}
+
+// Credential provisioning also accepts the exact inert installation phase at
+// zero desired replicas. It conveys neither readiness nor permission to launch.
+// The full spec/resourceVersion is retained by the surrounding observation, so
+// zero -> one during an operation invalidates its original proof. The rollout
+// bound is calculated at future desired=1 even while inert; a later launch
+// cannot reveal a previously hidden unbacked surge allowance.
+// A stale/closing process still consumes the role-wide SQL connection limit.
+func configurationRoleDeploymentBound(d apps.Deployment, in contracts.ConfigurationRuntimeRoles) bool {
+	if !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Spec.Template.Spec.ServiceAccountName != in.ServiceAccount.Name || d.Spec.Replicas == nil || *d.Spec.Replicas < 0 || *d.Spec.Replicas > 1 {
+		return false
+	}
+	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
+		return d.Spec.Strategy.RollingUpdate == nil
+	}
+	if d.Spec.Strategy.Type != apps.RollingUpdateDeploymentStrategyType || d.Spec.Strategy.RollingUpdate == nil || d.Spec.Strategy.RollingUpdate.MaxSurge == nil {
+		return false
+	}
+	surge, e := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxSurge, 1, true)
+	return e == nil && surge >= 0 && 1+surge <= contracts.ConfigurationRuntimeRetainedProcesses
+}
+
+// Exact source value equality ignores only observation timestamps. A later
+// read can narrow freshness but cannot make a different guarded input equal.
+func configurationRoleSameSources(a, b contracts.ConfigurationRoleObservation) bool {
+	a.ObservedAt, a.FreshUntil = time.Time{}, time.Time{}
+	b.ObservedAt, b.FreshUntil = time.Time{}, time.Time{}
+	a.Fleet.ObservedAt, a.Fleet.FreshUntil = time.Time{}, time.Time{}
+	b.Fleet.ObservedAt, b.Fleet.FreshUntil = time.Time{}, time.Time{}
+	a.Owner.ObservedAt, a.Owner.FreshUntil = time.Time{}, time.Time{}
+	b.Owner.ObservedAt, b.Owner.FreshUntil = time.Time{}, time.Time{}
+	return a == b
+}
+func configurationRoleSourceMatches(in contracts.ConfigurationRuntimeRoles, p contracts.ConfigurationRoleObservation, now time.Time) bool {
+	if p.InstallationID != in.InstallationID || p.ClusterID != in.ClusterID || p.NamespaceUID != in.Namespace.UID || p.DeploymentUID != in.Deployment.UID || p.AccountUID != in.ServiceAccount.UID || !authorization.UUID(p.IssuerEpoch) || p.Fleet.UID != in.FleetSource.UID || p.Owner.UID != in.OwnerSource.UID || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) {
+		return false
+	}
+	digest := func(s string) bool {
+		b, e := hex.DecodeString(s)
+		return e == nil && len(b) == 32 && hex.EncodeToString(b) == s && s != strings.Repeat("0", 64)
+	}
+	if !digest(p.WorkloadDigest) || !digest(p.GuardDigest) {
+		return false
+	}
+	for _, r := range []contracts.ConfigurationRoleSourceRevision{p.Fleet, p.Owner} {
+		if r.Generation < 1 || r.Generation > 2147483647 || !digest(r.Digest) || !identity.Fresh(r.ObservedAt, r.FreshUntil, now, 5*time.Second) || r.ObservedAt.Before(p.ObservedAt) || p.FreshUntil.After(r.FreshUntil) {
+			return false
+		}
+	}
+	return true
+}

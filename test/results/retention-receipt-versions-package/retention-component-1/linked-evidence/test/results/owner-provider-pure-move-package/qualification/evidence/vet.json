@@ -1,0 +1,27 @@
+{
+  "phase": "vet",
+  "command": [
+    "go",
+    "vet",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+    "./internal/adapters/providerconfig",
+    "./internal/adapters/kms"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 0.65,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "recorder": [],
+    "goldens": []
+  }
+}

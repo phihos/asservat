@@ -1,0 +1,5 @@
+--- FAIL: TestRelayCancellationClosesActiveRequests (0.01s)
+    server_test.go:297: active socket remained usable
+FAIL
+FAIL	asservat.local/asservat/internal/transport/ownerrelay	0.277s
+FAIL

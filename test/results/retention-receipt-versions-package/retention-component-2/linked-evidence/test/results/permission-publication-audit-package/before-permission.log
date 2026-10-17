@@ -1,0 +1,29 @@
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/original
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/empty
+    permission_policy_versions_test.go:30: current permission/policy receipt=true, want false
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/null
+    permission_policy_versions_test.go:30: current permission/policy receipt=true, want false
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/maximum
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/permission/oversize
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/original
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/empty
+    permission_policy_versions_test.go:30: current permission/policy receipt=true, want false
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/null
+    permission_policy_versions_test.go:30: current permission/policy receipt=true, want false
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/maximum
+=== RUN   TestPermissionPolicyAuditRequiresImmutableVersions/policy/oversize
+--- FAIL: TestPermissionPolicyAuditRequiresImmutableVersions (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/original (0.00s)
+    --- FAIL: TestPermissionPolicyAuditRequiresImmutableVersions/permission/empty (0.00s)
+    --- FAIL: TestPermissionPolicyAuditRequiresImmutableVersions/permission/null (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/maximum (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/permission/oversize (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/original (0.00s)
+    --- FAIL: TestPermissionPolicyAuditRequiresImmutableVersions/policy/empty (0.00s)
+    --- FAIL: TestPermissionPolicyAuditRequiresImmutableVersions/policy/null (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/maximum (0.00s)
+    --- PASS: TestPermissionPolicyAuditRequiresImmutableVersions/policy/oversize (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.006s
+FAIL

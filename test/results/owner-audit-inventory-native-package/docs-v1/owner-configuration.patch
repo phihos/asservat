@@ -1,0 +1,41 @@
+--- a/docs/architecture/owner-configuration.md
++++ b/docs/architecture/owner-configuration.md
+@@ -69,7 +69,9 @@
+ version IDs, explicit historical `null` versions, zero-byte objects, markers and
+ upload IDs remain distinct. An upload has no invented measured byte size. A
+ current key without a matching version is reported as inconsistent rather than
+-converted into a guessed version.
++converted into a guessed version. Complete version inventory reporting a latest
++data version while complete current LIST omits that key is also inconsistent;
++incomplete listings cannot establish that mismatch.
+ 
+ Validated earlier findings survive later read or row-validation failures with an
+ error and incomplete flags. Completion describes each individual bounded LIST;
+@@ -77,5 +79,25 @@
+ reader neither deletes objects nor releases quota, accepts configuration or
+ resumes an uncertain writer. Full pagination, durable physical accounting,
+ writer quiescence and retirement remain separate work. Component qualification
+-is recorded in [implementation progress](../implementation-progress.md); native
+-backend qualification and production composition remain pending.
++is recorded in [implementation progress](../implementation-progress.md).
++
++The [owned native fixture](../../test/integration/owner_audit_inventory_test.go)
++qualifies a narrow inspection profile on the pinned SeaweedFS 4.48 image. Its
++coarse bucket-scoped `List` role first produces versions 200, multipart uploads
++403 and no current LIST, retaining the validated version facts. An independent
++fixture administrator then grants only `s3:ListBucketMultipartUploads` through a
++bucket policy for the exact principal, bucket and original `s3:prefix`. The same
++reader's new bounded operation completes all three LISTs. This uses the pinned
++provider's [exact S3 action mapping](https://github.com/seaweedfs/seaweedfs/blob/530be3e37337488ecc34d58441e0bc476e121c93/weed/s3api/s3_action_resolver.go),
++not a broad `Read` permission.
++
++All six selected native cases pass. Missing/neighbor prefixes and the foreign
++bucket deny multipart listing; part listing, ordinary/version GET and mutations
++remain denied. Independent exact-version reads confirm unchanged historical
++zero-byte/null copies, non-null versions, marker, neighboring generations and
++unfinished upload/part. The original failed LIST run and later test-transport
++constructor failure remain recorded in
++[implementation progress](../implementation-progress.md). This qualification
++covers the inspection profile and bounded historical reader; production policy
++provisioning, complete pagination, backing, writer closure and physical
++retirement remain pending.

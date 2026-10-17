@@ -1,0 +1,59 @@
+Creating owned synthetic cluster 1
+Fixture command failed: ttps://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:31.476951     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:31.977787     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:32.477218     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:32.977818     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:33.477247     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:33.977805     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:34.477578     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:34.977265     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:35.476972     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:35.976858     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:36.477625     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:36.977516     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1012 18:13:40.478554     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=3000
+error: error execution phase wait-control-plane: cannot obtain client without bootstrap: could not bootstrap the admin user in file admin.conf: unable to create ClusterRoleBinding: Post "https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s": context deadline exceeded
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:262
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).visitAll
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:450
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:234
+k8s.io/kubernetes/cmd/kubeadm/app/cmd.newCmdInit.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/init.go:134
+github.com/spf13/cobra.(*Command).execute
+	github.com/spf13/cobra@v1.10.2/command.go:1015
+github.com/spf13/cobra.(*Command).ExecuteC
+	github.com/spf13/cobra@v1.10.2/command.go:1148
+github.com/spf13/cobra.(*Command).Execute
+	github.com/spf13/cobra@v1.10.2/command.go:1071
+k8s.io/kubernetes/cmd/kubeadm/app.Run
+	k8s.io/kubernetes/cmd/kubeadm/app/kubeadm.go:48
+main.main
+	k8s.io/kubernetes/cmd/kubeadm/kubeadm.go:25
+runtime.main
+	runtime/proc.go:290
+runtime.goexit
+	runtime/asm_amd64.s:1771
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 383, in <module>
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start))
+                     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 190, in main
+    run(create)
+    ~~~^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 32, in run
+    return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['kind', 'create', 'cluster', '--name', 'asservat-context-tvqk81vt-0', '--image', 'kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5', '--kubeconfig', '/home/phil/.cache/asservat-build/context-tvqk81vt/kube-0', '--wait', '90s', '--retain']' returned non-zero exit status 1.
+{"terminalExit": 1, "testExit": 1, "passedEntries": 0, "sourceHashes": 1524, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

@@ -1,0 +1,8 @@
+{
+  "internal/bootstrap/download_worker_native.go": "6f479929f6274b98f5ced1f926b6d0f3a58d0e86f580200747d2d81fbce7f342",
+  "internal/bootstrap/download_worker_native_test.go": "1d49724df8a58fc77f3991a4ec153b6abadeeb62d32cbceb7366dd6b14a68d10",
+  "test/integration/native_exchange_test.go": "7c55844f7c5f58a00a2a37fccc5ccfa824f0084ddd075b94ee6d5d73f5762c9f",
+  "docs/architecture/worker-startup.md": "6a3d7a3f7430c146e84f11429fd2612ca6499dee01c4219ba9524573c146a8e5",
+  "docs/decisions/121-native-worker-startup.md": "6f1f610a3efe134ad0a9d6eb3ec0484b0ec0d0644f7400054b32b71d16257dd5",
+  "internal/bootstrap/download_worker_native_scheduling_test.go": null
+}

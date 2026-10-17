@@ -1,0 +1,10 @@
+{
+  "internal/adapters/objectstore/framed/owner_configuration_epoch.go": {
+    "baseSHA256": null,
+    "sha256": "620c617557249a9fe90f04bd8f1dc3c7aae593efc0eb9f2a2bd11d588e1a17d5"
+  },
+  "internal/adapters/objectstore/framed/owner_configuration_epoch_test.go": {
+    "baseSHA256": null,
+    "sha256": "eba609542eb972d7578ba6f8c8324811198e303c8c71e3271a6b96e2c65f54f3"
+  }
+}

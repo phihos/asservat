@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestOwnerObservationCandidatesWithRealServices$"
+  ],
+  "exit": 0,
+  "seconds": 37.977,
+  "files": {
+    "regional-observation-candidates-native-environment.json": "c2035f84f92d0444ad135b6ffe05684fdec46faa0e6796b67b7545584ea50e62",
+    "regional-observation-candidates-native.log": "87f6095655495a516e62250d803b08ac991f8bec6b5b646dd0a6f9b8a73ed065"
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/contracts",
+        "./internal/adapters/providerconfig",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 8.143,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": null,
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "before-version-optional",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/before-overlay.json",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-v",
+        "-run",
+        "^TestInitialInstallerRequiresVersionBeforeAuditReceipt$",
+        "./internal/bootstrap"
+      ],
+      "exit": 1,
+      "expectedExit": 1,
+      "seconds": 2.884,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": 4,
+      "topLevelPass": 0,
+      "namedPass": 2,
+      "skips": 0
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=5m",
+        "-v",
+        "-run",
+        "^TestInitialInstaller",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 5.738,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": null,
+      "topLevelPass": 4,
+      "namedPass": 30,
+      "skips": 0
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/providerconfig",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.282,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": null,
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "/tmp/asservat-initial-versioned-audit-build-0u69nagg/mirror/scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 0.981,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": null,
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "phase": "spec",
+      "command": [
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "/tmp/asservat-initial-versioned-audit-build-0u69nagg/mirror/scripts/check-specs.py"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 4.987,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": []
+      },
+      "markerCount": null,
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "finalHashes": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "payloads": 33,
+  "dependencies": 3001,
+  "scratchRemoved": true,
+  "freeAfter": 16696176640
+}

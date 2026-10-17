@@ -1,0 +1,95 @@
+{
+  "baseRoot": "/home/phil/Projekte/asservat",
+  "files": [
+    {
+      "path": "docs/architecture/initial-sql-provisioning.md",
+      "baseSha256": null,
+      "newSha256": "d2344716daa497225ec387f602364b1c31b79430c7ada4086d03f4e1a973cf42"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_credentials.go",
+      "baseSha256": "0b61a1ac2dabfec84ee5c3c17c24474464b932c8ea5140f2274628ffefe898e0",
+      "newSha256": "63cd2d18cf7fffe9f3556e8a8f20ad15c25a20c41648da3a1b74b6a46eeadf78"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_credentials_test.go",
+      "baseSha256": "e899419fa65036f8e0656767f5df41dc0baf1b0f6fce1cc6b53f5060700e6ec9",
+      "newSha256": "1dfc3b64cd0668976e69ecbffc5527a5286b78ef1de5dad1e6fa01ee5ece477b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_credentials_test.go",
+      "baseSha256": "9ab83c8751b40d6e5c0e97a387b486dd5bd25b2a8c54f6e416b4e3ecc23c92e3",
+      "newSha256": "62c887b90d4c1a7b7102d3a9645be9a76cae8f95e6df48c389ae199e247fde4e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_observation.go",
+      "baseSha256": null,
+      "newSha256": "58a6db33997d88efe20f81dc4bc5abdb036ea9affa70ab632b06927266289b60"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_observation_test.go",
+      "baseSha256": null,
+      "newSha256": "ed89906c2ade37c53858175a92e6151b8269a08d3897739c614a837a9f05a0a7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_private.go",
+      "baseSha256": "ee8b0afb262495f8eb8f51d0c52ae505ab74a24d354fe628305e9064e8b9420f",
+      "newSha256": "8498e31d54c73e91347703a1e903ef83d277b948523aea9dd724f67189b4cf12"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_sql.go",
+      "baseSha256": null,
+      "newSha256": "03c59c2dc24e02ca8151832c15b94b65c2b03da7e965dbd5a7ab420e47a0e010"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_sql_test.go",
+      "baseSha256": null,
+      "newSha256": "af05250e4f44e70543dc6e71ce496657f49ae5ac4c1f8eefbe7a49dd079557f5"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_sql_material.go",
+      "baseSha256": "3cb4ea4ea640775129a3c5d59b1cdd7cf786947c0da1a46a9409d8788a047b84",
+      "newSha256": "c3205e058c7374684cdc8052770a7e261cca2467a4025603adc41a436870b1ee"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_sql_material_preflight_test.go",
+      "baseSha256": null,
+      "newSha256": "c79ca0d722297f0a55e8c2ae6343426b85eeab38eeaee7bc978143bac1827fa5"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer.go",
+      "baseSha256": "0751df49ef9d251374a3e37039a0bb323db8f8e69e16123c1905e06b73a74cb1",
+      "newSha256": "29943ec8861c5aa3bc7a62edff3c82e7159bb16da8aba729a300eaa44f133e99"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_sql.go",
+      "baseSha256": null,
+      "newSha256": "58de1400a8d9b1d993b11964861a939d703a39fefcc0f5c94eaf2a7aecb0f1e6"
+    },
+    {
+      "path": "internal/contracts/initial_preparation_private.go",
+      "baseSha256": "27c4e4e35712d0d882f17587976c643e1a969ec649b8d60d1cc6d8034d175b93",
+      "newSha256": "4a0b6fc96829e75d8fd3cb98da5c2c8e1d742c0a3c2bae3a61a4a581c5daf3be"
+    },
+    {
+      "path": "internal/contracts/initial_preparer.go",
+      "baseSha256": "aaeb8b559e7a38496152212a9bd9958534f5ff6dd2ee86d3a13d734c080bed45",
+      "newSha256": "df4842bc068ee5deb9fa472986570b9503f0158138ca8806d973726cda3ef81a"
+    },
+    {
+      "path": "specs/contracts/initial-preparation-private.schema.json",
+      "baseSha256": "e643487c9d9a9a9767db88787f84838e1a33faff8c98c038376863ec59a94891",
+      "newSha256": "bf32ed4729e29b439e00e34f8c78ef113ecbdbc891d4a7ec54cecdb9662ef5b1"
+    },
+    {
+      "path": "specs/contracts/initial-preparer.schema.json",
+      "baseSha256": "e11998c5b355aa5ce0352862ceb949116e14fa740ca05a2c785eee57f6ba5c6b",
+      "newSha256": "66cffc5ce67f77b19d2528bb718dc4abbde14f56e05066768508c5fedbd14a4c"
+    },
+    {
+      "path": "test/integration/initial_preparer_sql_test.go",
+      "baseSha256": null,
+      "newSha256": "1045acfcc4809282b2a00af61864db5161fa3a8040a0fe8b23252133933bc7cc"
+    }
+  ]
+}

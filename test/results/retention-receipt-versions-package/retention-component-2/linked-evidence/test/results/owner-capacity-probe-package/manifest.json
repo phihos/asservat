@@ -1,0 +1,10 @@
+{
+  "paths": 28,
+  "dependencies": 1616,
+  "files": {
+    "payload": "4c4317155f8a23c1b49ff882fadd640d22e5352cfe68e8de06234a081bae6418",
+    "bases": "6e396c9d7bca67bef821c6888176e98dc779fd1e44a72029fc8b419be236f8ee",
+    "dependencies": "95697149920809baec4cce34fa170ee12cda0c332195d0fd8079af84b96fdc7d",
+    "overlay": "ac94432787961dc2dab9dd96c0557383c43eae1a97bb2f1616eba8db68550f81"
+  }
+}

@@ -1,0 +1,3 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+FAIL: Broken local link in test/results/observation-direct-holder-package/checkpoint-v2/files/docs/architecture/cluster-observations.md: ../../test/results/owner-observation-operation-integration.json
+make: *** [Makefile:5: spec-check] Error 1

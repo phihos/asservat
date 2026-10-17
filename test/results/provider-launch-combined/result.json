@@ -1,0 +1,61 @@
+{
+  "scope": "Combined selected component verification; no native integration result",
+  "sourceCount": 2471,
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 14.96,
+      "sourcesUnchanged": true
+    },
+    {
+      "name": "joined-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-v",
+        "-run=^(TestConfigurationProviderCloseAndJoin|TestInstalledOwnerProviderCloseAndJoin|TestOwnerObservationDeployment(ExternalClose|RunCancellation|CloseBeforeRun)|TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper)",
+        "./internal/adapters/kms",
+        "./internal/adapters/kubernetes",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "seconds": 22.428,
+      "sourcesUnchanged": true
+    },
+    {
+      "name": "gates",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "seconds": 10.778,
+      "sourcesUnchanged": true
+    }
+  ],
+  "exit": 0,
+  "scratchRemoved": true,
+  "sourceUnchanged": true,
+  "logHashes": {
+    "compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+    "joined-races.log": "83dab7009f177b40f18c059a8b8eb8fcb646db16f32216bad65868ac5eacc8a5",
+    "gates.log": "71d62d9673650ae2c66b7f459eec7f228eeb7e051b1a14bee7c0ec450c799839"
+  }
+}

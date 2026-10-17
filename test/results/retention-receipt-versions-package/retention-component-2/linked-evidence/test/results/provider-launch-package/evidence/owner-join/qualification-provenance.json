@@ -1,0 +1,18 @@
+{
+  "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1",
+  "session": 75546,
+  "terminal_exit": 0,
+  "files": {
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/manifest.json": "830df515c57b039c1083ebe961ef629af4035d5c612f4c4bd2331c7eea5d745b",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/delta-manifest.json": "c5725e26668425a070f5273f6a2ce3c6adc334daa9cc819c0acc4a9a24c2fb03",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/dependencies.json": "72e0517b7f58db0e22224596be1affa7ae10176678638f15afc3d71ed6da3818",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/result.json": "0118cef388a4e6b87ab01f049c7672a8b18388964b93f41c41372621bd1262ae",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/run.py": "82e8b1e03d0e1680bb9600a4d68d1d129ef5c8c3eb3e71359cfa641c59fbb7b4",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/HANDOFF.md": "09ecfa3f137fee1e028ee9db621da13a914d3176d95302449431ae0b367aebef",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/evidence/before-deployment.log": "49f32a7a2b0368e69f180237edc530f0ee5a4ecb9502ef7bded3f74543b4988b",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/evidence/before-provider.log": "404fa308e178891a654d4cc6770406d3794096d4e693c08c29e37606c4695ff1",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/evidence/focused-races.log": "e30adf04f68b52879e2e8f668202255f0b3dc091bfb23949d7f0aef3b4eb7a87",
+    "/home/phil/.cache/asservat-build/planning/owner-observation-join-20261013/checks/join-1/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "rebase": "All six current live bases equal the original effective qualification inputs. All six output payloads are byte-identical to join-1. No current workflow coordinator code was changed or discarded. No new test run claimed."
+}

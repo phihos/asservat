@@ -1,0 +1,60 @@
+schemaVersion: grant/v1
+id: 00000000-0000-4000-8000-000000000081
+kind: AccessGrant
+spec:
+  requester:
+    issuer: https://identity.example.invalid/realms/company
+    subject: service-owner-123
+    clientID: asservat-browser
+    identityType: human
+  grantType: adHocCapture
+  target:
+    kind: capture
+    clusterID: 00000000-0000-4000-8000-000000000001
+    workloadUID: workload-ledger-uid
+    captureUID: 00000000-0000-4000-8000-000000000045
+    executionDigest: d3a5adbd38a80a8d859b62c31fe7e1662a2b27dcd774ff60a631907c5337fd71
+    recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
+  operations:
+  - runtimeDiagnostic
+  - command
+  - liveCore
+  reason: Review this one accepted capture before its original deadline.
+  notAfter: '2026-10-09T12:55:00Z'
+  limits:
+    maxBytes: 2155872256
+    maxExecutions: 3
+    maxDuration: 60s
+  issuedAt: '2026-10-09T12:00:00Z'
+  approver:
+    issuer: https://identity.example.invalid/realms/company
+    subject: incident-approver-456
+    clientID: asservat-browser
+    identityType: human
+  resultAccess:
+    actionIds:
+    - core
+    operations:
+    - read_memory
+    - download_artifact
+    clientIDs:
+    - asservat-browser
+    - developer-agent
+    maxArtifacts: 2
+    maxBytes: 6442450944
+    maxOperations: 20
+    notAfter: '2026-10-09T12:50:00Z'
+    digest: b20a9e528587356bfde5cf78eeff40e35f6d0b76a448de5d8a173137d8e88568
+status:
+  phase: Approved
+  revision: 1
+  reservedBytes: 0
+  spentBytes: 0
+  executionsSpent: 0
+  executionsReserved: 0
+  resultAccessCounters:
+    artifactsRegistered: 0
+    bytesReserved: 0
+    bytesSpent: 0
+    operationsReserved: 0
+    operationsSpent: 0

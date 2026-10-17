@@ -1,0 +1,545 @@
+#!/usr/bin/env python3
+"""Owned, synthetic component integration fixtures; never uses current kube context.
+
+Creates two disposable Kind clusters plus private S3/OpenBao fixtures, runs the
+Go integration test, and removes only resources it created, even on failure.
+The explicit fresh-database initial-handover case uses its single installer
+cluster; it contains no multi-cluster assertions. Ordinary selections retain two.
+No host kernel configuration or privileged collector is installed.
+"""
+import argparse
+import json
+import hashlib
+import os
+import shutil
+from pathlib import Path
+import subprocess
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
+from helm_registry import HelmRegistry, REGISTRY, verify_registry_cleanup
+
+ROOT = Path(__file__).resolve().parents[1]
+SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
+BAO = "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf"
+NODE = "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+POSTGRES = "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
+
+
+def run(args, *, data=None):
+    return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+
+
+
+def source_hashes():
+    files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__)]
+    files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
+    files += [ROOT/"scripts/helm_registry.py"] + list((ROOT/"charts/asservat").rglob("*"))
+    files = [p for p in files if p.is_file()]
+    files += list((ROOT/"internal").rglob("*.json")) + list((ROOT/"migrations").rglob("*.sql")) + list((ROOT/"migrations").rglob("*.go")) + list((ROOT/"test/fixtures").rglob("*.sql")) + list((ROOT/"test/fixtures").rglob("*.go"))
+    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
+
+
+def qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False):
+    if runtime_provider_owner and not runtime_provider_worker:
+        raise ValueError("owner runtime requires the original provider worker qualification")
+    if runtime_provider_worker and (not runtime_provider_pair or not initial_bootstrap_chain):
+        raise ValueError("Runtime worker requires the original provider pair and bootstrap chain")
+    if runtime_provider_pair and (test_pattern is not None or not initial_bootstrap_chain or any((initial_handover, initial_schema_handover, helm_bootstrap, runtime_object_roundtrip, owner_provider_auth, regional_context_start is not None))):
+        raise ValueError("Provider pair owns the fresh original bootstrap-chain qualification")
+    if owner_provider_auth:
+        if test_pattern is not None or regional_context_start is not None or any((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, runtime_object_roundtrip)):
+            raise ValueError("Owner provider qualification owns its exact package/test selection")
+        return "^TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao$", 1
+    if runtime_object_roundtrip:
+        if test_pattern is not None or regional_context_start is not None or any((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)):
+            raise ValueError("Runtime object qualification owns its exact package/test selection")
+        return "^TestInitialRuntimeObjectRoundTripWithRealKubernetes$", 1
+    if regional_context_start is not None:
+        if regional_context_start not in ("first", "continuation") or test_pattern is not None or any((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)):
+            raise ValueError("Regional context qualification owns its exact test selection")
+        return "^TestContextAdmissionWithRealServices$/^native-regional-api-" + regional_context_start + "$", 2
+    if sum((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap)) > 1:
+        raise ValueError("Select exactly one installation qualification")
+    if initial_handover or initial_schema_handover or initial_bootstrap_chain or helm_bootstrap:
+        if test_pattern is not None:
+            raise ValueError("Installation qualification owns its exact database selection")
+        name = "TestHelmBootstrapWithRealServices" if helm_bootstrap else "TestInitialBootstrapChainWithRealServices" if initial_bootstrap_chain else ("TestInitialSchemaHandoverWithRealServices" if initial_schema_handover else "TestInitialPreparationHandoverWithRealServices")
+        return "^" + name + "$", 1
+    return test_pattern, 2
+
+
+def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False):
+    env = base.copy()
+    env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
+    for key in ("ASSERVAT_INITIAL_HANDOVER_NATIVE", "ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE", "ASSERVAT_HELM_BOOTSTRAP_NATIVE", "ASSERVAT_CONTEXT_REGIONAL_START_NATIVE", "ASSERVAT_RUNTIME_OBJECT_ROUNDTRIP_NATIVE", "ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE"):
+        env.pop(key, None)
+    if initial_handover:
+        env["ASSERVAT_INITIAL_HANDOVER_NATIVE"] = "1"
+    if initial_schema_handover:
+        env["ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE"] = "1"
+    if initial_bootstrap_chain:
+        env["ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE"] = "1"
+    if helm_bootstrap:
+        env["ASSERVAT_HELM_BOOTSTRAP_NATIVE"] = "1"
+    if regional_context_start is not None:
+        if regional_context_start not in ("first", "continuation"):
+            raise ValueError("Invalid regional context qualification")
+        env["ASSERVAT_CONTEXT_REGIONAL_START_NATIVE"] = regional_context_start
+    if runtime_object_roundtrip:
+        env["ASSERVAT_RUNTIME_OBJECT_ROUNDTRIP_NATIVE"] = "1"
+    if owner_provider_auth:
+        env["ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE"] = "1"
+    env.pop("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR", None)
+    env.pop("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER", None)
+    env.pop("ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER", None)
+    if not initial_bootstrap_chain or runtime_provider_pair:
+        for key in ("ASSERVAT_INITIAL_RUNTIME_BRIDGE", "ASSERVAT_INITIAL_RUNTIME_INSTALLED_OWNER"):
+            env.pop(key, None)
+    if runtime_provider_pair:
+        qualification_selection(None, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, True, runtime_provider_worker, runtime_provider_owner)
+        env["ASSERVAT_INITIAL_RUNTIME_BRIDGE"] = "1"
+        env["ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR"] = "1"
+    if runtime_provider_worker:
+        if not runtime_provider_pair or not initial_bootstrap_chain:
+            raise ValueError("Runtime worker requires the original provider pair and bootstrap chain")
+        env["ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER"] = "1"
+    if runtime_provider_owner:
+        qualification_selection(None, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, True)
+        env["ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER"] = "1"
+    env["TMPDIR"] = str(work)
+    return env
+
+
+def prepare_fixture_database(cache, work, dsn, pgname, initial_schema_handover):
+    # The dedicated schema qualification must give the product an empty database.
+    # In particular, even broad fixture runtime grants would hide loader defects.
+    if initial_schema_handover:
+        return
+    migration_env = os.environ.copy()
+    migration_env.update({"GOOSE_DRIVER": "postgres", "GOOSE_DBSTRING": dsn, "TMPDIR": str(work)})
+    subprocess.run([str(cache/"bin/goose"), "-dir", str(ROOT/"migrations"), "up"], env=migration_env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
+    run(["docker", "exec", pgname, "psql", "-U", "postgres", "-d", "custody_test", "-v", "ON_ERROR_STOP=1", "-c", (ROOT/"test/fixtures/sql/runtime-roles.sql").read_text()])
+
+
+def prepare_ephemeral_node(name, run_id, containers, volumes):
+    """Bounded synthetic node state; never used for persistence qualification.
+
+    Keep the seed process alive: Docker's initial tmpfs population is lost when
+    create unmounts it before start. Copy the pinned image's /var after mounting.
+    The seed never runs Kubernetes or receives any test/provider credentials.
+    """
+    available = next(int(line.split()[1])*1024 for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:"))
+    if available < 8 * 1024**3:
+        raise RuntimeError("Provider-pair node requires 8 GiB available memory")
+    volume, seed = name+"-var", name+"-seed"
+    if volume in run(["docker", "volume", "ls", "--format", "{{.Name}}"]).splitlines() or seed in run(["docker", "ps", "-a", "--format", "{{.Names}}"]).splitlines():
+        raise RuntimeError("Ephemeral node fixture name collision")
+    volumes.append(volume)
+    run(["docker", "volume", "create", "--driver", "local", "--label", "asservat.test="+run_id, "--opt", "type=tmpfs", "--opt", "device=tmpfs", "--opt", "o=size=3g", volume])
+    containers.append(seed)
+    run(["docker", "run", "-d", "--name", seed, "--label", "asservat.test="+run_id, "--network", "none", "--memory", "768m", "--pids-limit", "32", "--mount", "type=volume,source="+volume+",target=/scratch", "--entrypoint", "/bin/sh", NODE, "-c", "cp -a /var/. /scratch/ && touch /scratch/.asservat-seeded && exec sleep 3600"])
+    end = time.monotonic()+60
+    while time.monotonic() < end:
+        if subprocess.run(["docker", "exec", seed, "test", "-f", "/scratch/.asservat-seeded"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0:
+            break
+        time.sleep(.1)
+    else:
+        raise RuntimeError("Ephemeral node image population deadline")
+    info = json.loads(run(["docker", "volume", "inspect", volume]))[0]
+    if info["Labels"].get("asservat.test") != run_id or info["Options"] != {"device":"tmpfs", "type":"tmpfs", "o":"size=3g"}:
+        raise RuntimeError("Ephemeral node volume ownership or limit changed")
+    return {"hostPath":info["Mountpoint"], "containerPath":"/var", "propagation":"None"}
+
+
+def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False):
+    # Aggregate test envelope only. Product authority/root/token dates are unchanged.
+    return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else None)
+
+
+def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False):
+    test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner)
+    direct_observation = test_pattern == "^TestDirectHolderObservationWithRealKubernetes$"
+    test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
+    cache.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="context-", dir=cache) as directory:
+        work = Path(directory)
+        run_id = work.name.replace("_", "-")
+        network = "asservat-"+run_id
+        containers, clusters, ephemeral_volumes = [], [], []
+        created_network = False
+        worker_tag = None
+        registry = None
+        registry_nodes = []
+        build_scratch = None
+        report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner) or "10m (Go default)", "bootstrapFixtureSeconds": (720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+        exit_code = 1
+        try:
+            if runtime_provider_pair or direct_observation:
+                if shutil.disk_usage("/tmp").free < 4 * 1024**3:
+                    raise RuntimeError("Selected in-Pod qualification requires 4 GiB free build scratch")
+                build_scope = "direct-observation" if direct_observation else "provider-pair"
+                build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir="/tmp"))
+                report["buildScratch"] = str(build_scratch)
+            report["goVersion"] = run(["go", "version"])
+            report["sourceHashes"] = source_hashes()
+            if helm_bootstrap:
+                report["helmVersion"] = run(["helm", "version", "--short"])
+                report["images"]["registry"] = REGISTRY
+            image_dir = work/"worker-image"
+            image_dir.mkdir()
+            build_env = os.environ.copy()
+            build_env.update({"TMPDIR": str(build_scratch or work), "CGO_ENABLED": "0"})
+            subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"asservat"), "./cmd/asservat"], cwd=ROOT, env=build_env, check=True)
+            subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
+            helper_copy = ""
+            if direct_observation:
+                subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"observation-native"), *[str(ROOT/"test/fixtures/observation-native"/name) for name in ("data.go", "enrollment.go", "inputs.go", "main.go", "metrics.go", "runtime.go")]], cwd=ROOT, env=build_env, check=True)
+                helper_copy = "COPY observation-native /observation-native\n"
+                report["directObservation"] = {"helperSHA256": hashlib.sha256((image_dir/"observation-native").read_bytes()).hexdigest(), "runtimeSelection": False, "setupAuthority": "synthetic installer/issuer acceptance; actual API/SQL/S3/TLS path", "fullInstalledHWORKBackground": False}
+            (image_dir/"Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY provider-proxy /provider-proxy\n"+helper_copy+"USER 65532:65532\n")
+            worker_tag = "asservat-context-worker:"+run_id
+            run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", worker_tag, str(image_dir)])
+            worker_info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
+            report["workerBuild"] = {"binarySHA256": hashlib.sha256((image_dir/"asservat").read_bytes()).hexdigest(), "dockerImageID": worker_info["Id"], "tag": worker_tag}
+            run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
+            created_network = True
+            if helm_bootstrap:
+                registry = HelmRegistry(work, network, run_id, containers, run)
+                registry.upload(worker_tag, worker_info["Id"])
+                report["registryImageIdentity"] = registry.export_identity
+                chart_dir = work/"chart"
+                chart_dir.mkdir()
+                run(["helm", "package", str(ROOT/"charts/asservat"), "--destination", str(chart_dir)])
+                chart_archive, = chart_dir.glob("*.tgz")
+                report["helmChartArchiveSHA256"] = hashlib.sha256(chart_archive.read_bytes()).hexdigest()
+            def service(name, image, command, extra):
+                full = network+"-"+name
+                run(["docker", "create", "--name", full, "--network", network,
+                     "--label", "asservat.test="+run_id, "--memory", "768m", "--cpus", "1",
+                     "--pids-limit", "256", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                     *extra, image, *command])
+                containers.append(full)
+                run(["docker", "start", full])
+                info = json.loads(run(["docker", "inspect", full]))[0]
+                return info["NetworkSettings"]["Networks"][network]["IPAddress"]
+            s3ip = service("s3", SEAWEED, ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"], ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--entrypoint", "/usr/bin/weed"])
+            baoip = service("kms", BAO, ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"], ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"])
+            pgip = service("postgres", POSTGRES, ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"], ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
+            proxy_ip = service("tls", worker_tag, ["http://"+s3ip+":8333", "http://"+baoip+":8200", pgip+":5432"], ["--user", "65532:65532", "--read-only", "--entrypoint", "/provider-proxy"])
+            for _ in range(50):
+                try:
+                    native_providers = json.loads(run(["docker", "logs", network+"-tls"]))
+                    break
+                except (json.JSONDecodeError, subprocess.CalledProcessError): time.sleep(.1)
+            else: raise RuntimeError("native TLS fixture unavailable")
+            report["nativeTLSProviders"] = {"address": proxy_ip, "scope": "TLS in owned private container, plaintext private backend hops"}
+            pgname=network+"-postgres"
+            if runtime_provider_pair:
+                # This is fixture initdb readiness before any product operation,
+                # not an extension of a native proof or installation deadline.
+                startup = time.monotonic()
+                startup_end = startup + 90
+                ready = False
+                try:
+                    while time.monotonic() < startup_end:
+                        remaining = startup_end - time.monotonic()
+                        try:
+                            probe = subprocess.run(["docker", "exec", pgname, "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "custody_test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=max(.001, min(5, remaining)))
+                            if probe.returncode == 0:
+                                ready = True
+                                break
+                        except subprocess.TimeoutExpired:
+                            pass
+                        time.sleep(min(.1, max(0, startup_end-time.monotonic())))
+                finally:
+                    report["postgresFixtureStartup"] = {"limitSeconds": 90, "elapsedSeconds": round(time.monotonic()-startup, 3), "ready": ready}
+                if not ready:
+                    raise RuntimeError("PostgreSQL fixture not ready")
+            else:
+                for _ in range(100):
+                    if subprocess.run(["docker", "exec", pgname, "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "custody_test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0: break
+                    time.sleep(.1)
+                else: raise RuntimeError("PostgreSQL fixture not ready")
+            dsn="postgres://postgres:synthetic-only@"+pgip+":5432/custody_test?sslmode=disable"
+            prepare_fixture_database(cache, work, dsn, pgname, initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)
+            for url in ["http://"+s3ip+":8333", "http://"+baoip+":8200/v1/sys/health"]:
+                for attempt in range(40):
+                    try:
+                        with urllib.request.urlopen(url, timeout=1): pass
+                        break
+                    except urllib.error.HTTPError as exc:
+                        if exc.code in (403, 404): break
+                    except OSError: pass
+                    time.sleep(.25)
+                else: raise RuntimeError("fixture did not become ready")
+            fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "nativeProviders":native_providers, "clusters": []}
+            if direct_observation:
+                fixture["directObservation"] = report["directObservation"]
+            if helm_bootstrap:
+                fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
+            for index in range(cluster_count):
+                name = network+"-"+str(index)
+                config = work/("kube-"+str(index))
+                # Refuse collisions before recording ownership; never reuse a cluster.
+                if name in run(["kind", "get", "clusters"]).splitlines(): raise RuntimeError("cluster name collision")
+                clusters.append(name)
+                print("Creating owned synthetic cluster", index+1, flush=True)
+                # Retain only until our finally cleanup so setup failures can be
+                # diagnosed; Kind's default removes the evidence immediately.
+                create = ["kind", "create", "cluster", "--name", name, "--image", NODE, "--kubeconfig", str(config), "--wait", "90s", "--retain"]
+                if helm_bootstrap:
+                    kind_config = work/"kind-helm.json"
+                    kind_config.write_text(json.dumps({"kind":"Cluster","apiVersion":"kind.x-k8s.io/v1alpha4","nodes":[{"role":"control-plane"},{"role":"worker"}]}))
+                    create += ["--config", str(kind_config)]
+                elif runtime_provider_pair:
+                    mount = prepare_ephemeral_node(name, run_id, containers, ephemeral_volumes)
+                    kind_config = work/"kind-provider-pair.json"
+                    kind_config.write_text(json.dumps({"kind":"Cluster", "apiVersion":"kind.x-k8s.io/v1alpha4", "nodes":[{"role":"control-plane", "extraMounts":[mount]}]}))
+                    create += ["--config", str(kind_config)]
+                    report["ephemeralNodeState"] = {"volume":ephemeral_volumes[-1], "maxBytes":3*1024**3, "storage":"tmpfs", "scope":"Synthetic API node only; original startup/product deadlines, no persistence qualification"}
+                run(create)
+                config.chmod(0o600)
+                run(["docker", "update", "--memory", "3g", "--memory-swap", "3g", "--cpus", "2", name+"-control-plane"])
+                if index == 0 or direct_observation:
+                    node_name = name+"-control-plane"
+                    run(["docker", "network", "connect", network, node_name])
+                    if runtime_provider_pair:
+                        # Only the owned provider joins the exact owned node's
+                        # original API network. No foreign node is read or used.
+                        info = json.loads(run(["docker", "inspect", node_name]))[0]
+                        original_networks = [n for n in info["NetworkSettings"]["Networks"] if n != network]
+                        if len(original_networks) != 1:
+                            raise RuntimeError("original owned API network is ambiguous")
+                        run(["docker", "network", "connect", original_networks[0], network+"-kms"])
+                        report["providerReviewerNetwork"] = {"ownedProvider": network+"-kms", "ownedAPINode": node_name, "network": original_networks[0]}
+                        fixture["runtimeProviderPairS3Container"] = network+"-s3"
+                    if helm_bootstrap:
+                        worker_node = name+"-worker"
+                        run(["docker", "update", "--memory", "3g", "--memory-swap", "3g", "--cpus", "2", worker_node])
+                        run(["docker", "network", "connect", network, worker_node])
+                        for owned in [node_name, worker_node]:
+                            registry.configure_owned_node(owned)
+                            info = json.loads(run(["docker", "inspect", owned]))[0]
+                            registry_nodes.append(info["NetworkSettings"]["Networks"][network]["IPAddress"])
+                        fixture["workerImage"] = registry.image
+                        report["workerBuild"]["nodeImage"] = registry.image
+                        report["workerBuild"]["exactImageAbsentBeforeBothPulls"] = True
+                        k = ["kubectl", "--kubeconfig", str(config), "--request-timeout=15s"]
+                        run(k+["taint", "node", node_name, "node-role.kubernetes.io/control-plane:NoSchedule-"])
+                        run(k+["cordon", worker_node])
+                        a = json.loads(run(k+["get","node",node_name,"-o","json"]))
+                        b = json.loads(run(k+["get","node",worker_node,"-o","json"]))
+                        fixture["helmBootstrap"].update(nodeA=node_name,nodeAUID=a["metadata"]["uid"],nodeB=worker_node,nodeBUID=b["metadata"]["uid"])
+                    else:
+                        run(["kind", "load", "docker-image", worker_tag, "--name", name])
+                        native_tag = "docker.io/library/"+worker_tag
+                        rows = run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "ls"]).splitlines()
+                        matches = [row.split()[2] for row in rows if row.split()[0] == native_tag]
+                        if len(matches) != 1 or not matches[0].startswith("sha256:"):
+                            raise RuntimeError("loaded worker image identity unavailable")
+                        digest_ref = "docker.io/library/asservat-context-worker@"+matches[0]
+                        run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "tag", native_tag, digest_ref])
+                        if direct_observation and "workerImage" in fixture and fixture["workerImage"] != digest_ref:
+                            raise RuntimeError("two owned nodes loaded different exact helper image identities")
+                        fixture["workerImage"] = digest_ref
+                        report["workerBuild"]["nodeImage"] = digest_ref
+                pause = PAUSE
+                k = ["kubectl", "--kubeconfig", str(config), "--request-timeout=15s"]
+                resources = [
+                    {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "synthetic", "labels": {"pod-security.kubernetes.io/enforce": "restricted"}}},
+                    {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "fixture", "namespace": "synthetic"}, "spec": {"replicas": 1, "selector": {"matchLabels": {"app": "fixture"}}, "template": {"metadata": {"labels": {"app": "fixture"}, "annotations": {"synthetic-user-data": "MUST-NOT-LEAK"}}, "spec": {"securityContext": {"runAsNonRoot": True, "runAsUser": 65532, "seccompProfile": {"type": "RuntimeDefault"}}, "containers": [{"name": "fixture", "image": pause, "imagePullPolicy": "IfNotPresent", "env": [{"name": "SYNTHETIC_SECRET", "value": "MUST-NOT-LEAK"}], "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}, "resources": {"requests": {"memory": "8Mi", "cpu": "5m"}, "limits": {"memory": "32Mi", "cpu": "50m"}}}]}}}},
+                    {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": "context-reader", "namespace": "synthetic"}},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role", "metadata": {"name": "context-reader", "namespace": "synthetic"}, "rules": [{"apiGroups": [""], "resources": ["pods"], "verbs": ["get"]}]},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "metadata": {"name": "context-reader", "namespace": "synthetic"}, "subjects": [{"kind": "ServiceAccount", "name": "context-reader", "namespace": "synthetic"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "context-reader"}},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": "context-reader"}, "rules": [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["synthetic"], "verbs": ["get"]}]},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": {"name": "context-reader"}, "subjects": [{"kind": "ServiceAccount", "name": "context-reader", "namespace": "synthetic"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "context-reader"}},
+                ]
+                resources.extend([
+                    {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": "target-reader", "namespace": "synthetic"}},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role", "metadata": {"name": "target-reader", "namespace": "synthetic"}, "rules": [{"apiGroups": [""], "resources": ["pods"], "verbs": ["get"]}, {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets", "replicasets"], "verbs": ["get"]}]},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding", "metadata": {"name": "target-reader", "namespace": "synthetic"}, "subjects": [{"kind": "ServiceAccount", "name": "target-reader", "namespace": "synthetic"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "target-reader"}},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": {"name": "target-reader"}, "rules": [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["synthetic"], "verbs": ["get"]}, {"apiGroups": [""], "resources": ["nodes"], "resourceNames": [name+"-control-plane"], "verbs": ["get"]}]},
+                    {"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding", "metadata": {"name": "target-reader"}, "subjects": [{"kind": "ServiceAccount", "name": "target-reader", "namespace": "synthetic"}], "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "target-reader"}},
+                ])
+                run(k+["apply", "-f", "-"], data=json.dumps({"apiVersion": "v1", "kind": "List", "items": resources}))
+                run(k+["-n", "synthetic", "rollout", "status", "deployment/fixture", "--timeout=90s"])
+                pod = json.loads(run(k+["-n", "synthetic", "get", "pod", "-l", "app=fixture", "-o", "json"]))["items"][0]
+                ns = json.loads(run(k+["get", "namespace", "synthetic", "-o", "json"]))
+                node = json.loads(run(k+["get", "node", pod["spec"]["nodeName"], "-o", "json"]))
+                deployment = json.loads(run(k+["-n", "synthetic", "get", "deployment", "fixture", "-o", "json"]))
+                token = run(k+["-n", "synthetic", "create", "token", "context-reader", "--duration=1h"])
+                target_token = run(k+["-n", "synthetic", "create", "token", "target-reader", "--duration=1h"])
+                fixture["clusters"].append({"config": str(config), "token": token, "targetToken": target_token, "nodeUID":node["metadata"]["uid"], "nodeBootID":node["status"]["nodeInfo"]["bootID"], "workloadUID":deployment["metadata"]["uid"], "pod": {"Namespace": "synthetic", "NamespaceUID": ns["metadata"]["uid"], "Name": pod["metadata"]["name"], "UID": pod["metadata"]["uid"], "NodeName": pod["spec"]["nodeName"], "ControllerUID": pod["metadata"]["ownerReferences"][0]["uid"]}})
+                report["clusters"].append({"name": name, "nodeImage": NODE, "workloadImage": pause, "podUID": pod["metadata"]["uid"]})
+            path = work/"fixtures.json"
+            path.touch(mode=0o600)
+            path.write_text(json.dumps(fixture))
+            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner)
+
+            if build_scratch is not None:
+                env["TMPDIR"] = str(build_scratch)
+
+            command = ["go", "test", "-race", "-count=1", "-v"]
+            if test_pattern:
+                command += ["-run", test_pattern]
+            aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner)
+            if aggregate_timeout:
+                command += ["-timeout", aggregate_timeout]
+            command += [test_package]
+            with (ROOT/"test/results/context-storage.log").open("w") as log:
+                result = subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+            exit_code = result.returncode
+            raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
+            try:
+                output = raw_output.decode("utf-8")
+            except UnicodeDecodeError:
+                # Preserve the original log and still record source/cleanup
+                # evidence if a synthetic diagnostic contains binary bytes.
+                # An undecodable log never becomes a passing qualification.
+                output = raw_output.decode("utf-8", errors="replace")
+                report["logEncodingError"] = True
+                exit_code = 1
+            passed = [line.strip().split()[2] for line in output.splitlines()
+                      if line.strip().startswith("--- PASS: Test")]
+            if test_pattern and "/" in test_pattern:
+                passed = [name for name in passed if "/" in name]
+            report["passedTests"] = passed
+            if not passed:
+                exit_code = 1
+            if owner_provider_auth and "TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao" not in passed:
+                report["missingRequiredOwnerProviderAuthentication"] = True
+                exit_code = 1
+            if runtime_object_roundtrip and "TestInitialRuntimeObjectRoundTripWithRealKubernetes" not in passed:
+                report["missingRequiredRuntimeObjectRoundTrip"] = True
+                exit_code = 1
+            if regional_context_start and "TestContextAdmissionWithRealServices/native-regional-api-" + regional_context_start not in passed:
+                report["missingRequiredRegionalContextStart"] = True
+                exit_code = 1
+            if initial_schema_handover and "TestInitialSchemaHandoverWithRealServices" not in passed:
+                report["missingRequiredSchemaHandover"] = True
+                exit_code = 1
+            if initial_bootstrap_chain and "TestInitialBootstrapChainWithRealServices" not in passed:
+                report["missingRequiredBootstrapChain"] = True
+                exit_code = 1
+            if direct_observation and "TestDirectHolderObservationWithRealKubernetes" not in passed:
+                report["missingRequiredDirectObservation"] = True
+                exit_code = 1
+            if runtime_provider_pair:
+                required = "runtime-provider-owner-identity" if runtime_provider_owner else ("runtime-provider-worker-source" if runtime_provider_worker else "runtime-provider-pair-worker-inputs")
+                if "TestInitialBootstrapChainWithRealServices/" + required not in passed:
+                    report["missingRequiredRuntimeProviderPair"] = required
+                    exit_code = 1
+            if helm_bootstrap:
+                if "TestHelmBootstrapWithRealServices" not in passed:
+                    report["missingRequiredHelmBootstrap"] = True
+                    exit_code = 1
+                if exit_code == 0:
+                    report["registryPulls"] = registry.report(registry_nodes)
+            report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
+            if not report["sourceUnchangedDuringTest"]: exit_code = 1
+            if exit_code:
+                with (ROOT/"test/results/context-storage-kubelet.log").open("w") as diagnostics:
+                    for name in clusters:
+                        diagnostics.write("Owned node: "+name+"-control-plane\n")
+                        result = subprocess.run(["docker", "exec", name+"-control-plane", "journalctl", "--unit", "kubelet", "--since", "-5min", "--no-pager", "-n", "80"], capture_output=True, text=True, timeout=15)
+                        diagnostics.write(result.stdout[-32768:])
+            print("Component test exit:", exit_code, flush=True)
+        except subprocess.CalledProcessError as exc:
+            (ROOT/"test/results/context-storage-fixture-error.log").write_text(exc.stderr or str(exc.returncode))
+            for name in clusters:
+                try:
+                    info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
+                    assert info["Config"]["Labels"]["io.x-k8s.kind.cluster"] == name
+                    run(["kind", "export", "logs", str(ROOT/"test/results"/(name+"-logs")), "--name", name])
+                except Exception:
+                    pass  # diagnostics cannot suppress the original failure or cleanup
+            print("Fixture command failed:", exc.stderr[-4000:] if exc.stderr else exc.returncode, flush=True)
+            raise
+        finally:
+            report["testExit"] = exit_code
+            failures = []
+            # Preserve diagnostics from this owned database before removing it.
+            # Without them, role/query failures collapse to the public unavailable
+            # error and the original SQL cause disappears with fixture cleanup.
+            pgname = network + "-postgres"
+            if exit_code and pgname in containers:
+                try:
+                    info = json.loads(run(["docker", "inspect", pgname]))[0]
+                    assert info["Config"]["Labels"]["asservat.test"] == run_id
+                    provider = subprocess.run(["docker", "logs", "--tail", "200", pgname], text=True, capture_output=True, timeout=10)
+                    (ROOT/"test/results/context-storage-postgres.log").write_text(provider.stdout+provider.stderr)
+                    report["providerLogExit"] = provider.returncode
+                except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, KeyError, IndexError, AssertionError) as exc:
+                    report["providerLogFailure"] = type(exc).__name__
+            for name in reversed(clusters):
+                try: run(["kind", "delete", "cluster", "--name", name])
+                except Exception: failures.append(name)
+            for name in reversed(containers):
+                try:
+                    info = json.loads(run(["docker", "inspect", name]))[0]
+                    assert info["Config"]["Labels"]["asservat.test"] == run_id
+                    run(["docker", "rm", "-f", "-v", name])
+                except Exception: failures.append(name)
+            for name in reversed(ephemeral_volumes):
+                try:
+                    info = json.loads(run(["docker", "volume", "inspect", name]))[0]
+                    assert info["Labels"]["asservat.test"] == run_id
+                    run(["docker", "volume", "rm", name])
+                except Exception: failures.append(name)
+            if worker_tag:
+                try:
+                    info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
+                    assert info["Config"]["Labels"]["asservat.test"] == run_id
+                    run(["docker", "image", "rm", worker_tag])
+                except Exception: failures.append(worker_tag)
+            if created_network:
+                try: run(["docker", "network", "rm", network])
+                except Exception: failures.append(network)
+            if helm_bootstrap:
+                try: report["registryCleanup"] = verify_registry_cleanup(run, work, network)
+                except Exception: failures.append(network+"-registry-cleanup-verification")
+            if build_scratch is not None:
+                try:
+                    shutil.rmtree(build_scratch)
+                    report["buildScratchRemoved"] = not build_scratch.exists()
+                except OSError:
+                    failures.append(str(build_scratch))
+            report["cleanupFailures"] = failures
+            # Setup failures still need an actual source comparison. This is
+            # provenance only and never turns an unexecuted test into a pass.
+            if "sourceHashes" in report:
+                report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
+                if not report["sourceUnchangedDuringTest"]:
+                    exit_code = 1
+            (ROOT/"test/results/context-storage-environment.json").write_text(json.dumps(report, indent=2)+"\n")
+            if failures: raise RuntimeError("Owned fixtures need cleanup: "+", ".join(failures))
+        return exit_code
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run", dest="test_pattern", help="Optional Go test pattern; recorded in the report. Default runs the full suite.")
+    parser.add_argument("--initial-handover", action="store_true", help="Qualify the original installer handover on its own fresh database; incompatible with --run.")
+    parser.add_argument("--initial-schema-handover", action="store_true", help="Qualify product schema initialization and original activation handover on an empty database; no fixture migrations or runtime grants.")
+    parser.add_argument("--initial-bootstrap-chain", action="store_true", help="Qualify all four fixed bootstrap commands in a Restricted runner and the original activation Pod on an empty database.")
+    parser.add_argument("--helm-bootstrap", action="store_true", help="Actual chart/four-command empty-database chain with authenticated TLS registry and two owned cold-image nodes.")
+    parser.add_argument("--regional-context-start", choices=("first", "continuation"), help="Qualify actual signed same-port H2 context start with SQL52/API/storage; owns its exact fresh-fixture test selection.")
+    parser.add_argument("--runtime-object-roundtrip", action="store_true", help="Qualify inert generated resource defaults in one owned API, using the exact package-local test; no installer authority claim.")
+    parser.add_argument("--owner-provider-auth", action="store_true", help="Qualify fixed owner Kubernetes authentication against the pinned provider and one owned API; no installed-runtime qualification.")
+    parser.add_argument("--runtime-provider-pair", action="store_true", help="Continue the original fresh bootstrap chain through selected worker2/owner2 resources and real provider/SQL worker inputs; requires --initial-bootstrap-chain.")
+    parser.add_argument("--runtime-provider-owner", action="store_true", help="Continue the original running worker through owner roles, projection and actual in-Pod paired identity; requires --initial-bootstrap-chain --runtime-provider-pair --runtime-provider-worker.")
+    parser.add_argument("--runtime-provider-worker", action="store_true", help="Continue the original provider pair through actual launch and in-Pod accepted owner observation; requires --initial-bootstrap-chain --runtime-provider-pair.")
+    args = parser.parse_args()
+    if (args.initial_handover or args.initial_schema_handover or args.initial_bootstrap_chain) and args.test_pattern is not None:
+        parser.error("Installation qualification cannot be combined with --run")
+    if sum((args.initial_handover, args.initial_schema_handover, args.initial_bootstrap_chain)) > 1:
+        parser.error("Select exactly one installation qualification")
+    if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
+        parser.error("--run must contain 1 to 256 characters")
+    (ROOT/"test/results").mkdir(parents=True, exist_ok=True)
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner))

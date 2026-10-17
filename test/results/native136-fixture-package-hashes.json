@@ -1,0 +1,12 @@
+{
+  "manifest.json": "6fc1a28fc53131c4a43cccb7b33510ec5166736ab0467bfad30ae7ec2532efa2",
+  "dependencies.json": "c68962bb51b3caa434f42145aa913f589f9ac6298003526b1b9b21c87a10afcc",
+  "payload.patch": "6c1d2f0f87f5474ed828065222ed4c608f81b744ae85e2d52406bf2efe087955",
+  "HANDOFF.md": "3d144502ef20e1b6ca60bd60544d1955047c6d3215eea7116863e01c65f9eefe",
+  "evidence/results.json": "8059c433f94528c7f1431e4f253fa54edf157b2cabdd5dc8e37443ba5476c38e",
+  "evidence/before.log": "a96a85c89f71548554f99e054633992fe43e3e0ffa41a7015a9b70c1259dbefd",
+  "evidence/after.log": "25d78c9c0ff69d065c5598a69009d4b72d973e6f99a29790f87fda5c9930aea4",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "changes/test/integration/context_native_content_test.go": "49e4278be6b1fcbef5cdbe9d6a3f52c82e297c261d82412a834e37b9ac297afc",
+  "changes/test/integration/context_native_fixture_test.go": "ae793feb079252dcce198d9456625d09976362e2b2d474c8914986bdb4cf7095"
+}

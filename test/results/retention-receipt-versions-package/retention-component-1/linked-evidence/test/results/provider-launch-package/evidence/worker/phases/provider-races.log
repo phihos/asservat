@@ -1,0 +1,40 @@
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-wrap
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-unwrap
+--- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole (0.04s)
+    --- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-wrap (0.02s)
+    --- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-unwrap (0.02s)
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/policy
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/account
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/unknown-login
+--- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount (0.06s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/policy (0.02s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/account (0.02s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/unknown-login (0.02s)
+=== RUN   TestConfigurationProviderCloseRetainsBlockedControlOwnership
+--- PASS: TestConfigurationProviderCloseRetainsBlockedControlOwnership (1.06s)
+=== RUN   TestConfigurationProviderCloseAndJoinKeepsNativeOwnership
+--- PASS: TestConfigurationProviderCloseAndJoinKeepsNativeOwnership (0.10s)
+=== RUN   TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow
+--- PASS: TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow (0.11s)
+=== RUN   TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential
+--- PASS: TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential (0.02s)
+=== RUN   TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline
+--- PASS: TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline (0.01s)
+=== RUN   TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup
+--- PASS: TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup (0.01s)
+=== RUN   TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken
+--- PASS: TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken (0.02s)
+=== RUN   TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication
+--- PASS: TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication (0.01s)
+=== RUN   TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow
+--- PASS: TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow (0.04s)
+=== RUN   TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath
+--- PASS: TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath (0.01s)
+=== RUN   TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned
+--- PASS: TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned (0.04s)
+=== RUN   TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining
+--- PASS: TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining (0.03s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kms	2.623s

@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-15",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "The continuation completed natively with ADR-184/185/186: public sources, all 66 public runtime roles (2 min 56 s), the public projection verified and published in one role operation (3.5 s), owner identity roles (now six purposes), selection, provider artifact with applier and owner projection and launch. The launched owner process then exited with code 1 two seconds after start; the test did not capture its output. Run 16 fetches the exited container's bounded fixed diagnostic.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

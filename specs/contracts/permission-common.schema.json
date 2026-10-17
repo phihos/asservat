@@ -1,0 +1,356 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/permission-common.schema.json",
+  "title": "Asservat permission primitives v1",
+  "$defs": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "evidence-reader",
+        "workload-maintainer",
+        "evidence-owner",
+        "action-approver"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "User",
+            "Group",
+            "Workload"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "format": "uri"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "kind",
+        "issuer",
+        "id"
+      ]
+    },
+    "namespaceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "name",
+        "uid"
+      ]
+    },
+    "workloadRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Deployment",
+            "StatefulSet"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "uid"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "namespaceRef": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/namespaceRef"
+        },
+        "workloads": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/workloadRef"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "clusterID",
+        "namespaceRef"
+      ]
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "matchLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "maxProperties": 16
+        }
+      },
+      "required": [
+        "matchLabels"
+      ]
+    },
+    "protection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "administratorManaged",
+            "admissionEnforced"
+          ]
+        },
+        "reviewRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "guardRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "mode",
+        "reviewRef"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "admissionEnforced"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "guardRef"
+            ]
+          }
+        }
+      ]
+    },
+    "metadataMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "enum": [
+            "annotation",
+            "label"
+          ]
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "groupID",
+            "valueMap"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "format": "uri"
+        },
+        "values": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true
+          }
+        }
+      },
+      "required": [
+        "field",
+        "key",
+        "mode",
+        "issuer"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "valueMap"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "values"
+            ],
+            "properties": {
+              "values": {
+                "minProperties": 1
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "values"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Ready",
+            "Disabled",
+            "Stale",
+            "UnsafeSource",
+            "Rejected"
+          ]
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lastVerifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "phase",
+        "observedGeneration"
+      ]
+    },
+    "accessProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespaceUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/subject"
+              },
+              "role": {
+                "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
+              },
+              "basisKind": {
+                "type": "string",
+                "enum": [
+                  "AccessBinding",
+                  "PermissionSource"
+                ]
+              },
+              "basisUID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "basisDigest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "assignmentID": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "subject",
+              "role",
+              "basisKind",
+              "basisUID",
+              "basisDigest",
+              "assignmentID"
+            ]
+          }
+        }
+      },
+      "required": [
+        "namespaceUID",
+        "assignments"
+      ]
+    }
+  }
+}

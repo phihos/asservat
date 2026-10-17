@@ -1,0 +1,32 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-preparation-trace-20261012/overlay.json",
+    "-race",
+    "./test/integration",
+    "-run",
+    "^TestNativePreparationTrace",
+    "-count=1",
+    "-timeout=60s"
+  ],
+  "go_pid": 1205113,
+  "exit": 0,
+  "elapsed_seconds": 11.225783348083496,
+  "payload": {
+    "test/integration/context_native_content_test.go": "cb1e9345df613560c56b7fcaf8c3c63a2aae5fe13aa39636446b24e9b130acc0",
+    "test/integration/native_preparation_trace_test.go": "be048bb9beccb35f2a538460bcedb40e38757fc39c54ce80b1756f614d50a3a3"
+  },
+  "dependency_count": 1309,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  }
+}

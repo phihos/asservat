@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/connector-identity.schema.json",
+  "title": "Protected connector identity configuration v1",
+  "description": "One private connector-identity.json source per independently pinned peer/profile under a shared multi-cluster root budget. Current native administrator protection, exact source identity, aggregate DER bounds, X.509 roots and role distinctness require runtime validation. A source observation is not acceptance, signing or activation authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "rootID",
+    "installationID",
+    "clusterID",
+    "issuerEpoch",
+    "peerID",
+    "revision",
+    "suspended",
+    "serverName",
+    "clientIssuerRoots",
+    "serverIssuerRoots",
+    "roles",
+    "backing",
+    "deployment"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-connector-identity/v1"
+    },
+    "rootID": {
+      "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+    },
+    "issuerEpoch": {
+      "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+    },
+    "peerID": {
+      "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "suspended": {
+      "type": "boolean"
+    },
+    "serverName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?)*(?![\\s\\S])",
+      "description": "One exact lower-case DNS name, never a wildcard or IP literal; runtime rejects IP addresses."
+    },
+    "clientIssuerRoots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 21848,
+        "contentEncoding": "base64",
+        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+      }
+    },
+    "serverIssuerRoots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 21848,
+        "contentEncoding": "base64",
+        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "journal",
+        "acknowledgement",
+        "cleanup",
+        "verifier",
+        "finalizer"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        },
+        "journal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        },
+        "acknowledgement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        },
+        "cleanup": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        },
+        "verifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        },
+        "finalizer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z_][a-z_0-9]*(?![\\s\\S])"
+        }
+      },
+      "description": "Four distinct installation-owned role names. The actual source producer resolves and pins OIDs/incarnation after root activation; names are not credentials or SQL authority."
+    },
+    "backing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "AccountVersion",
+        "AccountLimit",
+        "RecordsPerAccount",
+        "RetainedSeconds",
+        "ProfileLimit",
+        "SourceTransitionLimit",
+        "SourceBackupReservedBytes",
+        "SourceWALReservedBytes",
+        "Policy"
+      ],
+      "properties": {
+        "AccountVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "AccountLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "RecordsPerAccount": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000000
+        },
+        "RetainedSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 316224000
+        },
+        "ProfileLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "SourceTransitionLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "SourceBackupReservedBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "SourceWALReservedBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "Policy": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/policy"
+        }
+      },
+      "description": "Finite shared identity lane and separate pending-source reservations. Runtime compares the exact private qualification to independently accepted installation facts and checks all cross-field totals; configuration alone does not qualify a backend or allocate capacity."
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "namespaceUID",
+        "serviceAccount",
+        "accountUID",
+        "deployment",
+        "deploymentUID",
+        "servingSlots",
+        "retainedProcesses"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        },
+        "namespaceUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "serviceAccount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "accountUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deployment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "deploymentUID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "servingSlots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "retainedProcesses": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 256
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "digest": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "not": {
+        "const": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ID",
+        "Digest",
+        "Layout",
+        "MaximumRowFootprintBytes",
+        "MaximumTransitionWALBytes",
+        "BackupCopies",
+        "WALCopies"
+      ],
+      "properties": {
+        "ID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "Digest": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/digest"
+        },
+        "Layout": {
+          "enum": ["connector-operation-history/v1", "connector-operation-history/v2"]
+        },
+        "MaximumRowFootprintBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 16777216
+        },
+        "MaximumTransitionWALBytes": {
+          "type": "integer",
+          "minimum": 131072,
+          "maximum": 67108864
+        },
+        "BackupCopies": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "WALCopies": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "RootID",
+        "InstallationID",
+        "StoreID",
+        "PolicyID",
+        "BackupProfileID",
+        "Lane",
+        "PolicyDigest",
+        "BackupProfileDigest",
+        "BackingRevision",
+        "MetadataSlots",
+        "BackupReservedBytes",
+        "WALReservedBytes",
+        "BackupHorizonSeconds",
+        "CleanupBudgetSeconds",
+        "ProofWindowSeconds",
+        "MaxPurgeLeases",
+        "ValidUntil",
+        "History"
+      ],
+      "properties": {
+        "RootID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "InstallationID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "StoreID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "PolicyID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "BackupProfileID": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/uuid"
+        },
+        "Lane": {
+          "const": "identity"
+        },
+        "PolicyDigest": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/digest"
+        },
+        "BackupProfileDigest": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/digest"
+        },
+        "BackingRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1152921504606846976
+        },
+        "MetadataSlots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000
+        },
+        "BackupReservedBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "WALReservedBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "BackupHorizonSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 316224000
+        },
+        "CleanupBudgetSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "ProofWindowSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 316224000
+        },
+        "MaxPurgeLeases": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 32
+        },
+        "ValidUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "History": {
+          "$ref": "https://asservat.io/spec/v1/connector-identity.schema.json#/$defs/history"
+        },
+        "OverdueTerminal": {
+          "const": "overdue-original/v1"
+        }
+      }
+    }
+  }
+}

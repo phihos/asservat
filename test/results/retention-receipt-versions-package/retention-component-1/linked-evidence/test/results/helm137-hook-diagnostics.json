@@ -1,0 +1,6 @@
+{
+  "path": "test/integration/helm_bootstrap_test.go",
+  "baseSHA256": "e86cf97102067c4fe7e98f3a125070ffd09b82c500fae0d600cd6984e1621feb",
+  "payloadSHA256": "473dfdada9222b0002c8bf6ddeb133ddfb2d82c652971756c6a252badf073fa0",
+  "scope": "test-only bounded exact original Pod diagnostics; native qualification pending"
+}

@@ -1,0 +1,450 @@
+--- a/test/integration/context_native_admission_race_test.go
++++ b/test/integration/context_native_admission_race_test.go
+@@ -0,0 +1,29 @@
++package integration
++
++import (
++	"context"
++	"errors"
++
++	"asservat.local/asservat/internal/domain/artifact"
++)
++
++func nativeControlRaceError(err error) string {
++	switch {
++	case err == nil:
++		return "none"
++	case errors.Is(err, context.Canceled):
++		return "cancelled"
++	case errors.Is(err, context.DeadlineExceeded):
++		return "deadline"
++	case errors.Is(err, artifact.ErrDownloadConflict):
++		return "conflict"
++	case errors.Is(err, artifact.ErrDownloadCapacity):
++		return "capacity"
++	case errors.Is(err, artifact.ErrDownloadExpired):
++		return "expired"
++	case errors.Is(err, artifact.ErrDownloadUnavailable):
++		return "unavailable"
++	default:
++		return "other"
++	}
++}
+--- a/test/integration/context_native_content_test.go
++++ b/test/integration/context_native_content_test.go
+@@ -10,7 +10,6 @@
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"strings"
+-	"sync"
+ 	"testing"
+ 	"time"
+ 
+@@ -174,7 +173,7 @@
+ 	enrollment.CurrentAuthority = f.gate
+ 	cfg := evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{target.RunUntil}, Profile: f.worker.Intent.Profile, Configuration: f.content.configuration, Workers: f.content.workers, Preparation: first, Dispatcher: f.content.dispatcher, Enrollments: enrollment, Proofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
+ 		return channelSQLProof{token, f.worker}, nil
+-	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: f.admissionTrace.registrar(router), PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
++	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
+ 	runtime, e := evidence.NewContextNativeRuntime(cfg)
+ 	if e != nil {
+ 		t.Fatal("actual native runtime", e)
+@@ -198,7 +197,6 @@
+ 		t.Fatal("native context initial source lookup", e)
+ 	}
+ 	t.Log("native context initial source resolved")
+-	f.admissionTrace.mark(ctx, "prepare-entry")
+ 	if result, e := runtime.ContinueContextDownload(ctx, current(), session, source); e != nil || result.Pending {
+ 		t.Fatal("original preparation continuation", result, e)
+ 	}
+@@ -226,13 +224,12 @@
+ 	if e = f.config.BindDownloadControlAllocation(ctx, control); e != nil {
+ 		t.Fatal(e)
+ 	}
+-	if f.content.mode == "native-control-races" {
++	if f.content.mode == "native-control-races" || f.content.mode == "native-control-admission-race" {
+ 		requireContextNativeJoined(t, joined, target, 1)
+ 		stopWorker()
+ 		qualifyContextNativeControlRaces(t, ctx, f, en, firstOwners, responses, runtime, prep, ownerPod, epoch)
+ 		return
+ 	}
+-	f.admissionTrace.mark(ctx, "metadata-entry")
+ 	firstMetadata, found, e := runtime.ReadPreparedContextDownload(ctx, current(), session)
+ 	if e != nil || !found {
+ 		t.Fatal("original acknowledged native result", found, e)
+@@ -362,13 +359,117 @@
+ 	newResponse := func() artifact.DownloadResponse {
+ 		return artifact.DownloadResponse{ID: custodyID(), SessionID: prep.SessionID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: 1}, WindowReadLimit: evidence.ContextDownloadReadWork}, Until: f.worker.Intent.RunUntil}
+ 	}
+-	counts := func() [4]int64 {
++	counts := func() [10]int64 {
+ 		t.Helper()
+-		var v [4]int64
+-		if e := f.admin.QueryRow(ctx, "SELECT (SELECT updates FROM download_native_owner WHERE worker_id=$1),(SELECT count(*) FROM download_response WHERE session_id=$2),(SELECT reserved_responses FROM download_control_allocation WHERE id=$3),(SELECT reserved_windows FROM download_control_allocation WHERE id=$3)", f.worker.Intent.ID, prep.SessionID, f.allocation.ID).Scan(&v[0], &v[1], &v[2], &v[3]); e != nil {
++		var v [10]int64
++		if e := f.admin.QueryRow(ctx, `SELECT (SELECT updates FROM download_native_owner WHERE worker_id=$1),
++ (SELECT count(*) FROM download_response WHERE session_id=$2),
++ (SELECT reserved_responses FROM download_control_allocation WHERE id=$3),
++ (SELECT reserved_windows FROM download_control_allocation WHERE id=$3),
++ (SELECT charged_output FROM artifact_download WHERE id=$2),
++ (SELECT charged_read FROM artifact_download WHERE id=$2),
++ (SELECT requests FROM artifact_download WHERE id=$2),
++ (SELECT coalesce(sum(used_roles),0) FROM download_native_key WHERE worker_id=$1),
++ (SELECT coalesce(sum(used_roles),0) FROM download_key_binding WHERE session_id=$2),
++ (SELECT generation FROM artifact_download WHERE id=$2)`, f.worker.Intent.ID, prep.SessionID, f.allocation.ID).Scan(&v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9]); e != nil {
+ 			t.Fatal(e)
+ 		}
+ 		return v
++	}
++	// Both modes use distinct actual SQL pools. The fresh selector reaches this
++	// point through its own original allocation/session/worker/preparation;
++	// the negative selector keeps its uncertain first response and all charges.
++	runRace := func(want int) {
++		t.Helper()
++		beforeRace := counts()
++		a := f.authority()
++		op, response := newObserve(a), newResponse()
++		type operationResult struct {
++			operation value.NativeOperation
++			err       error
++		}
++		type responseResult struct {
++			response artifact.DownloadResponse
++			err      error
++		}
++		start := make(chan struct{})
++		operations := make(chan operationResult, 1)
++		responseResults := make(chan responseResult, 1)
++		go func() {
++			<-start
++			o, err := nativeOwners.ClaimNativeOperation(ctx, en, a, op)
++			operations <- operationResult{o, err}
++		}()
++		go func() {
++			<-start
++			r, err := second.BeginDownloadResponse(ctx, prep.SessionID, a, response)
++			responseResults <- responseResult{r, err}
++		}()
++		close(start)
++		// Join both operations before any assertion/cleanup. Deadline expiry
++		// cannot masquerade as the expected uncertain-state or race exclusion.
++		o, r := <-operations, <-responseResults
++		winners := 0
++		if o.err == nil {
++			winners++
++		}
++		if r.err == nil {
++			winners++
++		}
++		if !a.Valid(time.Now()) || !op.CurrentValid(time.Now()) || ctx.Err() != nil {
++			t.Fatal("control admission race lost original authority before outcome assertion")
++		}
++		if winners != want {
++			t.Fatal("status/content race admission count", winners, "expected", want,
++				"observe", nativeControlRaceError(o.err), "response", nativeControlRaceError(r.err))
++		}
++		expected := beforeRace
++		if o.err == nil {
++			if !o.operation.Valid() || !o.operation.Equal(op) {
++				t.Fatal("race changed original Observe identity")
++			}
++			expected[0]++ // Exactly one native claim; no content/key reservation.
++		}
++		if r.err == nil {
++			if !r.response.Valid() || r.response.ID != response.ID || r.response.OwnerID != response.OwnerID || r.response.SessionID != prep.SessionID {
++				t.Fatal("race changed original response identity")
++			}
++			expected[1]++
++			expected[2]++
++			expected[3] += response.Plan.Windows()
++			expected[9]++ // Response generation; no bytes/keys spent before a window.
++		}
++		if counts() != expected {
++			t.Fatal("race spent beyond the sole admitted operation or changed uncertain spend")
++		}
++		if o.err == nil {
++			// No peer was registered for this SQL-only race. Close only this
++			// exact no-I/O owner; never fabricate a remote Joined result.
++			if e := nativeOwners.ReleaseNativeOperation(ctx, o.operation); e != nil {
++				t.Fatal("close exact race owner", nativeControlRaceError(e))
++			}
++			expected[0]++
++		} else if r.err == nil {
++			if e := second.CloseDownloadResponse(ctx, prep.SessionID, r.response.ID, r.response.OwnerID); e != nil {
++				t.Fatal("close exact race response", nativeControlRaceError(e))
++			}
++		}
++		if counts() != expected {
++			t.Fatal("race cleanup refunded or changed original spend")
++		}
++	}
++	if f.content.mode == "native-control-admission-race" {
++		original, e := f.runtime.LookupDownload(ctx, prep.SessionID, f.worker.Intent.Authority.Scope.Principal)
++		if e != nil || original.Scope != f.worker.Intent.Authority.Scope || original.Generation != 1 || original.Requests != 1 || original.OutputLimit != 8192 || original.ReadLimit != 8<<20 || original.RequestLimit != 4 {
++			t.Fatal("fresh race must use its own original prepared session and unchanged fixture budgets")
++		}
++		initial := counts()
++		if initial[0] != 2 || initial[1] != 0 || initial[2] != 0 || initial[3] != 0 || initial[7] != 0 || initial[8] != 7 || initial[9] != 1 {
++			t.Fatal("fresh race inherited prior operation/response work")
++		}
++		runRace(1)
++		t.Log("fresh independently prepared session admits exactly one concurrent Observe/response, original budgets and loser spend preserved")
++		return
+ 	}
+ 	// A blocked native row must not outlive the original admission check or
+ 	// consume an update after the lock is released.
+@@ -477,52 +578,11 @@
+ 	if e = responses.CloseDownloadResponse(ctx, prep.SessionID, r.ID, r.OwnerID); e != nil {
+ 		t.Fatal(e)
+ 	}
+-	// Both actual replicas start simultaneously. Exactly one serialized admission
+-	// wins; the loser cannot abort the winner or spend a second operation/window.
+-	a = f.authority()
+-	op := newObserve(a)
+-	response := newResponse()
+-	start := make(chan struct{})
+-	done := make(chan bool, 2)
+-	var operation value.NativeOperation
+-	var responseResult artifact.DownloadResponse
+-	var mu sync.Mutex
+-	go func() {
+-		<-start
+-		o, e := nativeOwners.ClaimNativeOperation(ctx, en, a, op)
+-		mu.Lock()
+-		operation = o
+-		mu.Unlock()
+-		done <- e == nil
+-	}()
+-	go func() {
+-		<-start
+-		r, e := second.BeginDownloadResponse(ctx, prep.SessionID, a, response)
+-		mu.Lock()
+-		responseResult = r
+-		mu.Unlock()
+-		done <- e == nil
+-	}()
+-	close(start)
+-	winners := 0
+-	for range 2 {
+-		if <-done {
+-			winners++
+-		}
+-	}
+-	if winners != 1 {
+-		t.Fatal("status/content race admitted both or neither", winners)
+-	}
+-	mu.Lock()
+-	o, r2 := operation, responseResult
+-	mu.Unlock()
+-	if o.Valid() {
+-		if e = nativeOwners.ReleaseNativeOperation(ctx, o); e != nil {
+-			t.Fatal(e)
+-		}
+-	} else if e = second.CloseDownloadResponse(ctx, prep.SessionID, r2.ID, r2.OwnerID); e != nil {
+-		t.Fatal(e)
+-	}
++	// Closing a response with no independently acknowledged successful window
++	// leaves its first-context outcome uncertain. Neither operation may use it
++	// as retry eligibility; fresh-race success is a separate prepared selector.
++	runRace(0)
++	t.Log("incomplete closed response denies both concurrent admissions, all prior spend retained")
+ }
+ 
+ // The unused bearer and refresh paths explicitly deny. This fixture exercises
+@@ -608,7 +668,6 @@
+ 	original := before()
+ 	request := func(condition string) *http.Response {
+ 		t.Helper()
+-		f.admissionTrace.mark(ctx, "http-entry")
+ 		r, e := http.NewRequestWithContext(ctx, http.MethodGet, origin+browser.DownloadContentPrefix+session.ID+"/content", nil)
+ 		if e != nil {
+ 			t.Fatal(e)
+--- a/test/integration/context_native_interrupted_test.go
++++ b/test/integration/context_native_interrupted_test.go
+@@ -111,7 +111,6 @@
+ 	}
+ 	state.handler.Store(handler)
+ 	request := func(call context.Context, offset int64) (*http.Response, error) {
+-		f.admissionTrace.mark(call, "http-entry")
+ 		r, e := http.NewRequestWithContext(call, http.MethodGet, origin+browser.DownloadContentPrefix+session.ID+"/content", nil)
+ 		if e != nil {
+ 			return nil, e
+--- a/test/integration/download_sessions_test.go
++++ b/test/integration/download_sessions_test.go
+@@ -179,7 +179,7 @@
+ 		return evidence.DownloadReservation{Session: artifact.DownloadSession{ID: custodyID(), AllocationID: f.allocation.ID, Scope: a.Scope, RequestDigest: artifact.Digest{8}, State: artifact.DownloadPreparing, CreatedAt: time.Now().UTC(), Deadline: time.Now().UTC().Add(5 * time.Minute), OutputLimit: 8192, ReadLimit: 8 << 20, RequestLimit: 4}, IdempotencyDigest: artifact.Digest{9}, Authority: a}
+ 	}
+ 
+-	for _, mode := range []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
++	for _, mode := range []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+ 		t.Run("download-worker-"+mode, func(t *testing.T) {
+ 			ctx := ctx // This subtest owns any native source-observer cancellation.
+ 			var nativeScope authorization.KeyScope
+--- a/test/integration/native_exchange_test.go
++++ b/test/integration/native_exchange_test.go
+@@ -40,7 +40,6 @@
+ )
+ 
+ type nativeExchangeFixture struct {
+-	admissionTrace         *nativeAdmissionTrace
+ 	content                *nativeContextFixture
+ 	worker                 value.DownloadWorker
+ 	enrollment             workerEnrollmentFixture
+@@ -121,9 +120,6 @@
+ 	}
+ 	ctx, stop := context.WithTimeout(ctx, fixtureDuration)
+ 	defer stop()
+-	f.admissionTrace = newNativeAdmissionTrace(ctx, f.worker.Intent.RunUntil)
+-	t.Cleanup(func() { f.admissionTrace.report(t) })
+-	f.admissionTrace.mark(ctx, "phase-entry")
+ 	if f.content == nil || f.content.retry == nil || !f.content.retry.second {
+ 		nativeSQLRoles(t, ctx, f.admin)
+ 	}
+@@ -258,7 +254,7 @@
+ 			t.Fatal(e)
+ 		}
+ 	}
+-	attachment, e := evidence.NewNativeAttachment(evidence.NativeAttachmentConfig{Enrollment: enrollment, HubPodUID: custodyID(), HubProcessEpoch: custodyID(), KeyScope: f.keyScope, Owners: nativeOperations, Fences: owners, Origins: origins, Registrar: f.admissionTrace.registrar(router), PreparationKeys: preparationKeys, WindowKeys: windowKeys, Authority: f.gate, Now: time.Now, NewID: custodyID})
++	attachment, e := evidence.NewNativeAttachment(evidence.NativeAttachmentConfig{Enrollment: enrollment, HubPodUID: custodyID(), HubProcessEpoch: custodyID(), KeyScope: f.keyScope, Owners: nativeOperations, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: preparationKeys, WindowKeys: windowKeys, Authority: f.gate, Now: time.Now, NewID: custodyID})
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
+@@ -298,7 +294,6 @@
+ 	var batchID string
+ 	worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, CurrentAuthority: f.gate, RegionalPreparation: attachment, Now: time.Now, NewID: func() string { batchID = custodyID(); return batchID }}
+ 	current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+-	f.admissionTrace.mark(ctx, "prepare-entry")
+ 	t.Log("native diagnostic preparation started")
+ 	metadata, e := worker.PrepareCurrent(ctx, current, work)
+ 	t.Log("native diagnostic preparation terminal", e)
+--- a/test/integration/native_admission_trace_test.go
++++ /dev/null
+@@ -1,128 +0,0 @@
+-package integration
+-
+-import (
+-	"context"
+-	"sync"
+-	"testing"
+-	"time"
+-
+-	"asservat.local/asservat/internal/application/evidence"
+-	value "asservat.local/asservat/internal/domain/authorization"
+-)
+-
+-// Temporary fixture-only timings. No IDs, credentials, errors or metadata are
+-// retained. The original callbacks see the exact original context/values and
+-// run exactly once. This observer adds no API/SQL traffic or background owner.
+-type nativeAdmissionTrace struct {
+-	mu                     sync.Mutex
+-	started, outer, worker time.Time
+-	events                 [16]nativeAdmissionTraceEvent
+-	total                  int
+-	firstError             *nativeAdmissionTraceEvent
+-}
+-type nativeAdmissionTraceEvent struct {
+-	Number                     int
+-	Step, Kind                 string
+-	AtMS, ElapsedMS            int64
+-	CallerBound                bool
+-	CallerStartMS, CallerEndMS int64
+-	OuterEndMS, WorkerEndMS    int64
+-	LeaseBound                 bool
+-	LeaseEndMS                 int64
+-	OK, Cancelled              bool
+-}
+-
+-func newNativeAdmissionTrace(ctx context.Context, worker time.Time) *nativeAdmissionTrace {
+-	outer, _ := ctx.Deadline()
+-	return &nativeAdmissionTrace{started: time.Now(), outer: outer, worker: worker}
+-}
+-func (t *nativeAdmissionTrace) record(ctx context.Context, step string, kind value.NativeOperationKind, started, lease time.Time, err error) {
+-	if t == nil {
+-		return
+-	}
+-	ended := time.Now()
+-	deadline, bounded := ctx.Deadline()
+-	e := nativeAdmissionTraceEvent{Step: step, Kind: string(kind), AtMS: started.Sub(t.started).Milliseconds(), ElapsedMS: ended.Sub(started).Milliseconds(), CallerBound: bounded, OK: err == nil, Cancelled: ctx.Err() != nil}
+-	if bounded {
+-		e.CallerStartMS, e.CallerEndMS = deadline.Sub(started).Milliseconds(), deadline.Sub(ended).Milliseconds()
+-	}
+-	if !t.outer.IsZero() {
+-		e.OuterEndMS = t.outer.Sub(ended).Milliseconds()
+-	}
+-	e.WorkerEndMS = t.worker.Sub(ended).Milliseconds()
+-	if !lease.IsZero() {
+-		e.LeaseBound, e.LeaseEndMS = true, lease.Sub(ended).Milliseconds()
+-	}
+-	t.mu.Lock()
+-	defer t.mu.Unlock()
+-	t.total++
+-	e.Number = t.total
+-	t.events[(t.total-1)%len(t.events)] = e
+-	if err != nil && t.firstError == nil {
+-		first := e
+-		t.firstError = &first
+-	}
+-}
+-func (t *nativeAdmissionTrace) mark(ctx context.Context, step string) {
+-	t.record(ctx, step, "", time.Now(), time.Time{}, nil)
+-}
+-func (t *nativeAdmissionTrace) report(test *testing.T) {
+-	if t == nil {
+-		return
+-	}
+-	t.mu.Lock()
+-	defer t.mu.Unlock()
+-	test.Log("native callback trace total", t.total, "omitted", max(0, t.total-len(t.events)))
+-	if t.firstError != nil {
+-		test.Logf("native callback trace first error %+v", *t.firstError)
+-	}
+-	for i := max(0, t.total-len(t.events)); i < t.total; i++ {
+-		test.Logf("native callback trace %+v", t.events[i%len(t.events)])
+-	}
+-}
+-func (t *nativeAdmissionTrace) registrar(next evidence.NativeExchangeRegistrar) evidence.NativeExchangeRegistrar {
+-	if t == nil {
+-		return next
+-	}
+-	return nativeAdmissionTraceRegistrar{next: next, trace: t}
+-}
+-
+-type nativeAdmissionTraceRegistrar struct {
+-	next  evidence.NativeExchangeRegistrar
+-	trace *nativeAdmissionTrace
+-}
+-
+-func (r nativeAdmissionTraceRegistrar) RegisterNativeExchange(ctx context.Context, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, current func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+-	kind := in.Operation.Kind
+-	if before != nil {
+-		original := before
+-		before = func(call context.Context, origin evidence.NativeOrigin) error {
+-			started := time.Now()
+-			err := original(call, origin)
+-			r.trace.record(call, "before", kind, started, origin.Lease.Until, err)
+-			return err
+-		}
+-	}
+-	if current != nil {
+-		original := current
+-		current = func(call context.Context, origin evidence.NativeOrigin) (value.NativeLease, error) {
+-			started := time.Now()
+-			lease, err := original(call, origin)
+-			r.trace.record(call, "current", kind, started, origin.Lease.Until, err)
+-			return lease, err
+-		}
+-	}
+-	if in.Complete != nil {
+-		original := in.Complete
+-		in.Complete = func(call context.Context, lease value.NativeLease) error {
+-			started := time.Now()
+-			err := original(call, lease)
+-			r.trace.record(call, "complete", kind, started, lease.Until, err)
+-			return err
+-		}
+-	}
+-	started := time.Now()
+-	pending, err := r.next.RegisterNativeExchange(ctx, in, before, current)
+-	r.trace.record(ctx, "register", kind, started, in.Operation.Until, err)
+-	return pending, err
+-}

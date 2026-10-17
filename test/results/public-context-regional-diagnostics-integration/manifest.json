@@ -1,0 +1,30 @@
+{
+  "scope": "Fixture-only original regional verifier, runner pre-collector ports and joined exchange completion diagnostics; no production behavior or authority changes",
+  "paths": [
+    {
+      "path": "test/integration/context_start_exchange_test.go",
+      "base_sha256": "0619cb37a5659130e42c94f9405c36dfce330721c161ac45d22f7400f1ad374a",
+      "payload_sha256": "a530733056c17613ba1ad9b7b97d8df5916ef6e695478fa10c77b5bdfcbec33c"
+    },
+    {
+      "path": "test/integration/public_context_journey_diagnostics_test.go",
+      "base_sha256": "c285bc4af4bf4f22eb90992b82a4cce7f5a21e3f908b76b7d5917ec15ae213c8",
+      "payload_sha256": "e006be61d36dc67c4c80c60cf6e55e71541db83e9b29f6e0382a4885ba42c4b1"
+    },
+    {
+      "path": "test/integration/public_context_journey_test.go",
+      "base_sha256": "baa771cc8503c899260631d3f545a95261b84d34d8516559093b5bced5eb4f14",
+      "payload_sha256": "71da180febd8b82e122d4e219f8ff0f452587214ee7eb453973608c032aca9aa"
+    },
+    {
+      "path": "test/integration/public_context_regional_diagnostics_test.go",
+      "base_sha256": null,
+      "payload_sha256": "851d6fffcffdab8b14655e8d184badce4f7ed52afd6ef3ad671d9cc4b67daa71"
+    }
+  ],
+  "review_patch_sha256": "e1cecdddd5f1a7a3161561ac885d8e94494a92a2f148c4601deafa4095123e0c",
+  "native6_evidence": {
+    "result_sha256": "ed81951e1ded36f481617138c9a129f9e74865217c90f011eaa0a3f8323183af",
+    "independent_verification_sha256": "ad6619d827f2851abe4e6dddbeeada32a2a68ad9c64a82bf5ca442d1eecbb234"
+  }
+}

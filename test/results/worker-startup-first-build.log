@@ -1,0 +1,5 @@
+?   	asservat.local/asservat/internal/bootstrap	[no test files]
+ok  	asservat.local/asservat/internal/adapters/mtls	0.003s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.019s
+ok  	asservat.local/asservat/internal/application/evidence	0.002s [no tests to run]
+ok  	asservat.local/asservat/test/integration	0.128s

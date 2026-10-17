@@ -1,0 +1,4 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/owner_native_activation_test.go:214:19: undefined: app.OwnerStartupReadiness
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

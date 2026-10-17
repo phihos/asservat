@@ -1,0 +1,6 @@
+=== RUN   TestPublicRoleProjectionExcludesReconcilerCredentials
+    public_runtime_roles_test.go:325: invalid permission observation request
+--- FAIL: TestPublicRoleProjectionExcludesReconcilerCredentials (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.074s
+FAIL

@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/adapters/kubernetes	15.536s
+ok  	asservat.local/asservat/internal/adapters/mtls	1.215s
+ok  	asservat.local/asservat/internal/domain/fleet	1.009s
+ok  	asservat.local/asservat/internal/application/fleet	1.010s

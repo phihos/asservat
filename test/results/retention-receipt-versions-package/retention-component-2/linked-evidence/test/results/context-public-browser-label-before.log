@@ -1,0 +1,24 @@
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/11 18:47:57 http: TLS handshake error from 127.0.0.1:35590: remote error: tls: unknown certificate
+2026/10/11 18:47:57 http: TLS handshake error from 127.0.0.1:35616: remote error: tls: unknown certificate
+    console_test.go:117: console browser test failed: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        locator.selectOption: Timeout 30000ms exceeded.
+        Call log:
+        [2m  - waiting for getByLabel('Requested access duration', { exact: true })[22m
+        
+            at /home/phil/Projekte/asservat/web/scripts/browser-test.mjs:66:71 {
+          log: [
+            "  - waiting for getByLabel('Requested access duration', { exact: true })"
+          ],
+          name: 'TimeoutError'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleBrowserWithBuiltPackage (30.99s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	31.000s
+FAIL

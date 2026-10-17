@@ -1,0 +1,9 @@
+{
+  "files": [
+    {
+      "path": "test/integration/capture_intent_lifecycle_test.go",
+      "base_sha256": "7fc8ee5d5312d920e7b5a5a0c97d05b499c1d52eff19b10654490abb1dd138c4",
+      "sha256": "61399530e7264a815ae6f6c0a680a45000ff3b33a13b65e689c00c154333f9cc"
+    }
+  ]
+}

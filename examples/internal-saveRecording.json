@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "internal-work/v1",
+  "kind": "controlWork",
+  "workId": "00000000-0000-4000-8000-000000000001",
+  "operationId": "00000000-0000-4000-8000-000000000002",
+  "clusterId": "00000000-0000-4000-8000-000000000003",
+  "issuerEpoch": "00000000-0000-4000-8000-000000000004",
+  "deliveryFence": 1,
+  "recipient": "node",
+  "issuedAt": "2026-10-09T12:00:00Z",
+  "notAfter": "2026-10-09T12:00:45Z",
+  "scopeDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scopeRef": {
+    "id": "00000000-0000-4000-8000-000000000100",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "region": "eu-central",
+    "expiresAt": "2026-10-09T12:01:00Z"
+  },
+  "authorityRef": {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "region": "eu-central",
+    "expiresAt": "2026-10-09T12:01:00Z"
+  },
+  "budgetRef": {
+    "id": "00000000-0000-4000-8000-000000000102",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "region": "eu-central",
+    "expiresAt": "2026-10-09T12:01:00Z"
+  },
+  "auditRef": {
+    "id": "00000000-0000-4000-8000-000000000103",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "region": "eu-central",
+    "expiresAt": "2026-10-09T12:01:00Z"
+  },
+  "requiredCapabilities": [
+    "control/v1"
+  ],
+  "target": {
+    "podUID": "00000000-0000-4000-8000-000000000005",
+    "nodeUID": "00000000-0000-4000-8000-000000000006",
+    "nodeBootID": "00000000-0000-4000-8000-000000000007"
+  },
+  "purpose": "saveRecording",
+  "payload": {
+    "captureId": "00000000-0000-4000-8000-000000000013",
+    "snapshotId": "00000000-0000-4000-8000-000000000015",
+    "sourceSessionId": "00000000-0000-4000-8000-000000000010",
+    "sourceEpoch": "00000000-0000-4000-8000-000000000011",
+    "windowEnd": "2026-10-09T12:00:00Z",
+    "lookbackMillis": 20000,
+    "policyExecutionDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

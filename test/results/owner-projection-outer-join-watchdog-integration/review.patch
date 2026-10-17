@@ -1,0 +1,48 @@
+--- a/internal/adapters/kubernetes/owner_installation_driver_test.go
++++ b/internal/adapters/kubernetes/owner_installation_driver_test.go
+@@ -158,10 +158,32 @@
+ 				}
+ 				driver.Close()
+ 			}()
++			// This watchdog covers all 26 sequential calls, each of which keeps
++			// its original at-most-five-second operation budget. It does not
++			// change any caller, root, claim, effect or authority deadline.
++			sequenceWatchdog := time.NewTimer(26 * 5 * time.Second)
++			defer sequenceWatchdog.Stop()
+ 			select {
+ 			case <-blocked.entered:
+-			case <-time.After(5 * time.Second):
+-				t.Fatal("outer join was not reached")
++			case out := <-done:
++				t.Fatal("driver returned before outer cleanup barrier", out.result, out.err)
++			case <-sequenceWatchdog.C:
++				t.Fatal("outer join was not reached after bounded complete sequence")
++			}
++			// An earlier production refusal also releases the outer borrow.
++			// Require the complete positively finalized launch and all fixed
++			// effects before introducing cancellation, so that refusal cannot
++			// satisfy this regression. The entered channel orders these reads
++			// after the sequence, whose goroutine is blocked in outer cleanup.
++			verified := f.projection.lastVerified
++			if f.projection.pending != nil || verified == nil || verified.resources.State.OwnerIdentity == nil || verified.resources.State.OwnerIdentity.Receipt == nil || verified.resources.State.OwnerLaunch == nil || verified.resources.State.OwnerLaunch.Receipt == nil || f.verification.finalizations != 8 || f.roles.creates != 4 || projectionEffectCounts(f) != [4]int32{8, 1, 1, 1} {
++				unblock()
++				select {
++				case out := <-done:
++					t.Fatal("outer cleanup preceded complete positive sequence", out.result, out.err)
++				case <-time.After(5 * time.Second):
++					t.Fatal("early refusal did not finish outer cleanup")
++				}
+ 			}
+ 			switch mode {
+ 			case "caller":
+@@ -178,8 +200,8 @@
+ 			unblock()
+ 			select {
+ 			case out := <-done:
+-				if out.err == nil || out.result.Complete || out.result.Stop != OwnerInstallationCancelled {
+-					t.Fatal("cleanup cancellation returned complete", out.result, out.err)
++				if out.err == nil || out.result.Complete || out.result.Stop != OwnerInstallationCancelled || out.result.Phase != "launch-receipt" || out.result.Calls != 26 || out.result.Finalizations != 8 || out.result.Inspections != 0 || out.result.RoleRootUID == "" || out.result.ResourceRootUID == "" || out.result.OperationID == "" {
++					t.Fatal("cleanup cancellation changed the completed sequence or returned complete", out.result, out.err)
+ 				}
+ 			case <-time.After(5 * time.Second):
+ 				t.Fatal("driver did not join")

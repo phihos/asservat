@@ -1,0 +1,34 @@
+{
+  "manifest_sha256": "6f16370352c876cb59071b6bbe3d376e62bdb9fc41f176d2419c8d6530aea073",
+  "dependencies_sha256": "4021928b35062d6532ff81abd90353cbe55cb874056a929d3faea978c8c75abf",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-launch-native-20261012/checks/native-matrix-1/overlay.json",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 6.890947615989717
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/configuration-launch-native-20261012/checks/native-matrix-1/overlay.json",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 0.863810683003976
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 4,
+  "checked_dependencies": 1505
+}

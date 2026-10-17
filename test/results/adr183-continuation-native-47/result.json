@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-47",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass of ADR-193 step 2 (2a-2d). The continuation published the federation runtime projection, created the federation account and audit Secret, and put the federation's four Kubernetes-auth roles and policies, the two installation-wide connector PKI roles and the federation audit transit key into the one phase-3 owner provider artifact. The real applier created them with the operator's separate federation audit credential; the continuation filled the federation audit Secret and verified every path through the inspection token. After the owner launch and capacity projection it checked the operator's serving TLS Secret, launched the federation (Restricted, projected inputs, Kubernetes-auth provider lifetimes primed under the hub workload guard proof and recovery), which became available with zero peers, and published the immutable regional offer with the serving roots, connector suffix, issuer roots and six duty role names. Capacity root ReadyAt still set. Subtest 552.5 s.",
+  "scope": "Real kind API, OpenBao (Kubernetes auth, transit, PKI), SeaweedFS S3 and PostgreSQL. Synthetic operator connector PKI root and serving certificate. No regional cluster, enrollment or connector traffic yet (ADR-193 steps 3-6).",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

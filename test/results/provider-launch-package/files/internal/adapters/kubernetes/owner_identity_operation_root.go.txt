@@ -1,0 +1,60 @@
+package kubernetes
+
+import (
+	"context"
+	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// NewProviderOwnerIdentityRoleRoot is the explicit fresh pair constructor. The
+// legacy constructor and readers retain their existing behavior. Both native
+// brackets are real independent operations inside this original call; no role,
+// credential projection or workload is created by construction.
+func NewProviderOwnerIdentityRoleRoot(ctx context.Context, bridge *InitialRuntimeBridge, resources *InitialRuntimeResources, accepted fleetapp.OwnerConfigurationReader, layout string) (*OwnerIdentityRoleRoot, error) {
+	if ctx == nil || ctx.Err() != nil || bridge == nil || resources == nil || accepted == nil || !ownerIdentityDigestValid(layout) || resources.preparer != bridge.preparer || resources.rootUID != bridge.rootUID || !equalJSON(resources.initial, bridge.initial) || resources.workerLayout != contracts.HubWorkerProviderInstalledLayout || resources.ownerLayout != contracts.OwnerProviderInstalledLayout || !initialRuntimeProviderSelectionValid(resources.initial.InstallationID, resources.workerLayout, resources.ownerLayout, resources.workerProvider, resources.ownerProvider) {
+		return nil, cfg.ErrInvalid
+	}
+	life, cancel := context.WithCancel(ctx)
+	out := &OwnerIdentityRoleRoot{bridge: bridge, resources: resources, accepted: accepted, ctx: life, cancel: cancel}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	err := out.operation(call, func(bounded context.Context) error {
+		first, err := out.readOwnerIdentityOperationNative(bounded, layout, false)
+		if err != nil {
+			return err
+		}
+		out.input = first.input
+		out.resourceCreatedAt = first.retained.resources.State.CreatedAt
+		out.resourceUntil = first.retained.resources.State.Until
+		current, narrow := context.WithDeadline(bounded, first.until)
+		defer narrow()
+		last, err := out.readOwnerIdentityOperationNative(current, layout, false)
+		until := identity.Earlier(first.until, last.until)
+		if err != nil || !ownerIdentityOperationOriginalsEqual(first, last) || initialHandoverDeadline(current, resources.now, until) != nil {
+			return cfg.ErrUnavailable
+		}
+		return nil
+	})
+	if err != nil {
+		out.Close()
+		return nil, err
+	}
+	return out, nil
+}
+
+// Dates of independent observations are intentionally not equated or renewed.
+// Every original identity, protected value and exact retained journal is.
+func ownerIdentityOperationOriginalsEqual(a, b ownerIdentityOperationNative) bool {
+	return a.input == b.input &&
+		a.retained.bridge.UID == b.retained.bridge.UID && a.retained.bridge.ResourceVersion == b.retained.bridge.ResourceVersion && equalJSON(a.retained.bridge.State, b.retained.bridge.State) &&
+		a.retained.resources.UID == b.retained.resources.UID && a.retained.resources.ResourceVersion == b.retained.resources.ResourceVersion && equalJSON(a.retained.resources.State, b.retained.resources.State) &&
+		configurationRoleSameSources(a.source.proof.observation, b.source.proof.observation) && a.source.proof.guards == b.source.proof.guards &&
+		a.source.fleetRef == b.source.fleetRef && a.source.ownerRef == b.source.ownerRef && a.source.owner.Equal(b.source.owner) &&
+		a.source.deployment.ResourceVersion == b.source.deployment.ResourceVersion && equalJSON(a.source.deployment.Spec, b.source.deployment.Spec) &&
+		equalJSON(a.source.account, b.source.account) && equalJSON(a.source.administrator, b.source.administrator) &&
+		equalJSON(a.account, b.account) && equalJSON(a.service, b.service) && a.accepted.Configuration.Equal(b.accepted.Configuration)
+}

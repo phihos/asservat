@@ -1,0 +1,7 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 67 schemas, 48 MCP tools, 170 examples, 176 requirements, 176 scenarios, 11 tasks, 2398 local links, 589 rejected invalid examples (9034 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1130, "rejectedInvalidCases": 120}
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 49 domain entities, 72 browser operations, 48 MCP schema pairs, 332 resolved references.

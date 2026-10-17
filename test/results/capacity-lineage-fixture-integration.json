@@ -1,0 +1,52 @@
+{
+  "manifest": {
+    "scope": "Fixture-only explicit retained evidence horizon fits original60-second processing backing; no productSQL or authoritychanges",
+    "actual_before": "native12332 terminal1: timestampmatrix passes, managedpair241ms, publication unqualifiedprocessinglineage;76PASS/1764unchanged/cleanup[]",
+    "files": [
+      {
+        "path": "test/integration/capacity_context_test.go",
+        "base_sha256": "7d5d847c6e5da7336c915d54e9a339820f29bbcd103dcefe19fcf5f8cad596ea",
+        "payload_sha256": "5c067e4e80a5fa23e7f0867db5f6fc71858dd1132e02ed8815f142fb4667d9fe"
+      },
+      {
+        "path": "test/integration/capacity_lineage_test.go",
+        "base_sha256": null,
+        "payload_sha256": "16abe02c36ed409d84bb40b9f93b33418986658c60510bf21f232fba8bfc052d"
+      },
+      {
+        "path": "test/integration/capacity_session_test.go",
+        "base_sha256": "7aae359cb3b3280d5e5e728dfa67f31e9c6d0ca8713d61084f8b242418745f97",
+        "payload_sha256": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054"
+      },
+      {
+        "path": "test/integration/retention_effect_fixture_test.go",
+        "base_sha256": "2933193f64184110cb8d89676b72ce33771ce0b8b9323fea2feec69011a0fb44",
+        "payload_sha256": "c3f4b3c88e406b5b1684b4cfa923b3840c82efa579d18dc310543523c18af1ae"
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "test/integration/capacity_context_test.go",
+      "base_sha256": "7d5d847c6e5da7336c915d54e9a339820f29bbcd103dcefe19fcf5f8cad596ea",
+      "payload_sha256": "5c067e4e80a5fa23e7f0867db5f6fc71858dd1132e02ed8815f142fb4667d9fe"
+    },
+    {
+      "path": "test/integration/capacity_lineage_test.go",
+      "base_sha256": null,
+      "payload_sha256": "16abe02c36ed409d84bb40b9f93b33418986658c60510bf21f232fba8bfc052d"
+    },
+    {
+      "path": "test/integration/capacity_session_test.go",
+      "base_sha256": "7aae359cb3b3280d5e5e728dfa67f31e9c6d0ca8713d61084f8b242418745f97",
+      "payload_sha256": "23a4e82ada6b7200613f9ea3f74184e134cbe2153f3f921a206777b25891e054"
+    },
+    {
+      "path": "test/integration/retention_effect_fixture_test.go",
+      "base_sha256": "2933193f64184110cb8d89676b72ce33771ce0b8b9323fea2feec69011a0fb44",
+      "payload_sha256": "c3f4b3c88e406b5b1684b4cfa923b3840c82efa579d18dc310543523c18af1ae"
+    }
+  ],
+  "dependencies": 3230,
+  "scope": "Fixture correction only; native requalification pending; both packages validated before any live mutation"
+}

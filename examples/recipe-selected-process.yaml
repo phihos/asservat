@@ -1,0 +1,26 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: one-pod-worker-core
+  namespace: payments
+spec:
+  description: Ad hoc identity-pinned worker core; synthetic process identity, no
+    container selector.
+  actions:
+  - id: core
+    kind: liveCore
+    parameters:
+      profileRef: native-small
+      process: selectedPID
+      processIdentity:
+        podUID: pod-ledger-0-uid
+        nodeBootID: 00000000-0000-4000-8000-000000000090
+        hostPID: 420
+        startTimeTicks: 123456
+    required: false
+    impact: intrusive
+    limits:
+      maxBytes: 2147483648
+      timeout: 30s
+  maxTotalBytes: 2147483648
+  maxDuration: 60s

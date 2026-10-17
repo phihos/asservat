@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/recipe.schema.json",
+  "title": "Asservat recipe v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "EvidenceRecipe"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/action.schema.json"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "maxTotalBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "maxDuration": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+          "maxLength": 16
+        },
+        "endpointBindings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "templateRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "addressMode": {
+                "type": "string",
+                "enum": [
+                  "targetLoopback",
+                  "podIP"
+                ]
+              },
+              "portName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 15,
+                "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+              }
+            },
+            "required": [
+              "name",
+              "templateRef",
+              "addressMode",
+              "portName"
+            ]
+          }
+        }
+      },
+      "required": [
+        "description",
+        "actions",
+        "maxTotalBytes",
+        "maxDuration"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

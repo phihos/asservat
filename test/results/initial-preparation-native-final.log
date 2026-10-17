@@ -1,0 +1,5 @@
+=== RUN   TestInitialNamespaceProtectionWithRealKubernetes
+    initial_namespace_test.go:333: product creator and durable journal retain one concurrent create intent before writer creation, exact observed receipt and lookup-only resumption; collisions and plan/guard replacement deny; staging and final input proof remain independent; no provider credentials or activation
+--- PASS: TestInitialNamespaceProtectionWithRealKubernetes (9.33s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.381s

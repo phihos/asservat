@@ -1,0 +1,12 @@
+{
+  "evidence/compile.json": "8dd322c40967809f0a0016593e3e174c6a5aa07b5791fdd3178dc3cc46b044ad",
+  "evidence/compile.log": "616aa321a5eb8bfa84b70f0a793557f57cf2533fbcbede888e7e51ccfe3f654a",
+  "evidence/go-architecture.json": "46088e3ddb34b3717a736593e44a76416d8374beab2ce83d8f9a3a16fd9b81e4",
+  "evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+  "evidence/race.json": "84e09d95b09bc9a677f2de0fa1588c3bd0d9d411ca247af00e92f7606e54c921",
+  "evidence/race.log": "5361eae4c9e99e5105d4f63b4cceae25b93d10bb9689f0fe372d9c77d821f4f7",
+  "evidence/vet.json": "c3c9abbdf48ae7aad2f56b49ac25eb9f4e8d1b52b6d2a1bbcba7777f849ea438",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "HANDOFF.md": "bbffdf494e2b8c747cf343a7a80a4e08cc58de04c90ab5306c7264910734c313",
+  "RESULT.json": "8f89f8e066d4eac159355165874e3cdb1598d571ec8787469db5db4f40445f17"
+}

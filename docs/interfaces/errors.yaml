@@ -1,0 +1,22 @@
+version: 1
+status: design-only
+note: Shared browser/MCP operations use domain envelopes; http_status is for equivalent transport or console problem responses. Existing tool error enums remain authoritative.
+errors:
+  - {code: NotAuthorized, http_status: 404, retry: after-access-change, action: check-access, copy: This resource or operation is unavailable.}
+  - {code: GrantRequired, http_status: 403, retry: after-independent-review, action: open-own-review, copy: This operation needs a matching approved grant.}
+  - {code: ShareExpired, http_status: 410, retry: never-for-this-share, action: return-to-shares, copy: This share has expired.}
+  - {code: EvidenceExpired, http_status: 410, retry: never-for-this-artifact, action: return-to-case, copy: This evidence is no longer readable.}
+  - {code: CapabilityUnavailable, http_status: 409, retry: after-qualification, action: view-capability-report, copy: This mechanism is unavailable for this environment.}
+  - {code: TargetGone, http_status: 409, retry: after-fresh-selection, action: select-current-target, copy: The selected target identity is no longer available.}
+  - {code: BudgetExceeded, http_status: 429, retry: bounded-retry-time-if-known, action: inspect-capacity, copy: This workload has reached a collection limit.}
+  - {code: IndexRebuilding, http_status: 503, retry: bounded-backoff, action: use-known-case-reference, copy: Search is rebuilding; authorized direct references may still work.}
+  - {code: AnalysisUnavailable, http_status: 503, retry: after-operator-repair, action: use-available-extracts, copy: Analysis prerequisites are unavailable; retained evidence remains governed by its deadline.}
+  - {code: ArtifactIncomplete, http_status: 409, retry: only-if-finalizing, action: inspect-coverage, copy: This operation needs evidence that is incomplete or missing.}
+  - {code: InvalidCursor, http_status: 400, retry: fresh-query, action: restart-list, copy: Refresh this view to continue with current access.}
+  - {code: AuditUnavailable, http_status: 503, retry: bounded-backoff, action: contact-operator, copy: Required audit persistence is unavailable; acquisition has not been authorized.}
+  - {code: ClusterOffline, http_status: 503, retry: after-reconnect, action: use-stored-evidence, copy: New collection cannot be dispatched to this cluster.}
+  - {code: RetryLater, http_status: 429, retry: server-bounded-delay, action: wait, copy: This operation is temporarily limited.}
+  - {code: Conflict, http_status: 409, retry: refresh-and-review, action: refresh, copy: The request or resource changed; review the current version.}
+  - {code: RecordingSelectionRequired, http_status: 409, retry: fresh-recording-selection, action: list-recordings, copy: Select current recordings to repeat this save.}
+  - {code: SharingApprovalRequired, http_status: 403, retry: after-independent-review, action: open-own-review, copy: This evidence selection needs sharing approval.}
+  - {code: SharingCapacityUnavailable, http_status: 429, retry: bounded-retry-time-if-known, action: review-sharing-limits, copy: Bounded sharing capacity is unavailable.}

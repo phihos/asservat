@@ -1,0 +1,688 @@
+package integration
+
+import (
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/keyservice"
+	native "asservat.local/asservat/internal/transport/native"
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"io"
+	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+type nativeExchangeFixture struct {
+	content                *nativeContextFixture
+	worker                 value.DownloadWorker
+	enrollment             workerEnrollmentFixture
+	published              artifact.PublishedContext
+	runtime, audit, config *postgres.Downloads
+	allocation             artifact.DownloadAllocation
+	gate                   authapp.ContextDownloadAuthority
+	guards                 postgres.DownloadTransactionGuards
+	authority              func() artifact.DownloadAuthority
+	store                  *objectstore.Store
+	keys                   authorityTestKeys
+	keyScope               value.KeyScope
+	keyBackend             *kms.LocalOperations
+	admin                  *pgxpool.Pool
+	poolFor                func(string, string) *pgxpool.Pool
+}
+
+type nativeSQLProof struct {
+	worker value.DownloadWorker
+	token  evidence.DownloadPeerToken
+}
+
+func (p nativeSQLProof) ReadDownloadPeerProof(ctx context.Context, session string, peer value.KeyPeer) (value.KeyWorkerProof, error) {
+	raw, e := p.token.ReadDownloadPeerToken(ctx)
+	defer clear(raw)
+	if e != nil || !bytes.Equal(raw, []byte("synthetic.native.token")) || session != p.worker.Intent.SessionID || peer.PeerID != p.worker.Binding.PodUID {
+		return value.KeyWorkerProof{}, artifact.ErrDownloadUnavailable
+	}
+	now := time.Now().UTC()
+	return value.KeyWorkerProof{Binding: p.worker.Binding, Peer: peer, TokenDigest: sha256.Sum256(raw), ObservedAt: now, FreshUntil: minPublicationTime(now.Add(5*time.Second), p.worker.Intent.RunUntil)}, nil
+}
+
+// This native lab composes actual SQL45/42, encrypted S3, three-slot remote A-KEY,
+// real acquisition TLS, two actual h2 hops and the production final HTTPS sink.
+// The issuer, human session, protected bootstrap/Pod proof and connector serving
+// admission below remain explicitly synthetic. It is not deployed Pod proof,
+// an installed connector executable, real SSO or large-artifact qualification.
+func qualifyNativeExchange(t *testing.T, ctx context.Context, f nativeExchangeFixture) {
+	t.Helper()
+	if f.content == nil || f.content.mode != "native-content-interrupted" {
+		qualifyNativeExchangePhase(t, ctx, f)
+		return
+	}
+	// Each exchange owns its listeners, result, worker and purpose-specific SQL
+	// pools. Finish all first-phase cleanups before constructing another worker.
+	// Only the original client bytes, immutable SQL records and shared HTTP audit
+	// owner survive; the new phase cannot refund or revive the old exchange.
+	ctx, stop := context.WithTimeout(ctx, 2*time.Minute)
+	defer stop()
+	state := &nativeInterruptedState{owner: t}
+	f.content.retry = state
+	if !t.Run("original-interrupted-session", func(t *testing.T) {
+		qualifyNativeExchangePhase(t, ctx, f)
+	}) {
+		return
+	}
+	if !state.second || state.nextWorker == nil {
+		t.Fatal("interrupted phase did not acknowledge a distinct next worker")
+	}
+	t.Run("explicit-new-session", func(t *testing.T) {
+		next := f
+		next.worker = *state.nextWorker
+		next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.guards, f.store, f.keys, f.gate)
+		qualifyNativeExchangePhase(t, ctx, next)
+	})
+}
+
+func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExchangeFixture) {
+	t.Helper()
+	fixtureDuration := 20 * time.Second
+	if f.content != nil && (f.content.mode == "native-content" || f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted") {
+		// Setup, forty current warm-status checks and multiple audited HTTP
+		// requests can outlast the old 20-second aggregate lab cancellation.
+		// Give these assertions one finite outer interval from the start; do not
+		// renew the separately admitted worker/session, five-second authority,
+		// native operation, HTTP preflight or individual socket deadlines.
+		fixtureDuration = 2 * time.Minute
+	}
+	ctx, stop := context.WithTimeout(ctx, fixtureDuration)
+	defer stop()
+	if f.content == nil || f.content.retry == nil || !f.content.retry.second {
+		nativeSQLRoles(t, ctx, f.admin)
+	}
+	if f.content != nil {
+		contextNativeSQLRoles(t, ctx, f.admin)
+	}
+	open := func(role, password string) *pgxpool.Pool {
+		p := f.poolFor(role, password)
+		t.Cleanup(p.Close)
+		return p
+	}
+	ownerPool := open("native_owner_runtime", "synthetic-native-owner")
+	bindPool := open("native_key_bind_runtime", "synthetic-native-bind")
+	readPool := open("native_key_read_runtime", "synthetic-native-read")
+	historyPool := open("native_history_runtime", "synthetic-native-history")
+	metadataPool := open("native_metadata_runtime", "synthetic-native-metadata")
+	root := f.worker.Intent.Authority.Scope.RootID
+	owners, e := postgres.NewNativeOwners(ctx, ownerPool, root, f.worker.Intent.Profile, f.guards)
+	if e != nil {
+		t.Fatal(e)
+	}
+	readers, e := postgres.NewNativeReaders(ctx, metadataPool, root, f.worker.Binding.InstallationID, f.guards)
+	if e != nil {
+		t.Fatal("current native metadata reader", e)
+	}
+	history, e := postgres.NewNativeHistory(ctx, historyPool, root)
+	if e != nil {
+		t.Fatal(e)
+	}
+	backing := value.NativeBacking{AllocationID: f.allocation.ID, RootID: root, PolicyID: custodyID(), PolicyDigest: artifact.Digest{77}, Rows: 1, Keys: 2, TransitionsPerRow: 32, BackupBytes: 16 << 20, WALBytes: 16 << 20, BackupHorizonSeconds: 0, CleanupSeconds: 30, ValidUntil: f.allocation.ValidUntil, RetireBy: f.allocation.ValidUntil.Add(30 * time.Second), History: value.NativeHistoryQualification{ID: custodyID(), Digest: artifact.Digest{78}, RowBytes: 64 << 10, TransitionWALBytes: 64 << 10, BackupCopies: 1, WALCopies: 1}}
+	if f.content != nil && (f.content.mode == "native-content" || f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted") {
+		backing.TransitionsPerRow = 8
+		if f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted" {
+			// Prepare+Observe+two content claim/close pairs, retaining final
+			// retirement room. Two key rows each contain three unwrap slots.
+			backing.TransitionsPerRow = 10
+		}
+		// One live worker is charged before the plan reader checks whether a
+		// further admission could fit. Back these two rows from the outset.
+		backing.Rows = 2
+	}
+	if f.content == nil || f.content.retry == nil || !f.content.retry.second {
+		if e = history.InstallNativeBacking(ctx, backing); e != nil {
+			t.Fatal("synthetic protected native backing", e)
+		}
+	}
+	// Fixture capacity values exercise the arithmetic/SQL contract, not measured
+	// production WAL/backup qualification or a source acceptance mechanism.
+	preparationKeys, e := postgres.NewDownloadKeys(ctx, bindPool, root, f.keyScope, f.guards)
+	if e != nil {
+		t.Fatal(e)
+	}
+	windowKeys, e := postgres.NewNativeKeys(ctx, bindPool, root, f.worker.Intent.Profile, f.keyScope, f.guards)
+	if e != nil {
+		t.Fatal(e)
+	}
+	keyAuthority, e := postgres.NewNativeKeyAuthority(ctx, readPool, root, f.worker.Intent.Profile, f.keyScope, f.guards)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, private, e := ed25519.GenerateKey(rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.enrollment.csr, e = x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, private)
+	if e != nil {
+		t.Fatal(e)
+	}
+	certificate, e := f.enrollment.enroll(ctx, f.worker)
+	if e != nil {
+		t.Fatal("actual worker enrollment", e)
+	}
+	digest, e := mtls.EnrollmentKey(f.enrollment.csr)
+	if e != nil {
+		t.Fatal(e)
+	}
+	proof, e := f.enrollment.service.Proofs.ReadWorkerEnrollmentProof(ctx, f.worker.Intent.SessionID, f.worker.Intent.ID, digest)
+	if e != nil {
+		t.Fatal(e)
+	}
+	enrollment, _, _, e := f.enrollment.ledger.ClaimWorkerEnrollment(ctx, proof, f.authority())
+	if e != nil {
+		t.Fatal("exact original enrollment", e)
+	}
+	clientCertificate := tls.Certificate{Certificate: append([][]byte{certificate.DER}, certificate.ChainDER...), PrivateKey: private}
+	// The key server trusts the real enrolled acquisition leaf and uses real SQL
+	// preparation/window slot resolution, not fixtureKeyAuthority.
+	keyTLS := newKeyTLSFor(t, f.worker.Binding.InstallationID, "artifact", keyAuthority, f.keyBackend, func(http.Handler) http.Handler {
+		h, e := keyservice.NewHandler([]authapp.KeyService{{Scope: f.keyScope, Authority: keyAuthority, Backend: fixtureConfiguredKeyBackend{f.keyBackend}, Now: time.Now}}, f.enrollment.issuer.verifier, time.Now, 2)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return h
+	})
+	keyTLS.server.TLS.ClientCAs.AddCert(f.enrollment.issuer.ca) // before any acquisition connection
+	keyTransport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: keyTLS.roots, Certificates: []tls.Certificate{clientCertificate}, MinVersion: tls.VersionTLS13}, DisableKeepAlives: true}
+	defer keyTransport.CloseIdleConnections()
+	bound, e := f.store.ForCustody(f.published.Expectation.Registration.StoreID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	nativeReader, e := objectstore.NewNativeContextReader(bound, f.keyScope, keyTLS.server.URL, &http.Client{Transport: keyTransport, Timeout: 5 * time.Second})
+	if e != nil {
+		t.Fatal(e)
+	}
+	target := value.WorkerCredentialTarget{InstallationID: f.worker.Binding.InstallationID, SessionID: f.worker.Intent.SessionID, WorkerID: f.worker.Intent.ID, PodUID: f.worker.Binding.PodUID, CreatedAt: f.worker.Intent.CreatedAt, RunUntil: f.worker.Intent.RunUntil}
+	result, e := evidence.NewRegionalContextResult(ctx, target, nativeReader, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { result.Close(); _ = result.Wait(context.Background()) }()
+	workerObservation, e := readers.ReadDownloadWorkerEnrollment(ctx, target.SessionID, target.WorkerID)
+	if e != nil || workerObservation.Worker.Binding != f.worker.Binding {
+		t.Fatal("independently resolved original worker", e)
+	}
+	currentCertificate, e := readers.ReadNativeWorkerCertificate(ctx, target.SessionID, target.WorkerID, certificate.DER)
+	if e != nil || !bytes.Equal(currentCertificate.DER, certificate.DER) {
+		t.Fatal("current exact native certificate", e)
+	}
+	origins := evidence.NativeOrigins{Locators: readers, Operations: readers, Proofs: func(token evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
+		return nativeSQLProof{f.worker, token}, nil
+	}, Now: time.Now}
+	router, e := native.NewHubRouter(1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer router.Close()
+	var nativeOperations evidence.NativeOperations = owners
+	if f.content != nil {
+		nativeOperations, e = postgres.NewFirstContextNativeOperations(owners)
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	attachment, e := evidence.NewNativeAttachment(evidence.NativeAttachmentConfig{Enrollment: enrollment, HubPodUID: custodyID(), HubProcessEpoch: custodyID(), KeyScope: f.keyScope, Owners: nativeOperations, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: preparationKeys, WindowKeys: windowKeys, Authority: f.gate, Now: time.Now, NewID: custodyID})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if f.content != nil && f.content.mode == "native-preparation-race" {
+		qualifyFirstContextPreparationRace(t, ctx, f)
+		return
+	}
+	connectorCertificate := nativeSQLConnectorCertificate(t, f)
+	connectorVerifier, e := mtls.NewPeerVerifier(keyTLS.roots, f.worker.Binding.InstallationID, fleet.ConnectorPeer, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	hub := &nativeSQLAdmission{test: t, side: "hub", origins: origins, peer: certificate.Peer, router: router, leaf: certificate.DER, connectorVerifier: connectorVerifier, connectorDigest: sha256.Sum256(connectorCertificate.Certificate[0])}
+	upstream := nativeSQLServer(t, contracts.NativeOwnerPath, hub, connectorCertificate, keyTLS)
+	connector := &nativeSQLAdmission{test: t, side: "connector", origins: origins, peer: certificate.Peer, upstream: upstream, verifier: f.enrollment.issuer.verifier}
+	client := nativeSQLServer(t, contracts.NativeWorkerPath, connector, clientCertificate, keyTLS)
+	workerCtx, cancelWorker := context.WithDeadline(ctx, target.RunUntil)
+	defer cancelWorker()
+	workerDone := make(chan error, 1)
+	joined := make(chan nativeSQLWorkerOutcome, 3)
+	go func() { workerDone <- nativeSQLWorkerLoop(t, workerCtx, client, target, digest, result, joined) }()
+	var joinWorker sync.Once
+	stopWorker := func() {
+		joinWorker.Do(func() {
+			cancelWorker()
+			if e := <-workerDone; e != nil && !errors.Is(e, context.Canceled) {
+				t.Log("worker terminal", e)
+			}
+		})
+	}
+	defer stopWorker()
+	if f.content != nil {
+		qualifyContextNativeContent(t, ctx, f, owners, nativeOperations.(*postgres.FirstContextNativeOperations), origins, router, preparationKeys, windowKeys, enrollment, target, joined, stopWorker)
+		return
+	}
+	work := evidence.ContextDownloadRequest{SessionID: target.SessionID, Scope: f.worker.Intent.Authority.Scope, Expectation: f.published.Expectation, Copies: f.published.Copies}
+	var batchID string
+	worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, CurrentAuthority: f.gate, RegionalPreparation: attachment, Now: time.Now, NewID: func() string { batchID = custodyID(); return batchID }}
+	current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
+	t.Log("native diagnostic preparation started")
+	metadata, e := worker.PrepareCurrent(ctx, current, work)
+	t.Log("native diagnostic preparation terminal", e)
+	if e != nil {
+		var ownersCount, batchCount, roles int
+		check, end := context.WithTimeout(context.Background(), time.Second)
+		defer end()
+		ownerErr := f.admin.QueryRow(check, "SELECT count(*) FROM download_native_owner WHERE worker_id=$1", target.WorkerID).Scan(&ownersCount)
+		batchErr := f.admin.QueryRow(check, "SELECT count(*) FROM download_batch WHERE session_id=$1", target.SessionID).Scan(&batchCount)
+		keyErr := f.admin.QueryRow(check, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", batchID).Scan(&roles)
+		t.Log("native diagnostic persisted", "owners", ownersCount, ownerErr, "batches", batchCount, batchErr, "unwrap slots", roles, keyErr)
+		t.Fatal("regional preparation", e)
+	}
+	var slots int
+	if e = f.admin.QueryRow(ctx, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", batchID).Scan(&slots); e != nil || slots != 7 {
+		t.Fatal("preparation exact three unwraps", slots, e)
+	}
+	session, e := f.runtime.LookupDownload(ctx, target.SessionID, work.Scope.Principal)
+	if e != nil {
+		t.Fatal(e)
+	}
+	preparation := artifact.DownloadPreparation{SessionID: session.ID, BatchID: batchID, Generation: session.Generation}
+	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.published.Expectation.Registration.StoreID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
+	if e = f.config.BindDownloadControlAllocation(ctx, control); e != nil {
+		t.Fatal("window control", e)
+	}
+	objects, e := objectstore.NewDownloadWindowAuditObjects(f.store, control.AuditStoreID, f.keys, f.keys)
+	if e != nil {
+		t.Fatal(e)
+	}
+	transfer := evidence.DownloadResponseTransfer{Sessions: f.runtime, Responses: f.runtime, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}
+	outcomes := make(chan error, 1)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		source, e := evidence.NewRemoteContextSource(r.Context(), attachment, work, preparation)
+		if e != nil {
+			outcomes <- e
+			return
+		}
+		// The actual C02 reader creates separately bounded current batches from
+		// this explicit synthetic session store. It never renews a CurrentIdentity
+		// or supplies a credential/identity to the acquisition process.
+		initial, e := f.gate.Identities.Resolve(r.Context(), "synthetic-reference")
+		if e != nil {
+			outcomes <- e
+			return
+		}
+		reader, e := identities.NewBrowserLiveReader(r.Context(), workerBrowserSession{initial, session.Deadline, 5 * time.Second}, "synthetic-worker-session", session.Scope.Principal, session.Deadline, time.Now)
+		if e != nil {
+			outcomes <- e
+			return
+		}
+		sink := nativeSQLSink{w, r}
+		e = transfer.Transfer(r.Context(), reader, evidence.DownloadResponseRequest{SessionID: session.ID, ResponseID: custodyID(), OwnerID: custodyID(), HardUntil: session.Deadline}, source, sink)
+		outcomes <- e
+	}))
+	defer server.Close()
+	response, e := server.Client().Get(server.URL)
+	if e != nil {
+		t.Fatal(e)
+	}
+	body, e := io.ReadAll(response.Body)
+	response.Body.Close()
+	defer clear(body)
+	transferErr := <-outcomes
+	if e != nil || int64(len(body)) != metadata.Size || artifact.Digest(sha256.Sum256(body)) != metadata.SHA256 {
+		t.Fatal("exact native bytes", len(body), e, "transfer", transferErr)
+	}
+	if transferErr != nil {
+		t.Fatal("actual native transfer", transferErr)
+	}
+	// Exact native bytes and accounting are insufficient: all three actual
+	// worker conversations must positively join before this fixture can pass.
+	seenConversations := make(map[string]bool, 3)
+	for i := 0; i < 3; i++ {
+		select {
+		case d := <-joined:
+			if d.err != nil || d.result.State != contracts.NativeJoined || d.result.Reference.InstallationID != target.InstallationID || d.result.Reference.SessionID != target.SessionID || d.result.Reference.WorkerID != target.WorkerID || d.result.Reference.OperationID == "" || d.result.Reference.Fence < 1 {
+				t.Fatal("worker conversation did not join", i, d.result.State, d.err)
+			}
+			if seenConversations[d.result.Reference.OperationID] {
+				t.Fatal("duplicate joined native conversation", i)
+			}
+			seenConversations[d.result.Reference.OperationID] = true
+		case <-time.After(5 * time.Second):
+			t.Fatal("worker conversation did not positively join", i)
+		}
+	}
+	var windows, spent int
+	if e = f.admin.QueryRow(ctx, "SELECT count(*),COALESCE(sum(used_roles),0) FROM download_native_key WHERE worker_id=$1", target.WorkerID).Scan(&windows, &spent); e != nil || windows != 1 || spent != 7 {
+		t.Fatal("distinct content key window", windows, spent, e)
+	}
+	if e = f.admin.QueryRow(ctx, "SELECT used_roles FROM download_key_binding WHERE batch_id=$1", batchID).Scan(&slots); e != nil || slots != 7 {
+		t.Fatal("metadata observation refilled preparation", e)
+	}
+	finished, e := f.runtime.LookupDownload(ctx, session.ID, session.Scope.Principal)
+	if e != nil || finished.State != artifact.DownloadCompleted {
+		t.Fatal("whole-response completion", finished.State, e)
+	}
+	if _, e = ownerPool.Exec(ctx, "DELETE FROM download_native_owner WHERE worker_id=$1", target.WorkerID); e == nil {
+		t.Fatal("native runtime retired historical owner")
+	}
+	for _, statement := range []string{
+		"UPDATE download_native_owner SET closed=true WHERE worker_id=$1",
+		"UPDATE download_key_binding SET used_roles=0 WHERE batch_id=$1",
+	} {
+		_, denied := metadataPool.Exec(ctx, statement, target.WorkerID)
+		var pg *pgconn.PgError
+		if !errors.As(denied, &pg) || pg.Code != "42501" {
+			t.Fatal("metadata SQL role gained effect permission", denied)
+		}
+	}
+	t.Logf("actual SQL45/42 encrypted S3/A-KEY h2 two-hop HTTPS bytes=%d; synthetic identity/issuer/Pod/bootstrap facts", len(body))
+}
+
+// One observation owner spans fixture setup, dispatch and every subsequent
+// native phase, including a second independently admitted download. It supplies
+// current observations of explicit synthetic sources, never a renewed request,
+// operation or byte lease. Loss cancels and joins before fixture pools close.
+func startNativeFixtureObservations(t *testing.T, parent context.Context, refresh func(context.Context) error) (context.Context, func()) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(parent)
+	initial, end := context.WithTimeout(ctx, 5*time.Second)
+	err := refresh(initial)
+	end()
+	if err != nil {
+		cancel()
+		t.Fatal("initial protected native fixture observations", err)
+	}
+	done := make(chan error, 1)
+	// Fixture timing only: the longest refresh and longest interval between
+	// completed refreshes, reported once at close.
+	var longest, widest time.Duration
+	last := time.Now()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				done <- nil
+				return
+			case <-ticker.C:
+				call, finish := context.WithTimeout(ctx, 5*time.Second)
+				started := time.Now()
+				err := refresh(call)
+				finish()
+				if d := time.Since(started); d > longest {
+					longest = d
+				}
+				if d := time.Since(last); err == nil && d > widest {
+					widest = d
+				}
+				if err == nil {
+					last = time.Now()
+				}
+				if err != nil {
+					if ctx.Err() != nil {
+						done <- nil
+					} else {
+						done <- err
+					}
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx, func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Error("protected native fixture observation stopped", err)
+		}
+		t.Logf("native fixture observation longest-refresh=%s widest-completion-gap=%s", longest, widest)
+	}
+}
+
+type nativeSQLAdmission struct {
+	test              *testing.T
+	side              string
+	origins           evidence.NativeOrigins
+	peer              value.KeyPeer
+	router            *native.HubRouter
+	upstream          *mtls.NativeClient
+	verifier          *mtls.KeyPeerVerifier
+	leaf              []byte
+	connectorVerifier *mtls.PeerVerifier
+	connectorDigest   artifact.Digest
+}
+
+func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.ConnectionState, h contracts.NativeHello) (conversation native.Conversation, result error) {
+	started := time.Now()
+	a.test.Log("native diagnostic", a.side, "admission entered")
+	defer func() { a.test.Log("native diagnostic", a.side, "admission terminal", time.Since(started), result) }()
+	if state == nil || !state.HandshakeComplete || state.NegotiatedProtocol != "h2" || len(state.VerifiedChains) == 0 || len(state.PeerCertificates) < 1 {
+		return nil, contracts.ErrNativeProtocol
+	}
+	if a.router != nil {
+		// The fixture's connector admission is synthetic; forwarded acquisition leaf
+		// and the operation/Pod proof are still independently exact SQL inputs.
+		connector, e := a.connectorVerifier.Verify(state)
+		if e != nil || connector.Digest != a.connectorDigest || connector.Binding.InstallationID != a.peer.InstallationID || !bytes.Equal(h.WorkerLeaf, a.leaf) {
+			return nil, contracts.ErrNativeProtocol
+		}
+		origin, e := a.origins.Check(ctx, h.Reference.InstallationID, h.Reference.SessionID, h.Reference.WorkerID, a.peer, h.WorkerToken)
+		if e != nil {
+			return nil, e
+		}
+		a.test.Log("native diagnostic", a.side, "origin accepted", time.Until(origin.Lease.Until))
+		return a.router.Attach(ctx, origin, h)
+	}
+	peer, e := a.verifier.Verify(state)
+	if e != nil || peer != a.peer {
+		return nil, contracts.ErrNativeProtocol
+	}
+	origin, e := a.origins.Check(ctx, h.Reference.InstallationID, h.Reference.SessionID, h.Reference.WorkerID, peer, h.WorkerToken)
+	if e != nil {
+		return nil, e
+	}
+	a.test.Log("native diagnostic", a.side, "origin accepted", time.Until(origin.Lease.Until))
+	ref := origin.Lease.Operation.Reference
+	h.Reference = contracts.NativeReference{InstallationID: ref.InstallationID, SessionID: ref.SessionID, WorkerID: ref.WorkerID, OperationID: ref.OperationID, Fence: ref.Fence}
+	h.WorkerLeaf = append([]byte(nil), state.PeerCertificates[0].Raw...)
+	upstream, e := a.upstream.Open(ctx, h)
+	if e != nil {
+		return nil, e
+	}
+	gate, e := evidence.NewNativeFrameGate(ctx, func(c context.Context) (value.NativeLease, error) { return a.origins.Recheck(c, origin) }, time.Now)
+	if e != nil {
+		upstream.Close()
+		return nil, e
+	}
+	return native.NewRelayConversation(gate, upstream)
+}
+
+type nativeSQLServingCertificate struct{ certificate tls.Certificate }
+
+func (c nativeSQLServingCertificate) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return &c.certificate, nil
+}
+
+func nativeSQLServer(t *testing.T, path string, admission native.Admission, clientCertificate tls.Certificate, keys *keyTLSFixture) *mtls.NativeClient {
+	t.Helper()
+	listener, e := net.Listen("tcp", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	handler, e := native.NewHandler(path, listener.Addr().String(), admission, 1)
+	if e != nil {
+		listener.Close()
+		t.Fatal(e)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	// The actual bounded native listener is used; this fixture's server issuer
+	// and serving source remain explicitly synthetic protected installation facts.
+	serving := nativeSQLServingCertificate{keys.certificate(t, "server")}
+	go func() { done <- native.Serve(ctx, listener, keys.roots, serving, handler, 2) }()
+	t.Cleanup(func() {
+		cancel()
+		listener.Close()
+		if e := <-done; e != nil && !errors.Is(e, context.Canceled) {
+			t.Error("native listener shutdown", e)
+		}
+	})
+	client, e := mtls.NewNativeClient("https://"+listener.Addr().String()+path, &tls.Config{RootCAs: keys.roots, Certificates: []tls.Certificate{clientCertificate}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	return client
+}
+
+type nativeSQLWorkerOutcome struct {
+	result contracts.NativeConversationResult
+	err    error
+}
+
+func nativeSQLWorkerLoop(t *testing.T, ctx context.Context, client *mtls.NativeClient, target value.WorkerCredentialTarget, key artifact.Digest, result *evidence.RegionalContextResult, joined chan<- nativeSQLWorkerOutcome) error {
+	for attempt := 0; attempt < contracts.NativeMaximumConversations; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		var nonce [32]byte
+		if _, e := rand.Read(nonce[:]); e != nil {
+			return e
+		}
+		hello := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: target.InstallationID, SessionID: target.SessionID, WorkerID: target.WorkerID}, Nonce: base64.RawURLEncoding.EncodeToString(nonce[:]), WorkerToken: []byte("synthetic.native.token")}
+		t.Log("native diagnostic worker opening", attempt)
+		stream, e := client.Open(ctx, hello)
+		t.Log("native diagnostic worker open terminal", attempt, e)
+		var idle *contracts.NativeNoCommand
+		if e != nil && !errors.As(e, &idle) {
+			return e
+		}
+		if e == nil {
+			disposition, e := native.RunWorkerConversation(ctx, stream, hello, target, key, result)
+			t.Log("native diagnostic worker conversation terminal", attempt, disposition.State, e)
+			joined <- nativeSQLWorkerOutcome{disposition, e}
+			if e != nil || disposition.State != contracts.NativeJoined {
+				return fmt.Errorf("uncertain original native conversation: %w", e)
+			}
+		}
+		timer := time.NewTimer(contracts.NativeIdleRetry)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return artifact.ErrDownloadCapacity
+}
+
+type nativeSQLSink struct {
+	w http.ResponseWriter
+	r *http.Request
+}
+
+func (s nativeSQLSink) SelectDownloadResponse(m artifact.NativeDownloadMetadata) (artifact.DownloadSelection, error) {
+	return artifact.DownloadSelection{Length: m.Size}, nil
+}
+func (s nativeSQLSink) OpenDownloadResponse(_ context.Context, m artifact.NativeDownloadMetadata, r artifact.DownloadResponse) (evidence.DownloadResponseSink, error) {
+	return browser.NewHTTPDownloadResponse(s.w, s.r, m, r)
+}
+
+func nativeSQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
+	t.Helper()
+	// Private fixture roles retain distinct claim, binding, unwrap-slot and
+	// history responsibilities. No runtime inherits an administrator role.
+	statements := []string{
+		"CREATE ROLE native_owner_runtime LOGIN PASSWORD 'synthetic-native-owner'",
+		"CREATE ROLE native_key_bind_runtime LOGIN PASSWORD 'synthetic-native-bind'",
+		"CREATE ROLE native_key_read_runtime LOGIN PASSWORD 'synthetic-native-read'",
+		"CREATE ROLE native_history_runtime LOGIN PASSWORD 'synthetic-native-history'",
+		"CREATE ROLE native_metadata_runtime LOGIN PASSWORD 'synthetic-native-metadata'",
+		"GRANT CONNECT ON DATABASE custody_test TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime,native_history_runtime",
+		"GRANT USAGE ON SCHEMA public TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime,native_history_runtime",
+		"GRANT SELECT ON goose_db_version,download_allocation,download_native_backing,download_native_owner,download_native_key,download_worker TO native_history_runtime",
+		"GRANT INSERT ON download_native_backing TO native_history_runtime",
+		"GRANT UPDATE(closed,retired_at,updated_at,updates) ON download_native_owner TO native_history_runtime",
+		"GRANT DELETE ON download_native_backing,download_native_owner,download_native_key TO native_history_runtime",
+		"GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,context_catalog,context_capture,context_verification,custody_attempt,artifact_download,download_batch,retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,download_worker,download_worker_configuration,download_worker_configuration_revision,download_worker_enrollment,download_worker_certificate,download_key_binding,download_response,download_window,download_control_allocation,download_native_owner,download_native_key,download_native_backing TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT UPDATE(installation_id) ON fleet_current_trust TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT SELECT ON processing_root,context_processing,processing_rule TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT UPDATE(id) ON permission_stream,artifact_download,download_worker,download_response,download_window TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT UPDATE(root_id) ON retention_source TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT UPDATE(source_uid) ON download_worker_configuration TO native_owner_runtime,native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT UPDATE(worker_id) ON download_native_owner TO native_key_bind_runtime,native_key_read_runtime,native_metadata_runtime",
+		"GRANT INSERT ON download_native_owner TO native_owner_runtime",
+		"GRANT UPDATE(operation_id,fence,operation_json,authority_json,lease_sequence,lease_started,lease_until,updated_at,updates,closed) ON download_native_owner TO native_owner_runtime",
+		"GRANT INSERT ON download_key_binding,download_native_key TO native_key_bind_runtime",
+		"GRANT UPDATE(used_roles) ON download_key_binding,download_native_key TO native_key_read_runtime",
+		"GRANT SELECT ON download_response,download_window,download_control_allocation TO download_runtime,download_audit_runtime,download_config_runtime",
+		"GRANT INSERT ON download_response,download_window TO download_runtime",
+		"GRANT UPDATE(lease_sequence,lease_until,closed) ON download_response TO download_runtime",
+		"GRANT UPDATE(outcome_json) ON download_window TO download_runtime",
+		"GRANT UPDATE(intent_receipt,intent_completion,outcome_receipt,outcome_completion) ON download_window TO download_audit_runtime",
+		"GRANT UPDATE(id) ON download_response TO download_audit_runtime",
+		"GRANT INSERT ON download_control_allocation TO download_config_runtime",
+	}
+	for _, sql := range statements {
+		if strings.HasPrefix(sql, "CREATE ROLE ") {
+			var exists bool
+			if e := admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_roles WHERE rolname=$1)", strings.Fields(sql)[2]).Scan(&exists); e != nil {
+				t.Fatal(e)
+			}
+			if exists {
+				continue
+			} // Same fixed fixture roles are shared by sequential selected subcases.
+		}
+		if _, e := admin.Exec(ctx, sql); e != nil {
+			t.Fatal("native fixture role", e)
+		}
+	}
+}
+
+func nativeSQLConnectorCertificate(t *testing.T, f nativeExchangeFixture) tls.Certificate {
+	t.Helper()
+	public, key, e := ed25519.GenerateKey(rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	uri, e := mtls.PeerURI(fleet.PeerBinding{InstallationID: f.worker.Binding.InstallationID, ClusterID: f.worker.Binding.ClusterID, IssuerEpoch: custodyID(), PeerID: custodyID(), Role: fleet.ConnectorPeer})
+	if e != nil {
+		t.Fatal(e)
+	}
+	leaf := &x509.Certificate{SerialNumber: big.NewInt(987654), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(30 * time.Minute), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, URIs: []*url.URL{uri}}
+	raw, e := x509.CreateCertificate(rand.Reader, leaf, f.enrollment.issuer.ca, public, f.enrollment.issuer.key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return tls.Certificate{Certificate: [][]byte{raw, f.enrollment.issuer.ca.Raw}, PrivateKey: key}
+}

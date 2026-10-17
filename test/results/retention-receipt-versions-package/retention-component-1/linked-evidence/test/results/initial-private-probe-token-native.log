@@ -1,0 +1,64 @@
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-account
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-audience
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-extra-audience
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-shorter-duration
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-longer-duration
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-bound-kind
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-bound-name
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-missing-bound-uid
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-no-binding
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-nonadministrator
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-delete
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-replace-uid
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-owner
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-data-key
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-target_namespace
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-root
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-account
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-cluster_role
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-collection
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/retired-role-cannot-refill
+--- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes (50.76s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain (0.90s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-account (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-audience (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-extra-audience (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-shorter-duration (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-longer-duration (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-bound-kind (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-wrong-bound-name (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-missing-bound-uid (0.18s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-no-binding (0.20s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/token-boundary-nonadministrator (0.01s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-delete (0.39s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-replace-uid (0.40s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-owner (0.40s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/private-guard-data-key (0.40s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-target_namespace (0.20s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-bootstrap_namespace (0.20s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-root (0.20s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-account (0.20s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/retired-role-cannot-refill (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	51.819s

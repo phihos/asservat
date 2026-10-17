@@ -1,0 +1,287 @@
+[
+  {
+    "name": "original",
+    "now": "2026-10-14T01:41:31Z",
+    "input": {
+      "format": "asservat-owner-deployment/v1",
+      "installationID": "10000000-0000-4000-8000-000000000001",
+      "clusterID": "10000000-0000-4000-8000-000000000002",
+      "namespace": {
+        "name": "original-hub",
+        "uid": "10000000-0000-4000-8000-000000000003"
+      },
+      "kubernetes": {
+        "endpoint": "https://kubernetes.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ]
+      },
+      "postgres": {
+        "host": "database.example",
+        "port": 5432,
+        "database": "asservat",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "maxConnections": 1
+      },
+      "auditStore": {
+        "endpoint": "https://audit.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "bucket": "audit",
+        "region": "test"
+      },
+      "keyService": {
+        "endpoint": "https://bao.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "auditMount": "audit",
+        "auditKey": "owner",
+        "pkiMount": "owner-pki",
+        "serverRole": "server",
+        "clientRole": "client"
+      }
+    },
+    "account": {
+      "name": "original-owner",
+      "uid": "10000000-0000-4000-8000-000000000004"
+    },
+    "auditCredentials": {
+      "name": "selected-audit",
+      "uid": "10000000-0000-4000-8000-000000000005"
+    },
+    "mount": "owner-auth",
+    "accessor": "auth_kubernetes_original"
+  },
+  {
+    "name": "namespace-uid",
+    "now": "2026-10-14T01:41:31Z",
+    "input": {
+      "format": "asservat-owner-deployment/v1",
+      "installationID": "10000000-0000-4000-8000-000000000001",
+      "clusterID": "10000000-0000-4000-8000-000000000002",
+      "namespace": {
+        "name": "original-hub",
+        "uid": "10000000-0000-4000-8000-000000000044"
+      },
+      "kubernetes": {
+        "endpoint": "https://kubernetes.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ]
+      },
+      "postgres": {
+        "host": "database.example",
+        "port": 5432,
+        "database": "asservat",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "maxConnections": 1
+      },
+      "auditStore": {
+        "endpoint": "https://audit.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "bucket": "audit",
+        "region": "test"
+      },
+      "keyService": {
+        "endpoint": "https://bao.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "auditMount": "audit",
+        "auditKey": "owner",
+        "pkiMount": "owner-pki",
+        "serverRole": "server",
+        "clientRole": "client"
+      }
+    },
+    "account": {
+      "name": "original-owner",
+      "uid": "10000000-0000-4000-8000-000000000004"
+    },
+    "auditCredentials": {
+      "name": "selected-audit",
+      "uid": "10000000-0000-4000-8000-000000000005"
+    },
+    "mount": "owner-auth",
+    "accessor": "auth_kubernetes_original"
+  },
+  {
+    "name": "account-uid",
+    "now": "2026-10-14T01:41:31Z",
+    "input": {
+      "format": "asservat-owner-deployment/v1",
+      "installationID": "10000000-0000-4000-8000-000000000001",
+      "clusterID": "10000000-0000-4000-8000-000000000002",
+      "namespace": {
+        "name": "original-hub",
+        "uid": "10000000-0000-4000-8000-000000000003"
+      },
+      "kubernetes": {
+        "endpoint": "https://kubernetes.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ]
+      },
+      "postgres": {
+        "host": "database.example",
+        "port": 5432,
+        "database": "asservat",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "maxConnections": 1
+      },
+      "auditStore": {
+        "endpoint": "https://audit.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "bucket": "audit",
+        "region": "test"
+      },
+      "keyService": {
+        "endpoint": "https://bao.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "auditMount": "audit",
+        "auditKey": "owner",
+        "pkiMount": "owner-pki",
+        "serverRole": "server",
+        "clientRole": "client"
+      }
+    },
+    "account": {
+      "name": "original-owner",
+      "uid": "10000000-0000-4000-8000-000000000045"
+    },
+    "auditCredentials": {
+      "name": "selected-audit",
+      "uid": "10000000-0000-4000-8000-000000000005"
+    },
+    "mount": "owner-auth",
+    "accessor": "auth_kubernetes_original"
+  },
+  {
+    "name": "server-role",
+    "now": "2026-10-14T01:41:31Z",
+    "input": {
+      "format": "asservat-owner-deployment/v1",
+      "installationID": "10000000-0000-4000-8000-000000000001",
+      "clusterID": "10000000-0000-4000-8000-000000000002",
+      "namespace": {
+        "name": "original-hub",
+        "uid": "10000000-0000-4000-8000-000000000003"
+      },
+      "kubernetes": {
+        "endpoint": "https://kubernetes.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ]
+      },
+      "postgres": {
+        "host": "database.example",
+        "port": 5432,
+        "database": "asservat",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "maxConnections": 1
+      },
+      "auditStore": {
+        "endpoint": "https://audit.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "bucket": "audit",
+        "region": "test"
+      },
+      "keyService": {
+        "endpoint": "https://bao.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "auditMount": "audit",
+        "auditKey": "owner",
+        "pkiMount": "owner-pki",
+        "serverRole": "exact_other_server",
+        "clientRole": "client"
+      }
+    },
+    "account": {
+      "name": "original-owner",
+      "uid": "10000000-0000-4000-8000-000000000004"
+    },
+    "auditCredentials": {
+      "name": "selected-audit",
+      "uid": "10000000-0000-4000-8000-000000000005"
+    },
+    "mount": "owner-auth",
+    "accessor": "auth_kubernetes_original"
+  },
+  {
+    "name": "audit-key",
+    "now": "2026-10-14T01:41:31Z",
+    "input": {
+      "format": "asservat-owner-deployment/v1",
+      "installationID": "10000000-0000-4000-8000-000000000001",
+      "clusterID": "10000000-0000-4000-8000-000000000002",
+      "namespace": {
+        "name": "original-hub",
+        "uid": "10000000-0000-4000-8000-000000000003"
+      },
+      "kubernetes": {
+        "endpoint": "https://kubernetes.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ]
+      },
+      "postgres": {
+        "host": "database.example",
+        "port": 5432,
+        "database": "asservat",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "maxConnections": 1
+      },
+      "auditStore": {
+        "endpoint": "https://audit.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "bucket": "audit",
+        "region": "test"
+      },
+      "keyService": {
+        "endpoint": "https://bao.example",
+        "roots": [
+          "MIIB0jCCAXmgAwIBAgIUHb0WKSWvZoghtIfoedUl5Gfbzw0wCgYIKoZIzj0EAwIwNzE1MDMGA1UEAwwsQXNzZXJ2YXQgcHVibGljIHJlY2lwZSBjb21wYXRpYmlsaXR5IGZpeHR1cmUwHhcNMjYxMDEzMDE0MTMxWhcNMjYxMTEyMDE0MTMxWjA3MTUwMwYDVQQDDCxBc3NlcnZhdCBwdWJsaWMgcmVjaXBlIGNvbXBhdGliaWxpdHkgZml4dHVyZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEc9KvT2SW7dUFe/bcjjl0IMZJKZ4lmzan6XFa9n6zC4vFc/cW1C3ghQTGwVRAzd7LeIW8LLPWs2d6q0Maf6pZujYzBhMB0GA1UdDgQWBBRVo4/8e76GXZWHuO8F3YOej63sGjAfBgNVHSMEGDAWgBRVo4/8e76GXZWHuO8F3YOej63sGjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjOPQQDAgNHADBEAiAEQ4Kn8BbabCOEy9+mx91azQewKgm+qhsjprEdEcs6vAIgTUmVoW3QvTrV7/bJ2VFxjSNZx0FjWILDBCSrHHo6xnE="
+        ],
+        "auditMount": "audit",
+        "auditKey": "exact_other_audit",
+        "pkiMount": "owner-pki",
+        "serverRole": "server",
+        "clientRole": "client"
+      }
+    },
+    "account": {
+      "name": "original-owner",
+      "uid": "10000000-0000-4000-8000-000000000004"
+    },
+    "auditCredentials": {
+      "name": "selected-audit",
+      "uid": "10000000-0000-4000-8000-000000000005"
+    },
+    "mount": "owner-auth",
+    "accessor": "auth_kubernetes_original"
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "phase": "fixture-tests",
+  "command": [
+    "/tmp/asservat-direct-diagnostic-bud4y2h7/integration.test",
+    "-test.run=^TestDirectNativeFixture(WireParity|DiagnosticLabels)$",
+    "-test.v",
+    "-test.timeout=60s"
+  ],
+  "exit": 0,
+  "seconds": 0.176,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "namedPass": 14,
+  "skips": 0
+}

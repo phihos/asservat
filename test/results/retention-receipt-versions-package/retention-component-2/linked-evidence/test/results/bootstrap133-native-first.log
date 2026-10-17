@@ -1,0 +1,11 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:226: actual fixed-command runner failed
+    initial_bootstrap_chain_test.go:406: runner produce phase Failed output 
+    initial_bootstrap_chain_test.go:406: runner schema phase Failed output 
+    initial_bootstrap_chain_test.go:406: runner prepare phase Failed output 
+    initial_bootstrap_chain_test.go:406: runner retire phase Failed output setup differs from the saved installation: restore the original release inputs or requalify the changed protection; do not delete retained setup resources or edit journal UIDs
+        
+--- FAIL: TestInitialBootstrapChainWithRealServices (236.84s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	236.895s
+FAIL

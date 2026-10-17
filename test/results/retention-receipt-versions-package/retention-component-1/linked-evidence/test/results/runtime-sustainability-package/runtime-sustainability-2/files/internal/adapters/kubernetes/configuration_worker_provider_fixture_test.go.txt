@@ -1,0 +1,297 @@
+package kubernetes
+
+import (
+	"asservat.local/asservat/internal/adapters/mounts"
+	"bytes"
+	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	admission "k8s.io/api/admissionregistration/v1"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	authz "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/utils/ptr"
+)
+
+// This is a complete loopback API model with synthetic original resource,
+// role/input receipts and native denial responses. It supplies no real SQL,
+// provider authority, Kubernetes admission or installed startup qualification.
+// The actual product readers, fixed shared observer40/probe20 QPS clients and real clock run.
+type configurationProviderRuntimeFixture struct {
+	reader                        *ConfigurationWorkerProviderReader
+	manifest                      contracts.ConfigurationRuntimeCredentialManifest
+	mounted                       map[string][]byte
+	mu                            sync.Mutex
+	objects                       map[string]runtime.Object
+	observer, probe               atomic.Int32
+	denials                       [3]atomic.Int32
+	fault                         atomic.Int32
+	observerLimiter, probeLimiter flowcontrol.RateLimiter
+	input                         contracts.HubWorkerDeployment
+	podUID                        string
+	files                         *os.Root
+	tokenDirectory                string
+	extra                         func(http.ResponseWriter, *http.Request) bool
+}
+
+func newConfigurationProviderRuntimeFixture(t *testing.T) *configurationProviderRuntimeFixture {
+	t.Helper()
+	resources, snapshot, roles, now := configurationWorkerMaterialFixture(t)
+	// The lower-level template-only fixture uses literal non-certificate bytes
+	// for its owner root. This runtime fixture needs a real test DER root before
+	// constructing its synthetic original journal and any runtime input. Rebuild
+	// all template commitments together; no existing API journal is rewritten.
+	resources.ownerRoots = [][]byte{ownerConfigurationTestRoot(t, now)}
+	for i := range snapshot.State.Objects {
+		object, e := resources.object(snapshot.State, i)
+		if e != nil {
+			t.Fatal("original runtime template preflight", i, e)
+		}
+		snapshot.State.Objects[i].TemplateDigest = preparationDigest(object.object)
+	}
+	in, digest, raw, err := resources.configurationWorkerInputMaterial(snapshot, roles, ownerID(18200), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provenance := in.ProviderInputs
+	claim := &contracts.ConfigurationWorkerInputClaim{OperationID: provenance.OperationID, PublicDigest: digest, ConfigurationRoot: provenance.ConfigurationRoot, ConfigurationSetupID: provenance.ConfigurationSetupID, SQLProjection: provenance.SQLProjection, AuditCredentials: in.ProviderAuthentication.AuditCredentials, ClaimedAt: now, Until: now.Add(5 * time.Second), Receipt: &contracts.ConfigurationWorkerInputReceipt{Configuration: contracts.WorkerObjectReference{Name: resources.names.WorkerInputs, UID: ownerID(18201)}, ResourceVersion: "18201", ObservedAt: now}}
+	snapshot.State.WorkerInputs = claim
+	if !resources.valid(snapshot.State) {
+		t.Fatal("invalid synthetic original input state")
+	}
+	f := &configurationProviderRuntimeFixture{objects: map[string]runtime.Object{}, mounted: map[string][]byte{}, input: in, podUID: ownerID(18202)}
+	base := "/api/v1/namespaces/" + in.Namespace.Name
+	for _, i := range []int{1, 10, 11, 13, 14} {
+		object, e := resources.object(snapshot.State, i)
+		if e != nil {
+			t.Fatal(e)
+		}
+		m := object.object.(interface {
+			runtime.Object
+			meta.Object
+		})
+		m.SetUID(types.UID(snapshot.State.Objects[i].Receipt.UID))
+		m.SetResourceVersion("20")
+		m.SetGeneration(snapshot.State.Objects[i].Receipt.Generation)
+		m.SetAnnotations(map[string]string{initialRuntimeResourceMarker: snapshot.State.Objects[i].OperationID})
+		if d, ok := object.object.(*apps.Deployment); ok {
+			d.Spec.Template.Spec.DNSPolicy = core.DNSClusterFirst
+			d.Spec.Template.Spec.SchedulerName = core.DefaultSchedulerName
+			d.Spec.Template.Spec.Containers[0].TerminationMessagePath = core.TerminationMessagePathDefault
+			d.Spec.Template.Spec.Containers[0].TerminationMessagePolicy = core.TerminationMessageReadFile
+			if i == 11 {
+				d.Spec.Replicas = ptr.To(int32(1))
+				d.Generation++
+				d.Annotations[configurationLaunchAnnotation] = ownerID(18203)
+				d.Annotations["deployment.kubernetes.io/revision"] = "1"
+			}
+		}
+		f.objects[object.collection+"/"+m.GetName()] = object.object
+	}
+	body, _ := json.Marshal(snapshot.State)
+	f.objects[base+"/secrets/"+in.Activation.Resources.Name] = &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: in.Activation.Resources.Name, Namespace: in.Namespace.Name, UID: types.UID(snapshot.UID), ResourceVersion: "21"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": body}}
+	f.objects[base+"/configmaps/"+claim.Receipt.Configuration.Name] = &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: claim.Receipt.Configuration.Name, Namespace: in.Namespace.Name, UID: types.UID(claim.Receipt.Configuration.UID), ResourceVersion: claim.Receipt.ResourceVersion, Annotations: configurationWorkerInputAnnotations(snapshot.UID, snapshot.State.SetupID, claim)}, Immutable: ptr.To(true), Data: map[string]string{"deployment.json": string(raw)}}
+	fleetRaw, _ := json.Marshal(contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: in.InstallationID, IssuerEpoch: roles.Sources.IssuerEpoch, Issuer: "https://identity.example.test", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16})
+	f.objects[base+"/configmaps/"+in.FleetSource.Name] = &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: in.FleetSource.Name, Namespace: in.Namespace.Name, UID: types.UID(in.FleetSource.UID), ResourceVersion: "22", Generation: 1}, Data: map[string]string{"fleet.json": string(fleetRaw)}}
+	addGuard := func(p *admission.ValidatingAdmissionPolicy, b *admission.ValidatingAdmissionPolicyBinding, e error, g contracts.OwnerDeploymentGuard) {
+		t.Helper()
+		if e != nil {
+			t.Fatal(e)
+		}
+		p.UID = types.UID(g.PolicyUID)
+		p.Generation = g.PolicyGeneration
+		p.ResourceVersion = "23"
+		p.Status.ObservedGeneration = p.Generation
+		p.Status.TypeChecking = &admission.TypeChecking{}
+		b.UID = types.UID(g.BindingUID)
+		b.ResourceVersion = g.BindingResourceVersion
+		f.objects["/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/"+p.Name] = p
+		f.objects["/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/"+b.Name] = b
+	}
+	p, b, e := OwnerWorkloadAdmission(capacityActivationAdministration(in))
+	addGuard(p, b, e, in.Activation.WorkloadGuard)
+	for _, g := range []struct {
+		guard contracts.OwnerDeploymentGuard
+		name  string
+		fleet bool
+	}{{in.FleetGuard, in.FleetSource.Name, true}, {in.OwnerGuard, in.OwnerSource.Name, false}} {
+		plan := cfg.ConfigMapAdministration{Name: g.guard.Name, SourceName: g.name, ControlNamespace: cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}}
+		for _, a := range g.guard.Administrators {
+			plan.Administrators = append(plan.Administrators, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
+		}
+		if g.fleet {
+			p, b, e = FleetConfigurationAdmission(plan)
+		} else {
+			p, b, e = OwnerConfigurationAdmission(plan)
+		}
+		addGuard(p, b, e, g.guard)
+	}
+	f.manifest = contracts.ConfigurationRuntimeCredentialManifest{Format: contracts.ConfigurationRuntimeCredentialManifestFormat, Input: roles.State.Input, RootUID: roles.UID, SetupID: roles.State.OperationID}
+	for i, role := range roles.State.Roles {
+		f.manifest.Roles = append(f.manifest.Roles, contracts.ConfigurationRuntimeCredentialProof{Purpose: role.Purpose, Claim: *role.Claim, Receipt: *role.Receipt})
+		f.mounted[[]string{"sql-fleet.json", "sql-configuration.json", "sql-audit.json"}[i]], _ = json.Marshal(contracts.OwnerSQLCredential{Username: role.Receipt.RoleName, Password: role.Password})
+	}
+	f.mounted[contracts.ConfigurationRuntimeRoleManifestFile], _ = json.Marshal(f.manifest)
+	sqlData := map[string][]byte{}
+	for name, value := range f.mounted {
+		sqlData[name] = bytes.Clone(value)
+	}
+	f.objects[base+"/secrets/"+provenance.SQLProjection.Name] = &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: provenance.SQLProjection.Name, Namespace: in.Namespace.Name, UID: types.UID(provenance.SQLProjection.UID), ResourceVersion: "24", Annotations: map[string]string{"asservat.io/role-root-uid": roles.UID, "asservat.io/role-setup-id": roles.State.OperationID, "asservat.io/projection-id": roles.State.Projection.OperationID}}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: sqlData}
+	auditRaw, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: "synthetic-scoped-key", SecretAccessKey: "synthetic-test-secret"})
+	f.mounted[contracts.ConfigurationProviderAuditCredentialFile] = bytes.Clone(auditRaw)
+	ref := in.ProviderAuthentication.AuditCredentials
+	f.objects[base+"/secrets/"+ref.Name] = &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: ref.Name, Namespace: in.Namespace.Name, UID: types.UID(ref.UID), ResourceVersion: "25"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{contracts.ConfigurationProviderAuditCredentialFile: auditRaw}}
+	d := f.objects["/apis/apps/v1/namespaces/"+in.Namespace.Name+"/deployments/"+in.Activation.Deployment.Name].(*apps.Deployment)
+	rs := &apps.ReplicaSet{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "ReplicaSet"}, ObjectMeta: meta.ObjectMeta{Name: resources.names.Worker + "-synthetic", Namespace: in.Namespace.Name, UID: types.UID(ownerID(18204)), ResourceVersion: "26", OwnerReferences: []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: d.Name, UID: d.UID, Controller: ptr.To(true)}}}, Spec: apps.ReplicaSetSpec{Replicas: ptr.To(int32(1)), Selector: d.Spec.Selector.DeepCopy(), Template: *d.Spec.Template.DeepCopy()}}
+	rs.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey] = "synthetic-hash"
+	rs.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "synthetic-hash"
+	pod := &core.Pod{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Pod"}, ObjectMeta: *rs.Spec.Template.ObjectMeta.DeepCopy(), Spec: *rs.Spec.Template.Spec.DeepCopy(), Status: core.PodStatus{Phase: core.PodRunning}}
+	pod.Name = resources.names.Worker + "-synthetic-pod"
+	pod.Namespace = in.Namespace.Name
+	pod.UID = types.UID(f.podUID)
+	pod.ResourceVersion = "27"
+	pod.Spec.NodeName = "synthetic-node"
+	pod.OwnerReferences = []meta.OwnerReference{{APIVersion: "apps/v1", Kind: "ReplicaSet", Name: rs.Name, UID: rs.UID, Controller: ptr.To(true)}}
+	f.objects[base+"/pods/"+pod.Name] = pod
+	f.objects["/apis/apps/v1/namespaces/"+in.Namespace.Name+"/replicasets/"+rs.Name] = rs
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observer := r.Header.Get("Authorization") == "Bearer observer"
+		if observer {
+			f.observer.Add(1)
+		} else {
+			f.probe.Add(1)
+		}
+		f.mu.Lock()
+		extra := f.extra
+		f.mu.Unlock()
+		if extra != nil && extra(w, r) {
+			return
+		}
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		switch {
+		case r.URL.Path == base:
+			permissionReply(w, permissionNamespace(in.Namespace.Name, in.Namespace.UID))
+		case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
+			uid := in.Activation.ServiceAccount.UID
+			if f.fault.Load() == 1 || f.fault.Load() == 3 && !observer {
+				uid = ownerID(18299)
+			}
+			permissionReply(w, auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}, Status: auth.SelfSubjectReviewStatus{UserInfo: auth.UserInfo{Username: "system:serviceaccount:" + in.Namespace.Name + ":" + in.Activation.ServiceAccount.Name, UID: uid, Groups: []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + in.Namespace.Name}, Extra: map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {pod.Name}, "authentication.kubernetes.io/pod-uid": {f.podUID}}}}})
+		case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
+			permissionReply(w, authz.SelfSubjectAccessReview{Status: authz.SubjectAccessReviewStatus{Allowed: true}})
+		case r.Method == http.MethodPut:
+			if r.URL.Query().Get("dryRun") != "All" || r.URL.Query().Get("fieldValidation") != "Strict" {
+				t.Error("persistent runtime write")
+				http.Error(w, "denied", 403)
+				return
+			}
+			n, name, denial, group, kind := 0, in.Activation.WorkloadGuard.Name, ownerWorkloadDenial, "apps", "deployments"
+			if r.URL.Path == base+"/configmaps/"+in.FleetSource.Name {
+				n, name, denial, group, kind = 1, in.FleetGuard.Name, fleetConfigurationDenial, "", "configmaps"
+			}
+			if r.URL.Path == base+"/configmaps/"+in.OwnerSource.Name {
+				n, name, denial, group, kind = 2, in.OwnerGuard.Name, ownerConfigurationDenial, "", "configmaps"
+			}
+			f.denials[n].Add(1)
+			if f.fault.Load() == 2 {
+				permissionReply(w, f.objects[r.URL.Path])
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: group, Kind: kind, Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + name + "' with binding '" + name + "' denied request: " + denial}}}})
+		case r.Method == http.MethodGet && f.objects[r.URL.Path] != nil:
+			permissionReply(w, f.objects[r.URL.Path])
+		default:
+			t.Error("unexpected runtime API", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	f.tokenDirectory = t.TempDir()
+	for _, token := range []string{"observer", "probe"} {
+		if err = os.WriteFile(filepath.Join(f.tokenDirectory, "kube-"+token+".token"), []byte(token), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.files, err = os.OpenRoot(f.tokenDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.files.Close() })
+	client := func(token string) *PermissionClient {
+		name := "kube-" + token + ".token"
+		config := &rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}
+		config.WrapTransport = func(next http.RoundTripper) http.RoundTripper {
+			return configurationWorkerFixtureBearer{next: next, files: f.files, name: name}
+		}
+		c, e := NewConfigurationWorkerPermissionClient(config, f.files, name, in.ClusterID, cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}, time.Now)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if token == "observer" {
+			f.observerLimiter = c.api.GetRateLimiter()
+		} else {
+			f.probeLimiter = c.api.GetRateLimiter()
+		}
+		return c
+	}
+	w, err := NewInstalledWorkerProjectionReader(client("observer"), client("probe"), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.reader, err = NewConfigurationWorkerProviderReader(w, f.podUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exercise the actual complete source decoders before spending test time on
+	// TLS/rate behavior. These are pure shape checks, never current authority.
+	sources := [2]core.ConfigMap{*f.objects[base+"/configmaps/"+in.FleetSource.Name].(*core.ConfigMap).DeepCopy(), *f.objects[base+"/configmaps/"+in.OwnerSource.Name].(*core.ConfigMap).DeepCopy()}
+	if _, _, _, _, _, e := f.reader.providerSourceValues(sources, now, roles.Sources.IssuerEpoch); e != nil {
+		t.Fatal("complete source pure preflight", e)
+	}
+	return f
+}
+
+func (f *configurationProviderRuntimeFixture) setExtra(handler func(http.ResponseWriter, *http.Request) bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.extra = handler
+}
+
+// Like the installed bootstrap bearer transport, this reads the projected file
+// for every request. The surrounding native responses remain synthetic.
+type configurationWorkerFixtureBearer struct {
+	next  http.RoundTripper
+	files *os.Root
+	name  string
+}
+
+func (t configurationWorkerFixtureBearer) RoundTrip(r *http.Request) (*http.Response, error) {
+	b, err := mounts.Read(r.Context(), t.files, t.name, 16<<10)
+	defer clear(b)
+	if err != nil || !contracts.ValidWorkerToken(b) {
+		return nil, cfg.ErrUnavailable
+	}
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+string(b))
+	return t.next.RoundTrip(r)
+}

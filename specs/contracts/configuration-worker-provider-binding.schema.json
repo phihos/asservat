@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-worker-provider-binding.schema.json",
+  "title": "Completed configuration worker provider provenance",
+  "description": "Comparable original private role-root binding. Entire original selection and positive public input receipt are retained; zero omission preserves legacy bytes. This is not a provider token or current authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "selection",
+    "inputOperationID",
+    "publicDigest",
+    "configuration"
+  ],
+  "properties": {
+    "selection": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json"
+    },
+    "inputOperationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "publicDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "configuration": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    }
+  }
+}

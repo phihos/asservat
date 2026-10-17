@@ -1,0 +1,50 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_effects.go",
+    "base_sha256": "256ddf78b6a211b0593d7c672d9c5c0f7bc6deb161fb84c72068a6d422b615b1",
+    "payload_sha256": "4cda2c8c0dfd1e7e51f735536d59284400683347c7bf494cbdb465854cf4d315",
+    "qualified_payload_sha256": "4cda2c8c0dfd1e7e51f735536d59284400683347c7bf494cbdb465854cf4d315",
+    "original_manifest_base_sha256": "256ddf78b6a211b0593d7c672d9c5c0f7bc6deb161fb84c72068a6d422b615b1",
+    "qualification_foundation_sha256": null
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_installed.go",
+    "base_sha256": "96be1beca7be7a6a2eb436bdc5fef622480ece2b0e0c644be543b84bef1315e2",
+    "payload_sha256": "82f0585296d95e10de2e948ad0361656246eed19cf5f96de634dbd80e30c85bc",
+    "qualified_payload_sha256": "82f0585296d95e10de2e948ad0361656246eed19cf5f96de634dbd80e30c85bc",
+    "original_manifest_base_sha256": null,
+    "qualification_foundation_sha256": "96be1beca7be7a6a2eb436bdc5fef622480ece2b0e0c644be543b84bef1315e2"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_installed_join_test.go",
+    "base_sha256": null,
+    "payload_sha256": "df97938381299d682a31aadc069860e6a2e19bf6e1e878f6f1c325ac1eefdf8a",
+    "qualified_payload_sha256": "df97938381299d682a31aadc069860e6a2e19bf6e1e878f6f1c325ac1eefdf8a",
+    "original_manifest_base_sha256": null,
+    "qualification_foundation_sha256": null
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_lifetimes.go",
+    "base_sha256": "0242b818fba3fc676f64457ff58a3a8b21ee4c8e454b3c36a84635eea2b33f0c",
+    "payload_sha256": "a6e395049b4e0a72dbaa62f86ff93e9fb81c75c5a8d432637702ae9cee581c65",
+    "qualified_payload_sha256": "a6e395049b4e0a72dbaa62f86ff93e9fb81c75c5a8d432637702ae9cee581c65",
+    "original_manifest_base_sha256": "0242b818fba3fc676f64457ff58a3a8b21ee4c8e454b3c36a84635eea2b33f0c",
+    "qualification_foundation_sha256": null
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_deployment.go",
+    "base_sha256": "e1bd89fbf38cd272bc1a0089c7e1f45ccfdb3925b802f494154f035b28ab1992",
+    "payload_sha256": "df3e1238c442a5418b2e2226158b687b5ecbf1cb9dc31be0814bf9e15dd0a42e",
+    "qualified_payload_sha256": "df3e1238c442a5418b2e2226158b687b5ecbf1cb9dc31be0814bf9e15dd0a42e",
+    "original_manifest_base_sha256": "7c7a5a79d340c2473fbed0daa3820786b3e29333c64f1226df8942dffb1b2615",
+    "qualification_foundation_sha256": "e1bd89fbf38cd272bc1a0089c7e1f45ccfdb3925b802f494154f035b28ab1992"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_deployment_join_test.go",
+    "base_sha256": null,
+    "payload_sha256": "925b3fc8066e95964c80484faddd78526fa3e7078eddb02aa44d7cc92c89287f",
+    "qualified_payload_sha256": "925b3fc8066e95964c80484faddd78526fa3e7078eddb02aa44d7cc92c89287f",
+    "original_manifest_base_sha256": null,
+    "qualification_foundation_sha256": null
+  }
+]

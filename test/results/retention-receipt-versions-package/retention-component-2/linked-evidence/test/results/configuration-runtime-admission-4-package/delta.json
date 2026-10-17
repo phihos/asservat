@@ -1,0 +1,25 @@
+{
+  "previous_checkpoint": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-admission-3",
+  "payload_delta": [],
+  "manifest_unchanged": "12f51be30ed49fa8ac70e651ef04894060a137dd021a87df8af5255b0ed19d05",
+  "previous_dependencies": "64c9f75e74779edf1622390e3a49f25330dcd8089906c3a6c41086ff32fef87c",
+  "dependency_delta": [
+    {
+      "path": "scripts/test-custody.py",
+      "before": "4c89db87a1e982082864335c687b66bf06d6987468154b3f8116d2b40be0dbe1",
+      "after": "211c00787a2396412bd343ac60a0613a632dc9a6c11ee8aeecc7e12d16826ad1"
+    },
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "before": "acedbc87463749d4e2bdd112557159a60c56d6e3624370d6f5a29f0a361954c8",
+      "after": "dbf8aa11ab675737e07410c4fa6318b67fbb3d8af06bec1c19ec9cb2cabe2043"
+    },
+    {
+      "path": "test/integration/context_publication_test.go",
+      "before": "06aa8f615af0528864276203d3500e0b63527059ae4d8ddc61cef4bdbae3e698",
+      "after": "f0631c60250d4b0a9993b041f36fbd7a00b9385388fb6bb8a3a7aadb3977ffb6"
+    }
+  ],
+  "root_integration_report_sha256": "b958e4c71390f626df74cee9978d4ffe4a55ff95008a48d8dd313603b207358d",
+  "scope": "exact three parent-owned fixture/harness paths only; no runtime/pool/rate/deadline changes"
+}

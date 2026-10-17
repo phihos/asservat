@@ -1,0 +1,254 @@
+=== RUN   TestAccessTokenIdentity
+=== RUN   TestAccessTokenIdentity/at+jwt
+=== RUN   TestAccessTokenIdentity/application/at+jwt
+=== RUN   TestAccessTokenIdentity/at+JWT
+--- PASS: TestAccessTokenIdentity (0.07s)
+    --- PASS: TestAccessTokenIdentity/at+jwt (0.01s)
+    --- PASS: TestAccessTokenIdentity/application/at+jwt (0.00s)
+    --- PASS: TestAccessTokenIdentity/at+JWT (0.00s)
+=== RUN   TestRejectTokenConfusionAndMalformedClaims
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/controls_in_identity
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/missing_subject
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/azp_disagreement
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/numeric_string
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/missing_token_id
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/delegation_even_null
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/duplicate_group
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/null_audience
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/null_azp
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/null_groups
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/group_overflow
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/group_not_array
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_issuer
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/case-aliased_subject
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/case-aliased_optional_nbf
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/null_subject
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_resource
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/client_audience_is_not_resource
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/missing_expiry
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/future_issued
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/missing_client
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/future_not_before
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/ID_nonce
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/ambiguous_resources
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/null_not_before
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/missing_group_assertion
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/expiry_reached
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/scope_tabs
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/issuer_normalization_forbidden
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/fractional_expiry
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/delegated_actor
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/unsupported_proof_binding
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/duplicate_scope
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_type_JWT
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_type_ID
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_type_Bearer
+=== RUN   TestRejectTokenConfusionAndMalformedClaims/wrong_type_
+--- PASS: TestRejectTokenConfusionAndMalformedClaims (0.16s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/controls_in_identity (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/missing_subject (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/azp_disagreement (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/numeric_string (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/missing_token_id (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/delegation_even_null (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/duplicate_group (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/null_audience (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/null_azp (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/null_groups (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/group_overflow (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/group_not_array (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_issuer (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/case-aliased_subject (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/case-aliased_optional_nbf (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/null_subject (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_resource (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/client_audience_is_not_resource (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/missing_expiry (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/future_issued (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/missing_client (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/future_not_before (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/ID_nonce (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/ambiguous_resources (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/null_not_before (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/missing_group_assertion (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/expiry_reached (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/scope_tabs (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/issuer_normalization_forbidden (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/fractional_expiry (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/delegated_actor (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/unsupported_proof_binding (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/duplicate_scope (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_type_JWT (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_type_ID (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_type_Bearer (0.00s)
+    --- PASS: TestRejectTokenConfusionAndMalformedClaims/wrong_type_ (0.00s)
+=== RUN   TestKeysRotateExpireAndBoundRequests
+--- PASS: TestKeysRotateExpireAndBoundRequests (0.29s)
+=== RUN   TestExpiryAndCancellationDuringKeyFetch
+=== RUN   TestExpiryAndCancellationDuringKeyFetch/expiry
+=== RUN   TestExpiryAndCancellationDuringKeyFetch/cancel
+=== RUN   TestExpiryAndCancellationDuringKeyFetch/clock_rollback
+--- PASS: TestExpiryAndCancellationDuringKeyFetch (0.25s)
+    --- PASS: TestExpiryAndCancellationDuringKeyFetch/expiry (0.11s)
+    --- PASS: TestExpiryAndCancellationDuringKeyFetch/cancel (0.05s)
+    --- PASS: TestExpiryAndCancellationDuringKeyFetch/clock_rollback (0.10s)
+=== RUN   TestJWKSAndEndpointBounds
+=== RUN   TestJWKSAndEndpointBounds/redirect
+=== RUN   TestJWKSAndEndpointBounds/too_large
+=== RUN   TestJWKSAndEndpointBounds/private_key
+=== RUN   TestJWKSAndEndpointBounds/duplicate_key
+=== RUN   TestJWKSAndEndpointBounds/duplicate_JSON
+=== RUN   TestJWKSAndEndpointBounds/key_operations
+=== RUN   TestJWKSAndEndpointBounds/wrong_use
+2026/10/09 23:53:05 http: TLS handshake error from 127.0.0.1:44922: remote error: tls: bad certificate
+--- PASS: TestJWKSAndEndpointBounds (0.81s)
+    --- PASS: TestJWKSAndEndpointBounds/redirect (0.18s)
+    --- PASS: TestJWKSAndEndpointBounds/too_large (0.08s)
+    --- PASS: TestJWKSAndEndpointBounds/private_key (0.09s)
+    --- PASS: TestJWKSAndEndpointBounds/duplicate_key (0.07s)
+    --- PASS: TestJWKSAndEndpointBounds/duplicate_JSON (0.06s)
+    --- PASS: TestJWKSAndEndpointBounds/key_operations (0.07s)
+    --- PASS: TestJWKSAndEndpointBounds/wrong_use (0.09s)
+=== RUN   TestVerifiedTokenThroughCurrentEligibility
+    eligibility_flow_test.go:83: real TLS/JWKS and signed access token -> organization eligibility -> current workload permission -> retained audience; no collection, publication or disclosure performed
+--- PASS: TestVerifiedTokenThroughCurrentEligibility (0.15s)
+=== RUN   FuzzAccessTokenSyntax
+=== RUN   FuzzAccessTokenSyntax/seed#0
+=== RUN   FuzzAccessTokenSyntax/seed#1
+=== RUN   FuzzAccessTokenSyntax/seed#2
+--- PASS: FuzzAccessTokenSyntax (0.00s)
+    --- PASS: FuzzAccessTokenSyntax/seed#0 (0.00s)
+    --- PASS: FuzzAccessTokenSyntax/seed#1 (0.00s)
+    --- PASS: FuzzAccessTokenSyntax/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/oidc	2.743s
+=== RUN   TestOrganizationAdmission
+=== RUN   TestOrganizationAdmission/unregistered_client
+=== RUN   TestOrganizationAdmission/duplicate_groups
+=== RUN   TestOrganizationAdmission/future_policy
+=== RUN   TestOrganizationAdmission/unqualified_groups
+=== RUN   TestOrganizationAdmission/expired_token
+=== RUN   TestOrganizationAdmission/future_token
+=== RUN   TestOrganizationAdmission/controls_in_subject
+=== RUN   TestOrganizationAdmission/stale_groups
+=== RUN   TestOrganizationAdmission/expired_key
+=== RUN   TestOrganizationAdmission/invalid_revision
+=== RUN   TestOrganizationAdmission/ambiguous_identity_class
+=== RUN   TestOrganizationAdmission/duplicate_client
+=== RUN   TestOrganizationAdmission/stale_policy
+=== RUN   TestOrganizationAdmission/unbounded_policy
+=== RUN   TestOrganizationAdmission/fresh_signature_cannot_refresh_groups
+=== RUN   TestOrganizationAdmission/foreign_issuer
+=== RUN   TestOrganizationAdmission/eligible_issuer_is_not_membership
+--- PASS: TestOrganizationAdmission (0.00s)
+    --- PASS: TestOrganizationAdmission/unregistered_client (0.00s)
+    --- PASS: TestOrganizationAdmission/duplicate_groups (0.00s)
+    --- PASS: TestOrganizationAdmission/future_policy (0.00s)
+    --- PASS: TestOrganizationAdmission/unqualified_groups (0.00s)
+    --- PASS: TestOrganizationAdmission/expired_token (0.00s)
+    --- PASS: TestOrganizationAdmission/future_token (0.00s)
+    --- PASS: TestOrganizationAdmission/controls_in_subject (0.00s)
+    --- PASS: TestOrganizationAdmission/stale_groups (0.00s)
+    --- PASS: TestOrganizationAdmission/expired_key (0.00s)
+    --- PASS: TestOrganizationAdmission/invalid_revision (0.00s)
+    --- PASS: TestOrganizationAdmission/ambiguous_identity_class (0.00s)
+    --- PASS: TestOrganizationAdmission/duplicate_client (0.00s)
+    --- PASS: TestOrganizationAdmission/stale_policy (0.00s)
+    --- PASS: TestOrganizationAdmission/unbounded_policy (0.00s)
+    --- PASS: TestOrganizationAdmission/fresh_signature_cannot_refresh_groups (0.00s)
+    --- PASS: TestOrganizationAdmission/foreign_issuer (0.00s)
+    --- PASS: TestOrganizationAdmission/eligible_issuer_is_not_membership (0.00s)
+=== RUN   TestIdentityDeadlinesAndKinds
+=== RUN   TestIdentityDeadlinesAndKinds/token
+=== RUN   TestIdentityDeadlinesAndKinds/key
+=== RUN   TestIdentityDeadlinesAndKinds/group
+=== RUN   TestIdentityDeadlinesAndKinds/policy
+--- PASS: TestIdentityDeadlinesAndKinds (0.00s)
+    --- PASS: TestIdentityDeadlinesAndKinds/token (0.00s)
+    --- PASS: TestIdentityDeadlinesAndKinds/key (0.00s)
+    --- PASS: TestIdentityDeadlinesAndKinds/group (0.00s)
+    --- PASS: TestIdentityDeadlinesAndKinds/policy (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/identity	1.012s
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/collectContext
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/readApproved
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/downloadApproved
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/evidence-reader
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/evidence-owner
+=== RUN   TestOrdinaryDeveloperCanCollectReadAndDownload/action-approver
+--- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/collectContext (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/readApproved (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/downloadApproved (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/evidence-reader (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/evidence-owner (0.00s)
+    --- PASS: TestOrdinaryDeveloperCanCollectReadAndDownload/action-approver (0.00s)
+=== RUN   TestOwnershipAndDenyBoundaries
+=== RUN   TestOwnershipAndDenyBoundaries/other_cluster
+=== RUN   TestOwnershipAndDenyBoundaries/new_owner_cannot_read_old_evidence
+=== RUN   TestOwnershipAndDenyBoundaries/source_replacement
+=== RUN   TestOwnershipAndDenyBoundaries/changed_source_scope
+=== RUN   TestOwnershipAndDenyBoundaries/unknown_denies
+=== RUN   TestOwnershipAndDenyBoundaries/stale_deny_beats_independent_allow
+=== RUN   TestOwnershipAndDenyBoundaries/future_source
+=== RUN   TestOwnershipAndDenyBoundaries/A_B_A_reassignment
+=== RUN   TestOwnershipAndDenyBoundaries/removed_member
+=== RUN   TestOwnershipAndDenyBoundaries/download_scope_required
+=== RUN   TestOwnershipAndDenyBoundaries/raw_needs_its_own_path
+=== RUN   TestOwnershipAndDenyBoundaries/recreated_namespace
+=== RUN   TestOwnershipAndDenyBoundaries/replacement_pod
+=== RUN   TestOwnershipAndDenyBoundaries/explicit_deny_beats_allow
+=== RUN   TestOwnershipAndDenyBoundaries/same_group_under_other_issuer
+=== RUN   TestOwnershipAndDenyBoundaries/unknown_class
+=== RUN   TestOwnershipAndDenyBoundaries/stale_source
+=== RUN   TestOwnershipAndDenyBoundaries/stale_identity
+=== RUN   TestOwnershipAndDenyBoundaries/stale_config
+=== RUN   TestOwnershipAndDenyBoundaries/expired_artifact
+--- PASS: TestOwnershipAndDenyBoundaries (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/other_cluster (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/new_owner_cannot_read_old_evidence (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/source_replacement (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/changed_source_scope (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/unknown_denies (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/stale_deny_beats_independent_allow (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/future_source (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/A_B_A_reassignment (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/removed_member (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/download_scope_required (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/raw_needs_its_own_path (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/recreated_namespace (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/replacement_pod (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/explicit_deny_beats_allow (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/same_group_under_other_issuer (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/unknown_class (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/stale_source (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/stale_identity (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/stale_config (0.00s)
+    --- PASS: TestOwnershipAndDenyBoundaries/expired_artifact (0.00s)
+=== RUN   TestFreshnessAndAudienceBounds
+--- PASS: TestFreshnessAndAudienceBounds (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/authorization	1.011s
+=== RUN   TestPolicyAndKeyFreshnessAfterWait
+--- PASS: TestPolicyAndKeyFreshnessAfterWait (0.00s)
+=== RUN   TestInvalidTokenDoesNotReadPolicyOrLeakErrors
+--- PASS: TestInvalidTokenDoesNotReadPolicyOrLeakErrors (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/identity	1.009s
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility/unauthenticated
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility/no_entitlement
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility/unknown_denies
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility/missing_scope
+=== RUN   TestNoEvidenceLookupBeforeCurrentEligibility/explicit_deny
+--- PASS: TestNoEvidenceLookupBeforeCurrentEligibility (0.00s)
+    --- PASS: TestNoEvidenceLookupBeforeCurrentEligibility/unauthenticated (0.00s)
+    --- PASS: TestNoEvidenceLookupBeforeCurrentEligibility/no_entitlement (0.00s)
+    --- PASS: TestNoEvidenceLookupBeforeCurrentEligibility/unknown_denies (0.00s)
+    --- PASS: TestNoEvidenceLookupBeforeCurrentEligibility/missing_scope (0.00s)
+    --- PASS: TestNoEvidenceLookupBeforeCurrentEligibility/explicit_deny (0.00s)
+=== RUN   TestRevalidateAfterBlockingReaders
+--- PASS: TestRevalidateAfterBlockingReaders (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/authorization	1.009s

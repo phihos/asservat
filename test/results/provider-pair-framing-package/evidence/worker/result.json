@@ -1,0 +1,73 @@
+{
+  "manifest": "f457449a2a69a4787f34d412c14976bbcc392a3c33e47c4bd9bb690bb71ee917",
+  "dependencies": "215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce",
+  "runner": "9f47f2bb610e9e57aba615ee323655e32a6193e81d08cd78fde317faea666aa6",
+  "started": 1791875113.3253808,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [
+    {
+      "name": "affected-compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 11.380844593048096,
+      "log_sha256": "95c13883027b6d00f15913895534a0f593bfe32d7fcd28fb8556caa40ff96a8d",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "pass_entries": 0
+    },
+    {
+      "name": "postgres-vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-final-bound-1/overlay.json",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 0.6647567749023438,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      },
+      "pass_entries": 0
+    }
+  ],
+  "native": false,
+  "exit": 0,
+  "ended": 1791875125.667161,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "scratch": "/tmp/asservat-worker-final-bound-2e91351495284ccfbcaceada9563f024",
+  "scratch_removed": true
+}

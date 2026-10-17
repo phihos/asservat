@@ -1,0 +1,37 @@
+# ADR150 native owner operation primitive — checkpoint v1
+
+Four Go paths only; live repository untouched. This is the first concrete component of the separately reviewed ADR150 v2 composition. It does not select a runtime route or claim the original five-second full workflow is available.
+
+The new concrete Kubernetes reader owns a fresh deep copy of its complete native guard input. Begin performs the first actual bounded namespace/guard/probe/Service/account/EndpointSlice/Pod/ReplicaSet/template read. Original returns those exact observations without new dates or I/O. Final performs the second independent native boundary once, comparing original object identities/content and preserving the earliest original request, native and current caller deadlines. Changed/unknown/cancelled/expired reads permanently close the operation. Close cancels and joins admitted Final I/O. Identical request IDs do not share private state. The narrow existing guard extraction returns the actual Deployment used in the independent denial; public Current/prove behavior and native request sequence remain unchanged.
+
+The source count regression establishes 14 observer + 3 probe calls per boundary for one Pod/one page, 17 + 3 for two distinct Pods; these are actual counted fake-API requests, not a native latency qualification. Current SQL registration/configuration/roots, actual TLS and process key checks remain mandatory separate consumers. No new limiter, SQL role/pool, migration, authority cache, wire selection or effect API is included.
+
+## Immutable package
+
+- manifest.json supplies each original live base and staged payload SHA256, including three new paths.
+- dependencies.json pins all 1,802 Go/module/gate dependencies; bases.json/payload.json/overlay.json define the exact tested overlay.
+- freeze.json includes the tested payload, runner and source design. HANDOFF.md, RESULT.json and evidence-hashes.json are appended after the completed run; they do not rewrite the tested freeze.
+- DESIGN.md and ADR150.md are review-only copies of the full intended contract, not extra Go integration mutations. Their initial source-only status describes the pre-test design; the component results below supersede only that component status.
+
+## Actual checks
+
+Runner handle 45706 ended exit 0. All dependency/base/payload/file-set/freeze checks before and after every phase were unchanged.
+
+| Phase | Exit | Wall seconds |
+|---|---:|---:|
+| Kubernetes package compile-only | 0 | 6.272 |
+| Focused operation + legacy race tests | 0 | 26.484 |
+| Kubernetes package vet | 0 | 1.512 |
+| Go architecture | 0 | 1.312 |
+
+The race log has 12 top-level tests / 148 passing named entries; package reports 15.654s. Architecture reports 53 packages / 298 internal edges. Tests cover initial/final actual API calls, deep input ownership, final mutation of relevant native objects/guard, probe loss, unknown reads, expiry, final caller shortening, independent identical IDs, two exact processes, concurrent Final denial and Close/cancellation joining an admitted blocked native read. Existing current guard/endpoint/local caller tests also pass. Commands and actual exits are in each evidence/*.json; logs remain exact.
+
+## Before evidence and limits
+
+The preserved real counterexample is test/results/regional-observation-native-cost*: first concrete pair succeeded in 3.715292s with 94 observer/24 probe requests; second denied unavailable in 1.198731s under the same original bound. That named expected-denial test passed as a measured availability counterexample. It is not a successful user workflow. No fabricated fail-before compilation was used for the newly introduced API.
+
+This checkpoint uses actual loopback TLS against synthetic native API objects/probe replies. No real Kubernetes or SQL/native composition was run. Full v2 semantics, all four real regional source observations, HWORK local caller integration, locator retention and claim forwarding remain unimplemented here. Original v1 stays unchanged. The complete actual composed <=5s/20-QPS native gate is still mandatory.
+
+## Next work
+
+Continue source-only with the concrete regional operation: two real native source/workload brackets, four distinct protected full source-value reads and exact original phase/identity/deadline preservation. The fresh worker2+owner2 pair will use the existing required Observation.Format = owner-observation/v2, with independent regional v2 pin; console owns its shared carrier selection. No negotiation or candidate-limit inference. Any retained locator must own an original finite operation context independent of GET-handler auto-cancellation, with explicit delivery bookkeeping and joined cleanup.

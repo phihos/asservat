@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/test/integration/capture_admission_test.go": "/home/phil/.cache/asservat-build/planning/observation-operation-sql-20261013/files/test/integration/capture_admission_test.go",
+    "/home/phil/Projekte/asservat/test/integration/connector_observation_operation_sql_test.go": "/home/phil/.cache/asservat-build/planning/observation-operation-sql-20261013/files/test/integration/connector_observation_operation_sql_test.go"
+  }
+}

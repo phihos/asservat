@@ -1,0 +1,43 @@
+# ADR153 enrollment component handoff
+
+Scope: 15 payloads, comprising the exact 13-path `review-v1` source candidate plus two separately staged canonical linkage paragraphs. No live edits, runtime selectors, installer input, migration, provider, grant, client rate, deadline or pool changes. The frozen payload documentation still describes qualification as pending; update that status separately with these actual results after integration, retaining the tested payload hashes.
+
+## Contracts
+
+Each explicit Enroll/client-sign/server-sign call owns one purpose-bound private native operation. Initial and Final perform genuine independent complete enforcement observations. Intermediate phases read actual source/backing/roles, native policy identities, online token and live workload chain under the unchanged original proof. Original dates remain unchanged; each newly observed earlier cap immediately bounds subsequent I/O. Final mutation, expiry, cancellation or clock rollback permanently closes the operation. Close joins admitted reads.
+
+The shared private effect runner preserves current recovery and SQL checks, effect ordering, exact journal replay and unknown spend. Existing general attesters, legacy enrollment/signing entry points, retirement and ADR150 remain unchanged. A returned correlation cannot construct authority or reopen an operation.
+
+## Actual qualification
+
+Handle `93097` terminated 0. Every phase used GOMAXPROCS=2, GOFLAGS=-p=2 and owned tmpfs TMPDIR; phase wrappers were finite 600 seconds. No external services or native labs ran.
+
+| Phase | Actual exit | Time | Scope |
+| --- | ---: | ---: | --- |
+| BEFORE compile | 0 | 18.656s | Actual legacy application and HTTPS/native reader with before-only regression |
+| BEFORE standalone | 0 | 3.787s wrapper | One standalone 54 observer/12 probe proof; actual proof 1.836951s |
+| BEFORE repeated proof | 1, expected | 5.940s wrapper | Exact intended marker after admission, intent and stored outcome |
+| AFTER whole compile | 0 | 75.596s | `go test -race -count=1 -run=^$ -vet=off ./...`; compile only |
+| Native-reader component races | 0 | 67.790s | 23 top-level/179 named PASS; no skips |
+| Application/domain Connector races | 0 | 2.090s | 57 top-level/210 named PASS; no skips |
+| Affected vet | 0 | 10.420s | Domain, application, Kubernetes and bootstrap |
+| Canonical gates | 0 | 10.008s | Go architecture, spec, architecture and design |
+
+BEFORE reached a valid first proof (54/12, 1.836916s), second proof (54/12, 2.699917s), then failed the third after 9/3 requests and 0.451999s, with 10.620ms of the original interval remaining. Total 4.989496s. Prepare/intent/store/outcome counters were each 1; acceptance 0. The runner required those admission markers, the exact single failed test and `BEFORE-NESTED-NATIVE-BOUND`; setup failures would stop the run without claiming reproduction. The expected nonzero log is preserved unchanged.
+
+AFTER actual HTTPS/native reads through the explicit application enrollment completed in 2.541771s. Phases measured 22/6, 12/0, 12/0, 22/6; final remaining 2.458523s and each effect counter 1. These are real local HTTPS/client-limiter observations with synthetic SQL/audit/recovery authority. They do not establish native Kubernetes/SQL/provider or installed sustained availability.
+
+All 4,401 live dependency hashes, payload/base hashes, frozen source copies and both complete mirror file sets matched before/after. `docs/implementation-progress.md` was explicitly exempt from live hashing; its exact frozen copy and linked report closure were still hashed as mirror inputs. Architecture's generated report was retained separately then its input restored before final mirror comparison. The one owned scratch directory was removed after all child processes joined; free tmpfs afterward 16,731,344,896 bytes.
+
+## Exact artifacts
+
+- `payload.json`: integration path/SHA256 map (15); `bases.json`: original live hashes/absence for the same paths; `base-files/`: exact existing originals.
+- `files/`: tested AFTER payloads; `before/` plus `before-payload.json`: intentional old-path regression only.
+- `dependencies.json`: live dependency hashes (4,401); `source.json`/`source/`: frozen complete mirror input (4,402, including progress); `authored-files.json`: exact source set; `mirror-directories.json`: existing directory link targets.
+- `review/`: original reviewed manifest/proposal/call graph/base evidence, unchanged.
+- `run.py`, `inventory.py`, `freeze.py`, `freeze.json`: bounded runner and immutable source closure. Existing evidence destinations are refused.
+- `evidence/RESULT.json`: actual terminal, every phase exit/time/test set, final hash and cleanup facts. Each phase has its own unchanged log/report; `evidence/evidence-hashes.json` pins them.
+
+## Remaining work
+
+Next is the separately staged one-file explicit ADR153 selection in `test/fixtures/observation-native/enrollment.go`, followed by its compile and the original H/A/R native fixture. Preserve exact original helper Pods, positive remote joins, each five-second operation and the thirty-second Reconcile. That fixture uses actual SQL/S3 and native readers but an explicit `fixtureIssuer`, so it cannot qualify real provider latency or installer-produced issuer authority. Full initial/renewing native Reconcile, H/A/R critical-path timing, shared-client contention and installed regional runtime remain pending. No successful local counter test supplies those verdicts.

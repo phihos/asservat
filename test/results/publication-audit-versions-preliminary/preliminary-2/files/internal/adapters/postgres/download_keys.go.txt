@@ -1,0 +1,230 @@
+package postgres
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Binding and resolution use independently credentialed instances. Only the
+// download coordinator may insert bindings; A-KEY can consume three slots but
+// cannot create bindings, sessions, audit receipts, permissions or recovery.
+type DownloadKeys struct {
+	downloads *Downloads
+	scope     authorization.KeyScope
+}
+
+var _ evidence.DownloadKeyBindingLedger = (*DownloadKeys)(nil)
+var _ authapp.KeyOperationAuthorizer = (*DownloadKeys)(nil)
+
+func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope authorization.KeyScope, guards DownloadTransactionGuards) (*DownloadKeys, error) {
+	if !scope.Valid() || scope.Purpose != "artifact" || guards.Recovery == nil || guards.Retention == nil || guards.Recovery.installation != scope.InstallationID {
+		return nil, artifact.ErrInvalid
+	}
+	d, err := NewDownloads(ctx, pool, root, guards)
+	if err != nil {
+		return nil, err
+	}
+	return &DownloadKeys{d, scope}, nil
+}
+
+// The same original batch, permission, recovery, retention and disclosure fence
+// encloses key-binding/spend. Lock order remains recovery, permission, session,
+// child key record; callbacks perform no network I/O.
+func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact.DownloadAuthority, batch string, generation int64, effect func(*custodydb.Queries, artifact.DownloadSession, time.Time) error) error {
+	if s == nil || s.retention == nil || s.recovery == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
+		return artifact.ErrInvalid
+	}
+	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	if err != nil {
+		return err
+	}
+	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		if err != nil {
+			return err
+		}
+		p, err := q.LockPermissionStream(ctx, id(s.root))
+		if err != nil {
+			return err
+		}
+		row, err := q.LockDownloadSession(ctx, custodydb.LockDownloadSessionParams{ID: id(session), RootID: id(s.root)})
+		if err != nil {
+			return err
+		}
+		current, err := loadDownload(ctx, q, row)
+		if err != nil {
+			return err
+		}
+		check := func() (time.Time, error) {
+			if err := s.downloadFence(ctx, q, p, a, topology, recovery); err != nil {
+				return time.Time{}, err
+			}
+			now, err := q.CurrentTime(ctx)
+			if err != nil {
+				return time.Time{}, err
+			}
+			return now.Time, current.Permit(a, batch, generation, now.Time)
+		}
+		now, err := check()
+		if err != nil {
+			return err
+		}
+		if err = effect(q, current, now); err != nil {
+			return err
+		}
+		_, err = check()
+		return err
+	})
+}
+
+func (s *DownloadKeys) BindAttestedDownloadKeys(ctx context.Context, session string, a artifact.DownloadAuthority, batch string, generation int64, scope authorization.KeyScope, peer authorization.KeyPeer, proof authorization.KeyWorkerProof) error {
+	if ctx == nil || s == nil || s.downloads == nil || scope != s.scope || peer.Role != "acquisition" || peer.InstallationID != scope.InstallationID || proof.Binding.DownloadID != session || proof.Peer != peer || !proof.Valid(proof.ObservedAt) {
+		return authapp.ErrKeyDenied
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	encoded, err := json.Marshal(a)
+	if err != nil || len(encoded) > 65536 {
+		return authapp.ErrKeyDenied
+	}
+	worker, err := json.Marshal(proof)
+	if err != nil || len(worker) > 16384 {
+		return authapp.ErrKeyDenied
+	}
+	err = s.downloads.withKeyBatch(ctx, session, a, batch, generation, func(q *custodydb.Queries, current artifact.DownloadSession, now time.Time) error {
+		if !peer.Valid(now) || !proof.Valid(now) {
+			return authapp.ErrKeyDenied
+		}
+		until := identity.Earlier(a.ValidUntil, current.Active.LeaseUntil)
+		until = identity.Earlier(until, identity.Earlier(peer.NotAfter, proof.FreshUntil)).UTC().Truncate(time.Microsecond)
+		old, err := q.ReadDownloadKeyBinding(ctx, custodydb.ReadDownloadKeyBindingParams{BatchID: id(batch), RootID: id(s.downloads.root)})
+		if err == nil {
+			oldProof, e := downloadWorkerProof(old.WorkerProofJson, peer, session, now)
+			if e != nil || oldProof.Binding != proof.Binding || old.ValidUntil.Time.After(oldProof.FreshUntil) {
+				return authapp.ErrKeyDenied
+			}
+			if old.SessionID != id(session) || old.InstallationID != id(scope.InstallationID) || old.KeyID != scope.KeyID || old.PeerID != id(peer.PeerID) || !bytes.Equal(old.CertificateSha256, peer.Certificate[:]) || !bytes.Equal(old.AuthorityJson, encoded) || old.ValidUntil.Time.After(until) || !now.Before(old.ValidUntil.Time) {
+				return authapp.ErrKeyDenied
+			}
+			return nil // retry cannot reset used_roles or lengthen the original lease
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if !now.Before(until) {
+			return authapp.ErrKeyDenied
+		}
+		if err = q.InsertDownloadKeyBinding(ctx, custodydb.InsertDownloadKeyBindingParams{BatchID: id(batch), SessionID: id(session), RootID: id(s.downloads.root), InstallationID: id(scope.InstallationID), KeyID: scope.KeyID, PeerID: id(peer.PeerID), CertificateSha256: peer.Certificate[:], AuthorityJson: encoded, ValidUntil: ts(until), WorkerProofJson: worker}); err != nil {
+			return err
+		}
+		after, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if !proof.Valid(after.Time) || !after.Time.Before(until) {
+			return authapp.ErrKeyDenied
+		}
+		return nil
+	})
+	if err != nil {
+		return authapp.ErrKeyDenied
+	}
+	return nil
+}
+
+func (s *DownloadKeys) Resolve(ctx context.Context, peer authorization.KeyPeer, r authorization.KeyRequestInfo) (authorization.KeyOperationPermit, error) {
+	var out authorization.KeyOperationPermit
+	if s == nil || s.downloads == nil || ctx == nil || ctx.Err() != nil || r.Scope != s.scope || r.Operation != "unwrap" || r.Version != 0 || !authorization.UUID(r.AuthorityID) || r.RequestDigest == (artifact.Digest{}) || len(r.Binding) < 1 || len(r.Binding) > 2048 || peer.Role != "acquisition" || !peer.CanRequest(s.scope, "unwrap") || !strings.HasPrefix(r.Reference, "asservat-local-keyset/v1/"+s.scope.InstallationID+"/artifact/"+s.scope.KeyID+"/") {
+		return out, authapp.ErrKeyDenied
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	// Read enough to discover the immutable parent/authority. Everything is read
+	// again under the normal effect lock order; this initial read is no permit.
+	row, err := custodydb.New(s.downloads.ledger.pool).ReadDownloadKeyBinding(ctx, custodydb.ReadDownloadKeyBindingParams{BatchID: id(r.AuthorityID), RootID: id(s.downloads.root)})
+	if err != nil {
+		return out, authapp.ErrKeyDenied
+	}
+	var a artifact.DownloadAuthority
+	if json.Unmarshal(row.AuthorityJson, &a) != nil || a.Scope.RootID != s.downloads.root || row.InstallationID != id(s.scope.InstallationID) || row.KeyID != s.scope.KeyID {
+		return out, authapp.ErrKeyDenied
+	}
+	var generation int64
+	parent, err := custodydb.New(s.downloads.ledger.pool).ReadDownloadSession(ctx, custodydb.ReadDownloadSessionParams{ID: row.SessionID, RootID: row.RootID})
+	if err != nil {
+		return out, authapp.ErrKeyDenied
+	}
+	generation = parent.Generation
+	err = s.downloads.withKeyBatch(ctx, uid(row.SessionID), a, r.AuthorityID, generation, func(q *custodydb.Queries, current artifact.DownloadSession, now time.Time) error {
+		active, err := q.LockDownloadKeyBinding(ctx, custodydb.LockDownloadKeyBindingParams{BatchID: row.BatchID, RootID: row.RootID})
+		if err != nil {
+			return err
+		}
+		if !peer.Valid(now) || active.SessionID != row.SessionID || active.InstallationID != row.InstallationID || active.KeyID != row.KeyID || active.PeerID != id(peer.PeerID) || !bytes.Equal(active.CertificateSha256, peer.Certificate[:]) || !bytes.Equal(active.AuthorityJson, row.AuthorityJson) || !now.Before(active.ValidUntil.Time) {
+			return authapp.ErrKeyDenied
+		}
+		worker, proofErr := downloadWorkerProof(active.WorkerProofJson, peer, uid(active.SessionID), now)
+		if proofErr != nil || active.ValidUntil.Time.After(worker.FreshUntil) {
+			return authapp.ErrKeyDenied
+		}
+		published, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: row.RootID})
+		if err != nil {
+			return err
+		}
+		e, err := currentPublishedContext(published)
+		if err != nil {
+			return authapp.ErrKeyDenied
+		}
+		mask := int16(0)
+		for i, role := range []string{"data-key", "index-key", "manifest-key"} {
+			binding, err := evidence.ArtifactKeyBinding(e.Binding(), role)
+			if err != nil {
+				return err
+			}
+			if bytes.Equal(binding, r.Binding) {
+				mask = int16(1 << i)
+				break
+			}
+		}
+		if mask == 0 || active.UsedRoles&mask != 0 {
+			return authapp.ErrKeyDenied
+		}
+		affected, err := q.SpendDownloadKeyRole(ctx, custodydb.SpendDownloadKeyRoleParams{BatchID: row.BatchID, RootID: row.RootID, RoleMask: mask})
+		if err != nil || affected != 1 {
+			return authapp.ErrKeyDenied
+		}
+		end := identity.Earlier(active.ValidUntil.Time, peer.NotAfter)
+		end = identity.Earlier(end, current.Active.LeaseUntil)
+		out = authorization.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.RecoveryEpoch, Revision: uint64(current.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now, ValidUntil: end}
+		after, clockErr := q.CurrentTime(ctx)
+		if clockErr != nil || !worker.Valid(after.Time) || !out.Valid(peer, r, after.Time) {
+			return authapp.ErrKeyDenied
+		}
+		return nil
+	})
+	if err != nil {
+		return authorization.KeyOperationPermit{}, authapp.ErrKeyDenied
+	}
+	return out, nil
+}
+
+func downloadWorkerProof(b []byte, peer authorization.KeyPeer, session string, now time.Time) (authorization.KeyWorkerProof, error) {
+	var p authorization.KeyWorkerProof
+	if len(b) == 0 || len(b) > 16384 || json.Unmarshal(b, &p) != nil || !p.Valid(now) || p.Peer != peer || p.Binding.DownloadID != session {
+		return p, authapp.ErrKeyDenied
+	}
+	return p, nil
+}

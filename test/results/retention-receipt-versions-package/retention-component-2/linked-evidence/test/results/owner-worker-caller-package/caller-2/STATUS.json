@@ -1,0 +1,11 @@
+{
+  "state": "payload-frozen-not-run",
+  "native": false,
+  "payloads": 4,
+  "manifest_sha256": "d3d2f735ff658e215445369a1d8922450d0172a69b50c05a453a7897d0e00435",
+  "variants_sha256": "ff87df00c468ebb0a13cf4620703bf27d1b805c11206b4c960b7db1b0ccd888d",
+  "dependency_freeze": "pending parent stable notice after native terminal",
+  "supersedes_unrun": "caller-1 retained exact; no terminal inferred",
+  "before_final_journal": "controlled reversal of one new final RV comparison",
+  "before_classification": "exact caller-1 production with corrected classification tests; prior source draft, not released production"
+}

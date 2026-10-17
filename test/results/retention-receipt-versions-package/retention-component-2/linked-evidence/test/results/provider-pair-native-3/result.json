@@ -1,0 +1,43 @@
+{
+  "command": [
+    "python",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair"
+  ],
+  "exit": 0,
+  "seconds": 602.932,
+  "scope": "Original fresh bootstrap, real provider/SQL and finite worker input component; no runtime launch/public workflow",
+  "sourceCount": 2116,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/runtime-provider-pair-worker-inputs",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "productBinary": {
+    "binarySHA256": "af90f05efc810a51293a539c4b5590fbf8f0537fb37eba6f278fb0b113863c43",
+    "dockerImageID": "sha256:5731035b66fe38d94c04a6bc2c6c74d0a511a7180c5ff3675f75d44a754bd905",
+    "tag": "asservat-context-worker:context-cr4tucjq",
+    "nodeImage": "docker.io/library/asservat-context-worker@sha256:5731035b66fe38d94c04a6bc2c6c74d0a511a7180c5ff3675f75d44a754bd905"
+  },
+  "postgresFixtureStartup": {
+    "limitSeconds": 90,
+    "elapsedSeconds": 16.037,
+    "ready": true
+  },
+  "buildScratchRemoved": true,
+  "ephemeralNodeState": {
+    "volume": "asservat-context-cr4tucjq-0-var",
+    "maxBytes": 3221225472,
+    "storage": "tmpfs",
+    "scope": "Synthetic API node only; original startup/product deadlines, no persistence qualification"
+  },
+  "archiveHashes": {
+    "harness.log": "83bd22387e3545dd8bf6b7a6cd59a26c00b373fc772ed2c1cdb884296189f989",
+    "context-storage.log": "33eb48c4070bbb05308c62f9ce7670c516378f10e590f0f6a588937e233a18c9",
+    "context-storage-environment.json": "6a580f4391e34861999840c8b53e8a1ee1e9ff7fd01460d2592a21f051b3f97b"
+  }
+}

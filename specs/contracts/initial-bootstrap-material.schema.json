@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-material.schema.json",
+  "title": "Explicit private bootstrap provider input v1",
+  "description": "At most 8 KiB. Caller-supplied provider credential/material, never Helm values or public output. Producer binds generated IDs after original private seed acceptance. Upstream ownership remains unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "issuerToken",
+    "storage",
+    "storageUseUntil"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-bootstrap-material/v1"
+    },
+    "issuerToken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[!-~]+$"
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accessKeyID",
+        "secretAccessKey",
+        "sessionToken"
+      ],
+      "properties": {
+        "accessKeyID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[!-~]+$"
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[!-~]+$"
+        },
+        "sessionToken": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4096,
+          "pattern": "^[!-~]*$"
+        }
+      }
+    },
+    "storageUseUntil": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "registryConfig": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5464,
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+      "description": "Canonical base64 of at most 4096 bytes normalized single-registry Docker config, permitted only by the original dockerconfigjson/v1 workload capability. Counts toward the unchanged aggregate 8 KiB material limit. Never public, logged or mounted into activation."
+    }
+  }
+}

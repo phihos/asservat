@@ -1,0 +1,341 @@
+{"phase": "compile", "pid": 2104354, "started": 1791876523.178464}
+{"name": "compile", "command": ["go", "test", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "-run=^$", "-count=1", "./internal/adapters/kubernetes", "./internal/adapters/kms", "./internal/adapters/postgres", "./internal/bootstrap", "./test/integration"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 21.998444080352783, "log_sha256": "d9721dd720f921782366d8fc7e4c46af424f2272eb9508914117d62661b3182b", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 0}
+{"phase": "before-earliest", "pid": 2105069, "started": 1791876545.3724523}
+{"name": "before-earliest", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-deadline-overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/kubernetes", "-run=^TestConfigurationWorkerOpaqueLaterPhaseCannotReextendAdmittedDeadline$"], "exit": 1, "expected_exit": 1, "timed_out": false, "seconds": 12.381153345108032, "log_sha256": "601669fafc5034cead189d7f6e1f449a5cc4047d023463430e8eb0c346690ae2", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 0, "intended_assertion": true}
+{"phase": "before-receipt", "pid": 2105409, "started": 1791876557.8599362}
+{"name": "before-receipt", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-receipt-overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/kubernetes", "-run=^TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun$"], "exit": 1, "expected_exit": 1, "timed_out": false, "seconds": 11.529752492904663, "log_sha256": "004693a16a5ec4c03004c1c7cd2408862a0f0390649d8db0d5290c1cf7d1b091", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 1, "intended_assertion": true}
+{"phase": "before-join", "pid": 2105745, "started": 1791876569.495634}
+{"name": "before-join", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-join-overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/kms", "-run=^TestConfigurationProviderCloseAndJoin"], "exit": 1, "expected_exit": 1, "timed_out": false, "seconds": 13.031949996948242, "log_sha256": "94ae243d3e081e053ff1a6fc4ac6db814af749b6ad43c3e9fc8f57847cbc4edd", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 0, "intended_assertion": true}
+{"phase": "worker-races", "pid": 2106147, "started": 1791876582.6351376}
+{"name": "worker-races", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/kubernetes", "-run=^Test(ConfigurationWorker(Launch|UnknownLaunch|LostLaunch|Opaque|ConcurrentPhase|AutomaticRun|LostReceiptCAS|HistoricalReceipt|UnknownOrChanged|ExistingReceipt)|ConfigurationLaunch)"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 88.91199350357056, "log_sha256": "564175d246781461afea6eb548af1616798dfdeb71eb51d63d64704cc7a20cb1", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 28, "named_pass": 89}
+{"phase": "provider-races", "pid": 2108511, "started": 1791876671.6545875}
+{"name": "provider-races", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/kms", "-run=^Test(ConfigurationProvider|ConfigurationControl|OwnerProviderLifetime)"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 5.949326276779175, "log_sha256": "28db7346700194ece6c2d49dc6d5328a023d89ed1e08e80ed364344609344cfb", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 14, "named_pass": 19}
+{"phase": "sql-races", "pid": 2108746, "started": 1791876677.7096202}
+{"name": "sql-races", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/adapters/postgres", "-run=^TestConfigurationWorkerLaunch"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 8.264535188674927, "log_sha256": "3a42d487273f027940078fe7d42d9be516ddce1106741993ccb6372e7f14637a", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 2, "named_pass": 2}
+{"phase": "bootstrap-races", "pid": 2109046, "started": 1791876686.0796309}
+{"name": "bootstrap-races", "command": ["go", "test", "-race", "-vet=off", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "-count=1", "-timeout=3m", "-v", "./internal/bootstrap", "-run=^TestHubWorker"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 7.4744346141815186, "log_sha256": "65ffbe0ef77c4fe26b2163d66f003b1f6132c9eef8714379a2a564263f7888c3", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 3, "named_pass": 11}
+{"phase": "vet", "pid": 2109427, "started": 1791876693.6579492}
+{"name": "vet", "command": ["go", "vet", "-overlay", "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "./internal/adapters/kubernetes", "./internal/adapters/kms", "./internal/adapters/postgres", "./internal/bootstrap"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 2.689195156097412, "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 0}
+{"phase": "go-architecture", "pid": 2109573, "started": 1791876696.4788377}
+{"name": "go-architecture", "command": ["env", "GOFLAGS=-p=2 -overlay=/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json", "/home/phil/.cache/asservat-build/spec-venv/bin/python", "scripts/check-go-architecture.py"], "exit": 0, "expected_exit": 0, "timed_out": false, "seconds": 1.1653456687927246, "log_sha256": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d", "hashes": {"payloads": [], "bases": [], "dependencies": [], "inventory": [], "auxiliary": []}, "top_level_pass": 0, "named_pass": 0}
+{
+  "manifest": "b79bd741ff056cdc40396351f7f6f67532fb7596a63a415182dadf3eceeb5063",
+  "dependencies": "0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38",
+  "runner": "7dbf49661afabd23267b043dda768d2ea1f58cbf5cb14225f0e4189af21ba1f0",
+  "started": 1791876523.0685728,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/kms",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 21.998444080352783,
+      "log_sha256": "d9721dd720f921782366d8fc7e4c46af424f2272eb9508914117d62661b3182b",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "name": "before-earliest",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-deadline-overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerOpaqueLaterPhaseCannotReextendAdmittedDeadline$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 12.381153345108032,
+      "log_sha256": "601669fafc5034cead189d7f6e1f449a5cc4047d023463430e8eb0c346690ae2",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0,
+      "intended_assertion": true
+    },
+    {
+      "name": "before-receipt",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-receipt-overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerLostLaunchReceiptCASDoesNotRetryWithinRun$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 11.529752492904663,
+      "log_sha256": "004693a16a5ec4c03004c1c7cd2408862a0f0390649d8db0d5290c1cf7d1b091",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 1,
+      "intended_assertion": true
+    },
+    {
+      "name": "before-join",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/before-join-overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kms",
+        "-run=^TestConfigurationProviderCloseAndJoin"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 13.031949996948242,
+      "log_sha256": "94ae243d3e081e053ff1a6fc4ac6db814af749b6ad43c3e9fc8f57847cbc4edd",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0,
+      "intended_assertion": true
+    },
+    {
+      "name": "worker-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^Test(ConfigurationWorker(Launch|UnknownLaunch|LostLaunch|Opaque|ConcurrentPhase|AutomaticRun|LostReceiptCAS|HistoricalReceipt|UnknownOrChanged|ExistingReceipt)|ConfigurationLaunch)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 88.91199350357056,
+      "log_sha256": "564175d246781461afea6eb548af1616798dfdeb71eb51d63d64704cc7a20cb1",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 28,
+      "named_pass": 89
+    },
+    {
+      "name": "provider-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kms",
+        "-run=^Test(ConfigurationProvider|ConfigurationControl|OwnerProviderLifetime)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 5.949326276779175,
+      "log_sha256": "28db7346700194ece6c2d49dc6d5328a023d89ed1e08e80ed364344609344cfb",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 14,
+      "named_pass": 19
+    },
+    {
+      "name": "sql-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/postgres",
+        "-run=^TestConfigurationWorkerLaunch"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 8.264535188674927,
+      "log_sha256": "3a42d487273f027940078fe7d42d9be516ddce1106741993ccb6372e7f14637a",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 2,
+      "named_pass": 2
+    },
+    {
+      "name": "bootstrap-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/bootstrap",
+        "-run=^TestHubWorker"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 7.4744346141815186,
+      "log_sha256": "65ffbe0ef77c4fe26b2163d66f003b1f6132c9eef8714379a2a564263f7888c3",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 3,
+      "named_pass": 11
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/kms",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 2.689195156097412,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "name": "go-architecture",
+      "command": [
+        "env",
+        "GOFLAGS=-p=2 -overlay=/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-1/overlay.json",
+        "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.1653456687927246,
+      "log_sha256": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "native": false,
+  "exit": 0,
+  "ended": 1791876697.6984878,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": []
+  },
+  "scratch": "/tmp/asservat-worker-launch-1-c66bdb7d06fe4f448cb392eb0610491b",
+  "scratch_removed": true
+}

@@ -1,0 +1,11 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+BEGIN;
+DELETE FROM public.fleet_observation;
+DELETE FROM public.fleet_trust;
+INSERT INTO public.fleet_trust SELECT * FROM public.probe_trust_original;
+WITH original AS MATERIALIZED (SELECT clock_timestamp() AS at)
+UPDATE public.fleet_trust SET observed_at=at,fresh_until=at+interval '5 seconds' FROM original;
+INSERT INTO public.fleet_observation SELECT installation_id,semantic_version,
+ issuer_epoch,source_uid,source_generation,source_digest,activated_postmaster_at,
+ activated_database_oid,observed_at,fresh_until FROM public.fleet_trust;
+COMMIT;

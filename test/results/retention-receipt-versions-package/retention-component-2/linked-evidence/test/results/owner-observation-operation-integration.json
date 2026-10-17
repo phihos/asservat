@@ -1,0 +1,162 @@
+{
+  "manifestSHA256": "9766157213dba2e78dbbcb8f906e9315d1d70dfdcb1f4e130f1a5c2522965ee7",
+  "dependenciesSHA256": "a9dfb6d323f302aee69a317ab7c445385313a3bc4c83e459288036525bfb21b8",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_operation.go",
+      "base": null,
+      "payload": "a892cb55d909e0f3cb74d0c27201c1022bc877078178a099d23d2e235ffbc875"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_operation_routes.go",
+      "base": null,
+      "payload": "8134349bea66b65a6ce3d9502d0f23fbf87815c0363e970021ee292df7613e54"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_operation_test.go",
+      "base": null,
+      "payload": "f0a51a71eb531a52aee4614e9fe6596052b8f4aa4f751532ba7125ed8d702b16"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+      "base": "9487e99d50fa68067a10dd718ad233b8a1d816dba7440c35fb4db52cb028b9a6",
+      "payload": "f43606513f8ec1b8b6fde6f28add3e8973921d1f24ac09d1f98e5b9c786762d0"
+    }
+  ],
+  "verification": {
+    "handle": 45706,
+    "terminal": 0,
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+          "-vet=off",
+          "-run",
+          "^$",
+          "./internal/adapters/kubernetes"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 6.272,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=180s",
+          "-run",
+          "^Test(OwnerObservationOperation|OwnerWorkloadProtectionRequiresActualCurrentDenial|OwnerEndpointBoundedDiscovery|ClusterObservationCallerExactNativeReadBoundary)",
+          "-v",
+          "./internal/adapters/kubernetes"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 26.484,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+          "./internal/adapters/kubernetes"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 1.512,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "go-architecture",
+        "command": [
+          "env",
+          "GOFLAGS=-p=2 -overlay=/home/phil/.cache/asservat-build/planning/regional-observation-proof-composition-20261013/checkpoint-v1/overlay.json",
+          "python3",
+          "scripts/check-go-architecture.py"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 1.312,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "payloadSet": [],
+          "freeze": []
+        }
+      }
+    ],
+    "topLevelPasses": 12,
+    "namedPasses": 148,
+    "nativeRun": false,
+    "componentAuthority": "actual TLS fake Kubernetes API with explicit synthetic native objects and guard responses"
+  },
+  "scope": "Native observation operation primitive only; synthetic API over actual TLS. Full routing composition and native availability pending."
+}

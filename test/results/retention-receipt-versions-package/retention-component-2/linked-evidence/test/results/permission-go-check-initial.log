@@ -1,0 +1,34 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 4 canonical local resources, byte-identical; no runtime network loader
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+ok  	asservat.local/asservat/internal/adapters/kms	1.074s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.802s
+ok  	asservat.local/asservat/internal/adapters/objectstore	1.915s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.668s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.554s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.028s
+?   	asservat.local/asservat/internal/adapters/postgres	[no test files]
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+ok  	asservat.local/asservat/internal/application/authorization	1.020s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+?   	asservat.local/asservat/internal/application/configuration	[no test files]
+?   	asservat.local/asservat/internal/application/evidence	[no test files]
+ok  	asservat.local/asservat/internal/application/identity	1.019s
+ok  	asservat.local/asservat/internal/application/privacy	1.021s
+?   	asservat.local/asservat/internal/domain/artifact	[no test files]
+ok  	asservat.local/asservat/internal/domain/authorization	1.025s
+ok  	asservat.local/asservat/internal/domain/configuration	1.018s
+ok  	asservat.local/asservat/internal/domain/identity	1.019s
+ok  	asservat.local/asservat/test/integration	1.063s
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 42, in <module>
+    source = owner(package["ImportPath"])
+  File "/home/phil/Projekte/asservat/scripts/check-go-architecture.py", line 36, in owner
+    raise ValueError(f"Unmapped/ambiguous package: {path}: {matches}")
+ValueError: Unmapped/ambiguous package: api/v1alpha1: []
+make: *** [Makefile:42: go-architecture-check] Error 1

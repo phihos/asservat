@@ -1,0 +1,136 @@
+{
+  "scope": "Typed owner/channel/coordinator v2 over actual TLS/codecs with synthetic native/SQL/terminal ports; actual HTTP/2 framing/holder/runtime route remains pending",
+  "paths": [
+    {
+      "path": "internal/adapters/mtls/connector_operation_channel.go",
+      "base": null,
+      "payload": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_operation_coordinator_test.go",
+      "base": null,
+      "payload": "898a2f2d79197c7537da551ddfe1ac1cae541e810c4a522c14378b260d5ef536"
+    },
+    {
+      "path": "internal/adapters/mtls/connector_operation_hub.go",
+      "base": null,
+      "payload": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a"
+    },
+    {
+      "path": "internal/adapters/mtls/owner_operation.go",
+      "base": null,
+      "payload": "7429888e9247222473b75c60081b95e4dabfd219ee2f5b590500ad6629289712"
+    },
+    {
+      "path": "internal/adapters/mtls/owner_operation_wire.go",
+      "base": null,
+      "payload": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333"
+    },
+    {
+      "path": "internal/contracts/owner_observation_operation.go",
+      "base": null,
+      "payload": "53609a7245115f6af1919c9956b9dbdbf95b25718a706d3a40486218305d6a71"
+    },
+    {
+      "path": "internal/contracts/owner_observation_operation_test.go",
+      "base": null,
+      "payload": "12abc603eaa636466a17609208043e87872c1a79ef92c4bddfdfc865ce58d9da"
+    }
+  ],
+  "dependencyCount": 1937,
+  "dependenciesVerifiedBeforeIntegration": true,
+  "manifestHash": "26410dc3ea62ff4d354fdb9d4606581bbf1344e73a5e9b4741bc5f2cdad7d7da",
+  "resultHash": "cb1349fbd41359fd8bf1954cc090fcf5db7db5c1efee90f6f0b47f89b8a8c569",
+  "archiveHashes": {
+    "observation-operation-coordinator-package/manifest.json": "26410dc3ea62ff4d354fdb9d4606581bbf1344e73a5e9b4741bc5f2cdad7d7da",
+    "observation-operation-coordinator-package/bases.json": "5feaddf5344fcd4277a3514edf8c0826bcd529075a78a38210bcf9fa169d802b",
+    "observation-operation-coordinator-package/payload.json": "60eee370131184edf1a4d8a80172c7d7d8cbc0bf9bc2bacf29440e51ab15bb5a",
+    "observation-operation-coordinator-package/dependencies.json": "9b0240a5e3b21f90d482871077a01dc4e95286732fe42d3d7182d2efbcfa6241",
+    "observation-operation-coordinator-package/overlay.json": "54bea3aa538bf863180368686bbc0e5dcae61539855f4414b414decbeef1d5cd",
+    "observation-operation-coordinator-package/mirror-manifest.json": "a0482f74a5a2b91f92787d0fe4f774b14573ba244716bc28ed66812aceaa5155",
+    "observation-operation-coordinator-package/SCOPE.md.txt": "97dd9b32f2730c1fb135537a837e1b979c87df3fb39fd5548aaf07b1925a4870",
+    "observation-operation-coordinator-package/run.py.txt": "5b6eade9708769f2f439bb51db5b4ea003d19fadaf7487262c4e9a94e050941d",
+    "observation-operation-coordinator-package/freeze.json": "4eb76b8215e4f0f9f041284649ef7d691f07bfb7862b55995a3b433c7e847080",
+    "observation-operation-coordinator-package/RESULT.json": "cb1349fbd41359fd8bf1954cc090fcf5db7db5c1efee90f6f0b47f89b8a8c569",
+    "observation-operation-coordinator-package/HANDOFF.md.txt": "a0d48abe74ed6018a8a6651d090058f1a62e7aa73fb960238c9bfaefed2d7db2",
+    "observation-operation-coordinator-package/evidence-hashes.json": "7c61a4b0059fddadd353034b69815e5f6c6886e3ead53006671e2497a90e7879",
+    "observation-operation-coordinator-package/files/internal/contracts/owner_observation_operation.go.txt": "53609a7245115f6af1919c9956b9dbdbf95b25718a706d3a40486218305d6a71",
+    "observation-operation-coordinator-package/files/internal/contracts/owner_observation_operation_test.go.txt": "12abc603eaa636466a17609208043e87872c1a79ef92c4bddfdfc865ce58d9da",
+    "observation-operation-coordinator-package/files/internal/adapters/mtls/connector_operation_channel.go.txt": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "observation-operation-coordinator-package/files/internal/adapters/mtls/connector_operation_coordinator_test.go.txt": "898a2f2d79197c7537da551ddfe1ac1cae541e810c4a522c14378b260d5ef536",
+    "observation-operation-coordinator-package/files/internal/adapters/mtls/connector_operation_hub.go.txt": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "observation-operation-coordinator-package/files/internal/adapters/mtls/owner_operation.go.txt": "7429888e9247222473b75c60081b95e4dabfd219ee2f5b590500ad6629289712",
+    "observation-operation-coordinator-package/files/internal/adapters/mtls/owner_operation_wire.go.txt": "640a6a16cb5f8862d15a3ae49413861cc131d2af4138ec8f263e44419607d333",
+    "observation-operation-coordinator-package/evidence/compile.log": "c1920a5edbe953c92a38354620445d04eb34025e73821d8cc095f9f95d9c9c1c",
+    "observation-operation-coordinator-package/evidence/compile.json": "9025646998e42b5f5fd7cfc9179311ecf29a4ac40dcd8dff071cc8991b4fc970",
+    "observation-operation-coordinator-package/evidence/race.log": "c655637092816604486bbe926366ae850d1c94175f13e7551af38e625194d730",
+    "observation-operation-coordinator-package/evidence/race.json": "4c7be61a54bf5e6b29f93a165ce23623933441d28cb55e4219ddf7057235e09b",
+    "observation-operation-coordinator-package/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation-operation-coordinator-package/evidence/vet.json": "26e0516bc754ac500c5f35b603bb7a1fe9930c0e7e6848cee72fbb1122383540",
+    "observation-operation-coordinator-package/evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+    "observation-operation-coordinator-package/evidence/go-architecture.json": "67822a9c26d78dfc8e46967561e795482b23cae33427434211811066690d1483",
+    "observation-operation-coordinator-first-failure/manifest.json": "8399e9639e881298cb334710645be8f98641d1ffeead7c7f218578d77b8f1368",
+    "observation-operation-coordinator-first-failure/bases.json": "5feaddf5344fcd4277a3514edf8c0826bcd529075a78a38210bcf9fa169d802b",
+    "observation-operation-coordinator-first-failure/payload.json": "81ca81011615a98321995ece0b208107b199adade017324074761676332e9b7b",
+    "observation-operation-coordinator-first-failure/dependencies.json": "9b0240a5e3b21f90d482871077a01dc4e95286732fe42d3d7182d2efbcfa6241",
+    "observation-operation-coordinator-first-failure/overlay.json": "119f06818470a3e26fa64bbfedfa61aff4af0df678f04b0f64462c8072b51eee",
+    "observation-operation-coordinator-first-failure/mirror-manifest.json": "637dbaef02e9ceb0a5f91affc46900412da47e5082eac7840b426c73cc1fb8ac",
+    "observation-operation-coordinator-first-failure/SCOPE.md.txt": "97dd9b32f2730c1fb135537a837e1b979c87df3fb39fd5548aaf07b1925a4870",
+    "observation-operation-coordinator-first-failure/run.py.txt": "5b6eade9708769f2f439bb51db5b4ea003d19fadaf7487262c4e9a94e050941d",
+    "observation-operation-coordinator-first-failure/freeze.json": "9f35b955c9a97afb94805b0633f1956f0bb9bd8eb62b4122502b5492683d9003",
+    "observation-operation-coordinator-first-failure/files/internal/contracts/owner_observation_operation.go.txt": "53609a7245115f6af1919c9956b9dbdbf95b25718a706d3a40486218305d6a71",
+    "observation-operation-coordinator-first-failure/files/internal/contracts/owner_observation_operation_test.go.txt": "12abc603eaa636466a17609208043e87872c1a79ef92c4bddfdfc865ce58d9da",
+    "observation-operation-coordinator-first-failure/files/internal/adapters/mtls/connector_operation_channel.go.txt": "26e6cb994221b44e3e67f98d5b6f2a72f34f0fd77485c16e1b3b58c8ad7607e9",
+    "observation-operation-coordinator-first-failure/files/internal/adapters/mtls/connector_operation_coordinator_test.go.txt": "6524371d7f8701c66027827208f227f4d8411aca3eeac4ed92ad5710371befec",
+    "observation-operation-coordinator-first-failure/files/internal/adapters/mtls/connector_operation_hub.go.txt": "725a7900ec152493940b2610c5e3ef66aba78bb2d034f4f643d8ee12a4cb089a",
+    "observation-operation-coordinator-first-failure/files/internal/adapters/mtls/owner_operation.go.txt": "7429888e9247222473b75c60081b95e4dabfd219ee2f5b590500ad6629289712",
+    "observation-operation-coordinator-first-failure/files/internal/adapters/mtls/owner_operation_wire.go.txt": "1c56f415ccbc980eeedc7c4e59060024e6ff896c332f48ac950a950553c922e2",
+    "observation-operation-coordinator-first-failure/evidence/compile.log": "439abd7dc3dbd4b7371d6f63ec0e9da87b8405afe4ce147c0e1ee839edf5125f",
+    "observation-operation-coordinator-first-failure/evidence/compile.json": "c6a4da3f445fe1fb3701266e755535ef1756f5efd5190e491b5480c28fcd4240",
+    "observation-operation-coordinator-first-failure/evidence/race.log": "1250791f01a8fd2ef52addbbbd4a427662ffab5da8e26863532e36c7d5ae3ec8",
+    "observation-operation-coordinator-first-failure/evidence/race.json": "334a216415aab91d5481fc46b5445503d12c65dead85a9618f34819983e74d70"
+  },
+  "priorFailure": "observation-operation-coordinator-first-failure",
+  "checks": {
+    "handle": 36918,
+    "exit": 0,
+    "phases": [
+      {
+        "phase": "compile",
+        "exit": 0,
+        "seconds": 11.069
+      },
+      {
+        "phase": "race",
+        "exit": 0,
+        "seconds": 15.861
+      },
+      {
+        "phase": "vet",
+        "exit": 0,
+        "seconds": 1.891
+      },
+      {
+        "phase": "go-architecture",
+        "exit": 0,
+        "seconds": 1.94
+      }
+    ],
+    "topLevelPass": 35,
+    "namedPass": 154,
+    "dependencies": 1937,
+    "payloads": 7,
+    "architectureMirrorFiles": 1944,
+    "allBeforeAfterUnchanged": true,
+    "evidence": {
+      "evidence/compile.json": "9025646998e42b5f5fd7cfc9179311ecf29a4ac40dcd8dff071cc8991b4fc970",
+      "evidence/compile.log": "c1920a5edbe953c92a38354620445d04eb34025e73821d8cc095f9f95d9c9c1c",
+      "evidence/go-architecture.json": "67822a9c26d78dfc8e46967561e795482b23cae33427434211811066690d1483",
+      "evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc",
+      "evidence/race.json": "4c7be61a54bf5e6b29f93a165ce23623933441d28cb55e4219ddf7057235e09b",
+      "evidence/race.log": "c655637092816604486bbe926366ae850d1c94175f13e7551af38e625194d730",
+      "evidence/vet.json": "26e0516bc754ac500c5f35b603bb7a1fe9930c0e7e6848cee72fbb1122383540",
+      "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

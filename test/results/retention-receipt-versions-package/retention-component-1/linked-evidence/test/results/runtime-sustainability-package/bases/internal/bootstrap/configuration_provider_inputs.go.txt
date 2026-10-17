@@ -1,0 +1,175 @@
+package bootstrap
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"sync"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// This fixed loader foundation does not select an audit backend, start a loop
+// or enable a command. Its eventual concrete worker owns these resources until
+// provider effects and all configuration/capacity/cleanup children have joined.
+type configurationProviderInputs struct {
+	input      *providerInputs
+	deployment contracts.HubWorkerDeployment
+	manifest   contracts.ConfigurationRuntimeCredentialManifest
+	observer   *kube.PermissionClient
+	probe      *kube.PermissionClient
+	activation *kube.InstalledWorkerProjectionReader
+	provider   *kube.ConfigurationWorkerProviderReader
+	pools      [3]*pgxpool.Pool
+	recovery   *postgres.RecoveryReader
+	once       sync.Once
+}
+
+func readConfigurationProviderMaterial(ctx context.Context, files *os.Root) (contracts.ConfigurationRuntimeCredentialManifest, map[string][]byte, error) {
+	var zero contracts.ConfigurationRuntimeCredentialManifest
+	out := map[string][]byte{}
+	ok := false
+	defer func() {
+		if !ok {
+			for _, value := range out {
+				clear(value)
+			}
+		}
+	}()
+	for _, name := range []string{contracts.ConfigurationRuntimeRoleManifestFile, "sql-fleet.json", "sql-configuration.json", "sql-audit.json", contracts.ConfigurationProviderAuditCredentialFile} {
+		limit := int64(contracts.ConfigurationRuntimeRoleMaxBytes)
+		if name == contracts.ConfigurationProviderAuditCredentialFile {
+			limit = 32 << 10
+		}
+		b, err := mounts.Read(ctx, files, name, limit)
+		if err != nil || len(b) == 0 {
+			clear(b)
+			return zero, nil, mounts.ErrUnavailable
+		}
+		out[name] = b
+	}
+	manifest, err := contracts.DecodeConfigurationRuntimeCredentialManifest(bytes.NewReader(out[contracts.ConfigurationRuntimeRoleManifestFile]))
+	if err != nil || ctx.Err() != nil {
+		return zero, nil, mounts.ErrUnavailable
+	}
+	ok = true
+	return manifest, out, nil
+}
+
+func newConfigurationProviderInputs(ctx context.Context, files *os.Root, podUID string) (*configurationProviderInputs, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	startup, end := context.WithTimeout(ctx, 30*time.Second)
+	defer end()
+	in, input, err := readHubWorkerInputs(startup, files)
+	if err != nil || input.ProviderAuthentication == nil || input.ProviderInputs == nil || !kube.HubWorkerActivationBound(input) ||
+		input.Activation.WorkerLayout != contracts.HubWorkerProviderInstalledLayout || input.Postgres.MaxConnections != 1 ||
+		providerconfig.ValidateConfigurationProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out := &configurationProviderInputs{input: in, deployment: input}
+	complete := false
+	defer func() {
+		if !complete {
+			out.close()
+		}
+	}()
+	manifest, mounted, err := readConfigurationProviderMaterial(startup, files)
+	if err != nil || manifest.Input.LayoutDigest != postgres.ConfigurationRuntimeRoleLayoutDigest() {
+		return nil, mounts.ErrUnavailable
+	}
+	defer func() {
+		for _, value := range mounted {
+			clear(value)
+		}
+	}()
+	out.manifest = manifest
+	namespace := cfg.NamespaceRef{Name: input.Namespace.Name, UID: input.Namespace.UID}
+	out.observer, err = kube.NewPermissionClient(in.kubernetes("kube-observer.token"), input.ClusterID, namespace, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.probe, err = kube.NewPermissionClient(in.kubernetes("kube-probe.token"), input.ClusterID, namespace, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.activation, err = kube.NewInstalledWorkerProjectionReader(out.observer, out.probe, input)
+	if err != nil {
+		return nil, err
+	}
+	out.provider, err = kube.NewConfigurationWorkerProviderReader(out.activation, podUID)
+	if err != nil {
+		return nil, err
+	}
+	until, err := out.provider.VerifyProjected(startup, manifest, mounted)
+	if err != nil {
+		return nil, err
+	}
+	// No SQL credential is used before this positive current native read. All
+	// three independent SQL verifications retain that same original deadline.
+	bound, narrow := context.WithDeadline(startup, until)
+	defer narrow()
+	purposes := contracts.ConfigurationRuntimeRolePurposes()
+	for i, file := range []string{"sql-fleet.json", "sql-configuration.json", "sql-audit.json"} {
+		original, e := contracts.DecodeOwnerSQLCredential(bytes.NewReader(mounted[file]))
+		name, known := postgres.ConfigurationRuntimeRoleName(input.InstallationID, purposes[i])
+		if e != nil || !known || original.Username != name {
+			return nil, mounts.ErrUnavailable
+		}
+		config, e := in.sqlConfig(bound, file)
+		if e != nil || config == nil || config.ConnConfig.User != original.Username || config.ConnConfig.Password != original.Password {
+			return nil, mounts.ErrUnavailable
+		}
+		config.MaxConns, config.MinConns = 1, 0
+		config.ConnConfig.RequireAuth = "scram-sha-256"
+		// Unlike the legacy rotating input, SQL3 is an immutable original object.
+		// Never send a changed same-name mounted password on a later connection.
+		config.BeforeConnect = func(call context.Context, connection *pgx.ConnConfig) error {
+			next, readErr := in.sqlCredential(call, file)
+			if readErr != nil || next != original || call.Err() != nil {
+				return mounts.ErrUnavailable
+			}
+			connection.Password = original.Password
+			return nil
+		}
+		out.pools[i], e = pgxpool.NewWithConfig(bound, config)
+		if e != nil || postgres.VerifyConfigurationRuntimeCredential(bound, out.pools[i], manifest, purposes[i]) != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	out.recovery, err = postgres.NewRecoveryReader(bound, out.pools[0], input.InstallationID)
+	if err != nil || bound.Err() != nil || !time.Now().Before(until) {
+		return nil, mounts.ErrUnavailable
+	}
+	// RecoveryReader construction only checks schema. Provider effects read its
+	// actual current state later; startup neither creates nor clears recovery,
+	// and does not require accepted owner SQL before the fleet loop can run.
+	complete = true
+	return out, nil
+}
+
+func (s *configurationProviderInputs) close() {
+	if s == nil {
+		return
+	}
+	s.once.Do(func() {
+		for i := len(s.pools) - 1; i >= 0; i-- {
+			if s.pools[i] != nil {
+				s.pools[i].Close()
+			}
+		}
+		if s.input != nil {
+			s.input.closeHTTP()
+		}
+	})
+}

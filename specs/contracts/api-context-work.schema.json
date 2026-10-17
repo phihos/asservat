@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/api-context-work.schema.json",
+  "title": "Purpose-separated signed API context work v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "api-context-work/v1"
+    },
+    "purpose": {
+      "const": "runAction"
+    },
+    "executionClass": {
+      "const": "kubernetesAPI"
+    },
+    "actionId": {
+      "const": "pod-status"
+    },
+    "nativeBytes": {
+      "const": 4096
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rootId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "exchangeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "hub": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "installationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "clusterId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "issuerEpoch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "podUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "processEpoch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "installationId",
+            "clusterId",
+            "issuerEpoch",
+            "podUID",
+            "processEpoch"
+          ]
+        },
+        "connector": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "installationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "clusterId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "issuerEpoch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "peerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "podUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "processEpoch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "leafDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "installationId",
+            "clusterId",
+            "issuerEpoch",
+            "peerId",
+            "podUID",
+            "processEpoch",
+            "leafDigest"
+          ]
+        },
+        "executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespaceUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "accountUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "podUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "processEpoch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "startupDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "imageDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "namespaceUID",
+            "accountUID",
+            "podUID",
+            "processEpoch",
+            "startupDigest",
+            "imageDigest"
+          ]
+        }
+      },
+      "required": [
+        "rootId",
+        "exchangeId",
+        "challenge",
+        "hub",
+        "connector",
+        "executor"
+      ]
+    },
+    "captureId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "attemptId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36,
+      "format": "uuid"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "const": "human"
+        }
+      },
+      "required": [
+        "issuer",
+        "subject",
+        "clientId",
+        "kind"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "format": "uuid"
+        },
+        "namespaceUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "workloadUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "podUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "clusterId",
+        "namespaceUID",
+        "workloadUID",
+        "podUID"
+      ]
+    },
+    "scopeDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expectationDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "intentDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "budgetDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "digest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "uid",
+        "generation",
+        "digest"
+      ]
+    },
+    "projectionDigest": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "issuedAt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "format": "date-time"
+    },
+    "notAfter": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "format",
+    "purpose",
+    "executionClass",
+    "actionId",
+    "nativeBytes",
+    "channel",
+    "captureId",
+    "attemptId",
+    "actor",
+    "target",
+    "scopeDigest",
+    "expectationDigest",
+    "intentDigest",
+    "budgetDigest",
+    "capability",
+    "projectionDigest",
+    "issuedAt",
+    "notAfter"
+  ]
+}

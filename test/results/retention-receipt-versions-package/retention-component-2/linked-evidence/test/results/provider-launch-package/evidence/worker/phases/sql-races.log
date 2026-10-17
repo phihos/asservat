@@ -1,0 +1,6 @@
+=== RUN   TestConfigurationWorkerLaunchClaimsKeepOriginalRoleAuthority
+--- PASS: TestConfigurationWorkerLaunchClaimsKeepOriginalRoleAuthority (0.00s)
+=== RUN   TestConfigurationWorkerLaunchFinalSQLStateOnlyAddsOriginalReceipt
+--- PASS: TestConfigurationWorkerLaunchFinalSQLStateOnlyAddsOriginalReceipt (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.044s

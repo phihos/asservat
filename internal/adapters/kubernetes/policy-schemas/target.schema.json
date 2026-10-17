@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/target.schema.json",
+  "title": "Asservat target v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63
+    },
+    "workloadRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "enum": [
+            "apps/v1",
+            "v1"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Deployment",
+            "StatefulSet",
+            "Pod"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "name"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "Pod"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "apiVersion": {
+                "const": "v1"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "apiVersion": {
+                "const": "apps/v1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "podSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "matchLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        }
+      },
+      "required": [
+        "matchLabels"
+      ]
+    },
+    "maxPods": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Maximum pods collected per occurrence; never the monitoring coverage limit."
+    },
+    "selection": {
+      "type": "string",
+      "enum": [
+        "oldestReady",
+        "newest",
+        "allWithinLimit",
+        "lowestOrdinal",
+        "triggeringPod"
+      ]
+    },
+    "ordinals": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100000
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "adoption": {
+      "type": "string",
+      "enum": [
+        "pinUID",
+        "followApprovedReplacement"
+      ]
+    }
+  },
+  "required": [
+    "namespace",
+    "maxPods",
+    "selection",
+    "adoption"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "workloadRef"
+      ],
+      "not": {
+        "required": [
+          "podSelector"
+        ]
+      }
+    },
+    {
+      "required": [
+        "podSelector"
+      ],
+      "not": {
+        "required": [
+          "workloadRef"
+        ]
+      }
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "ordinals"
+        ]
+      },
+      "then": {
+        "required": [
+          "workloadRef"
+        ],
+        "properties": {
+          "workloadRef": {
+            "properties": {
+              "kind": {
+                "const": "StatefulSet"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

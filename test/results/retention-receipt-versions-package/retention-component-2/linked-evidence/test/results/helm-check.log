@@ -1,0 +1,9 @@
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/tmp/asservat-openapi-validation/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 modes, 4 canonical CRDs, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06

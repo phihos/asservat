@@ -1,0 +1,6 @@
+=== RUN   TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper
+    configuration_worker_launch_operation_test.go:65: copied launch wrapper consumed the original opaque phase
+--- FAIL: TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.045s
+FAIL

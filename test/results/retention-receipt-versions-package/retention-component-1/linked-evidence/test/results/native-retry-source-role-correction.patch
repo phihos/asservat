@@ -1,0 +1,11 @@
+--- test/integration/context_native_content_test.go
++++ test/integration/context_native_content_test.go
+@@ -70,7 +70,7 @@
+ 	// roles retain their existing narrow writes; this never grants key/PKI audit.
+ 	for _, q := range []string{
+ 		"GRANT SELECT ON download_native_backing,download_native_owner,download_response,download_window,download_key_binding,download_worker_enrollment,download_worker_certificate TO download_worker_runtime",
+-		"GRANT SELECT ON download_native_backing,download_native_owner,download_worker TO download_runtime",
++		"GRANT SELECT ON download_native_backing,download_native_owner,download_worker,context_case_locator,custody_copy TO download_runtime",
+ 		"CREATE ROLE native_plan_runtime LOGIN PASSWORD 'synthetic-native-plan'",
+ 		"GRANT CONNECT ON DATABASE custody_test TO native_plan_runtime",
+ 		"GRANT USAGE ON SCHEMA public TO native_plan_runtime",

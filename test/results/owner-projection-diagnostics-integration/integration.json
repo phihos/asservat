@@ -1,0 +1,80 @@
+{
+  "integratedAt": "2026-10-13T22:48:20.199899+00:00",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/owner_installation_driver.go",
+      "baseSHA256": "94148231d673e1805cb0594590e7d35aece44cfd39255343a06f311633941380",
+      "payloadSHA256": "dfa85db28cce65146db0dcd312b875a5d8303eb8bfa0eaef4384bc4921ddc94e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_diagnostic.go",
+      "baseSHA256": null,
+      "payloadSHA256": "70a332331855a645f57831d7f841037b36fd1915666dfc1a2714ea268473fe0e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_diagnostic_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "409187bffea994c6431f22acd5e63d1eedae4bc6c15b9b3be5977cd924fb43d8"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation.go",
+      "baseSHA256": "b5052b8ef9f23b76779757e8143ab7f09700ee3c3b4c88b02dbf90ab4648aeea",
+      "payloadSHA256": "4c52a2568f40d5715506da32127cb161cc8a04a40dfe5c433c54ada2da172eae"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_native.go",
+      "baseSHA256": "b8656baf5e250084a29ab707b50669c9790846014dcedf81371eedcf15ce01e4",
+      "payloadSHA256": "01f583fd95ea41d216304f447099d6048ed77b3ea210edda64575161e47fd724"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_diagnostic.go",
+      "baseSHA256": null,
+      "payloadSHA256": "40b7b16454edf0ab8d68940c8637fed9aeaaa933d0328ff8421643298f170f69"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_diagnostic_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "87ee0675ba7be3de6a7ae837d3d704756c258912758d062c1ba15f1332979b00"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_operation.go",
+      "baseSHA256": "1b86b143fc9920efaa52da3af7d9a3a36db116d80c5823c4b7d1ec722a75d48e",
+      "payloadSHA256": "36c0a2c1ebb0bf6be00317b5b96959347c974f72bc1a0b6c8d30d1e98b6f86ab"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "baseSHA256": "d281685c1f0b874aad990c5968d712c1e23f73959f878b67c57b332639977d1f",
+      "payloadSHA256": "552990d8c4040f778cb5f0871a10c3149473df9b8599a550d884982ac6e9b105"
+    }
+  ],
+  "manifestSHA256": "86a3e114ca13283e31c134711bb013e5523a125300a2446883a2d771e68ff8ff",
+  "reviewPatchSHA256": "7104090ee8d374dc79907fe1ecd9f5af0e8a2cf779a15c4a34faa58b9fe0a041",
+  "priorGoResultSHA256": "63eacc558fb33ad95ff70725e5228180a95f49d2e4ae7882d4774bf1869c9f3d",
+  "qualification": "component passed; native installation fails at final native source branch",
+  "scope": "Fixed diagnostic codes only; original admission, normalization, deadlines and attempts unchanged.",
+  "archiveHashes": {
+    "payload/test/integration/initial_runtime_owner_pair_native_test.go.txt": "552990d8c4040f778cb5f0871a10c3149473df9b8599a550d884982ac6e9b105",
+    "payload/internal/adapters/kubernetes/owner_installation_driver.go.txt": "dfa85db28cce65146db0dcd312b875a5d8303eb8bfa0eaef4384bc4921ddc94e",
+    "payload/internal/adapters/kubernetes/owner_projection_diagnostic.go.txt": "70a332331855a645f57831d7f841037b36fd1915666dfc1a2714ea268473fe0e",
+    "payload/internal/adapters/kubernetes/owner_projection_diagnostic_test.go.txt": "409187bffea994c6431f22acd5e63d1eedae4bc6c15b9b3be5977cd924fb43d8",
+    "payload/internal/adapters/kubernetes/owner_projection_operation.go.txt": "4c52a2568f40d5715506da32127cb161cc8a04a40dfe5c433c54ada2da172eae",
+    "payload/internal/adapters/kubernetes/owner_projection_operation_native.go.txt": "01f583fd95ea41d216304f447099d6048ed77b3ea210edda64575161e47fd724",
+    "payload/internal/adapters/postgres/owner_projection_diagnostic.go.txt": "40b7b16454edf0ab8d68940c8637fed9aeaaa933d0328ff8421643298f170f69",
+    "payload/internal/adapters/postgres/owner_projection_diagnostic_test.go.txt": "87ee0675ba7be3de6a7ae837d3d704756c258912758d062c1ba15f1332979b00",
+    "payload/internal/adapters/postgres/owner_projection_operation.go.txt": "36c0a2c1ebb0bf6be00317b5b96959347c974f72bc1a0b6c8d30d1e98b6f86ab",
+    "before/test/integration/initial_runtime_owner_pair_native_test.go.txt": "d281685c1f0b874aad990c5968d712c1e23f73959f878b67c57b332639977d1f",
+    "before/internal/adapters/kubernetes/owner_installation_driver.go.txt": "94148231d673e1805cb0594590e7d35aece44cfd39255343a06f311633941380",
+    "before/internal/adapters/kubernetes/owner_projection_operation.go.txt": "b5052b8ef9f23b76779757e8143ab7f09700ee3c3b4c88b02dbf90ab4648aeea",
+    "before/internal/adapters/kubernetes/owner_projection_operation_native.go.txt": "b8656baf5e250084a29ab707b50669c9790846014dcedf81371eedcf15ce01e4",
+    "before/internal/adapters/postgres/owner_projection_operation.go.txt": "1b86b143fc9920efaa52da3af7d9a3a36db116d80c5823c4b7d1ec722a75d48e"
+  },
+  "componentResult": {
+    "path": "test/results/owner-projection-diagnostics-component-1/result.json",
+    "sha256": "1bd1e22fb35653047ead1c0b5d8194a0bc17fad04be3a8d44d7b815eba99ead1"
+  },
+  "nativeResult": {
+    "path": "test/results/runtime-provider-owner-native-6/result.json",
+    "sha256": "60af72321f5d7bf92a381b17845b1ca58c8e3c021edff98fe92ff52af80f5a9f",
+    "exit": 1
+  }
+}

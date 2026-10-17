@@ -1,0 +1,8 @@
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence
+    fleet_observation_test.go:138: equal SQL timestamp extended observation
+--- FAIL: TestEnrollmentFleetObservationWithRealPostgres (0.03s)
+    --- FAIL: TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.084s
+FAIL

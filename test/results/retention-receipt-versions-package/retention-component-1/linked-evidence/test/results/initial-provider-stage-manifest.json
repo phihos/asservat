@@ -1,0 +1,130 @@
+{
+  "baseRoot": "/home/phil/Projekte/asservat",
+  "files": [
+    {
+      "path": "docs/architecture/initial-provider-provisioning.md",
+      "baseSha256": null,
+      "newSha256": "baa115b41639d63e6bbf832624f824247826ab96d8a36f6361bacf041e334a5d"
+    },
+    {
+      "path": "docs/decisions/128-initial-provider-provisioning.md",
+      "baseSha256": null,
+      "newSha256": "7087003b5beda94e13fdbf38d12c537378efda093ed8bb07c90a53a9f67f8de8"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider.go",
+      "baseSha256": null,
+      "newSha256": "c02f4ba06ba51ba1ee50c2f9122e4d32deb5e78e1ddf8948d10551391896d481"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider_retirement.go",
+      "baseSha256": null,
+      "newSha256": "32826f0b5c5b4dfb86b126d19e28fbbf876d9880a8247ccedfd7487be784ad38"
+    },
+    {
+      "path": "internal/adapters/kms/initial_provider_test.go",
+      "baseSha256": null,
+      "newSha256": "babfdf2316a2c7b88ff8e7a711db51ea50a6fa33ee220930e0fbb31d3f9099c6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer.go",
+      "baseSha256": "646747fcd33f1bde9f7e30adbe4f2106954983f83aa3d256c4a7072bd72413df",
+      "newSha256": "d7d7cf49cbfd17cb7e5a649bed3c41790c1d8be8af6841b66f117d7ad1e91a39"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_private.go",
+      "baseSha256": "8498e31d54c73e91347703a1e903ef83d277b948523aea9dd724f67189b4cf12",
+      "newSha256": "57a201d52522f518932e3f50f68fef2dfa24e2522b5a232f314182a014233419"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_provider.go",
+      "baseSha256": null,
+      "newSha256": "75bb07b0e3a55af4222df103c97358b48f24add1a410b5e912389960df54cd2a"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_provider_projection.go",
+      "baseSha256": null,
+      "newSha256": "a283565efe45ca0187d24388a720b9503236b73f3a8fc93c8e71c410aab9aad7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_provider_state.go",
+      "baseSha256": null,
+      "newSha256": "4c6212aa9b3bd8b609e39784f9315495a75833e2f017f18eafcf5c4be4502d3c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_provider_test.go",
+      "baseSha256": null,
+      "newSha256": "625640ea9f91a8cf6b737959f671de829ce1d1bde22ec2f34c1f36f9729d5672"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_requests.go",
+      "baseSha256": "cd8c04a7cf1003091a2edfd0a23049c62996ece5f8185e6a1d82a39ac0fa87bf",
+      "newSha256": "755cfc825ed11c5c4acb00ef6f2b6dbca487212ac3371c833663a97173d09890"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_provider_material.go",
+      "baseSha256": null,
+      "newSha256": "41e2a2b0a06a578bbc49fb177cdaf3b6db7fe1eb277c43b4a535c6b6c95ed462"
+    },
+    {
+      "path": "internal/adapters/providerconfig/initial_provider.go",
+      "baseSha256": null,
+      "newSha256": "69370ce68f2cfa8248f2674be10d94e2f4f28546f0e5cd989146ed4b96932428"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer.go",
+      "baseSha256": "29943ec8861c5aa3bc7a62edff3c82e7159bb16da8aba729a300eaa44f133e99",
+      "newSha256": "3aa246b6c6a07de96c3c1b8e8b2293c7897e3478ffc7c6a9c091778e506f5f7d"
+    },
+    {
+      "path": "internal/bootstrap/initial_preparer_sql.go",
+      "baseSha256": "58de1400a8d9b1d993b11964861a939d703a39fefcc0f5c94eaf2a7aecb0f1e6",
+      "newSha256": "acbc212cc461775c494c02fed474ff16b93d8692627e5e3c80807ccef8ae0f6d"
+    },
+    {
+      "path": "internal/contracts/initial_preparation_private.go",
+      "baseSha256": "4a0b6fc96829e75d8fd3cb98da5c2c8e1d742c0a3c2bae3a61a4a581c5daf3be",
+      "newSha256": "67b773d60fb6b03fb0af132c7da1b323046ea92427c8e63e9ab33e21997df52f"
+    },
+    {
+      "path": "internal/contracts/initial_preparer.go",
+      "baseSha256": "df4842bc068ee5deb9fa472986570b9503f0158138ca8806d973726cda3ef81a",
+      "newSha256": "053750f7986ead63b5b8a1f8eac181c3b2974362269912a2a5d8d0992a9df294"
+    },
+    {
+      "path": "internal/contracts/initial_provider.go",
+      "baseSha256": null,
+      "newSha256": "68e32b351eb80c3d8d14da3c04fa32fe705158deae2df6064df49656c515150d"
+    },
+    {
+      "path": "specs/contracts/initial-preparation-private.schema.json",
+      "baseSha256": "bf32ed4729e29b439e00e34f8c78ef113ecbdbc891d4a7ec54cecdb9662ef5b1",
+      "newSha256": "a95cdd057c48678b287c8f7798edb0eec6073cf27ffac9ebcc7f8f161f6ada4f"
+    },
+    {
+      "path": "specs/contracts/initial-preparer.schema.json",
+      "baseSha256": "66cffc5ce67f77b19d2528bb718dc4abbde14f56e05066768508c5fedbd14a4c",
+      "newSha256": "0b004c563194795a895e866507aa763c0914d14d746297e4a2009585fc754bf1"
+    },
+    {
+      "path": "specs/contracts/initial-provider-material.schema.json",
+      "baseSha256": null,
+      "newSha256": "59eabb243bd1f4e5a98472be821e16c7751e36112917b410287ef9ec4b9fb7ca"
+    },
+    {
+      "path": "specs/contracts/initial-provider-profile.schema.json",
+      "baseSha256": null,
+      "newSha256": "f9377d07bcd1b2376e043d3518e11167349a5116244e2580258c1deed9ddfd81"
+    },
+    {
+      "path": "test/integration/initial_preparer_provider_test.go",
+      "baseSha256": null,
+      "newSha256": "28a433d00c865f9a459c7de40011c8d17eb09b426b5ef3c073adeb3d1179e916"
+    },
+    {
+      "path": "test/integration/initial_preparer_test.go",
+      "baseSha256": "33b22aa83990aae041dd5fe2e2b381eed3456e09afa402cc33c2962390244d21",
+      "newSha256": "b963d94cd7d24b811b3f243ab3cbc8149e14c6d3645916612fb6bc59b3cc6b9e"
+    }
+  ]
+}

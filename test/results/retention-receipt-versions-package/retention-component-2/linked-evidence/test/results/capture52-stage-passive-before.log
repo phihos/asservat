@@ -1,0 +1,20 @@
+--- FAIL: TestCaptureOperationCompletedReadOutlivesWriteCutoffWithoutEffects (0.00s)
+    capture_operation_test.go:376: complete receipt stranded after original write cutoff durable audit unavailable
+--- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough (0.02s)
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-protocol (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-root (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/wrong-id (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/legacy-key (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/read-error (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/expired-read (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+    --- FAIL: TestCaptureOperationCompletedReadFailureNeverFallsThrough/cancelled-read (0.00s)
+        capture_operation_test.go:419: invalid retained acknowledgement accepted <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/audit	0.025s
+FAIL

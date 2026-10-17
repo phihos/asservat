@@ -1,0 +1,192 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+type ownerDiagnosticAcceptedReader func(context.Context) (fleet.OwnerConfigurationObservation, error)
+
+func (f ownerDiagnosticAcceptedReader) ReadOwnerConfiguration(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+	return f(ctx)
+}
+
+// This file also compiles with the old implementation: the failing-before
+// oracle is the missing fixed diagnostic, not a reference to a new identifier.
+func TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	api := installOwnerBootstrapAPI(t, f)
+	p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Close)
+	secret := errors.New("synthetic-private-driver-password")
+	reads := 0
+	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+		reads++
+		if reads == 1 {
+			return fleet.OwnerConfigurationObservation{}, secret
+		}
+		// The existing one Inspect has a different failure. It cannot replace
+		// the first Advance's deciding code, create another claim or retry it.
+		v, err := f.accepted.ReadOwnerConfiguration(ctx)
+		v.FreshUntil = v.ObservedAt
+		return v, err
+	})
+	out, err := p.Complete(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "selection.initial-native: native.accepted-read") {
+		t.Fatalf("missing original accepted-read diagnostic: %v", err)
+	}
+	if !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, secret) || strings.Contains(err.Error(), secret.Error()) {
+		t.Fatalf("changed normalized error classification or disclosed driver data: %v", err)
+	}
+	if out.Status != OwnerBootstrapStopped || out.Stop != OwnerInstallationUnverified || reads != 2 || api.creates.Load() != 0 || api.writes.Load() != 0 {
+		t.Fatal("diagnostic changed stopped disposition, one Inspect or zero effects", out.Status, out.Stop, reads, api.creates.Load(), api.writes.Load())
+	}
+}
+
+func TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization(t *testing.T) {
+	f := newOwnerIdentityOperationFixture(t)
+	api := installOwnerBootstrapAPI(t, f)
+	p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Close)
+	reads := 0
+	f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+		reads++
+		if reads == 3 {
+			return fleet.OwnerConfigurationObservation{}, cfg.ErrChanged
+		}
+		return f.accepted.ReadOwnerConfiguration(ctx)
+	})
+	out, err := p.Advance(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "selection.final-native: native.accepted-read") || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) {
+		t.Fatalf("final native failure lost deciding check or original normalization: %v", err)
+	}
+	if reads != 3 || api.writes.Load() != 1 || api.creates.Load() != 0 || out.Status != OwnerBootstrapStopped || out.Stop != OwnerInstallationUnverified {
+		t.Fatal("failed final proof retried or certified original intent", reads, api.writes.Load(), api.creates.Load(), out.Status, out.Stop)
+	}
+}
+
+func TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		clockReads int32
+	}{
+		{"read", "native.accepted-read", 0},
+		{"valid", "native.accepted-valid", 1},
+		{"equal", "native.accepted-equal", 1},
+		{"deadline", "native.accepted-deadline", 2},
+		{"success", "", 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newOwnerIdentityOperationFixture(t)
+			originalClock := f.resources.preparer.protection.observer.now
+			var armed atomic.Bool
+			var clockReads atomic.Int32
+			var acceptedEnd time.Time
+			f.resources.preparer.protection.observer.now = func() time.Time {
+				if armed.Load() {
+					n := clockReads.Add(1)
+					if tc.name == "deadline" && n == 2 {
+						return acceptedEnd
+					}
+				}
+				return originalClock()
+			}
+			t.Cleanup(func() { f.resources.preparer.protection.observer.now = originalClock })
+			reads := 0
+			f.root.accepted = ownerDiagnosticAcceptedReader(func(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+				reads++
+				v, err := f.accepted.ReadOwnerConfiguration(ctx)
+				acceptedEnd = v.FreshUntil
+				armed.Store(true)
+				switch tc.name {
+				case "read":
+					return v, cfg.ErrChanged
+				case "valid":
+					v.FreshUntil = v.ObservedAt
+				case "equal":
+					v.Configuration.Pool.ServiceUID = ownerID(4910)
+				}
+				return v, err
+			})
+			call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := f.root.operation(call, func(current context.Context) error {
+				_, err := f.root.readOwnerIdentityOperationNative(current, f.root.input.LayoutDigest, false)
+				return err
+			})
+			if tc.want == "" {
+				if err != nil {
+					t.Fatal("unchanged positive path failed", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.want) || !errors.Is(err, cfg.ErrUnavailable) {
+				t.Fatalf("missing accepted-source check %s: %v", tc.want, err)
+			}
+			if reads != 1 || clockReads.Load() != tc.clockReads {
+				t.Fatal("changed original accepted read or short-circuit clock sampling", reads, clockReads.Load(), tc.clockReads)
+			}
+		})
+	}
+}
+
+type ownerDiagnosticBridgeEffects struct {
+	*rootPinEffectFixture
+	after bool
+	cause error
+	calls int
+}
+
+func (s *ownerDiagnosticBridgeEffects) WithInitialRuntimeBridge(ctx context.Context, run func(context.Context) error) error {
+	s.calls++
+	if s.after {
+		if err := run(ctx); err != nil {
+			return err
+		}
+	}
+	return s.cause
+}
+
+func (s *ownerDiagnosticBridgeEffects) WithInitialRuntimeOwnerBridge(ctx context.Context, _ fleet.Administration, run func(context.Context) error) error {
+	return s.WithInitialRuntimeBridge(ctx, run)
+}
+
+func TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause(t *testing.T) {
+	for _, after := range []bool{false, true} {
+		t.Run(map[bool]string{false: "before", true: "after"}[after], func(t *testing.T) {
+			f := newOwnerIdentityOperationFixture(t)
+			api := installOwnerBootstrapAPI(t, f)
+			p, err := NewOwnerBootstrapSelectionProducer(f.root, ownerBootstrapPlanFixture(f))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(p.Close)
+			cause := errors.New("synthetic-private-outer-driver-password")
+			effects := &ownerDiagnosticBridgeEffects{rootPinEffectFixture: f.effects, after: after, cause: cause}
+			f.bridge.effects = effects
+			out, err := p.Advance(context.Background())
+			want := map[bool]string{false: "selection.outer-before-callback", true: "selection.outer-after-callback"}[after]
+			if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, cause) || strings.Contains(err.Error(), cause.Error()) || strings.Contains(err.Error(), "sql") {
+				t.Fatalf("incorrect outer boundary diagnostic or error identity: %v", err)
+			}
+			writes := int32(0)
+			if after {
+				writes = 1
+			}
+			if out.Status != OwnerBootstrapStopped || effects.calls != 1 || api.writes.Load() != writes || api.creates.Load() != 0 {
+				t.Fatal("outer failure changed admitted effect count", effects.calls, api.writes.Load(), api.creates.Load())
+			}
+		})
+	}
+}

@@ -1,0 +1,19 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestFederationRegionalProductWithRealKubernetes$"
+  ],
+  "exit": 0,
+  "seconds": 171.039,
+  "requiredPassed": [
+    "TestFederationRegionalProductWithRealKubernetes"
+  ],
+  "scope": "ADR-193 step 3f: generation 1 from a product BootstrapIssuer slot, enrolled in-band by the connector over the bootstrap purpose; the hub claims, stages the source under the hub-decided backing, writes and acknowledges the generation-1 audit and activates (00064). Product /asservat hub-federation and connector Pods with product connector grants, real OpenBao PKI/transit/KV, encrypted S3 audit. Fixture-created roles, PKI, owner/fleet trust and the fleet operator authority remain synthetic setup authority; no product installer.",
+  "missing": [],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "passed"
+}

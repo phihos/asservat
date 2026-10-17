@@ -1,0 +1,16 @@
+{
+  "files": {
+    "docs/architecture/runtime-profiles.md": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+    "internal/adapters/diagnostics/go_profile.go": "f3e85ca5012552ee546b98b4c5dac6e420ee2365382694910a60b141abe686c5",
+    "internal/adapters/diagnostics/go_profile_test.go": "71f9809be95c9394135b1edc578bfe52dfc17d6b74b651103850f7d2ecc93c86",
+    "internal/application/execution/go_profile.go": "1560a2480f13dfa580c84f45e0e35d4ad464edb8bfdb6285313f00546e23fb90",
+    "internal/domain/execution/go_profile.go": "134068baf6d32ba20d474bcd29149175be72e91bc51709dd0ae2c0b4375e6998",
+    "internal/domain/execution/go_profile_test.go": "183ead631466d4999540af077185fed72349b3fdd5b4b17f31804c8589cf131e",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+  },
+  "sourceManifests": [
+    "dcc9715117fc6a8d869dceaebf3ce8692345cccfdcff7e7bc41816ec217f4ea9",
+    "ba79c47b0d9f5a7a3901086b0e3a7a78ebe5ecbe42129eb7d4a073d871132ae1"
+  ],
+  "scope": "All affected profile domain/application/adapter tests and canonical gates after original caller correction"
+}

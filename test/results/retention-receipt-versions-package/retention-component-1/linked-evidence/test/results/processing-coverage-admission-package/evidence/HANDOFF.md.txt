@@ -1,0 +1,77 @@
+# ADR146 processing coverage integration handoff
+
+Frozen source: `candidate-v2/manifest.json`, SHA256
+`3329d2defaa7a7c7f682d370f36c4cc69383ff982f818123a0ed8860a054d970`.
+20 payloads, exact original bases retained; dependencies SHA256
+`1e14056e474ca0dc0fa5214ba743df4194d9c7b29f6e6ac63a75d4b2820f450d`
+(3,260 paths). All sets unchanged before/after job78747. V1 is retained unmodified;
+v2 records reviewed parent dependency changes and the requested plain outward
+copy. `candidate-v2/CONSTRUCTORS.md` inventories both actual literals and explicitly
+records that the production installed public graph has no constructor yet.
+
+## Behavior and boundaries
+
+The existing role15 ProcessingReads supplies the mandatory C09 transient port.
+Preview/new request checks exact original acquisition/target/location/deletion
+coverage; accepted same-key replay stays passive. SQL54 managed admission repeats
+it under existing recovery→permission serialization before all inserts/debits.
+Role40 gains SELECT only on processing_root/processing_rule. No migration, SQL
+query generation, new credential, runtime enablement, retention shortening or
+publication relaxation. Coverage does not reserve a pending lineage slot or
+promise a future renewal. Full malformed inventory and expired original
+identity/recovery/root observations remain unavailable rather than known short
+coverage. User copy preserves earlier same-key uncertainty.
+
+The existing independently scoped role15 still must be supplied by the future
+installed public graph. The continuation native helper uses its existing actual
+fixture catalog reader's processing privileges; the SQL54 coverage helper uses
+the actual fixed purpose15/40 credentials produced in that matrix. Neither is a
+claim that installed runtime composition is complete.
+
+## Actual local evidence
+
+`checks/coverage-v2/result.json` records the real joined handle78747 and commands.
+The wrapper terminal is **1** solely because its extra final spec check's physical
+mirror omitted linked historical `test/results` files; the first reported missing
+link was `owner-identity-roles-native-matrix-check.log`. No failed gate is called a
+pass and no product file was changed to bypass it. No build remains active.
+
+- Before race: exit1 with both intended preview/new-admission assertion failures,
+  each reporting `known short coverage reached draft/admission <nil>`. The scaffold
+  adds only the new field declaration to the original production body so the new
+  fixture compiles. It introduces no call/condition. This is a behavioral failure,
+  not a compile failure.
+- Full application/capture, presentation and bootstrap races: exit0,
+  150 top-level tests / 578 PASS entries including subcases. Package times
+  1.373s, 8.934s and 11.430s; no test selection regex.
+- Focused processing predicate/root/rule/role plans plus capture domain races:
+  exit0, 20 top-level / 97 PASS entries; 1.073s / 1.010s.
+- Full integration package compile, no tests selected: exit0, 13.453s wall.
+- All six affected packages' actual vet: exit0, 2.377s wall.
+- Go architecture: PASS 53 packages / 297 internal edges.
+- Design architecture: PASS 1,218 positive / 120 negative cases.
+- Spec check: packaging failure described above; integrated spec gate remains
+  mandatory. Frozen source and its existing bases/dependencies were unchanged.
+
+No SQL/native fixture was run by this agent. Sources and docs describing native
+checks as pending remain accurate; local source qualification above supersedes
+source-time notes that all added checks were unrun.
+
+## Next parent-owned native qualification
+
+Use the existing full fleet selector `^TestCapacityProducerWithRealPostgres$`.
+The new helper is invoked from the original managed publication scenario and adds:
+
+1. actual role15 uncovered retention returns the specific coverage error;
+2. actual role40 atomic admission returns the same error with unchanged storage,
+   control, attempts/captures, capture audit account/pairs/bindings and lineage;
+3. actual permission-row wait exhausts the original child deadline, joins and
+   leaves those same charges unchanged;
+4. the original short request still passes current coverage then proceeds through
+   encrypted pair, independently verified publication and original session.
+
+Do not infer success from the previous SQL54 matrix; these cases remain unrun.
+Requalify `native-api-runner`/regional continuation selectors as applicable because
+their C09 helper now supplies an actual SQL ProcessingReads constructor. Original
+human/target/bootstrap/physical-history facts remain synthetic. Continuous
+history replenishment and installed user workflow remain pending.

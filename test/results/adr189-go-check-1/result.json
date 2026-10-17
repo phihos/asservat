@@ -1,0 +1,11 @@
+{
+  "name": "adr189-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-187/188 (replay after the bridge, configuration role post-lock proof, settle wait, continuation diagnostics), ADR-189 (installed permission stream: SQL purposes 72/73, guard, projection, hub-worker child, authority audit operation and admission purpose) and ADR-191 (retained-bracket projection writes)",
+  "results": "55 full packages and 557 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip",
+  "sourceHashBefore": "ebc9276e4327891d7264cfcedb36c22411b402c49c1a277a6e4ee6ffe5bfc250",
+  "sourceHashAfter": "ebc9276e4327891d7264cfcedb36c22411b402c49c1a277a6e4ee6ffe5bfc250",
+  "log": "go-check.log"
+}

@@ -1,0 +1,1 @@
+../../.cache/asservat-build/planning/owner-worker-caller-20261013/checks/caller-2/files/internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go:154:12: assignment copies lock value to copied: asservat.local/asservat/internal/adapters/kubernetes.OwnerBootstrapSelectionProducer contains sync.Mutex

@@ -1,0 +1,14 @@
+{
+  "bases.json": "4744f5703717a115d40bccd455ed7158596fec3b7d822c0918716c68dcf06c35",
+  "dependencies.json": "72e266a335e504669b7588bab565226fab8ff18d2e6c1cfdc305a5eb60dfcd39",
+  "files/docs/architecture/cluster-observations.md": "dde55f95eb0aaca24cd7b9f0a2d8d56f3e698b8a194c293481eff3d3821d80f8",
+  "files/internal/adapters/mtls/connector_observation_channel.go": "57233bbe7f77509acc07b09f10b36d7cb6e23e85021baa8d47fe2691018cfde1",
+  "files/internal/adapters/mtls/connector_observation_channel_test.go": "b7ba978b5497af7f7f43e56e63d93d70775465a8fd622380141a31eef550a3f2",
+  "files/internal/application/fleet/cluster_observation_digest.go": "f21614d334ecfadea85809593d9075fc027372660bfc8687b6471b4820564d71",
+  "files/internal/transport/clusterobservation/digest_parity_test.go": "2f69344cf65cdad9f1d99a2a6a9d5103d1cb7fd40c85addf08d02430b9631c65",
+  "files/internal/transport/clusterobservation/wire.go": "ff93ecf4809540a115467667c938524e712ea6de601329f8b86af7e12a61cd0f",
+  "manifest.json": "72a80b493b31ada39b0f8e497521637ea265f9c7e5d8c04846c0e78c69dfd5f1",
+  "overlay.json": "4836785c8e92b577b024787a0ff5c1a38e72653c57237e6c2434531fc58fdd9d",
+  "payload.json": "bf05db38dd47afd82d374df049703b2655ef74983ad539456b52081b2077f281",
+  "run.py": "c58f89de3bffe80c1371361deaa3de256e7497d46b44a745e957240da8be1b43"
+}

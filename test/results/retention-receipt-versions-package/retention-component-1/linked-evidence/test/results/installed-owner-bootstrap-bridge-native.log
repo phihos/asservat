@@ -1,0 +1,14 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:248: original activation 8f29aaf6-7fae-49c8-bcd8-162f6b960df2 image docker.io/library/asservat-context-worker@sha256:e87234efb7a198995bc7b36cdf0965c3e1b64728812ad2a06c1cd5fe98272fb7 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/runtime-resources-installed-owner-guard-bridge
+    initial_bootstrap_chain_test.go:321: actual original bootstrap activation/retirement, 19 fixed inert resources (installed-owner=true), lost CREATE lookup, two lost guard-CAS replies with exact receipts and SELECT-only history during recovery, actual zero-replica controller/GC and missing-owner denial; owner/runtime/provider projection remains unqualified
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:335: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- PASS: TestInitialBootstrapChainWithRealServices (387.25s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (21.60s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/runtime-resources-installed-owner-guard-bridge (88.16s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+PASS
+ok  	asservat.local/asservat/test/integration	388.313s

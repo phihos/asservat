@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/local-start.schema.json",
+  "title": "Local CapacityReservation single onTrigger start v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "CapacityReservation"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "onTriggerStart/v1",
+            "apiContextStart/v1"
+          ]
+        },
+        "operationID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "captureID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "attemptID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "clusterID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "issuerEpoch": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "podUID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "nodeUID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "nodeBootID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "collectorEpoch": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "actionID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+        },
+        "scopeDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        },
+        "authorityDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        },
+        "budgetDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        },
+        "auditDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "maxLength": 64
+        },
+        "nativeBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "notBefore": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 32
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 32,
+          "description": "Original immutable start deadline. apiContextStart/v1 is at most five seconds after notBefore; the historical node profile is at most sixty seconds. Native CEL and the execution domain enforce these relational bounds."
+        },
+        "executorPodUID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "executorAccountUID": {
+          "type": "string",
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "profile",
+        "operationID",
+        "captureID",
+        "attemptID",
+        "clusterID",
+        "issuerEpoch",
+        "podUID",
+        "collectorEpoch",
+        "actionID",
+        "scopeDigest",
+        "authorityDigest",
+        "budgetDigest",
+        "auditDigest",
+        "nativeBytes",
+        "notBefore",
+        "notAfter"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "profile": {
+                "const": "apiContextStart/v1"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "executorPodUID",
+              "executorAccountUID"
+            ],
+            "properties": {
+              "actionID": {
+                "const": "pod-status"
+              },
+              "nativeBytes": {
+                "const": 4096
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "nodeUID"
+                  ]
+                },
+                {
+                  "required": [
+                    "nodeBootID"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "nodeUID",
+              "nodeBootID"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "executorPodUID"
+                  ]
+                },
+                {
+                  "required": [
+                    "executorAccountUID"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "Ready",
+            "StartCommitted"
+          ]
+        },
+        "committedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 32
+        }
+      },
+      "required": [
+        "phase"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "StartCommitted"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "committedAt"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "committedAt"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-24",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "First ADR-189 run. Product steps passed through: the post-bridge settle wait (6.0 s), the configuration roles (12.4 s), the worker launch, all 68 public roles (3m0.9s, now including permission-accept and permission-audit), the public projection, the owner identity roles and the selection, and the permission guard creation. It then stopped at 'permission/projection/- after 14 attempts; first - (unavailable)': the permission projection publication failed on every attempt without a fixed step name. Run 25 adds stage names and timings. Suspected cause: the publication runs inside the verified role operation's five seconds while every journal read repeats two bridge proofs and a resource-producer proof.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,299 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"slices"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+type workerProjectionPurpose uint8
+
+const (
+	workerCapacityProjection workerProjectionPurpose = iota
+	workerCleanupProjection
+)
+
+type workerProjectionNative struct {
+	state contracts.InitialRuntimeResourceState
+	guard string
+	owner apps.Deployment
+}
+
+// WorkerProjectionOperation is a fixed capacity or cleanup native bracket,
+// minted only by the exact installed reader. An actual effect belongs between
+// Begin and Finish; the handle never substitutes for its current SQL checks.
+// No provider source proof, Pod identity or token refresh is inferred here.
+type WorkerProjectionOperation struct {
+	self                   *WorkerProjectionOperation
+	reader                 *InstalledWorkerProjectionReader
+	purpose                workerProjectionPurpose
+	ctx                    context.Context
+	cancel                 context.CancelFunc
+	tokens                 *configurationWorkerTokenInterval
+	initial                workerProjectionNative
+	mu                     sync.Mutex
+	changed                chan struct{}
+	until                  time.Time
+	started                time.Time
+	busy, finished, closed bool
+}
+
+func (s *InstalledWorkerProjectionReader) BeginCapacityProjectionOperation(ctx context.Context) (*WorkerProjectionOperation, contracts.CapacityRuntimeProjectionClaim, error) {
+	var out contracts.CapacityRuntimeProjectionClaim
+	p, err := s.beginProjectionOperation(ctx, workerCapacityProjection)
+	if err != nil {
+		return nil, out, err
+	}
+	raw, err := json.Marshal(p.initial.state.CapacityProjection)
+	if err != nil || json.Unmarshal(raw, &out) != nil {
+		p.Close()
+		return nil, out, cfg.ErrChanged
+	}
+	return p, out, nil
+}
+func (s *InstalledWorkerProjectionReader) BeginCleanupProjectionOperation(ctx context.Context) (*WorkerProjectionOperation, contracts.CaptureCleanupProjectionClaim, error) {
+	var out contracts.CaptureCleanupProjectionClaim
+	p, err := s.beginProjectionOperation(ctx, workerCleanupProjection)
+	if err != nil {
+		return nil, out, err
+	}
+	raw, err := json.Marshal(p.initial.state.CleanupProjection)
+	if err != nil || json.Unmarshal(raw, &out) != nil {
+		p.Close()
+		return nil, out, cfg.ErrChanged
+	}
+	return p, out, nil
+}
+
+func (s *InstalledWorkerProjectionReader) beginProjectionOperation(ctx context.Context, purpose workerProjectionPurpose) (*WorkerProjectionOperation, error) {
+	if s == nil || s.client == nil || s.guard == nil || s.guard.observer != s.client || s.input.Activation == nil || s.input.Activation.WorkerLayout != contracts.HubWorkerProviderInstalledLayout || ctx == nil || ctx.Err() != nil || purpose > workerCleanupProjection {
+		return nil, cfg.ErrUnavailable
+	}
+	started := s.client.now()
+	call, end := context.WithDeadline(ctx, started.Add(5*time.Second))
+	until, _ := call.Deadline()
+	p := &WorkerProjectionOperation{reader: s, purpose: purpose, ctx: call, cancel: end, started: started, until: until, changed: make(chan struct{})}
+	p.self = p
+	complete := false
+	defer func() {
+		if !complete {
+			p.Close()
+		}
+	}()
+	var err error
+	p.ctx, p.tokens, err = beginConfigurationWorkerTokens(call, s.client, s.guard.probe)
+	if err != nil {
+		return nil, err
+	}
+	p.initial, err = s.projectionNative(p.ctx, started, purpose, true)
+	if err == nil {
+		err = p.tokens.mountedCurrent(p.ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err = initialHandoverDeadline(p.ctx, s.client.now, p.until); err != nil {
+		return nil, err
+	}
+	complete = true
+	return p, nil
+}
+
+func (p *WorkerProjectionOperation) Context() context.Context {
+	if p == nil || p.self != p {
+		ctx, end := context.WithCancel(context.Background())
+		end()
+		return ctx
+	}
+	return p.ctx
+}
+
+func (p *WorkerProjectionOperation) FreshUntil() time.Time {
+	if p == nil || p.self != p {
+		return time.Time{}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed || p.ctx.Err() != nil || !p.reader.client.now().Before(p.until) {
+		return time.Time{}
+	}
+	return p.until
+}
+
+func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
+	if p == nil || p.self != p || ctx == nil {
+		return cfg.ErrUnavailable
+	}
+	p.mu.Lock()
+	if end, ok := ctx.Deadline(); ok {
+		p.until = identity.Earlier(p.until, end)
+	}
+	if p.closed || p.finished || p.busy || ctx.Err() != nil || p.ctx.Err() != nil || !p.reader.client.now().Before(p.until) {
+		p.mu.Unlock()
+		return cfg.ErrUnavailable
+	}
+	p.busy, p.finished = true, true
+	until := p.until
+	p.mu.Unlock()
+	call, end := context.WithDeadline(p.ctx, until)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() { end(); close(joined) })
+	defer func() {
+		end()
+		if !stop() {
+			<-joined
+		}
+		p.mu.Lock()
+		p.busy = false
+		close(p.changed)
+		p.changed = make(chan struct{})
+		p.mu.Unlock()
+	}()
+	last, err := p.reader.projectionNative(call, p.started, p.purpose, false)
+	if err == nil {
+		err = p.tokens.mountedCurrent(call)
+	}
+	if err == nil && (last.guard != p.initial.guard || !equalJSON(last.state, p.initial.state) || !configurationProviderDeploymentEqual(last.owner, p.initial.owner)) {
+		err = cfg.ErrChanged
+	}
+	p.mu.Lock()
+	if p.closed || ctx.Err() != nil || p.ctx.Err() != nil || initialHandoverDeadline(call, p.reader.client.now, p.until) != nil {
+		err = cfg.ErrUnavailable
+	}
+	if err != nil {
+		p.cancel()
+	}
+	p.mu.Unlock()
+	return err
+}
+
+func (p *WorkerProjectionOperation) Close() {
+	if p == nil || p.self != p {
+		return
+	}
+	p.mu.Lock()
+	p.closed = true
+	p.cancel()
+	for p.busy {
+		changed := p.changed
+		p.mu.Unlock()
+		<-changed
+		p.mu.Lock()
+	}
+	p.mu.Unlock()
+	p.tokens.close()
+}
+
+// Initial11S/3P and final10S preserve two complete current value passes. Only
+// the actual initial denial/SSR interval is reused, under unchanged token bytes.
+// No nested Current call repeats the same mutable facts inside either phase.
+func (s *InstalledWorkerProjectionReader) projectionNative(ctx context.Context, started time.Time, purpose workerProjectionPurpose, initial bool) (workerProjectionNative, error) {
+	var out workerProjectionNative
+	until, ok := ctx.Deadline()
+	if !ok {
+		return out, cfg.ErrInvalid
+	}
+	if initial {
+		ns, err := s.client.namespace(ctx, s.client.control)
+		if err != nil {
+			return out, err
+		}
+		if ns.Deleting {
+			return out, cfg.ErrChanged
+		}
+	}
+	g := s.guard
+	var err error
+	out.guard, err = checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
+	if err != nil {
+		return out, err
+	}
+	if initial {
+		var actor auth.UserInfo
+		out.owner, actor, err = g.proveObjectIdentity(ctx, started)
+		if err != nil {
+			return out, err
+		}
+		if !s.projectionActor(actor) {
+			return out, cfg.ErrDenied
+		}
+		raw, e := s.client.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
+		var self auth.SelfSubjectReview
+		if e != nil {
+			return out, cfg.ErrUnavailable
+		}
+		if strictGuardJSON(raw, &self) != nil || !s.projectionActor(self.Status.UserInfo) {
+			return out, cfg.ErrDenied
+		}
+	} else {
+		if err = s.get(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+g.plan.Deployment, &out.owner); err != nil {
+			return out, err
+		}
+		if out.owner.APIVersion != "apps/v1" || out.owner.Kind != "Deployment" || !ownerMetadata(out.owner.ObjectMeta, s.input.Namespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
+			return out, cfg.ErrChanged
+		}
+	}
+	out.state, err = s.journal(ctx)
+	if err != nil {
+		return out, err
+	}
+	if err = s.workload(ctx, out.state); err != nil {
+		return out, err
+	}
+	switch purpose {
+	case workerCapacityProjection:
+		p := out.state.CapacityProjection
+		if p == nil || p.Receipt == nil {
+			return out, cfg.ErrUnavailable
+		}
+		err = s.projectionMetadata(ctx, out.state.SetupID, p.OperationID, p.PublicDigest, p.Receipt.Secret, p.Receipt.ResourceVersion)
+	case workerCleanupProjection:
+		p := out.state.CleanupProjection
+		if p == nil || p.Receipt == nil {
+			return out, cfg.ErrUnavailable
+		}
+		err = s.projectionMetadata(ctx, out.state.SetupID, p.OperationID, p.PublicDigest, p.Receipt.Secret, p.Receipt.ResourceVersion)
+	default:
+		return out, cfg.ErrInvalid
+	}
+	if err != nil {
+		return out, err
+	}
+	if !initial {
+		ns, e := s.client.namespace(ctx, s.client.control)
+		if e != nil {
+			return out, e
+		}
+		if ns.Deleting {
+			return out, cfg.ErrChanged
+		}
+	}
+	if err = initialHandoverDeadline(ctx, s.client.now, until); err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+func (s *InstalledWorkerProjectionReader) projectionActor(actor auth.UserInfo) bool {
+	a := s.input.Activation.ServiceAccount
+	groups := slices.Clone(actor.Groups)
+	slices.Sort(groups)
+	if actor.Username != "system:serviceaccount:"+s.input.Namespace.Name+":"+a.Name || actor.UID != a.UID || !slices.Equal(groups, []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + s.input.Namespace.Name}) {
+		return false
+	}
+	for _, admin := range s.guard.plan.Administrators {
+		if actorMatches(admin, actor) {
+			return false
+		}
+	}
+	return true
+}

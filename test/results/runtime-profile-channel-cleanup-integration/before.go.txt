@@ -1,0 +1,382 @@
+// Package diagnostics implements bounded runtime diagnostic mechanisms. It does
+// not resolve public collection authority or publish collected evidence.
+package diagnostics
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"io"
+	"mime"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	port "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/execution"
+)
+
+type GoProfileCollector struct {
+	dialer port.GoProfileDialer
+	guard  port.GoProfileGuard
+	now    func() time.Time
+}
+
+var _ port.GoProfileCollector = (*GoProfileCollector)(nil)
+
+func NewGoProfileCollector(dialer port.GoProfileDialer, guard port.GoProfileGuard, now func() time.Time) (*GoProfileCollector, error) {
+	if dialer == nil || guard == nil || now == nil {
+		return nil, value.ErrInvalid
+	}
+	return &GoProfileCollector{dialer: dialer, guard: guard, now: now}, nil
+}
+
+// CollectGoProfile performs exactly one HTTP acquisition. It never spends a
+// grant/start, selects another endpoint, parses profiles, stops an application
+// profiler, retries an uncertain call or publishes a readable artifact.
+func (c *GoProfileCollector) CollectGoProfile(parent context.Context, r value.GoProfileRequest, sink port.GoProfileSink) (out port.GoProfileCollection, err error) {
+	if sink == nil {
+		return out, value.ErrInvalid
+	}
+	var watch *profileWatch
+	var channelDeadline time.Time
+	defer func() {
+		sink.Close()
+		// Output disposal also joins the original attempt. Check immutable/current
+		// cutoffs after it; the collector owns even an unopened prepared sink.
+		if err == nil && (parent.Err() != nil || r.Validate(c.now()) != nil || watch == nil || !watch.valid(c.now()) || !c.now().Before(channelDeadline)) {
+			out.Layout = artifact.Layout{}
+			out.Outcome.ResponseComplete = false
+			err = value.ErrExpired
+		}
+	}()
+	if c == nil || c.dialer == nil || c.guard == nil || c.now == nil || parent == nil {
+		return out, value.ErrInvalid
+	}
+	if parent.Err() != nil {
+		return out, value.ErrExpired
+	}
+	if invalid := r.Validate(c.now()); invalid != nil {
+		return out, invalid
+	}
+	ctx, deadlineCancel := context.WithDeadline(parent, r.Deadline)
+	defer deadlineCancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(context.Canceled)
+	initialCtx, initialCancel := context.WithTimeout(ctx, 5*time.Second)
+	observation, observeErr := c.guard.ObserveGoProfile(initialCtx, r)
+	initialErr := initialCtx.Err()
+	initialCancel()
+	if observeErr != nil || initialErr != nil || !observation.Valid(r, c.now()) || ctx.Err() != nil {
+		return out, value.ErrDenied
+	}
+	watch = c.watch(ctx, cancel, r, observation)
+	var channelCancel context.CancelFunc
+	defer func() {
+		if channelCancel != nil {
+			channelCancel()
+		}
+	}()
+	defer func() {
+		watch.stop()
+		// Joining the original observer and closing sockets are part of this
+		// operation. A late cancellation/expiry cannot return usable output.
+		if err == nil && (ctx.Err() != nil || parent.Err() != nil || !watch.valid(c.now())) {
+			out.Layout = artifact.Layout{}
+			out.Outcome.ResponseComplete = false
+			err = value.ErrExpired
+		}
+	}()
+	effectiveDeadline, hasDeadline := ctx.Deadline()
+	if !hasDeadline || !c.now().Add(r.Parameters.Duration+time.Second).Before(effectiveDeadline) {
+		return out, value.ErrExpired
+	}
+	channel, dialErr := c.dialer.DialGoProfile(ctx, r)
+	if channel.Connection != nil {
+		defer channel.Connection.Close()
+	}
+	if dialErr != nil || channel.Connection == nil {
+		return out, value.ErrProfileUnavailable
+	}
+	if !validProfileChannel(channel) || !c.now().Before(channel.ValidUntil) || channel.ValidUntil.After(r.Deadline) || ctx.Err() != nil || !watch.valid(c.now()) {
+		return out, value.ErrDenied
+	}
+	ctx, channelCancel = context.WithDeadline(ctx, channel.ValidUntil)
+	// Preserve the earliest original caller, action and channel cutoff. A
+	// longer channel lifetime cannot make an unfinishable recording admissible.
+	channelDeadline, hasDeadline = ctx.Deadline()
+	if !hasDeadline {
+		return out, value.ErrExpired
+	}
+	if err = channel.Connection.SetDeadline(channelDeadline); err != nil {
+		return out, value.ErrProfileUnavailable
+	}
+	// Interrupt a blocked Read/Write at current-observation loss too, not just
+	// at the original action deadline. Join the callback before returning.
+	closed := make(chan struct{})
+	stopClose := context.AfterFunc(ctx, func() { _ = channel.Connection.Close(); close(closed) })
+	defer func() {
+		if !stopClose() {
+			<-closed
+		}
+	}()
+	var taken atomic.Bool
+	transport := &http.Transport{
+		Proxy: nil,
+		DialContext: func(dialCtx context.Context, network, address string) (net.Conn, error) {
+			if network != "tcp" || address != "profile.invalid:80" || !taken.CompareAndSwap(false, true) || dialCtx.Err() != nil || ctx.Err() != nil || !watch.valid(c.now()) {
+				return nil, value.ErrDenied
+			}
+			return channel.Connection, nil
+		},
+		DisableCompression: true, DisableKeepAlives: true, ForceAttemptHTTP2: false,
+		MaxConnsPerHost: 1, MaxResponseHeaderBytes: 32 << 10,
+	}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	path, query := goProfilePath(r.Parameters)
+	request, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, (&url.URL{Scheme: "http", Host: "profile.invalid", Path: path, RawQuery: query}).String(), nil)
+	if requestErr != nil {
+		return out, value.ErrInvalid
+	}
+	request.Host = channel.Host
+	request.Header.Set("Accept", value.GoProfileMediaType)
+	request.Header.Set("Accept-Encoding", "identity")
+	request.Header.Set("User-Agent", "Asservat")
+	if channel.Authorization != "" {
+		request.Header.Set("Authorization", channel.Authorization)
+	}
+	// Dial/setup may have consumed the admitted margin. Do not contact the
+	// application unless its fixed requested duration still fits.
+	if ctx.Err() != nil || !watch.valid(c.now()) || !c.now().Add(r.Parameters.Duration+time.Second).Before(channelDeadline) {
+		return out, value.ErrExpired
+	}
+	out.Outcome = value.GoProfileOutcome{Format: r.Parameters.Format(), StartedAt: c.now().UTC(), MayHaveStarted: true}
+	response, responseErr := client.Do(request)
+	if response != nil && response.Body != nil {
+		defer response.Body.Close()
+	}
+	if responseErr != nil || response == nil {
+		return out, profileOperationError(ctx, value.ErrProfileUnavailable)
+	}
+	if response.StatusCode != http.StatusOK {
+		return out, classifyProfileStatus(ctx, response, r.Parameters)
+	}
+	media, _, mediaErr := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if mediaErr != nil || media != value.GoProfileMediaType {
+		return out, value.ErrProfileUnavailable
+	}
+	if response.ContentLength == 0 {
+		return out, value.ErrProfileUnavailable
+	}
+	if response.ContentLength > r.NativeLimit {
+		return out, value.ErrProfileLimit
+	}
+	body := &profileBody{ctx: ctx, source: response.Body, remaining: r.NativeLimit}
+	layout, sinkErr := sink.ConsumeGoProfile(ctx, r, body)
+	out.Outcome.NativeBytes = r.NativeLimit - body.remaining
+	if body.failure != nil {
+		return out, profileOperationError(ctx, body.failure)
+	}
+	if sinkErr != nil {
+		return out, profileOperationError(ctx, value.ErrProfileOutput)
+	}
+	if !body.eof || out.Outcome.NativeBytes == 0 || layout.Validate() != nil || layout.Binding != r.Binding || layout.NativeBytes != out.Outcome.NativeBytes {
+		return out, value.ErrProfileOutput
+	}
+	if ctx.Err() != nil || !watch.valid(c.now()) {
+		return out, value.ErrExpired
+	}
+	out.Outcome.CompletedAt = c.now().UTC()
+	out.Outcome.ResponseComplete = true
+	out.Layout = layout
+	return out, nil
+}
+
+func validProfileChannel(c port.GoProfileChannel) bool {
+	if c.Connection == nil || len(c.Host) == 0 || len(c.Host) > 253 || strings.ContainsAny(c.Host, "/\\?#@%\r\n\t ") || len(c.Authorization) > 4096 {
+		return false
+	}
+	for _, s := range []string{c.Host, c.Authorization} {
+		for _, b := range []byte(s) {
+			if b < 32 || b > 126 {
+				return false
+			}
+		}
+	}
+	u, err := url.Parse("http://" + c.Host)
+	if err != nil || u.Host != c.Host || u.Hostname() == "" || u.User != nil || u.Path != "" {
+		return false
+	}
+	secure, hasTLS := c.Connection.(interface{ ConnectionState() tls.ConnectionState })
+	if c.Authorization != "" && !hasTLS {
+		return false
+	}
+	if hasTLS {
+		state := secure.ConnectionState()
+		if !state.HandshakeComplete || state.Version < tls.VersionTLS12 || len(state.VerifiedChains) == 0 || (state.NegotiatedProtocol != "" && state.NegotiatedProtocol != "http/1.1") {
+			return false
+		}
+	}
+	return true
+}
+
+func goProfilePath(p value.GoProfileParameters) (string, string) {
+	name := p.Type
+	if name == "cpu" {
+		name = "profile"
+	}
+	if name == "runtimeTrace" {
+		name = "trace"
+	}
+	q := url.Values{"debug": []string{"0"}}
+	if p.Duration > 0 {
+		q.Set("seconds", strconv.FormatInt(int64(p.Duration/time.Second), 10))
+	}
+	if p.ForceGC {
+		q.Set("gc", "1")
+	}
+	return "/debug/pprof/" + name, q.Encode()
+}
+
+func classifyProfileStatus(ctx context.Context, r *http.Response, p value.GoProfileParameters) error {
+	if r.StatusCode == http.StatusInternalServerError && r.Header.Get("X-Go-Pprof") == "1" && (p.Type == "cpu" || p.Type == "runtimeTrace") {
+		var buffer [513]byte
+		defer clear(buffer[:])
+		n, err := io.ReadFull(r.Body, buffer[:])
+		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) && n <= 512 && ctx.Err() == nil {
+			text := string(buffer[:n])
+			if p.Type == "cpu" && text == "Could not enable CPU profiling: cpu profiling already in use\n" || p.Type == "runtimeTrace" && text == "Could not enable tracing: tracing is already enabled\n" {
+				return value.ErrProfilerBusy
+			}
+		}
+	}
+	return profileOperationError(ctx, value.ErrProfileUnavailable)
+}
+
+func profileOperationError(ctx context.Context, otherwise error) error {
+	if ctx.Err() != nil {
+		return value.ErrExpired
+	}
+	return otherwise
+}
+
+type profileBody struct {
+	ctx       context.Context
+	source    io.Reader
+	remaining int64
+	eof       bool
+	failure   error
+}
+
+func (b *profileBody) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if b.failure != nil {
+		return 0, b.failure
+	}
+	if b.ctx.Err() != nil {
+		b.failure = value.ErrExpired
+		return 0, b.failure
+	}
+	n, err := b.source.Read(p[:min(int64(len(p)), b.remaining+1)])
+	if n < 0 || n > len(p) {
+		b.failure = value.ErrProfileUnavailable
+		return 0, b.failure
+	}
+	if int64(n) > b.remaining {
+		clear(p[b.remaining:n])
+		b.failure = value.ErrProfileLimit
+		return 0, b.failure
+	}
+	b.remaining -= int64(n)
+	if b.ctx.Err() != nil {
+		clear(p[:n])
+		b.failure = value.ErrExpired
+		return 0, b.failure
+	}
+	if errors.Is(err, io.EOF) {
+		b.eof = true
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		b.failure = value.ErrProfileUnavailable
+		return n, b.failure
+	}
+	return n, err
+}
+
+type profileWatch struct {
+	mu         sync.Mutex
+	request    value.GoProfileRequest
+	current    value.GoProfileCurrent
+	cancel     context.CancelFunc
+	done       chan struct{}
+	expiry     *time.Timer
+	expiryDone chan struct{}
+}
+
+func (w *profileWatch) valid(now time.Time) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.current.Valid(w.request, now)
+}
+func (w *profileWatch) stop() {
+	w.cancel()
+	<-w.done
+	if !w.expiry.Stop() {
+		<-w.expiryDone
+	}
+}
+
+func (c *GoProfileCollector) watch(ctx context.Context, cancel context.CancelCauseFunc, r value.GoProfileRequest, initial value.GoProfileCurrent) *profileWatch {
+	watchCtx, stop := context.WithCancel(ctx)
+	w := &profileWatch{request: r, current: initial, cancel: stop, done: make(chan struct{}), expiryDone: make(chan struct{})}
+	w.expiry = time.AfterFunc(time.Until(initial.ValidUntil), func() { cancel(value.ErrExpired); close(w.expiryDone) })
+	go func() {
+		defer close(w.done)
+		for {
+			w.mu.Lock()
+			previous := w.current
+			w.mu.Unlock()
+			wait := min(time.Second, time.Until(previous.ValidUntil)/2)
+			if wait <= 0 {
+				cancel(value.ErrExpired)
+				return
+			}
+			timer := time.NewTimer(wait)
+			select {
+			case <-watchCtx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			checkCtx, stopCheck := context.WithDeadline(watchCtx, previous.ValidUntil)
+			next, err := c.guard.ObserveGoProfile(checkCtx, r)
+			checkErr := checkCtx.Err()
+			stopCheck()
+			if watchCtx.Err() != nil {
+				return
+			}
+			if err != nil || checkErr != nil || !next.Valid(r, c.now()) || next.CheckedAt.Before(previous.CheckedAt) {
+				cancel(value.ErrDenied)
+				return
+			}
+			if !w.expiry.Stop() {
+				cancel(value.ErrExpired)
+				return
+			}
+			w.mu.Lock()
+			w.current = next
+			w.mu.Unlock()
+			w.expiry.Reset(time.Until(next.ValidUntil))
+		}
+	}()
+	return w
+}

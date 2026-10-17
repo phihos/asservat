@@ -1,0 +1,11 @@
+--- a/internal/bootstrap/hub_worker.go
++++ b/internal/bootstrap/hub_worker.go
+@@ -263,7 +263,7 @@
+ 		return mounts.ErrUnavailable
+ 	}
+ 	defer files.Close()
+-	d, err := NewHubWorkerDeployment(ctx, files)
++	d, err := NewProvisionedHubWorkerDeployment(ctx, files)
+ 	if err != nil {
+ 		return err
+ 	}

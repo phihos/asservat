@@ -1,0 +1,279 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	admission "k8s.io/api/admissionregistration/v1"
+	auth "k8s.io/api/authentication/v1"
+	authz "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	apiMeta "k8s.io/apimachinery/pkg/api/meta"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+)
+
+// The API enforcement, original activation and accepted SQL source in this
+// loopback fixture are explicitly synthetic. Actual production constructors,
+// complete negative proof calls, original clock and CAS bodies remain intact.
+// This exercises composition; it is neither native Kubernetes admission nor a
+// real SQL/provider qualification or a measurement of API-rate availability.
+type ownerIdentityProducerFixture struct {
+	api       *preparerFixture
+	resources *InitialRuntimeResources
+	bridge    *InitialRuntimeBridge
+	root      *OwnerIdentityRoleRoot
+	source    *ConfigurationRoleSource
+	accepted  *ownerIdentityAcceptedFixture
+	effects   *rootPinEffectFixture
+	fault     atomic.Int32
+}
+
+type ownerIdentityAcceptedFixture struct {
+	source *OwnerConfigurationSource
+	fault  *atomic.Int32
+}
+
+func (s *ownerIdentityAcceptedFixture) ReadOwnerConfiguration(ctx context.Context) (fleet.OwnerConfigurationObservation, error) {
+	v, e := s.source.ReadOwnerConfiguration(ctx)
+	if e == nil && s.fault.Load() == 3 {
+		v.Configuration.Pool.ServiceUID = ownerID(4900)
+	}
+	return v, e
+}
+
+func newOwnerIdentityProducerFixture(t *testing.T) *ownerIdentityProducerFixture {
+	t.Helper()
+	f, p, original := handoverConflictFixture(t)
+	effects := rootPinEffects(t, p, original)
+	resources, e := NewInstalledOwnerRuntimeResources(context.Background(), p, effects, [][]byte{ownerConfigurationTestRoot(t, time.Now())})
+	if e != nil {
+		t.Fatal("installed resource constructor", e)
+	}
+	t.Cleanup(resources.Close)
+	out := &ownerIdentityProducerFixture{api: f, resources: resources, effects: effects}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	state := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: resources.binding, SetupID: ownerID(4500), WorkerLayout: contracts.HubWorkerInstalledLayout, OwnerLayout: contracts.OwnerInstalledLayout, CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
+	put := func(path string, object any) {
+		t.Helper()
+		b, e := json.Marshal(object)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var v map[string]any
+		if json.Unmarshal(b, &v) != nil {
+			t.Fatal("fixture object")
+		}
+		f.objects[path] = v
+	}
+	f.mu.Lock()
+	for i, item := range initialRuntimeResourceItems {
+		object, e := resources.object(state, i)
+		if e != nil {
+			f.mu.Unlock()
+			t.Fatal(e)
+		}
+		state.Objects = append(state.Objects, contracts.InitialRuntimeResourceClaim{Item: item, OperationID: ownerID(4510 + i), TemplateDigest: preparationDigest(object.object), ClaimedAt: now, Until: now.Add(5 * time.Second), Receipt: &contracts.InitialRuntimeResourceReceipt{UID: ownerID(4550 + i), ResourceVersion: "1", Generation: 1}})
+		m, e := apiMeta.Accessor(object.object)
+		if e != nil {
+			f.mu.Unlock()
+			t.Fatal(e)
+		}
+		m.SetUID(types.UID(state.Objects[i].Receipt.UID))
+		m.SetResourceVersion("1")
+		m.SetGeneration(1)
+		m.SetAnnotations(map[string]string{initialRuntimeResourceMarker: state.Objects[i].OperationID})
+		if policy, ok := object.object.(*admission.ValidatingAdmissionPolicy); ok {
+			policy.Status.ObservedGeneration = 1
+			policy.Status.TypeChecking = &admission.TypeChecking{}
+		}
+		put(object.collection+"/"+m.GetName(), object.object)
+	}
+	encoded, _ := json.Marshal(state)
+	put(resources.path(), &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: resources.name(), Namespace: resources.initial.Namespace.Name, UID: types.UID(ownerID(4590)), ResourceVersion: "1"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": encoded}})
+	// ConfigMap generation comes from the API; the original helper's generic
+	// store intentionally omits it. No source value or UID is changed here.
+	fleetPath := "/api/v1/namespaces/" + resources.initial.Namespace.Name + "/configmaps/" + resources.initial.FleetSource.Name
+	f.objects[fleetPath]["metadata"].(map[string]any)["generation"] = float64(1)
+	f.mu.Unlock()
+	inventory, e := resources.inventory(state)
+	if e != nil {
+		t.Fatal("fixture original inventory", e)
+	}
+	control := cfg.NamespaceRef{Name: inventory.Namespace.Name, UID: inventory.Namespace.UID}
+	observer, e := NewPermissionClient(f.client, resources.initial.ClusterID, control, f.clock)
+	if e != nil {
+		t.Fatal(e)
+	}
+	probe := func(token string) *PermissionClient {
+		c := rest.CopyConfig(f.client)
+		c.BearerToken = token
+		v, e := NewPermissionClient(c, resources.initial.ClusterID, control, f.clock)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return v
+	}
+	ownerProbe, workerProbe := probe("owner-probe"), probe("worker-probe")
+	pin := func(g contracts.OwnerDeploymentGuard) GuardPin {
+		return GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
+	}
+	protection, e := NewOwnerWorkloadProtection(observer, ownerProbe, inventory.BridgeAdministration.Owner, pin(inventory.WorkloadGuard))
+	if e != nil {
+		t.Fatal(e)
+	}
+	plan := func(g contracts.OwnerDeploymentGuard, name string) cfg.ConfigMapAdministration {
+		return cfg.ConfigMapAdministration{Name: g.Name, SourceName: name, ControlNamespace: control, Administrators: inventory.BridgeAdministration.Owner.Administrators}
+	}
+	fleetGuard, e := NewFleetConfigurationProtection(observer, workerProbe, plan(inventory.FleetGuard, inventory.FleetSource.Name), pin(inventory.FleetGuard))
+	if e != nil {
+		t.Fatal(e)
+	}
+	fleetSource, e := NewProtectedFleetSettings(observer, fleetGuard, inventory.FleetSource.Name, inventory.FleetSource.UID, resources.initial.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ownerGuard, e := NewOwnerConfigurationProtection(observer, workerProbe, plan(inventory.OwnerSourceGuard, inventory.OwnerSource.Name), pin(inventory.OwnerSourceGuard))
+	if e != nil {
+		t.Fatal(e)
+	}
+	ownerSource, e := NewOwnerConfigurationSource(observer, ownerGuard, inventory.OwnerSource.Name, inventory.OwnerSource.UID, resources.initial.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	source, e := NewConfigurationRoleSource(observer, protection, fleetSource, ownerSource, contracts.ConfigurationRuntimeRoles{Format: contracts.ConfigurationRuntimeRolesFormat, InstallationID: resources.initial.InstallationID, InitialClaimID: effects.record.Claim.ID, ClusterID: resources.initial.ClusterID, Namespace: inventory.Namespace, Deployment: inventory.WorkerDeployment, ServiceAccount: inventory.WorkerAccount, FleetSource: inventory.FleetSource, OwnerSource: inventory.OwnerSource, LayoutDigest: strings.Repeat("a", 64)})
+	if e != nil {
+		t.Fatal(e)
+	}
+	out.source = source
+	f.mu.Lock()
+	previous := f.extra
+	f.extra = func(w http.ResponseWriter, r *http.Request) bool {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/selfsubjectreviews") {
+			ref := contracts.WorkerObjectReference{}
+			switch r.Header.Get("Authorization") {
+			case "Bearer owner-probe":
+				ref = inventory.OwnerAccount
+			case "Bearer worker-probe":
+				ref = inventory.WorkerAccount
+			}
+			if ref.Name != "" {
+				permissionReply(w, auth.SelfSubjectReview{Status: auth.SelfSubjectReviewStatus{UserInfo: auth.UserInfo{Username: "system:serviceaccount:" + control.Name + ":" + ref.Name, UID: ref.UID, Groups: []string{"system:authenticated"}}}})
+				return true
+			}
+		}
+		if out.fault.Load() == 1 && strings.HasSuffix(path, "/selfsubjectaccessreviews") {
+			permissionReply(w, authz.SelfSubjectAccessReview{Status: authz.SubjectAccessReviewStatus{Allowed: false}})
+			return true
+		}
+		if r.Method == http.MethodPut && r.URL.Query().Get("dryRun") == "All" {
+			policy, denial, kind := "", "", "configmaps"
+			switch {
+			case strings.HasSuffix(path, "/deployments/"+inventory.OwnerDeployment.Name):
+				policy, denial, kind = inventory.WorkloadGuard.Name, ownerWorkloadDenial, "deployments"
+			case strings.HasSuffix(path, "/configmaps/"+inventory.FleetSource.Name):
+				policy, denial = inventory.FleetGuard.Name, fleetConfigurationDenial
+			case strings.HasSuffix(path, "/configmaps/"+inventory.OwnerSource.Name):
+				policy, denial = inventory.OwnerSourceGuard.Name, ownerConfigurationDenial
+			}
+			if policy != "" {
+				if out.fault.Load() == 2 {
+					permissionReply(w, f.objects[path])
+					return true
+				}
+				group := ""
+				if kind == "deployments" {
+					group = "apps"
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: group, Kind: kind, Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + policy + "' with binding '" + policy + "' denied request: " + denial}}}})
+				return true
+			}
+		}
+		if r.Method == http.MethodPut && strings.HasSuffix(path, "/deployments/"+inventory.OwnerDeployment.Name) {
+			raw, e := io.ReadAll(r.Body)
+			if e != nil {
+				t.Error(e)
+				return true
+			}
+			var next map[string]any
+			if json.Unmarshal(raw, &next) != nil {
+				t.Error("launch body")
+				return true
+			}
+			old := f.objects[path]
+			m := next["metadata"].(map[string]any)
+			om := old["metadata"].(map[string]any)
+			if m["uid"] != om["uid"] || m["resourceVersion"] != om["resourceVersion"] {
+				f.status(w, 409, meta.StatusReasonConflict, "deployments", "")
+				return true
+			}
+			f.serial++
+			m["resourceVersion"] = strconv.Itoa(f.serial)
+			m["generation"] = float64(2)
+			f.objects[path] = next
+			permissionReply(w, next)
+			return true
+		}
+		return previous != nil && previous(w, r)
+	}
+	f.mu.Unlock()
+	bridge, e := NewInitialRuntimeBridge(context.Background(), p, source, effects, inventory.BridgeAdministration)
+	if e != nil {
+		t.Fatal("retained bridge constructor", e)
+	}
+	t.Cleanup(bridge.Close)
+	out.bridge = bridge
+	// Original completed phase2 is synthetic setup, never a result claimed by
+	// this test. Every subsequent read still checks its exact native guard shape.
+	at := time.Now().UTC().Truncate(time.Microsecond)
+	bridgeState := contracts.InitialRuntimeBridgeState{Format: contracts.InitialRuntimeBridgeStateFormat, BindingDigest: bridge.binding, SetupID: ownerID(4600), CreatedAt: at.Add(-time.Minute), Until: at.Add(29 * time.Minute)}
+	bridgeState.Probe = &contracts.InitialRuntimeBridgeTransition{OperationID: ownerID(4601), FromResourceVersion: "1", FromGeneration: 1, ClaimedAt: at.Add(-30 * time.Second), Until: at.Add(-25 * time.Second), Receipt: &contracts.InitialRuntimeBridgeReceipt{PolicyUID: bridge.guards[0].pin.PolicyUID, ResourceVersion: "2", Generation: 2, SpecDigest: initialRuntimeBridgeSpecDigest(bridge.policies[1])}}
+	bridgeState.Retained = &contracts.InitialRuntimeBridgeTransition{OperationID: ownerID(4602), FromResourceVersion: "2", FromGeneration: 2, ClaimedAt: at.Add(-20 * time.Second), Until: at.Add(-15 * time.Second), Receipt: &contracts.InitialRuntimeBridgeReceipt{PolicyUID: bridge.guards[0].pin.PolicyUID, ResourceVersion: "3", Generation: 3, SpecDigest: initialRuntimeBridgeSpecDigest(bridge.policies[2])}}
+	if !bridge.validState(bridgeState, at) {
+		t.Fatal("synthetic bridge state invalid")
+	}
+	encoded, _ = json.Marshal(bridgeState)
+	f.mu.Lock()
+	put(bridge.path(), &core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: bridge.name(), Namespace: control.Name, UID: types.UID(ownerID(4603)), ResourceVersion: "1"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": encoded}})
+	policy := bridge.policies[2].DeepCopy()
+	policy.TypeMeta = meta.TypeMeta{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingAdmissionPolicy"}
+	policy.UID = types.UID(bridge.guards[2].pin.PolicyUID)
+	policy.ResourceVersion = "3"
+	policy.Generation = 3
+	policy.Annotations = map[string]string{initialRuntimeBridgeMarker: bridgeState.Retained.OperationID}
+	policy.Status.ObservedGeneration = 3
+	policy.Status.TypeChecking = &admission.TypeChecking{}
+	put(bridge.policyPath(), policy)
+	f.mu.Unlock()
+	accepted := &ownerIdentityAcceptedFixture{source: ownerSource, fault: &out.fault}
+	out.accepted = accepted
+	// Separate preflight assertions localize fixture setup failures. These are
+	// independent reads, never reused as authority for the constructor below.
+	if _, e := bridge.ReadInitialRuntimeBridge(context.Background()); e != nil {
+		t.Fatal("synthetic retained bridge preflight", e)
+	}
+	if _, e := accepted.ReadOwnerConfiguration(context.Background()); e != nil {
+		t.Fatal("synthetic accepted-source preflight", e)
+	}
+	root, e := NewOwnerIdentityRoleRoot(context.Background(), bridge, resources, accepted, strings.Repeat("d", 64))
+	if e != nil {
+		t.Fatal("actual owner root constructor under synthetic original proof", e)
+	}
+	t.Cleanup(root.Close)
+	out.root = root
+	return out
+}

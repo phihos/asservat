@@ -1,0 +1,5 @@
+--- FAIL: TestDownloadAuditEqualitySurvivesPersistence (0.00s)
+    download_equality_test.go:33: persistence changed equality of the original audit record
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.002s
+FAIL

@@ -1,0 +1,450 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-11 18:08:54.806 UTC [49] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-11 18:08:54.806 UTC [49] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-11 18:08:54.816 UTC [55] LOG:  database system was shut down at 2026-10-11 18:08:54 UTC
+2026-10-11 18:08:54.826 UTC [49] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-11 18:08:54.985 UTC [49] LOG:  received fast shutdown request
+.2026-10-11 18:08:54.988 UTC [49] LOG:  aborting any active transactions
+2026-10-11 18:08:54.989 UTC [49] LOG:  background worker "logical replication launcher" (PID 58) exited with exit code 1
+2026-10-11 18:08:54.989 UTC [53] LOG:  shutting down
+2026-10-11 18:08:54.992 UTC [53] LOG:  checkpoint starting: shutdown immediate
+2026-10-11 18:08:55.972 UTC [53] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.029 s, sync=0.938 s, total=0.984 s; sync files=303, longest=0.009 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+.2026-10-11 18:08:55.987 UTC [49] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-11 18:08:56.107 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-11 18:08:56.107 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-11 18:08:56.107 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-11 18:08:56.110 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-11 18:08:56.117 UTC [119] LOG:  database system was shut down at 2026-10-11 18:08:55 UTC
+2026-10-11 18:08:56.122 UTC [1] LOG:  database system is ready to accept connections
+2026-10-11 18:08:56.237 UTC [130] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-11 18:08:56.237 UTC [130] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-11 18:09:03.330 UTC [146] ERROR:  permission denied for table custody_pool
+2026-10-11 18:09:03.330 UTC [146] STATEMENT:  UPDATE custody_pool SET paused=true
+2026-10-11 18:09:03.330 UTC [146] ERROR:  permission denied for table permission_assignment
+2026-10-11 18:09:03.330 UTC [146] STATEMENT:  DELETE FROM permission_assignment
+2026-10-11 18:09:05.152 UTC [149] ERROR:  bootstrap issuance receipts are immutable
+2026-10-11 18:09:05.152 UTC [149] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-11 18:09:05.152 UTC [149] STATEMENT:  UPDATE fleet_bootstrap_intent SET credential_sha256=decode(repeat('ab',32),'hex') WHERE installation_id=$1
+2026-10-11 18:09:05.152 UTC [149] ERROR:  bootstrap issuance receipts are immutable
+2026-10-11 18:09:05.152 UTC [149] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-11 18:09:05.152 UTC [149] STATEMENT:  UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1
+2026-10-11 18:09:05.700 UTC [151] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:05.700 UTC [151] STATEMENT:  -- name: AcknowledgeBootstrapIssue :execrows
+	UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=clock_timestamp(),audit_digest=$3,
+	 audit_object_key=$4,audit_object_version=$5,audit_object_etag=$6,audit_object_bytes=$7,audit_object_sha256=$8
+	WHERE installation_id=$1 AND id=$2 AND credential_recorded_at IS NOT NULL AND audit_acknowledged_at IS NULL
+	
+2026-10-11 18:09:05.707 UTC [152] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:05.707 UTC [152] STATEMENT:  -- name: CreateIssuedBootstrap :exec
+	INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,
+	 issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,$10,$11,$12)
+	
+2026-10-11 18:09:05.714 UTC [149] ERROR:  bootstrap issuance receipts are immutable
+2026-10-11 18:09:05.714 UTC [149] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-11 18:09:05.714 UTC [149] STATEMENT:  UPDATE fleet_bootstrap_intent SET issued_at=NULL WHERE installation_id=$1
+2026-10-11 18:09:05.714 UTC [150] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:05.714 UTC [150] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-11 18:09:05.715 UTC [150] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:05.715 UTC [150] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-11 18:09:05.715 UTC [150] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:05.715 UTC [150] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-11 18:09:05.715 UTC [150] ERROR:  permission denied for table fleet_peer
+2026-10-11 18:09:05.715 UTC [150] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-11 18:09:05.716 UTC [151] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:05.716 UTC [151] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-11 18:09:05.717 UTC [151] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:05.717 UTC [151] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-11 18:09:05.717 UTC [151] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:05.717 UTC [151] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-11 18:09:05.718 UTC [151] ERROR:  permission denied for table fleet_peer
+2026-10-11 18:09:05.718 UTC [151] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-11 18:09:05.718 UTC [152] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:05.718 UTC [152] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-11 18:09:05.719 UTC [152] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:05.719 UTC [152] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-11 18:09:05.719 UTC [152] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:05.719 UTC [152] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-11 18:09:05.720 UTC [152] ERROR:  permission denied for table fleet_peer
+2026-10-11 18:09:05.720 UTC [152] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-11 18:09:05.720 UTC [157] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:05.720 UTC [157] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-11 18:09:05.720 UTC [157] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:05.720 UTC [157] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-11 18:09:05.721 UTC [157] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:05.721 UTC [157] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-11 18:09:05.721 UTC [157] ERROR:  permission denied for table fleet_peer
+2026-10-11 18:09:05.721 UTC [157] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-11 18:09:06.241 UTC [168] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:06.241 UTC [168] STATEMENT:  UPDATE fleet_bootstrap_intent SET not_after=not_after+interval '1 minute' WHERE installation_id=$1
+2026-10-11 18:09:06.241 UTC [168] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-11 18:09:06.241 UTC [168] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-11 18:09:06.241 UTC [168] ERROR:  permission denied for table fleet_peer
+2026-10-11 18:09:06.241 UTC [168] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-11 18:09:06.242 UTC [168] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:06.242 UTC [168] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-11 18:09:06.242 UTC [168] ERROR:  permission denied for table fleet_bootstrap
+2026-10-11 18:09:06.242 UTC [168] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-11 18:09:06.243 UTC [161] ERROR:  bootstrap intent binding is immutable
+2026-10-11 18:09:06.243 UTC [161] CONTEXT:  PL/pgSQL function guard_bootstrap_intent() line 9 at RAISE
+2026-10-11 18:09:06.243 UTC [161] STATEMENT:  UPDATE fleet_bootstrap_intent SET display_name='replacement' WHERE installation_id=$1
+2026-10-11 18:09:06.260 UTC [170] ERROR:  permission denied for table permission_stream
+2026-10-11 18:09:06.260 UTC [170] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-11 18:09:06.260 UTC [170] ERROR:  permission denied for table context_storage_binding
+2026-10-11 18:09:06.260 UTC [170] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-11 18:09:06.261 UTC [170] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:06.261 UTC [170] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-11 18:09:06.261 UTC [170] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:06.261 UTC [170] STATEMENT:  DELETE FROM context_capture
+2026-10-11 18:09:07.135 UTC [182] ERROR:  new row for relation "context_control_pool" violates check constraint "context_control_pool_check"
+2026-10-11 18:09:07.135 UTC [182] DETAIL:  Failing row contains (10000000-0000-4000-8000-00000000007b, t, f, 1, 2026-10-11 19:09:07.135276+00, 0, 0, 1, 1).
+2026-10-11 18:09:07.135 UTC [182] STATEMENT:  UPDATE context_control_pool SET configured=true,revision=1,valid_until=clock_timestamp()+interval '1 hour',full_limit=0,replay_limit=0
+2026-10-11 18:09:07.147 UTC [117] LOG:  checkpoint starting: immediate force wait
+2026-10-11 18:09:07.321 UTC [117] LOG:  checkpoint complete: wrote 586 buffers (3.6%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.060 s, sync=0.099 s, total=0.174 s; sync files=362, longest=0.085 s, average=0.001 s; distance=12291 kB, estimate=12291 kB; lsn=0/2795DB8, redo lsn=0/2795D60
+2026-10-11 18:09:09.237 UTC [181] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.237 UTC [181] STATEMENT:  UPDATE context_control_account SET charged_full=0
+2026-10-11 18:09:09.237 UTC [181] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.237 UTC [181] STATEMENT:  UPDATE context_control_account SET charged_replay=0
+2026-10-11 18:09:09.237 UTC [181] ERROR:  permission denied for table context_control_pool
+2026-10-11 18:09:09.237 UTC [181] STATEMENT:  UPDATE context_control_pool SET backed_full=0
+2026-10-11 18:09:09.238 UTC [181] ERROR:  permission denied for table context_control_charge
+2026-10-11 18:09:09.238 UTC [181] STATEMENT:  DELETE FROM context_control_charge
+2026-10-11 18:09:09.238 UTC [181] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.238 UTC [181] STATEMENT:  DELETE FROM context_control_account
+2026-10-11 18:09:09.238 UTC [181] ERROR:  permission denied for table context_control_pool
+2026-10-11 18:09:09.238 UTC [181] STATEMENT:  DELETE FROM context_control_pool
+2026-10-11 18:09:09.238 UTC [181] ERROR:  permission denied for function reserve_context_control_charge
+2026-10-11 18:09:09.238 UTC [181] STATEMENT:  SELECT reserve_context_control_charge()
+2026-10-11 18:09:09.238 UTC [181] ERROR:  permission denied for function back_context_control_account
+2026-10-11 18:09:09.238 UTC [181] STATEMENT:  SELECT back_context_control_account()
+2026-10-11 18:09:09.239 UTC [190] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.239 UTC [190] STATEMENT:  UPDATE context_control_account SET charged_full=0
+2026-10-11 18:09:09.239 UTC [190] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.239 UTC [190] STATEMENT:  UPDATE context_control_account SET charged_replay=0
+2026-10-11 18:09:09.239 UTC [190] ERROR:  permission denied for table context_control_pool
+2026-10-11 18:09:09.239 UTC [190] STATEMENT:  UPDATE context_control_pool SET backed_full=0
+2026-10-11 18:09:09.239 UTC [190] ERROR:  permission denied for table context_control_charge
+2026-10-11 18:09:09.239 UTC [190] STATEMENT:  DELETE FROM context_control_charge
+2026-10-11 18:09:09.239 UTC [190] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.239 UTC [190] STATEMENT:  DELETE FROM context_control_account
+2026-10-11 18:09:09.240 UTC [190] ERROR:  permission denied for table context_control_pool
+2026-10-11 18:09:09.240 UTC [190] STATEMENT:  DELETE FROM context_control_pool
+2026-10-11 18:09:09.240 UTC [190] ERROR:  permission denied for function reserve_context_control_charge
+2026-10-11 18:09:09.240 UTC [190] STATEMENT:  SELECT reserve_context_control_charge()
+2026-10-11 18:09:09.240 UTC [190] ERROR:  permission denied for function back_context_control_account
+2026-10-11 18:09:09.240 UTC [190] STATEMENT:  SELECT back_context_control_account()
+2026-10-11 18:09:09.242 UTC [190] ERROR:  control account configuration revision mismatch
+2026-10-11 18:09:09.242 UTC [190] CONTEXT:  PL/pgSQL function public.guard_context_control_account() line 18 at RAISE
+2026-10-11 18:09:09.242 UTC [190] STATEMENT:  UPDATE context_control_account SET full_limit=full_limit+1
+2026-10-11 18:09:09.242 UTC [190] ERROR:  control pool configuration revision mismatch
+2026-10-11 18:09:09.242 UTC [190] CONTEXT:  PL/pgSQL function public.guard_context_control_pool() line 16 at RAISE
+2026-10-11 18:09:09.242 UTC [190] STATEMENT:  UPDATE context_control_pool SET full_limit=full_limit+1
+2026-10-11 18:09:09.243 UTC [190] ERROR:  control backing is unavailable
+2026-10-11 18:09:09.243 UTC [190] CONTEXT:  PL/pgSQL function public.back_context_control_account() line 15 at RAISE
+2026-10-11 18:09:09.243 UTC [190] STATEMENT:  UPDATE context_control_account SET configured=false
+2026-10-11 18:09:09.375 UTC [179] ERROR:  accepted context requires retained control charge
+2026-10-11 18:09:09.375 UTC [179] CONTEXT:  PL/pgSQL function public.require_context_control_charge() line 7 at RAISE
+2026-10-11 18:09:09.375 UTC [179] STATEMENT:  SET CONSTRAINTS context_control_capture_charge IMMEDIATE
+2026-10-11 18:09:09.765 UTC [191] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:09.765 UTC [191] STATEMENT:  DELETE FROM context_capture
+2026-10-11 18:09:09.766 UTC [191] ERROR:  permission denied for table context_control_charge
+2026-10-11 18:09:09.766 UTC [191] STATEMENT:  DELETE FROM context_control_charge
+2026-10-11 18:09:09.766 UTC [191] ERROR:  permission denied for table context_control_account
+2026-10-11 18:09:09.766 UTC [191] STATEMENT:  UPDATE context_control_account SET charged_full=0
+2026-10-11 18:09:12.491 UTC [192] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:12.491 UTC [192] STATEMENT:  INSERT INTO context_capture DEFAULT VALUES
+2026-10-11 18:09:12.492 UTC [192] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:12.492 UTC [192] STATEMENT:  UPDATE context_capture SET preview_id=NULL
+2026-10-11 18:09:12.492 UTC [192] ERROR:  permission denied for table context_preview
+2026-10-11 18:09:12.492 UTC [192] STATEMENT:  UPDATE context_preview SET deadline=deadline+interval '1 second'
+2026-10-11 18:09:12.492 UTC [192] ERROR:  permission denied for table custody_allocation
+2026-10-11 18:09:12.492 UTC [192] STATEMENT:  UPDATE custody_allocation SET charged_objects=0
+2026-10-11 18:09:12.492 UTC [192] ERROR:  permission denied for table permission_stream
+2026-10-11 18:09:12.492 UTC [192] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-11 18:09:12.493 UTC [192] ERROR:  permission denied for function guard_context_preview_fence
+2026-10-11 18:09:12.493 UTC [192] STATEMENT:  SELECT guard_context_preview_fence()
+2026-10-11 18:09:12.493 UTC [192] ERROR:  context preview is not expired
+2026-10-11 18:09:12.493 UTC [192] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 21 at RAISE
+2026-10-11 18:09:12.493 UTC [192] STATEMENT:  DELETE FROM context_preview WHERE id=$1
+2026-10-11 18:09:12.501 UTC [192] ERROR:  context preview closure is immutable
+2026-10-11 18:09:12.501 UTC [192] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 14 at RAISE
+2026-10-11 18:09:12.501 UTC [192] STATEMENT:  UPDATE context_preview SET closed_at=NULL,closed_request_key=NULL,closed_submission_digest=NULL WHERE id=$1
+2026-10-11 18:09:12.945 UTC [194] ERROR:  permission denied for table context_storage_binding
+2026-10-11 18:09:12.945 UTC [194] STATEMENT:  UPDATE context_storage_binding SET fresh_until=fresh_until WHERE allocation_id=$1
+2026-10-11 18:09:12.945 UTC [194] ERROR:  permission denied for table custody_pool
+2026-10-11 18:09:12.945 UTC [194] STATEMENT:  UPDATE custody_pool SET allocated_objects=allocated_objects WHERE id=$1
+2026-10-11 18:09:12.946 UTC [194] ERROR:  permission denied for table custody_allocation
+2026-10-11 18:09:12.946 UTC [194] STATEMENT:  UPDATE custody_allocation SET charged_objects=charged_objects WHERE id=$1
+2026-10-11 18:09:12.946 UTC [194] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:12.946 UTC [194] STATEMENT:  INSERT INTO context_capture DEFAULT VALUES
+2026-10-11 18:09:13.331 UTC [200] ERROR:  permission denied for table context_preview
+2026-10-11 18:09:13.331 UTC [200] STATEMENT:  UPDATE context_preview SET deadline=deadline+interval '1 second' WHERE id=$1
+2026-10-11 18:09:13.332 UTC [200] ERROR:  context preview is not expired
+2026-10-11 18:09:13.332 UTC [200] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 21 at RAISE
+2026-10-11 18:09:13.332 UTC [200] STATEMENT:  DELETE FROM context_preview WHERE id=$1
+2026-10-11 18:09:13.349 UTC [210] ERROR:  context preview is not expired
+2026-10-11 18:09:13.349 UTC [210] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 21 at RAISE
+2026-10-11 18:09:13.349 UTC [210] STATEMENT:  DELETE FROM context_preview WHERE id=$1
+2026-10-11 18:09:13.349 UTC [179] ERROR:  context preview is immutable
+2026-10-11 18:09:13.349 UTC [179] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 11 at RAISE
+2026-10-11 18:09:13.349 UTC [179] STATEMENT:  UPDATE context_preview SET deadline=deadline+interval '1 second' WHERE id=$1
+2026-10-11 18:09:16.977 UTC [211] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.977 UTC [211] STATEMENT:  UPDATE context_capture SET progress_revision=progress_revision
+2026-10-11 18:09:16.977 UTC [211] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.977 UTC [211] STATEMENT:  UPDATE context_capture SET deadline=deadline
+2026-10-11 18:09:16.977 UTC [211] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.977 UTC [211] STATEMENT:  UPDATE context_capture SET state=state
+2026-10-11 18:09:16.978 UTC [211] ERROR:  permission denied for table custody_attempt
+2026-10-11 18:09:16.978 UTC [211] STATEMENT:  UPDATE custody_attempt SET state=state
+2026-10-11 18:09:16.978 UTC [211] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:16.978 UTC [211] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:16.978 UTC [211] ERROR:  permission denied for function advance_context_progress
+2026-10-11 18:09:16.978 UTC [211] STATEMENT:  SELECT advance_context_progress()
+2026-10-11 18:09:16.994 UTC [212] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.994 UTC [212] STATEMENT:  UPDATE context_capture SET progress_revision=progress_revision
+2026-10-11 18:09:16.994 UTC [212] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.994 UTC [212] STATEMENT:  UPDATE context_capture SET deadline=deadline
+2026-10-11 18:09:16.994 UTC [212] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:16.994 UTC [212] STATEMENT:  UPDATE context_capture SET state=state
+2026-10-11 18:09:16.995 UTC [212] ERROR:  permission denied for table custody_attempt
+2026-10-11 18:09:16.995 UTC [212] STATEMENT:  UPDATE custody_attempt SET state=state
+2026-10-11 18:09:16.995 UTC [212] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:16.995 UTC [212] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:16.995 UTC [212] ERROR:  permission denied for function advance_context_progress
+2026-10-11 18:09:16.995 UTC [212] STATEMENT:  SELECT advance_context_progress()
+2026-10-11 18:09:20.445 UTC [215] ERROR:  context deadline observation cannot rewind
+2026-10-11 18:09:20.445 UTC [215] CONTEXT:  PL/pgSQL function public.guard_context_progress() line 19 at RAISE
+2026-10-11 18:09:20.445 UTC [215] STATEMENT:  UPDATE context_capture SET deadline_observed_at=NULL WHERE root_id=$1
+2026-10-11 18:09:20.445 UTC [215] ERROR:  context deadline observation cannot rewind
+2026-10-11 18:09:20.445 UTC [215] CONTEXT:  PL/pgSQL function public.guard_context_progress() line 19 at RAISE
+2026-10-11 18:09:20.445 UTC [215] STATEMENT:  UPDATE context_capture SET deadline_observed_at=clock_timestamp() WHERE root_id=$1
+2026-10-11 18:09:20.879 UTC [217] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.879 UTC [217] STATEMENT:  DELETE FROM context_execution
+2026-10-11 18:09:20.879 UTC [217] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.879 UTC [217] STATEMENT:  UPDATE context_execution SET binding_json=binding_json
+2026-10-11 18:09:20.879 UTC [217] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:20.879 UTC [217] STATEMENT:  UPDATE context_capture SET expectation_json=expectation_json
+2026-10-11 18:09:20.880 UTC [217] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:20.880 UTC [217] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-11 18:09:20.880 UTC [217] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:20.880 UTC [217] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:20.895 UTC [218] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.895 UTC [218] STATEMENT:  DELETE FROM context_execution
+2026-10-11 18:09:20.895 UTC [218] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.895 UTC [218] STATEMENT:  UPDATE context_execution SET binding_json=binding_json
+2026-10-11 18:09:20.896 UTC [218] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:20.896 UTC [218] STATEMENT:  UPDATE context_capture SET expectation_json=expectation_json
+2026-10-11 18:09:20.896 UTC [218] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:20.896 UTC [218] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-11 18:09:20.896 UTC [218] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:20.896 UTC [218] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:20.912 UTC [219] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.912 UTC [219] STATEMENT:  DELETE FROM context_execution
+2026-10-11 18:09:20.912 UTC [219] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.912 UTC [219] STATEMENT:  UPDATE context_execution SET binding_json=binding_json
+2026-10-11 18:09:20.912 UTC [219] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:20.912 UTC [219] STATEMENT:  UPDATE context_capture SET expectation_json=expectation_json
+2026-10-11 18:09:20.913 UTC [219] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:20.913 UTC [219] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-11 18:09:20.913 UTC [219] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:20.913 UTC [219] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:20.913 UTC [217] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.913 UTC [217] STATEMENT:  UPDATE context_execution SET phase=phase
+2026-10-11 18:09:20.913 UTC [218] ERROR:  permission denied for table context_execution
+2026-10-11 18:09:20.913 UTC [218] STATEMENT:  INSERT INTO context_execution(capture_id) SELECT id FROM context_capture LIMIT 0
+2026-10-11 18:09:22.998 UTC [232] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:22.998 UTC [232] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-11 18:09:22.999 UTC [232] ERROR:  permission denied for table context_verification
+2026-10-11 18:09:22.999 UTC [232] STATEMENT:  UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()
+2026-10-11 18:09:23.014 UTC [233] ERROR:  permission denied for table context_verification
+2026-10-11 18:09:23.014 UTC [233] STATEMENT:  UPDATE context_verification SET authority_digest=authority_digest
+2026-10-11 18:09:23.014 UTC [233] ERROR:  permission denied for table custody_attempt
+2026-10-11 18:09:23.014 UTC [233] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-11 18:09:23.030 UTC [234] ERROR:  permission denied for table context_verification
+2026-10-11 18:09:23.030 UTC [234] STATEMENT:  UPDATE context_verification SET expectation_digest=expectation_digest
+2026-10-11 18:09:23.045 UTC [235] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:23.045 UTC [235] STATEMENT:  UPDATE context_catalog SET published_at=clock_timestamp()
+2026-10-11 18:09:23.698 UTC [237] ERROR:  permission denied for table context_case_locator
+2026-10-11 18:09:23.698 UTC [237] STATEMENT:  INSERT INTO context_case_locator SELECT * FROM context_case_locator LIMIT 0
+2026-10-11 18:09:23.698 UTC [237] ERROR:  permission denied for table context_case_locator
+2026-10-11 18:09:23.698 UTC [237] STATEMENT:  UPDATE context_case_locator SET case_id=case_id
+2026-10-11 18:09:23.698 UTC [237] ERROR:  permission denied for table context_case_locator
+2026-10-11 18:09:23.698 UTC [237] STATEMENT:  DELETE FROM context_case_locator
+2026-10-11 18:09:23.698 UTC [237] ERROR:  permission denied for table context_catalog
+2026-10-11 18:09:23.698 UTC [237] STATEMENT:  UPDATE context_catalog SET published_at=published_at
+2026-10-11 18:09:23.699 UTC [237] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:23.699 UTC [237] STATEMENT:  UPDATE context_capture SET deadline=deadline
+2026-10-11 18:09:23.699 UTC [237] ERROR:  permission denied for table context_capture
+2026-10-11 18:09:23.699 UTC [237] STATEMENT:  SELECT expectation_json FROM context_capture LIMIT 0
+2026-10-11 18:09:23.699 UTC [237] ERROR:  permission denied for function project_context_case_locator
+2026-10-11 18:09:23.699 UTC [237] STATEMENT:  SELECT project_context_case_locator()
+2026-10-11 18:09:23.699 UTC [237] ERROR:  permission denied for function protect_context_case_locator
+2026-10-11 18:09:23.699 UTC [237] STATEMENT:  SELECT protect_context_case_locator()
+2026-10-11 18:09:24.474 UTC [179] ERROR:  immutable context case routing; retirement protocol required
+2026-10-11 18:09:24.474 UTC [179] CONTEXT:  PL/pgSQL function public.protect_context_case_locator() line 3 at RAISE
+2026-10-11 18:09:24.474 UTC [179] STATEMENT:  UPDATE context_case_locator SET case_id=case_id WHERE capture_id=$1
+2026-10-11 18:09:24.474 UTC [179] ERROR:  immutable context case routing; retirement protocol required
+2026-10-11 18:09:24.474 UTC [179] CONTEXT:  PL/pgSQL function public.protect_context_case_locator() line 3 at RAISE
+2026-10-11 18:09:24.474 UTC [179] STATEMENT:  DELETE FROM context_case_locator WHERE capture_id=$1
+2026-10-11 18:09:42.029 UTC [179] ERROR:  immutable context verification
+2026-10-11 18:09:42.029 UTC [179] CONTEXT:  PL/pgSQL function protect_context_verification() line 5 at RAISE
+2026-10-11 18:09:42.029 UTC [179] STATEMENT:  UPDATE context_verification SET authority_digest=decode(repeat('01',32),'hex') WHERE capture_id=$1
+2026-10-11 18:09:42.666 UTC [256] ERROR:  permission denied for table artifact_download
+2026-10-11 18:09:42.666 UTC [256] STATEMENT:  UPDATE artifact_download SET deadline=deadline
+2026-10-11 18:09:42.666 UTC [256] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:42.666 UTC [256] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-11 18:09:42.666 UTC [256] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:42.666 UTC [256] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=issuer_epoch
+2026-10-11 18:09:42.667 UTC [256] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:42.667 UTC [256] STATEMENT:  UPDATE fleet_trust SET fresh_until=clock_timestamp()
+2026-10-11 18:09:42.682 UTC [257] ERROR:  permission denied for table fleet_trust
+2026-10-11 18:09:42.682 UTC [257] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-11 18:09:42.682 UTC [256] ERROR:  permission denied for table download_batch
+2026-10-11 18:09:42.682 UTC [256] STATEMENT:  UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()
+2026-10-11 18:09:42.683 UTC [256] ERROR:  permission denied for table download_allocation
+2026-10-11 18:09:42.683 UTC [256] STATEMENT:  UPDATE download_allocation SET output_limit=output_limit
+2026-10-11 18:09:42.698 UTC [258] ERROR:  permission denied for table artifact_download
+2026-10-11 18:09:42.698 UTC [258] STATEMENT:  UPDATE artifact_download SET charged_output=0
+2026-10-11 18:09:42.698 UTC [258] ERROR:  permission denied for table download_batch
+2026-10-11 18:09:42.698 UTC [258] STATEMENT:  UPDATE download_batch SET outcome_json=outcome_json
+2026-10-11 18:09:42.714 UTC [259] ERROR:  permission denied for table artifact_download
+2026-10-11 18:09:42.714 UTC [259] STATEMENT:  UPDATE artifact_download SET state='Ready'
+2026-10-11 18:09:45.177 UTC [266] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:45.177 UTC [266] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:09:45.177 UTC [268] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:45.177 UTC [268] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:09:48.141 UTC [272] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:48.141 UTC [272] STATEMENT:  UPDATE download_worker SET claimed_at=NULL WHERE id=$1
+2026-10-11 18:09:48.142 UTC [272] ERROR:  permission denied for table download_worker_owner
+2026-10-11 18:09:48.142 UTC [272] STATEMENT:  UPDATE download_worker_owner SET released_at=clock_timestamp() WHERE worker_id=$1
+2026-10-11 18:09:48.142 UTC [272] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:48.142 UTC [272] STATEMENT:  DELETE FROM download_worker WHERE id=$1
+2026-10-11 18:09:48.143 UTC [272] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:09:48.143 UTC [272] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:09:48.143 UTC [272] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:09:48.145 UTC [272] ERROR:  update or delete on table "fleet_trust" violates foreign key constraint "download_worker_installation_id_fkey" on table "download_worker"
+2026-10-11 18:09:48.145 UTC [272] DETAIL:  Key (installation_id)=(10000000-0000-4000-8000-00000000070c) is still referenced from table "download_worker".
+2026-10-11 18:09:48.145 UTC [272] STATEMENT:  UPDATE fleet_trust SET installation_id='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:09:53.258 UTC [277] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:53.258 UTC [277] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:09:53.259 UTC [279] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:53.259 UTC [279] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:09:58.589 UTC [284] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:58.589 UTC [284] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:09:58.590 UTC [286] ERROR:  permission denied for table download_worker
+2026-10-11 18:09:58.590 UTC [286] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:10:04.005 UTC [290] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:04.005 UTC [290] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:10:04.006 UTC [292] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:04.006 UTC [292] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:10:09.457 UTC [296] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:09.457 UTC [296] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:10:09.458 UTC [298] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:09.458 UTC [298] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:10:41.002 UTC [321] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:41.002 UTC [321] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:10:41.003 UTC [323] ERROR:  permission denied for table download_worker
+2026-10-11 18:10:41.003 UTC [323] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:10:57.857 UTC [356] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.857 UTC [356] STATEMENT:  DELETE FROM download_worker_configuration WHERE installation_id=$1
+2026-10-11 18:10:57.858 UTC [356] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:10:57.858 UTC [356] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:10:57.858 UTC [356] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:10:57.859 UTC [356] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.859 UTC [356] STATEMENT:  UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1
+2026-10-11 18:10:57.859 UTC [356] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.859 UTC [356] STATEMENT:  UPDATE download_worker_configuration_revision SET audit_receipt_json=audit_receipt_json WHERE installation_id=$1
+2026-10-11 18:10:57.875 UTC [357] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.875 UTC [357] STATEMENT:  DELETE FROM download_worker_configuration WHERE installation_id=$1
+2026-10-11 18:10:57.876 UTC [357] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:10:57.876 UTC [357] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:10:57.876 UTC [357] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:10:57.877 UTC [357] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.877 UTC [357] STATEMENT:  UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1
+2026-10-11 18:10:57.877 UTC [357] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.877 UTC [357] STATEMENT:  UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1
+2026-10-11 18:10:57.893 UTC [358] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.893 UTC [358] STATEMENT:  DELETE FROM download_worker_configuration WHERE installation_id=$1
+2026-10-11 18:10:57.894 UTC [358] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:10:57.894 UTC [358] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:10:57.894 UTC [358] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:10:57.894 UTC [358] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.894 UTC [358] STATEMENT:  UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1
+2026-10-11 18:10:57.895 UTC [358] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.895 UTC [358] STATEMENT:  UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1
+2026-10-11 18:10:57.895 UTC [358] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.895 UTC [358] STATEMENT:  UPDATE download_worker_configuration_revision SET audit_receipt_json=audit_receipt_json WHERE installation_id=$1
+2026-10-11 18:10:57.911 UTC [359] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.911 UTC [359] STATEMENT:  DELETE FROM download_worker_configuration WHERE installation_id=$1
+2026-10-11 18:10:57.912 UTC [359] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:10:57.912 UTC [359] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:10:57.912 UTC [359] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:10:57.912 UTC [359] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.912 UTC [359] STATEMENT:  UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1
+2026-10-11 18:10:57.913 UTC [359] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.913 UTC [359] STATEMENT:  UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1
+2026-10-11 18:10:57.913 UTC [359] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.913 UTC [359] STATEMENT:  UPDATE download_worker_configuration_revision SET audit_receipt_json=audit_receipt_json WHERE installation_id=$1
+2026-10-11 18:10:57.929 UTC [360] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.929 UTC [360] STATEMENT:  DELETE FROM download_worker_configuration WHERE installation_id=$1
+2026-10-11 18:10:57.930 UTC [360] ERROR:  worker configuration identity and revision cannot roll back
+2026-10-11 18:10:57.930 UTC [360] CONTEXT:  PL/pgSQL function guard_worker_configuration_head() line 5 at RAISE
+2026-10-11 18:10:57.930 UTC [360] STATEMENT:  UPDATE download_worker_configuration SET source_uid='00000000-0000-4000-8000-000000000001' WHERE installation_id=$1
+2026-10-11 18:10:57.931 UTC [360] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.931 UTC [360] STATEMENT:  UPDATE download_worker_configuration_revision SET snapshot_json=convert_to('{}','UTF8') WHERE installation_id=$1
+2026-10-11 18:10:57.931 UTC [360] ERROR:  permission denied for table download_worker_configuration
+2026-10-11 18:10:57.931 UTC [360] STATEMENT:  UPDATE download_worker_configuration SET observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '5 seconds' WHERE installation_id=$1
+2026-10-11 18:10:57.932 UTC [360] ERROR:  permission denied for table download_worker_configuration_revision
+2026-10-11 18:10:57.932 UTC [360] STATEMENT:  UPDATE download_worker_configuration_revision SET audit_receipt_json=audit_receipt_json WHERE installation_id=$1
+2026-10-11 18:11:34.679 UTC [391] ERROR:  canceling statement due to user request
+2026-10-11 18:11:34.679 UTC [391] CONTEXT:  while locking tuple (0,42) in relation "download_worker_configuration"
+2026-10-11 18:11:34.679 UTC [391] STATEMENT:  -- name: LockWorkerConfiguration :one
+	SELECT installation_id, cluster_id, source_uid, generation, observed_at, fresh_until FROM download_worker_configuration WHERE installation_id=$1 AND cluster_id=$2 AND source_uid=$3 FOR UPDATE
+	
+2026-10-11 18:11:38.692 UTC [395] ERROR:  permission denied for table download_worker
+2026-10-11 18:11:38.692 UTC [395] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:11:38.693 UTC [397] ERROR:  permission denied for table download_worker
+2026-10-11 18:11:38.693 UTC [397] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1
+2026-10-11 18:11:55.032 UTC [408] ERROR:  permission denied for table download_worker
+2026-10-11 18:11:55.032 UTC [408] STATEMENT:  UPDATE download_worker SET audit_receipt_json=audit_receipt_json WHERE id=$1
+2026-10-11 18:11:55.033 UTC [410] ERROR:  permission denied for table download_worker
+2026-10-11 18:11:55.033 UTC [410] STATEMENT:  UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1

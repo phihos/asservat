@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-9",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Trace for complete:configuration-fleet: current 1 ms, claim 1.8 s, role 3.18 s, authenticate 3.185 s, stop 4.049 s with 951 ms left on both claim and operation. One role operation proves the guarded source three times (claim full read, role-step root reread, completion recheck) inside its original five seconds at the unchanged 20 QPS; the completion recheck could not obtain limiter tokens before the deadline. The fixture runs averaged about 4.5 s per role operation, so the budget is inherently near its edge. The role was created and authenticated, which the designed replay (non-fresh claim: verify, never recreate) completes. Run 10 replays Provision within a one-minute bound.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,205 @@
+{
+  "recordedUTC": "2026-10-09T19:06:42.922465+00:00",
+  "scope": "First packet/native-download feasibility spikes only; synthetic evidence and disposable lab. No complete EXP gate or product TASK is complete.",
+  "runs": {
+    "test": {
+      "record": "final-test.json",
+      "log": "final-test.log",
+      "exit": 0,
+      "elapsedSeconds": 8.553700923919678,
+      "recordSHA256": "389fc89a546000a866d62b30e952b3d9dfb403d28fde8bbb0219afd70d17f75b"
+    },
+    "measure": {
+      "record": "final-measure.json",
+      "log": "final-measure.log",
+      "exit": 0,
+      "elapsedSeconds": 4.871406078338623,
+      "recordSHA256": "5c21b515daf44d68e8fc6abf622ae04c8b8e6a424f6653f76261bad6fac68d7e"
+    },
+    "large": {
+      "record": "final-large.json",
+      "log": "final-large.log",
+      "exit": 0,
+      "elapsedSeconds": 31.85272789001465,
+      "recordSHA256": "122d6b1850bc4f2b8fbe8754e5989fb74b59a6aa1f667204206900309ca4efd5"
+    },
+    "baseline": {
+      "record": "final-baseline.json",
+      "log": "final-baseline.log",
+      "exit": 0,
+      "elapsedSeconds": 2.286970853805542,
+      "recordSHA256": "11ecc00f146950631c8c7496960cbe87a5ca9c58f998c45c8d31febed5ba3321"
+    }
+  },
+  "ordinarySuite": {
+    "passed": 11,
+    "explicitMeasurementSkips": 3,
+    "raceDetector": true
+  },
+  "kernelFilterProbe": {
+    "cases": 11,
+    "result": "pass",
+    "scope": "real libpcap cBPF -> Gadget's cbpfc dependency -> VM kernel verifier and BPF_PROG_TEST_RUN, Ethernet corpus only; not Gadget operator injection or live kernel attachment"
+  },
+  "packetRoundTrip": {
+    "nativeBytes": 101968,
+    "sha256": "00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f",
+    "tsharkRecords": 1012,
+    "localToolRecord": "local-tool-validation.txt"
+  },
+  "cleanup": {
+    "finishedUTC": "2026-10-09T19:01:58.231979+00:00",
+    "vmPID": 1662269,
+    "commands": [
+      {
+        "command": [
+          "python3",
+          "experiments/feasibility/vm/lab.py",
+          "down"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "python3",
+          "experiments/feasibility/services.py",
+          "down"
+        ],
+        "exit": 0
+      }
+    ],
+    "verificationRetry": "Initial cleanup verification rejected Docker lower-case no such volume message; case-insensitive read-only verification confirmed absence. No repeated deletion was necessary.",
+    "checks": {
+      "vmStopped": true,
+      "container:c3e60d92e17de4753c0428be3f40639d740c268d6a2a6ca0228368d26b6496f7": "absent",
+      "network:asservat-feasibility-20261009": "absent",
+      "volume:efce560be0f2b301cd00cf1e4e79757b8984dce53e71682728884427165c1db1": "absent",
+      "privateLabStateRemoved": true
+    },
+    "scope": "Only this experiment VM, private cache/SSH keys, labelled S3 container, anonymous volume and network removed. Shared build/image caches and other infrastructure untouched. Filesystem removal is not a physical-media erasure claim."
+  },
+  "originalBriefSHA256": "af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20",
+  "notRun": [
+    "Production Gadget bytecode/map/event integration",
+    "HTTP sanitizer",
+    "SQL transactions and distributed grants",
+    "Crash helper",
+    "Ceph RGW/OpenBao",
+    "Production UI/OIDC/regional delivery",
+    "Complete production/runtime/overhead or no-egress qualification"
+  ],
+  "inputSHA256": {
+    "experiments/feasibility/README.md": "ad1db9062d106be8eb91b1ef966e700207e8d98b432332aac0f50f3b217f4627",
+    "experiments/feasibility/go/baseline_test.go": "51c40e8e1efcdd8aa2dc5aa93ff954527138e1ad3888f3266c8c2d34053e13b0",
+    "experiments/feasibility/go/cmd/filterprobe/main.go": "332547d46495bb64c523089ce184ecd05f408beaefd0d7fe30428c6e91dfde27",
+    "experiments/feasibility/go/cmd/mapprobe/main.go": "7785b0be95f3ecdb7d1f79a9feeaf7d2533b964938a9efc1fdbf0d121555ec4e",
+    "experiments/feasibility/go/delivery.go": "65a14f269ac94ae244a5121c708046a8f8d160bc0d9a479679d90780ae5c83c3",
+    "experiments/feasibility/go/go.mod": "267ebf86ba14664a130bca1acda3e979b67b84b0493f096d9d39fcd4144120b9",
+    "experiments/feasibility/go/go.sum": "73349cc0fe6adcd56a46b0d7b6cf82bb989c814c3a12179e2e7cb89e20839bd4",
+    "experiments/feasibility/go/packets_test.go": "0265e845194da81a5c4b1440eca1c3a35b6f0445363fa34db50f9041d5c3f868",
+    "experiments/feasibility/go/ring_test.go": "161eef8358b75608d093aa53fb74703c8353348b7e908a17139b2ab268f1e3bb",
+    "experiments/feasibility/go/storage.go": "6aa72c2808fea49a4ccf49f6487e31278580ccbcdfe8f0ce53df626b0c5384e6",
+    "experiments/feasibility/go/storage_test.go": "f59c466b91a043395effcd490e2a21932ed60f70d59fd1afd71e15ecf952ba06",
+    "experiments/feasibility/run.py": "216b3a0db0a6a2321e9572b1cd64ca2a9e3cfeacf30666fe902740c09a895341",
+    "experiments/feasibility/services.py": "a29018e7d928345a5c1c78caad6811f5c65d6a9b34b24030731cd970c6116a2f",
+    "experiments/feasibility/vm/README.md": "d7b2f80ddbca6725c54624c3a88437911f85a2d6d732897350e145662815bffb",
+    "experiments/feasibility/vm/gadget-loopback.sh": "41ec21ad6233c2fce94dd666619cec3118be001bb8cd6ffc2e0a1e4d4795ebe3",
+    "experiments/feasibility/vm/gadget-packets.sh": "ac26dfd11193d71d4a257099b08253fc30c5b061f4d9cefc8de72c268b8dab92",
+    "experiments/feasibility/vm/lab.py": "3f7e7b175cde8a9a7155fc854e9c37eee260bd82c136afad9d8c66e857a2132a",
+    "experiments/feasibility/vm/peers.bpf.c": "5c6028e610b9c2fdac44290910e9aa2e9e3ae5d26a92985e7ee469e8f5b475b8",
+    "experiments/feasibility/vm/workload.yaml": "f3d6903c089c18ddd1c2c7d7646f7e17c4d9ad50c22dca66dd07a5cc1d5e2c73"
+  },
+  "resultSHA256": {
+    "cleanup.json": "c3031048fd33543f94ba4c184e8bf9f5884dea87f11de6a9f6324c089f60ac86",
+    "docker-network.txt": "dfb0ec001c34e5889bb68b3a74f2eaa92d958302f54d653494feaef4d6ff0f8e",
+    "documentation-checks.log": "b7a11cd44339ecb29668059e5b34ce26cff00765b80f13d9dee174c65358f28e",
+    "downloaded-gadget.pcapng": "00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f",
+    "filter-compiler.log": "c19ccc808a188354f489e7931dcd67ca8a0a49a7e164f4c375e458e91fcc33fb",
+    "filter-parity.json": "d89b0d8144ca4717e87df678cfe15100f856890db055c407da50cc162a4fbd59",
+    "filter-programs.json": "4dde71d6abb64788327f908d08e701370221913a89d186694be15b44fb3e5c5a",
+    "final-baseline.json": "11ecc00f146950631c8c7496960cbe87a5ca9c58f998c45c8d31febed5ba3321",
+    "final-baseline.log": "1cf956c5f3fde43af93ffedda839d97f8226078ee330ab4f753ad28de191710e",
+    "final-large.json": "122d6b1850bc4f2b8fbe8754e5989fb74b59a6aa1f667204206900309ca4efd5",
+    "final-large.log": "be299d81c94ebc03d6eb436c65647951e1691407656d9e9d7cc692e86474b46c",
+    "final-measure.json": "5c21b515daf44d68e8fc6abf622ae04c8b8e6a424f6653f76261bad6fac68d7e",
+    "final-measure.log": "b345b7e121d286581355d16fc5f8e73dbf33e2812182c6bc2721c627b2529e81",
+    "final-test.json": "389fc89a546000a866d62b30e952b3d9dfb403d28fde8bbb0219afd70d17f75b",
+    "final-test.log": "88c3191b0be68125b948a8379691921c95ec326f120c2f3d7edf0558e49cc8a6",
+    "gadget-capture.log": "24ffa84be27cab5162d61141f2ba9e08f7857e13cfaa2f4ef44359c1de2c9a6a",
+    "gadget-cli.json": "107f95aea50e13daf7849336f3e42facb9b99d407ef309073ff4a3cce5a8ea10",
+    "gadget-explicit-loopback.log": "dd59618db820ae4c07b8cebc7694d2f19c601467b8042dfe9433ed6363134f1a",
+    "gadget-loopback.pcapng": "05c0a1bb5bb26e3f32ea57624b04c0bf084cae72235cf5febd7eb734af524917",
+    "gadget-pods.log": "0071ec73b2fb4f97d065219c95ab56539bd48b414e964e1a64a6364f8d4b90b6",
+    "gadget-pods.pcapng": "00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f",
+    "gadget-sources.json": "e09ca42af2d8b951a7b9c8877266217f9db12329f658b6e3f96c2d2a69aa672f",
+    "gadget-tcpdump-help.log": "f189fa68e375b6f9e5b0f1c8839dec83e768160922d3757c9143a4845ba6ca69",
+    "host-toolchain.json": "587795bb89419aa7ee3c0e2c7e6556e04966ca8f4674ecf98b17a6a11ac98ec7",
+    "k3s-release.json": "4c043787fd241fd7461ba0954beaeb5fd1f643368cbc6fa50dac4d727d1e5454",
+    "kernel-filter-probe.log": "8acaa8e8c3394c3f21ea2f288068b32d1a3abbbd42f323c2a17ae09dd98eb723",
+    "large-stream.json": "3aad36493ffb64c3df07ea0fbdd1db9c2dd57de54a868fcd493b2b290f851ee0",
+    "large-stream.log": "a9515a10e273e714a58524ac04bfe0bfa82ba75c3f74f419e8ae9bebe593f604",
+    "local-tool-validation.txt": "b62e62e1f829e56ec2e65553e22902146aea898cbf6a79865ce6b0f8e93c35f3",
+    "mapprobe-direct-run.log": "24ab3ca47df3d88e3ef9115a8ccff3824c707495f1f4d5e01d389e3ea0019403",
+    "mapprobe-final-run.log": "08f41184ac7a5750fde32628b64c4dac30f86cf797d3103424f64869d351016c",
+    "mapprobe-run.log": "ad429e51cd14186e0ca5a780ccd149bb38354bb2c2a524a96f8ed42692f31525",
+    "mapprobe.json": "4ab413674d4092ca8586caf39a6223e6e810feea3dc3a554fe390bc99d497931",
+    "native-pcap-download.log": "59234acc5e3dc9ecb866629a973a9b5d9c426ec2f69b18be11867d08f0f1c1cc",
+    "race-tests.log": "0629a1eebbdabb6ec3867c39257b8f764e12b3006fda37ef4baf75f46d5a48b8",
+    "s3-container.txt": "55a83a7daf42b21a0efb00e8d717cef09ce59bcf0d72beb0d50d2208b04c7a17",
+    "s3-help.txt": "84c173814f61dcff3259a0eb014040020f57dece08da4037a46651cbc995d815",
+    "s3-image-pull.log": "c90745b320d143c4e41c7851bbb1210b4c8fdb05d761385942e1cb5051b80218",
+    "s3-release.json": "d4c4866563cdb2957cd94245a71baa81b1748f806796e8f767f62aa93e34dd70",
+    "s3-startup-third.log": "3936a1fbfb351e2d72befc08375cf1ea20e9f8a7a2bef6a92c1214d03a506795",
+    "s3-startup.log": "b42332c18200019cce2c8cae910cab5507365ee7dab740356ec8aba7b5402aa1",
+    "sequential-baseline.json": "ec2120ec5532d737fc9d1b4a326147834faec35ac380d7347657dcae5101783d",
+    "sequential-baseline.log": "4516fcf83d5a27f2c397de67ee4db6b5649678edfdd674c3594785f4d0465132",
+    "storage-compile.log": "4fe9158c72008d6da3e008e891e7e8705fb57764c4eb0759f45966fb83bc1433",
+    "storage-measurements.json": "f98a3fad51b1dd42fe183e61564bcbd3c3b97b73fc38fa59f9c11f521664f267",
+    "storage-measurements.log": "c4417e298f78bcf4a521793590f8ede2920d7fb129ffacae65ab4a4558760d5a",
+    "storage-packet-tests.log": "6822d6f2d47e67a344fe69239e2b79a4fc9320bc160655ff7f4f29eae56b0461",
+    "synthetic.pcapng": "b5f5d8dbd7f9c401344f608a243a7a628025fdcf2ffd6ed2289c64d310b1122a",
+    "vm-environment.txt": "58e5c5617ded6d16c9f6944a6d0fa2c3c541506a240b7a91873cacbdffeb0363",
+    "vm-image.json": "4fa20a30e5e272dbd11cf6080ba2090d0acdce04725e9f88cbb939fd6b6aa460",
+    "vm-packages.log": "aaf5ade7e496e1f12beb409f4ebac47f006e6302d2f0900c6cacaa390db3e4be",
+    "vm-probe-sha256.txt": "5525a7d2d4dc0d5a17d1a45d72e7b03150b6f8ba568ee145f3e17b503796a78b",
+    "vm-setup.log": "2eb451a8a6b2c5f8dbe5c97bcc4421857ecf2f1e8dd1f2952ecd9c95384897fe"
+  },
+  "documentationChecks": {
+    "command": [
+      "make",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "openapi-check",
+      "download-check",
+      "investigation-check",
+      "live-check",
+      "PYTHON=/tmp/asservat-openapi-validation/bin/python"
+    ],
+    "exit": 0,
+    "log": "documentation-checks.log",
+    "scope": "Offline specification/architecture/DTO checks; unchanged GUI prototype was not retested"
+  },
+  "sourceChecks": {
+    "pythonAST": "pass",
+    "shellSyntax": "pass",
+    "goFormatting": "pass",
+    "allFinalRunGoHashesMatch": true
+  },
+  "planningDocumentsSHA256": {
+    "AGENTS.md": "cad64d48ee85ea4f6a7022087ad560a2b9fe05b4ff3833946c4d7fd3b30ec17a",
+    "README.md": "5d697de31f70ef4ad543fd4b9e16ffcae141c082ce63d863e1d9ee30b13ac341",
+    "docs/architecture/README.md": "65304866de2ff24bae78ae62f86951cb748a7adf0388ae46a24eb081bd74ce0f",
+    "docs/architecture/implementation-slices.md": "faca2e1d4b6208e32739469523379f8c75d4504a9ffaae05cf6b08636aa7706c",
+    "docs/implementation-plan.md": "e8c3325d1abb91b8f42bd352ae30e924c6f4789050cb9d762b25b6c170ca77ab",
+    "docs/validation.md": "f7d439bb33ce9816fd86b5180ecc552a2ee4f87927fbd776a900e5e04fa2c8e8",
+    "docs/technology.md": "e2d132b0126dea54a9e2d802a6f1352be2018a47ab989b5fee2cb9eb439af185",
+    "docs/research/findings.md": "a65fc89b0938128f338001046943dba6bc3267c367e1088b2e661b8c4a1e1f56",
+    "docs/research/technology-selection.md": "87f9f3dfe0b8991485210e71e955bb18a578af8c9223a1e4718eadefd0da6463",
+    "docs/research/packet-capture-flexibility.md": "cd7ff14f2cb8ee3808c84fdb979e32e6cd9312c5cb2bf8aa09298670b7f0d770",
+    "docs/research/feasibility-packet-downloads.md": "fd8547250ec2145279736cec15eb86da5480b96883ee29c811dff35f6b088f81",
+    "docs/research/spec-validation.txt": "d84fcb003380433d1f0465f1e39cf403264360c6056833b78b65ce7537294df4",
+    "specs/artifact-downloads.md": "89fbc86b8b3098bf22f8ca8c443c954571e1554a2bf30247e334c411d7d99235",
+    "specs/packets.md": "94816453929625de3015e5a6229aa5018c6c8b99d8133db040222bd0f7cf457f"
+  }
+}

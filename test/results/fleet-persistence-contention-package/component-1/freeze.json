@@ -1,0 +1,11 @@
+{
+  "source_manifest": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+  "manifest": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+  "dependencies": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+  "inventory": "6424f0dbf4ac9968095c9aecffbf5f5d9a7631e14ab86339f463077c3ee0e585",
+  "dependency_args": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+  "linked_directories": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+  "paths": 17,
+  "dependency_count": 4336,
+  "status": "unrun"
+}

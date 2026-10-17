@@ -1,0 +1,26 @@
+{
+  "files": {
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/manifest.json": "ed3e839500a46b7238cbfd37e4f1c49ec78465a165274b9e10f9a1479500a6a8",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/docs/decisions/149-fresh-provider-installed-pair.md": "e1a771e9b0dd61638571ae9facac71142196f549220fae9be55d82281182e94a",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_current.go": "763111848056ac4234cb21dccfb46254263284953a5c229f14bd080b76cf8930",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_deployment.go": "5986f252156a10cb65408918d57f9922bea990c3cc811a3019f07278a4789b04",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_fixture_test.go": "0209a48503f1e4263964523d0136591722d600cf2aa3f96f0d1fd24dce72d42e",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_objects.go": "4aaf81253d62b87467e3cd183acdef8dfabb0a925e26d819d2118e77ef478b7c",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_selection.go": "6e366159d8c80fee2d004338298fa3b786b5fdfc5d2f28a480bc4ac9fbae7b9c",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_selection_test.go": "b829b2130c8a3aacf985040d1c8f10bdda0e847f6b9be6c6bf31fc5c91959276",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_state.go": "c66b604a327432630e542e486cbb7d77d721a3a88eacb6179ce2679163c542d4",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_state_test.go": "c6792ff8642925c1803579c180410a8b8d1dbf29d068fe2cdea8e08418d2a60a",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_bootstrap_values.go": "8e66f03bde87c91f3fa14edfeecd07155837cfc8c41008cda5f7920a42703b63",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_identity_operation_material.go": "d9f82bdf30bb577f02cf12c92c3224863fb09c66eecd34e0d41398a922352bfe",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_identity_projection_input.go": "4a9c6f7a5d845d29321dd6ecf2fae412c784badc354029789024ee06c60bf901",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_projection_operation_provider_test.go": "b11d3fa4f7b42da427310a1417b7180344254d395247abeed9697a352ec9b7ca",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_provider_binding.go": "08258592510ea1e1e62643a0e95c8bb6de5cb73f76c5859bf32e010ecc85eef9",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/owner_provider_objects_test.go": "51d77ae63b6203f66c11c66002fbe15d9ae3e9154eb181c508c611435d85b550",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/adapters/kubernetes/worker_projection_state.go": "025fba86e5c36935052f23d121eed66e01853515d324377761eecb2257dd2463",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/contracts/initial_runtime_resources.go": "333ef0ae694a5a11d11ed11b5d28461b0b7ba6a966c6464be929ce3f44d59f1a",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/contracts/owner_bootstrap_selection.go": "a7c9393b481a3068be86e3b09fe4c2674ca1cd87733abda279e0b794a8a75f26",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/internal/contracts/owner_bootstrap_selection_test.go": "6e5194f5798feea3899926443db84a4d8fd2363ffcc2353996a7cdd0780dd52f",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/specs/contracts/initial-runtime-resources.schema.json": "c7e3a81f81614c20fcb5aa1c39b22eecf27e01501868e40528ef8ea27fc93813",
+    "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/source-checkpoint-v1/files/specs/contracts/owner-bootstrap-selection.schema.json": "21072c52ecb10e54055660839dc77437ebfa81d1269fa26ad2b16f5cde07afc8"
+  }
+}

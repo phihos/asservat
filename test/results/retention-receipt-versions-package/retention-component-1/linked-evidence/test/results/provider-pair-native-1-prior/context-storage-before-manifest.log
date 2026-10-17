@@ -1,0 +1,13 @@
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:280: nativeBytes=353 dataBytes=326 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:280: nativeBytes=353 dataBytes=327 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.41s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.30s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.06s)
+=== RUN   TestCustodyWithRealServices
+    custody_test.go:111: run make custody-integration for owned real-service fixtures
+--- SKIP: TestCustodyWithRealServices (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.449s

@@ -1,0 +1,770 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/trigger.schema.json",
+  "title": "Asservat trigger v1",
+  "$defs": {
+    "detector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "log"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "stream": {
+                  "type": "string",
+                  "enum": [
+                    "stdout",
+                    "stderr",
+                    "both"
+                  ]
+                },
+                "pattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "literal",
+                    "regexp"
+                  ]
+                },
+                "jsonField": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "maxRecordBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65536
+                },
+                "overlong": {
+                  "enum": [
+                    "drop",
+                    "matchPrefix"
+                  ]
+                }
+              },
+              "required": [
+                "stream",
+                "pattern",
+                "match"
+              ]
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "resource"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "enum": [
+                    "cpuCores",
+                    "cpuQuotaRatio",
+                    "cpuThrottledRatio",
+                    "memoryBytes",
+                    "memoryLimitRatio",
+                    "memoryGrowthBytesPerSecond",
+                    "memoryPSI",
+                    "cpuPSI",
+                    "ioPSI"
+                  ]
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte"
+                  ]
+                },
+                "threshold": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "sampleInterval": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "metric",
+                "operator",
+                "threshold",
+                "sampleInterval"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "metric": {
+                        "enum": [
+                          "cpuThrottledRatio",
+                          "memoryPSI",
+                          "cpuPSI",
+                          "ioPSI"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "threshold": {
+                        "maximum": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "probe"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "probeType": {
+                  "type": "string",
+                  "enum": [
+                    "Liveness",
+                    "Readiness",
+                    "Startup"
+                  ]
+                },
+                "minimumFailures": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "window": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "events",
+                    "kubeletMetrics"
+                  ]
+                }
+              },
+              "required": [
+                "probeType",
+                "minimumFailures",
+                "window",
+                "source"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "exit"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "exitCodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  "maxItems": 16,
+                  "minItems": 0,
+                  "uniqueItems": true
+                },
+                "signals": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 64
+                  },
+                  "maxItems": 16,
+                  "minItems": 0,
+                  "uniqueItems": true
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "OOMKilled",
+                      "Error",
+                      "Completed",
+                      "CrashLoopBackOff"
+                    ]
+                  },
+                  "maxItems": 4,
+                  "minItems": 0,
+                  "uniqueItems": true
+                }
+              },
+              "required": []
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "alert"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "receiverRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "matchLabels": {
+                  "type": "object",
+                  "maxProperties": 16,
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "firing",
+                    "resolved"
+                  ]
+                }
+              },
+              "required": [
+                "receiverRef",
+                "status"
+              ]
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "crashArtifact"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "elf-core",
+                      "dotnet-dump",
+                      "hprof",
+                      "node-report",
+                      "cuda-core"
+                    ]
+                  },
+                  "maxItems": 5,
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "formats"
+              ]
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "schedule"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cron": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "timeZone": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "jitter": {
+                  "type": "string",
+                  "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "cron",
+                "timeZone",
+                "jitter"
+              ]
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "file"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "changed",
+                    "sizeAbove"
+                  ]
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1099511627776
+                },
+                "pollInterval": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "path",
+                "condition",
+                "pollInterval"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "condition": {
+                        "const": "sizeAbove"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "sizeBytes"
+                    ]
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "sizeBytes"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "eventWindow": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "network"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "enum": [
+                    "connectFailureRate",
+                    "retransmitRate",
+                    "dnsFailureRate"
+                  ]
+                },
+                "threshold": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "window": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "metric",
+                "threshold",
+                "window"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "kind": {
+              "const": "kubernetesCondition"
+            },
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "RolloutStalled",
+                    "Evicted",
+                    "NodePressure",
+                    "VolumeWarning"
+                  ]
+                },
+                "window": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "kind",
+                "window"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "options"
+          ]
+        }
+      ]
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "detector": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            }
+          },
+          "required": [
+            "detector"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "all"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "any"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "not": {
+              "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+            }
+          },
+          "required": [
+            "not"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "for": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "expression": {
+                  "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+                },
+                "duration": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "expression",
+                "duration"
+              ]
+            }
+          },
+          "required": [
+            "for"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "count": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "detector": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "atLeast": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100000
+                },
+                "within": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "detector",
+                "atLeast",
+                "within"
+              ]
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sequence": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "detectors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "maxItems": 16,
+                  "minItems": 2,
+                  "uniqueItems": true
+                },
+                "within": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                }
+              },
+              "required": [
+                "detectors",
+                "within"
+              ]
+            }
+          },
+          "required": [
+            "sequence"
+          ]
+        }
+      ]
+    }
+  },
+  "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/detector"
+}

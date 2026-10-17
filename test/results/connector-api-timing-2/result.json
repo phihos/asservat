@@ -1,0 +1,1 @@
+{"exit":1,"status":"failed","finding":"Diagnostic run: the CapacityReservation CREATE was refused (no stored object; POST round trip 654 ms vs ~1 ms for every other call). PrepareStart 1.39 s with 3.61 s of its interval left. Next run waits until the test-created CRD is served before the timed phase and replays a refused CREATE to log the status.","log":"context-storage.log"}

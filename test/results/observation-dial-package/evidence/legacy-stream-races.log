@@ -1,0 +1,96 @@
+=== RUN   TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot
+--- PASS: TestConnectorObservationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot (0.03s)
+=== RUN   TestConnectorObservationHelloCancellationJoinsUnreadPipeWrite
+--- PASS: TestConnectorObservationHelloCancellationJoinsUnreadPipeWrite (0.04s)
+=== RUN   TestConnectorObservationStreamCloseJoinsAdmittedNativeProof
+--- PASS: TestConnectorObservationStreamCloseJoinsAdmittedNativeProof (0.04s)
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length
+=== RUN   TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media
+--- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed (0.12s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/unavailable (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/redirect (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/fixed-length (0.03s)
+    --- PASS: TestConnectorObservationStreamUnknownPOSTIsNotReplayed/wrong-media (0.03s)
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name
+2026/10/13 21:47:10 http: TLS handshake error from 127.0.0.1:59948: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots
+2026/10/13 21:47:10 http: TLS handshake error from 127.0.0.1:57222: remote error: tls: bad certificate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate
+=== RUN   TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate
+--- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate (0.11s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate (0.03s)
+    --- PASS: TestConnectorObservationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate (0.03s)
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers
+=== RUN   TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello
+--- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello (0.85s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/headers (0.42s)
+    --- PASS: TestConnectorObservationStreamOriginalDeadlineBoundsHeaderAndHello/hello (0.42s)
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2
+=== RUN   TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3
+--- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner (0.12s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/0 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/1 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/2 (0.03s)
+    --- PASS: TestConnectorObservationStreamHeaderCancellationKeepsSingleShutdownOwner/3 (0.03s)
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte
+=== RUN   TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof
+--- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF (3.18s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/joined (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/extra-byte (0.08s)
+    --- PASS: TestConnectorObservationStreamReceiptRequiresExactTerminalEOF/lost-final-eof (3.02s)
+=== RUN   TestConnectorOperationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot
+--- PASS: TestConnectorOperationStreamStandbyCloseJoinsBlockedReadAndRetainsSlot (0.03s)
+=== RUN   TestConnectorOperationStreamUnknownPOSTIsNotReplayed
+=== RUN   TestConnectorOperationStreamUnknownPOSTIsNotReplayed/unavailable
+=== RUN   TestConnectorOperationStreamUnknownPOSTIsNotReplayed/redirect
+=== RUN   TestConnectorOperationStreamUnknownPOSTIsNotReplayed/fixed-length
+=== RUN   TestConnectorOperationStreamUnknownPOSTIsNotReplayed/wrong-media
+--- PASS: TestConnectorOperationStreamUnknownPOSTIsNotReplayed (0.12s)
+    --- PASS: TestConnectorOperationStreamUnknownPOSTIsNotReplayed/unavailable (0.03s)
+    --- PASS: TestConnectorOperationStreamUnknownPOSTIsNotReplayed/redirect (0.03s)
+    --- PASS: TestConnectorOperationStreamUnknownPOSTIsNotReplayed/fixed-length (0.03s)
+    --- PASS: TestConnectorOperationStreamUnknownPOSTIsNotReplayed/wrong-media (0.03s)
+=== RUN   TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate
+=== RUN   TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name
+2026/10/13 21:47:15 http: TLS handshake error from 127.0.0.1:32964: remote error: tls: bad certificate
+=== RUN   TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots
+2026/10/13 21:47:15 http: TLS handshake error from 127.0.0.1:60622: remote error: tls: bad certificate
+=== RUN   TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate
+=== RUN   TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate
+--- PASS: TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate (0.11s)
+    --- PASS: TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-name (0.03s)
+    --- PASS: TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/wrong-roots (0.03s)
+    --- PASS: TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/excluded-candidate (0.03s)
+    --- PASS: TestConnectorOperationStreamRequiresActualMutualTLSAndSelectedCandidate/no-client-certificate (0.03s)
+=== RUN   TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello
+=== RUN   TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello/headers
+=== RUN   TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello/hello
+--- PASS: TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello (0.85s)
+    --- PASS: TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello/headers (0.42s)
+    --- PASS: TestConnectorOperationStreamOriginalDeadlineBoundsHeaderAndHello/hello (0.42s)
+=== RUN   TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner
+=== RUN   TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/0
+=== RUN   TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/1
+=== RUN   TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/2
+=== RUN   TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/3
+--- PASS: TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner (0.12s)
+    --- PASS: TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/0 (0.03s)
+    --- PASS: TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/1 (0.03s)
+    --- PASS: TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/2 (0.03s)
+    --- PASS: TestConnectorOperationStreamHeaderCancellationKeepsSingleShutdownOwner/3 (0.03s)
+=== RUN   TestConnectorOperationStreamCanonicalUTCEmission
+--- PASS: TestConnectorOperationStreamCanonicalUTCEmission (0.11s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/mtls	6.842s

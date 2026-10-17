@@ -1,0 +1,141 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	port "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type FleetObservation struct{ claims *EnrollmentClaims }
+
+var _ port.FleetTrustProjection = (*FleetObservation)(nil)
+
+func NewFleetObservation(ctx context.Context, pool *pgxpool.Pool, installation string) (*FleetObservation, error) {
+	c, err := NewEnrollmentClaims(ctx, pool, installation)
+	if err != nil {
+		return nil, err
+	}
+	return &FleetObservation{c}, nil
+}
+func (s *FleetObservation) ObserveAdministration(ctx context.Context, a value.Administration) error {
+	if a.InstallationID != s.claims.installation || !a.Valid(a.ObservedAt) {
+		return value.ErrInvalid
+	}
+	a.ObservedAt, a.FreshUntil = ownerTime(a.ObservedAt), ownerTime(a.FreshUntil)
+	// Include the new nonlocking reads in the same original five-second SQL
+	// operation budget, rather than starting Ledger's window after those reads.
+	until := time.Now().Add(5 * time.Second)
+	if a.FreshUntil.Before(until) {
+		until = a.FreshUntil
+	}
+	original, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	ctx = original
+	// This same-pool query precedes the transaction, so MaxConns1 is never
+	// acquired recursively. The incarnation is retained across every attempt.
+	incarnation, err := readFleetObservationIncarnation(ctx, s.claims.ledger.pool)
+	if err != nil || ctx.Err() != nil || !incarnation.primary || !a.Valid(incarnation.at) {
+		return value.ErrUnavailable
+	}
+	var comparison custodydb.FleetCurrentTrust
+	lockContention := false
+	err = s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		// Ledger may invoke this callback again only for its existing bounded
+		// serialization/deadlock retry. An earlier attempt cannot classify a later
+		// query or unknown COMMIT result.
+		comparison, lockContention = custodydb.FleetCurrentTrust{}, false
+		now, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !a.Valid(now.Time) {
+			return value.ErrDenied
+		}
+		// This unlocked row is only a possible failure classification. It never
+		// replaces the original FOR UPDATE or authorizes UPDATE/COMMIT.
+		before, readErr := q.ReadFleetTrust(ctx, id(a.InstallationID))
+		if readErr != nil && !errors.Is(readErr, pgx.ErrNoRows) {
+			return readErr
+		}
+		now, err = q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		candidate := readErr == nil && unchangedFleetObservation(a, before, now.Time)
+		// The restricted SQL role cannot insert suspension/recovery flags. Database
+		// defaults create a blocked root, including when the SQL row was absent.
+		if err = q.InsertBlockedFleetTrust(ctx, custodydb.InsertBlockedFleetTrustParams{InstallationID: id(a.InstallationID), IssuerEpoch: id(a.IssuerEpoch), SourceUid: a.Revision.UID, SourceGeneration: a.Revision.Generation, SourceDigest: a.Revision.Digest[:], ObservedAt: ts(a.ObservedAt), FreshUntil: ts(a.FreshUntil)}); err != nil {
+			return err
+		}
+		root, err := q.LockFleetTrust(ctx, id(a.InstallationID))
+		if err != nil {
+			if candidate && fleetObservationLockTimeout(err) {
+				comparison, lockContention = before, true
+			}
+			// The exact server abort returns before UPDATE or any COMMIT attempt.
+			return err
+		}
+		now, err = q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !a.Valid(now.Time) || root.IssuerEpoch != id(a.IssuerEpoch) || root.SourceUid != a.Revision.UID || a.Revision.Generation < root.SourceGeneration || (a.Revision.Generation == root.SourceGeneration && trustRevision(root) != a.Revision) {
+			return value.ErrDenied
+		}
+		if a.ObservedAt.Before(root.ObservedAt.Time) {
+			return value.ErrConflict
+		}
+		if a.ObservedAt.Equal(root.ObservedAt.Time) && (a.FreshUntil.After(root.FreshUntil.Time) || trustRevision(root) != a.Revision || (a.Suspended || root.RecoveryBlocked) != root.Suspended) {
+			return value.ErrConflict
+		}
+		// A restart or current configuration is not restore proof. This UPDATE does
+		// not name recovery_blocked or issuer_epoch, even for a newly observed root.
+		n, err := q.ObserveFleetAdministration(ctx, custodydb.ObserveFleetAdministrationParams{InstallationID: root.InstallationID, SourceGeneration: a.Revision.Generation, SourceDigest: a.Revision.Digest[:], Suspended: a.Suspended || root.RecoveryBlocked, ObservedAt: ts(a.ObservedAt), FreshUntil: ts(a.FreshUntil)})
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return value.ErrDenied
+		}
+		now, err = q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !a.Valid(now.Time) {
+			return value.ErrDenied
+		}
+		return nil
+	})
+	// The generic transaction has now completed its rollback/release path.
+	// Only the last exact lock abort can enter confirmation; unknown COMMIT,
+	// connection failure and all other errors keep the original failure fence.
+	if err != nil && lockContention && s.confirmFleetObservationContention(ctx, a, comparison, incarnation) {
+		return value.ErrObservationPersistenceContended
+	}
+	return err
+}
+func (s *FleetObservation) FenceAdministration(ctx context.Context, started time.Time) error {
+	if started.Year() < 2020 || started.Year() > 9999 {
+		return value.ErrInvalid
+	}
+	started = ownerTime(started)
+	return s.claims.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		now, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if started.After(now.Time) {
+			return value.ErrInvalid
+		}
+		// The predicate is re-evaluated under the row lock. An older failure cannot
+		// suspend a successful observation begun after that failing read started.
+		_, err = q.FenceFleetObservation(ctx, custodydb.FenceFleetObservationParams{InstallationID: id(s.claims.installation), ObservationStarted: ts(started)})
+		return err
+	})
+}

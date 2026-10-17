@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Read-only probe verification and lossless renamed archival. Never launches a lab."""
+import datetime, hashlib, json, os, pathlib, re, shutil, subprocess
+REPO=pathlib.Path('/home/phil/Projekte/asservat')
+STAGE=pathlib.Path('/home/phil/.cache/asservat-build/planning/fleet-freshness-lock-probe-20261014')
+OUT=REPO/'test/results/fleet-freshness-lock-feasibility'
+def digest(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+def write_json(p,v): p.write_text(json.dumps(v,indent=2,sort_keys=True)+'\n')
+def files(p): return {str(x.relative_to(p)) for x in p.rglob('*') if x.is_file()}
+def archived(p): return p+'.txt' if pathlib.PurePosixPath(p).suffix in ('.py','.sql') else p
+expected_acl={'select-only-cannot-lock':'42501','consumer-cannot-read-base':'42501','consumer-cannot-write-observation':'42501','consumer-view-remains-read-only':'55000'}
+forms=['share-all','update-all','share-column','share-nowait','update-nowait','join-share-of','join-share-all','composite-share']
+bindings=['missing','version','issuer','uid','generation','digest','postmaster','database','missing-incarnation','aba-version','suspended','recovery','wrong-process','wrong-database']
+expected=list(expected_acl)+forms+['exclusive-authority-still-excludes-renewal','ordinary-join-blocks-observation']+['blocked-share-nowait','blocked-update-nowait','blocked-base-share-nowait']+['binding-'+x for x in bindings]
+report={'scope':'SQL view-lock feasibility only; no production migration, producer, observer or installed workflow qualification','nativeRerun':False,'verifiedAtUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'runs':{},'readOnlyCleanupCommands':[]}
+boot=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+for run in ('probe-1','probe-2'):
+ d=STAGE/'checks'/run;r=json.loads((d/'result.json').read_text());m=json.loads((d/'manifest.json').read_text());cmd=r['commands'];by={x['label']:x for x in cmd}
+ # Labels repeat for bounded readiness polls; exact command identity is its log/PID.
+ assert len({c['log'] for c in cmd})==len(cmd)
+ assert r['scope']=='SQL view lock feasibility only' and r['native'] and not r['productionSelected']
+ assert r['bootID']==boot and r['signalReceived'] is None and r['sourceChanges']==[]
+ assert r['exit']==(2 if run=='probe-1' else 0)
+ if run=='probe-2':assert digest(d/'result.json')=='e272cfb59775372f7e53603646cef106b6512bd58c892ac1caa603b2b3d29b41'
+ assert digest(d/'manifest.json')==r['manifestSHA256']
+ assert files(d)==set(r['artifacts'])|{'result.json'}
+ for p,h in r['artifacts'].items():assert digest(d/p)==h,p
+ for p,h in m['payloads'].items():assert digest(d/p)==h,p
+ assert {str(x.relative_to(d/'sources')) for x in (d/'sources').rglob('*') if x.is_file()}=={p+'.txt' for p in m['sources']}
+ current_sources={}
+ for p,h in m['sources'].items():
+  assert digest(d/'sources'/(p+'.txt'))==h,p
+  current_sources[p]={'frozenSHA256':h,'currentSHA256':digest(REPO/p),'matches':digest(REPO/p)==h}
+ assert len(cmd)==(43 if run=='probe-1' else 208)
+ assert len({c['pid'] for c in cmd})==len(cmd)
+ groups={x['pid']:x for x in r['cleanup']['processGroups']}
+ assert set(groups)=={c['pid'] for c in cmd}
+ for c in cmd:
+  assert c['ownedGroupJoined'] and c['exit'] is not None
+  assert c['logSHA256']==digest(d/c['log'])
+  assert groups[c['pid']]=={'pid':c['pid'],'exit':c['exit'],'absent':True}
+ assert r['cleanup']['containerRemoved'] and r['cleanup']['ownedGroupsJoined']
+ def raw(label):return (d/by[label]['log']).read_text()
+ def obj(label):return json.loads(raw(label))
+ assert obj('server')==r['server'] and r['server']['versionNum']=='180006' and not r['server']['inRecovery']
+ views=obj('view-contract');assert views==r['viewColumns'] and views['fleet_current_trust']==views['fleet_legacy_contract'] and len(views['fleet_current_trust'])==9
+ assert raw('consumer-acl').strip()=='probe_consumer|f|f|f|f|f|t|f'
+ for n,s in expected_acl.items():assert by[n]['exit']==3 and re.search(r'ERROR:\s+'+s+':',raw(n))
+ assert [c['name'] for c in r['cases']]==(list(expected_acl) if run=='probe-1' else expected)
+ assert all(c['passed'] is True for c in r['cases'])
+ if run=='probe-1':
+  assert 'share-all-semantic-blocking' in r['error'] and 'NOTICE' in r['error'] and 'truncated' in r['error']
+  lines=raw('share-all-semantic-blocking').splitlines();assert len(lines)==2 and lines[0].startswith('NOTICE:')
+  blocked=json.loads(lines[1])[0];assert blocked['waitType']=='Lock' and blocked['blockers']==[by['share-all']['backendPID']]
+ else:
+  cases={x['name']:x for x in r['cases']}
+  for f in forms:
+   case=cases[f];holder=by[f]['backendPID'];blocked=obj(f+'-semantic-blocking');assert len(blocked)==1 and blocked[0]==case['semanticBlocking']==by[f+'-semantic']['observedBlocking']
+   assert blocked[0]['blockers']==[holder] and blocked[0]['waitType']=='Lock' and blocked[0]['role']=='probe_semantic' and blocked[0]['state']=='active'
+   assert 'probe-backend:'+str(holder) in raw(f) and 'probe-holder-ready' in raw(f)
+   assert raw(f+'-held').strip()=='1' and raw(f+'-active').strip()=='t'
+   assert raw(f+'-uncommitted').strip()=='f' and raw(f+'-gone').strip()=='0' and raw(f+'-fenced').strip()=='t'
+   assert by[f+'-renew']['exit']==by[f+'-semantic']['exit']==0
+   old=obj(f+'-old-dates');new=obj(f+'-new-dates');assert old.keys()==new.keys()
+   assert old['observed_at']!=new['observed_at'] and old['fresh_until']!=new['fresh_until']
+   assert {k:v for k,v in old.items() if k not in ('observed_at','fresh_until')}=={k:v for k,v in new.items() if k not in ('observed_at','fresh_until')}
+   assert case['renewalCompletedWithAuthorityShare']==(f not in ('update-all','update-nowait'))
+   assert case['directObservationUpdateCompleted'] and case['semanticCommittedOnlyAfterRelease']
+  for case,wait,holder in [('exclusive-authority-still-excludes-renewal','observer-authority-share','authority-exclusive'),('ordinary-join-blocks-observation','ordinary-join-renew','ordinary-join-holder')]:
+   evidence=obj(wait+'-blocking');assert len(evidence)==1 and evidence[0]==cases[case]['blocking']==by[wait]['observedBlocking']
+   assert evidence[0]['blockers']==[by[holder]['backendPID']] and evidence[0]['waitType']=='Lock' and evidence[0]['role']=='probe_observer'
+   assert by[wait]['exit']==0 and raw(holder+'-gone').strip()=='0'
+  for n in ['blocked-share-nowait','blocked-update-nowait','blocked-base-share-nowait']:
+   assert cases[n]['SQLSTATE']=='55P03' and by[n]['exit']==3 and re.search(r'ERROR:\s+55P03:',raw(n))
+  for idx,n in enumerate(bindings):
+   f='binding-'+n;facts=obj(f+'-deny');assert facts==cases[f]['facts'] and facts['admitted'] is False and facts['nonnull'] and (facts['blocked'] or facts['suspended'])
+   assert raw(f+'-active').strip()=='t' and by[f+'-change']['exit']==0
+   if idx<10:assert facts['invalidDates'] and facts['blocked']
+ inspect=obj('cleanup-inspect')[0]
+ assert inspect['Id']==r['containerID']==r['cleanup']['containerID'] and inspect['Name']=='/'+r['containerName']
+ assert inspect['Image']==r['imageID'] and inspect['Config']['Labels']=={'asservat.probe':'fleet-lock','asservat.test':r['runID']}
+ host=inspect['HostConfig'];assert host['NetworkMode']=='none' and not host['Privileged'] and not host['Binds'] and not host['PortBindings'] and host['ReadonlyRootfs'] and host['CapDrop']==['ALL'] and host['Memory']==768*1024**2 and host['NanoCpus']==2000000000 and host['PidsLimit']==256
+ assert [x['Name'] for x in inspect['Mounts'] if x['Type']=='volume']==r['cleanup']['volumes']
+ assert by['remove-owned-container']['exit']==0 and raw('remove-owned-container').strip()==r['containerID'] and raw('remaining-owned-containers').strip()==''
+ assert by['remaining-volume']['exit']==1 and 'no such volume' in raw('remaining-volume') and r['cleanup']['volumes'][0] in raw('remaining-volume')
+ pglog=raw('postgres-log');assert 'PostgreSQL 18.6' in pglog and 'database system is ready to accept connections' in pglog
+ assert 'permission denied for view fleet_current_trust' in pglog and 'cannot update view "fleet_current_trust"' in pglog
+ if run=='probe-2':assert pglog.count('ERROR:')==7 and pglog.count('ERROR:  could not obtain lock on row in relation "fleet_trust"')==3
+ # Current process/group check against same boot, including the former container init.
+ absent=[]
+ for pid in list(groups)+[inspect['State']['Pid']]:
+  assert not pathlib.Path('/proc',str(pid)).exists(),('retained PID',pid)
+  try:os.killpg(pid,0)
+  except ProcessLookupError:pass
+  else:raise AssertionError(('retained process group',pid))
+  absent.append(pid)
+ def read_command(args,absent_text=None):
+  c=subprocess.run(args,capture_output=True,text=True,timeout=20)
+  report['readOnlyCleanupCommands'].append({'run':run,'argv':args,'exit':c.returncode,'stdout':c.stdout,'stderr':c.stderr})
+  if absent_text:assert c.returncode==1 and absent_text.lower() in c.stderr.lower()
+  else:assert c.returncode==0 and c.stdout.strip()==''
+ read_command(['docker','ps','-aq','--filter','label=asservat.test='+r['runID']])
+ read_command(['docker','inspect',r['containerID']],'No such object')
+ read_command(['docker','inspect',r['containerName']],'No such object')
+ for vol in r['cleanup']['volumes']:read_command(['docker','volume','inspect',vol],'no such volume')
+ mapping={}
+ for p in sorted(files(d)):
+  dest=OUT/run/archived(p);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(d/p,dest);assert digest(d/p)==digest(dest);mapping[p]={'archivePath':str(dest.relative_to(OUT)),'sha256':digest(dest)}
+ report['runs'][run]={'terminalExit':r['exit'],'resultSHA256':digest(d/'result.json'),'exactArtifactCount':len(r['artifacts']),'archivedFileCount':len(mapping),'commandsVerified':len(cmd),'manifestPayloadsVerified':len(m['payloads']),'archivedRepoSourcesVerified':len(m['sources']),'currentRepoSourceComparison':current_sources,'cases':r['cases'],'server':r['server'],'recordedCleanupVerified':True,'currentProcessAndGroupsAbsent':absent,'bootID':boot,'archiveMapping':mapping,'failurePreserved':r.get('error')}
+for p in ['probe-2-delta.patch','probe-1-independent-verification.json']:
+ dest=OUT/'provenance'/p;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(STAGE/p,dest)
+integration_path=REPO/'test/results/public-context-journey-integration/integration.json'
+integration=json.loads(integration_path.read_text())
+entry=next(x for x in integration['files'] if x['path']=='scripts/test-context-storage.py')
+for run in report['runs'].values():
+ changed={p:v for p,v in run['currentRepoSourceComparison'].items() if not v['matches']}
+ assert set(changed)=={'scripts/test-context-storage.py'}
+ c=changed[entry['path']];assert c['frozenSHA256']==entry['base_sha256'] and c['currentSHA256']==entry['payload_sha256']
+shutil.copyfile(integration_path,OUT/'provenance/public-context-journey-integration.json')
+report['postProbeSourceChange']={'path':entry['path'],'baseSHA256':entry['base_sha256'],'currentSHA256':entry['payload_sha256'],'integrationRecordSHA256':digest(integration_path),'integratedAt':integration['integratedAt'],'scope':'Subsequent recorded selector-only journey integration, after both actual probe runs; original sourceChanges arrays are empty.'}
+# Exact command argv token inspection; never infer cleanup from a missing root PID alone.
+matching=[]
+for proc in pathlib.Path('/proc').iterdir():
+ if not proc.name.isdecimal():continue
+ try:args=(proc/'cmdline').read_bytes().split(b'\0')
+ except (FileNotFoundError,ProcessLookupError,PermissionError):continue
+ if any(a.decode(errors='replace').startswith(str(STAGE)) and a.decode(errors='replace').endswith('/probe.py') for a in args):matching.append(proc.name)
+assert not matching,matching
+report['currentProbeRunnerProcesses']=matching
+report['verdict']='PASS: both recorded runs verified and preserved; probe-2 all 31 cases pass, probe-1 remains failed.'
+write_json(OUT/'independent-verification.json',report)
+print(json.dumps({'verdict':report['verdict'],'verificationSHA256':digest(OUT/'independent-verification.json'),'archivedRuns':{k:{x:v[x] for x in ('terminalExit','resultSHA256','exactArtifactCount','archivedFileCount','commandsVerified')} for k,v in report['runs'].items()}},indent=2))

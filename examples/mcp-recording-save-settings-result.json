@@ -1,0 +1,53 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000199",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "recordingSaveSettings",
+    "operation": "recordingSave",
+    "capture_id": "00000000-0000-4000-8000-000000000190",
+    "cluster_id": "00000000-0000-4000-8000-000000000001",
+    "namespace_uid": "namespace-payments-uid",
+    "accepted_at": "2026-10-09T12:00:05Z",
+    "expires_at": "2026-10-10T11:55:00Z",
+    "settings_digest": "6be8353925e07ea2816f9f71f201e27e2438c6804420b17732fe5feb815dee44",
+    "original_execution_digest": "33dc70161e239f66d41de88282ce27c1a2426797fb743c9f688e0261e39822d8",
+    "settings": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "name": "api",
+          "uid": "workload-api-uid"
+        },
+        "maxPods": 1,
+        "selection": "allWithinLimit",
+        "adoption": "pinUID"
+      },
+      "policy": {
+        "clusterID": "00000000-0000-4000-8000-000000000001",
+        "namespaceUID": "namespace-payments-uid",
+        "policyUID": "policy-trigger-lifecycles-uid",
+        "executionDigest": "4920c87bc4d15f2d7adbdde931973b7047c24a9bd0a086065f541a547bc41cb3"
+      },
+      "action_windows": [
+        {
+          "actionID": "traffic",
+          "before": "20s"
+        },
+        {
+          "actionID": "syscalls",
+          "before": "20s"
+        }
+      ]
+    },
+    "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000190"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

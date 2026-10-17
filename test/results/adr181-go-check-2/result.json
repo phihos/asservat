@@ -1,0 +1,12 @@
+{
+  "name": "adr181-go-check-2",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-180 (hub-api public composition P1-P5), ADR-181 (publisher, migration 63, unwrap authority, publisher compartment) and the hub-held work trust",
+  "results": "55 full packages and 544 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (group 4)",
+  "previousAttempt": "adr181-go-check-1 failed in group 7 (publicRuntimeWorkerPurpose omitted the publisher compartment)",
+  "sourceHashBefore": "7eee12079a3204e399499cf3ebb3bb1fcb3c3ad66b9982b2400531fbdcc2997f",
+  "sourceHashAfter": "7eee12079a3204e399499cf3ebb3bb1fcb3c3ad66b9982b2400531fbdcc2997f",
+  "log": "go-check.log"
+}

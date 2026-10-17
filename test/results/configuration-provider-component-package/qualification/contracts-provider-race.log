@@ -1,0 +1,510 @@
+=== RUN   TestAPIContextFramesEnforceKindSpecificBoundsBeforePayloadRead
+--- PASS: TestAPIContextFramesEnforceKindSpecificBoundsBeforePayloadRead (0.00s)
+=== RUN   TestAPIContextMaximumIdentityEncoding
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-22
+    api_context_start_test.go:47: maximum legal escaped identity: 153205 bytes, total eight replies: 1225640
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-5c
+    api_context_start_test.go:47: maximum legal escaped identity: 153205 bytes, total eight replies: 1225640
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-3c
+    api_context_start_test.go:47: maximum legal escaped identity: 77813 bytes, total eight replies: 622504
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-3e
+    api_context_start_test.go:47: maximum legal escaped identity: 77813 bytes, total eight replies: 622504
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-26
+    api_context_start_test.go:47: maximum legal escaped identity: 77813 bytes, total eight replies: 622504
+=== RUN   TestAPIContextMaximumIdentityEncoding/char-e280a8
+    api_context_start_test.go:47: maximum legal escaped identity: 77813 bytes, total eight replies: 622504
+--- PASS: TestAPIContextMaximumIdentityEncoding (0.24s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-22 (0.05s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-5c (0.05s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-3c (0.04s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-3e (0.04s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-26 (0.04s)
+    --- PASS: TestAPIContextMaximumIdentityEncoding/char-e280a8 (0.04s)
+=== RUN   TestAPIContextClosedIdentityEncoding
+=== RUN   TestAPIContextClosedIdentityEncoding/absent
+=== RUN   TestAPIContextClosedIdentityEncoding/trailing
+=== RUN   TestAPIContextClosedIdentityEncoding/oversize
+=== RUN   TestAPIContextClosedIdentityEncoding/duplicate
+=== RUN   TestAPIContextClosedIdentityEncoding/alias
+=== RUN   TestAPIContextClosedIdentityEncoding/unknown
+=== RUN   TestAPIContextClosedIdentityEncoding/null
+--- PASS: TestAPIContextClosedIdentityEncoding (0.01s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/absent (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/trailing (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/oversize (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/duplicate (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/alias (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/unknown (0.00s)
+    --- PASS: TestAPIContextClosedIdentityEncoding/null (0.00s)
+=== RUN   TestCapacityLocalOwnerOmissionKeepsComponentEncoding
+--- PASS: TestCapacityLocalOwnerOmissionKeepsComponentEncoding (0.00s)
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/shared
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/raw
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/pcap
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/native_checksum
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/native_path
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/title
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/timeline
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/preservation
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/verified_classification
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/deletion_complete
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/omitted_exposure
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/partial
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/missing_notice
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/extra_provenance
+=== RUN   TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/pending
+--- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection (0.08s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/shared (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/raw (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/pcap (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/native_checksum (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/native_path (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/title (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/timeline (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/preservation (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/verified_classification (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/deletion_complete (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/omitted_exposure (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/partial (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/missing_notice (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/extra_provenance (0.00s)
+    --- PASS: TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection/pending (0.00s)
+=== RUN   TestClusterObservationFramesRejectOversizedBeforeReadingBody
+--- PASS: TestClusterObservationFramesRejectOversizedBeforeReadingBody (0.00s)
+=== RUN   TestClusterObservationFramesHaveNoCaptureOrCredentialFallback
+--- PASS: TestClusterObservationFramesHaveNoCaptureOrCredentialFallback (0.00s)
+=== RUN   TestClusterObservationRoutingCanonicalTarget
+=== RUN   TestClusterObservationRoutingCanonicalTarget/bad-escape
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty-duplicate
+=== RUN   TestClusterObservationRoutingCanonicalTarget/order
+=== RUN   TestClusterObservationRoutingCanonicalTarget/escape-unreserved
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty-key
+=== RUN   TestClusterObservationRoutingCanonicalTarget/userinfo
+=== RUN   TestClusterObservationRoutingCanonicalTarget/claim-path
+=== RUN   TestClusterObservationRoutingCanonicalTarget/unknown
+=== RUN   TestClusterObservationRoutingCanonicalTarget/duplicate
+=== RUN   TestClusterObservationRoutingCanonicalTarget/missing
+=== RUN   TestClusterObservationRoutingCanonicalTarget/alias
+=== RUN   TestClusterObservationRoutingCanonicalTarget/semicolon
+=== RUN   TestClusterObservationRoutingCanonicalTarget/empty
+=== RUN   TestClusterObservationRoutingCanonicalTarget/encoded-path
+=== RUN   TestClusterObservationRoutingCanonicalTarget/double-slash
+=== RUN   TestClusterObservationRoutingCanonicalTarget/fragment
+=== RUN   TestClusterObservationRoutingCanonicalTarget/lowercase-escape
+=== RUN   TestClusterObservationRoutingCanonicalTarget/wrong-format
+=== RUN   TestClusterObservationRoutingCanonicalTarget/over-bound
+=== RUN   TestClusterObservationRoutingCanonicalTarget/absolute
+=== RUN   TestClusterObservationRoutingCanonicalTarget/relative
+=== RUN   TestClusterObservationRoutingCanonicalTarget/unescaped-time
+--- PASS: TestClusterObservationRoutingCanonicalTarget (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/bad-escape (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty-duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/order (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/escape-unreserved (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty-key (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/userinfo (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/claim-path (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/missing (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/alias (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/semicolon (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/empty (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/encoded-path (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/double-slash (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/fragment (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/lowercase-escape (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/wrong-format (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/over-bound (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/absolute (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/relative (0.00s)
+    --- PASS: TestClusterObservationRoutingCanonicalTarget/unescaped-time (0.00s)
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/zero-id
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/uppercase-id
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/invalid
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/offset
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/fraction-zero
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/excess-precision
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/comma
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/over-five-seconds
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/purpose
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/zero
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/empty-interval
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/backwards
+=== RUN   TestClusterObservationRoutingRejectsDatesAndIDs/missing-id
+--- PASS: TestClusterObservationRoutingRejectsDatesAndIDs (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/zero-id (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/uppercase-id (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/invalid (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/offset (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/fraction-zero (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/excess-precision (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/comma (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/over-five-seconds (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/zero (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/empty-interval (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/backwards (0.00s)
+    --- PASS: TestClusterObservationRoutingRejectsDatesAndIDs/missing-id (0.00s)
+=== RUN   TestClusterObservationRoutingExactUint64
+=== RUN   TestClusterObservationRoutingExactUint64/1
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740991
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740992
+=== RUN   TestClusterObservationRoutingExactUint64/9007199254740993
+=== RUN   TestClusterObservationRoutingExactUint64/18446744073709551614
+=== RUN   TestClusterObservationRoutingExactUint64/18446744073709551615
+=== RUN   TestClusterObservationRoutingExactUint64/reject-0
+=== RUN   TestClusterObservationRoutingExactUint64/reject--0
+=== RUN   TestClusterObservationRoutingExactUint64/reject--1
+=== RUN   TestClusterObservationRoutingExactUint64/reject-18446744073709551616
+=== RUN   TestClusterObservationRoutingExactUint64/reject-9007199254740993.0
+=== RUN   TestClusterObservationRoutingExactUint64/reject-1e0
+=== RUN   TestClusterObservationRoutingExactUint64/reject-"1"
+=== RUN   TestClusterObservationRoutingExactUint64/reject-null
+=== RUN   TestClusterObservationRoutingExactUint64/reject-true
+=== RUN   TestClusterObservationRoutingExactUint64/reject-01
+--- PASS: TestClusterObservationRoutingExactUint64 (0.01s)
+    --- PASS: TestClusterObservationRoutingExactUint64/1 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740991 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740992 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/9007199254740993 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/18446744073709551614 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/18446744073709551615 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject--0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject--1 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-18446744073709551616 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-9007199254740993.0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-1e0 (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-"1" (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-null (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-true (0.00s)
+    --- PASS: TestClusterObservationRoutingExactUint64/reject-01 (0.00s)
+=== RUN   TestClusterObservationRoutingClosedJSON
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-locator-purpose
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-request-purpose
+=== RUN   TestClusterObservationRoutingClosedJSON/trailing
+=== RUN   TestClusterObservationRoutingClosedJSON/over-bound
+=== RUN   TestClusterObservationRoutingClosedJSON/duplicate
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-duplicate
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-alias
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-missing
+=== RUN   TestClusterObservationRoutingClosedJSON/nested-null
+=== RUN   TestClusterObservationRoutingClosedJSON/request-unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/request-null
+=== RUN   TestClusterObservationRoutingClosedJSON/unknown
+=== RUN   TestClusterObservationRoutingClosedJSON/wrong-envelope-purpose
+--- PASS: TestClusterObservationRoutingClosedJSON (0.01s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-locator-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-request-purpose (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/trailing (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/over-bound (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-duplicate (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-alias (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-missing (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/nested-null (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/request-unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/request-null (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/unknown (0.00s)
+    --- PASS: TestClusterObservationRoutingClosedJSON/wrong-envelope-purpose (0.00s)
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/extended-observation
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/request-format
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/request
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/challenge
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/root
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/cluster
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/holder
+=== RUN   TestClusterObservationRoutingClaimRetainsOriginalBounds/prior-observation
+--- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/extended-observation (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/request-format (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/request (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/challenge (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/root (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/cluster (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/holder (0.00s)
+    --- PASS: TestClusterObservationRoutingClaimRetainsOriginalBounds/prior-observation (0.00s)
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-guard
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-candidates
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload-candidates
+=== RUN   TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload
+--- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings (0.01s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-guard (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-namespace-candidates (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload-candidates (0.00s)
+    --- PASS: TestClusterObservationRoutingRetainsFourRequestEncodings/capacity-workload (0.00s)
+=== RUN   TestClusterObservationRoutingMaximumRequest
+--- PASS: TestClusterObservationRoutingMaximumRequest (0.06s)
+=== RUN   TestClusterObservationMaximumClosedWire
+=== RUN   TestClusterObservationMaximumClosedWire/char-22
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-5c
+    cluster_observation_test.go:38: bounded exact observation bytes=164802 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-3c
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+=== RUN   TestClusterObservationMaximumClosedWire/char-26
+    cluster_observation_test.go:38: bounded exact observation bytes=83974 ceiling=196608
+--- PASS: TestClusterObservationMaximumClosedWire (0.44s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-22 (0.12s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-5c (0.13s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-3c (0.09s)
+    --- PASS: TestClusterObservationMaximumClosedWire/char-26 (0.09s)
+=== RUN   TestClusterObservationWireRejectsSmuggledFields
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/missing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/trailing
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/too-large
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/token
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/url
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/duplicate
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/alias
+=== RUN   TestClusterObservationWireRejectsSmuggledFields/null
+--- PASS: TestClusterObservationWireRejectsSmuggledFields (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/missing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/trailing (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/too-large (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/token (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/url (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/duplicate (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/alias (0.00s)
+    --- PASS: TestClusterObservationWireRejectsSmuggledFields/null (0.00s)
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"token":"private"
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"reviewer":"private"
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"role":"chosen"
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"tokenTTL":100000
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"providerAdministrator":true
+=== RUN   TestConfigurationProviderProfileIsClosedPublicInput/"authMount":"duplicate"
+--- PASS: TestConfigurationProviderProfileIsClosedPublicInput (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"token":"private" (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"reviewer":"private" (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"role":"chosen" (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"tokenTTL":100000 (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"providerAdministrator":true (0.00s)
+    --- PASS: TestConfigurationProviderProfileIsClosedPublicInput/"authMount":"duplicate" (0.00s)
+=== RUN   TestHubWorkerActivationLegacyOmissionPreservesBytes
+--- PASS: TestHubWorkerActivationLegacyOmissionPreservesBytes (0.00s)
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/deep
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/null_lifetime
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/explicit_zero
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/fraction
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/sharing_not_discarded
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/trailing_object
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/case_alias
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/broad_preset
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/oversize
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/duplicate
+=== RUN   TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/reason_not_discarded
+--- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues (0.07s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/deep (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/null_lifetime (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/explicit_zero (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/fraction (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/sharing_not_discarded (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/trailing_object (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/case_alias (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/broad_preset (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/oversize (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/duplicate (0.00s)
+    --- PASS: TestInvestigationInputsRejectUnsupportedOrAmbiguousValues/reason_not_discarded (0.00s)
+=== RUN   TestPodStatusOutputRequiresSubmissionRetentionAnchor
+--- PASS: TestPodStatusOutputRequiresSubmissionRetentionAnchor (0.08s)
+=== RUN   TestCaptureRequestResolutionHasStrictAcknowledgedDisposition
+--- PASS: TestCaptureRequestResolutionHasStrictAcknowledgedDisposition (0.07s)
+=== RUN   TestCaptureContinuationStrictInputAndPassiveAlternatives
+--- PASS: TestCaptureContinuationStrictInputAndPassiveAlternatives (0.06s)
+=== RUN   TestNativeFrameBoundedBeforePayload
+=== RUN   TestNativeFrameBoundedBeforePayload/unknown
+=== RUN   TestNativeFrameBoundedBeforePayload/empty
+=== RUN   TestNativeFrameBoundedBeforePayload/control
+=== RUN   TestNativeFrameBoundedBeforePayload/metadata
+=== RUN   TestNativeFrameBoundedBeforePayload/acknowledgement
+=== RUN   TestNativeFrameBoundedBeforePayload/commit
+=== RUN   TestNativeFrameBoundedBeforePayload/done
+=== RUN   TestNativeFrameBoundedBeforePayload/command
+=== RUN   TestNativeFrameBoundedBeforePayload/payload
+=== RUN   TestNativeFrameBoundedBeforePayload/overflow
+--- PASS: TestNativeFrameBoundedBeforePayload (0.01s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/unknown (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/empty (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/control (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/metadata (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/acknowledgement (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/commit (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/done (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/command (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/payload (0.00s)
+    --- PASS: TestNativeFrameBoundedBeforePayload/overflow (0.00s)
+=== RUN   TestNativeControlClosedDecoder
+--- PASS: TestNativeControlClosedDecoder (0.00s)
+=== RUN   TestOwnerWireNativePortHistoricalOmission
+--- PASS: TestOwnerWireNativePortHistoricalOmission (0.00s)
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/ttl
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/reviewer
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/alias
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/duplicate
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/missing-account
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/token
+=== RUN   TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/role
+--- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/ttl (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/reviewer (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/alias (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/duplicate (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/missing-account (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/token (0.00s)
+    --- PASS: TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases/role (0.00s)
+=== RUN   TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment
+--- PASS: TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment (0.00s)
+=== RUN   TestOwnerRelayResponseFrame
+=== RUN   TestOwnerRelayResponseFrame/zero
+=== RUN   TestOwnerRelayResponseFrame/oversized
+=== RUN   TestOwnerRelayResponseFrame/short-prefix
+=== RUN   TestOwnerRelayResponseFrame/short-body
+=== RUN   TestOwnerRelayResponseFrame/duplicate
+=== RUN   TestOwnerRelayResponseFrame/unknown
+=== RUN   TestOwnerRelayResponseFrame/missing
+=== RUN   TestOwnerRelayResponseFrame/alias
+=== RUN   TestOwnerRelayResponseFrame/trailing
+--- PASS: TestOwnerRelayResponseFrame (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/zero (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/oversized (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/short-prefix (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/short-body (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/duplicate (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/unknown (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/missing (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/alias (0.00s)
+    --- PASS: TestOwnerRelayResponseFrame/trailing (0.00s)
+=== RUN   TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection
+--- PASS: TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection (0.00s)
+=== RUN   TestPublicRuntimeWorkerOmissionPreservesOriginalInputBytes
+--- PASS: TestPublicRuntimeWorkerOmissionPreservesOriginalInputBytes (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	2.189s
+=== RUN   TestConfigurationProviderArtifactUsesOnlyActualSourceAndNamedSetup
+--- PASS: TestConfigurationProviderArtifactUsesOnlyActualSourceAndNamedSetup (0.01s)
+=== RUN   TestConfigurationProviderRecipeSeparatesExactTwoEffects
+--- PASS: TestConfigurationProviderRecipeSeparatesExactTwoEffects (0.01s)
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/mount
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/accessor
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/digest
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/installation
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/cluster
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/namespace
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/fleet-source
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/owner-source
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/transit
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/bucket
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/region
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/provider
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/account
+=== RUN   TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/secret
+--- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope (0.02s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/mount (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/accessor (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/digest (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/installation (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/cluster (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/namespace (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/fleet-source (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/owner-source (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/transit (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/bucket (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/region (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/provider (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/account (0.00s)
+    --- PASS: TestConfigurationProviderRecipeBindsOriginalSourceAndProviderScope/secret (0.00s)
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/foreign-secret
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/same-object
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/token-auth
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/wildcard-account
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/missing-source
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/invalid-key
+=== RUN   TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/insecure-endpoint
+--- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/foreign-secret (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/same-object (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/token-auth (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/wildcard-account (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/missing-source (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/invalid-key (0.00s)
+    --- PASS: TestConfigurationProviderRecipeRejectsForeignSecretAndAuthorityShape/insecure-endpoint (0.00s)
+=== RUN   TestInitialBootstrapPublicCompilerNormalizesOnlyNonAuthorizingInput
+--- PASS: TestInitialBootstrapPublicCompilerNormalizesOnlyNonAuthorizingInput (0.01s)
+=== RUN   TestInitialBootstrapAudienceHintNeverAcceptsExpiredOrDuplicateClaims
+--- PASS: TestInitialBootstrapAudienceHintNeverAcceptsExpiredOrDuplicateClaims (0.00s)
+=== RUN   TestInitialRegistryClosedSingleImageMaterial
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/scheme
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/headers
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/duplicate-entry
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/contradictory
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/newline
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/other-registry
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/half-pair
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/oversize
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/path
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/entry-helper
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/case-alias
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/two-registries
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/missing-password
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/wildcard
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/helper
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/duplicate
+=== RUN   TestInitialRegistryClosedSingleImageMaterial/null
+--- PASS: TestInitialRegistryClosedSingleImageMaterial (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/scheme (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/headers (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/duplicate-entry (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/contradictory (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/newline (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/other-registry (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/half-pair (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/oversize (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/path (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/entry-helper (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/case-alias (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/two-registries (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/missing-password (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/wildcard (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/helper (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/duplicate (0.00s)
+    --- PASS: TestInitialRegistryClosedSingleImageMaterial/null (0.00s)
+=== RUN   TestInitialRegistryDockerHubAliasIsNotGeneralURLMatching
+--- PASS: TestInitialRegistryDockerHubAliasIsNotGeneralURLMatching (0.00s)
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-pki
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-server
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/invalid-server
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/same-role
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/invalid-audit
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/insecure-provider
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-roots
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/pki-path
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-client
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/oversized-client
+=== RUN   TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/same-mount
+--- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-pki (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-server (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/invalid-server (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/same-role (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/invalid-audit (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/insecure-provider (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-roots (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/pki-path (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/missing-client (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/oversized-client (0.00s)
+    --- PASS: TestOwnerProviderProjectionRejectsInvalidAndOverlappingPKIRoles/same-mount (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/providerconfig	1.076s

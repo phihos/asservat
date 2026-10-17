@@ -1,0 +1,11 @@
+{
+  "HANDOFF.md": "ea6e78b51d97e2c4595aad08f29a6331cbcc43b91a777412a70cfb5f3945a9c7",
+  "bases.json": "d6ce13dc7e5362b18ef892bb4acfda2b9aa4396745bc184f377b7f05b71f5735",
+  "changes/test/integration/context_native_content_test.go": "cb1e9345df613560c56b7fcaf8c3c63a2aae5fe13aa39636446b24e9b130acc0",
+  "changes/test/integration/native_preparation_trace_test.go": "be048bb9beccb35f2a538460bcedb40e38757fc39c54ce80b1756f614d50a3a3",
+  "dependencies.json": "4617dda30b8a4b676f6419c55569b8e00a8cca441dd0472d3708c4952986a68b",
+  "evidence/trace-focused.json": "28e634f483887290596688c71001845b090d0d150a543fe86d1410408b70613f",
+  "evidence/trace-focused.log": "6d826e0484e0223f2e1a36f2af5c312fbd1f8177038e96f94ba5928af6775b88",
+  "manifest.json": "c18495a49fd6d804bd311ba731b8757ef07f733e44ab5741f76a55a0f4f1ab94",
+  "overlay.json": "58de9079a95bb602f03e3ee6637d0b653254b00a50455b5dc714ab7060285d03"
+}

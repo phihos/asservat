@@ -1,0 +1,48 @@
+{
+  "scope": "owned scoped storage fixture only; native execution pending",
+  "manifestSHA256": "ce7c0f8a6cc7c3dcab0c4b822ddf942d2acb224318dd1b16ff86123cd70c08d7",
+  "dependenciesSHA256": "4329762398ae6a8701d61e48fd32aa3f4c0221003e8a3e1d116904c416b773fb",
+  "dependencyCount": 1930,
+  "files": [
+    {
+      "path": "scripts/test-custody.py",
+      "baseSHA256": "399531a7f6d5be7a9a50e106b25f4e7b9d7f810763d405a6900a783c6cb6b5bb",
+      "payloadSHA256": "aa5228b8180c81359cd067ba2db4fcd7dd74347b155e6de428c77603c828dc3c"
+    },
+    {
+      "path": "test/integration/scoped_audit_storage_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "e6a66a2772fd75b1b67a8c5515a8d5dc827be6ba69aab0308c4e238dbae81c80"
+    }
+  ],
+  "verification": {
+    "scope": "compile and vet only; actual scoped IAM native test remains pending",
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/overlay.json",
+          "-run",
+          "^$",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 46.506
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/scoped-audit-native-20261013/overlay.json",
+          "./test/integration"
+        ],
+        "exit": 0,
+        "seconds": 2.398
+      }
+    ]
+  },
+  "installedRuntimeEnabled": false
+}

@@ -1,0 +1,460 @@
+package kubernetes
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const initialRuntimeResourceMarker = "asservat.io/runtime-resource-operation"
+
+// InitialRuntimeResources owns one fixed sequence of inert public objects.
+// No arbitrary body, kind, name, API endpoint or grant is accepted by Advance.
+// This component cannot create credentials, change guards, launch a process or
+// establish accepted configuration. The separate bridge follows its completion.
+type InitialRuntimeResources struct {
+	preparer                    *InitialPreparer
+	effects                     app.InitialRuntimeBridgeEffects
+	record                      audit.InitialInstallation
+	initial                     contracts.InitialInstaller
+	ownerRoots                  [][]byte
+	names                       initialRuntimeResourceNames
+	binding, rootUID            string
+	ctx                         context.Context
+	cancel                      context.CancelFunc
+	mu                          sync.Mutex
+	closed, busy, freshRootUsed bool
+	joined                      sync.WaitGroup
+}
+
+func NewInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte) (*InitialRuntimeResources, error) {
+	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || preparer.plan.HistoryProbe == nil || effects == nil {
+		return nil, cfg.ErrInvalid
+	}
+	record, receipt := effects.InitialRuntimeBridgeRecord()
+	if !record.Valid() || !receipt.ValidInitialInstallation(record.Scope.InstallationID, record.Claim.ID) {
+		return nil, cfg.ErrInvalid
+	}
+	roots := make([][]byte, len(ownerIssuerRoots))
+	for i, b := range ownerIssuerRoots {
+		roots[i] = bytes.Clone(b)
+	}
+	if _, _, e := mtls.OwnerTrustRoots(roots, preparer.protection.observer.now()); e != nil {
+		return nil, cfg.ErrInvalid
+	}
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	_, root, initial, until, e := preparer.currentHandover(call)
+	if e != nil {
+		return nil, e
+	}
+	// The original create input can omit RootUID. currentHandover has checked
+	// the acknowledged root, its self UID, original plan and native guards.
+	// Retain that actual UID locally; never mutate the shared preparer input.
+	raw, e := json.Marshal(initial)
+	if e != nil || !authorization.UUID(root.RootUID) || record.Scope != initialPreparationWitnessScope(initial) || sha256.Sum256(raw) != record.Claim.PlanDigest {
+		return nil, cfg.ErrChanged
+	}
+	names := runtimeResourceNames(initial.InstallationID)
+	old := []string{initial.Configuration, initial.Witness.Name, initial.WriterAccount.Name, initial.ProbeAccount.Name, initial.Pod.Name, initial.FleetSource.Name, preparer.plan.Workload.Credentials}
+	for _, name := range []string{names.Owner, names.Worker, names.OwnerInputs, names.WorkerInputs, names.OwnerProviders, names.WorkerProviders, names.OwnerSource, names.OwnerSourceGuard, names.WorkloadGuard, names.Lease} {
+		for _, v := range old {
+			if name == v {
+				return nil, cfg.ErrInvalid
+			}
+		}
+	}
+	b, e := json.Marshal(struct {
+		Format, RootUID, Image string
+		Initial                contracts.InitialInstaller
+		Record                 audit.InitialInstallation
+		Receipt                audit.Receipt
+		OwnerRoots             [][]byte
+	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots})
+	if e != nil || initialHandoverDeadline(call, preparer.protection.observer.now, until) != nil {
+		return nil, cfg.ErrUnavailable
+	}
+	d := sha256.Sum256(b)
+	life, cancel := context.WithCancel(ctx)
+	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, ctx: life, cancel: cancel}
+	if _, e = s.object(contracts.InitialRuntimeResourceState{}, 0); e != nil {
+		s.Close()
+		return nil, e
+	}
+	return s, nil
+}
+
+func (s *InitialRuntimeResources) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.mu.Unlock()
+	s.joined.Wait()
+}
+func (s *InitialRuntimeResources) name() string {
+	return "asservat-runtime-resources-" + strings.ReplaceAll(s.initial.InstallationID, "-", "")
+}
+func (s *InitialRuntimeResources) path() string {
+	return "/api/v1/namespaces/" + s.initial.Namespace.Name + "/secrets/" + s.name()
+}
+func (s *InitialRuntimeResources) now() time.Time { return s.preparer.protection.observer.now() }
+
+func (s *InitialRuntimeResources) operation(ctx context.Context, run func(context.Context) error) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || run == nil {
+		return cfg.ErrInvalid
+	}
+	s.mu.Lock()
+	if s.closed || s.busy || s.ctx.Err() != nil {
+		s.mu.Unlock()
+		return cfg.ErrUnavailable
+	}
+	s.busy = true
+	s.joined.Add(1)
+	s.mu.Unlock()
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { end(); close(joined) })
+	defer func() {
+		end()
+		if !stop() {
+			<-joined
+		}
+		s.mu.Lock()
+		s.busy = false
+		s.mu.Unlock()
+		s.joined.Done()
+	}()
+	return s.effects.WithInitialRuntimeBridge(call, run)
+}
+func (s *InitialRuntimeResources) current(ctx context.Context) (time.Time, error) {
+	_, root, c, until, e := s.preparer.currentHandover(ctx)
+	if e != nil {
+		return time.Time{}, e
+	}
+	if root.RootUID != s.rootUID || !equalJSON(c, s.initial) || initialPreparationWitnessScope(c) != s.record.Scope {
+		return time.Time{}, cfg.ErrChanged
+	}
+	if _, end, e := mtls.OwnerTrustRoots(s.ownerRoots, s.now()); e != nil {
+		return time.Time{}, cfg.ErrUnavailable
+	} else {
+		until = identity.Earlier(until, end)
+	}
+	if e = initialHandoverDeadline(ctx, s.now, until); e != nil {
+		return time.Time{}, e
+	}
+	return until, nil
+}
+
+func (s *InitialRuntimeResources) valid(v contracts.InitialRuntimeResourceState) bool {
+	now := s.now()
+	if v.Format != contracts.InitialRuntimeResourcesFormat || v.BindingDigest != s.binding || !authorization.UUID(v.SetupID) || v.CreatedAt.Year() < 2020 || v.CreatedAt.After(now) || !v.CreatedAt.Equal(v.CreatedAt.Truncate(time.Microsecond)) || v.Until.Sub(v.CreatedAt) != 30*time.Minute || v.Objects == nil || len(v.Objects) > contracts.InitialRuntimeResourceCount || contracts.InitialRuntimeResourceCount != len(initialRuntimeResourceItems) {
+		return false
+	}
+	seen := map[string]bool{v.SetupID: true}
+	uids := map[string]bool{}
+	for i, c := range v.Objects {
+		if c.Item != initialRuntimeResourceItems[i] || !authorization.UUID(c.OperationID) || seen[c.OperationID] || !preparationDigestValid(c.TemplateDigest) || c.ClaimedAt.Before(v.CreatedAt) || c.ClaimedAt.After(now) || !c.ClaimedAt.Equal(c.ClaimedAt.Truncate(time.Microsecond)) || !c.Until.Equal(c.Until.Truncate(time.Microsecond)) || !c.ClaimedAt.Before(c.Until) || c.Until.After(v.Until) || c.Until.Sub(c.ClaimedAt) > 5*time.Second || i > 0 && v.Objects[i-1].Receipt == nil {
+			return false
+		}
+		seen[c.OperationID] = true
+		want, e := s.object(v, i)
+		if e != nil || preparationDigest(want.object) != c.TemplateDigest {
+			return false
+		}
+		if r := c.Receipt; r != nil {
+			if !authorization.UUID(r.UID) || uids[r.UID] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 0 || r.Generation >= 1<<53 {
+				return false
+			}
+			uids[r.UID] = true
+		} else if i != len(v.Objects)-1 {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *InitialRuntimeResources) decode(ctx context.Context, raw []byte) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	var obj core.Secret
+	if permissionJSON(raw, contracts.InitialRuntimeResourcesMaxBytes*2, 32768) != nil || strictGuardJSON(raw, &obj) != nil || obj.APIVersion != "v1" || obj.Kind != "Secret" || obj.Namespace != s.initial.Namespace.Name || obj.Name != s.name() || !authorization.UUID(string(obj.UID)) || !identity.Text(obj.ResourceVersion, 128) || obj.DeletionTimestamp != nil || len(obj.OwnerReferences) != 0 || len(obj.Finalizers) != 0 || len(obj.Labels) != 0 || len(obj.Annotations) != 0 || obj.Type != core.SecretTypeOpaque || obj.Immutable != nil && *obj.Immutable || len(obj.Data) != 1 || len(obj.StringData) != 0 {
+		return out, nil, cfg.ErrChanged
+	}
+	v, e := contracts.DecodeInitialRuntimeResourceState(bytes.NewReader(obj.Data["state.json"]))
+	if e != nil || !s.valid(v) {
+		return out, nil, cfg.ErrChanged
+	}
+	until, ok := ctx.Deadline()
+	if !ok || initialHandoverDeadline(ctx, s.now, until) != nil {
+		return out, nil, cfg.ErrUnavailable
+	}
+	return contracts.InitialRuntimeResourceSnapshot{State: v, UID: string(obj.UID), ResourceVersion: obj.ResourceVersion, ValidUntil: until}, &obj, nil
+}
+func (s *InitialRuntimeResources) read(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, error) {
+	b, e := s.preparer.creator.api.Get().AbsPath(s.path()).MaxRetries(0).DoRaw(ctx)
+	if e != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, nil, cfg.ErrUnavailable
+	}
+	return s.decode(ctx, b)
+}
+func (s *InitialRuntimeResources) write(ctx context.Context, obj *core.Secret, v contracts.InitialRuntimeResourceState) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var zero contracts.InitialRuntimeResourceSnapshot
+	if obj == nil || !s.valid(v) || !s.now().Before(v.Until) {
+		return zero, cfg.ErrChanged
+	}
+	until, e := s.current(ctx)
+	if e != nil {
+		return zero, e
+	}
+	ctx, end := context.WithDeadline(ctx, identity.Earlier(until, v.Until))
+	defer end()
+	data, e := json.Marshal(v)
+	if e != nil || len(data) > contracts.InitialRuntimeResourcesMaxBytes {
+		return zero, cfg.ErrInvalid
+	}
+	next := obj.DeepCopy()
+	next.Data = map[string][]byte{"state.json": data}
+	body, e := json.Marshal(next)
+	if e != nil {
+		return zero, cfg.ErrInvalid
+	}
+	raw, e := s.preparer.creator.api.Put().AbsPath(s.path()).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(ctx)
+	if e != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	got, _, e := s.decode(ctx, raw)
+	if e != nil || got.UID != string(obj.UID) || got.ResourceVersion == obj.ResourceVersion || !equalJSON(got.State, v) {
+		return zero, cfg.ErrChanged
+	}
+	return got, nil
+}
+
+// Create is an explicit fresh setup action. A caller recovering any unknown
+// result calls Read; neither Read nor Advance can recreate the private root.
+func (s *InitialRuntimeResources) Create(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	e := s.operation(ctx, func(call context.Context) error {
+		s.mu.Lock()
+		if s.freshRootUsed {
+			s.mu.Unlock()
+			return cfg.ErrUnavailable
+		}
+		s.freshRootUsed = true
+		s.mu.Unlock()
+		until, e := s.current(call)
+		if e != nil {
+			return e
+		}
+		call, end := context.WithDeadline(call, until)
+		defer end()
+		id, e := prepUUID()
+		if e != nil {
+			return e
+		}
+		now := s.now().UTC().Truncate(time.Microsecond)
+		v := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: s.binding, SetupID: id, CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
+		b, e := json.Marshal(v)
+		if e != nil {
+			return cfg.ErrInvalid
+		}
+		obj := core.Secret{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: metav1.ObjectMeta{Name: s.name(), Namespace: s.initial.Namespace.Name}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"state.json": b}}
+		body, e := json.Marshal(obj)
+		if e != nil {
+			return cfg.ErrInvalid
+		}
+		raw, e := s.preparer.creator.api.Post().AbsPath("/api/v1/namespaces/"+s.initial.Namespace.Name+"/secrets").Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(call)
+		if e != nil {
+			return cfg.ErrUnavailable
+		}
+		got, _, e := s.decode(call, raw)
+		if e != nil || !equalJSON(got.State, v) {
+			return cfg.ErrChanged
+		}
+		if _, e = s.current(call); e != nil {
+			return e
+		}
+		out = got
+		return nil
+	})
+	if e != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, e
+	}
+	return out, nil
+}
+
+func (s *InitialRuntimeResources) Read(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	e := s.operation(ctx, func(call context.Context) error {
+		until, e := s.current(call)
+		if e != nil {
+			return e
+		}
+		call, end := context.WithDeadline(call, until)
+		defer end()
+		out, _, e = s.read(call)
+		return e
+	})
+	if e != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, e
+	}
+	return out, nil
+}
+
+func (s *InitialRuntimeResources) verified(ctx context.Context, raw []byte, v contracts.InitialRuntimeResourceState, index int) (contracts.InitialRuntimeResourceReceipt, error) {
+	var zero contracts.InitialRuntimeResourceReceipt
+	want, e := s.object(v, index)
+	if e != nil {
+		return zero, e
+	}
+	claim := v.Objects[index]
+	// Decode into a zero object. Starting from the expected template would let
+	// omitted wire fields inherit expected values and conceal a mutated object.
+	got := reflect.New(reflect.TypeOf(want.object).Elem()).Interface().(runtime.Object)
+	if permissionJSON(raw, 256<<10, 131072) != nil || strictGuardJSON(raw, got) != nil {
+		return zero, cfg.ErrChanged
+	}
+	m, e := meta.Accessor(got)
+	if e != nil {
+		return zero, cfg.ErrChanged
+	}
+	wm, _ := meta.Accessor(want.object)
+	if !authorization.UUID(string(m.GetUID())) || !identity.Text(m.GetResourceVersion(), 128) || m.GetName() != wm.GetName() || m.GetNamespace() != wm.GetNamespace() || m.GetDeletionTimestamp() != nil || len(m.GetOwnerReferences()) != 0 || len(m.GetFinalizers()) != 0 || len(m.GetAnnotations()) != 1 || m.GetAnnotations()[initialRuntimeResourceMarker] != claim.OperationID || got.GetObjectKind().GroupVersionKind() != want.object.GetObjectKind().GroupVersionKind() {
+		return zero, cfg.ErrChanged
+	}
+	r := contracts.InitialRuntimeResourceReceipt{UID: string(m.GetUID()), ResourceVersion: m.GetResourceVersion(), Generation: m.GetGeneration()}
+	if claim.Receipt != nil && (r.UID != claim.Receipt.UID || r.Generation != claim.Receipt.Generation) {
+		return zero, cfg.ErrChanged
+	}
+	m.SetAnnotations(nil)
+	if normalizeInitialRuntimeObject(got) != nil || normalizeInitialRuntimeObject(want.object) != nil || !equalJSON(got, want.object) {
+		return zero, cfg.ErrChanged
+	}
+	until, ok := ctx.Deadline()
+	if !ok || initialHandoverDeadline(ctx, s.now, until) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return r, nil
+}
+
+// Advance handles only the next compiled item. A recorded unacknowledged claim
+// is lookup-only forever, including after restart and after its effect deadline.
+// Absence is never evidence that CREATE did not happen or permission to retry.
+func (s *InitialRuntimeResources) Advance(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
+	var out contracts.InitialRuntimeResourceSnapshot
+	e := s.operation(ctx, func(call context.Context) error {
+		until, e := s.current(call)
+		if e != nil {
+			return e
+		}
+		call, end := context.WithDeadline(call, until)
+		defer end()
+		start, obj, e := s.read(call)
+		if e != nil {
+			return e
+		}
+		v := start.State
+		if !s.now().Before(v.Until) {
+			return cfg.ErrUnavailable
+		}
+		call, setupEnd := context.WithDeadline(call, v.Until)
+		defer setupEnd()
+		index := len(v.Objects)
+		fresh := false
+		if index > 0 && v.Objects[index-1].Receipt == nil {
+			index--
+		}
+		if index == len(initialRuntimeResourceItems) {
+			out = start
+			return nil
+		}
+		want, e := s.object(v, index)
+		if e != nil {
+			return e
+		}
+		if index == len(v.Objects) {
+			id, e := prepUUID()
+			if e != nil {
+				return e
+			}
+			now := s.now().UTC().Truncate(time.Microsecond)
+			deadline, _ := call.Deadline()
+			deadline = deadline.UTC().Truncate(time.Microsecond)
+			claim := contracts.InitialRuntimeResourceClaim{Item: initialRuntimeResourceItems[index], OperationID: id, TemplateDigest: preparationDigest(want.object), ClaimedAt: now, Until: deadline}
+			v.Objects = append(v.Objects, claim)
+			ack, e := s.write(call, obj, v)
+			if e != nil {
+				return e
+			}
+			// Only this positive exact acknowledgement owns the original CREATE.
+			fresh = true
+			start = ack
+		}
+		claim := v.Objects[index]
+		accessor, _ := meta.Accessor(want.object)
+		path := want.collection + "/" + accessor.GetName()
+		if fresh {
+			var effectEnd context.CancelFunc
+			call, effectEnd = context.WithDeadline(call, claim.Until)
+			defer effectEnd()
+			if _, e = s.current(call); e != nil {
+				return e
+			}
+			accessor.SetAnnotations(map[string]string{initialRuntimeResourceMarker: claim.OperationID})
+			body, e := json.Marshal(want.object)
+			if e != nil {
+				return cfg.ErrInvalid
+			}
+			raw, e := s.preparer.creator.api.Post().AbsPath(want.collection).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(call)
+			if e != nil {
+				return cfg.ErrUnavailable
+			}
+			if _, e = s.verified(call, raw, v, index); e != nil {
+				return e
+			}
+		}
+		// Independent lookup verifies the exact original generated object. It
+		// cannot authorize a replacement CREATE or synthesize another operation.
+		raw, e := s.preparer.creator.api.Get().AbsPath(path).MaxRetries(0).DoRaw(call)
+		if e != nil {
+			return cfg.ErrUnavailable
+		}
+		receipt, e := s.verified(call, raw, v, index)
+		if e != nil {
+			return e
+		}
+		if _, e = s.current(call); e != nil {
+			return e
+		}
+		latest, object, e := s.read(call)
+		if e != nil || latest.UID != start.UID || !equalJSON(latest.State, v) {
+			return cfg.ErrChanged
+		}
+		v.Objects[index].Receipt = &receipt
+		out, e = s.write(call, object, v)
+		return e
+	})
+	if e != nil {
+		return contracts.InitialRuntimeResourceSnapshot{}, e
+	}
+	return out, nil
+}

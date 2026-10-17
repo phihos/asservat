@@ -1,0 +1,5 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:170: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; enrollment/spend/recovery inputs remain synthetic, no registry activation or forwarding
+--- PASS: TestEnrollmentOwnerPKIWithRealServices (0.08s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.130s

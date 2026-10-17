@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+SELECT json_build_object('version',version(),'versionNum',current_setting('server_version_num'),'startedAt',pg_postmaster_start_time(),'databaseOID',(SELECT oid FROM pg_database WHERE datname=current_database()),'inRecovery',pg_is_in_recovery());

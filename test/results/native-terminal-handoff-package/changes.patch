@@ -1,0 +1,984 @@
+--- a/docs/architecture/native-exchange.md
++++ b/docs/architecture/native-exchange.md
+@@ -38,9 +38,9 @@
+ 
+ A positive no-command response requires actual verified h2/TLS, the exact Hello nonce and worker identities, and an original current deadline of at most five seconds. Generic HTTP errors, EOF, timeouts and stale/ambiguous rows are not no-command responses. Idle checks use at least one second of backoff, at most 32768 conversations, and the worker's original `RunUntil`; none renews authority, SQL ownership or capacity.
+ 
+-A positive final Done marker runs its blocking current-authority check before the write. The transport then checks the original deadline and known cancellation around the write/flush, with no new blocking authority work after the marker has already reached the peer. A peer may close normally upon receiving Done. Metadata, data and other control frames retain their post-I/O current checks; the application's final metadata authorization remains separate. A failed or partial final write is unavailable, and successful HTTP flush does not prove downstream persistence or all participants' independent quiescence.
++A positive final Done marker runs its blocking current-authority check and positively closes its exact original SQL owner before the write. The private completion callback locks and matches the original operation/reference/fence and lease sequence, requires one acknowledged open-to-closed transition, and checks the original deadline after blocking work and commit. Already-closed, missing, replaced, expired and unknown results cannot supply this proof. Ordinary cancellation cleanup remains idempotent and cannot certify success or close another generation. After that restrictive transition, only the hub’s private exact-completion capability can send the same zero-byte final marker using the unextended last complete gate bound; no metadata, data, key or new-work effect uses it. The transport then checks the original deadline and known cancellation around the write/flush, with no new blocking authority work after the marker has already reached the peer. A peer may close normally upon receiving Done. Metadata, data and other control frames retain their post-I/O current checks; the application's final metadata authorization remains separate. A failed or partial final write is unavailable, and successful HTTP flush does not prove downstream persistence or all participants' independent quiescence.
+ 
+-`RunWorkerConversation` returns Joined only after its successful final protocol acknowledgement, local buffer cleanup, receive goroutine and stream close have joined. Uncertain results stop automatic selection of new work. The returned reference is diagnostic/fencing context, not recovery authority.
++`RunWorkerConversation` returns Joined only after its successful final protocol acknowledgement, local buffer cleanup, receive goroutine and stream close have joined. The stronger final-marker ordering means that its old SQL operation is already unrouteable; it does not prove the hub’s remaining response checks or remote filesystem persistence. The router and handler remain charged until their actual local I/O joins. Concurrent same-worker registration stays denied before SQL claim while that slot is occupied; sequential application return follows its joined Close. The existing one-second worker backoff is scheduling, not a closure proof. Uncertain results stop automatic selection of new work. The returned reference is diagnostic/fencing context, not recovery authority.
+ 
+ The first implementation does **not** support automatic lost-final-acknowledgement metadata reconciliation. Socket close, fencing and expiry cannot prove that all three former participants joined. A new metadata-only operation would require an exact authenticated same-process closure receipt plus independently joined connector/hub cleanup and the original positive SQL outcome. That receipt protocol is not implemented. The available recovery is cancellation of the exact worker, positive existing termination/retirement proof, and an explicit new paid admission/preparation where current limits permit it. Previously uncertain spend remains charged.
+ 
+--- a/docs/architecture/worker-startup.md
++++ b/docs/architecture/worker-startup.md
+@@ -71,6 +71,8 @@
+ credential renewal, one original regional result owner and every opened
+ conversation. It starts native work only after credentials are established.
+ Each connection rereads the projected token and uses a new cryptographic nonce.
++The hub must positively close the exact original SQL operation before producing final Done. The worker’s one-second scheduling delay is not proof of that closure; failed or unknown close/final delivery remains uncertain.
++
+ Only an exact authenticated NoCommand or positively Joined result permits the
+ next connection, with one-second backoff, the original worker end and a 32,768
+ conversation ceiling. An unknown reply or lost acknowledgement stops the worker;
+--- a/docs/decisions/116-context-native-exchange.md
++++ b/docs/decisions/116-context-native-exchange.md
+@@ -14,7 +14,7 @@
+ 
+ There is no broker, generic RPC framework, remotely supplied callback or automatic uncertain POST replay. Each hop owns at most one pending native payload and one bounded next-phase control input, with current checks and the original deadline around every frame. One original five-second setup bound includes Hello, handshake and headers; h2 is required on both the actual client and server.
+ 
+-Known no-command and positively joined success may permit another bounded conversation within the original worker lifetime. Every other result is uncertain. Lost final acknowledgement currently requires explicit cancellation, positive worker retirement and a separately paid new preparation; automatic same-process metadata reconciliation needs an additional positive closure protocol and is not claimed here.
++Known no-command and positively joined success may permit another bounded conversation within the original worker lifetime. Successful v1 Done now requires a positively acknowledged exact original SQL-owner close before its production. This strengthens the existing success condition without changing bytes or adding a retry: nil cleanup, absence, expiry or an unknown result are not positive closure. A private hub-only capability sends that zero-byte terminal marker under the previous complete check’s original deadline after the restrictive close; all nonterminal frames keep ordinary current checks. Router/handler capacity remains held until actual I/O joins. A lost final marker stays uncertain even when SQL closure succeeded. Every other result is uncertain. Lost final acknowledgement currently requires explicit cancellation, positive worker retirement and a separately paid new preparation; automatic same-process metadata reconciliation needs an additional positive closure protocol and is not claimed here.
+ 
+ Finite rows, key slots and update/history backing require protected measured qualification and cleanup before runtime enablement. Expiry and row fencing do not prove quiescence or erase spend. The 4096-byte reader does not establish generic large-artifact throughput, despite SQL42's larger accounting limit. See [native exchange](../architecture/native-exchange.md) for code boundaries, current qualification and remaining composition.
+ 
+--- /dev/null
++++ b/internal/adapters/postgres/native_completion.go
+@@ -0,0 +1,59 @@
++package postgres
++
++import (
++	"context"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/authorization"
++)
++
++// CompleteNativeOperation is a positive handoff, distinct from idempotent
++// restrictive cleanup. Only one acknowledged exact open-to-closed transition
++// qualifies; absence, earlier cleanup and an unknown COMMIT never imply success.
++// The caller has just completed the ordinary current frame gate. This operation
++// can only reduce authority, and its result permits only the final zero-byte
++// marker under that same original lease. It refunds no owner/key/history spend.
++func (s *NativeOwners) CompleteNativeOperation(ctx context.Context, l value.NativeLease) error {
++	if s == nil || ctx == nil || ctx.Err() != nil || !l.Valid(time.Now()) || !l.Operation.CurrentValid(time.Now()) || l.Operation.Reference.InstallationID != s.workers.profile.InstallationID {
++		return artifact.ErrDownloadUnavailable
++	}
++	call, stop := context.WithDeadline(ctx, l.Until)
++	defer stop()
++	err := s.workers.downloads.ledger.transaction(call, func(q *custodydb.Queries) error {
++		row, e := q.LockNativeOwner(call, custodydb.LockNativeOwnerParams{WorkerID: id(l.Operation.Reference.WorkerID), RootID: id(s.workers.downloads.root)})
++		if e != nil {
++			return e
++		}
++		clock, e := q.CurrentTime(call)
++		if e != nil || !nativeCompletionRecordValid(row, l, clock.Time) || call.Err() != nil {
++			return artifact.ErrDownloadUnavailable
++		}
++		n, e := q.CloseNativeOwner(call, custodydb.CloseNativeOwnerParams{WorkerID: row.WorkerID, RootID: row.RootID, OperationID: row.OperationID, Fence: row.Fence})
++		if e != nil {
++			return e
++		}
++		if n != 1 {
++			return artifact.ErrDownloadUnavailable
++		}
++		// The close trigger can wait on its backing lock. Recheck the original lease
++		// after that wait; expiry may not turn a restrictive write into terminal proof.
++		clock, e = q.CurrentTime(call)
++		if e != nil || call.Err() != nil || !l.Valid(clock.Time) || !clock.Time.Before(row.LeaseUntil.Time) {
++			return artifact.ErrDownloadExpired
++		}
++		return nil
++	})
++	if err != nil {
++		return err
++	}
++	if call.Err() != nil || !l.Valid(time.Now()) {
++		return artifact.ErrDownloadExpired
++	}
++	return nil
++}
++func nativeCompletionRecordValid(row custodydb.DownloadNativeOwner, l value.NativeLease, now time.Time) bool {
++	actual, _, err := decodeNativeOwner(row)
++	return err == nil && !row.Closed && !row.RetiredAt.Valid && actual.Equal(l.Operation) && row.LeaseSequence == l.Sequence && l.Valid(now) && actual.CurrentValid(now) && row.LeaseUntil.Valid && now.Before(row.LeaseUntil.Time) && !l.Until.After(row.LeaseUntil.Time)
++}
+--- /dev/null
++++ b/internal/adapters/postgres/native_completion_test.go
+@@ -0,0 +1,56 @@
++package postgres
++
++import (
++	"asservat.local/asservat/internal/adapters/postgres/custodydb"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++	"encoding/json"
++	"testing"
++	"time"
++)
++
++func TestNativeCompletionRequiresCurrentExactOpenGeneration(t *testing.T) {
++	n := time.Now().UTC().Truncate(time.Microsecond)
++	key := "10000000-0000-4000-8000-000000000001"
++	rev := identity.Revision{UID: key, Generation: 1, Digest: artifact.Digest{7}}
++	a := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: key, ArtifactID: key, CaptureID: key, ClusterID: key, NamespaceUID: key, WorkloadUID: key, PodUID: key, Version: artifact.Digest{1}, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}, PermissionEpoch: key, PermissionSequence: 1, ProjectionDigest: artifact.Digest{2}, DecisionDigest: artifact.Digest{3}, IdentityRevision: rev, CheckedAt: n, ValidUntil: n.Add(4 * time.Second), AccessUntil: n.Add(time.Hour)}
++	o := value.NativeOperation{Reference: value.NativeReference{InstallationID: key, SessionID: key, WorkerID: key, OperationID: key, Fence: 2}, Kind: value.NativeObserve, HubPodUID: key, HubProcessEpoch: key, WorkerPodUID: key, WorkerPublicKey: artifact.Digest{1}, SourceVersion: a.Scope.Version, ParentID: key, Generation: 1, StartedAt: n, Until: a.ValidUntil}
++	o.Path = artifact.DownloadPath{ID: key, TargetClusterID: key, StoreID: key, StorageRegion: "test", AcquisitionClusterID: key, AcquisitionRegion: "test", ConnectorClusterID: key, ConnectorRegion: "test", HubClusterID: key, HubRegion: "test", WorkerConfiguration: rev, HubConfiguration: rev}
++	o.Processing = artifact.DownloadProcessingProof{RootID: key, Epoch: key, CaptureID: key, Location: artifact.Location{ClusterID: key, ArtifactID: key, AttemptID: key}, Sequence: 1, StateDigest: artifact.Digest{3}, ObservedAt: n, ValidUntil: o.Until}
++	l := value.NativeLease{Operation: o, Certificate: artifact.Digest{5}, Sequence: 1, ObservedAt: n, Until: o.Until}
++	ob, _ := json.Marshal(o)
++	ab, _ := json.Marshal(a)
++	row := custodydb.DownloadNativeOwner{WorkerID: id(key), RootID: id(key), OperationID: id(key), Fence: 2, OperationJson: ob, AuthorityJson: ab, LeaseSequence: 1, LeaseStarted: ts(n), LeaseUntil: ts(o.Until)}
++	if !nativeCompletionRecordValid(row, l, n) {
++		t.Fatal("current exact original row denied")
++	}
++	tests := []struct {
++		name   string
++		change func(*custodydb.DownloadNativeOwner, *value.NativeLease, *time.Time)
++	}{
++		{"already-closed", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) { r.Closed = true }},
++		{"retired", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) { r.RetiredAt = ts(n) }},
++		{"different-operation", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) {
++			r.OperationID = id("10000000-0000-4000-8000-000000000002")
++		}},
++		{"replacement-fence", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) { r.Fence++ }},
++		{"old-lease-sequence", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) { r.LeaseSequence++ }},
++		{"shortened-row", func(r *custodydb.DownloadNativeOwner, _ *value.NativeLease, _ *time.Time) {
++			r.LeaseUntil = ts(n.Add(time.Second))
++		}},
++		{"expired-after-lock", func(_ *custodydb.DownloadNativeOwner, _ *value.NativeLease, now *time.Time) { *now = o.Until }},
++		{"different-parent", func(_ *custodydb.DownloadNativeOwner, l *value.NativeLease, _ *time.Time) {
++			l.Operation.ParentID = "10000000-0000-4000-8000-000000000002"
++		}},
++	}
++	for _, tc := range tests {
++		t.Run(tc.name, func(t *testing.T) {
++			r, c, now := row, l, n
++			tc.change(&r, &c, &now)
++			if nativeCompletionRecordValid(r, c, now) {
++				t.Fatal("historical/replaced row certified completion")
++			}
++		})
++	}
++}
+--- a/internal/application/evidence/native_attachment.go
++++ b/internal/application/evidence/native_attachment.go
+@@ -25,6 +25,7 @@
+ 	Operation value.NativeOperation
+ 	Source    NativeContextSource
+ 	Delivery  artifact.DownloadDeliveryLease
++	Complete  NativeCompletion
+ }
+ 
+ // The local registrar retains callbacks in the original hub process only.
+@@ -68,11 +69,35 @@
+ 
+ type attachedExchange struct {
+ 	NativeExchange
+-	pending   NativePendingExchange
++	pending  NativePendingExchange
++	release  *nativeOperationRelease
++	once     sync.Once
++	closeErr error
++}
++
++// A positive completion and cancellation cleanup share one original close
++// attempt. An unknown result is retained, never retried as a successful handoff.
++type nativeOperationRelease struct {
+ 	owners    NativeOperations
+ 	operation value.NativeOperation
+ 	once      sync.Once
+-	closeErr  error
++	err       error
++	positive  bool
++}
++
++func (r *nativeOperationRelease) complete(ctx context.Context, lease value.NativeLease) error {
++	if ctx == nil || ctx.Err() != nil || !lease.Operation.Equal(r.operation) || !lease.Valid(time.Now()) {
++		return artifact.ErrDownloadUnavailable
++	}
++	r.once.Do(func() { r.err = r.owners.CompleteNativeOperation(ctx, lease); r.positive = r.err == nil })
++	if !r.positive || ctx.Err() != nil || !lease.Valid(time.Now()) {
++		return artifact.ErrDownloadUnavailable
++	}
++	return nil
++}
++func (r *nativeOperationRelease) cleanup(ctx context.Context) error {
++	r.once.Do(func() { r.err = r.owners.ReleaseNativeOperation(ctx, r.operation) })
++	return r.err
+ }
+ 
+ func (e *attachedExchange) Close() error {
+@@ -83,7 +108,7 @@
+ 		e.pending.Close()
+ 		ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+ 		defer stop()
+-		e.closeErr = e.owners.ReleaseNativeOperation(ctx, e.operation)
++		e.closeErr = e.release.cleanup(ctx)
+ 	})
+ 	return e.closeErr
+ }
+@@ -163,7 +188,8 @@
+ 	}
+ 	// Register first: a persisted locator without a live original request must
+ 	// never become runnable. An unknown claim closes local admission and stays spent.
+-	pending, e := c.Registrar.RegisterNativeExchange(ctx, NativeExchangeRegistration{operation, cloneNativeSource(source), delivery}, before, current)
++	release := &nativeOperationRelease{owners: c.Owners, operation: operation}
++	pending, e := c.Registrar.RegisterNativeExchange(ctx, NativeExchangeRegistration{Operation: operation, Source: cloneNativeSource(source), Delivery: delivery, Complete: release.complete}, before, current)
+ 	if e != nil {
+ 		return nil, e
+ 	}
+@@ -179,11 +205,11 @@
+ 	if e != nil {
+ 		pending.Close()
+ 		cleanup, done := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+-		_ = c.Owners.ReleaseNativeOperation(cleanup, operation)
++		_ = release.cleanup(cleanup)
+ 		done()
+ 		return nil, e
+ 	}
+-	return &attachedExchange{NativeExchange: exchange, pending: pending, owners: c.Owners, operation: operation}, nil
++	return &attachedExchange{NativeExchange: exchange, pending: pending, release: release}, nil
+ }
+ func (s *NativeAttachment) PrepareNativeMetadata(ctx context.Context, r ContextDownloadRequest, i audit.DownloadIntent, a artifact.DownloadAuthority, check NativePreparationCheck) (artifact.NativeDownloadMetadata, NativePreparationCommit, error) {
+ 	if !i.Valid() || i.SessionID != r.SessionID || i.Batch.Purpose != artifact.DownloadMetadata || i.Batch.Authority.Scope != r.Scope || a.Scope != r.Scope {
+--- /dev/null
++++ b/internal/application/evidence/native_completion_test.go
+@@ -0,0 +1,58 @@
++package evidence
++
++import (
++	value "asservat.local/asservat/internal/domain/authorization"
++	"context"
++	"errors"
++	"testing"
++)
++
++type completionOwners struct {
++	NativeOperations
++	completes, cleans int
++	err               error
++}
++
++func (s *completionOwners) CompleteNativeOperation(context.Context, value.NativeLease) error {
++	s.completes++
++	return s.err
++}
++func (s *completionOwners) ReleaseNativeOperation(context.Context, value.NativeOperation) error {
++	s.cleans++
++	return s.err
++}
++func TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof(t *testing.T) {
++	for _, mode := range []string{"positive", "unknown", "cleanup-first", "wrong-generation"} {
++		t.Run(mode, func(t *testing.T) {
++			l := nativeLeaseFixture()
++			s := &completionOwners{}
++			if mode == "unknown" {
++				s.err = errors.New("synthetic unknown commit")
++			}
++			r := &nativeOperationRelease{owners: s, operation: l.Operation}
++			if mode == "cleanup-first" {
++				if e := r.cleanup(context.Background()); e != nil {
++					t.Fatal(e)
++				}
++			}
++			if mode == "wrong-generation" {
++				l.Operation.Reference.Fence++
++			}
++			first := r.complete(context.Background(), l)
++			second := r.complete(context.Background(), l)
++			if mode == "positive" && (first != nil || second != nil) {
++				t.Fatal(first, second)
++			}
++			if mode != "positive" && (first == nil || second == nil) {
++				t.Fatal("unproven close accepted")
++			}
++			_ = r.cleanup(context.Background())
++			if s.completes+s.cleans != 1 {
++				t.Fatal("close retried", s.completes, s.cleans)
++			}
++			if mode == "cleanup-first" && s.completes != 0 {
++				t.Fatal("cleanup converted into current completion")
++			}
++		})
++	}
++}
+--- a/internal/application/evidence/native_exchange.go
++++ b/internal/application/evidence/native_exchange.go
+@@ -19,11 +19,18 @@
+ 	NativeOperationReader
+ 	ClaimNativeOperation(context.Context, value.WorkerEnrollment, artifact.DownloadAuthority, value.NativeOperation) (value.NativeOperation, error)
+ 	ReleaseNativeOperation(context.Context, value.NativeOperation) error
++	// Complete requires an acknowledged exact open-to-closed transition under
++	// the original current lease. Cleanup nil/absence/expiry is insufficient.
++	CompleteNativeOperation(context.Context, value.NativeLease) error
+ }
+ 
+ // NativeCurrentCheck belongs to the live original hub request. It is never
+ // encoded or reconstructed from a certificate or NativeLease.
+ type NativeCurrentCheck func(context.Context) (value.NativeLease, error)
++
++// NativeCompletion belongs to the original request and its exact owner. A nil
++// result proves its restrictive SQL close, not new work or disclosed metadata.
++type NativeCompletion func(context.Context, value.NativeLease) error
+ 
+ // NativeFrameGate owns a stream's current observation and known cancellation.
+ // Refreshing a *response* lease is an explicit higher-level current check, not
+--- a/internal/transport/native/flow_test.go
++++ b/internal/transport/native/flow_test.go
+@@ -9,6 +9,7 @@
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"net/url"
++	"sync"
+ 	"sync/atomic"
+ 	"testing"
+ 	"time"
+@@ -117,11 +118,30 @@
+ func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClient {
+ 	server, client, roots := testCertificates(t)
+ 	var handler http.Handler
+-	s := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
++	var handlers sync.WaitGroup
++	var admission sync.Mutex
++	closing := false
++	s := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		admission.Lock()
++		if closing {
++			admission.Unlock()
++			return
++		}
++		handlers.Add(1)
++		admission.Unlock()
++		defer handlers.Done()
++		handler.ServeHTTP(w, r)
++	}))
+ 	s.EnableHTTP2 = true
+ 	s.TLS = &tls.Config{Certificates: []tls.Certificate{server}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots, MinVersion: tls.VersionTLS13}
+ 	s.StartTLS()
+-	t.Cleanup(s.Close)
++	t.Cleanup(func() {
++		admission.Lock()
++		closing = true
++		admission.Unlock()
++		s.Close()
++		handlers.Wait()
++	})
+ 	u, _ := url.Parse(s.URL)
+ 	var e error
+ 	handler, e = native.NewHandler(path, u.Host, a, 1)
+@@ -168,9 +188,9 @@
+ 		command.WindowID = delivery.WindowID
+ 		command.Offset = delivery.Offset
+ 		command.Length = delivery.Length
+-		operation, e = native.NewHubResponseOperation(gate, command, source, delivery)
++		operation, e = native.NewHubResponseOperation(gate, command, source, delivery, syntheticNativeCompletion)
+ 	} else {
+-		operation, e = native.NewHubOperation(gate, command, source)
++		operation, e = native.NewHubOperation(gate, command, source, syntheticNativeCompletion)
+ 	}
+ 	if e != nil {
+ 		t.Fatal("operation", e)
+--- a/internal/transport/native/handler.go
++++ b/internal/transport/native/handler.go
+@@ -263,7 +263,7 @@
+ 
+ // SendTerminal is deliberately absent from the general NativeStream contract.
+ // Only the relay's already validated zero-byte final marker uses this path;
+-// hub production of Done and every other frame retain full current checks.
++// hub production uses its separate private exact-completion proof below.
+ func (s *serverStream) SendTerminal(ctx context.Context, f contracts.NativeFrame) error {
+ 	a, e := contracts.DecodeNativeAcknowledge(f.Payload)
+ 	l, leaseErr := s.gate.TerminalLease(ctx)
+@@ -272,6 +272,18 @@
+ 	}
+ 	return s.send(ctx, f, true)
+ }
++
++// sendCompleted is private to this transport package: the hub may use it only
++// after its exact original SQL close. It cannot send any evidence or new work.
++func (s *serverStream) sendCompleted(ctx context.Context, f contracts.NativeFrame, proof nativeCompletionProof) error {
++	lease, err := s.gate.TerminalLease(ctx)
++	a, decode := contracts.DecodeNativeAcknowledge(f.Payload)
++	if err != nil || decode != nil || proof.gate != s.gate || !proof.lease.Valid(time.Now()) || !lease.Operation.Equal(proof.lease.Operation) || lease.Sequence != proof.lease.Sequence || lease.Certificate != proof.lease.Certificate || lease.Until.After(proof.lease.Until) || f.Kind != contracts.NativeDoneFrame || a.Format != contracts.NativeExchangeFormat || a.Reference != nativeReference(proof.lease.Operation) || a.Nonce != proof.nonce || a.Phase != proof.phase || a.Bytes != 0 || (a.Phase != "closed" && a.Phase != "joined") {
++		return contracts.ErrNativeProtocol
++	}
++	return s.send(ctx, f, true)
++}
++
+ func (s *serverStream) send(ctx context.Context, f contracts.NativeFrame, terminal bool) error {
+ 	call, end, err := s.begin(ctx, false, terminal)
+ 	if err != nil {
+@@ -287,7 +299,8 @@
+ 	}
+ 	// Done is the positive final marker. The peer may close normally as soon as
+ 	// it receives it, so all blocking authority checks must precede its write.
+-	// Hub sends use a complete check; validated relay closure uses only the
++	// Hub completion first checks current authority and exact SQL closure; both
++	// its terminal send and validated relay closure use only the
+ 	// original gate snapshot after the hub may have retired itself. Successful
+ 	// flush completes only transport delivery; application metadata authority
+ 	// and accounting still have their independent final gates.
+--- a/internal/transport/native/operation.go
++++ b/internal/transport/native/operation.go
+@@ -23,6 +23,7 @@
+ // payload queue. A content buffer is handed to exactly one response consumer.
+ type HubOperation struct {
+ 	gate                             *evidence.NativeFrameGate
++	complete                         evidence.NativeCompletion
+ 	command                          contracts.NativeCommand
+ 	expected                         evidence.NativeContextSource
+ 	delivery                         artifact.DownloadDeliveryLease
+@@ -38,24 +39,24 @@
+ 	doneOnce                         sync.Once
+ }
+ 
+-func NewHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource) (*HubOperation, error) {
++func NewHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, complete evidence.NativeCompletion) (*HubOperation, error) {
+ 	if c.Kind == string(value.NativeResponse) {
+ 		return nil, artifact.ErrInvalid
+ 	}
+-	return newHubOperation(gate, c, expected, artifact.DownloadDeliveryLease{})
++	return newHubOperation(gate, c, expected, artifact.DownloadDeliveryLease{}, complete)
+ }
+ 
+ // NewHubResponseOperation pins the complete original delivery lease locally.
+ // Neither the worker command nor a matching range can substitute another owner,
+ // scope or current authority observation when acknowledging a final sink write.
+-func NewHubResponseOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease) (*HubOperation, error) {
++func NewHubResponseOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease, complete evidence.NativeCompletion) (*HubOperation, error) {
+ 	if c.Kind != string(value.NativeResponse) || !delivery.Valid(time.Now()) {
+ 		return nil, artifact.ErrInvalid
+ 	}
+-	return newHubOperation(gate, c, expected, delivery)
+-}
+-func newHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease) (*HubOperation, error) {
+-	if gate == nil {
++	return newHubOperation(gate, c, expected, delivery, complete)
++}
++func newHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease, complete evidence.NativeCompletion) (*HubOperation, error) {
++	if gate == nil || complete == nil {
+ 		return nil, artifact.ErrInvalid
+ 	}
+ 	l, e := gate.Check(gate.Context())
+@@ -94,7 +95,7 @@
+ 		return nil, artifact.ErrInvalid
+ 	}
+ 	ctx, cancel := context.WithDeadline(gate.Context(), until)
+-	result := &HubOperation{gate: gate, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
++	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
+ 	if o.Kind == value.NativeResponse && !result.matchChunk(delivery, c.Offset, c.Length) {
+ 		cancel()
+ 		return nil, artifact.ErrInvalid
+@@ -256,6 +257,42 @@
+ 	}
+ 	return native, nil
+ }
++
++// nativeCompletionProof never crosses the wire or application boundary. Only
++// this successful exact close can enable the hub's zero-byte terminal send.
++type nativeCompletionProof struct {
++	gate         *evidence.NativeFrameGate
++	lease        value.NativeLease
++	nonce, phase string
++}
++
++func (o *HubOperation) finish(ctx context.Context, s Stream, phase string) error {
++	lease, err := o.gate.Check(ctx)
++	if err != nil {
++		return err
++	}
++	call, stop := context.WithDeadline(ctx, lease.Until)
++	defer stop()
++	if err = o.complete(call, lease); err != nil {
++		return err
++	}
++	if call.Err() != nil || o.ctx.Err() != nil || !lease.Valid(time.Now()) {
++		return artifact.ErrDownloadExpired
++	}
++	terminal, ok := s.(interface {
++		sendCompleted(context.Context, contracts.NativeFrame, nativeCompletionProof) error
++	})
++	if !ok {
++		return contracts.ErrNativeProtocol
++	}
++	payload, err := json.Marshal(ack(o.command, phase, 0))
++	if err != nil {
++		return err
++	}
++	defer clear(payload)
++	return terminal.sendCompleted(call, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: payload}, nativeCompletionProof{o.gate, lease, o.command.Nonce, phase})
++}
++
+ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
+ 	o.mu.Lock()
+ 	if !o.reserved || o.attached || o.closed || s == nil {
+@@ -316,7 +353,7 @@
+ 		if action.phase != "observed" || action.n != 0 {
+ 			return contracts.ErrNativeProtocol
+ 		}
+-		return sendControl(work, s, contracts.NativeDoneFrame, ack(o.command, "closed", 0))
++		return o.finish(work, s, "closed")
+ 	}
+ 	if o.command.Kind == "prepare-context" {
+ 		if action.phase != "prepared" || action.n != 0 {
+@@ -332,7 +369,7 @@
+ 		if err = exactAck(f, contracts.NativeAcknowledgeFrame, o.command, "prepared", 0); err != nil {
+ 			return err
+ 		}
+-		return sendControl(work, s, contracts.NativeDoneFrame, ack(o.command, "closed", 0))
++		return o.finish(work, s, "closed")
+ 	}
+ 	if action.phase != "delivered" || action.n != o.command.Length {
+ 		return contracts.ErrNativeProtocol
+@@ -347,7 +384,7 @@
+ 	if err = exactAck(f, contracts.NativeDoneFrame, o.command, "closed", 0); err != nil {
+ 		return err
+ 	}
+-	return sendControl(work, s, contracts.NativeDoneFrame, ack(o.command, "joined", 0))
++	return o.finish(work, s, "joined")
+ }
+ 
+ // Attach binds the worker's fresh nonce only after the ingress independently
+--- a/internal/transport/native/registration.go
++++ b/internal/transport/native/registration.go
+@@ -20,7 +20,7 @@
+ var _ evidence.NativeExchangeRegistrar = (*HubRouter)(nil)
+ 
+ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+-	if before == nil || check == nil || !input.Source.Valid(input.Operation.SourceVersion) {
++	if before == nil || check == nil || input.Complete == nil || !input.Source.Valid(input.Operation.SourceVersion) {
+ 		return nil, artifact.ErrInvalid
+ 	}
+ 	// Snapshot all slice-backed source fields before local registration. Every
+@@ -66,9 +66,9 @@
+ 			command.WindowID = delivery.WindowID
+ 			command.Offset = delivery.Offset
+ 			command.Length = delivery.Length
+-			result, e = NewHubResponseOperation(gate, command, source, delivery)
++			result, e = NewHubResponseOperation(gate, command, source, delivery, input.Complete)
+ 		} else {
+-			result, e = NewHubOperation(gate, command, source)
++			result, e = NewHubOperation(gate, command, source, input.Complete)
+ 		}
+ 		if e != nil {
+ 			return fail(e)
+--- a/internal/transport/native/router_test.go
++++ b/internal/transport/native/router_test.go
+@@ -41,7 +41,7 @@
+ 		operation, _ := json.Marshal(o)
+ 		encoded, _ := json.Marshal(source)
+ 		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: h.Reference, Kind: string(o.Kind), Source: encoded, Operation: operation, ParentID: o.ParentID, Generation: o.Generation, LeaseSequence: 1, Until: o.Until.UTC().Format(time.RFC3339Nano)}
+-		result, e := native.NewHubOperation(gate, command, source)
++		result, e := native.NewHubOperation(gate, command, source, syntheticNativeCompletion)
+ 		if e != nil {
+ 			gate.Close()
+ 			_ = gate.Wait(context.Background())
+--- /dev/null
++++ b/internal/transport/native/terminal_handoff_compat_test.go
+@@ -0,0 +1,17 @@
++package native_test
++
++import (
++	"asservat.local/asservat/internal/application/evidence"
++	value "asservat.local/asservat/internal/domain/authorization"
++	native "asservat.local/asservat/internal/transport/native"
++	"context"
++)
++
++func registerHandoffOperation(ctx context.Context, r *native.HubRouter, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error), complete func(context.Context, value.NativeLease) error) (evidence.NativePendingExchange, error) {
++	in.Complete = complete
++	return r.RegisterNativeExchange(ctx, in, before, check)
++}
++
++// Only standalone protocol fixtures use this explicit synthetic SQL outcome.
++// Production constructors receive the original NativeAttachment closure.
++func syntheticNativeCompletion(ctx context.Context, _ value.NativeLease) error { return ctx.Err() }
+--- /dev/null
++++ b/internal/transport/native/terminal_handoff_test.go
+@@ -0,0 +1,245 @@
++package native_test
++
++import (
++	"context"
++	"crypto/tls"
++	"errors"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/authorization"
++	native "asservat.local/asservat/internal/transport/native"
++)
++
++type handoffAdmission struct {
++	router *native.HubRouter
++	origin evidence.NativeOrigin
++	closed *atomic.Bool
++}
++
++func (a *handoffAdmission) OpenNative(ctx context.Context, peer *tls.ConnectionState, h contracts.NativeHello) (native.Conversation, error) {
++	if peer == nil || !peer.HandshakeComplete || len(peer.VerifiedChains) == 0 || a.closed.Load() {
++		return nil, artifact.ErrDownloadUnavailable
++	}
++	return a.router.Attach(ctx, a.origin, h)
++}
++
++// Real two-hop h2/mTLS, product router and worker. SQL/source authority is an
++// explicit synthetic port. The before helper uses the unchanged original
++// registrar API; after adds the private completion callback to that same API.
++func TestNativeJoinedWaitsForExactSQLClosureBeyondIdleDelay(t *testing.T) {
++	runNativeHandoff(t, "delayed-close")
++}
++func TestNativeHandoffRejectsUnacknowledgedClosure(t *testing.T) {
++	for _, mode := range []string{"failed-close", "unknown-close", "deadline", "cancel", "concurrent-registration", "lost-final", "known-revocation", "known-shortening"} {
++		t.Run(mode, func(t *testing.T) { runNativeHandoff(t, mode) })
++	}
++}
++func runNativeHandoff(t *testing.T, mode string) {
++	duration := 8 * time.Second
++	if mode == "deadline" {
++		duration = 700 * time.Millisecond
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), duration)
++	defer cancel()
++	source := flowSourceValue(t)
++	origin, _, _ := routerFixture(t)
++	router, e := native.NewHubRouter(1)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer router.Close()
++	var closed, revoked, shortened atomic.Bool
++	entered, release := make(chan struct{}), make(chan struct{})
++	unblock := sync.OnceFunc(func() { close(release) })
++	defer unblock()
++	var once sync.Once
++	var closeErr error
++	var closeCalls atomic.Int32
++	var capturedDeadline time.Time
++	complete := func(call context.Context, l value.NativeLease) error {
++		once.Do(func() {
++			closeCalls.Add(1)
++			capturedDeadline, _ = call.Deadline()
++			if !l.Operation.Equal(origin.Lease.Operation) || l.Sequence != origin.Lease.Sequence || l.Until.After(origin.Lease.Until) {
++				closeErr = artifact.ErrDownloadUnavailable
++				close(entered)
++				return
++			}
++			close(entered)
++			select {
++			case <-release:
++			case <-call.Done():
++				closeErr = call.Err()
++				return
++			}
++			if call.Err() != nil {
++				closeErr = call.Err()
++				return
++			}
++			switch mode {
++			case "failed-close":
++				closeErr = errors.New("synthetic exact close unavailable")
++				return
++			case "unknown-close":
++				closed.Store(true)
++				closeErr = errors.New("synthetic unknown close response")
++				return
++			}
++			closed.Store(true)
++		})
++		return closeErr
++	}
++	check := func(call context.Context, _ evidence.NativeOrigin) (value.NativeLease, error) {
++		if call.Err() != nil || closed.Load() || revoked.Load() {
++			return value.NativeLease{}, artifact.ErrDownloadUnavailable
++		}
++		l := origin.Lease
++		if shortened.Load() {
++			l.Until = time.Now().Add(20 * time.Millisecond)
++		}
++		return l, nil
++	}
++	pending, e := registerHandoffOperation(ctx, router, evidence.NativeExchangeRegistration{Operation: origin.Lease.Operation, Source: source}, func(context.Context, evidence.NativeOrigin) error { return nil }, check, complete)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer pending.Close()
++	upstream := flowServer(t, contracts.NativeOwnerPath, &handoffAdmission{router, origin, &closed})
++	connector := &flowAdmission{t: t, owner: ctx, lease: origin.Lease, upstream: upstream, check: func(call context.Context) (value.NativeLease, error) {
++		// Real connector origins read the same SQL open/closed state. Only its
++		// existing terminal forwarding path can survive positive owner closure.
++		return check(call, origin)
++	}}
++	if mode == "lost-final" {
++		connector.wrap = func(s native.Stream) native.Stream { return lostHandoffFinal{s} }
++	}
++	client := flowServer(t, contracts.NativeWorkerPath, connector)
++	now := time.Now()
++	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
++	reader := &flowSource{}
++	result, e := evidence.NewRegionalContextResult(ctx, target, reader, time.Now)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer func() { result.Close(); result.Wait(context.Background()) }()
++	done := flowRunWorker(t, ctx, client, target, result)
++	exchange, e := pending.Wait(ctx)
++	if e != nil {
++		t.Fatal(e)
++	}
++	if _, e = exchange.Prepared(ctx); e != nil {
++		t.Fatal(e)
++	}
++	appDone := make(chan error, 1)
++	go func() {
++		err := exchange.Commit(ctx)
++		// Original application path joins registration and closes the exact owner
++		// after Commit. After correction the same cleanup is already acknowledged.
++		pending.Close()
++		cleanup, stop := context.WithDeadline(ctx, origin.Lease.Until)
++		defer stop()
++		closeResult := complete(cleanup, origin.Lease)
++		if err == nil {
++			err = closeResult
++		}
++		appDone <- err
++	}()
++	select {
++	case <-entered:
++	case <-ctx.Done():
++		t.Fatal("completion was not reached", ctx.Err())
++	}
++	var premature bool
++	var workerErr error
++	switch mode {
++	case "delayed-close":
++		timer := time.NewTimer(1100 * time.Millisecond)
++		select {
++		case workerErr = <-done:
++			premature = true
++			<-timer.C
++		case <-timer.C:
++		}
++		if closed.Load() {
++			t.Fatal("held SQL close already succeeded")
++		}
++	case "concurrent-registration":
++		_, _, factory := routerFixture(t)
++		if p, err := router.Register(ctx, origin.Lease.Operation, factory); err == nil {
++			p.Close()
++			t.Error("unjoined original released routing capacity")
++		}
++	case "deadline":
++		// Expiry of the actual original caller bound is not cancellation renewal.
++		<-ctx.Done()
++	case "cancel":
++		cancel()
++	case "known-revocation":
++		revoked.Store(true)
++		if _, err := exchange.(*native.HubOperation).Gate().Check(ctx); err == nil {
++			t.Fatal("known revocation accepted")
++		}
++	case "known-shortening":
++		shortened.Store(true)
++		l, err := exchange.(*native.HubOperation).Gate().Check(ctx)
++		if err != nil {
++			t.Fatal(err)
++		}
++		wait, stop := context.WithDeadline(ctx, l.Until)
++		<-wait.Done()
++		stop()
++	}
++	unblock()
++	if !premature {
++		workerErr = <-done
++	}
++	appErr := <-appDone
++	if capturedDeadline.After(origin.Lease.Until) {
++		t.Fatal("SQL close renewed original deadline")
++	}
++	if premature && workerErr == nil {
++		t.Fatal("worker Joined while old SQL operation remained routeable beyond one-second backoff")
++	}
++	positive := mode == "delayed-close" || mode == "concurrent-registration"
++	if positive && (workerErr != nil || appErr != nil || !closed.Load()) {
++		t.Fatal("acknowledged original close did not finish", workerErr, appErr)
++	}
++	if !positive && workerErr == nil {
++		t.Fatal("unacknowledged closure became Joined", mode)
++	}
++	if closeCalls.Load() != 1 || reader.reads.Load() != 1 {
++		t.Fatal("closure retry or evidence reread", closeCalls.Load(), reader.reads.Load())
++	}
++	if positive {
++		_, _, factory := routerFixture(t)
++		replacement, err := router.Register(ctx, origin.Lease.Operation, factory)
++		if err != nil {
++			t.Fatal("joined registration stayed occupied", err)
++		}
++		pending.Close() // An old cleanup handle cannot remove the replacement.
++		if p, err := router.Register(ctx, origin.Lease.Operation, factory); err == nil {
++			p.Close()
++			t.Error("old close removed replacement")
++		}
++		replacement.Close()
++	}
++}
++
++// Drop the already produced final marker on the real connector receive path.
++// Its absence cannot restore the SQL owner or imply worker success.
++type lostHandoffFinal struct{ native.Stream }
++
++func (s lostHandoffFinal) Receive(ctx context.Context) (contracts.NativeFrame, error) {
++	f, e := s.Stream.Receive(ctx)
++	if e == nil && f.Kind == contracts.NativeDoneFrame {
++		clear(f.Payload)
++		return contracts.NativeFrame{}, contracts.ErrNativeProtocol
++	}
++	return f, e
++}
+--- a/specs/artifact-downloads.md
++++ b/specs/artifact-downloads.md
+@@ -32,7 +32,7 @@
+ 
+ Use a minimized SQL `ArtifactDownload` session under C-14, referencing the exact immutable artifact/version, actor/client, authority revisions, output/read-work reservations, absolute deadline and conservative delivery counters. It is neither a new CRD nor a new plaintext evidence copy. States: Preparing, Ready, Streaming, Completed, Interrupted, Cancelled, Expired, Denied, Failed. A failed connection may enter Interrupted and resume within its original authority/deadline. Terminal cancellation/expiry/denial cannot restart. Preparation is idempotent; opaque paths are not bearer capabilities. Before verified native metadata is available, Preparing/early failure responses omit filename, format, size, checksum, ETag and coverage together; never invent a zero size or placeholder checksum. Ready/Streaming/Interrupted require that complete metadata group. Completed may omit it; if any native metadata is present, the entire verified group is required. Preparing and terminal states never advertise resume. The UI shows preparation progress and cancellation until the file is ready.
+ 
+-Terminal status remains readable after the transfer deadline while current identity, evidence metadata access, retained audience, retention and recovery checks still permit metadata disclosure. This status does not renew the original transfer deadline, resume authority or evidence lifetime. Expired nonterminal sessions project Expired without starting work or changing accounting; an existing Completed outcome stays Completed. A terminal-only response needs neither a live regional worker nor a native metadata cache. Status reads never dispatch, unwrap, decrypt or re-prepare evidence. Completed records the server transfer outcome and is not proof that a browser/client saved or verified the local file.
++Terminal status remains readable after the transfer deadline while current identity, evidence metadata access, retained audience, retention and recovery checks still permit metadata disclosure. This status does not renew the original transfer deadline, resume authority or evidence lifetime. Expired nonterminal sessions project Expired without starting work or changing accounting; an existing Completed outcome stays Completed. A terminal-only response needs neither a live regional worker nor a native metadata cache. Status reads never dispatch, unwrap, decrypt or re-prepare evidence. Completed records the server transfer outcome and is not proof that a browser/client saved or verified the local file. A successful regional conversation must not permit the worker to poll while its completed old operation is still routeable. Its existing final zero-byte acknowledgement follows positive exact SQL-owner closure under the original deadline; scheduling delay, idempotent cleanup, absence or expiry cannot substitute for that acknowledgement. Failed or unknown closure/final delivery remains uncertain and conservatively charged.
+ 
+ When a native worker cannot be safely reused after an interrupted response, the console offers **Start a new download**. This explicit action first confirms restrictive Stop for the old download, then prepares one new session for the same immutable saved artifact under current covering rights. It restarts the browser transfer from the beginning and never claims to append to a browser-owned partial file. Keep the old cancellation key and new preparation key through unknown replies; retry the corresponding original operation, without repeated admission or automatic GET replacement. All old uncertain spend remains charged and new work needs existing allocation headroom. No new approval step or recapture is introduced.
+ 
+--- a/test/integration/context_native_content_test.go
++++ b/test/integration/context_native_content_test.go
+@@ -336,6 +336,7 @@
+ 
+ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativeExchangeFixture, en value.WorkerEnrollment, nativeOwners *postgres.FirstContextNativeOperations, responses *postgres.FirstContextResponses, runtime *evidence.ContextNativeRuntime, prep artifact.DownloadPreparation, pod, epoch string) {
+ 	t.Helper()
++	qualifyNativeCompletionClosed(t, ctx, f, nativeOwners)
+ 	// A second independent adapter/pool represents another replica. Both locks
+ 	// must serialize through SQL; no shared Go mutex supplies correctness.
+ 	secondPool := f.poolFor("download_runtime", "synthetic-download")
+@@ -420,6 +421,7 @@
+ 		t.Fatal("observe first", e)
+ 	}
+ 	before := counts()
++	qualifyNativeCompletionHeld(t, ctx, f, nativeOwners, held)
+ 	if _, e = second.BeginDownloadResponse(ctx, prep.SessionID, f.authority(), newResponse()); e == nil {
+ 		t.Fatal("response interrupted an unjoined Observe")
+ 	}
+--- /dev/null
++++ b/test/integration/native_completion_test.go
+@@ -0,0 +1,114 @@
++package integration
++
++import (
++	"context"
++	"encoding/json"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/adapters/postgres"
++	value "asservat.local/asservat/internal/domain/authorization"
++)
++
++// These negative tests inspect the existing real SQL owner and activated
++// certificate as fixture administrator. They create no operation, certificate,
++// authority or additional allowance. Positive completion is exercised by the
++// normal Prepare/Observe/content conversations through the production adapter.
++func nativeCompletionSnapshot(t *testing.T, ctx context.Context, f nativeExchangeFixture) (value.NativeLease, bool, [5]int64) {
++	t.Helper()
++	var l value.NativeLease
++	var encoded, certificate []byte
++	var closed bool
++	var charged [5]int64
++	if e := f.admin.QueryRow(ctx, `SELECT operation_json,lease_sequence,lease_started,lease_until,closed,updates,
++ (SELECT count(*) FROM download_response WHERE session_id=$2),
++ (SELECT reserved_responses FROM download_control_allocation WHERE id=$3),
++ (SELECT reserved_windows FROM download_control_allocation WHERE id=$3),
++ (SELECT coalesce(sum(used_roles),0) FROM download_native_key WHERE worker_id=$1)
++ FROM download_native_owner WHERE worker_id=$1`, f.worker.Intent.ID, f.worker.Intent.SessionID, f.allocation.ID).Scan(&encoded, &l.Sequence, &l.ObservedAt, &l.Until, &closed, &charged[0], &charged[1], &charged[2], &charged[3], &charged[4]); e != nil {
++		t.Fatal("completion owner snapshot", e)
++	}
++	if e := json.Unmarshal(encoded, &l.Operation); e != nil {
++		t.Fatal("completion operation snapshot", e)
++	}
++	if e := f.admin.QueryRow(ctx, `SELECT certificate_sha256 FROM download_worker_certificate WHERE worker_id=$1 AND activated_at IS NOT NULL`, f.worker.Intent.ID).Scan(&certificate); e != nil || len(certificate) != len(l.Certificate) {
++		t.Fatal("completion activated certificate snapshot", e)
++	}
++	copy(l.Certificate[:], certificate)
++	return l, closed, charged
++}
++
++func qualifyNativeCompletionClosed(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.FirstContextNativeOperations) {
++	t.Helper()
++	l, closed, before := nativeCompletionSnapshot(t, ctx, f)
++	if !closed || !l.Valid(time.Now()) || !l.Operation.CurrentValid(time.Now()) {
++		t.Fatal("completed preparation must still have its original current interval for closed-state test")
++	}
++	if e := owners.CompleteNativeOperation(ctx, l); e == nil {
++		t.Fatal("already-closed operation fabricated positive completion")
++	}
++	if !l.Valid(time.Now()) || !l.Operation.CurrentValid(time.Now()) {
++		t.Fatal("closed-state rejection was obscured by original expiry")
++	}
++	_, closed, after := nativeCompletionSnapshot(t, ctx, f)
++	if !closed || after != before {
++		t.Fatal("already-closed completion changed retained spend")
++	}
++	t.Log("already-closed exact native operation denied within original current lease, charges unchanged")
++}
++
++func qualifyNativeCompletionHeld(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.FirstContextNativeOperations, expected value.NativeOperation) {
++	t.Helper()
++	l, closed, before := nativeCompletionSnapshot(t, ctx, f)
++	if closed || !l.Operation.Equal(expected) || !l.Valid(time.Now()) || !l.Operation.CurrentValid(time.Now()) {
++		t.Fatal("completion test requires exact original current open operation")
++	}
++	wrong := l
++	wrong.Operation.Reference.Fence++
++	if e := owners.CompleteNativeOperation(ctx, wrong); e == nil {
++		t.Fatal("wrong generation completed current native owner")
++	}
++	wrong = l
++	wrong.Sequence++
++	if e := owners.CompleteNativeOperation(ctx, wrong); e == nil {
++		t.Fatal("wrong sequence completed current native owner")
++	}
++	if !l.Valid(time.Now()) || !l.Operation.CurrentValid(time.Now()) {
++		t.Fatal("generation/sequence rejection was obscured by original expiry")
++	}
++	tx, e := f.admin.Begin(ctx)
++	if e != nil {
++		t.Fatal(e)
++	}
++	defer tx.Rollback(ctx)
++	if _, e = tx.Exec(ctx, "SELECT worker_id FROM download_native_owner WHERE worker_id=$1 FOR UPDATE", expected.Reference.WorkerID); e != nil {
++		t.Fatal(e)
++	}
++	call, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
++	defer cancel()
++	done := make(chan error, 1)
++	go func() { done <- owners.CompleteNativeOperation(call, l) }()
++	waited := false
++	for call.Err() == nil {
++		if e = f.admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE usename='native_owner_runtime' AND wait_event_type='Lock')").Scan(&waited); e != nil {
++			cancel()
++			<-done
++			t.Fatal(e)
++		}
++		if waited {
++			break
++		}
++		time.Sleep(time.Millisecond)
++	}
++	if e = <-done; e == nil || !waited {
++		t.Fatal("held-row completion did not expire under the original caller bound", waited, e)
++	}
++	if e = tx.Rollback(ctx); e != nil {
++		t.Fatal(e)
++	}
++	actual, closed, after := nativeCompletionSnapshot(t, ctx, f)
++	if closed || !actual.Operation.Equal(expected) || after != before {
++		t.Fatal("denied completion changed owner or retained spend")
++	}
++	t.Log("wrong fence/sequence and held-row original-deadline completion denied, owner and charges unchanged")
++}

@@ -1,0 +1,339 @@
+package fleet
+
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+func workerOwnerAuditConfiguration() value.OwnerConfiguration {
+	const id = "11111111-1111-4111-8111-111111111111"
+	return value.OwnerConfiguration{Pool: value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "hub", ServiceUID: id, Deployment: "hub", DeploymentUID: id, ServiceAccount: "hub", AccountUID: id, Port: 8443}, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{{3}}}
+}
+
+func workerOwnerAuditCandidate(c value.OwnerConfiguration) ownerConfigurationAuditCandidate {
+	now := time.Now().UTC()
+	return ownerConfigurationAuditCandidate{observation: value.OwnerConfigurationObservation{Configuration: c.Clone(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, until: now.Add(5 * time.Second)}
+}
+
+func TestWorkerOwnerAuditNeverReplacesSelectedIntervalAndCancelsSupersededSource(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	entered := make(chan context.Context, 1)
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	var writes, acks atomic.Int32
+	o := &OwnerConfigurationObserver{Now: time.Now,
+		Audit: ownerAuditFunc(func(ctx context.Context, c value.OwnerConfiguration) (audit.Receipt, error) {
+			writes.Add(1)
+			entered <- ctx
+			<-release
+			return audit.Receipt{}, value.ErrUnavailable
+		}),
+		Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error { acks.Add(1); return nil }),
+	}
+	s := &workerOwnerAudit{owner: o, wake: make(chan struct{}, 1)}
+	done := make(chan struct{})
+	go func() { s.run(ctx); close(done) }()
+	defer func() { cancel(); unblock(); <-done }()
+	first := workerOwnerAuditCandidate(workerOwnerAuditConfiguration())
+	s.notify(first, false, nil)
+	var call context.Context
+	select {
+	case call = <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("selected audit did not start")
+	}
+	second := workerOwnerAuditCandidate(first.observation.Configuration)
+	s.notify(second, false, nil)
+	deadline, ok := call.Deadline()
+	if !ok || !deadline.Equal(first.until) {
+		t.Fatal("new observation changed selected original deadline")
+	}
+	s.mu.Lock()
+	selected, pending := s.active, s.pending
+	s.mu.Unlock()
+	if selected == nil || !selected.until.Equal(first.until) || pending == nil || !pending.until.Equal(second.until) {
+		t.Fatal("active or pending inventory changed incorrectly")
+	}
+	changed := workerOwnerAuditCandidate(first.observation.Configuration)
+	changed.observation.Configuration.Revision.Generation++
+	changed.observation.Configuration.Revision.Digest[0]++
+	s.notify(changed, false, nil)
+	<-call.Done()
+	s.mu.Lock()
+	pending = s.pending
+	s.mu.Unlock()
+	if pending != nil {
+		t.Fatal("superseded pending revision survived")
+	}
+	// Source supersession cancels immediately, but the blocked actual writer
+	// remains owned until it returns. Shutdown must join it, not only cancel it.
+	cancel()
+	select {
+	case <-done:
+		t.Fatal("audit reported joined while writer blocked")
+	default:
+	}
+	unblock()
+	<-done
+	if writes.Load() != 1 || acks.Load() != 0 {
+		t.Fatal("superseded audit retried or acknowledged")
+	}
+}
+
+func TestWorkerOwnerSourceLoopsContinueWhileAuditWaitsAndJoinItOnShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var fleetCalls, ownerCalls atomic.Int32
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	c := workerOwnerAuditConfiguration()
+	s := &ConfigurationReconciler{
+		Fleet: &TrustObserver{Settings: administrationFunc(func(context.Context) (value.Administration, error) {
+			fleetCalls.Add(1)
+			return value.Administration{}, value.ErrUnavailable
+		}), Projection: &trustObservationFixture{}, Now: time.Now},
+		Owner: &OwnerConfigurationObserver{Reader: ownerConfigFunc(func(context.Context) (value.OwnerConfigurationObservation, error) {
+			ownerCalls.Add(1)
+			return workerOwnerAuditCandidate(c).observation, nil
+		}),
+			Ledger: ownerLedgerFake{observe: func(context.Context, value.OwnerConfigurationObservation) (audit.Receipt, bool, error) {
+				return audit.Receipt{}, false, nil
+			}, fence: func(context.Context, time.Time) error { return nil }},
+			Audit: ownerAuditFunc(func(ctx context.Context, _ value.OwnerConfiguration) (audit.Receipt, error) {
+				close(entered)
+				<-release
+				return audit.Receipt{}, ctx.Err()
+			}),
+			Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error {
+				t.Error("failed audit acknowledged")
+				return value.ErrUnavailable
+			}), Now: time.Now},
+	}
+	done := make(chan struct{})
+	go func() { _ = s.RunWithIndependentOwnerAudit(ctx); close(done) }()
+	defer func() { cancel(); unblock(); <-done }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("first audit did not start")
+	}
+	until := time.Now().Add(2500 * time.Millisecond)
+	for (ownerCalls.Load() < 3 || fleetCalls.Load() < 3) && time.Now().Before(until) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if ownerCalls.Load() < 3 || fleetCalls.Load() < 3 {
+		t.Fatal("queued/active audit stalled independent source loops", ownerCalls.Load(), fleetCalls.Load())
+	}
+	cancel()
+	select {
+	case <-done:
+		t.Fatal("reconciler released blocked audit owner")
+	default:
+	}
+	unblock()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("released audit did not join")
+	}
+}
+
+func TestWorkerOwnerAuditSourceFailureCancelsActiveAndClearsPending(t *testing.T) {
+	for _, failure := range []string{"unavailable", "expired"} {
+		t.Run(failure, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			entered := make(chan context.Context, 1)
+			release := make(chan struct{})
+			var once sync.Once
+			unblock := func() { once.Do(func() { close(release) }) }
+			defer unblock()
+			var writes atomic.Int32
+			owner := &OwnerConfigurationObserver{Now: time.Now, Audit: ownerAuditFunc(func(call context.Context, _ value.OwnerConfiguration) (audit.Receipt, error) {
+				writes.Add(1)
+				entered <- call
+				<-release
+				return audit.Receipt{}, value.ErrUnavailable
+			}), Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error {
+				t.Error("unavailable source acknowledged")
+				return value.ErrUnavailable
+			})}
+			s := &workerOwnerAudit{owner: owner, wake: make(chan struct{}, 1)}
+			done := make(chan struct{})
+			go func() { s.run(ctx); close(done) }()
+			defer func() { cancel(); unblock(); <-done }()
+			candidate := workerOwnerAuditCandidate(workerOwnerAuditConfiguration())
+			s.notify(candidate, false, nil)
+			var active context.Context
+			select {
+			case active = <-entered:
+			case <-time.After(time.Second):
+				t.Fatal("audit not selected")
+			}
+			pending := workerOwnerAuditCandidate(candidate.observation.Configuration)
+			s.notify(pending, false, nil)
+			if failure == "unavailable" {
+				s.notify(ownerConfigurationAuditCandidate{}, false, value.ErrUnavailable)
+			} else {
+				pending.until = time.Now().Add(-time.Microsecond)
+				s.notify(pending, false, nil)
+			}
+			select {
+			case <-active.Done():
+			case <-time.After(time.Second):
+				t.Fatal("source failure left active audit usable")
+			}
+			s.mu.Lock()
+			left := s.pending
+			s.mu.Unlock()
+			if left != nil {
+				t.Fatal("source failure retained pending audit")
+			}
+			cancel()
+			unblock()
+			<-done
+			if writes.Load() != 1 {
+				t.Fatal("source failure retried uncertain original audit")
+			}
+		})
+	}
+}
+
+func TestWorkerOwnerSourceFailureCancelsBeforeBlockedSQLFence(t *testing.T) {
+	for _, mode := range []string{"reader", "ledger", "invalid-receipt"} {
+		t.Run(mode, func(t *testing.T) {
+			selected, stopSelected := context.WithCancel(t.Context())
+			defer stopSelected()
+			candidate := workerOwnerAuditCandidate(workerOwnerAuditConfiguration())
+			fenceEntered, releaseFence := make(chan struct{}), make(chan struct{})
+			var once sync.Once
+			unblock := func() { once.Do(func() { close(releaseFence) }) }
+			defer unblock()
+			owner := &OwnerConfigurationObserver{Now: time.Now,
+				Reader: ownerConfigFunc(func(context.Context) (value.OwnerConfigurationObservation, error) {
+					if mode == "reader" {
+						return value.OwnerConfigurationObservation{}, value.ErrUnavailable
+					}
+					return candidate.observation, nil
+				}),
+				Ledger: ownerLedgerFake{observe: func(context.Context, value.OwnerConfigurationObservation) (audit.Receipt, bool, error) {
+					if mode == "ledger" {
+						return audit.Receipt{}, false, value.ErrUnavailable
+					}
+					return audit.Receipt{}, true, nil
+				}, fence: func(context.Context, time.Time) error {
+					close(fenceEntered)
+					<-releaseFence
+					return nil
+				}},
+				Audit: ownerAuditFunc(func(context.Context, value.OwnerConfiguration) (audit.Receipt, error) {
+					t.Error("rejected source began another audit")
+					return audit.Receipt{}, value.ErrUnavailable
+				}),
+				Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error {
+					t.Error("rejected source acknowledged")
+					return value.ErrUnavailable
+				}),
+			}
+			mailbox := &workerOwnerAudit{owner: owner, active: &candidate, pending: &candidate, cancel: stopSelected, wake: make(chan struct{}, 1)}
+			done := make(chan struct{})
+			go func() { _, _, _ = owner.observeForAuditNotifying(t.Context(), mailbox); close(done) }()
+			defer func() { unblock(); <-done }()
+			select {
+			case <-fenceEntered:
+			case <-time.After(time.Second):
+				t.Fatal("negative fence not entered")
+			}
+			if selected.Err() == nil {
+				t.Fatal("known unavailable source remained active during blocked fence")
+			}
+			mailbox.mu.Lock()
+			pending, active := mailbox.pending, mailbox.active
+			mailbox.mu.Unlock()
+			if pending != nil || active != &candidate {
+				t.Fatal("failure retained pending authority or discarded unjoined active ownership")
+			}
+			select {
+			case <-done:
+				t.Fatal("observer returned before negative fence joined")
+			default:
+			}
+		})
+	}
+}
+
+func TestWorkerOwnerChangedSourceCancelsBeforeBlockedSQLObservation(t *testing.T) {
+	selected, stopSelected := context.WithCancel(t.Context())
+	defer stopSelected()
+	original := workerOwnerAuditCandidate(workerOwnerAuditConfiguration())
+	changed := workerOwnerAuditCandidate(original.observation.Configuration)
+	changed.observation.Configuration.Revision.Generation++
+	changed.observation.Configuration.Revision.Digest[0]++
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	owner := &OwnerConfigurationObserver{Now: time.Now,
+		Reader: ownerConfigFunc(func(context.Context) (value.OwnerConfigurationObservation, error) {
+			return changed.observation, nil
+		}),
+		Ledger: ownerLedgerFake{observe: func(context.Context, value.OwnerConfigurationObservation) (audit.Receipt, bool, error) {
+			close(entered)
+			<-release
+			return audit.Receipt{}, false, nil
+		}, fence: func(context.Context, time.Time) error { return nil }},
+		Audit: ownerAuditFunc(func(context.Context, value.OwnerConfiguration) (audit.Receipt, error) {
+			t.Error("changed observation began audit in its supersession pass")
+			return audit.Receipt{}, value.ErrUnavailable
+		}),
+		Acknowledgements: ownerAckFunc(func(context.Context, value.OwnerConfiguration, audit.Receipt) error {
+			t.Error("changed observation acknowledged without audit")
+			return value.ErrUnavailable
+		}),
+	}
+	known := original.observation.Configuration.Clone()
+	mailbox := &workerOwnerAudit{owner: owner, known: &known, active: &original, pending: &original, cancel: stopSelected, wake: make(chan struct{}, 1)}
+	done := make(chan struct{})
+	go func() {
+		candidate, ack, err := owner.observeForAuditNotifying(t.Context(), mailbox)
+		mailbox.notify(candidate, ack, err)
+		close(done)
+	}()
+	defer func() { unblock(); <-done }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("original SQL observation not entered")
+	}
+	if selected.Err() == nil {
+		t.Fatal("known changed source kept old audit usable while SQL blocked")
+	}
+	mailbox.mu.Lock()
+	pending, active := mailbox.pending, mailbox.active
+	mailbox.mu.Unlock()
+	if pending != nil || active != &original {
+		t.Fatal("supersession replaced active ownership or retained pending audit")
+	}
+	unblock()
+	<-done
+	mailbox.mu.Lock()
+	pending = mailbox.pending
+	mailbox.mu.Unlock()
+	if pending != nil {
+		t.Fatal("supersession pass silently queued a new audit")
+	}
+}

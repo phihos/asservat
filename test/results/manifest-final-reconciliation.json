@@ -1,0 +1,19 @@
+{
+  "context-storage": {
+    "testExit": 0,
+    "sourceUnchangedDuringTest": true,
+    "sourceChangesSinceRun": [],
+    "cleanupFailures": []
+  },
+  "custody": {
+    "testExit": 0,
+    "sourceUnchangedDuringTest": true,
+    "sourceChangesSinceRun": [],
+    "cleanupFailures": []
+  },
+  "remainingLabeledContainers": [],
+  "remainingLabeledNetworks": [],
+  "remainingContextNodes": [],
+  "originalBriefSHA256": "af701ee51dd5b8d7b61388cbe2772baec1beb4354a4b26dc3398a63452660c20",
+  "briefCopyMatches": true
+}

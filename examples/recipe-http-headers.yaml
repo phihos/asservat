@@ -1,0 +1,59 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: http-incident-context
+  namespace: payments
+spec:
+  description: Plain HTTP/1 approved fields, live peer updates and segmented bounded
+    history.
+  actions:
+  - id: http
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: httpHeaders
+        protocol: http1
+        projectionRef:
+          name: http-response-headers
+          version: v1
+        maxFlows: 1024
+        maxHeaderBytes: 32768
+        maxReassemblyBytesPerFlow: 262144
+        maxReassemblyBytes: 16777216
+        idleTimeout: 30s
+      before: 30s
+      after: 30s
+      ring:
+        maxAge: 30s
+        maxBytes: 16777216
+        segmentBytes: 4194304
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - resourceRef:
+            kind: Service
+            namespace: payments
+            name: ledger-api
+            serviceMode: backends
+            readyOnly: false
+        - resourceRef:
+            kind: StatefulSet
+            namespace: payments
+            name: ledger
+        protocol: tcp
+        ports:
+        - 8080
+        resolution: follow
+        maxEndpoints: 256
+        maxStaleness: 5s
+      maxFrozenBytes: 67108864
+      maxConcurrentSnapshots: 1
+      filter: tcp and port 8080
+    required: false
+    impact: sensitiveRead
+    limits:
+      maxBytes: 67108864
+      timeout: 90s
+  maxTotalBytes: 67108864
+  maxDuration: 120s

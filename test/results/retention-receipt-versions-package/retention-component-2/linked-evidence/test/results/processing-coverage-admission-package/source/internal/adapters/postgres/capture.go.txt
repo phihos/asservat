@@ -1,0 +1,535 @@
+package postgres
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/application/capacity"
+	captureapp "asservat.local/asservat/internal/application/capture"
+	"asservat.local/asservat/internal/application/planning"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type ContextAdmissions struct {
+	ledger    *Ledger
+	root      string
+	retention *RetentionTransactionGuard
+	recovery  *RecoveryTransactionGuard
+	auditMAC  *auditapp.OperationMAC
+}
+
+var _ captureapp.AdmissionTransaction = (*ContextAdmissions)(nil)
+var _ captureapp.ReviewedAdmissionTransaction = (*ContextAdmissions)(nil)
+var _ captureapp.ContextAdmissionReplay = (*ContextAdmissions)(nil)
+var _ capacity.ContextStorageBindings = (*ContextAdmissions)(nil)
+
+func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, guards ...EffectTransactionGuards) (*ContextAdmissions, error) {
+	if !authorization.UUID(root) {
+		return nil, value.ErrInvalid
+	}
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var version int64
+	if err = pool.QueryRow(ctx, "SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version); err != nil || (version < 5 || version > currentSchemaVersion) {
+		return nil, value.ErrUnavailable
+	}
+	guard, err := effectGuardsFor(root, guards)
+	if err != nil {
+		return nil, err
+	}
+	return &ContextAdmissions{ledger: l, root: root, retention: guard.Retention, recovery: guard.Recovery}, nil
+}
+
+// NewAuditedContextAdmissions explicitly selects atomic private intent backing.
+// Legacy construction remains unchanged and cannot adopt configured private
+// allocations. The protected pool/account producer must run independently.
+func NewAuditedContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, mac *auditapp.OperationMAC, guards ...EffectTransactionGuards) (*ContextAdmissions, error) {
+	if mac == nil || mac.AccountVersion() == "" || mac.Version() == "" {
+		return nil, value.ErrInvalid
+	}
+	s, e := NewContextAdmissions(ctx, pool, root, guards...)
+	if e != nil {
+		return nil, e
+	}
+	s.auditMAC = mac
+	return s, nil
+}
+
+func captureError(err error) error {
+	if err == nil {
+		return nil
+	}
+	for _, e := range []error{value.ErrInvalid, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
+		if errors.Is(err, e) {
+			return e
+		}
+	}
+	if errors.Is(err, privacyapp.ErrConflict) {
+		return value.ErrConflict
+	}
+	if errors.Is(err, privacyapp.ErrCapacity) {
+		return value.ErrCapacity
+	}
+	if errors.Is(err, privacyapp.ErrExpired) || errors.Is(err, privacyapp.ErrFence) {
+		return value.ErrChanged
+	}
+	return value.ErrUnavailable
+}
+
+func sameStorage(row custodydb.ContextStorageBinding, b value.StorageBinding) bool {
+	return row.RootID == id(b.RootID) && row.ClusterID == id(b.ClusterID) && row.NamespaceUid == b.NamespaceUID && row.WorkloadUid == b.WorkloadUID && row.AllocationID == id(b.AllocationID) && row.SourceUid == b.Revision.UID && row.SourceGeneration == b.Revision.Generation && bytes.Equal(row.SourceDigest, b.Revision.Digest[:])
+}
+
+func (s *ContextAdmissions) BindContextStorage(ctx context.Context, b value.StorageBinding) error {
+	if b.RootID != s.root || b.ObservedAt.Nanosecond()%1000 != 0 || b.FreshUntil.Nanosecond()%1000 != 0 || !b.Valid(b.ObservedAt) {
+		return value.ErrInvalid
+	}
+	return captureError(s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		// Same order as admission: permission root, pool, allocation, binding.
+		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
+			return err
+		}
+		p, a, err := lockAllocation(ctx, q, b.AllocationID)
+		if err != nil {
+			return err
+		}
+		row, err := q.LockContextStorage(ctx, custodydb.LockContextStorageParams{RootID: id(s.root), ClusterID: id(b.ClusterID), NamespaceUid: b.NamespaceUID, WorkloadUid: b.WorkloadUID})
+		if err == nil {
+			if !sameStorage(row, b) || b.ObservedAt.Before(row.ObservedAt.Time) || (b.ObservedAt.Equal(row.ObservedAt.Time) && !b.FreshUntil.Equal(row.FreshUntil.Time)) {
+				return value.ErrConflict
+			}
+			err = q.RefreshContextStorage(ctx, custodydb.RefreshContextStorageParams{RootID: id(s.root), ClusterID: id(b.ClusterID), NamespaceUid: b.NamespaceUID, WorkloadUid: b.WorkloadUID, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(b.FreshUntil)})
+		} else if errors.Is(err, pgx.ErrNoRows) {
+			err = q.InsertContextStorage(ctx, custodydb.InsertContextStorageParams{RootID: id(s.root), ClusterID: id(b.ClusterID), NamespaceUid: b.NamespaceUID, WorkloadUid: b.WorkloadUID, AllocationID: id(b.AllocationID), SourceUid: b.Revision.UID, SourceGeneration: b.Revision.Generation, SourceDigest: b.Revision.Digest[:], ObservedAt: ts(b.ObservedAt), FreshUntil: ts(b.FreshUntil)})
+		}
+		if err != nil {
+			return err
+		}
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !b.Valid(n.Time) || p.Paused || a.Paused || a.ServiceClass != "context" || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(a.ValidUntil.Time) {
+			return value.ErrChanged
+		}
+		return nil
+	}))
+}
+
+func validAdmission(a value.Admission) bool {
+	r := a.Registration
+	p := a.Plan.Input
+	t := p.Target.Target()
+	e := a.Eligibility
+	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && r.NativeLimit == artifact.MaxContextBytes && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+}
+
+func requestKey(a value.Admission) []byte {
+	return contextRequestKey(a.Plan.Input.Executor, a.IdempotencyKey)
+}
+
+func contextRequestKey(actor identity.Principal, key string) []byte {
+	// Encoding length-aware structured fields prevents ambiguous concatenation.
+	return digest(struct {
+		Format string
+		Actor  identity.Principal
+		Key    string
+	}{"context-request-key/v1", actor, key})
+}
+
+func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
+	var e artifact.ContextExpectation
+	var pin artifact.PinnedPod
+	if json.Unmarshal(row.ExpectationJson, &e) != nil || json.Unmarshal(row.PodPinJson, &pin) != nil || e.Validate() != nil || e.CaptureUID != uid(row.ID) || e.Registration.Location.AttemptID != uid(row.AttemptID) || len(row.ScopeDigest) != 32 || len(row.SubmissionDigest) != 32 {
+		return value.Accepted{}, value.ErrUnavailable
+	}
+	out := value.Accepted{CaptureID: uid(row.ID), State: row.State, Expectation: e, Pin: pin, CreatedAt: row.CreatedAt.Time, Deadline: row.Deadline.Time}
+	copy(out.ScopeDigest[:], row.ScopeDigest)
+	copy(out.SubmissionDigest[:], row.SubmissionDigest)
+	if out.ScopeDigest != e.PlanDigest {
+		return value.Accepted{}, value.ErrUnavailable
+	}
+	return out, nil
+}
+
+// currentCaptureEligibility re-evaluates the identity snapshot against the SQL
+// projection after locks. Freshness, deny precedence, group membership and the
+// complete default audience use the same domain evaluator as the caller.
+func currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, a value.Admission) (authorization.CaptureEligibility, error) {
+	p, err := permissionProjection(ctx, q, stream, a.Plan.Input.Target.Target())
+	if err != nil {
+		return authorization.CaptureEligibility{}, value.ErrUnavailable
+	}
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return authorization.CaptureEligibility{}, err
+	}
+	fresh := authorization.ContextEligibility(a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time)
+	if !fresh.Eligible || !n.Time.Before(a.Eligibility.ValidUntil) {
+		return fresh, value.ErrDenied
+	}
+	if fresh.Principal != a.Plan.Input.Executor || fresh.IdentityRevision != a.Eligibility.IdentityRevision || fresh.PermissionRevision != a.Eligibility.PermissionRevision {
+		return fresh, value.ErrChanged
+	}
+	return fresh, nil
+}
+
+// LookupContextAdmission resolves the original operation before a caller loads
+// a preview or resolves a live Pod. Only newly checked recovery and current SQL
+// permissions authorize the response; stored capture facts are routing/scope,
+// never renewed collection authority. A lost COMMIT reply therefore recovers
+// the same accepted IDs even after the preview or Pod has disappeared.
+func (s *ContextAdmissions) LookupContextAdmission(ctx context.Context, in value.ReplayQuery) (value.Accepted, bool, error) {
+	if s == nil {
+		return value.Accepted{}, false, value.ErrUnavailable
+	}
+	d, err := resolveContextRequest(ctx, s.ledger, s.root, s.recovery, in, false)
+	if err != nil {
+		return value.Accepted{}, false, err
+	}
+	if d.State == value.RequestAccepted && d.Accepted != nil {
+		return *d.Accepted, true, nil
+	}
+	return value.Accepted{}, false, nil
+}
+
+func (s *ContextAdmissions) AdmitContext(ctx context.Context, a value.Admission) (value.Accepted, error) {
+	return s.admitContext(ctx, "", a)
+}
+
+func (s *ContextAdmissions) AdmitReviewedContext(ctx context.Context, previewID string, a value.Admission) (value.Accepted, error) {
+	if !authorization.UUID(previewID) || a.SubmissionDigest != captureapp.ContextRequestDigest(previewID) {
+		return value.Accepted{}, value.ErrInvalid
+	}
+	return s.admitContext(ctx, previewID, a)
+}
+
+func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, a value.Admission) (value.Accepted, error) {
+	var out value.Accepted
+	if s == nil || s.ledger == nil || a.RootID != s.root || !validAdmission(a) {
+		return out, value.ErrInvalid
+	}
+	topology, err := s.retention.observe(ctx, a.Plan.Input.Target.Target().ClusterID)
+	if err != nil {
+		return out, captureError(err)
+	}
+	r := normalized(a.Registration)
+	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		recovery, err := s.recovery.lock(ctx, q, s.root, a.Recovery)
+		if err != nil {
+			return err
+		}
+		// The root serializes protected control capacity and reviewed admission. No network
+		// call or evidence byte transfer occurs while any of these locks is held.
+		stream, err := q.LockPermissionStream(ctx, id(s.root))
+		if err != nil {
+			return err
+		}
+		fresh, err := currentCaptureEligibility(ctx, q, stream, a)
+		if err != nil {
+			return err
+		}
+		old, err := q.FindContextCapture(ctx, custodydb.FindContextCaptureParams{RootID: id(s.root), RequestKey: requestKey(a)})
+		if err == nil {
+			if old.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(old.SubmissionDigest, a.SubmissionDigest[:]) || !bytes.Equal(old.ScopeDigest, a.Plan.ScopeDigest[:]) {
+				return value.ErrConflict
+			}
+			out, err = admittedRecord(old)
+			if err != nil {
+				return err
+			}
+			fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+			if err != nil {
+				return err
+			}
+			if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
+				return err
+			}
+			now, err := q.CurrentTime(ctx)
+			if err != nil {
+				return err
+			}
+			if !now.Time.Before(fresh.ValidUntil) || !now.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(now.Time) {
+				return value.ErrDenied
+			}
+			out.Replay = true
+			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+			return nil // no new storage, deadline, audience or acquisition on replay
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		var reviewed value.ContextPreview
+		if previewID != "" {
+			query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity, Recovery: a.Recovery}
+			if row, found, err := findContextRequest(ctx, q, query); err != nil {
+				return err
+			} else if found {
+				if row.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(row.ScopeDigest, a.Plan.ScopeDigest[:]) {
+					return value.ErrConflict
+				}
+				out, err = admittedRecord(row)
+				if err != nil {
+					return err
+				}
+				out.Replay = true
+				fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+				if err != nil {
+					return err
+				}
+				if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
+					return err
+				}
+				n, err := q.CurrentTime(ctx)
+				if err != nil {
+					return err
+				}
+				if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(n.Time) {
+					return value.ErrDenied
+				}
+				out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+				return ctx.Err()
+			}
+			reviewed, err = readReviewedContext(ctx, q, previewID, a)
+			if err != nil {
+				return err
+			}
+		}
+		var auditAccount audit.CaptureAuditAccount
+		var auditUntil time.Time
+		if s.auditMAC != nil {
+			raw, e := q.LockCaptureAuditAdmission(ctx, custodydb.LockCaptureAuditAdmissionParams{RootID: id(s.root), AllocationID: id(r.AllocationID)})
+			if e != nil {
+				return e
+			}
+			var observed struct {
+				audit.CaptureAuditAccount
+				ValidUntil time.Time
+			}
+			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditMAC.AccountVersion() {
+				return value.ErrUnavailable
+			}
+			auditAccount = observed.CaptureAuditAccount
+			auditUntil = observed.ValidUntil
+		}
+		p, allocation, err := lockAllocation(ctx, q, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		binding, err := q.ShareContextStorage(ctx, custodydb.ShareContextStorageParams{RootID: id(s.root), ClusterID: id(r.Location.ClusterID), NamespaceUid: a.Storage.NamespaceUID, WorkloadUid: a.Storage.WorkloadUID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return value.ErrChanged
+		}
+		if err != nil {
+			return err
+		}
+		if !sameStorage(binding, a.Storage) || allocation.ServiceClass != "context" {
+			return value.ErrChanged
+		}
+		controlUntil, err := lockContextControlCapacity(ctx, q, s.root, r.AllocationID)
+		if err != nil {
+			return err
+		}
+		// Physical bindings also exist in an incomplete managed enrollment.
+		// Keep the exact source/root deadline through all subsequent effects;
+		// this read cannot promote an old record or extend a phase permit.
+		capacityUntil, err := q.ReadManagedCapacityAdmission(ctx, custodydb.ReadManagedCapacityAdmissionParams{RootID: id(s.root), AllocationID: id(r.AllocationID), Kind: "context"})
+		if err != nil {
+			return err
+		}
+		if !capacityUntil.Valid {
+			return value.ErrUnavailable
+		}
+		// Only managed SQL54 accounts enter the installed profile. Historical
+		// replay above stays read-only and does not need new acquisition coverage.
+		// Supported processing writers take this already-held permission root
+		// before their writes; these are nonlocking reads, not a later lock inversion.
+		var processing value.ProcessingCoverage
+		managed := capacityUntil.InfinityModifier == pgtype.Finite
+		if managed {
+			n, e := q.CurrentTime(ctx)
+			if e != nil {
+				return e
+			}
+			until := contextMetadataDeadline(ctx, n.Time.Add(5*time.Second), capacityUntil.Time, a.Recovery.FreshUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Storage.FreshUntil)
+			in := value.ProcessingCoverageRequest{RootID: s.root, Location: r.Location, Target: a.Plan.Input.Target.Target(), AnchorAt: r.AnchorAt, DeleteBy: r.DeleteBy}
+			processing, err = readProcessingCaptureCoverage(ctx, q, in, a.Recovery, n.Time, until)
+			if err != nil {
+				return err
+			}
+		}
+
+		// New capture identities cannot adopt an independently registered or
+		// ambiguous old attempt. Replay was resolved using the capture above.
+		if _, err = q.LockAttempt(ctx, id(r.Location.AttemptID)); err == nil {
+			return value.ErrConflict
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		check := func() error {
+			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
+				return err
+			}
+			if err := s.retention.check(ctx, q, topology, a.Plan.Input.Retention.Proof, a.Plan.Input.Target.Target()); err != nil {
+				return err
+			}
+			var err error
+			fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+			if err != nil {
+				return err
+			}
+			n, err := q.CurrentTime(ctx)
+			if err != nil {
+				return err
+			}
+			if !slices.Equal(fresh.DefaultAudience, a.Eligibility.DefaultAudience) || !slices.Equal(fresh.ContributingAssignments, a.Eligibility.ContributingAssignments) {
+				return value.ErrChanged
+			}
+			if previewID != "" && !reviewed.Current(n.Time) {
+				return value.ErrChanged
+			}
+			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
+				return value.ErrChanged
+			}
+			if err := current(ctx, q, p, allocation, r, r.ExpiresAt); err != nil {
+				return err
+			}
+			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
+				return err
+			}
+			// One final database instant bounds every earlier read. A later
+			// recovery query cannot extend shorter deny, target or storage facts.
+			n, err = q.CurrentTime(ctx)
+			if err != nil {
+				return err
+			}
+			if !a.Recovery.Valid(n.Time) || !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
+				return value.ErrDenied
+			}
+			if managed && !processing.Current(n.Time) {
+				return value.ErrUnavailable
+			}
+
+			if previewID != "" && !reviewed.Current(n.Time) {
+				return value.ErrChanged
+			}
+			if s.auditMAC != nil && !n.Time.Before(auditUntil) {
+				return value.ErrChanged
+			}
+			if capacityUntil.InfinityModifier < 0 || capacityUntil.InfinityModifier == 0 && !n.Time.Before(capacityUntil.Time) {
+				return value.ErrChanged
+			}
+			if !n.Time.Before(controlUntil) || !planning.VerifyContextPlan(a.Plan, n.Time) || !a.Storage.Valid(n.Time) || !n.Time.Before(binding.FreshUntil.Time) || !n.Time.Before(p.ValidUntil.Time) || !n.Time.Before(allocation.ValidUntil.Time) {
+				return value.ErrChanged
+			}
+			return ctx.Err()
+		}
+		if err = check(); err != nil {
+			return err
+		}
+		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
+			return err
+		}
+		in := a.Plan.Input
+		target := in.Target
+		retention := in.Retention
+		expected := artifact.ContextExpectation{ExecutionClass: target.ExecutionClass, Registration: r, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, NodeUID: target.NodeUID, NodeBootID: target.NodeBootID, PodUID: target.Request.PodUID, Namespace: target.Request.Namespace.Name, NamespaceUID: target.Request.Namespace.UID, WorkloadUID: target.Request.Workload.UID, CollectorVersion: in.Capability.CollectorVersion, CollectorImageDigest: in.Capability.CollectorImageDigest, RecipeDigest: a.Plan.RecipeDigest, PlanDigest: a.Plan.ScopeDigest, CaptureUID: in.CaptureID, ActionID: "pod-status", DataClass: "metadata", PurposeRef: retention.PurposeRef, Audience: fresh.DefaultAudience, RequestedAgeSeconds: retention.RequestedSeconds, MaximumAgeSeconds: retention.MaximumSeconds, DeletionBudgetSeconds: retention.DeletionBudgetSeconds, RetentionRules: retention.Policies, TriggeredAt: r.AnchorAt}
+		if expected.Validate() != nil {
+			return value.ErrInvalid
+		}
+		expectationJSON, err := json.Marshal(expected)
+		if err != nil || len(expectationJSON) > 65536 {
+			return value.ErrInvalid
+		}
+		pinJSON, err := json.Marshal(in.Target.Pin)
+		if err != nil || len(pinJSON) > 4096 {
+			return value.ErrInvalid
+		}
+		operationID := ""
+		if s.auditMAC != nil {
+			operationID = in.CaptureID
+		}
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID)})
+		if err != nil {
+			return err
+		}
+		if s.auditMAC != nil {
+			intent, e := captureIntent(row)
+			if e != nil {
+				return e
+			}
+			managedUntil := in.Deadline
+			if capacityUntil.InfinityModifier == 0 {
+				managedUntil = capacityUntil.Time
+			}
+			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
+			operation, e := auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, bound)
+			if e != nil {
+				return value.ErrUnavailable
+			}
+			body, e := auditapp.EncodeCaptureOperationIntent(operation)
+			if e != nil || len(body) > 16<<10 {
+				return value.ErrUnavailable
+			}
+			if e = q.ReserveCaptureAudit(ctx, custodydb.ReserveCaptureAuditParams{RootID: id(s.root), CaptureID: row.ID, IntentValue: body, CaptureDigest: digest(intent), OriginalUntil: ts(bound)}); e != nil {
+				return e
+			}
+		}
+		if err = q.InsertContextControlCharge(ctx, custodydb.InsertContextControlChargeParams{CaptureID: row.ID, RootID: id(s.root), AllocationID: allocation.ID}); err != nil {
+			return err
+		}
+		if err = check(); err != nil {
+			return err
+		}
+		out, err = admittedRecord(row)
+		if err == nil {
+			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+			if capacityUntil.InfinityModifier == pgtype.Finite {
+				out.MetadataValidUntil = contextMetadataDeadline(ctx, out.MetadataValidUntil, capacityUntil.Time)
+			}
+			if s.auditMAC != nil {
+				out.MetadataValidUntil = contextMetadataDeadline(ctx, out.MetadataValidUntil, auditUntil)
+			}
+		}
+		return err
+	})
+	if err != nil {
+		return value.Accepted{}, captureError(err)
+	}
+	return out, nil
+}
+
+// Response-only bound from the original observations, never a renewed lease.
+func contextMetadataDeadline(ctx context.Context, deadlines ...time.Time) time.Time {
+	var until time.Time
+	for _, at := range deadlines {
+		if at.IsZero() {
+			return time.Time{}
+		}
+		if until.IsZero() || at.Before(until) {
+			until = at
+		}
+	}
+	if at, ok := ctx.Deadline(); ok && (until.IsZero() || at.Before(until)) {
+		until = at
+	}
+	return until
+}

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--owner-provider-auth"
+  ],
+  "exit": 0,
+  "seconds": 106.57,
+  "files": {
+    "owner-provider-setup-native-retry.log": "9c561aa0c945ace8c4deb8ed459fda076b90d3bb2581f3c5696b5ba326ac3443",
+    "owner-provider-setup-native-retry-environment.json": "1be73917bdf539bd9f046e86ace133e2c21c3ea4f3e95daa50b81fd82cc1ba9c"
+  }
+}

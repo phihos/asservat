@@ -1,0 +1,70 @@
+# Exact activated enrollment avoids unused preparation routing
+
+This immutable outside-repository package contains three paths. It changes no SQL,
+wire format, native polling interval, capacity, deadline, current authorization or
+cryptographic operation. The live repository is unchanged by this agent.
+
+`ContextNativeRuntime.ContinueContextDownload` retains the existing current exact
+Job/Pod observation, independent SQL attachment read and final C03 check. When its
+initial and latest observations have the same exact worker, enrollment and active
+peer covering the original request without certificate renewal, it starts the
+existing first preparation directly. It does not construct/register an unused
+enrollment owner or repeat an attachment read solely to rediscover that peer.
+Native SQL claim, exact hub/process routing, actual TLS/Pod/current certificate,
+key binding, frames and final checks remain unchanged. Selected active identity
+loss/change fails and cannot fall back to issuance. Pending/unactivated workers
+and renewal windows keep the original enrollment path and bounded wait.
+
+Renewal scheduling uses the actual peer NotAfter minus the existing renewal lead,
+including equality, as the supervisor does. Original-period compatibility also
+uses WorkerCertificateEpoch. The test deliberately fixes CreatedAt to .500s to
+cover the difference between original epoch arithmetic and second-truncated leaf
+NotAfter. The existing final-period exception requires the exact original
+RunUntil at second precision and the peer must still cover the request end.
+
+## Evidence
+
+The prior native failure is retained in live `test/results/native-fresh-content-isolated*`:
+resume failed before ranges after connector origin returned 2.071s remaining and
+hub origin 2.024s; connector admission took 706ms. Those intervals do not identify
+operation age or prove which earlier port consumed the time. The package removes
+a demonstrated unnecessary dependency, not a measured guarantee of native latency.
+
+Executed outside the repository by `python3 run_checks.py`, handle **16269**, final
+exit **0**, with GOMAXPROCS=2, GOFLAGS=-p=2 and this stage's explicit TMPDIR:
+
+- BEFORE: `go test -overlay overlay-before.json -race ./internal/application/evidence -run '^TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim$' -count=1 -timeout=60s -v` exited **1** as intended (2.890s wall, 0.009s Go). The actual Continue path attempted one unused owner claim and reached zero first batches. The exact failure includes `synthetic enrollment owner must not be used`.
+- AFTER: `go test -overlay overlay-after.json -race ./internal/application/evidence -run '^Test(ContextRuntime|ActiveContextEnrollment|WorkerCurrent|WorkerPending|WorkerOwner|NativePreparation)' -count=1 -timeout=90s -v` exited **0**, 110 named passing entries (3.891s wall, 1.216s Go).
+- `go vet -overlay overlay-after.json ./internal/application/evidence` exited **0** (0.286s wall).
+
+All 1,254 internal/module dependencies, existing bases, payloads, overlays, runner
+and check inputs matched before and after every command. Raw logs and JSON reports
+are in `evidence/`. The BEFORE overlay includes the same full-Continue tests and
+omits only the unit test of the new private classifier, which did not yet exist.
+
+New coverage checks current identity revocation before lookup and after Pod/SQL,
+missing/changed/mutated active peer, changed enrollment key/worker, busy/uncertain
+state, concurrently started metadata, cancellation and expiry. The full-Continue
+regression uses a 400ms original parent and a synthetic blocking observation,
+then models a lost first batch acknowledgement. One request/generation and 4MiB
+read charge remain spent; the same original session cannot prepare again and no
+finish/refund runs. Existing unbound-launch and pending-enrollment tests remain
+unmodified and pass. These are component tests with explicit synthetic authority,
+not real SQL/Kubernetes/TLS/provider or installed-workflow qualification.
+
+## Integration and next checks
+
+`manifest.json` lists base and payload hashes; `base.json`, `payload-hashes.json`
+and `dependencies.json` are maps. Copy only the three `changes/` paths after exact
+verification. `freeze.json` binds the manifest, dependencies, evidence and runner.
+If archiving Go evidence under test/results, use `.go.txt` names to avoid compiling
+an unintended package. Preserve existing native failure logs.
+
+Parent should run combined repository gates and own the next actual native check,
+with all build jobs joined and immutable live sources. Existing candidate selector:
+
+`python3 scripts/test-custody.py --run '^TestContextAdmissionWithRealServices/download-worker-native-(content|content-resume|control-admission-race)$'`
+
+That selector has NOT been run against this payload. Its source/cleanup checks,
+original authority intervals and worker backoff must remain unchanged. Interrupted
+fresh-session and other native qualification remain separate existing coverage.

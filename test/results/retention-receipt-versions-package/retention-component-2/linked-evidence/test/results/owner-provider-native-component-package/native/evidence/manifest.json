@@ -1,0 +1,14 @@
+[
+  {
+    "path": "internal/adapters/kms/owner_provider_native_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "4f7048b4367d387169de65ce0cd3525c42e01a263fe43a704cab6f1c12855ef6",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-1/files/internal/adapters/kms/owner_provider_native_fixture_test.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_native_test.go",
+    "base_sha256": null,
+    "payload_sha256": "03a4d96775f7c0dce74e60acc23f1c22914117c6781705e25f8f89ee1e32db23",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-1/files/internal/adapters/kms/owner_provider_native_test.go"
+  }
+]

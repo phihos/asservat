@@ -1,0 +1,20 @@
+{
+  "started": 1791897728.4101617,
+  "manifest": "6a4b0baf0bc7dcf9d8f5fd889fd03c24521167490327feb38416df98b327c587",
+  "checkpoint": "40fbc5c9f19450ab43a3cf2e451c0dddf869aef24b24aa9561ee32fc7ec8ca85",
+  "runner": "cf73431ad024fc1cdab937bec8a39f711ba74fa1c99fea9bc265bec2af58bb20",
+  "native": false,
+  "before": {
+    "checkpoint": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "linked_snapshot": []
+  },
+  "phases": [],
+  "boot_id": "68ccce0b-1249-42a4-8177-f4af22deeb03",
+  "excluded_live_paths": [
+    "docs/implementation-progress.md"
+  ]
+}

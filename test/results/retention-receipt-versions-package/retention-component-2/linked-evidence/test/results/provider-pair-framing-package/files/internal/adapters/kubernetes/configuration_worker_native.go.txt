@@ -1,0 +1,275 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// One actual native bracket, retained only by the private worker advancement.
+// These complete responses do not implement a general current-reader port.
+// Direct reads can compare them but cannot renew this interval or enforcement.
+type configurationWorkerNative struct {
+	proof           configurationRoleObserved
+	fleet           fleet.Administration
+	owner           fleet.OwnerConfiguration
+	deployment      apps.Deployment
+	ownerDeployment apps.Deployment
+	account         core.ServiceAccount
+	administrator   auth.UserInfo
+	fleetRef        cfg.Resource
+	ownerRef        cfg.Resource
+}
+
+// This purpose-specific read shares actual probe target responses with the
+// complete source decoders. It leaves ReadConfigurationRoleSource unchanged.
+// With no definite Deployment conflict it performs 24 observer requests and
+// three independent native denial triplets. Final source values are read AFTER
+// the final guard checks, so mutation during those checks cannot hide behind
+// the earlier probe target. All children retain the caller's original end.
+func (s *ConfigurationRoleSource) readConfigurationWorkerNative(ctx context.Context) (configurationWorkerNative, error) {
+	var zero configurationWorkerNative
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	started := s.client.now()
+	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer cancel()
+	until, _ := call.Deadline()
+	ns, err := s.client.namespace(call, s.client.control)
+	if err != nil {
+		return zero, err
+	}
+	if ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	before, err := s.configurationRoleGuardVersions(call)
+	if err != nil {
+		return zero, err
+	}
+
+	// Exactly three fixed independent probes. Cancellation is propagated on a
+	// failure, but every started probe is joined before any result is used.
+	probeCall, stopProbes := context.WithCancel(call)
+	var probe sync.WaitGroup
+	var sources [2]core.ConfigMap
+	var ownerDeployment apps.Deployment
+	var actors [3]auth.UserInfo
+	var errors [3]error
+	probe.Add(3)
+	go func() {
+		defer probe.Done()
+		ownerDeployment, actors[0], errors[0] = s.protection.proveObjectIdentity(probeCall, started)
+		if errors[0] != nil {
+			stopProbes()
+		}
+	}()
+	go func() {
+		defer probe.Done()
+		sources[0], actors[1], errors[1] = s.fleet.protection.proveObjectIdentity(probeCall)
+		if errors[1] != nil {
+			stopProbes()
+		}
+	}()
+	go func() {
+		defer probe.Done()
+		sources[1], actors[2], errors[2] = s.owner.protection.proveObjectIdentity(probeCall)
+		if errors[2] != nil {
+			stopProbes()
+		}
+	}()
+	probe.Wait()
+	stopProbes()
+	for _, e := range errors {
+		if e != nil {
+			return zero, e
+		}
+	}
+	administrator, err := s.configurationWorkerAdministrator(call)
+	if err != nil {
+		return zero, err
+	}
+	f, fref, err := s.configurationWorkerFleet(sources[0], started)
+	if err != nil {
+		return zero, err
+	}
+	o, oref, rootsUntil, err := s.configurationWorkerOwner(sources[1])
+	if err != nil {
+		return zero, err
+	}
+	until = identity.Earlier(until, identity.Earlier(f.FreshUntil, rootsUntil))
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	if !s.configurationWorkerSourcesMatch(f, o) {
+		return zero, cfg.ErrChanged
+	}
+	reader := &OwnerEndpoints{client: s.client, pool: o.Pool}
+	deploymentPath := "/apis/apps/v1/namespaces/" + s.input.Namespace.Name + "/deployments/" + s.input.Deployment.Name
+	accountPath := "/api/v1/namespaces/" + s.input.Namespace.Name + "/serviceaccounts/" + s.input.ServiceAccount.Name
+	d, err := ownerResource[apps.Deployment](reader, call, deploymentPath, "apps/v1", "Deployment")
+	if err != nil {
+		return zero, err
+	}
+	if !configurationRoleDeploymentBound(d, s.input) {
+		return zero, cfg.ErrChanged
+	}
+	account, err := ownerResource[core.ServiceAccount](reader, call, accountPath, "v1", "ServiceAccount")
+	if err != nil {
+		return zero, err
+	}
+	if !ownerMetadata(account.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) {
+		return zero, cfg.ErrChanged
+	}
+	guards, err := s.configurationRoleGuardVersions(call)
+	if err != nil {
+		return zero, err
+	}
+	if guards != before {
+		return zero, cfg.ErrChanged
+	}
+	lastFleet, lastOwner, lastFleetRef, lastOwnerRef, lastRootsUntil, err := s.readConfigurationWorkerValues(call, started)
+	if err != nil {
+		return zero, err
+	}
+	if lastFleet.Revision != f.Revision || !lastOwner.Equal(o) || lastFleetRef != fref || lastOwnerRef != oref {
+		return zero, cfg.ErrChanged
+	}
+	until = identity.Earlier(until, lastRootsUntil)
+	d2, err := ownerResource[apps.Deployment](reader, call, deploymentPath, "apps/v1", "Deployment")
+	if err != nil {
+		return zero, err
+	}
+	if !configurationRoleDeploymentBound(d2, s.input) || !equalJSON(d.Spec, d2.Spec) || d.ResourceVersion != d2.ResourceVersion {
+		return zero, cfg.ErrChanged
+	}
+	account2, err := ownerResource[core.ServiceAccount](reader, call, accountPath, "v1", "ServiceAccount")
+	if err != nil {
+		return zero, err
+	}
+	if !ownerMetadata(account2.ObjectMeta, s.input.Namespace.Name, s.input.ServiceAccount.Name, s.input.ServiceAccount.UID) || account.ResourceVersion != account2.ResourceVersion || !equalJSON(account, account2) {
+		return zero, cfg.ErrChanged
+	}
+	ns, err = s.client.namespace(call, s.client.control)
+	if err != nil {
+		return zero, err
+	}
+	if ns.Deleting {
+		return zero, cfg.ErrChanged
+	}
+	if initialHandoverDeadline(call, s.client.now, until) != nil || !f.Valid(s.client.now()) || !lastFleet.Valid(s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	encoded, err := json.Marshal(d.Spec)
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	digest := sha256.Sum256(encoded)
+	revision := func(r identity.Revision) contracts.ConfigurationRoleSourceRevision {
+		return contracts.ConfigurationRoleSourceRevision{UID: r.UID, Generation: r.Generation, Digest: hex.EncodeToString(r.Digest[:]), ObservedAt: started.UTC(), FreshUntil: until.UTC()}
+	}
+	observation := contracts.ConfigurationRoleObservation{InstallationID: s.input.InstallationID, ClusterID: s.input.ClusterID,
+		IssuerEpoch: f.IssuerEpoch, NamespaceUID: s.input.Namespace.UID, DeploymentUID: s.input.Deployment.UID, AccountUID: s.input.ServiceAccount.UID,
+		WorkloadDigest: hex.EncodeToString(digest[:]), GuardDigest: hex.EncodeToString(s.protection.digest[:]), Fleet: revision(f.Revision), Owner: revision(o.Revision),
+		ObservedAt: started.UTC(), FreshUntil: until.UTC()}
+	if s.protection.digest == (artifact.Digest{}) || !configurationRoleSourceMatches(s.input, observation, s.client.now()) {
+		return zero, cfg.ErrUnavailable
+	}
+	responses := &configurationRoleNativeResponses{clients: [3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe}, identities: actors, worker: *account2.DeepCopy()}
+	return configurationWorkerNative{proof: configurationRoleObserved{observation: observation, deploymentVersion: d.ResourceVersion,
+		accountVersion: account.ResourceVersion, guards: guards, native: responses}, fleet: f, owner: o, deployment: d2, account: account2,
+		administrator: administrator, fleetRef: fref, ownerRef: oref, ownerDeployment: ownerDeployment}, nil
+}
+
+func (s *ConfigurationRoleSource) configurationWorkerAdministrator(ctx context.Context) (auth.UserInfo, error) {
+	var zero auth.UserInfo
+	raw, err := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/selfsubjectreviews").Body(&auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}).MaxRetries(0).DoRaw(ctx)
+	var who auth.SelfSubjectReview
+	if err != nil || permissionJSON(raw, permissionPageBytes, 131072) != nil || strictGuardJSON(raw, &who) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	for _, admin := range s.protection.plan.Administrators {
+		if actorMatches(admin, who.Status.UserInfo) {
+			return who.Status.UserInfo, nil
+		}
+	}
+	return zero, cfg.ErrDenied
+}
+
+// Pure decoding of the complete actual probe response. No observation is
+// renewed: both values use the original caller/native start supplied above.
+func (s *ConfigurationRoleSource) configurationWorkerFleet(object core.ConfigMap, start time.Time) (fleet.Administration, cfg.Resource, error) {
+	raw, err := json.Marshal(object)
+	if err != nil {
+		return fleet.Administration{}, cfg.Resource{}, cfg.ErrInvalid
+	}
+	data, ref, err := s.client.decodeInstallationConfig(raw, s.input.FleetSource.Name, s.input.FleetSource.UID, false)
+	if err != nil {
+		return fleet.Administration{}, cfg.Resource{}, err
+	}
+	out, err := s.fleet.settings.decodeFleetAdministration(data, ref, start)
+	if err != nil || out.Suspended || !out.Valid(s.client.now()) {
+		return fleet.Administration{}, cfg.Resource{}, cfg.ErrUnavailable
+	}
+	return out, ref, nil
+}
+
+func (s *ConfigurationRoleSource) configurationWorkerOwner(object core.ConfigMap) (fleet.OwnerConfiguration, cfg.Resource, time.Time, error) {
+	raw, err := json.Marshal(object)
+	if err != nil {
+		return fleet.OwnerConfiguration{}, cfg.Resource{}, time.Time{}, cfg.ErrInvalid
+	}
+	data, ref, err := s.client.decodeInstallationConfig(raw, s.input.OwnerSource.Name, s.input.OwnerSource.UID, false)
+	if err != nil {
+		return fleet.OwnerConfiguration{}, cfg.Resource{}, time.Time{}, err
+	}
+	out, until, err := s.owner.decodeOwnerConfiguration(data)
+	out.ProtectionDigest = s.owner.protection.digest
+	if err != nil || out.Suspended || !out.Valid() || !s.client.now().Before(until) {
+		return fleet.OwnerConfiguration{}, cfg.Resource{}, time.Time{}, cfg.ErrUnavailable
+	}
+	return out, ref, until, nil
+}
+
+func (s *ConfigurationRoleSource) configurationWorkerSourcesMatch(f fleet.Administration, o fleet.OwnerConfiguration) bool {
+	p := o.Pool
+	return p.InstallationID == s.input.InstallationID && p.ClusterID == s.input.ClusterID && p.NamespaceUID == s.input.Namespace.UID && p.Namespace == s.input.Namespace.Name &&
+		p.Deployment == s.protection.plan.Deployment && p.DeploymentUID == s.protection.plan.DeploymentUID && f.IssuerEpoch == p.IssuerEpoch
+}
+
+// Two fixed source GETs only. Namespace/guard/current-identity checks belong to
+// the named surrounding boundary, never a caller-supplied proof callback.
+func (s *ConfigurationRoleSource) readConfigurationWorkerValues(ctx context.Context, start time.Time) (fleet.Administration, fleet.OwnerConfiguration, cfg.Resource, cfg.Resource, time.Time, error) {
+	reader := &OwnerEndpoints{client: s.client}
+	var f fleet.Administration
+	var o fleet.OwnerConfiguration
+	var fr, or cfg.Resource
+	var until time.Time
+	fleetObject, err := ownerResource[core.ConfigMap](reader, ctx, "/api/v1/namespaces/"+s.input.Namespace.Name+"/configmaps/"+s.input.FleetSource.Name, "v1", "ConfigMap")
+	if err == nil {
+		f, fr, err = s.configurationWorkerFleet(fleetObject, start)
+	}
+	if err != nil {
+		return f, o, fr, or, until, err
+	}
+	ownerObject, err := ownerResource[core.ConfigMap](reader, ctx, "/api/v1/namespaces/"+s.input.Namespace.Name+"/configmaps/"+s.input.OwnerSource.Name, "v1", "ConfigMap")
+	if err == nil {
+		o, or, until, err = s.configurationWorkerOwner(ownerObject)
+	}
+	if err == nil && !s.configurationWorkerSourcesMatch(f, o) {
+		err = cfg.ErrChanged
+	}
+	return f, o, fr, or, until, err
+}

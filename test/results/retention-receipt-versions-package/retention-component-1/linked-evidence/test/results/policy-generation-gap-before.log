@@ -1,0 +1,8 @@
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity
+    policy_authority_test.go:408: generation gap revived original collection intent
+--- FAIL: TestPermissionAuthorityPoliciesWithRealServices (0.43s)
+    --- FAIL: TestPermissionAuthorityPoliciesWithRealServices/missed-policy-generations-cannot-assert-intent-continuity (0.41s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.481s
+FAIL

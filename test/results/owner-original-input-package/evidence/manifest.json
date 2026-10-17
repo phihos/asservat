@@ -1,0 +1,42 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go",
+    "base_sha256": "45e89a2fd66ed8384a0a2918acb90ad762f89aa2daf192adbae7180ff78a76a4",
+    "payload_sha256": "511991098b85a9bb07c4bafaddd5db46bab6e07afa0728e75964ed5b9a9661a2"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_launch.go",
+    "base_sha256": "ff7d6330ec2f583f0331bc5083c8608d9fc28c9f3ccb8026381398cc1ee41d37",
+    "payload_sha256": "947f0dfdc9e6561954ea99ebaca245d960ccb670ba8d338fad6ccfb380998301"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+    "base_sha256": "6bf13e0d0d23417091a0e92eb3f575c3717d9d60937843ada6bc356e3aa1e4f0",
+    "payload_sha256": "22e9bfca2cc230462fd5fa065acb22a6edc249dae4ec5f742417629457894b72"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input.go",
+    "base_sha256": null,
+    "payload_sha256": "ad6d1a44cc68b4732eaf90957ec4a59b2be0922fcbe8c289e56ee6da226761b1"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input_objects_test.go",
+    "base_sha256": null,
+    "payload_sha256": "26ac33d00603e618afad9ff1568edf7d900e3a3d9f6fff8fb1368eb3b0d12330"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_projection_input_test.go",
+    "base_sha256": null,
+    "payload_sha256": "1a22865537c4a83da56a8091882f6b55e8bced0b2ab7cfa6623c49a67d5b6016"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "base_sha256": "2a4a0270743ce8614f3b13d0245f3f6a786a1aae2e0100297fabb4e3d7d62090",
+    "payload_sha256": "0590278c8ca52deaceee9c3cb686f9c30281a5b85f684e409f5bb511ab5eefd9"
+  },
+  {
+    "path": "test/integration/initial_runtime_bridge_native_test.go",
+    "base_sha256": "5157cc3ed75ba466067ff7d223967e608d2b50a2ce095ee6b39f66ba98635bcf",
+    "payload_sha256": "07c16ced94ce5d67f5004555f8749e6ec271ad85fbbc249bf80673edce0beb29"
+  }
+]

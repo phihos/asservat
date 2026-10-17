@@ -1,0 +1,18 @@
+# Recipe and composed identity checkpoint
+
+All eight payloads are NEW paths. Use files/ plus manifest.json; do not copy mutable source directories. The checkpoint source, manifests, runner and evidence remain immutable.
+
+Manifest SHA-256: e934be856f59e08058ac235b2ad7a63f79e257aaf54040cd4371afadb83ef85e.
+Dependencies SHA-256: eeaa0e27459bb7b8ad8fd3040ca39e4b328edb9073c91c8b07d33295ceaa2869 (1,926 paths).
+Runner SHA-256: e57c32423fc55c3d71dba14690650ebb8840a8ea9ec2f751de74b914b34b467f.
+Result SHA-256: 08ebf191b78d05ba403f4a6588bb79dc4f9d80edb9a1d47bdb59ce70b3a93466.
+
+Actual job handle 67621 finished exit 0. The sequential three-package compile passed in 7.537s; provider recipe races in 7.365s; composed projection/lost-reply race in 86.838s including compilation (named test execution 32.21s); vet in 3.982s. Six named provider tests and one composed test passed. Every before/after/final comparison found all original bases, payloads and dependencies unchanged. GOMAXPROCS=2, GOFLAGS=-p=2 and the explicit checkpoint TMPDIR were used. Exact commands and actual exits are in result.json; complete output is in evidence/.
+
+The pure component supplies a closed standalone public provider-auth DTO/schema and deterministic four-purpose JSON Kubernetes-auth role/ACL recipes. Names are isolated by the complete original installation/cluster/namespace/account scope. It does not configure Bao, authenticate, renew, verify live policy recipes, select a new runtime profile or enable public serving. The legacy deployment decoder continues rejecting the unimplemented optional profile field. No migration or existing Go contract changes are included.
+
+The composed test exercises actual production root, projection and launch code under the original five-second call bounds, with explicit synthetic Kubernetes enforcement, SQL receipt/verifier and provider material. It proves lost CREATE and launch replies remain lookup-only; separate child attempts can progress after positive first-child observation; original parent/root intervals persist; negative current admission causes no CREATE; replay after positive launch causes no extra effect or journal mutation. It does not run an owner Pod or real Bao credentials. The existing separate native four-role SQL matrix and real API/fresh bridge results retain their separately documented boundaries.
+
+Manual canonical merge after review: docs/decisions/README.md, docs/architecture/owner-deployment.md, specs/deployment-profiles.md, docs/implementation-progress.md, and scripts/spec-check.py schema registration/assertions. Keep all existing current documentation updates. The standalone schema must not become a recognized optional OwnerDeployment field until the loader, producer, mixed-profile denial and runtime selection are implemented together. Schema/spec/architecture gates were not run by this checkpoint.
+
+Next work: purpose-fixed protected recipe verification and finite standard Kubernetes-auth login/self-policy/renewal/reconciliation, then credential-lease-aware existing KMS transport and four-purpose lifecycle. Pinned-source follow-up is separate under ../../research/pinned-kubernetes-auth: the pinned provider renews against the originally submitted JWT, so future scheduling must reauthenticate from the current projected JWT before that original renewal opportunity closes. No extra per-effect policy reads or product authority relaxation.

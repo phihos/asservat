@@ -1,0 +1,117 @@
+[
+  {
+    "path": "cmd/asservat/main.go",
+    "base_sha256": "eab1ce559563cfc4bfd1897c3f4b34a074caaf1ede9b6f2374e8b792849792ed",
+    "sha256": "2252e406c395234d5d19c6787cc21cf800b5d2336f1b337293e89fe28a41f4f6"
+  },
+  {
+    "path": "docs/architecture/catalog.yaml",
+    "base_sha256": "aca6fb943c993030a918db28348032f20b80b031254bb690aec91e83aacf75b3",
+    "sha256": "af406561b29dc7312139578a21d82e53cf4bf80f82669f788860aa6d75107b3b"
+  },
+  {
+    "path": "docs/architecture/initial-schema.md",
+    "base_sha256": null,
+    "sha256": "88b75e00c85b2ad7c63c6a6c4d9392ce951aca50330f527add19f589f9621c84"
+  },
+  {
+    "path": "docs/decisions/130-bounded-initial-schema.md",
+    "base_sha256": null,
+    "sha256": "dd175b97637e17493610f5fddfc34ed0680c7565e6e769595bba4ef21dc10a03"
+  },
+  {
+    "path": "go.mod",
+    "base_sha256": "8471f16d21e3bb29200c6c3053a436c00aeab85f359cd81ad3703e3ce6f6155d",
+    "sha256": "693025c52045be6507972e5bc0849812a0838371572bac62e9c77fc996119b56"
+  },
+  {
+    "path": "go.sum",
+    "base_sha256": "ae361d7cf0736d756571122a63ee79b38a4934cdc06412f173524c405491315f",
+    "sha256": "3f7f26175604f4e8bcddafaab5854257767787d7ac1915783b4c188c3a160641"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer.go",
+    "base_sha256": "80c370972439b62a010067f2eef679a3f18f1dbc6863c7588fe48b3c48be7447",
+    "sha256": "4f8e879a02655d3c6cb200462e932c09b3813ccc8070b4f8518b207671debc36"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+    "base_sha256": "1169db7c07b5d5f3dd06948200d62bf5596bdbc44c7b4b49743e067b5ad75c6a",
+    "sha256": "f1fb226f1f46309d06e44056d5df09daec0ad9209feeec5e94be103dfce74a7a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_schema.go",
+    "base_sha256": null,
+    "sha256": "0e4e04a0eb61ff79636ca4a19c8cab3e151de3f7dc86b25713ab9fa588cbd928"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_schema_test.go",
+    "base_sha256": null,
+    "sha256": "4bbadcd42a0a0333c813c7b3ae2650d65d03b45acd80a4c2909b6d8e4753d864"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema.go",
+    "base_sha256": null,
+    "sha256": "d2e123ab21a42a298870c5fdb67f922d65e69802f583905d1b5ec243d71c8139"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_bundle.go",
+    "base_sha256": null,
+    "sha256": "847aecfd20c6203a1a1d6da28b17b80e2e9eb8713be7faef31c80584b482db91"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_checks.go",
+    "base_sha256": null,
+    "sha256": "d8791a38ab6c9ef3e0ac086fb4fb8f03d2abfa35c4416d8ee2fc23bfab05c8a5"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_completion.go",
+    "base_sha256": null,
+    "sha256": "d4d250ddc137af6d2516bff92afd6d23d897669e89f154226481661f887111e6"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_schema_test.go",
+    "base_sha256": null,
+    "sha256": "4df627d3867bec793ec33d48317f44ba40baa346cb2b41626be27eb6d08df1e5"
+  },
+  {
+    "path": "internal/bootstrap/initial_schema.go",
+    "base_sha256": null,
+    "sha256": "384d999e8c3be58835e2ac5348f0be313ec461e7efc6a0750845090b2e257fd2"
+  },
+  {
+    "path": "internal/contracts/initial_preparer.go",
+    "base_sha256": "90804541c050143f5cf03738566eeaab2ffc84792bccd807e83bffc54169ed98",
+    "sha256": "60192108d90ae7bb2ec737db52406cac1a3719a5593d762908f4823d5b44992b"
+  },
+  {
+    "path": "migrations/files.go",
+    "base_sha256": null,
+    "sha256": "963784c6cd9a1c8e174977101b5bdc568354cc2109b46c11c5245b4f29c6e675"
+  },
+  {
+    "path": "scripts/test-identity.py",
+    "base_sha256": "6d411d513ce0ba715d86ac7ffe6b2ef6d5c11067003c9347e7f6b3e24506bdbe",
+    "sha256": "0dbc8a7f90f5980ead8c29455be5d675d3956e9557b7886cd455e9d5c2231f4d"
+  },
+  {
+    "path": "scripts/test-permissions.py",
+    "base_sha256": "26c7f8e2c2d929f59fe3b8bdc1eba2fcf9b1d3510ed88b3bdde869d34e6eddfc",
+    "sha256": "2d2155350eb3c1a43ba3a8964e9d4950d34173d6ecd0d062d99cc9a5ed438e51"
+  },
+  {
+    "path": "specs/contracts/initial-preparation-root.schema.json",
+    "base_sha256": "e3e9b79bef898756113276ce122d5d9851977bb3a328c864cc3797bae503c6df",
+    "sha256": "17e54412ff06d1290a8dd4b3eb45ef9a7476995b57b4bfe5395548d7ace756d0"
+  },
+  {
+    "path": "specs/contracts/initial-preparer.schema.json",
+    "base_sha256": "b4d345c017b62184b020210dce2a7b1c6dd8d8074e88f5cb01e028afed47703e",
+    "sha256": "565d6aed8db05541f5f4dacd069c3b92fe133da32bec6a8a2f6ffa26055d296e"
+  },
+  {
+    "path": "test/integration/initial_schema_test.go",
+    "base_sha256": null,
+    "sha256": "2924b0f47846bd72f227a6907edc0ff0ade385e72f375ab9f94856958d7bcb0c"
+  }
+]

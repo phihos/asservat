@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-provider-selection.schema.json",
+  "title": "Original owner provider selection",
+  "description": "Public initial selection only. Exact generated Secret name, UID separation and complete paired layout are independently validated; empty original Secret content does not establish readiness. No credentials or private payload hashes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authMount",
+    "authMountAccessor",
+    "auditCredentials"
+  ],
+  "properties": {
+    "authMount": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])",
+      "not": {
+        "const": "token"
+      },
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authMountAccessor": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "auditCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^asservat-[0-9a-f]{32}-owner-audit(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  }
+}

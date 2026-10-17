@@ -1,0 +1,13 @@
+{
+  "reason": "Expanded historical receipt tests exceed the ordinary fixture single five-second permission observation; reuse existing joined synthetic source owner without changing operation deadlines",
+  "paths": {
+    "test/integration/download_sessions_test.go": {
+      "before": "80065b13279dfe38dba9cdbba8e95ceafd8a5b748a5c49536c948c333c7f62bd",
+      "after": "0f402d095c61e45b06221b32837e2fa08c6b0944edd2160ed14fa6effdd2de3a"
+    },
+    "test/integration/worker_audit_history_versions_test.go": {
+      "before": "a7ffe9465c2b3a68990d2ceba7ac5e31b8b346d5e3714085274ab1c18c4b0c03",
+      "after": "62a4da35a998ed22d923e80ee94d2cd62eea85280fe4e687cc207d26f423581b"
+    }
+  }
+}

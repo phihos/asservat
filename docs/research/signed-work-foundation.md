@@ -1,0 +1,23 @@
+# Initial signed-action verification
+
+Implementation record, 2026-10-10. C-04/C-20/C-21/C-24, I-01/I-02 and TASK-03 under S-01; partial REQ-ARC-001/003/004 and REQ-FED-001/003 evidence. This is a verifier component, not an enrolled fleet, signer role, network listener or execution permit.
+
+`internal/adapters/jose` accepts only compact JWS with protected `typ=asservat-internal-work+jws`, `alg=Ed25519` and a configured `kid`. Header keys, raw-base64url spelling, signatures, input sizes and canonical payload bytes are bounded/checked. Duplicate keys, invalid Unicode, unknown fields, fractions/unsafe integers and excessive JSON depth fail. A local embedded copy of the canonical work schema validates the exact runAction DTO. Other purposes cannot invoke this facet.
+
+The current trust reader supplies at most eight unique public keys, original freshness, cluster and issuer-epoch restrictions, and activation/expiry intervals. It receives independently authenticated receiver context, not a token-selected endpoint. The verifier checks original freshness again after the read/cryptographic work, compares node/boot/cluster/epoch and reference locality/deadlines, and rejects work whose lifetime exceeds 60 seconds or its signing key. The output validity is the intersection of work, key-trust and receiver deadlines. It does not resolve grant/budget/audit references, enforce delivery ordering or authorize a local effect. The protected trust reader, actual mTLS enrollment and durable start journal remain required.
+
+## Dependency decision and primary evidence
+
+The existing design selects the fully specified Ed25519 JWS identifier. [RFC 9864](https://www.rfc-editor.org/rfc/rfc9864.html) defines that identifier and deprecates polymorphic EdDSA. The already used go-jose dependency still exposes the latter identifier, so it is not substituted by relabeling a signature or adding a custom crypto plugin.
+
+The product now pins [jwx v4.5.0](https://github.com/lestrrat-go/jwx/releases/tag/v4.5.0) for this narrow JWS adapter. Its current upstream release and module metadata were rechecked; the repository has ongoing fixes and explicit algorithm support. No incoming JWKS, automatic URL fetching, experimental algorithm plugin or algorithm inference is enabled. jwx's transitive [option/v3 v3.0.0-alpha1](https://github.com/lestrrat-go/jwx/blob/v4.5.0/go.mod) is still its current upstream dependency. The installed source was reviewed: it is a small generic option container with no I/O or cryptography, under MIT. Retaining that upstream-selected version is an explicit adapter-scoped engineering choice, not a claim that it is a stable release. Its API stability and maintainer concentration remain dependency-review items.
+
+The existing token adapter's go-jose pin was updated from v4.1.4 to [v4.1.5](https://github.com/go-jose/go-jose/releases/tag/v4.1.5). The release fixes parser and key/algorithm validation issues. Actual OIDC/identity/authorization race tests passed after the update. Native JWS framing and cryptographic operations remain library-owned.
+
+## Tests and limits
+
+Actual Ed25519 signing/verification tests use synthetic ephemeral keys and the repository's runAction fixture. They cover key rotation, wrong node/boot/cluster/epoch, unknown key, duplicate key IDs, key validity, unsupported capabilities, reference mismatch/expiry/locality, stale peer/trust, expiry during trust reading, signature/payload corruption, noncanonical encodings, malformed/duplicate JSON, unknown commands, unsafe numbers and explicit rejection of polymorphic EdDSA. `go test -race ./internal/adapters/jose` passed. These are component protocol tests, not mTLS partition/rotation, production key custody, old-process exclusion, N/N-1 negotiation or effect-spend qualification.
+
+The complete Go, import-architecture, SQL-generation, specification and architecture gates passed with exit 0 in `test/results/signed-work-gates.log`. The imported-adapter vulnerability scan reports no affected symbols or imported-package vulnerabilities. Its one required-module advisory is [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932), concerning the unimported `golang.org/x/crypto/openpgp` package; the verbose report is `test/results/signed-work-vuln-details.log`. This result does not mean every dependency is free of all undiscovered issues.
+
+Subsequent tests exposed acceptance of noncanonical UTC-offset/redundant-fraction timestamp spellings. The verifier now requires canonical UTC spelling for work and reference times; the failing regression and passing race test are `test/results/signed-work-time-regression.log` and `test/results/signed-work-time-fixed.log`.

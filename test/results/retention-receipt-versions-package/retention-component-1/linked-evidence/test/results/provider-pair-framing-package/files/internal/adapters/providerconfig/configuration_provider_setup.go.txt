@@ -1,0 +1,125 @@
+package providerconfig
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// ConfigurationSetupCheck can only be produced by the concrete installer
+// reader. It is finite provider readback, not Kubernetes custody, SQL recovery,
+// backend capability, runtime authorization or an atomic fence against later
+// changes by the trusted provider administrator.
+type ConfigurationSetupCheck struct {
+	binding           [32]byte
+	observedAt, until time.Time
+}
+
+func (o ConfigurationSetupCheck) ObservedAt() time.Time { return o.observedAt }
+func (o ConfigurationSetupCheck) FreshUntil() time.Time { return o.until }
+func (o ConfigurationSetupCheck) Matches(in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication, now time.Time) bool {
+	if o.binding == ([32]byte{}) || ValidateConfigurationProviderAuthentication(in, profile, now) != nil || o.observedAt.IsZero() || now.Before(o.observedAt) || !now.Before(o.until) || o.until.Sub(o.observedAt) > 5*time.Second {
+		return false
+	}
+	binding, err := configurationSetupBinding(in, profile)
+	return err == nil && o.binding == binding
+}
+
+func configurationSetupBinding(in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication) ([32]byte, error) {
+	body, err := json.Marshal(in)
+	if err != nil || len(body) > contracts.OwnerDeploymentMaxBytes {
+		return [32]byte{}, ErrSetupUnavailable
+	}
+	raw, err := json.Marshal(struct {
+		Format  string                                        `json:"format"`
+		Input   contracts.HubWorkerDeployment                 `json:"input"`
+		Profile contracts.ConfigurationProviderAuthentication `json:"profile"`
+	}{"asservat-configuration-provider-setup-check/v1", in, profile})
+	if err != nil || len(raw) > contracts.OwnerDeploymentMaxBytes+contracts.ConfigurationProviderAuthenticationMaxBytes+256 {
+		return [32]byte{}, ErrSetupUnavailable
+	}
+	canonical := jsontext.Value(raw)
+	if canonical.Canonicalize(jsontext.CanonicalizeRawInts(false)) != nil {
+		return [32]byte{}, ErrSetupUnavailable
+	}
+	return sha256.Sum256(canonical), nil
+}
+
+// VerifyConfiguration checks exactly the generated two audit purposes. It
+// never writes provider configuration or issues a token; the inspection token
+// stays only in the separately owned SetupReader. Endpoint and original caller
+// bounds are checked by begin before the first named GET.
+func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication) (ConfigurationSetupCheck, error) {
+	var zero ConfigurationSetupCheck
+	if ctx == nil || ctx.Err() != nil || ValidateConfigurationProviderAuthentication(in, profile, time.Now()) != nil {
+		return zero, ErrSetupUnavailable
+	}
+	binding, err := configurationSetupBinding(in, profile)
+	if err != nil {
+		return zero, ErrSetupUnavailable
+	}
+	recipe, err := ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{
+		AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials,
+	}, profile.ServiceAccount, time.Now())
+	if err != nil {
+		return zero, ErrSetupUnavailable
+	}
+	paths := []string{"sys/mounts/auth/" + profile.AuthMount, "auth/" + profile.AuthMount + "/config",
+		"sys/mounts/" + in.KeyService.AuditMount, in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey}
+	for _, role := range recipe.Roles {
+		paths = append(paths, "sys/policies/acl/"+role.Name, "auth/"+profile.AuthMount+"/role/"+role.Name)
+	}
+	o, err := r.begin(ctx, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, paths)
+	if err != nil {
+		return zero, err
+	}
+	defer o.finish()
+	data, err := o.get(paths[0])
+	if err != nil || verifyAuthMount(data, profile.AuthMountAccessor) != nil {
+		return zero, setupComponentError("configuration auth mount")
+	}
+	data, err = o.get(paths[1])
+	if err != nil || verifyKubernetesAuthConfig(data, in.Kubernetes) != nil {
+		return zero, setupComponentError("configuration Kubernetes authentication")
+	}
+	data, err = o.get(paths[2])
+	if err != nil || verifyTransitMount(data) != nil {
+		return zero, setupComponentError("configuration Transit mount")
+	}
+	data, err = o.get(paths[3])
+	if err != nil || verifyTransitKey(data, in.KeyService.AuditKey) != nil {
+		return zero, setupComponentError("configuration Transit key")
+	}
+	for i, role := range recipe.Roles {
+		data, err = o.get(paths[4+2*i])
+		if err != nil || verifyACL(data, role.Name, role.Policy) != nil {
+			return zero, setupComponentError("configuration purpose policy")
+		}
+		data, err = o.get(paths[5+2*i])
+		if err != nil || verifyKubernetesRole(data, role.Role) != nil {
+			return zero, setupComponentError("configuration purpose role")
+		}
+	}
+	if !o.valid() {
+		return zero, ErrSetupUnavailable
+	}
+	until := o.until
+	for _, anchors := range [][][]byte{in.Kubernetes.Roots, in.Postgres.Roots, in.AuditStore.Roots, in.KeyService.Roots} {
+		_, end, e := mtls.OwnerTrustRoots(anchors, time.Now())
+		if e != nil {
+			return zero, ErrSetupUnavailable
+		}
+		until = identity.Earlier(until, end)
+	}
+	out := ConfigurationSetupCheck{binding: binding, observedAt: o.observedAt, until: until}
+	if !out.Matches(in, profile, time.Now()) {
+		return zero, ErrSetupUnavailable
+	}
+	return out, nil
+}

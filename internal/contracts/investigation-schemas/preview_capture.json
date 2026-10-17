@@ -1,0 +1,1403 @@
+{
+  "name": "preview_capture",
+  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "kind": {
+            "enum": [
+              "Deployment",
+              "StatefulSet",
+              "Pod"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "cluster_id",
+          "namespace",
+          "kind",
+          "name"
+        ]
+      },
+      "preset_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "pod-status"
+          },
+          "version": {
+            "const": "v1"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ]
+      },
+      "requested_retention_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 315360000,
+        "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+      }
+    },
+    "required": [
+      "target_ref",
+      "preset_ref"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "preview_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "execution_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "pod_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 109951162777600
+                  },
+                  "max_process_starts": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "approval_required": {
+                    "type": "boolean"
+                  },
+                  "capture_enabled": {
+                    "type": "boolean"
+                  },
+                  "blockers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "responsible_role": {
+                          "enum": [
+                            "maintainer",
+                            "approver",
+                            "administrator",
+                            "none"
+                          ]
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "responsible_role",
+                        "retryable"
+                      ]
+                    },
+                    "minItems": 0,
+                    "maxItems": 32
+                  },
+                  "warnings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "minItems": 0,
+                    "maxItems": 32
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "lifecycle_plan": {
+                    "$ref": "#/$defs/d0"
+                  },
+                  "capture_assessment": {
+                    "$ref": "#/$defs/d1"
+                  },
+                  "preset_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "const": "pod-status"
+                      },
+                      "version": {
+                        "const": "v1"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  },
+                  "target_ref": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "cluster_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "kind": {
+                        "enum": [
+                          "Deployment",
+                          "StatefulSet",
+                          "Pod"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253
+                      }
+                    },
+                    "required": [
+                      "cluster_id",
+                      "namespace",
+                      "kind",
+                      "name"
+                    ]
+                  },
+                  "selected_pods": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cluster_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "namespace": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253
+                        },
+                        "uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "workload": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "Deployment",
+                                "StatefulSet",
+                                "Pod"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253
+                            },
+                            "uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "uid"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cluster_id",
+                        "namespace",
+                        "name",
+                        "uid",
+                        "workload"
+                      ]
+                    }
+                  },
+                  "pod_selection": {
+                    "enum": [
+                      "explicitPod",
+                      "lexicalEligiblePod"
+                    ],
+                    "description": "Selection for the fixed pod-status/v1 preset. This describes the reviewed pod, never ongoing monitoring coverage or authority to select a replacement."
+                  }
+                },
+                "required": [
+                  "preview_id",
+                  "expires_at",
+                  "execution_digest",
+                  "pod_count",
+                  "max_bytes",
+                  "max_process_starts",
+                  "approval_required",
+                  "capture_enabled",
+                  "blockers",
+                  "warnings",
+                  "navigation_uri",
+                  "lifecycle_plan",
+                  "capture_assessment",
+                  "preset_ref",
+                  "target_ref",
+                  "selected_pods",
+                  "pod_selection"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "preset_ref"
+                      ],
+                      "properties": {
+                        "preset_ref": {
+                          "required": [
+                            "name"
+                          ],
+                          "properties": {
+                            "name": {
+                              "const": "pod-status"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "target_ref",
+                        "selected_pods",
+                        "pod_selection"
+                      ],
+                      "properties": {
+                        "pod_count": {
+                          "const": 1
+                        },
+                        "max_bytes": {
+                          "const": 4096
+                        },
+                        "max_process_starts": {
+                          "const": 0
+                        },
+                        "selected_pods": {
+                          "minItems": 1,
+                          "maxItems": 1
+                        },
+                        "lifecycle_plan": {
+                          "const": {
+                            "schemaVersion": "action-lifecycle/v1",
+                            "requestKind": "DebugCapture",
+                            "actions": [
+                              {
+                                "actionID": "pod-status",
+                                "kind": "kubernetesSnapshot",
+                                "executionMode": "onTrigger"
+                              }
+                            ],
+                            "ongoingPodScope": "none"
+                          }
+                        },
+                        "capture_assessment": {
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "properties": {
+                                  "retention": {
+                                    "properties": {
+                                      "anchorRule": {
+                                        "const": "submissionPreparation"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "action-lifecycle/v1"
+          },
+          "requestKind": {
+            "enum": [
+              "DebugCapture",
+              "DebugPolicy"
+            ]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "actionID": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63
+                    },
+                    "kind": {
+                      "enum": [
+                        "kubernetesSnapshot",
+                        "logs",
+                        "processSnapshot",
+                        "fileRead",
+                        "packetCapture",
+                        "networkSnapshot",
+                        "runtimeDiagnostic",
+                        "kernelCore",
+                        "liveCore",
+                        "command",
+                        "httpDiagnostic",
+                        "artifactCollect",
+                        "profile",
+                        "syscallTrace"
+                      ]
+                    },
+                    "executionMode": {
+                      "const": "onTrigger"
+                    },
+                    "requestedBefore": {
+                      "const": "0s"
+                    },
+                    "after": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                      "maxLength": 16
+                    }
+                  },
+                  "required": [
+                    "actionID",
+                    "kind",
+                    "executionMode"
+                  ],
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "packetCapture",
+                              "syscallTrace"
+                            ]
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "requestedBefore",
+                          "after"
+                        ]
+                      },
+                      "else": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "requestedBefore"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "after"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "actionID": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63
+                    },
+                    "kind": {
+                      "enum": [
+                        "packetCapture",
+                        "syscallTrace"
+                      ]
+                    },
+                    "executionMode": {
+                      "const": "ongoing"
+                    },
+                    "activation": {
+                      "enum": [
+                        "policyArming",
+                        "manualSession"
+                      ]
+                    },
+                    "requestedBefore": {
+                      "type": "string",
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                      "maxLength": 16
+                    },
+                    "after": {
+                      "type": "string",
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                      "maxLength": 16
+                    }
+                  },
+                  "required": [
+                    "actionID",
+                    "kind",
+                    "executionMode",
+                    "activation",
+                    "requestedBefore",
+                    "after"
+                  ]
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 16
+          },
+          "ongoingPodScope": {
+            "enum": [
+              "allAuthorizedWithinObservationLimits",
+              "acceptedCapturePods",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "requestKind",
+          "actions",
+          "ongoingPodScope"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "requestKind": {
+                  "const": "DebugPolicy"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actions": {
+                  "items": {
+                    "properties": {
+                      "activation": {
+                        "const": "policyArming"
+                      }
+                    }
+                  }
+                },
+                "ongoingPodScope": {
+                  "enum": [
+                    "none",
+                    "allAuthorizedWithinObservationLimits"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "requestKind": {
+                  "const": "DebugCapture"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actions": {
+                  "items": {
+                    "properties": {
+                      "activation": {
+                        "const": "manualSession"
+                      }
+                    }
+                  }
+                },
+                "ongoingPodScope": {
+                  "enum": [
+                    "none",
+                    "acceptedCapturePods"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d2": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "d3": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "unknown"
+            ]
+          },
+          "hasUnknowns": {
+            "type": "boolean"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "applicationPause",
+                "applicationCPU",
+                "applicationAllocation",
+                "forcedGC",
+                "nodeCPU",
+                "collectorMemory",
+                "storageIO",
+                "uploadContention",
+                "applicationMutation",
+                "diagnosticInterference"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 10,
+            "uniqueItems": true
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "level",
+          "hasUnknowns",
+          "effects",
+          "explanation"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "level": {
+                  "const": "unknown"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "hasUnknowns": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d6": {
+        "type": "string",
+        "enum": [
+          "unknown",
+          "potentialPersonalData",
+          "personalData",
+          "specialCategoryPossible",
+          "verifiedNonPersonal"
+        ]
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "$ref": "#/$defs/d6"
+          },
+          "basis": {
+            "enum": [
+              "conservativeMechanism",
+              "protectedWorkload",
+              "reviewedTransform"
+            ]
+          },
+          "assessmentRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "retainedPossible": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "userContent",
+                "credentials",
+                "personalIdentifiers",
+                "networkAddresses",
+                "paths",
+                "profileLabels",
+                "unknownApplicationData"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 7,
+            "uniqueItems": true
+          },
+          "transientOnly": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "userContent",
+                "credentials",
+                "personalIdentifiers",
+                "networkAddresses",
+                "paths",
+                "profileLabels",
+                "unknownApplicationData"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 7,
+            "uniqueItems": true
+          },
+          "unknownContent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "classification",
+          "basis",
+          "retainedPossible",
+          "transientOnly",
+          "unknownContent"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "classification": {
+                  "const": "verifiedNonPersonal"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "assessmentRef"
+              ],
+              "properties": {
+                "basis": {
+                  "const": "reviewedTransform"
+                },
+                "retainedPossible": {
+                  "maxItems": 0
+                },
+                "unknownContent": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "classification": {
+                  "const": "unknown"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "unknownContent": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d7": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "anchorRule": {
+            "enum": [
+              "firstAcquisitionOrEarlierSource",
+              "submissionPreparation"
+            ],
+            "description": "submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source."
+          },
+          "accessAgeSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 315360000
+          },
+          "maximumAgeSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 315360000
+          },
+          "deletionBudgetSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          },
+          "policyDigests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d3"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
+          },
+          "automaticDeletion": {
+            "const": true
+          },
+          "managedCopiesOnly": {
+            "const": true
+          },
+          "preservationException": {
+            "enum": [
+              "none",
+              "possible",
+              "active"
+            ]
+          },
+          "deleteAgeSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 315360000
+          }
+        },
+        "required": [
+          "anchorRule",
+          "accessAgeSeconds",
+          "maximumAgeSeconds",
+          "deletionBudgetSeconds",
+          "policyDigests",
+          "automaticDeletion",
+          "managedCopiesOnly",
+          "preservationException",
+          "deleteAgeSeconds"
+        ]
+      },
+      "d8": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "enum": [
+              "applicationPauseMs",
+              "applicationCpuMillicores",
+              "collectorMemoryBytes",
+              "outputBytes",
+              "uploadBytesPerSecond",
+              "applicationLatencyPercent",
+              "collectorStorageBytes"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "whileArmed",
+              "perIncident"
+            ]
+          },
+          "scope": {
+            "enum": [
+              "perProcess",
+              "perObservationPod",
+              "perIncidentPod",
+              "perNode",
+              "wholePlan"
+            ]
+          },
+          "basis": {
+            "enum": [
+              "configuredLimit",
+              "modelEstimate",
+              "qualifiedMeasurement"
+            ]
+          },
+          "lower": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "upper": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "sourceRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "environmentDigest": {
+            "$ref": "#/$defs/d3"
+          },
+          "coverage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "dimension",
+          "phase",
+          "scope",
+          "basis",
+          "lower",
+          "upper",
+          "sourceRef",
+          "coverage"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "basis": {
+                  "const": "qualifiedMeasurement"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "measuredAt",
+                "environmentDigest"
+              ]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "measuredAt"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "environmentDigest"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schemaVersion": {
+            "const": "capture-assessment/v1"
+          },
+          "assessmentID": {
+            "$ref": "#/$defs/d2"
+          },
+          "planDigest": {
+            "$ref": "#/$defs/d3"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "basis": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rulesDigest": {
+                "$ref": "#/$defs/d3"
+              },
+              "capabilityDigest": {
+                "$ref": "#/$defs/d3"
+              },
+              "metrics": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "fresh",
+                      "stale",
+                      "unavailable"
+                    ]
+                  },
+                  "observedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "state": {
+                          "const": "unavailable"
+                        }
+                      }
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "observedAt"
+                        ]
+                      }
+                    },
+                    "else": {
+                      "required": [
+                        "observedAt"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "rulesDigest",
+              "capabilityDigest",
+              "metrics"
+            ]
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "observationPods": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "incidentPods": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "observationPods",
+              "incidentPods"
+            ]
+          },
+          "combinedImpact": {
+            "$ref": "#/$defs/d4"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "actionID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "executionMode": {
+                  "enum": [
+                    "onTrigger",
+                    "ongoing"
+                  ]
+                },
+                "impact": {
+                  "$ref": "#/$defs/d4"
+                },
+                "data": {
+                  "$ref": "#/$defs/d5"
+                },
+                "retention": {
+                  "$ref": "#/$defs/d7"
+                },
+                "quantities": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/d8"
+                  },
+                  "minItems": 0,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "actionID",
+                "executionMode",
+                "impact",
+                "data",
+                "retention",
+                "quantities"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 16
+          },
+          "combinedQuantities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d8"
+            },
+            "minItems": 0,
+            "maxItems": 16
+          },
+          "interactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "actionIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                },
+                "kind": {
+                  "enum": [
+                    "profilerConflict",
+                    "measurementDistortion",
+                    "sharedPressure",
+                    "combinedCostUnknown"
+                  ]
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "blocking": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "actionIDs",
+                "kind",
+                "message",
+                "blocking"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 16
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "actionIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                },
+                "change": {
+                  "enum": [
+                    "narrowScope",
+                    "shortenWindow",
+                    "lowerSampling",
+                    "metadataOnly",
+                    "fewerIncidentPods",
+                    "serialize",
+                    "removeAction",
+                    "futureOnly"
+                  ]
+                },
+                "benefit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 192
+                },
+                "coverageLoss": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 192
+                }
+              },
+              "required": [
+                "actionIDs",
+                "change",
+                "benefit",
+                "coverageLoss"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 8
+          },
+          "handlingCodes": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "minimizeCapture",
+                "restrictAccess",
+                "preferApprovedExtracts",
+                "reviewBeforeSharing",
+                "approvedClientsOnly",
+                "externalCopiesNotRecalled"
+              ]
+            },
+            "minItems": 6,
+            "maxItems": 6,
+            "uniqueItems": true
+          },
+          "handlingPolicyRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "assessmentID",
+          "planDigest",
+          "generatedAt",
+          "validUntil",
+          "basis",
+          "scope",
+          "combinedImpact",
+          "actions",
+          "combinedQuantities",
+          "interactions",
+          "alternatives",
+          "handlingCodes"
+        ]
+      }
+    }
+  }
+}

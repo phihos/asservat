@@ -1,0 +1,198 @@
+package kubernetes
+
+import (
+	"encoding/json"
+	"strings"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	admission "k8s.io/api/admissionregistration/v1"
+	apps "k8s.io/api/apps/v1"
+	coordination "k8s.io/api/coordination/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+var initialRuntimeResourceItems = [...]string{
+	"owner-account", "worker-account", "owner-role", "owner-binding", "owner-cluster-role", "owner-cluster-binding",
+	"worker-role", "worker-binding", "worker-cluster-role", "worker-cluster-binding", "owner-deployment", "worker-deployment",
+	"owner-service", "worker-lease", "owner-source", "owner-source-policy", "owner-source-binding", "owner-workload-policy", "owner-workload-binding",
+}
+
+type initialRuntimeResourceNames struct {
+	Owner, Worker, OwnerInputs, WorkerInputs, OwnerProviders, WorkerProviders string
+	OwnerSource, OwnerSourceGuard, WorkloadGuard, Lease                       string
+}
+
+func runtimeResourceNames(installation string) initialRuntimeResourceNames {
+	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
+	return initialRuntimeResourceNames{prefix + "-owner", prefix + "-worker", prefix + "-owner-inputs", prefix + "-worker-inputs", prefix + "-owner-providers", prefix + "-worker-providers", prefix + "-owner-source", prefix + "-owner-source-guard", prefix + "-workload-guard", prefix + "-leader"}
+}
+
+type initialRuntimeObject struct {
+	object     runtime.Object
+	collection string
+}
+
+func (s *InitialRuntimeResources) object(state contracts.InitialRuntimeResourceState, index int) (initialRuntimeObject, error) {
+	if index < 0 || index >= len(initialRuntimeResourceItems) {
+		return initialRuntimeObject{}, cfg.ErrInvalid
+	}
+	p := s.names
+	namespace := s.initial.Namespace.Name
+	buildOwner := BuildOwnerWorkload
+	if s.ownerLayout == contracts.OwnerInstalledLayout {
+		buildOwner = BuildInstalledOwnerWorkload
+	} else if s.ownerLayout != "" {
+		return initialRuntimeObject{}, cfg.ErrInvalid
+	}
+	owner, err := buildOwner(OwnerWorkloadPlan{InstallationID: s.initial.InstallationID, Namespace: namespace, Name: p.Owner, ServiceAccount: p.Owner, Configuration: p.OwnerInputs, Credentials: p.OwnerProviders, WorkloadGuard: p.WorkloadGuard, Image: s.preparer.plan.Workload.Image})
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	buildWorker := BuildProvisionedHubWorkerWorkload
+	if s.workerLayout == contracts.HubWorkerInstalledLayout {
+		buildWorker = BuildInstalledHubWorkerWorkload
+	} else if s.workerLayout != "" {
+		return initialRuntimeObject{}, cfg.ErrInvalid
+	}
+	worker, err := buildWorker(HubWorkerWorkloadPlan{Namespace: namespace, Name: p.Worker, ServiceAccount: p.Worker, Configuration: p.WorkerInputs, Credentials: p.WorkerProviders, Image: s.preparer.plan.Workload.Image, FleetSource: s.initial.FleetSource.Name, OwnerSource: p.OwnerSource, FleetGuard: s.initial.FleetGuard.Name, OwnerGuard: p.OwnerSourceGuard, LeaderLease: p.Lease}, s.initial.InstallationID)
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	corePath := "/api/v1/namespaces/" + namespace + "/"
+	rbacPath := "/apis/rbac.authorization.k8s.io/v1/namespaces/" + namespace + "/"
+	clusterPath := "/apis/rbac.authorization.k8s.io/v1/"
+	appsPath := "/apis/apps/v1/namespaces/" + namespace + "/deployments"
+	objects := []initialRuntimeObject{
+		{owner.Account, corePath + "serviceaccounts"}, {worker.Account, corePath + "serviceaccounts"},
+		{owner.Role, rbacPath + "roles"}, {owner.Binding, rbacPath + "rolebindings"}, {owner.ClusterRole, clusterPath + "clusterroles"}, {owner.ClusterBinding, clusterPath + "clusterrolebindings"},
+		{worker.Role, rbacPath + "roles"}, {worker.Binding, rbacPath + "rolebindings"}, {worker.ClusterRole, clusterPath + "clusterroles"}, {worker.ClusterBinding, clusterPath + "clusterrolebindings"},
+		{owner.Deployment, appsPath}, {worker.Deployment, appsPath}, {owner.Service, corePath + "services"},
+		{&coordination.Lease{TypeMeta: metav1.TypeMeta{APIVersion: "coordination.k8s.io/v1", Kind: "Lease"}, ObjectMeta: metav1.ObjectMeta{Name: p.Lease, Namespace: namespace}}, "/apis/coordination.k8s.io/v1/namespaces/" + namespace + "/leases"},
+	}
+	if index < len(objects) {
+		return objects[index], nil
+	}
+	ref := func(at int, name string) (contracts.WorkerObjectReference, error) {
+		if at >= len(state.Objects) || state.Objects[at].Item != initialRuntimeResourceItems[at] || state.Objects[at].Receipt == nil || !authorization.UUID(state.Objects[at].Receipt.UID) {
+			return contracts.WorkerObjectReference{}, cfg.ErrUnavailable
+		}
+		return contracts.WorkerObjectReference{Name: name, UID: state.Objects[at].Receipt.UID}, nil
+	}
+	account, err := ref(0, p.Owner)
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	deployment, err := ref(10, p.Owner)
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	service, err := ref(12, p.Owner)
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	control := cfg.NamespaceRef{Name: namespace, UID: s.initial.Namespace.UID}
+	admins := preparerAdministration(s.preparer.plan).Administrators
+	if index == 14 {
+		v := contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: s.initial.InstallationID, ClusterID: s.initial.ClusterID, IssuerEpoch: s.initial.IssuerEpoch, Revision: 1, Namespace: s.initial.Namespace, Deployment: deployment, Service: service, ServiceAccount: account, Port: 9443, IssuerRoots: s.ownerRoots}
+		if s.ownerLayout == contracts.OwnerInstalledLayout {
+			v.NativePort = contracts.OwnerInstalledNativePort
+			v.NativeBootstrap = fleet.OwnerBootstrapProfile
+		}
+		b, e := json.Marshal(v)
+		if e != nil {
+			return initialRuntimeObject{}, cfg.ErrInvalid
+		}
+		return initialRuntimeObject{&core.ConfigMap{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: metav1.ObjectMeta{Name: p.OwnerSource, Namespace: namespace}, Data: map[string]string{"owner-pool.json": string(b)}}, corePath + "configmaps"}, nil
+	}
+	var policy *admission.ValidatingAdmissionPolicy
+	var binding *admission.ValidatingAdmissionPolicyBinding
+	if index == 15 || index == 16 {
+		policy, binding, err = OwnerConfigurationAdmission(cfg.ConfigMapAdministration{Name: p.OwnerSourceGuard, SourceName: p.OwnerSource, ControlNamespace: control, Administrators: admins})
+	} else {
+		if s.preparer.plan.HistoryProbe == nil {
+			return initialRuntimeObject{}, cfg.ErrInvalid
+		}
+		h := s.preparer.plan.HistoryProbe
+		owner := cfg.OwnerWorkloadAdministration{Name: p.WorkloadGuard, Deployment: p.Owner, DeploymentUID: deployment.UID, ControlNamespace: control, Administrators: admins,
+			ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: s.initial.FleetSource.Name, ServiceAccount: p.Worker}, {ConfigMap: p.OwnerSource, ServiceAccount: p.Worker}},
+			SchedulingLeases:    []cfg.OwnerSchedulingLease{{Lease: p.Lease, ServiceAccount: p.Worker}},
+			InitialHistoryProbe: &cfg.OwnerInitialHistoryProbe{Namespace: cfg.NamespaceRef{Name: s.preparer.plan.BootstrapNamespace.Name, UID: s.preparer.plan.BootstrapNamespace.UID}, ServiceAccount: h.Name, ServiceAccountUID: h.UID, Configuration: s.initial.Configuration},
+		}
+		if s.ownerLayout == contracts.OwnerInstalledLayout {
+			worker, e := ref(1, p.Worker)
+			if e != nil {
+				return initialRuntimeObject{}, e
+			}
+			owner.CapacityProbe = &cfg.OwnerCapacityProbe{ServiceAccount: worker.Name, ServiceAccountUID: worker.UID}
+			owner.ConfigurationProbes = append(owner.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: installedProcessingSource(s.initial.InstallationID), ServiceAccount: worker.Name})
+		}
+		policy, binding, err = OwnerWorkloadAdmission(owner)
+	}
+	if err != nil {
+		return initialRuntimeObject{}, err
+	}
+	path := "/apis/admissionregistration.k8s.io/v1/"
+	if index == 15 || index == 17 {
+		return initialRuntimeObject{policy, path + "validatingadmissionpolicies"}, nil
+	}
+	return initialRuntimeObject{binding, path + "validatingadmissionpolicybindings"}, nil
+}
+
+// Only known defaulted fields of the fixed inert resource kinds are removed.
+// No admission-added privilege, sidecar, selector, mount or account is ignored.
+func normalizeInitialRuntimeObject(obj runtime.Object) error {
+	switch v := obj.(type) {
+	case *apps.Deployment:
+		v.Status = apps.DeploymentStatus{}
+		if v.Spec.RevisionHistoryLimit != nil && *v.Spec.RevisionHistoryLimit == 10 {
+			v.Spec.RevisionHistoryLimit = nil
+		}
+		if v.Spec.ProgressDeadlineSeconds != nil && *v.Spec.ProgressDeadlineSeconds == 600 {
+			v.Spec.ProgressDeadlineSeconds = nil
+		}
+		normalizeInitialPodDefaults(&v.Spec.Template.Spec)
+	case *core.Service:
+		if v.Spec.ClusterIP != core.ClusterIPNone {
+			return cfg.ErrChanged
+		}
+		if len(v.Spec.ClusterIPs) == 1 && v.Spec.ClusterIPs[0] == core.ClusterIPNone {
+			v.Spec.ClusterIPs = nil
+		}
+		if len(v.Spec.IPFamilies) == 1 && (v.Spec.IPFamilies[0] == core.IPv4Protocol || v.Spec.IPFamilies[0] == core.IPv6Protocol) {
+			v.Spec.IPFamilies = nil
+		}
+		if v.Spec.IPFamilyPolicy != nil && *v.Spec.IPFamilyPolicy == core.IPFamilyPolicySingleStack {
+			v.Spec.IPFamilyPolicy = nil
+		}
+		if v.Spec.InternalTrafficPolicy != nil && *v.Spec.InternalTrafficPolicy == core.ServiceInternalTrafficPolicyCluster {
+			v.Spec.InternalTrafficPolicy = nil
+		}
+		if v.Spec.SessionAffinity == core.ServiceAffinityNone {
+			v.Spec.SessionAffinity = ""
+		}
+		v.Status = core.ServiceStatus{}
+	case *admission.ValidatingAdmissionPolicy:
+		v.Status = admission.ValidatingAdmissionPolicyStatus{}
+		normalizePermissionPolicy(&v.Spec)
+	case *core.ServiceAccount, *core.ConfigMap, *rbac.Role, *rbac.RoleBinding, *rbac.ClusterRole, *rbac.ClusterRoleBinding, *coordination.Lease, *admission.ValidatingAdmissionPolicyBinding:
+	default:
+		return cfg.ErrInvalid
+	}
+	m, e := meta.Accessor(obj)
+	if e != nil {
+		return cfg.ErrInvalid
+	}
+	m.SetUID("")
+	m.SetResourceVersion("")
+	m.SetGeneration(0)
+	m.SetCreationTimestamp(metav1.Time{})
+	m.SetManagedFields(nil)
+	return nil
+}

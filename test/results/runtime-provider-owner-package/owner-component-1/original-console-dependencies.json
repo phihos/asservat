@@ -1,0 +1,14 @@
+[
+  {
+    "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+    "from": "/home/phil/.cache/asservat-build/planning/owner-native-continuation-20261013/changes/test/integration/initial_runtime_owner_pair_native_test.go",
+    "sha256": "147192f7fa86aec8ff896cd1f505aea700caa34b5ffcbf35ae083f689082b191",
+    "status": "uncompiled source dependency, exact console bytes"
+  },
+  {
+    "path": "test/integration/initial_runtime_owner_audit_native_test.go",
+    "from": "/home/phil/.cache/asservat-build/planning/owner-native-continuation-20261013/changes/test/integration/initial_runtime_owner_audit_native_test.go",
+    "sha256": "de390b31b8ee1a50de099ac2c014dfeae71914610848fe261526b98ad0b673a5",
+    "status": "uncompiled source dependency, exact console bytes"
+  }
+]

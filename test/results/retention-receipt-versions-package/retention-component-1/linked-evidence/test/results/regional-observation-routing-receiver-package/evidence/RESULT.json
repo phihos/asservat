@@ -1,0 +1,149 @@
+{
+  "handle": 93067,
+  "exit": 0,
+  "scope": "component only: actual TLS13/h2 + process keys; synthetic registry/native authority; no runtime selection",
+  "dependencies": 1904,
+  "paths": 10,
+  "namedPass": 90,
+  "newRoutingPass": 65,
+  "retainedHolderPass": 25,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/domain/fleet",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 3.399,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=120s",
+        "-run",
+        "^Test(ObservationRouting|OwnerObservationRoutingPeers|ClusterObservationRoutingPeers|OwnerPoolNativeCandidateLimit|HubObservation)",
+        "-v",
+        "./internal/domain/fleet",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 8.908,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/overlay.json",
+        "./internal/domain/fleet",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 0.694,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      }
+    },
+    {
+      "phase": "architecture",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/mirror",
+      "exit": 0,
+      "seconds": 1.45,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": []
+      }
+    }
+  ]
+}

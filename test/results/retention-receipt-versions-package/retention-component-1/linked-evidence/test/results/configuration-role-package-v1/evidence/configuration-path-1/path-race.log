@@ -1,0 +1,6 @@
+--- FAIL: TestConfigurationRoleRootOpenKeepsOriginalFiveSecondPath (5.03s)
+    configuration_role_source_path_test.go:253: complete source plus initial root: elapsed=4.951955789s requests=149 negative_probes=10
+    configuration_role_source_path_test.go:255: original root interval exhausted by actual bounded API graph permission source identity changed
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	13.893s
+FAIL

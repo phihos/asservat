@@ -1,0 +1,38 @@
+{
+  "paths": [
+    {
+      "action": "replace",
+      "baseSHA256": "68532a84d757cbb02e2a108976984d58f3baeb94ce6711a70d9202543ece92c3",
+      "path": "test/fixtures/observation-native/inputs.go",
+      "payloadSHA256": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82"
+    },
+    {
+      "action": "replace",
+      "baseSHA256": "3b79b56a3b7a384030efa18a48cce69def3d053516a7e321e5c874f9056c3a6e",
+      "path": "test/fixtures/observation-native/main.go",
+      "payloadSHA256": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82"
+    },
+    {
+      "action": "replace",
+      "baseSHA256": "9171a3448cad7b359e24cc48149eba44b8510326203cde8410b9b279bc86cece",
+      "path": "test/fixtures/observation-native/runtime.go",
+      "payloadSHA256": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427"
+    },
+    {
+      "action": "replace",
+      "baseSHA256": "4bc69d49a5bcc7069d06c8bf199e2117f97c25ee803dd63b25a64a8b2cfd7c9d",
+      "path": "test/integration/direct_observation_native_fixture_test.go",
+      "payloadSHA256": "3d93efd62b3df39991ebfb565307cbdaf8cdaa90906296102d5a4afa96707e38"
+    },
+    {
+      "action": "replace",
+      "baseSHA256": "8d1a98328905452b8a6ce97982186dc03f552277471f96b555d55e5fecf27cd5",
+      "path": "test/integration/direct_observation_native_test.go",
+      "payloadSHA256": "c8ce3e9eab4d98f07352e86263a640d54d1a7951701562ce7658f26b3df6ba2f"
+    }
+  ],
+  "resultSHA256": "237c4f6d48afcae14b5965311bfbdc4504e5e22e1d7138acb5360e39fbb846c4",
+  "verifiedDependencies": 2210,
+  "freezeSHA256": "bab6ab24b85b3ebb06bc474e2f8aa1dc81d35cabdfc9124d5cc74611c47c9433",
+  "nativeQualification": false
+}

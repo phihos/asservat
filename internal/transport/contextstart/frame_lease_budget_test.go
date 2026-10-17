@@ -1,0 +1,97 @@
+package contextstart
+
+import (
+	"context"
+	"io"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"golang.org/x/time/rate"
+)
+
+// This is a transport budget regression, not a Kubernetes or installed-runtime
+// qualification. Ten tokens model the independently enumerated ten requests on
+// the native bare-Pod process reader's one executor REST client. The standard
+// client-go limiter also uses x/time/rate at 20 QPS with a burst of 20.
+func TestContextStreamWorkLeaseFitsOriginalRateBudget(t *testing.T) {
+	for _, limited := range []bool{false, true} {
+		name := "exact-observation-count"
+		if limited {
+			name = "original-five-seconds-standard-20-20"
+		}
+		t.Run(name, func(t *testing.T) {
+			w := workFixture()
+			ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+			defer cancel()
+			input, producer := io.Pipe()
+			var calls atomic.Int32
+			limiter := rate.NewLimiter(20, 20)
+			check := func(c context.Context) (fleet.APIContextReceiver, error) {
+				calls.Add(1)
+				start := time.Now()
+				if limited {
+					for request := 0; request < 10; request++ {
+						if e := limiter.Wait(c); e != nil {
+							return fleet.APIContextReceiver{}, fleet.ErrUnavailable
+						}
+					}
+				}
+				return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: start, ValidUntil: w.ValidUntil}, nil
+			}
+			stream, e := newFrameStream(ctx, w.Work.Channel, check, input, io.Discard,
+				func(time.Time) error { return nil }, func(time.Time) error { return nil },
+				func() error { return nil }, func() { _ = input.Close() })
+			if e != nil {
+				t.Fatal(e)
+			}
+			sent := make(chan error, 1)
+			go func() {
+				frames := []contracts.APIContextFrame{{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")}}
+				for i := 0; i < 7; i++ {
+					frames = append(frames, contracts.APIContextFrame{Kind: contracts.APIContextOperationRequestFrame, Payload: []byte("operation")})
+				}
+				frames = append(frames, contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: []byte("receipt")})
+				for _, frame := range frames {
+					if e := contracts.WriteAPIContextFrame(producer, frame); e != nil {
+						sent <- e
+						return
+					}
+				}
+				sent <- nil
+			}()
+			t.Cleanup(func() { _ = stream.Close(); _ = producer.Close(); <-sent })
+			work, receiver, e := stream.AwaitWork(ctx)
+			clear(work.Payload)
+			if e != nil || receiver.Channel != w.Work.Channel {
+				t.Fatal("original work admission failed", e)
+			}
+			for i := 0; i < 7; i++ {
+				request, e := stream.Receive(ctx)
+				clear(request.Payload)
+				if e != nil || request.Kind != contracts.APIContextOperationRequestFrame {
+					t.Fatalf("operation %d Receive could not retain the original work interval; peer observations=%d: %v", i+1, calls.Load(), e)
+				}
+				if e = stream.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextOperationResponseFrame, Payload: []byte("reply")}); e != nil {
+					t.Fatalf("operation %d Send could not retain the original work interval; completed peer observations=%d: %v", i+1, calls.Load(), e)
+				}
+			}
+			if e = stream.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")}); e != nil {
+				t.Fatal("final current result check", e)
+			}
+			receipt, e := stream.Receive(ctx)
+			clear(receipt.Payload)
+			if e != nil || receipt.Kind != contracts.APIContextReceiptFrame {
+				t.Fatal("original receipt", e)
+			}
+			if got := calls.Load(); got != 2 {
+				t.Fatalf("one complete work observation and one final current observation required; got %d", got)
+			}
+			if ctx.Err() != nil {
+				t.Fatal("completed after the original deadline")
+			}
+		})
+	}
+}

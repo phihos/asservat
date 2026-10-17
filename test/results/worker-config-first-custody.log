@@ -1,0 +1,34 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-missing-configuration
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-rollback
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-suspended
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-fenced
+=== RUN   TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired
+=== RUN   TestContextAdmissionWithRealServices/download-worker-coordinator-recovery
+=== RUN   TestContextAdmissionWithRealServices/download-worker-fresh-audit
+=== RUN   TestContextAdmissionWithRealServices/download-worker-short-runtime
+=== RUN   TestContextAdmissionWithRealServices/download-worker-parallel-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-unaudited
+=== RUN   TestContextAdmissionWithRealServices/download-worker-binding-replacement
+=== RUN   TestContextAdmissionWithRealServices/download-worker-capacity-held
+=== RUN   TestContextAdmissionWithRealServices/download-worker-expired-claim
+=== RUN   TestContextAdmissionWithRealServices/download-worker-cancelled-parent
+=== RUN   TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https
+--- PASS: TestContextAdmissionWithRealServices (12.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-missing-configuration (0.99s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-rollback (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-suspended (0.61s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-fenced (0.59s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-configuration-lock-expired (0.95s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-coordinator-recovery (1.01s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-fresh-audit (1.05s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-short-runtime (0.58s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-parallel-claim (0.83s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-unaudited (0.65s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-binding-replacement (0.90s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-capacity-held (0.89s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-expired-claim (1.11s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-cancelled-parent (0.85s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-real-encryption-audit-and-native-https (1.03s)
+PASS
+ok  	asservat.local/asservat/test/integration	14.004s

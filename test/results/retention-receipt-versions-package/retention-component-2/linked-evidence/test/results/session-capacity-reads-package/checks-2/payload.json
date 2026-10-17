@@ -1,0 +1,12 @@
+{
+  "test/integration/capacity_session_test.go": "4d80820e6071a460eefc41199366cdf85d5344f0acff79c3b16e3a9e42ffb9a4",
+  "docs/architecture/capacity-production.md": "c40dfd7a596570a3b4b85eb4b987d7f5678126d6e4244f9f93ee2856bda4bc16",
+  "internal/adapters/postgres/context_native_control.go": "b001e4165894b48e87156d01a6523d1d6c5fc1fa16e34fbefb89a00a1795b9bc",
+  "internal/adapters/postgres/download_response_window.go": "63c37d20916a79c0d25bfe70a638fc8d0774ff8ca3567a35a037d5dd788d9498",
+  "internal/adapters/postgres/capacity_session_reads.go": "76a08b678f6878280665eb76b2468dab67967e2ba8e26d333b8c283771404aa7",
+  "internal/adapters/postgres/capacity_session_reads_test.go": "5dacafb00f42e070baca8ff1df48601bf2f22e05aff7c6a82f3ba0e3d563a7e4",
+  "internal/adapters/postgres/custodydb/download_response.sql.go": "7e6dfe9fb39d41ce7ce1f329cd29f0d834d90144befcfbb7a8518d633c848598",
+  "internal/adapters/postgres/custodydb/native_exchange.sql.go": "9b39a2e15acb9dd84bec1cfb3cea29407426511ce1c4a387eec2728c44373dd9",
+  "migrations/queries/native_exchange.sql": "776c6af5d0fe52083f257f065bc536a5eb7591cf19dc8ae69d304fe52f5ff431",
+  "migrations/queries/download_response.sql": "f4141ba1bc187be44e680802ccddfb6ccb860c9814a53813984d4ef64faac0ed"
+}

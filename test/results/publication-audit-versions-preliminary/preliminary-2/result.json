@@ -1,0 +1,173 @@
+{
+  "native": false,
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/home/phil/.cache/asservat-build/asservat-publication-e8xqj0rl",
+  "manifest": "01b8724b9f81ed748e983ce703e6de8720ecf8e0d108502cefb1501d6742332a",
+  "runner": "9f891d38cc163c33732e78d28b26d9292b33638a0e5d79b5270cb6652dc209ab",
+  "phases": [
+    {
+      "name": "sqlc-version",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "version"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.065,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "7a54f3f1dad67104e41c3998c35716a83134876096c530cf7b6edec81d4b42a7",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "sqlc-generate",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.521,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/evidence",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 25.553,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "19cf62fe846fd12bf64efad9be3053ce128e248677c9a1fa8b720af07a6120ff",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/publication-audit-versions-20261013/checks/preliminary-2/before-overlay.json",
+        "-run=^(TestContextEffectReceiptsRequireImmutableVersions|TestAcceptedPublicationRequiresRetainedIntentReceipt)$",
+        "-count=1",
+        "-timeout=120s",
+        "-v",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 7.474,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "db47ec594805cbd31291fe08d72ebe2a2e90e170181d9e4c4c3482147ee90bca",
+      "passes": 8,
+      "topPasses": 0
+    },
+    {
+      "name": "affected-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/evidence"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 21.946,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "96180eef4259625d887aebab2b33a055eff94e5df9ade5b792743bf606e9f7a1",
+      "passes": 1074,
+      "topPasses": 264
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/evidence",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 2.367,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passes": 0,
+      "topPasses": 0
+    }
+  ],
+  "sqlcSHA256": "fae55f275d1a5d8722eb5b52b97a2cc2d2f39e3d9135dd0449291be21df26b44",
+  "generated": [
+    {
+      "path": "internal/adapters/postgres/custodydb/publication.sql.go",
+      "base": "86ec529bd058dfe28445c78a222ac1e8c37f67692494e58b9d620b50a8717dc5",
+      "payload": "c74305e6e94fec9973e621490c84b48db788170fb19826fada1f3fc19beaa7ec"
+    }
+  ],
+  "finalHashes": {
+    "deps": [],
+    "inventory": [],
+    "payload": [],
+    "bases": []
+  },
+  "scratchRemoved": true,
+  "exit": 0
+}

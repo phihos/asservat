@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-32",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "First native ADR-190 capacity run. The operator objects and all six shipped CRDs were accepted. The continuation passed the permission guard and projection, then the capacity sources (115 ms) and the live proofs of the three new guards (1.0 s): the worker's dry-run CREATE was denied by the capacity guard, the dedicated probe account's namespace label change by the selector guard, and the worker's processing source UPDATE by the processing guard. The qualification was built and validated (1.9 s). InitializeCapacity then returned unavailable on all 129 attempts within 5 minutes, without a stage name. Suspected: its claim, two full public-root proofs and three capacity-guard proofs do not fit the claim's five seconds, after which replays are lookup-only. Run 33 adds stage names and runs the setup inside one role operation.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

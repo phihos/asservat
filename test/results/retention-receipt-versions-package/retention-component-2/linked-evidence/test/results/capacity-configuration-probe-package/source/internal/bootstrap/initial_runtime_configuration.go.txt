@@ -1,0 +1,101 @@
+package bootstrap
+
+import (
+	"bytes"
+	"encoding/json"
+	"reflect"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// InitialConfigurationDocuments are the two fixed public documents generated
+// from the original installation and actual resource receipts. Generation is
+// pure: it creates no credentials, observations, acceptance or launch authority.
+// The protected ConfigMap/credential producers must separately record their
+// real UIDs before the installer may add ConfigurationRuntimeLaunchInputs.
+type InitialConfigurationDocuments struct {
+	Worker []byte
+	Roles  []byte
+}
+
+// BuildInitialConfigurationDocuments keeps the original provider identity and
+// generates the complete three-purpose reconciler input without needing an
+// unfinished public owner runtime document. This is the configuration component;
+// it cannot select a public/capacity role, remote cluster or alternative source.
+func BuildInitialConfigurationDocuments(original contracts.InitialInstaller, inventory kube.InitialRuntimeResourceInventory, initialClaimID string) (InitialConfigurationDocuments, error) {
+	var zero InitialConfigurationDocuments
+	if original.Format != contracts.InitialInstallerFormat || inventory.Namespace != original.Namespace || inventory.FleetSource != original.FleetSource || !reflect.DeepEqual(inventory.FleetGuard, original.FleetGuard) {
+		return zero, configurationRoleInputInvalid
+	}
+	owner := inventory.BridgeAdministration.Owner
+	if !owner.Valid() || owner.APIContextStarts != nil || owner.Deployment != inventory.OwnerDeployment.Name || owner.DeploymentUID != inventory.OwnerDeployment.UID || owner.ControlNamespace.Name != original.Namespace.Name || owner.ControlNamespace.UID != original.Namespace.UID || owner.Name != inventory.WorkloadGuard.Name || owner.InitialHistoryProbe == nil || owner.InitialHistoryProbe.Configuration != original.Configuration {
+		return zero, configurationRoleInputInvalid
+	}
+	sql := original.Postgres
+	sql.MaxConnections = 1
+	worker := contracts.HubWorkerDeployment{
+		Format: contracts.HubWorkerDeploymentFormat, InstallationID: original.InstallationID, ClusterID: original.ClusterID, Namespace: original.Namespace,
+		FleetSource: original.FleetSource, OwnerSource: inventory.OwnerSource, FleetGuard: original.FleetGuard, OwnerGuard: inventory.OwnerSourceGuard, LeaderLease: inventory.LeaderLease,
+		Kubernetes: original.Kubernetes, Postgres: sql, AuditStore: original.AuditStore, KeyService: original.KeyService,
+	}
+	if validateHubWorkerInputs(worker) != nil {
+		return zero, configurationRoleInputInvalid
+	}
+	input := contracts.ConfigurationRoleInstaller{
+		Format:          contracts.ConfigurationRoleInstallerFormat,
+		Roles:           contracts.ConfigurationRuntimeRoles{Format: contracts.ConfigurationRuntimeRolesFormat, InstallationID: original.InstallationID, InitialClaimID: initialClaimID, ClusterID: original.ClusterID, Namespace: original.Namespace, Deployment: inventory.WorkerDeployment, ServiceAccount: inventory.WorkerAccount, FleetSource: original.FleetSource, OwnerSource: inventory.OwnerSource, LayoutDigest: postgres.ConfigurationRuntimeRoleLayoutDigest()},
+		OwnerDeployment: inventory.OwnerDeployment, WorkloadGuard: inventory.WorkloadGuard, FleetGuard: inventory.FleetGuard, OwnerGuard: inventory.OwnerSourceGuard, Kubernetes: original.Kubernetes, Postgres: sql,
+		ConfigurationProbes: make([]contracts.OwnerConfigurationProbe, len(owner.ConfigurationProbes)), SchedulingLeases: make([]contracts.OwnerSchedulingLease, len(owner.SchedulingLeases)),
+		InitialHistoryProbe: &contracts.OwnerInitialHistoryProbe{Namespace: contracts.WorkerObjectReference{Name: owner.InitialHistoryProbe.Namespace.Name, UID: owner.InitialHistoryProbe.Namespace.UID}, ServiceAccount: contracts.WorkerObjectReference{Name: owner.InitialHistoryProbe.ServiceAccount, UID: owner.InitialHistoryProbe.ServiceAccountUID}, Configuration: owner.InitialHistoryProbe.Configuration},
+	}
+	// Preserve the exact already installed guard. This carrier cannot encode
+	// APIContextStarts; its unsupported nonnil branch is rejected above.
+	if p := owner.CapacityProbe; p != nil {
+		input.CapacityProbe = &contracts.OwnerDeploymentCapacityProbe{ServiceAccount: contracts.WorkerObjectReference{Name: p.ServiceAccount, UID: p.ServiceAccountUID}}
+	}
+	for i, p := range owner.ConfigurationProbes {
+		input.ConfigurationProbes[i] = contracts.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
+	}
+	for i, p := range owner.SchedulingLeases {
+		input.SchedulingLeases[i] = contracts.OwnerSchedulingLease{Lease: p.Lease, ServiceAccount: p.ServiceAccount}
+	}
+	if _, _, err := configurationRoleInstallerPlan(input); err != nil {
+		return zero, err
+	}
+	w, err := json.Marshal(worker)
+	if err != nil || len(w) > contracts.OwnerDeploymentMaxBytes {
+		return zero, configurationRoleInputInvalid
+	}
+	r, err := json.Marshal(input)
+	if err != nil || len(r) > contracts.ConfigurationRoleInstallerMaxBytes {
+		return zero, configurationRoleInputInvalid
+	}
+	return InitialConfigurationDocuments{Worker: w, Roles: r}, nil
+}
+
+// BuildInstalledInitialConfigurationDocuments generates the same fixed
+// configuration credentials plus original-journal activation pins. It does not
+// need a future capacity/public role-root UID and cannot make a pending Secret
+// into runtime authority.
+func BuildInstalledInitialConfigurationDocuments(original contracts.InitialInstaller, resources contracts.InitialRuntimeResourceSnapshot, inventory kube.InitialRuntimeResourceInventory, initialClaimID string) (InitialConfigurationDocuments, error) {
+	var zero InitialConfigurationDocuments
+	docs, err := BuildInitialConfigurationDocuments(original, inventory, initialClaimID)
+	if err != nil {
+		return zero, err
+	}
+	worker, err := contracts.DecodeHubWorkerDeployment(bytes.NewReader(docs.Worker))
+	if err != nil {
+		return zero, configurationRoleInputInvalid
+	}
+	worker.Activation, err = kube.BuildHubWorkerActivation(original.InstallationID, resources, inventory)
+	if err != nil || validateHubWorkerInputs(worker) != nil {
+		return zero, configurationRoleInputInvalid
+	}
+	docs.Worker, err = json.Marshal(worker)
+	if err != nil || len(docs.Worker) > contracts.OwnerDeploymentMaxBytes {
+		return zero, configurationRoleInputInvalid
+	}
+	return docs, nil
+}

@@ -1,0 +1,90 @@
+{
+  "scope": "SQL49 operation regression; synthetic native values, actual SQL/S3 pending",
+  "paths": [
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "base": "3e4ef751e343048982ae5b9c911ff4dcb2eb4b32282bca68ea7ac549f876ccd3",
+      "payload": "59ab35e7237a0b0fb66c370608f775346030ce08b012f31dd256bd8d70f45fe3"
+    },
+    {
+      "path": "test/integration/connector_observation_operation_sql_test.go",
+      "base": null,
+      "payload": "701ff1709ac294470e1eff50433b34c92d844e0f4718e3505fe165c73c8e37aa"
+    }
+  ],
+  "sourceVerifiedBeforeIntegration": true,
+  "archiveHashes": {
+    "observation-operation-sql-package/manifest.json": "2e694fb4bf18ce464325e9486e42ce232848384e494d39bd15e007ffd7444735",
+    "observation-operation-sql-package/overlay.json": "82a9d7f13379c984b981ebea865aa25dceed5717e40932642225840c5ad7c4c8",
+    "observation-operation-sql-package/SCOPE.md.txt": "ead589f6f251696fe6a46377e89f532f741f95f396f99347db356ca3853460cb",
+    "observation-operation-sql-package/run-component.py.txt": "e93e6e90b1cea8af2841ee71a607cb2fe63ff6a653c97939ff5f0a6d6a3645c8",
+    "observation-operation-sql-package/component-sources.json": "17e42523ce33172ca3948ab81920e368bd341275c87dfecdbd66809e1734dac2",
+    "observation-operation-sql-package/compile.log": "cd3dddcf516c89020ec40052b7f79d2798d9420651e5475f18e587bcd8d5d1f2",
+    "observation-operation-sql-package/component-results.json": "eca3f57a3cf1359fcb10971abfb65e5cae7db3007c763398652f96589bdecbdc",
+    "observation-operation-sql-package/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation-operation-sql-package/files/test/integration/connector_observation_operation_sql_test.go.txt": "701ff1709ac294470e1eff50433b34c92d844e0f4718e3505fe165c73c8e37aa",
+    "observation-operation-sql-package/files/test/integration/capture_admission_test.go.txt": "59ab35e7237a0b0fb66c370608f775346030ce08b012f31dd256bd8d70f45fe3"
+  },
+  "componentChecks": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/observation-operation-sql-20261013/overlay.json",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 48.778,
+      "changedSources": []
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/observation-operation-sql-20261013/overlay.json",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.927,
+      "changedSources": []
+    }
+  ],
+  "nativeRun": {
+    "scope": "Real SQL49 operation pairs using synthetic native/source/TLS values; no installed routing",
+    "command": [
+      "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "scripts/test-custody.py",
+      "--run",
+      "^TestContextAdmissionWithRealServices$/^connector-observation-operation$"
+    ],
+    "exit": 0,
+    "seconds": 73.332
+  },
+  "nativeQualification": {
+    "sourceCount": 1956,
+    "unchangedSources": true,
+    "cleanupFailures": [],
+    "passedTestNames": [
+      "TestContextAdmissionWithRealServices/connector-observation-operation",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source",
+      "TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait"
+    ],
+    "scope": "Actual SQL49 and S3 composition with synthetic native/source/TLS values; no installed route",
+    "correctedFixture": "Activated both purpose-separated leaves before serving; initial client-only failure preserved",
+    "earlierFailure": "observation-operation-sql-first-failure"
+  },
+  "finalPayloads": {
+    "test/integration/capture_admission_test.go": "59ab35e7237a0b0fb66c370608f775346030ce08b012f31dd256bd8d70f45fe3",
+    "test/integration/connector_observation_operation_sql_test.go": "01427f4a217a01e7db8f5485822c558435b616363f3460615bdeb906e9da20db"
+  }
+}

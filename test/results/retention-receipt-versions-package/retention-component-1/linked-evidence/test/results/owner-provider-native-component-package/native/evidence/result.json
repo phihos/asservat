@@ -1,0 +1,60 @@
+{
+  "manifest_sha256": "64fe52fe255890070f35b9d19ffd84ce10ceaf5ab5f8caf9adf01390d421a79b",
+  "dependencies_sha256": "fa2b5842edbf96b470a1b4648d8a492263e7f90012cdacdd85639c2339e27cd8",
+  "runner_sha256": "891047705affd0ed47d807f6e997ac54e4dcba394f34bc31b2d77660f2b66b1d",
+  "paths": 2,
+  "dependencies": 1972,
+  "native_executed": false,
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-2/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 3.205,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/native-auth-2/overlay.json",
+        "./internal/adapters/kms"
+      ],
+      "exit": 0,
+      "seconds": 0.599,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": []
+      }
+    }
+  ],
+  "terminal_exit": 0,
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": []
+  }
+}

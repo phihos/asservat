@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--initial-installation"
+  ],
+  "exit": 0,
+  "scope": "Real PostgreSQL provisioning and exact ACL verification of all 66 public runtime roles at schema head 63: the ADR-181 publisher compartment (publication gate, verify, verification audit, publish, publisher identity/retention reads at ordinals 65/66), the reduced 46-purpose hub projection and the context_catalog queue grant on context-verify",
+  "passedCount": 87,
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "sourceHashBefore": "5038feb50f0666f6c3a33a2859bcd4c8a3d1efcc2024ce1aeba1f42df2f6e859",
+  "sourceHashAfter": "5038feb50f0666f6c3a33a2859bcd4c8a3d1efcc2024ce1aeba1f42df2f6e859",
+  "log": "initial-installation.log",
+  "status": "passed"
+}

@@ -1,0 +1,154 @@
+{
+  "integratedAt": 1791861344.7602684,
+  "jointPreflight": true,
+  "manifestSHA256": "bd91b71bb1a84f97bb25dbd09e39694316bb3e8f52e1bdb213e34dbc3a55ac8c",
+  "dependenciesSHA256": "06d3321d89fe785dedf11bc7533bb608c80daac34b3ccd7bedb27648cb2d105b",
+  "dependencyCount": 2074,
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/capacity_projection.go",
+      "base_sha256": "8bacf9175c3aa6234862792732a7edfe04aca0ee44671777de2ddc2e80d5f035",
+      "payload_sha256": "43a0482c86eab5cd64469ad5f46c5f787ee7fb7eeda52e2eac06a7e87ddba224"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+      "base_sha256": "22e9bfca2cc230462fd5fa065acb22a6edc249dae4ec5f742417629457894b72",
+      "payload_sha256": "cec7a2e94fd969d4221ab2a61e11cad822e636578dc48d7f8aa1f7fade211b6b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_material.go",
+      "base_sha256": "aee70370baaef8eeee6b8c1d5f8ff1caf74e36181d3a7b7cb7711d672f316bb6",
+      "payload_sha256": "869feff9058dfcf5c849fc2ac421d471a237c451c1314a22d6a36bba6ef7a285"
+    },
+    {
+      "path": "internal/adapters/kubernetes/projection_input_ownership_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b33260ed8327e245f5cc6a1b585476d5984829501b1d92ac2ab853a52fe00d38"
+    }
+  ],
+  "qualification": {
+    "manifest_sha256": "bd91b71bb1a84f97bb25dbd09e39694316bb3e8f52e1bdb213e34dbc3a55ac8c",
+    "dependencies_sha256": "06d3321d89fe785dedf11bc7533bb608c80daac34b3ccd7bedb27648cb2d105b",
+    "runner_sha256": "f9c9f258f463577fad6a479c47ef288f2b13b937898dfbfd08ed7d77509973eb",
+    "paths": 4,
+    "dependencies": 2074,
+    "native_executed": false,
+    "status": "legacy constructor input ownership only; no runtime selector or authority change",
+    "commands": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/projection-input-ownership-20261013/check-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "seconds": 6.712,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        }
+      },
+      {
+        "phase": "before-alias",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/projection-input-ownership-20261013/check-1/before-overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=60s",
+          "-v",
+          "-run",
+          "^TestProjectionInputOwnership",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 1,
+        "seconds": 11.375,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        }
+      },
+      {
+        "phase": "focused-races",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/projection-input-ownership-20261013/check-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=180s",
+          "-v",
+          "-run",
+          "^Test(ProjectionInputOwnership|OwnerIdentity|CapacityProjection|CapacityLocalOwner)",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "seconds": 72.432,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/projection-input-ownership-20261013/check-1/overlay.json",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "seconds": 2.005,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before_payloads": []
+        }
+      }
+    ],
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": [],
+      "before_payloads": []
+    },
+    "terminal_exit": 0
+  },
+  "scope": "Component input ownership only; no new runtime selection"
+}

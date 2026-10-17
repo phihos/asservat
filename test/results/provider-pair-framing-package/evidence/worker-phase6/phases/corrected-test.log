@@ -1,0 +1,22 @@
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/zero
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/root
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/detached_context
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/other_operation
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/order
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/expired
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/already_closed
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed
+=== RUN   TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_released_call
+--- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/zero (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/root (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/detached_context (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/other_operation (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/order (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/expired (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/already_closed (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_marked_closed (0.00s)
+    --- PASS: TestConfigurationWorkerOpaquePhaseRejectsForgedRootContextAndOrder/owner_released_call (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.048s

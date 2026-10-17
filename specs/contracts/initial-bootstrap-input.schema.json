@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-input.schema.json",
+  "title": "Public Helm bootstrap input",
+  "description": "At most 48 KiB; PEM and a single current API-token audience are normalized locally before private setup effects. This supplies no authentication, generated identity, source acceptance or recovery authority. The chart selects the fresh v3 capability; retained exact v2/v3 pins are still independently resolved by the producer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "targetNamespace",
+    "image",
+    "kubernetes",
+    "postgres",
+    "auditStore",
+    "keyService",
+    "fleet",
+    "providers",
+    "format",
+    "bootstrapNamespace",
+    "runnerAccount"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "maxLength": 30,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "targetNamespace": {
+      "type": "string",
+      "maxLength": 63,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "image": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/properties/image"
+    },
+    "probeAudience": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "kubernetes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "rootsPEM": {
+          "type": "string",
+          "maxLength": 32768
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "database",
+        "maxConnections",
+        "rootsPEM"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "maxLength": 63
+        },
+        "maxConnections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "rootsPEM": {
+          "type": "string",
+          "maxLength": 32768
+        }
+      }
+    },
+    "auditStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "region",
+        "bucket",
+        "rootsPEM"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "region": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "bucket": {
+          "type": "string",
+          "maxLength": 63
+        },
+        "rootsPEM": {
+          "type": "string",
+          "maxLength": 32768
+        }
+      }
+    },
+    "keyService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "auditMount",
+        "auditKey",
+        "rootsPEM"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "auditMount": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "auditKey": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "rootsPEM": {
+          "type": "string",
+          "maxLength": 32768
+        }
+      }
+    },
+    "fleet": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/properties/fleet"
+    },
+    "providers": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap.schema.json#/properties/providers"
+    },
+    "format": {
+      "const": "asservat-bootstrap-input/v1"
+    },
+    "bootstrapNamespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "runnerAccount": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "registryAuthentication": {
+      "const": "dockerconfigjson/v1"
+    }
+  }
+}

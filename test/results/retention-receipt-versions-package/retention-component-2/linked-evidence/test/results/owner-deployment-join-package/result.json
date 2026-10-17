@@ -1,0 +1,166 @@
+{
+  "manifest_sha256": "cfdba935d1f844629074d78bc9093408d29ed6176710088f3066a1e4d1282f0d",
+  "dependencies_sha256": "98d8969f04dbe25dd4ae42dfa7346ba8d6bcef6cedcdd0df5dc35d59d7bfdb28",
+  "runner_sha256": "7680e11a95a1bce8b0c007052afd857218c3aa2505861b14e34fa00ef99486c1",
+  "paths": 6,
+  "dependencies": 2091,
+  "native_executed": false,
+  "status": "Legacy owner deployment and existing router wrapper lifetime ownership only; no fresh profile/runtime enablement",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/application/evidence",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "intended_before": true,
+      "seconds": 9.7,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      }
+    },
+    {
+      "phase": "before-deployment",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/before-deployment-overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=90s",
+        "-v",
+        "-run",
+        "^TestOwnerDeployment(ExternalClose|CloseBeforeRun)",
+        "./internal/bootstrap"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "intended_before": true,
+      "seconds": 29.021,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      }
+    },
+    {
+      "phase": "before-router",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/before-router-overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=90s",
+        "-v",
+        "-run",
+        "^TestWorker(RoutesCloseAndJoin|OwnerWrappersJoin)",
+        "./internal/application/evidence"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "intended_before": true,
+      "seconds": 3.024,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      }
+    },
+    {
+      "phase": "focused-races",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=90s",
+        "-v",
+        "-run",
+        "^Test(OwnerDeployment|OwnerRuntime|OwnerMounted|OwnerInput|OwnerTrust|WorkerRoutes|WorkerOwner|WorkerCurrent)",
+        "./internal/application/evidence",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "intended_before": true,
+      "seconds": 31.711,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+        "./internal/application/evidence",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "intended_before": true,
+      "seconds": 2.326,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payloads": [],
+        "auxiliary": []
+      }
+    }
+  ],
+  "final_hash_check": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "auxiliary": []
+  },
+  "terminal_exit": 0
+}

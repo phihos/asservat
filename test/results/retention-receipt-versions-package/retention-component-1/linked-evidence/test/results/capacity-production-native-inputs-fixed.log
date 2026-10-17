@@ -1,0 +1,19 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+=== RUN   TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:129: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: fixed_role_production_ms=1768
+=== RUN   TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt
+=== RUN   TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker
+=== RUN   TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early
+    capacity_sql_matrix_test.go:93: root reserve permission configuration unavailable
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:150: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- FAIL: TestCapacityProducerWithRealPostgres (3.22s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-paired-root-and-lost-receipt (0.47s)
+    --- PASS: TestCapacityProducerWithRealPostgres/exact-purpose-roles-and-no-private-marker (0.28s)
+    --- FAIL: TestCapacityProducerWithRealPostgres/three-root-phases-do-not-publish-early (0.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	3.283s
+FAIL

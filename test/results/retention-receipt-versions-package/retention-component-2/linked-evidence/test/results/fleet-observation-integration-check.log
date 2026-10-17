@@ -1,0 +1,2 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-custody.py --fleet
+Fleet integration exit: 0

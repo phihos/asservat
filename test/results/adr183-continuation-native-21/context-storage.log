@@ -1,0 +1,44 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 02e6ac20-cfeb-4dd0-b86d-fc8abf55613f image docker.io/library/asservat-context-worker@sha256:6d81aa64dc8c14620acdd9c043b0e57615e63690c839e792eca3eeb686098ab8 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-duv70gt8-0", namespace "bootstrap-chain-10000000", installation "9127948d-c6ba-4ce2-87ab-2c64c077f142": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-309da494b93f975ccf482485107ecfaadaba4ada16ca8fe5373fece00cfd39a6-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-309da494b93f975ccf482485107ecfaadaba4ada16ca8fe5373fece00cfd39a6-audit-wrap
+        created: sys/policies/acl/asservat-configuration-309da494b93f975ccf482485107ecfaadaba4ada16ca8fe5373fece00cfd39a6-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-309da494b93f975ccf482485107ecfaadaba4ada16ca8fe5373fece00cfd39a6-audit-unwrap
+        created: sys/policies/acl/asservat-9127948dc6ba4ce287ab2c64c077f142-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:349: continuation produce 
+    installer_continuation_native_test.go:349: continuation continue installer continuation: resources/audit-secrets done in 4ms
+        installer continuation: resources/producer done in 690ms
+        installer continuation: resources/journal done in 2.1s
+        installer continuation: resources/advance done in 1m6.504s
+        installer continuation: resources/inventory done in 701ms
+        installer continuation: bridge/observer done in 20ms
+        installer continuation: bridge/protection done in 0s
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.232s
+        installer continuation: bridge/probe done in 3.451s
+        installer continuation: bridge/retained done in 4.901s
+        installer continuation: worker/configuration-documents done in 0s
+        installer continuation: worker/outbox done in 2ms
+        installer continuation: worker/inbox done in 2.003s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 2ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 7ms
+        installer continuation stopped at worker/roles-provision/role:configuration-fleet/lookup after current=0s claim=1.75s role=3.101s stop=3.101s, 1.899s, operation 1.899s left after 13 attempts; first role:configuration-fleet/root-read after current=1ms claim=1.801s role=2.701s stop=2.701s, 2.299s, operation 2.299s left (unavailable) (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (465.43s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.60s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (155.18s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.80s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	465.490s
+FAIL

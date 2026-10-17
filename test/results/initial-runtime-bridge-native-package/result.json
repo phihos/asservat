@@ -1,0 +1,44 @@
+{
+  "manifest_sha256": "37d6527def0ce7d5db0966c084d08d604645255d9d5437ae6ea42eca732e4614",
+  "dependencies_sha256": "11a1d3c2870ba44f8f074ab9524ee1134e1e347fee5c4955929d2631fbf192ed",
+  "commands": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-native-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./internal/application/fleet",
+        "./internal/contracts",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 13.873636649004766
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-native-1/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./internal/application/fleet",
+        "./internal/contracts",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.6216142500052229
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 32,
+  "checked_dependencies": 1536
+}

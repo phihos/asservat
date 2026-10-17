@@ -1,0 +1,12 @@
+{
+  "scope": "Preserved original failing-before and failed fixture run; no production changes in corrected overlay. Prior meaningful before is not rerun.",
+  "files": {
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/manifest.json": "b6395b9767b9430258b039c92be8604f67b7587ead33fcbe82a3425025c8f9fa",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/dependencies.json": "215efec38d5274751860db4a031900b12ee97eae1ffa9f73523c2f5da2004bce",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/result.json": "8456638d1c519e7359710907581d0837e1aa6ca1bb3048182b78b64943599aa1",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/before-manifest.json": "dcb8b4a0df556c081c219a3f4d4279f14095c13ec0d8d75f8bf4a409511fba87",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/evidence/controlled-before.log": "456372a27ebe6e7dda7db35c8dbc6cb1106878b1b505ed890c7d0c4609ffaab7",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/evidence/owner-projection-race.log": "3066de1bf2d405a258804faecc473458ee871d878328232e1970387697d4f8b2",
+    "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/owner-projection-1/HANDOFF.md": "c6ff6da36587dd26f49f35ecb0f3b01f515943efa3939eab598f6e33e4fc18d7"
+  }
+}

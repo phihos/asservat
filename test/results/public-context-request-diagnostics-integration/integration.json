@@ -1,0 +1,21 @@
+{
+  "scope": "Fixture-only one first-request diagnostic window after original preview returns; no production behavior correction, replay or authority changes",
+  "paths": [
+    {
+      "path": "test/integration/public_context_journey_diagnostics_test.go",
+      "base_sha256": "03703b97ddbc037c113dbb1a379fbafddfb0eb4f6c028ead0be72f9a9f6d80cd",
+      "payload_sha256": "c285bc4af4bf4f22eb90992b82a4cce7f5a21e3f908b76b7d5917ec15ae213c8"
+    },
+    {
+      "path": "test/integration/public_context_journey_test.go",
+      "base_sha256": "5bba2ad6c46c3e11964969ff734bc9036f12c4d7d3f454cf86ddce9cb1dcf565",
+      "payload_sha256": "baa771cc8503c899260631d3f545a95261b84d34d8516559093b5bced5eb4f14"
+    },
+    {
+      "path": "test/integration/public_context_request_diagnostics_test.go",
+      "base_sha256": null,
+      "payload_sha256": "4d1a21cf7b86e0fcb01c7a25150528ccbc477572b72ac9dd8b8ba00fcc6a99f0"
+    }
+  ],
+  "qualification": "pending"
+}

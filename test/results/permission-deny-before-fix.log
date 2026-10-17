@@ -1,0 +1,5 @@
+--- FAIL: TestEmptyDenySnapshotCannotOutliveFiveSeconds (0.00s)
+    eligibility_test.go:25: an empty deny snapshot older than five seconds authorized disclosure
+FAIL
+FAIL	asservat.local/asservat/internal/domain/authorization	0.002s
+FAIL

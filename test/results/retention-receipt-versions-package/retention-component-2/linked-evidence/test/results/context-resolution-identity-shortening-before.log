@@ -1,0 +1,12 @@
+--- FAIL: TestMCPFinalIdentityShorteningReachesSocket (0.11s)
+    --- FAIL: TestMCPFinalIdentityShorteningReachesSocket/2025-11-25 (0.06s)
+        context_test.go:261: final identity shortening lost: got=2026-10-11 19:20:02.210842626 +0200 CEST m=+2.019550453 want=2026-10-11 19:20:01.210842626 +0200 CEST m=+1.019550453
+    --- FAIL: TestMCPFinalIdentityShorteningReachesSocket/2026-07-28 (0.05s)
+        context_test.go:261: final identity shortening lost: got=2026-10-11 19:20:02.267892574 +0200 CEST m=+2.076600400 want=2026-10-11 19:20:01.267892574 +0200 CEST m=+1.076600400
+FAIL
+FAIL	asservat.local/asservat/internal/transport/mcp	0.137s
+--- FAIL: TestContextOperationsKeepFinalShorterIdentityDeadline (0.04s)
+    context_operations_test.go:235: lost final shortened identity: 2026-10-11 12:00:05 +0000 UTC <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/transport/presentation	0.064s
+FAIL

@@ -1,0 +1,11 @@
+{
+  "name": "adr183-go-check-2",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 2,
+  "status": "failed",
+  "scope": "Full Go gate after the ADR-183 native fixes",
+  "results": "One failure: internal/bootstrap TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose/blocked-headers (second load-dependent occurrence; first seen as blocked-body during an earlier package run). Cause: the 250 ms original interval can elapse under -race load before the GET reaches the fixture handler, so the exact one-GET assertion fails while the forwarder behaves correctly. Fixed for adr183-go-check-3 by a 1 s interval and a 3 s elapsed bound; exactly-one-GET, at-most-one-POST and the original deadline checks are unchanged.",
+  "sourceHashBefore": "9048c7660afada4c28f1ebe8617ceea06817832ccc8ae75d84b474e0c89cec9c",
+  "sourceHashAfter": "9048c7660afada4c28f1ebe8617ceea06817832ccc8ae75d84b474e0c89cec9c",
+  "log": "go-check.log"
+}

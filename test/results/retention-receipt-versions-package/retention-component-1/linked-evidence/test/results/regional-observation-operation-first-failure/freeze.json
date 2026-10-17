@@ -1,0 +1,12 @@
+{
+  "SCOPE.md": "03e4f87687f3249e2a36aa40f330069e8475e0de220b18ed24e4ac71e0f875ec",
+  "bases.json": "161d90b2cdfaea0c1672bfbd965ad8c22d027ad34a545418a8c744a666c49168",
+  "dependencies.json": "85e927f709af8a3335ab8598ad66ded87e76fad93c693f1e16ab4531ec810bca",
+  "files/internal/adapters/kubernetes/connector_observation_operation.go": "80bf85563a5708b5243e017fc25a25ca7eb40ebddc0e68052338ccd1570d478c",
+  "files/internal/adapters/kubernetes/connector_observation_operation_native.go": "75932fd8a16c200f0ef89c95841abe1f966a0fb36d982bddc079949d228069d1",
+  "files/internal/adapters/kubernetes/connector_observation_operation_test.go": "515329397dd7881136494a7d40f5b5065e98c6b852aa93333c6cfbecea500d4c",
+  "manifest.json": "2de7826219f7e6c88170bf94e39ce61d22463b8aa7ccb623c1cdcf560721ba69",
+  "overlay.json": "de12a9a3d5047571ae64f0fa185deb59a9ce2bd93cf447633272ff89cfce62d6",
+  "payload.json": "5502acd0ac30aabb77f4a79465fad5c9e3c3b01b819dc93c58e5c80eff7515b8",
+  "run.py": "f83601a934c0040b2796904f1f234508c6bbc212e9c24ef5d49c3047d366ead1"
+}

@@ -1,0 +1,302 @@
+--- a/internal/adapters/kubernetes/initial_runtime_bridge.go
++++ b/internal/adapters/kubernetes/initial_runtime_bridge.go
+@@ -34,7 +34,7 @@
+ 	record                        audit.InitialInstallation
+ 	administration                cfg.InitialRuntimeBridgeAdministration
+ 	initial                       contracts.InitialInstaller
+-	binding                       string
++	binding, rootUID              string
+ 	policies                      [3]*admission.ValidatingAdmissionPolicy
+ 	guards                        [3]*configMapProtection
+ 	ctx                           context.Context
+@@ -53,7 +53,7 @@
+ }
+ 
+ func newInitialRuntimeBridge(ctx context.Context, preparer *InitialPreparer, source *ConfigurationRoleSource, effects app.InitialRuntimeBridgeEffects, record audit.InitialInstallation, receipt audit.Receipt, administration cfg.InitialRuntimeBridgeAdministration) (*InitialRuntimeBridge, error) {
+-	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || !authorization.UUID(preparer.rootUID) || source == nil || source.client == nil || source.protection == nil || source.fleet == nil || source.fleet.settings == nil || source.fleet.protection == nil || source.owner == nil || source.owner.protection == nil || !administration.Valid() || !equalJSON(source.protection.plan, administration.Owner) || source.client.control != administration.Initial.ControlNamespace || source.input.ClusterID != preparer.plan.ClusterID || source.input.InitialClaimID == "" {
++	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || source == nil || source.client == nil || source.protection == nil || source.fleet == nil || source.fleet.settings == nil || source.fleet.protection == nil || source.owner == nil || source.owner.protection == nil || !administration.Valid() || !equalJSON(source.protection.plan, administration.Owner) || source.client.control != administration.Initial.ControlNamespace || source.input.ClusterID != preparer.plan.ClusterID || source.input.InitialClaimID == "" {
+ 		return nil, cfg.ErrInvalid
+ 	}
+ 	private, copyErr := json.Marshal(administration)
+@@ -73,8 +73,11 @@
+ 	if _, _, err := preparer.protection.current(call); err != nil {
+ 		return nil, err
+ 	}
++	// Preserve the actual acknowledged root independently of the optional UID
++	// in the original create input. read validates both original ownership and
++	// the journal self UID; current operations still prove their exact phase.
+ 	_, root, err := preparer.read(call)
+-	if err != nil || root.Activation == nil || root.Activation.Handover == nil || root.RootUID != preparer.rootUID {
++	if err != nil || root.Activation == nil || root.Activation.Handover == nil || !authorization.UUID(root.RootUID) {
+ 		return nil, cfg.ErrChanged
+ 	}
+ 	c, err := preparer.inputConfiguration(root)
+@@ -119,7 +122,7 @@
+ 		return nil, err
+ 	}
+ 	life, cancel := context.WithCancel(ctx)
+-	out := &InitialRuntimeBridge{preparer: preparer, source: source, effects: effects, record: record, administration: administration, initial: c, ctx: life, cancel: cancel}
++	out := &InitialRuntimeBridge{preparer: preparer, source: source, effects: effects, record: record, administration: administration, initial: c, rootUID: root.RootUID, ctx: life, cancel: cancel}
+ 	for i, policy := range []*admission.ValidatingAdmissionPolicy{old, probe, retained} {
+ 		normalizePermissionPolicy(&policy.Spec)
+ 		out.policies[i] = policy.DeepCopy()
+@@ -136,7 +139,7 @@
+ 		Sources             contracts.ConfigurationRuntimeRoles
+ 		OwnerPin            GuardPin
+ 		FleetPin, SourcePin GuardPin
+-	}{"asservat-initial-runtime-bridge-binding/v1", preparer.rootUID, c, administration, source.input, source.protection.pin, source.fleet.protection.pin, source.owner.protection.pin})
++	}{"asservat-initial-runtime-bridge-binding/v1", root.RootUID, c, administration, source.input, source.protection.pin, source.fleet.protection.pin, source.owner.protection.pin})
+ 	if err != nil {
+ 		cancel()
+ 		return nil, cfg.ErrInvalid
+@@ -317,9 +320,12 @@
+ 		}
+ 		s.createAttempted = true
+ 		s.mu.Unlock()
+-		_, _, _, originalUntil, e := s.preparer.currentHandover(call)
++		_, root, initial, originalUntil, e := s.preparer.currentHandover(call)
+ 		if e != nil {
+ 			return e
++		}
++		if root.RootUID != s.rootUID || !equalJSON(initial, s.initial) {
++			return cfg.ErrChanged
+ 		}
+ 		call, finish := context.WithDeadline(call, originalUntil)
+ 		defer finish()
+--- a/internal/adapters/kubernetes/initial_runtime_bridge_history.go
++++ b/internal/adapters/kubernetes/initial_runtime_bridge_history.go
+@@ -72,7 +72,7 @@
+ 		if e != nil {
+ 			return e
+ 		}
+-		if w.RootUID != b.preparer.rootUID || !equalJSON(c, b.initial) {
++		if w.RootUID != b.rootUID || !equalJSON(c, b.initial) {
+ 			return cfg.ErrChanged
+ 		}
+ 		until = identity.Earlier(snapshot.ValidUntil, bound)
+--- a/internal/adapters/kubernetes/initial_runtime_bridge_transition.go
++++ b/internal/adapters/kubernetes/initial_runtime_bridge_transition.go
+@@ -67,7 +67,7 @@
+ 	if err != nil {
+ 		return nil, 0, time.Time{}, err
+ 	}
+-	if w.RootUID != s.preparer.rootUID || !equalJSON(c, s.initial) {
++	if w.RootUID != s.rootUID || !equalJSON(c, s.initial) {
+ 		return nil, 0, time.Time{}, cfg.ErrChanged
+ 	}
+ 	if err = initialHandoverDeadline(ctx, s.source.client.now, until); err != nil {
+--- a/internal/adapters/kubernetes/initial_runtime_resources.go
++++ b/internal/adapters/kubernetes/initial_runtime_resources.go
+@@ -37,7 +37,7 @@
+ 	initial                     contracts.InitialInstaller
+ 	ownerRoots                  [][]byte
+ 	names                       initialRuntimeResourceNames
+-	binding                     string
++	binding, rootUID            string
+ 	ctx                         context.Context
+ 	cancel                      context.CancelFunc
+ 	mu                          sync.Mutex
+@@ -66,8 +66,11 @@
+ 	if e != nil {
+ 		return nil, e
+ 	}
++	// The original create input can omit RootUID. currentHandover has checked
++	// the acknowledged root, its self UID, original plan and native guards.
++	// Retain that actual UID locally; never mutate the shared preparer input.
+ 	raw, e := json.Marshal(initial)
+-	if e != nil || root.RootUID != preparer.rootUID || record.Scope != initialPreparationWitnessScope(initial) || sha256.Sum256(raw) != record.Claim.PlanDigest {
++	if e != nil || !authorization.UUID(root.RootUID) || record.Scope != initialPreparationWitnessScope(initial) || sha256.Sum256(raw) != record.Claim.PlanDigest {
+ 		return nil, cfg.ErrChanged
+ 	}
+ 	names := runtimeResourceNames(initial.InstallationID)
+@@ -85,13 +88,13 @@
+ 		Record                 audit.InitialInstallation
+ 		Receipt                audit.Receipt
+ 		OwnerRoots             [][]byte
+-	}{contracts.InitialRuntimeResourcesFormat, preparer.rootUID, preparer.plan.Workload.Image, initial, record, receipt, roots})
++	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots})
+ 	if e != nil || initialHandoverDeadline(call, preparer.protection.observer.now, until) != nil {
+ 		return nil, cfg.ErrUnavailable
+ 	}
+ 	d := sha256.Sum256(b)
+ 	life, cancel := context.WithCancel(ctx)
+-	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), ctx: life, cancel: cancel}
++	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, ctx: life, cancel: cancel}
+ 	if _, e = s.object(contracts.InitialRuntimeResourceState{}, 0); e != nil {
+ 		s.Close()
+ 		return nil, e
+@@ -149,7 +152,7 @@
+ 	if e != nil {
+ 		return time.Time{}, e
+ 	}
+-	if root.RootUID != s.preparer.rootUID || !equalJSON(c, s.initial) || initialPreparationWitnessScope(c) != s.record.Scope {
++	if root.RootUID != s.rootUID || !equalJSON(c, s.initial) || initialPreparationWitnessScope(c) != s.record.Scope {
+ 		return time.Time{}, cfg.ErrChanged
+ 	}
+ 	if _, end, e := mtls.OwnerTrustRoots(s.ownerRoots, s.now()); e != nil {
+--- /dev/null
++++ b/internal/adapters/kubernetes/initial_runtime_root_pin_test.go
+@@ -0,0 +1,163 @@
++package kubernetes
++
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"errors"
++	"strings"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	"asservat.local/asservat/internal/domain/audit"
++	cfg "asservat.local/asservat/internal/domain/configuration"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// The protected API/root facts and SQL receipt in this fixture are synthetic.
++// It exercises the actual constructors and original handover read graph, not
++// native admission or independent database activation.
++type rootPinEffectFixture struct {
++	record  audit.InitialInstallation
++	receipt audit.Receipt
++	effects int
++}
++
++func (s *rootPinEffectFixture) InitialRuntimeBridgeRecord() (audit.InitialInstallation, audit.Receipt) {
++	return s.record, s.receipt
++}
++func (s *rootPinEffectFixture) WithInitialRuntimeBridge(ctx context.Context, run func(context.Context) error) error {
++	s.effects++
++	return run(ctx)
++}
++
++func rootPinEffects(t *testing.T, p *InitialPreparer, root contracts.InitialPreparationRoot) *rootPinEffectFixture {
++	t.Helper()
++	c, err := p.inputConfiguration(root)
++	if err != nil {
++		t.Fatal(err)
++	}
++	raw, err := json.Marshal(c)
++	if err != nil {
++		t.Fatal(err)
++	}
++	now := time.Now().UTC().Truncate(time.Microsecond)
++	record := audit.InitialInstallation{Scope: initialPreparationWitnessScope(c), Claim: fleet.InitialActivationClaim{
++		ID: ownerID(971), Database: fleet.DatabaseIncarnation{StartedAt: now.Add(-time.Hour), DatabaseOID: 1, SchemaVersion: 53},
++		FleetSource: identity.Revision{UID: c.FleetSource.UID, Generation: 1, Digest: artifact.Digest{1}},
++		PlanDigest:  sha256.Sum256(raw), NotBefore: now.Add(-time.Minute), NotAfter: now,
++	}}
++	receipt := audit.Receipt{Key: audit.InitialInstallationKey(record.Scope.InstallationID, record.Claim.ID), ETag: "original", Bytes: 1, SHA256: artifact.Digest{2}}
++	if !record.Valid() || !receipt.ValidInitialInstallation(record.Scope.InstallationID, record.Claim.ID) {
++		t.Fatal("invalid synthetic original record")
++	}
++	return &rootPinEffectFixture{record: record, receipt: receipt}
++}
++
++func rootPinSource(t *testing.T, resources *InitialRuntimeResources, effects *rootPinEffectFixture) (*ConfigurationRoleSource, cfg.InitialRuntimeBridgeAdministration) {
++	t.Helper()
++	now := time.Now().UTC().Truncate(time.Microsecond)
++	v := contracts.InitialRuntimeResourceState{Format: contracts.InitialRuntimeResourcesFormat, BindingDigest: resources.binding, SetupID: ownerID(972), CreatedAt: now, Until: now.Add(30 * time.Minute), Objects: []contracts.InitialRuntimeResourceClaim{}}
++	for i, item := range initialRuntimeResourceItems {
++		obj, err := resources.object(v, i)
++		if err != nil {
++			t.Fatal(err)
++		}
++		v.Objects = append(v.Objects, contracts.InitialRuntimeResourceClaim{Item: item, OperationID: ownerID(1000 + i), TemplateDigest: preparationDigest(obj.object), ClaimedAt: now, Until: now.Add(5 * time.Second), Receipt: &contracts.InitialRuntimeResourceReceipt{UID: ownerID(1100 + i), ResourceVersion: "1", Generation: 1}})
++	}
++	in, err := resources.inventory(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	a := in.BridgeAdministration
++	// No source effect is called by these constructor/root-mismatch tests.
++	// Current source enforcement is qualified by the separate native matrix.
++	s := &ConfigurationRoleSource{client: &PermissionClient{control: a.Initial.ControlNamespace, now: time.Now}, protection: &OwnerWorkloadProtection{plan: a.Owner}, fleet: &ProtectedFleetSettings{settings: &FleetSettingsClient{}, protection: &FleetConfigurationProtection{configMapProtection: &configMapProtection{}}}, owner: &OwnerConfigurationSource{protection: &OwnerConfigurationProtection{configMapProtection: &configMapProtection{}}}, input: contracts.ConfigurationRuntimeRoles{InstallationID: effects.record.Scope.InstallationID, InitialClaimID: effects.record.Claim.ID, ClusterID: resources.initial.ClusterID, Namespace: in.Namespace, FleetSource: in.FleetSource, OwnerSource: in.OwnerSource}}
++	return s, a
++}
++
++func TestInitialRuntimeRootPinOriginalCreationInputAndReplacement(t *testing.T) {
++	f, preparer, original := handoverConflictFixture(t)
++	if preparer.rootUID != "" || original.RootUID == "" {
++		t.Fatal("fixture must preserve original creation input and acknowledged UID")
++	}
++	effects := rootPinEffects(t, preparer, original)
++	roots := [][]byte{ownerConfigurationTestRoot(t, time.Now())}
++	resources, err := NewInitialRuntimeResources(context.Background(), preparer, effects, roots)
++	if err != nil {
++		t.Fatal("completed original creation input rejected", err)
++	}
++	defer resources.Close()
++	if preparer.rootUID != "" || effects.effects != 0 {
++		t.Fatal("constructor changed shared preparer or entered SQL effects")
++	}
++	if _, err = resources.current(context.Background()); err != nil {
++		t.Fatal("current original acknowledged root rejected", err)
++	}
++	source, administration := rootPinSource(t, resources, effects)
++	bridge, err := NewInitialRuntimeBridge(context.Background(), preparer, source, effects, administration)
++	if err != nil {
++		t.Fatal("bridge rejected original unpinned creation input", err)
++	}
++	defer bridge.Close()
++	if preparer.rootUID != "" {
++		t.Fatal("bridge changed shared preparer")
++	}
++
++	// Explicitly pinned reopens and original creation inputs must derive the
++	// same durable binding. Root pinning is not a new attempt or new authority.
++	f.config.RootUID = original.RootUID
++	pinned := f.preparer(t)
++	defer pinned.Close()
++	again, err := NewInitialRuntimeResources(context.Background(), pinned, effects, roots)
++	if err != nil {
++		t.Fatal("exact pinned reopen", err)
++	}
++	defer again.Close()
++	b2, err := NewInitialRuntimeBridge(context.Background(), pinned, source, effects, administration)
++	if err != nil {
++		t.Fatal("exact pinned bridge reopen", err)
++	}
++	defer b2.Close()
++	if again.binding != resources.binding || b2.binding != bridge.binding {
++		t.Fatal("same actual original root changed durable binding")
++	}
++	f.config.RootUID = ownerID(1200)
++	wrong := f.preparer(t)
++	defer wrong.Close()
++	if value, e := NewInitialRuntimeResources(context.Background(), wrong, effects, roots); e == nil {
++		value.Close()
++		t.Fatal("explicit contrary root pin ignored")
++	}
++
++	// A self-consistent replacement cannot become the current root for an
++	// already-constructed component even though the shared original input is
++	// still empty. This deliberately changes both the metadata and self pin.
++	replacement := original
++	replacement.RootUID = ownerID(1201)
++	setSyntheticHandoverRoot(t, f, preparer, replacement)
++	f.mu.Lock()
++	f.objects[preparer.rootPath()]["metadata"].(map[string]any)["uid"] = replacement.RootUID
++	f.mu.Unlock()
++	if _, e := resources.current(context.Background()); !errors.Is(e, cfg.ErrChanged) {
++		t.Fatal("resource component adopted changed root", e)
++	}
++	ctx, end := context.WithTimeout(context.Background(), 5*time.Second)
++	defer end()
++	if _, _, _, e := bridge.current(ctx, contracts.InitialRuntimeBridgeState{}); !errors.Is(e, cfg.ErrChanged) {
++		t.Fatal("bridge component adopted changed root", e)
++	}
++	if _, e := bridge.CreateInitialRuntimeBridge(context.Background()); !errors.Is(e, cfg.ErrChanged) {
++		t.Fatal("bridge CREATE adopted changed root", e)
++	}
++	f.mu.Lock()
++	defer f.mu.Unlock()
++	for path, count := range f.posts {
++		if strings.HasSuffix(path, "/secrets/"+bridge.name()) && count != 0 {
++			t.Fatal("changed-root bridge journal was created")
++		}
++	}
++}

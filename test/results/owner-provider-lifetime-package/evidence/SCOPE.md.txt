@@ -1,0 +1,9 @@
+# Private provider lifetime checkpoint
+
+Six paths compose the private standard Kubernetes-auth control client with four independently owned purposes and finite credential borrows. No runtime profile selector, installed current-authority constructor, scheduled supervisor, or provider effect adapter is enabled by this checkpoint.
+
+Each fresh control call owns its original caller/5-second/current-proof interval. Concurrent callers do not join another caller identity or deadline. Unknown login is not recovered or replayed; subsequent independent login is bounded by 1/2/4/8/16/30-second backoff. Unknown renewal permits only exact same-token reconciliation while its original bounds remain usable. New credential publication requires the final private current-proof check. The eventual installed constructor must supply actual native/source/recovery proof; test proof callbacks are synthetic.
+
+At most one current and one draining acknowledged credential are retained per purpose. Existing response borrows keep their own original token and expiry, including across positive renewal. A held draining response prevents a third token. Borrowing never authenticates, renews or inspects provider state. Close cancels all purposes first, waits for real control/body closure within the earlier caller/10-second bound, and retains unjoined ownership on timeout. Provider self-revocation failure is not a refund or a provider deletion assertion.
+
+The tests use synthetic TLS provider replies and accelerated local clock observations. Earlier actual pinned-provider native qualification established response shapes and Pod deletion/renewal behavior; this checkpoint does not claim timed kubelet rotation, actual JWT expiry or installed process qualification.

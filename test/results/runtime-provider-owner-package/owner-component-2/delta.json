@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/initial_runtime_owner_continuation_native_test.go",
+    "before_sha256": "7cd319c3bf8e3920d84ec76a6ba81f387cb899194e26dcfc567769d6c8b31be4",
+    "after_sha256": "624e6600fa5cfde174225d7cef48ee7acc6a619ece604fc2fac613e1bcfbdc75"
+  },
+  {
+    "path": "test/integration/initial_runtime_worker_source_native_test.go",
+    "before_sha256": "8fb476449cdbd2cc93039ae9301f654e26479169eaae306f029acaf0a8c1a7f9",
+    "after_sha256": "d7716ff2684613c29d78895079fcf1b13caf91d7765f558edad8fe3c9fddcb0a"
+  }
+]

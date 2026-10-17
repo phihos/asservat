@@ -1,0 +1,21 @@
+{
+  "manifest": {
+    "paths": 1,
+    "dependencies": 1621,
+    "files": {
+      "payload": "c7318ac64e810ec8d699de0f2cacbf016abec2a1150497d0cf241cf062a99318",
+      "bases": "64c5ea3b4eac6461c43c9c5f3abf7fc76164c8da8de17b368e6a3827b998d4b6",
+      "dependencies": "6b6f5b33ccbe091d8b84379a92e575d82ee7191497baad78930d99f50c07b99e",
+      "overlay": "8b57a0d23ca6a2d0493f8d023694751b77f6da2e6884d3611ab76cb885d85aff"
+    }
+  },
+  "files": [
+    {
+      "path": "test/integration/owner_capacity_probe_test.go",
+      "base_sha256": "8603874e25db6a8ba5466770ec5113b645eb7421a54d47a434ec936671c644fb",
+      "payload_sha256": "8d303acb419de205f04e4ad376ae67b6c352a3b3979887b2f84ca3222336f7c7"
+    }
+  ],
+  "dependencies": 1621,
+  "scope": "Fixture correction only; native requalification pending; both packages validated before any live mutation"
+}

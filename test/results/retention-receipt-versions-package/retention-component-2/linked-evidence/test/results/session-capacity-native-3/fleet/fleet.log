@@ -1,0 +1,256 @@
+=== RUN   TestBootstrapChannelWithRealOpenBao
+=== RUN   TestBootstrapChannelWithRealOpenBao/immutable-channel-role-and-binding
+=== RUN   TestBootstrapChannelWithRealOpenBao/replaced-version-rejected
+=== RUN   TestBootstrapChannelWithRealOpenBao/deleted-credential-is-not-recreated
+=== RUN   TestBootstrapChannelWithRealOpenBao/expiry-and-provider-revocation
+--- PASS: TestBootstrapChannelWithRealOpenBao (0.08s)
+    --- PASS: TestBootstrapChannelWithRealOpenBao/immutable-channel-role-and-binding (0.00s)
+    --- PASS: TestBootstrapChannelWithRealOpenBao/replaced-version-rejected (0.00s)
+    --- PASS: TestBootstrapChannelWithRealOpenBao/deleted-credential-is-not-recreated (0.01s)
+    --- PASS: TestBootstrapChannelWithRealOpenBao/expiry-and-provider-revocation (0.00s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/actor
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/request
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt
+--- PASS: TestEnrollmentBootstrapIssuanceWithRealServices (1.07s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/requires-credential-and-encrypted-audit (0.34s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/concurrent-retry-creates-one-unchanged-token (0.11s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/immutable-credential-and-audit (0.04s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/suspended (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/recovery (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/epoch (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/revision (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/actor (0.02s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/request (0.02s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/expired-lock (0.33s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/historical-audit-does-not-activate (0.03s)
+    --- PASS: TestEnrollmentBootstrapIssuanceWithRealServices/role-separation-and-terminal-receipt (0.04s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/suspended
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/recovery
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/epoch
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/revision
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/expired-lock
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record
+--- PASS: TestEnrollmentBootstrapReservationsWithRealServices (0.55s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/concurrent-same-key-and-restart-preserve-identity-expiry (0.12s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-active-slot (0.02s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/last-cluster-slot (0.02s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-history-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-active-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-history-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/preexisting-bootstrap-cluster-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/registered-cluster-still-counts (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/suspended (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/revision (0.01s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/expired-lock (0.31s)
+    --- PASS: TestEnrollmentBootstrapReservationsWithRealServices/role-and-immutable-record (0.01s)
+=== RUN   TestEnrollmentSigningWithRealServices
+=== RUN   TestEnrollmentSigningWithRealServices/claim-audit-required
+=== RUN   TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning
+=== RUN   TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume
+=== RUN   TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result
+=== RUN   TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign
+=== RUN   TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds
+=== RUN   TestEnrollmentSigningWithRealServices/missing-certificate-audit
+=== RUN   TestEnrollmentSigningWithRealServices/revoked-bootstrap
+=== RUN   TestEnrollmentSigningWithRealServices/changed-trust
+=== RUN   TestEnrollmentSigningWithRealServices/new-epoch
+=== RUN   TestEnrollmentSigningWithRealServices/recovery
+=== RUN   TestEnrollmentSigningWithRealServices/expiry-while-activation-waits
+=== RUN   TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history
+--- PASS: TestEnrollmentSigningWithRealServices (12.11s)
+    --- PASS: TestEnrollmentSigningWithRealServices/claim-audit-required (0.10s)
+    --- PASS: TestEnrollmentSigningWithRealServices/complete-and-recover-without-resigning (0.36s)
+    --- PASS: TestEnrollmentSigningWithRealServices/invalid-proof-cannot-consume (0.01s)
+    --- PASS: TestEnrollmentSigningWithRealServices/audit-failure-preserves-signed-result (0.09s)
+    --- PASS: TestEnrollmentSigningWithRealServices/parallel-prepare-spends-once-and-restart-cannot-resign (0.12s)
+    --- PASS: TestEnrollmentSigningWithRealServices/uncertain-provider-budget-never-refunds (10.09s)
+    --- PASS: TestEnrollmentSigningWithRealServices/missing-certificate-audit (0.04s)
+    --- PASS: TestEnrollmentSigningWithRealServices/revoked-bootstrap (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/changed-trust (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/new-epoch (0.06s)
+    --- PASS: TestEnrollmentSigningWithRealServices/recovery (0.05s)
+    --- PASS: TestEnrollmentSigningWithRealServices/expiry-while-activation-waits (1.01s)
+    --- PASS: TestEnrollmentSigningWithRealServices/roles-and-write-once-signing-history (0.06s)
+=== RUN   TestEnrollmentWithRealServices
+=== RUN   TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing
+=== RUN   TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable
+=== RUN   TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart
+=== RUN   TestEnrollmentWithRealServices/competing-keys-have-one-winner
+=== RUN   TestEnrollmentWithRealServices/secret
+=== RUN   TestEnrollmentWithRealServices/replacement-key
+=== RUN   TestEnrollmentWithRealServices/revocation-after-claim
+=== RUN   TestEnrollmentWithRealServices/epoch
+=== RUN   TestEnrollmentWithRealServices/recovery
+=== RUN   TestEnrollmentWithRealServices/stale-trust
+=== RUN   TestEnrollmentWithRealServices/expired
+=== RUN   TestEnrollmentWithRealServices/expiry-during-lock
+--- PASS: TestEnrollmentWithRealServices (0.81s)
+    --- PASS: TestEnrollmentWithRealServices/encrypted-claim-audit-before-signing (0.31s)
+    --- PASS: TestEnrollmentWithRealServices/claim-role-cannot-issue-or-enable (0.00s)
+    --- PASS: TestEnrollmentWithRealServices/concurrent-identical-retry-and-restart (0.09s)
+    --- PASS: TestEnrollmentWithRealServices/competing-keys-have-one-winner (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/secret (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/replacement-key (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/revocation-after-claim (0.02s)
+    --- PASS: TestEnrollmentWithRealServices/epoch (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/recovery (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/stale-trust (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/expired (0.01s)
+    --- PASS: TestEnrollmentWithRealServices/expiry-during-lock (0.31s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/epoch
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/source-uid
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/regressed-generation
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/expired-lock
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer
+--- PASS: TestEnrollmentFleetObservationWithRealPostgres (0.49s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/enabled-flag-alone-cannot-activate-database (0.04s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/missing-root-starts-blocked-and-restart-cannot-clear (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-postmaster (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/stale-activation-database (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/current-observation-preserves-original-deadline (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/equal-or-rounded-observation-cannot-extend-or-unfence (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/newer-success-wins-over-delayed-failure-and-old-observation (0.02s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/failed-current-read-fences-without-clearing-recovery (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/epoch (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/source-uid (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/regressed-generation (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/same-generation-new-digest (0.01s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/expired-lock (0.31s)
+    --- PASS: TestEnrollmentFleetObservationWithRealPostgres/role-cannot-clear-recovery-rotate-epoch-or-activate-peer (0.01s)
+=== RUN   TestInitialProviderIssuerWithRealOpenBao
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup
+    initial_provider_issuer_test.go:98: role_only_explicit_max_ttl_zero=true; nonrenewable=true; finite_actual_expiry=true
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/wrap
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-revoke status=204 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=400 exact_invalid_accessor=false single_error=true exact_wrapped_invalid_accessor=true
+    initial_provider_issuer_test.go:157: self-lookup status=403 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+=== RUN   TestInitialProviderIssuerWithRealOpenBao/unwrap
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: self-lookup status=200 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-revoke status=204 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+    initial_provider_issuer_test.go:157: accessor-lookup status=400 exact_invalid_accessor=false single_error=true exact_wrapped_invalid_accessor=true
+    initial_provider_issuer_test.go:157: self-lookup status=403 exact_invalid_accessor=false single_error=false exact_wrapped_invalid_accessor=false
+--- PASS: TestInitialProviderIssuerWithRealOpenBao (0.13s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/role-only-provider-lookup (0.00s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/wrap (0.05s)
+    --- PASS: TestInitialProviderIssuerWithRealOpenBao/unwrap (0.05s)
+=== RUN   TestEnrollmentOwnerConfigurationWithRealServices
+    owner_configuration_sql_test.go:379: real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles/history bound, suspension/recovery/issuer changes, and expiry after proven lock wait
+--- PASS: TestEnrollmentOwnerConfigurationWithRealServices (0.92s)
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-configuration-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-configuration-null-cannot-authorize
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-enrollment-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-enrollment-null-cannot-authorize
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-certificate-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerPKIWithRealServices/retained-certificate-null-cannot-authorize
+=== NAME  TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:27: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:27: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerPKIWithRealServices (12.07s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-configuration-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-configuration-null-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-enrollment-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-enrollment-null-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-certificate-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerPKIWithRealServices/retained-certificate-null-cannot-authorize (0.03s)
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-configuration-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-configuration-null-cannot-authorize
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-enrollment-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-enrollment-null-cannot-authorize
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-certificate-empty-cannot-authorize
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-certificate-null-cannot-authorize
+=== NAME  TestEnrollmentOwnerBootstrapPKIWithRealServices
+    owner_pki_test.go:31: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:31: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices (17.42s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-configuration-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-configuration-null-cannot-authorize (0.02s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-enrollment-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-enrollment-null-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-certificate-empty-cannot-authorize (0.03s)
+    --- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices/retained-certificate-null-cannot-authorize (0.03s)
+=== RUN   TestPeerRegistryWithRealServices
+=== RUN   TestPeerRegistryWithRealServices/read-role-cannot-mint-authority
+=== RUN   TestPeerRegistryWithRealServices/active
+=== RUN   TestPeerRegistryWithRealServices/revocation
+=== RUN   TestPeerRegistryWithRealServices/root-suspended
+=== RUN   TestPeerRegistryWithRealServices/recovery
+=== RUN   TestPeerRegistryWithRealServices/database-process-changed
+=== RUN   TestPeerRegistryWithRealServices/database-recreated
+=== RUN   TestPeerRegistryWithRealServices/epoch
+=== RUN   TestPeerRegistryWithRealServices/cluster
+=== RUN   TestPeerRegistryWithRealServices/missing-audit
+=== RUN   TestPeerRegistryWithRealServices/expired-trust
+=== RUN   TestPeerRegistryWithRealServices/invalid-trust-revision
+=== RUN   TestPeerRegistryWithRealServices/expired-peer
+=== RUN   TestPeerRegistryWithRealServices/unknown-certificate
+=== RUN   TestPeerRegistryWithRealServices/rotation
+=== RUN   TestPeerRegistryWithRealServices/blocked-read
+--- PASS: TestPeerRegistryWithRealServices (5.26s)
+    --- PASS: TestPeerRegistryWithRealServices/read-role-cannot-mint-authority (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/active (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/revocation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/root-suspended (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/recovery (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/database-process-changed (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/database-recreated (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/epoch (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/cluster (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/missing-audit (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-trust (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/invalid-trust-revision (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/expired-peer (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/unknown-certificate (0.01s)
+    --- PASS: TestPeerRegistryWithRealServices/rotation (0.02s)
+    --- PASS: TestPeerRegistryWithRealServices/blocked-read (5.01s)
+=== RUN   TestConnectorPKIWithRealOpenBao
+=== RUN   TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate
+=== RUN   TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit
+=== RUN   TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS
+=== RUN   TestConnectorPKIWithRealOpenBao/provider-role-and-revocation
+--- PASS: TestConnectorPKIWithRealOpenBao (0.70s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS (0.67s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/provider-role-and-revocation (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	52.656s

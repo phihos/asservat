@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_effects_native_test.go": "/home/phil/.cache/asservat-build/planning/owner-effects-native-20261013/changes/internal/adapters/kms/owner_provider_effects_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_native_test.go": "/home/phil/.cache/asservat-build/planning/owner-effects-native-20261013/changes/internal/adapters/kms/owner_provider_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_effects.go": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1/files/internal/adapters/kms/owner_provider_effects.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kms/owner_provider_effects_test.go": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1/files/internal/adapters/kms/owner_provider_effects_test.go"
+  }
+}

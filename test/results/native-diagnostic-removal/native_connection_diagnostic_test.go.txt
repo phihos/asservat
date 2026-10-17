@@ -1,0 +1,44 @@
+package integration
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Temporary fixture-admin resource observation, outside an authority operation.
+// These fixed counts neither refresh observations nor alter connection capacity.
+func nativeFixtureSQLUsage(t *testing.T, ctx context.Context, admin *pgxpool.Pool, phase string) {
+	t.Helper()
+	call, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	var total, active, idle, roles, maximum int64
+	err := admin.QueryRow(call, `SELECT count(*), count(*) FILTER (WHERE state='active'),
+ count(*) FILTER (WHERE state='idle'), count(DISTINCT usename),
+ current_setting('max_connections')::bigint
+ FROM pg_stat_activity WHERE datname=current_database() AND backend_type='client backend'`).Scan(&total, &active, &idle, &roles, &maximum)
+	if err != nil {
+		t.Logf("native SQL usage phase=%s unavailable", phase)
+		return
+	}
+	t.Logf("native SQL usage phase=%s total=%d active=%d idle=%d roles=%d maximum=%d", phase, total, active, idle, roles, maximum)
+	rows, err := admin.Query(call, `SELECT usename, count(*), count(*) FILTER (WHERE state='idle')
+ FROM pg_stat_activity WHERE datname=current_database() AND backend_type='client backend'
+ GROUP BY usename ORDER BY count(*) DESC, usename LIMIT 8`)
+	if err != nil {
+		t.Logf("native SQL role counts phase=%s unavailable", phase)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var role string
+		var count, idle int64
+		if rows.Scan(&role, &count, &idle) != nil {
+			t.Logf("native SQL role counts phase=%s unavailable", phase)
+			return
+		}
+		t.Logf("native SQL role phase=%s role=%s count=%d idle=%d", phase, role, count, idle)
+	}
+}

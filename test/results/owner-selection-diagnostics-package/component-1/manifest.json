@@ -1,0 +1,22 @@
+{
+  "internal/adapters/kubernetes/owner_bootstrap_selection.go": {
+    "baseSHA256": "6e366159d8c80fee2d004338298fa3b786b5fdfc5d2f28a480bc4ac9fbae7b9c",
+    "sha256": "d58aca77eb0816b6d80c838a64c776a66e1058d6f751475032efcaa3ebc145d9"
+  },
+  "internal/adapters/kubernetes/owner_bootstrap_selection_diagnostics_test.go": {
+    "baseSHA256": null,
+    "sha256": "2565b92fda882d05f102df2567e24608080a993bc987dc55ce82ac7fa78d54b1"
+  },
+  "internal/adapters/kubernetes/owner_identity_operation_diagnostics_test.go": {
+    "baseSHA256": null,
+    "sha256": "2f50d8460703d38814b2305c633a415e2056e39275c4fa9017be3a48abe550f5"
+  },
+  "internal/adapters/kubernetes/owner_identity_operation_native.go": {
+    "baseSHA256": "d97dcadcef35ee88e5569636269b314c34674054b18681eb9f54d9a831a1c70a",
+    "sha256": "dcce1788e8bc7692c2155f55e19a3362ffde07ac4ee746f6fb2a2c3ac847af8b"
+  },
+  "internal/adapters/kubernetes/owner_identity_operation_root.go": {
+    "baseSHA256": "f4ade5e107f6d34ecc4f3923020a1fcb75bbdfd67205ac543e7dbedf24791000",
+    "sha256": "849767e93d3abbb6fb4a89d42c151b256869e1f303b4fcbfa286fc6365ed37f8"
+  }
+}

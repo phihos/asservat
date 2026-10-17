@@ -1,0 +1,12 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/initial_runtime_object_roundtrip_native_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_launch.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/owner_identity_launch.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_projection.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/owner_identity_projection.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_projection_input.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/owner_identity_projection_input.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_projection_input_objects_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/owner_identity_projection_input_objects_test.go",
+    "/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_identity_projection_input_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/internal/adapters/kubernetes/owner_identity_projection_input_test.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_bootstrap_chain_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/test/integration/initial_bootstrap_chain_test.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_runtime_bridge_native_test.go": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/checks/input-1/files/test/integration/initial_runtime_bridge_native_test.go"
+  }
+}

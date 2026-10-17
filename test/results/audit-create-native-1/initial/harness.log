@@ -1,0 +1,2 @@
+python3 scripts/test-custody.py --initial-installation
+Initial-installation integration exit: 0

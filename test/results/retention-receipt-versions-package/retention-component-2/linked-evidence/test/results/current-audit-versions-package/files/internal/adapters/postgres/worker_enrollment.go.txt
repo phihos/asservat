@@ -1,0 +1,453 @@
+package postgres
+
+import (
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
+)
+
+type WorkerEnrollments struct {
+	workers *DownloadWorkers
+	newID   func() string
+}
+
+var _ evidence.WorkerEnrollmentLedger = (*WorkerEnrollments)(nil)
+var _ evidence.WorkerCertificateActivator = (*WorkerEnrollments)(nil)
+var _ auditapp.WorkerEnrollmentAcknowledgements = (*WorkerEnrollments)(nil)
+
+func NewWorkerEnrollments(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g DownloadTransactionGuards, newID func() string) (*WorkerEnrollments, error) {
+	if newID == nil {
+		return nil, artifact.ErrInvalid
+	}
+	w, e := NewDownloadWorkers(ctx, pool, root, p, g)
+	if e != nil {
+		return nil, e
+	}
+	return &WorkerEnrollments{w, newID}, nil
+}
+func (s *WorkerEnrollments) withProof(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority, f func(context.Context, *custodydb.Queries, time.Time) error) error {
+	if s == nil || ctx == nil || !p.Valid(p.ObservedAt) || p.Worker.Intent.Profile != s.workers.profile || p.Worker.Intent.Authority.Scope != a.Scope {
+		return artifact.ErrInvalid
+	}
+	ctx, end := context.WithDeadline(ctx, p.FreshUntil)
+	defer end()
+	return s.workers.withSession(ctx, p.Worker.Intent.SessionID, a, func(q *custodydb.Queries, _ artifact.DownloadSession, _ time.Time) error {
+		row, e := q.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(p.Worker.Intent.ID), RootID: id(s.workers.downloads.root)})
+		if e != nil {
+			return e
+		}
+		w, e := currentAuditedWorker(row)
+		if e != nil || w != p.Worker || row.TerminationJson != nil || row.RetiredProofJson != nil {
+			return artifact.ErrDownloadExpired
+		}
+		check := func() (time.Time, error) {
+			n, e := q.CurrentTime(ctx)
+			if e != nil {
+				return time.Time{}, e
+			}
+			if !p.Valid(n.Time) {
+				return n.Time, artifact.ErrDownloadExpired
+			}
+			return n.Time, nil
+		}
+		now, e := check()
+		if e != nil {
+			return e
+		}
+		if e = f(ctx, q, now); e != nil {
+			return e
+		}
+		_, e = check()
+		return e
+	})
+}
+func decodeWorkerEnrollment(r custodydb.DownloadWorkerEnrollment, w value.DownloadWorker) (value.WorkerEnrollment, error) {
+	var e value.WorkerEnrollment
+	if json.Unmarshal(r.EnrollmentJson, &e) != nil || !e.Valid() || e.Worker != w || uid(r.WorkerID) != w.Intent.ID {
+		return e, artifact.ErrIntegrity
+	}
+	return e, nil
+}
+func enrollmentReceipt(r custodydb.DownloadWorkerEnrollment, e value.WorkerEnrollment) (audit.Receipt, bool, error) {
+	var receipt audit.Receipt
+	if r.AuditReceiptJson == nil {
+		return receipt, false, nil
+	}
+	if json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerEnrollment(e) {
+		return receipt, false, artifact.ErrIntegrity
+	}
+	return receipt, true, nil
+}
+func (s *WorkerEnrollments) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerEnrollment, audit.Receipt, bool, error) {
+	var out value.WorkerEnrollment
+	var receipt audit.Receipt
+	var ack bool
+	err := s.withProof(ctx, p, a, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+		r, e := q.ReadWorkerEnrollment(ctx, id(p.Worker.Intent.ID))
+		if errors.Is(e, pgx.ErrNoRows) {
+			out = value.WorkerEnrollment{Worker: p.Worker, PublicKeyDigest: p.PublicKeyDigest, ClaimedAt: now.UTC()}
+			if !out.Valid() {
+				return artifact.ErrInvalid
+			}
+			b, _ := json.Marshal(out)
+			return q.InsertWorkerEnrollment(ctx, custodydb.InsertWorkerEnrollmentParams{WorkerID: id(p.Worker.Intent.ID), EnrollmentJson: b})
+		}
+		if e != nil {
+			return e
+		}
+		out, e = decodeWorkerEnrollment(r, p.Worker)
+		if e != nil {
+			return e
+		}
+		if out.PublicKeyDigest != p.PublicKeyDigest {
+			return artifact.ErrDownloadConflict
+		}
+		receipt, ack, e = enrollmentReceipt(r, out)
+		return e
+	})
+	if err != nil {
+		return value.WorkerEnrollment{}, audit.Receipt{}, false, err
+	}
+	return out, receipt, ack, nil
+}
+func decodeWorkerCertificateAttempt(r custodydb.DownloadWorkerCertificate) (value.WorkerCertificateAttempt, error) {
+	var a value.WorkerCertificateAttempt
+	if json.Unmarshal(r.AttemptJson, &a) != nil || !a.Valid(a.CheckedAt) || a.ID != uid(r.ID) || a.Enrollment.Worker.Intent.ID != uid(r.WorkerID) || int(r.Epoch) != a.Epoch || int(r.Ordinal) != a.Ordinal {
+		return a, artifact.ErrIntegrity
+	}
+	return a, nil
+}
+func decodeWorkerCertificate(r custodydb.DownloadWorkerCertificate, a value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
+	var c value.WorkerCertificate
+	if json.Unmarshal(r.CertificateJson, &c) != nil || !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || !bytes.Equal(r.CertificateSha256, c.Peer.Certificate[:]) {
+		return c, artifact.ErrIntegrity
+	}
+	return c, nil
+}
+func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, authority artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
+	var out value.WorkerCertificateProgress
+	err := s.withProof(ctx, p, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+		out = value.WorkerCertificateProgress{}
+		r, e := q.ReadWorkerEnrollment(ctx, id(p.Worker.Intent.ID))
+		if e != nil {
+			return e
+		}
+		enrollment, e := decodeWorkerEnrollment(r, p.Worker)
+		if e != nil || enrollment.PublicKeyDigest != p.PublicKeyDigest {
+			return artifact.ErrIntegrity
+		}
+		receipt, ok, e := enrollmentReceipt(r, enrollment)
+		if e != nil || !ok {
+			return artifact.ErrDownloadUnavailable
+		}
+		epoch, until, e := value.WorkerCertificateEpoch(p.Worker, now)
+		if e != nil {
+			return e
+		}
+		rows, e := q.ReadWorkerCertificateEpoch(ctx, custodydb.ReadWorkerCertificateEpochParams{WorkerID: r.WorkerID, Epoch: int32(epoch)})
+		if e != nil {
+			return e
+		}
+		if len(rows) > 2 {
+			return artifact.ErrIntegrity
+		}
+		if len(rows) > 0 {
+			row := rows[len(rows)-1]
+			a, e := decodeWorkerCertificateAttempt(row)
+			if e != nil {
+				return e
+			}
+			if a.Enrollment != enrollment || a.RecoveryEpoch != authority.Environment.RecoveryEpoch || a.EnrollmentAudit != receipt.SHA256 {
+				return artifact.ErrIntegrity
+			}
+			out.Attempt = a
+			if row.CertificateJson != nil {
+				c, e := decodeWorkerCertificate(row, a)
+				if e != nil {
+					return e
+				}
+				out.Signed = &c
+				return nil
+			}
+			if now.Before(a.SignBefore) {
+				return nil
+			}
+			if len(rows) == 2 {
+				return artifact.ErrDownloadCapacity
+			}
+		}
+		end := identity.Earlier(p.FreshUntil, identity.Earlier(authority.ValidUntil, identity.Earlier(now.Add(5*time.Second), until)))
+		attempt := value.WorkerCertificateAttempt{ID: s.newID(), Epoch: epoch, Ordinal: len(rows) + 1, Enrollment: enrollment, Proof: p, RecoveryEpoch: authority.Environment.RecoveryEpoch, EnrollmentAudit: receipt.SHA256, CheckedAt: now.UTC(), SignBefore: end, CertificateNotAfter: until}
+		if !attempt.Valid(now) {
+			return artifact.ErrDownloadExpired
+		}
+		b, e := json.Marshal(attempt)
+		if e != nil || len(b) > 65536 {
+			return artifact.ErrInvalid
+		}
+		if e = q.InsertWorkerCertificateAttempt(ctx, custodydb.InsertWorkerCertificateAttemptParams{ID: id(attempt.ID), WorkerID: r.WorkerID, Epoch: int32(epoch), Ordinal: int32(attempt.Ordinal), AttemptJson: b}); e != nil {
+			return e
+		}
+		out = value.WorkerCertificateProgress{Attempt: attempt, MaySign: true}
+		n, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if !attempt.Valid(n.Time) {
+			return artifact.ErrDownloadExpired
+		}
+		return nil
+	})
+	if err != nil {
+		return value.WorkerCertificateProgress{}, err
+	}
+	return out, nil
+}
+func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, c value.WorkerCertificate, authority artifact.DownloadAuthority) error {
+	if !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || a.RecoveryEpoch != authority.Environment.RecoveryEpoch {
+		return artifact.ErrInvalid
+	}
+	b, e := json.Marshal(c)
+	if e != nil || len(b) > 48<<10 {
+		return artifact.ErrInvalid
+	}
+	return s.withProof(ctx, a.Proof, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+		if !a.Valid(now) || !c.Peer.Valid(now) {
+			return artifact.ErrDownloadExpired
+		}
+		r, e := q.ReadWorkerCertificate(ctx, custodydb.ReadWorkerCertificateParams{ID: id(a.ID), WorkerID: id(a.Enrollment.Worker.Intent.ID)})
+		if e != nil {
+			return e
+		}
+		frozen, e := decodeWorkerCertificateAttempt(r)
+		if e != nil || frozen != a {
+			return artifact.ErrIntegrity
+		}
+		if r.CertificateJson != nil {
+			if !bytes.Equal(r.CertificateJson, b) {
+				return artifact.ErrIntegrity
+			}
+			return nil
+		}
+		n, e := q.StoreWorkerCertificate(ctx, custodydb.StoreWorkerCertificateParams{ID: r.ID, WorkerID: r.WorkerID, CertificateJson: b, CertificateSha256: c.Peer.Certificate[:]})
+		if e != nil {
+			return e
+		}
+		if n != 1 {
+			return artifact.ErrDownloadConflict
+		}
+		checked, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if !a.Valid(checked.Time) || !c.Peer.Valid(checked.Time) {
+			return artifact.ErrDownloadExpired
+		}
+		return nil
+	})
+}
+func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt, authority artifact.DownloadAuthority) (value.WorkerCertificate, error) {
+	var out value.WorkerCertificate
+	if a.Enrollment.Worker != p.Worker || a.Enrollment.PublicKeyDigest != p.PublicKeyDigest || a.RecoveryEpoch != authority.Environment.RecoveryEpoch {
+		return out, artifact.ErrInvalid
+	}
+	err := s.withProof(ctx, p, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+		enrollment, e := currentAuditedWorkerEnrollment(ctx, q, p.Worker)
+		if e != nil || enrollment != a.Enrollment {
+			return artifact.ErrDownloadUnavailable
+		}
+
+		r, e := q.ReadWorkerCertificate(ctx, custodydb.ReadWorkerCertificateParams{ID: id(a.ID), WorkerID: id(p.Worker.Intent.ID)})
+		if e != nil {
+			return e
+		}
+		frozen, e := decodeWorkerCertificateAttempt(r)
+		if e != nil || frozen != a {
+			return artifact.ErrIntegrity
+		}
+		out, e = decodeWorkerCertificate(r, a)
+		if e != nil {
+			return e
+		}
+		var receipt audit.Receipt
+		if json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerCertificate(audit.WorkerCertificate{Attempt: a, Peer: out.Peer}) || !out.Peer.Valid(now) {
+			return artifact.ErrDownloadExpired
+		}
+		if r.ActivatedAt.Valid {
+			return nil
+		}
+		n, e := q.ActivateWorkerCertificate(ctx, custodydb.ActivateWorkerCertificateParams{ID: r.ID, WorkerID: r.WorkerID})
+		if e != nil {
+			return e
+		}
+		if n != 1 {
+			return artifact.ErrDownloadConflict
+		}
+		checked, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		if !out.Peer.Valid(checked.Time) {
+			return artifact.ErrDownloadExpired
+		}
+		return nil
+	})
+	if err != nil {
+		return value.WorkerCertificate{}, err
+	}
+	return out, nil
+}
+
+// Historical audit acknowledgement never refreshes profile/identity or turns a
+// signed certificate into an active registration. All writers lock the worker.
+func (s *WorkerEnrollments) auditTransaction(ctx context.Context, w value.DownloadWorker, f func(context.Context, *custodydb.Queries) error) error {
+	if s == nil || ctx == nil || !w.Valid() || w.Intent.Profile != s.workers.profile {
+		return artifact.ErrInvalid
+	}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	return s.workers.downloads.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		row, e := q.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(w.Intent.ID), RootID: id(s.workers.downloads.root)})
+		if e != nil {
+			return e
+		}
+		stored, e := decodeWorker(row)
+		if e != nil || stored != w {
+			return artifact.ErrIntegrity
+		}
+		return f(ctx, q)
+	})
+}
+func (s *WorkerEnrollments) AcknowledgeWorkerEnrollment(ctx context.Context, e value.WorkerEnrollment, receipt audit.Receipt) error {
+	if !receipt.ValidWorkerEnrollment(e) {
+		return artifact.ErrInvalid
+	}
+	return s.auditTransaction(ctx, e.Worker, func(ctx context.Context, q *custodydb.Queries) error {
+		r, err := q.ReadWorkerEnrollment(ctx, id(e.Worker.Intent.ID))
+		if err != nil {
+			return err
+		}
+		frozen, err := decodeWorkerEnrollment(r, e.Worker)
+		if err != nil || frozen != e {
+			return artifact.ErrIntegrity
+		}
+		b, _ := json.Marshal(receipt)
+		if r.AuditReceiptJson != nil {
+			if !bytes.Equal(b, r.AuditReceiptJson) {
+				return artifact.ErrIntegrity
+			}
+			return nil
+		}
+		n, err := q.AcknowledgeWorkerEnrollment(ctx, custodydb.AcknowledgeWorkerEnrollmentParams{WorkerID: r.WorkerID, AuditReceiptJson: b})
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return artifact.ErrDownloadConflict
+		}
+		return nil
+	})
+}
+func (s *WorkerEnrollments) certificateAuditRow(ctx context.Context, q *custodydb.Queries, c audit.WorkerCertificate) (custodydb.DownloadWorkerCertificate, error) {
+	r, e := q.ReadWorkerCertificate(ctx, custodydb.ReadWorkerCertificateParams{ID: id(c.Attempt.ID), WorkerID: id(c.Attempt.Enrollment.Worker.Intent.ID)})
+	if e != nil {
+		return r, e
+	}
+	a, e := decodeWorkerCertificateAttempt(r)
+	if e != nil || a != c.Attempt {
+		return r, artifact.ErrIntegrity
+	}
+	issued, e := decodeWorkerCertificate(r, a)
+	if e != nil || issued.Peer != c.Peer {
+		return r, artifact.ErrIntegrity
+	}
+	return r, nil
+}
+func (s *WorkerEnrollments) ReadWorkerCertificateReceipt(ctx context.Context, c audit.WorkerCertificate) (audit.Receipt, bool, error) {
+	var out audit.Receipt
+	var ok bool
+	if !c.Valid() {
+		return out, false, artifact.ErrInvalid
+	}
+	err := s.auditTransaction(ctx, c.Attempt.Enrollment.Worker, func(ctx context.Context, q *custodydb.Queries) error {
+		r, e := s.certificateAuditRow(ctx, q, c)
+		if e != nil {
+			return e
+		}
+		if r.AuditReceiptJson == nil {
+			return nil
+		}
+		if json.Unmarshal(r.AuditReceiptJson, &out) != nil || !out.ValidWorkerCertificate(c) {
+			return artifact.ErrIntegrity
+		}
+		ok = true
+		return nil
+	})
+	if err != nil {
+		return audit.Receipt{}, false, err
+	}
+	return out, ok, nil
+}
+func (s *WorkerEnrollments) AcknowledgeWorkerCertificate(ctx context.Context, c audit.WorkerCertificate, receipt audit.Receipt) error {
+	if !receipt.ValidWorkerCertificate(c) {
+		return artifact.ErrInvalid
+	}
+	return s.auditTransaction(ctx, c.Attempt.Enrollment.Worker, func(ctx context.Context, q *custodydb.Queries) error {
+		r, e := s.certificateAuditRow(ctx, q, c)
+		if e != nil {
+			return e
+		}
+		b, _ := json.Marshal(receipt)
+		if r.AuditReceiptJson != nil {
+			if !bytes.Equal(b, r.AuditReceiptJson) {
+				return artifact.ErrIntegrity
+			}
+			return nil
+		}
+		n, e := q.AcknowledgeWorkerCertificate(ctx, custodydb.AcknowledgeWorkerCertificateParams{ID: r.ID, WorkerID: r.WorkerID, AuditReceiptJson: b})
+		if e != nil {
+			return e
+		}
+		if n != 1 {
+			return artifact.ErrDownloadConflict
+		}
+		return nil
+	})
+}
+
+func activeWorkerCertificate(ctx context.Context, q *custodydb.Queries, w value.DownloadWorker, peer value.KeyPeer) error {
+	enrollment, err := currentAuditedWorkerEnrollment(ctx, q, w)
+	if err != nil {
+		return err
+	}
+
+	r, e := q.ReadActiveWorkerCertificate(ctx, custodydb.ReadActiveWorkerCertificateParams{WorkerID: id(w.Intent.ID), CertificateSha256: peer.Certificate[:]})
+	if e != nil {
+		return artifact.ErrDownloadUnavailable
+	}
+	a, e := decodeWorkerCertificateAttempt(r)
+	if e != nil || a.Enrollment != enrollment {
+		return artifact.ErrIntegrity
+	}
+	c, e := decodeWorkerCertificate(r, a)
+	if e != nil || c.Peer != peer {
+		return artifact.ErrIntegrity
+	}
+	var receipt audit.Receipt
+	if json.Unmarshal(r.AuditReceiptJson, &receipt) != nil || !receipt.ValidWorkerCertificate(audit.WorkerCertificate{Attempt: a, Peer: peer}) {
+		return artifact.ErrIntegrity
+	}
+	return nil
+}

@@ -1,0 +1,59 @@
+Creating owned synthetic cluster 1
+Fixture command failed: ="" milliseconds=0
+I1011 11:25:29.540782     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:30.041254     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:30.540739     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:31.041488     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:31.540766     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:32.041115     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:32.540726     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:33.041475     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:33.540795     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:34.041572     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:34.541318     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:35.040729     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:35.540754     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1011 11:25:36.041532     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+error: error execution phase wait-control-plane: cannot obtain client without bootstrap: could not bootstrap the admin user in file admin.conf: unable to create ClusterRoleBinding: context deadline exceeded
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:262
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).visitAll
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:450
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:234
+k8s.io/kubernetes/cmd/kubeadm/app/cmd.newCmdInit.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/init.go:134
+github.com/spf13/cobra.(*Command).execute
+	github.com/spf13/cobra@v1.10.2/command.go:1015
+github.com/spf13/cobra.(*Command).ExecuteC
+	github.com/spf13/cobra@v1.10.2/command.go:1148
+github.com/spf13/cobra.(*Command).Execute
+	github.com/spf13/cobra@v1.10.2/command.go:1071
+k8s.io/kubernetes/cmd/kubeadm/app.Run
+	k8s.io/kubernetes/cmd/kubeadm/app/kubeadm.go:48
+main.main
+	k8s.io/kubernetes/cmd/kubeadm/kubeadm.go:25
+runtime.main
+	runtime/proc.go:290
+runtime.goexit
+	runtime/asm_amd64.s:1771
+
+Traceback (most recent call last):
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 228, in <module>
+    raise SystemExit(main(args.test_pattern))
+                     ~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 116, in main
+    run(["kind", "create", "cluster", "--name", name, "--image", NODE, "--kubeconfig", str(config), "--wait", "90s"])
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phil/Projekte/asservat/scripts/test-context-storage.py", line 28, in run
+    return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['kind', 'create', 'cluster', '--name', 'asservat-context-qepsixj6-0', '--image', 'kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5', '--kubeconfig', '/home/phil/.cache/asservat-build/context-qepsixj6/kube-0', '--wait', '90s']' returned non-zero exit status 1.

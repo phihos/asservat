@@ -1,0 +1,6 @@
+=== RUN   TestInitialRuntimeBridgeInstalledOriginalSourceProbes
+    initial_runtime_bridge_installed_probes_test.go:52: complete installed original source probes rejected permission source identity changed
+--- FAIL: TestInitialRuntimeBridgeInstalledOriginalSourceProbes (0.33s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.339s
+FAIL

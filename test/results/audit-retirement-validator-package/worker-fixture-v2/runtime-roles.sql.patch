@@ -1,0 +1,12 @@
+--- a/test/fixtures/sql/runtime-roles.sql
++++ b/test/fixtures/sql/runtime-roles.sql
+@@ -220,7 +220,8 @@
+ GRANT UPDATE(certificate_json,certificate_sha256) ON download_worker_certificate TO worker_enrollment_runtime;
+ GRANT UPDATE(audit_receipt_json) ON download_worker_enrollment,download_worker_certificate TO worker_enrollment_audit_runtime;
+ GRANT UPDATE(activated_at) ON download_worker_certificate TO worker_enrollment_activate_runtime;
+-GRANT SELECT ON download_worker_certificate TO download_worker_identity_runtime;
++-- Current identity verifies both the retained enrollment and certificate audits.
++GRANT SELECT ON download_worker_enrollment,download_worker_certificate TO download_worker_identity_runtime;
+ 
+ -- Active hub request locators have no worker/signing or evidence privileges.
+ CREATE ROLE worker_owner_runtime LOGIN PASSWORD 'synthetic-worker-owner';

@@ -1,0 +1,5 @@
+{
+  "url": "https://github.com/inspektor-gadget/inspektor-gadget/releases/download/v0.57.0/ig-linux-amd64-v0.57.0.tar.gz",
+  "sha256": "f5e3233c6c1ffc3ad068326913e11def23c7cef6c764e585c2205cda0e2f76f1",
+  "verification": "SHA256 from upstream HTTPS release; signature verification not performed"
+}

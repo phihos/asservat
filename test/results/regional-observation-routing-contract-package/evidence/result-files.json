@@ -1,0 +1,12 @@
+{
+  "HANDOFF.md": "f8f65fd1a05f47c597ca7d0cd77e9d9ffda9f46211f556c3c2e7ebe5bd4979ba",
+  "RESULT.json": "7990881d19f9e4a457d2c7b8a6fe1a28a3f5dd527a9fd07664361c7fdab0b9fd",
+  "evidence/architecture.json": "3eab440b2f1b1e260db59d6efa12cbb75858927a5391c29562a5112e30f22bb0",
+  "evidence/architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "evidence/compile.json": "08463e7a32ff0150454947f8c066f0579e790cca5ccfd0b9e0211c91a87a0245",
+  "evidence/compile.log": "f47900a793d6a0f91d83956528c91331689f405d31aceebcbb48774009448d06",
+  "evidence/race.json": "db287d717cb65b0fe572a9b4b322c25b32eb779580547d50481a6dcc884544c0",
+  "evidence/race.log": "7d93b21ba2d702148fdb0baf371fa0ba1d8c837c0caec5a41c2dcd1d94cfeef8",
+  "evidence/vet.json": "950de317904f6676b6ba05776873588b499c96d9059239de5f8981181fab4e51",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

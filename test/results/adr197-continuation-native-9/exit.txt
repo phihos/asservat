@@ -1,0 +1,1 @@
+exit=stopped (launched at host load 5.2/10.3 from another session; stopped by me during the image build before any cluster existed; its temp dir was removed)

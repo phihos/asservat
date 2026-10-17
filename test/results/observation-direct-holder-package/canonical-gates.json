@@ -1,0 +1,22 @@
+{
+  "attempts": [
+    {
+      "command": "make spec-check architecture-check design-check go-architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "exit": 2,
+      "log": "canonical-gates.log",
+      "failure": "Archived markdown source was discovered as canonical linked documentation."
+    },
+    {
+      "command": "make spec-check architecture-check design-check go-architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "exit": 0,
+      "log": "canonical-gates-2.log",
+      "correction": "Archive only: source markdown renamed with .txt suffix; original bytes unchanged."
+    }
+  ],
+  "canonicalDocumentation": {
+    "docs/architecture/cluster-observations.md": "b2518e19e98e912df117d3e5bdfb8dbe95e6876609c42c946ca04f22536bbe7d",
+    "docs/decisions/144-cluster-local-observations.md": "f4892955da491d95d663a1397ed2d7939ddb47c520d9a9ebe98b38868e8e9c25",
+    "docs/decisions/150-operation-owned-native-observation-proof.md": "adef4253a7eba41fb3e870cc16965a086c9d60d28a8966889605d375606b98c4",
+    "docs/decisions/README.md": "b94b741cfcfd6e6e2eb08f8dbb78b83c781877b9ce07e87c0bab4fc18ec5e679"
+  }
+}

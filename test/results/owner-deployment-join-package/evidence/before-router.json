@@ -1,0 +1,31 @@
+{
+  "phase": "before-router",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/before-router-overlay.json",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-v",
+    "-run",
+    "^TestWorker(RoutesCloseAndJoin|OwnerWrappersJoin)",
+    "./internal/application/evidence"
+  ],
+  "exit": 1,
+  "expected_exit": 1,
+  "intended_before": true,
+  "seconds": 3.024,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "auxiliary": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "auxiliary": []
+  }
+}

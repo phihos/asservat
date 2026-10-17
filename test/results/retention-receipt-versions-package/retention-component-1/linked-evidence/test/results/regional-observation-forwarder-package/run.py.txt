@@ -1,0 +1,43 @@
+from pathlib import Path
+import hashlib,json,os,signal,subprocess,time
+stage=Path(__file__).resolve().parent
+repo=Path('/home/phil/Projekte/asservat')
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+maps={name:json.loads((stage/(name+'.json')).read_text()) for name in ['payload','bases','dependencies','mirror']}
+def check():
+    actual=set(subprocess.run(['rg','--files','-g','*.go','-g','go.mod','-g','go.sum'],cwd=repo,capture_output=True,text=True,check=True).stdout.splitlines())
+    expected={k for k in maps['dependencies'] if k.endswith('.go') or Path(k).name in {'go.mod','go.sum'}}
+    mirror={str(p.relative_to(stage/'mirror')) for p in (stage/'mirror').rglob('*') if p.is_file()}
+    return {'live':[k for k,v in maps['dependencies'].items() if sha(repo/k)!=v], 'bases':[k for k,v in maps['bases'].items() if sha(repo/k)!=v], 'payload':[k for k,v in maps['payload'].items() if sha(stage/'files'/k)!=v], 'fileSet':sorted(actual^expected), 'mirror':[k for k,v in maps['mirror'].items() if sha(stage/'mirror'/k)!=v], 'mirrorSet':sorted(mirror^set(maps['mirror'])), 'freeze':[k for k,v in json.loads((stage/'freeze.json').read_text()).items() if sha(stage/k)!=v]}
+evidence=stage/'evidence'
+evidence.mkdir(exist_ok=False)
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(stage/'tmp'))
+reports=[]
+def phase(name,command,cwd=repo):
+    before=check()
+    if any(before.values()):
+        (evidence/(name+'-preflight.json')).write_text(json.dumps(before,indent=2)+'\n')
+        raise SystemExit('immutable preflight failed')
+    start=time.monotonic()
+    with (evidence/(name+'.log')).open('x') as log:
+        p=subprocess.Popen(command,cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        print(json.dumps({'phase':name,'pid':p.pid,'command':command}),flush=True)
+        try: code=p.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid,signal.SIGTERM)
+            try:p.wait(timeout=5)
+            except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+            code=124
+    after=check()
+    result={'phase':name,'command':command,'cwd':str(cwd),'exit':code,'seconds':round(time.monotonic()-start,3),'before':before,'after':after}
+    (evidence/(name+'.json')).write_text(json.dumps(result,indent=2)+'\n');reports.append(result)
+    print(json.dumps(result),flush=True)
+    if code!=0 or any(after.values()):raise SystemExit(1)
+overlay=['-overlay',str(stage/'overlay.json')]
+packages=['./internal/application/fleet','./internal/adapters/mtls','./internal/bootstrap','./internal/transport/clusterobservation']
+phase('compile',['go','test',*overlay,'-vet=off','-run','^$',*packages])
+selected='^Test(OwnerObservationForwarder|OwnerClientObservationRequiresAllCurrentBoundaries|OwnerAuthenticationRequiresAllCurrentBoundaries|OwnerServingRequiresAllCurrentBoundaries|OwnerClientRequiresAllCurrentBoundaries|ObservationRouting|OwnerObservationRouting)'
+phase('race',['go','test',*overlay,'-race','-vet=off','-count=1','-timeout=120s','-run',selected,'-v',*packages])
+phase('vet',['go','vet',*overlay,*packages])
+phase('architecture',['make','go-architecture-check'],stage/'mirror')
+print(json.dumps({'terminal':0,'finalHashes':check()}),flush=True)

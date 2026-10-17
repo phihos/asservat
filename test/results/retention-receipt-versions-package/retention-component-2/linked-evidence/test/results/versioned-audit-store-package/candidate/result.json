@@ -1,0 +1,79 @@
+{
+  "scope": "Explicit version-required audit store component only; no installed selection or backend IAM qualification",
+  "manifest": "2ae09356432300bb6877cb0654840ddc2eb72290e5fd2652ba3ab673b7880974",
+  "dependencies": "25b46f3117bda0d821b61c7e5c0ce6be70836215bf62c6b1f26a48cfd18ff0a0",
+  "runner": "cadcfef64cee4c0b78afaf02259fe206892eb92428189176264f7f9ad5367cb8",
+  "dependencyCount": 1825,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/objectstore/..."
+      ],
+      "exit": 0,
+      "seconds": 1.698,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=120s",
+        "-v",
+        "./internal/adapters/objectstore/..."
+      ],
+      "exit": 0,
+      "seconds": 9.159,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/versioned-audit-store-20261013/check-1/overlay.json",
+        "./internal/adapters/objectstore/..."
+      ],
+      "exit": 0,
+      "seconds": 0.396,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": []
+      }
+    }
+  ],
+  "terminalExit": 0
+}

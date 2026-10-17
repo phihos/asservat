@@ -1,0 +1,22 @@
+{
+  "component": "/home/phil/.cache/asservat-build/planning/owner-audit-inventory-20261013/checks/native-component-1",
+  "componentPins": {
+    "manifest.json": "7b0ecade4073c62afd3c1a69a8a94170c264857ee55af6df4131474fb762408a",
+    "dependencies.json": "c6c64b969ef7925e51d2b178d8c8663f21ff31b519e47f93aa6af50a4e90b7b4",
+    "args.json": "694f7c46c35eb3ea65c81046e34f75d8480323f2e894adf2318e6cf0b91dabfd",
+    "run.py": "81abb50b990c1d84948934642b23185a86c17faf5ebd0d6e8020bc397501f8f9",
+    "result.json": "2562b2a54397d70c9d702d0134499d40bda429b14137cfc7a93067d36aa16372"
+  },
+  "runner": "a2aa4242255557f1f62fe63e85f2e48fb071e1da75d15c42c1481787088a4f39",
+  "before": {
+    "componentPins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [],
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scope": "read-only scoped physical owner audit inventory; no installed reserve/retirement/refund",
+  "scratch": "/tmp/asservat-owner-inventory-native-bt80at1o"
+}

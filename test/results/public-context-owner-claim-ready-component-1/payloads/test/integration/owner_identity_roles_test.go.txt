@@ -1,0 +1,561 @@
+package integration
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Explicit synthetic Secret/CAS side for the real SQL matrix. The actual native
+// protected Secret adapter needs separate qualification; this fixture is never an
+// installed producer, namespace guard or grant of current recovery authority.
+type ownerIdentitySQLRoot struct {
+	mu                     sync.Mutex
+	value                  contracts.OwnerIdentityRoleSnapshot
+	lostClaim, lostReceipt bool
+	claims, receipts       int
+	beforeClaim            func()
+	afterRead              func()
+}
+
+func (r *ownerIdentitySQLRoot) snapshot(ctx context.Context) contracts.OwnerIdentityRoleSnapshot {
+	b, _ := json.Marshal(r.value)
+	defer clear(b)
+	var v contracts.OwnerIdentityRoleSnapshot
+	_ = json.Unmarshal(b, &v)
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	v.ValidUntil = n.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok && d.Before(v.ValidUntil) {
+		v.ValidUntil = d
+	}
+	return v
+}
+func (r *ownerIdentitySQLRoot) OpenOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	return r.ReadOwnerIdentityRoles(ctx)
+}
+func (r *ownerIdentitySQLRoot) ReadOwnerIdentityRoles(ctx context.Context) (contracts.OwnerIdentityRoleSnapshot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ctx.Err() != nil {
+		return contracts.OwnerIdentityRoleSnapshot{}, ctx.Err()
+	}
+	value := r.snapshot(ctx)
+	if r.afterRead != nil {
+		run := r.afterRead
+		r.afterRead = nil
+		run()
+	}
+	return value, nil
+}
+func (r *ownerIdentitySQLRoot) ClaimOwnerIdentityRole(ctx context.Context, purpose string, db uint32, postmaster time.Time) (contracts.OwnerIdentityRoleSnapshot, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ctx.Err() != nil {
+		return contracts.OwnerIdentityRoleSnapshot{}, false, ctx.Err()
+	}
+	for i := range r.value.State.Roles {
+		role := &r.value.State.Roles[i]
+		if role.Purpose != purpose {
+			continue
+		}
+		if role.Claim != nil {
+			return r.snapshot(ctx), false, nil
+		}
+		n := time.Now().UTC().Truncate(time.Microsecond)
+		until := n.Add(5 * time.Second)
+		if d, ok := ctx.Deadline(); ok && d.Before(until) {
+			until = d
+		}
+		if r.value.State.Until.Before(until) {
+			until = r.value.State.Until
+		}
+		until = until.Truncate(time.Microsecond)
+		if !n.Before(until) {
+			return contracts.OwnerIdentityRoleSnapshot{}, false, cfg.ErrUnavailable
+		}
+		role.Claim = &contracts.PublicRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster}
+		r.claims++
+		if r.beforeClaim != nil {
+			r.beforeClaim()
+			r.beforeClaim = nil
+		}
+		if r.lostClaim {
+			r.lostClaim = false
+			return contracts.OwnerIdentityRoleSnapshot{}, false, cfg.ErrUnavailable
+		}
+		return r.snapshot(ctx), true, nil
+	}
+	return contracts.OwnerIdentityRoleSnapshot{}, false, cfg.ErrInvalid
+}
+func (r *ownerIdentitySQLRoot) CompleteOwnerIdentityRole(ctx context.Context, original contracts.OwnerIdentityRoleSnapshot, purpose string, receipt contracts.PublicRuntimeRoleReceipt) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if r.lostReceipt {
+		r.lostReceipt = false
+		return cfg.ErrUnavailable
+	}
+	for i := range r.value.State.Roles {
+		role := &r.value.State.Roles[i]
+		if role.Purpose != purpose {
+			continue
+		}
+		if role.Claim == nil || original.State.Roles[i].Claim == nil || !ownerIdentityFixtureClaimEqual(*role.Claim, *original.State.Roles[i].Claim) {
+			return cfg.ErrChanged
+		}
+		if role.Receipt != nil {
+			if *role.Receipt != receipt {
+				return cfg.ErrChanged
+			}
+			return nil
+		}
+		r.receipts++
+		role.Receipt = &receipt
+		return nil
+	}
+	return cfg.ErrInvalid
+}
+func newOwnerIdentitySQLRoot(t *testing.T, input contracts.OwnerIdentityRoles) *ownerIdentitySQLRoot {
+	t.Helper()
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	r := &ownerIdentitySQLRoot{value: contracts.OwnerIdentityRoleSnapshot{State: contracts.OwnerIdentityRoleState{Format: contracts.OwnerIdentityRoleStateFormat, Input: input, OperationID: custodyID(), CreatedAt: n, Until: n.Add(30 * time.Minute)}, UID: custodyID(), ResourceVersion: "1"}}
+	for _, p := range contracts.OwnerIdentityRolePurposes() {
+		b := make([]byte, 32)
+		if _, e := rand.Read(b); e != nil {
+			t.Fatal(e)
+		}
+		r.value.State.Roles = append(r.value.State.Roles, contracts.PublicRuntimeRoleMaterial{Purpose: p, Password: base64.RawURLEncoding.EncodeToString(b)})
+		clear(b)
+	}
+	return r
+}
+
+// The caller creates the original installation through InitialInstaller + real
+// SQL/S3/KMS audit. Only its existing explicitly synthetic witness/source facts
+// are reused here; no fixture UPDATE clears a recovery fence for this producer.
+func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, a fleet.Administration, mode string) {
+	t.Helper()
+	input := contracts.OwnerIdentityRoles{Format: contracts.OwnerIdentityRolesFormat, InstallationID: scope.InstallationID, InitialClaimID: claim, OwnerConfigurationUID: custodyID(), ClusterID: scope.ClusterID, Namespace: contracts.WorkerObjectReference{Name: scope.Namespace, UID: scope.NamespaceUID}, LayoutDigest: postgres.OwnerIdentityRoleLayoutDigest(), OwnerLayout: contracts.OwnerInstalledLayout, Resources: contracts.WorkerObjectReference{Name: "original-resources", UID: custodyID()}, ResourceSetupID: custodyID(), ResourceBinding: strings.Repeat("1", 64), Deployment: contracts.WorkerObjectReference{Name: "original-owner", UID: custodyID()}, ServiceAccount: contracts.WorkerObjectReference{Name: "original-owner", UID: custodyID()}}
+	root := newOwnerIdentitySQLRoot(t, input)
+	c := publicRoleTLSConfig(t, admin, address, tlsConfig)
+	observerName := "owner_identity_observer_" + strings.ReplaceAll(custodyID(), "-", "")
+	qname := pgx.Identifier{observerName}.Sanitize()
+	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO "+qname); e != nil {
+		t.Fatal(e)
+	}
+	observerConfig, e := pgxpool.ParseConfig("")
+	if e != nil {
+		t.Fatal(e)
+	}
+	observerConfig.ConnConfig = c.Copy()
+	observerConfig.ConnConfig.User, observerConfig.ConnConfig.Password = observerName, "synthetic-observer"
+	if mode == "constructor-bridge-contention" {
+		observerConfig.ConnConfig.RuntimeParams = map[string]string{"lock_timeout": "1000ms", "statement_timeout": "5000ms", "application_name": "asservat-owner-constructor-observer-fixture"}
+	}
+	var lostCommit *fleetObservationCommitLoss
+	if mode == "observation-unknown-commit" || strings.HasPrefix(mode, "observation-contention-final-") {
+		observerConfig.ConnConfig, lostCommit = fleetObservationLostCommitConfig(t, observerConfig.ConnConfig, admin.Config().ConnConfig)
+	}
+	observerConfig.MaxConns = 1
+	observerConfig.MinConns = 0
+	observerPool, e := pgxpool.NewWithConfig(ctx, observerConfig)
+	if e != nil {
+		t.Fatal(e)
+	}
+	observer, e := postgres.NewFleetObservation(ctx, observerPool, scope.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		observerPool.Close()
+		clean, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, purpose := range append(contracts.OwnerIdentityRolePurposes(), "fixture-observer") {
+			name := observerName
+			if purpose != "fixture-observer" {
+				name, _ = postgres.OwnerIdentityRoleName(scope.InstallationID, purpose)
+			}
+			var exists bool
+			if e := admin.QueryRow(clean, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", name).Scan(&exists); e != nil {
+				t.Error(e)
+				continue
+			}
+			if exists {
+				qn := pgx.Identifier{name}.Sanitize()
+				if _, e := admin.Exec(clean, "DROP OWNED BY "+qn+"; DROP ROLE "+qn); e != nil {
+					t.Error(e)
+				}
+			}
+		}
+	})
+	refresh := func() {
+		a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+		a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
+		if e := observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); e != nil {
+			t.Fatal("current synthetic source observation", e)
+		}
+	}
+	refresh()
+	if mode == "runtime-administrator-denied" {
+		runtime := c.Copy()
+		runtime.User, runtime.Password = observerName, "synthetic-observer"
+		denied, e := postgres.NewOwnerIdentitySQLRoles(ctx, runtime, root, input)
+		if denied != nil {
+			denied.Close()
+		}
+		if e == nil {
+			t.Fatal("runtime login acquired installer role creation")
+		}
+		return
+	}
+	if mode == "constructor-expired-source" || mode == "constructor-bridge-contention" {
+		qualifyOwnerIdentityConstructorCurrent(t, ctx, admin, c, root, input, observer, observerPool, a, mode)
+		return
+	}
+	if strings.HasPrefix(mode, "observation-contention") || mode == "observation-unknown-commit" {
+		qualifyFleetObservationContention(t, ctx, admin, c, root, input, observer, a, mode, lostCommit)
+		return
+	}
+	producer, e := postgres.NewOwnerIdentitySQLRoles(ctx, c, root, input)
+	if e != nil {
+		t.Fatal("post-activation constructor", e)
+	}
+	t.Cleanup(producer.Close)
+	firstName, _ := postgres.OwnerIdentityRoleName(scope.InstallationID, "enrollment")
+	switch mode {
+	case "unknown-claim":
+		root.lostClaim = true
+		if _, e = producer.Provision(ctx); e == nil {
+			t.Fatal("unknown claim granted SQL creation")
+		}
+		refresh()
+		if _, e = producer.Provision(ctx); e == nil {
+			t.Fatal("unknown claim retried SQL creation")
+		}
+		var count int
+		if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname=$1", firstName).Scan(&count); e != nil || count != 0 || root.claims != 1 {
+			t.Fatal("unknown claim created role or replacement", e)
+		}
+		return
+	case "held-lock":
+		blocker, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(ctx, "SELECT pg_advisory_xact_lock(1095979854,hashtext($1))", scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		short, cancel := context.WithTimeout(ctx, 80*time.Millisecond)
+		_, e = producer.Provision(short)
+		cancel()
+		if e == nil {
+			t.Fatal("role creation crossed original lock deadline")
+		}
+		if e = blocker.Rollback(ctx); e != nil {
+			t.Fatal(e)
+		}
+		refresh()
+		if _, e = producer.Provision(ctx); e == nil {
+			t.Fatal("expired/spent claim restarted after lock release")
+		}
+		var count int
+		if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname=$1", firstName).Scan(&count); e != nil || count != 0 {
+			t.Fatal("lock wait created role", e)
+		}
+		return
+	case "root-after-lock":
+		blocker, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(ctx, "SELECT pg_advisory_xact_lock(1095979854,hashtext($1))", scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		claimed := make(chan struct{})
+		root.beforeClaim = func() { close(claimed) }
+		outcome := make(chan error, 1)
+		go func() { _, e := producer.Provision(ctx); outcome <- e }()
+		select {
+		case <-claimed:
+		case e := <-outcome:
+			t.Fatal("original claim unavailable", e)
+		case <-time.After(time.Second):
+			t.Fatal("role did not reach original claim")
+		}
+		root.mu.Lock()
+		root.value.UID = custodyID()
+		root.mu.Unlock()
+		if e = blocker.Commit(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if e = <-outcome; e == nil {
+			t.Fatal("role effect accepted changed root after blocking lock")
+		}
+		var count int
+		if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname=$1", firstName).Scan(&count); e != nil || count != 0 {
+			t.Fatal("changed root created role", e)
+		}
+		return
+	case "recovery-after-lock":
+		blocker, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		claimed := make(chan struct{})
+		root.beforeClaim = func() { close(claimed) }
+		outcome := make(chan error, 1)
+		go func() { _, e := producer.Provision(ctx); outcome <- e }()
+		select {
+		case <-claimed:
+		case e := <-outcome:
+			t.Fatal("did not reach claimed role before recovery lock", e)
+		case <-time.After(time.Second):
+			t.Fatal("role did not reach lock")
+		}
+		if e = blocker.Commit(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if e = <-outcome; e == nil {
+			t.Fatal("role creation ignored post-lock recovery fence")
+		}
+		var count int
+		if e = admin.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname=$1", firstName).Scan(&count); e != nil || count != 0 {
+			t.Fatal("recovery change created role", e)
+		}
+		return
+	case "lost-completion":
+		root.lostReceipt = true
+	}
+	if mode == "lost-completion" {
+		if _, e = producer.Provision(ctx); e == nil {
+			t.Fatal("lost completion reported success")
+		}
+	}
+	refresh()
+	snapshot, e := producer.Provision(ctx)
+	if e != nil {
+		t.Fatal("provision/reconcile fixed roles", e)
+	}
+	if mode == "verification-root-after-lock" {
+		blocker, e := admin.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(ctx, "SELECT pg_advisory_xact_lock(1095979854,hashtext($1))", scope.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+		read := make(chan struct{})
+		root.mu.Lock()
+		root.afterRead = func() { close(read) }
+		root.mu.Unlock()
+		outcome := make(chan error, 1)
+		go func() { _, e := producer.VerifyOwnerIdentityRoles(ctx); outcome <- e }()
+		select {
+		case <-read:
+		case e := <-outcome:
+			t.Fatal("original verification read unavailable", e)
+		case <-time.After(time.Second):
+			t.Fatal("verification did not read root")
+		}
+		root.mu.Lock()
+		root.value.State.Roles[0].Password = root.value.State.Roles[1].Password
+		root.mu.Unlock()
+		if e = blocker.Commit(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if e = <-outcome; e == nil {
+			t.Fatal("projection verification ignored changed root after lock")
+		}
+		return
+	}
+	originalClaims, originalReceipts := root.claims, root.receipts
+	verified, e := producer.VerifyOwnerIdentityRoles(ctx)
+	if e != nil || verified.State.OperationID != snapshot.State.OperationID || root.claims != originalClaims || root.receipts != originalReceipts {
+		t.Fatal("read-only inventory verification changed claims/receipts", e)
+	}
+	var originalVerifier string
+	if e = admin.QueryRow(ctx, "SELECT rolpassword FROM pg_authid WHERE rolname=$1", firstName).Scan(&originalVerifier); e != nil || !strings.HasPrefix(originalVerifier, "SCRAM-SHA-256$") {
+		t.Fatal("missing SCRAM verifier")
+	}
+	refresh()
+	again, e := producer.Provision(ctx)
+	if e != nil || root.claims != len(contracts.OwnerIdentityRolePurposes()) || again.State.OperationID != snapshot.State.OperationID {
+		t.Fatal("restart renewed creation claims", e)
+	}
+	var unchanged bool
+	if e = admin.QueryRow(ctx, "SELECT rolpassword=$2 FROM pg_authid WHERE rolname=$1", firstName, originalVerifier).Scan(&unchanged); e != nil || !unchanged {
+		t.Fatal("lookup recreated password", e)
+	}
+	for _, role := range snapshot.State.Roles {
+		current := c.Copy()
+		current.User = role.Receipt.RoleName
+		current.Password = role.Password
+		current.RequireAuth = "scram-sha-256"
+		conn, e := pgx.ConnectConfig(ctx, current)
+		if e != nil {
+			t.Fatal("runtime SCRAM authentication", e)
+		}
+		for _, statement := range []string{"UPDATE public.fleet_trust SET recovery_blocked=false", "INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')", "CREATE TABLE public.forbidden_owner_identity(id int)"} {
+			_, e = conn.Exec(ctx, statement)
+			var denied *pgconn.PgError
+			if !errors.As(e, &denied) || denied.Code != "42501" {
+				conn.Close(ctx)
+				t.Fatal("runtime role gained unrelated authority", role.Purpose, denied)
+			}
+		}
+		if e = conn.Close(ctx); e != nil {
+			t.Fatal(e)
+		}
+		manifest := contracts.OwnerIdentityCredentialManifest{Format: contracts.OwnerIdentityCredentialManifestFormat, Input: input, RootUID: snapshot.UID, SetupID: snapshot.State.OperationID}
+		for _, r := range snapshot.State.Roles {
+			manifest.Roles = append(manifest.Roles, contracts.PublicRuntimeCredentialProof{Purpose: r.Purpose, Claim: *r.Claim, Receipt: *r.Receipt})
+		}
+		pc, e := pgxpool.ParseConfig("")
+		if e != nil {
+			t.Fatal(e)
+		}
+		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, 1, 0
+		runtime, e := pgxpool.NewWithConfig(ctx, pc)
+		if e != nil {
+			t.Fatal(e)
+		}
+		e = postgres.VerifyOwnerIdentityCredential(ctx, runtime, manifest, role.Purpose)
+		runtime.Close()
+		if e != nil {
+			t.Fatal("runtime's own catalog/provenance check", role.Purpose, e)
+		}
+	}
+	if mode == "lost-completion" {
+		return
+	}
+	// Independent runtime processes can retain one connection each. The fixed
+	// role ceiling also includes one verification login, and does not silently
+	// become the per-process pool setting or an unbounded rollout allowance.
+	login := c.Copy()
+	login.User, login.Password, login.RequireAuth = snapshot.State.Roles[0].Receipt.RoleName, snapshot.State.Roles[0].Password, "scram-sha-256"
+	var active []*pgx.Conn
+	defer func() {
+		closeCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		for _, conn := range active {
+			_ = conn.Close(closeCtx)
+		}
+	}()
+	for range contracts.OwnerIdentityRoleConnections {
+		conn, e := pgx.ConnectConfig(ctx, login.Copy())
+		if e != nil {
+			t.Fatal("bounded independent login unavailable", e)
+		}
+		active = append(active, conn)
+	}
+	excess, e := pgx.ConnectConfig(ctx, login.Copy())
+	if excess != nil {
+		_ = excess.Close(ctx)
+	}
+	var full *pgconn.PgError
+	if !errors.As(e, &full) || full.Code != "53300" {
+		t.Fatal("role-wide connection ceiling not enforced", e)
+	}
+	if e = active[0].Close(ctx); e != nil {
+		t.Fatal(e)
+	}
+	replacement, e := pgx.ConnectConfig(ctx, login.Copy())
+	if e != nil {
+		t.Fatal("closed connection capacity not reusable", e)
+	}
+	active[0] = replacement
+	for _, conn := range active {
+		if e = conn.Close(ctx); e != nil {
+			t.Fatal(e)
+		}
+	}
+	active = nil
+	for _, mutation := range []struct{ name, grant, undo string }{
+		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize()},
+		{"public-table", "GRANT SELECT ON public.custody_pool TO PUBLIC", "REVOKE SELECT ON public.custody_pool FROM PUBLIC"},
+		{"public-column", "GRANT UPDATE(recovery_blocked) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(recovery_blocked) ON public.fleet_trust FROM PUBLIC"},
+		{"public-schema", "GRANT CREATE ON SCHEMA public TO PUBLIC", "REVOKE CREATE ON SCHEMA public FROM PUBLIC"},
+		{"public-definer", "CREATE FUNCTION public.owner_identity_escape() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'UPDATE public.fleet_trust SET recovery_blocked=false'", "DROP FUNCTION public.owner_identity_escape()"},
+		{"direct-default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO " + pgx.Identifier{firstName}.Sanitize(), "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM " + pgx.Identifier{firstName}.Sanitize()},
+		{"public-default", "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO PUBLIC", "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM PUBLIC"},
+		{"type-owner", "CREATE TYPE public.owner_identity_owned_type AS ENUM ('fixed'); ALTER TYPE public.owner_identity_owned_type OWNER TO " + pgx.Identifier{firstName}.Sanitize(), "DROP TYPE public.owner_identity_owned_type"},
+		{"membership", "GRANT " + qname + " TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE " + qname + " FROM " + pgx.Identifier{firstName}.Sanitize()},
+	} {
+		refresh()
+		if _, e = admin.Exec(ctx, mutation.grant); e != nil {
+			t.Fatal(e)
+		}
+		_, denied := producer.Provision(ctx)
+		if _, e = admin.Exec(ctx, mutation.undo); e != nil {
+			t.Fatal(e)
+		}
+		if denied == nil {
+			t.Fatal("accepted excess direct/ambient authority", mutation.name)
+		}
+	}
+	refresh()
+	// A changed password in private storage cannot be adopted or repaired.
+	root.mu.Lock()
+	originalPassword := root.value.State.Roles[0].Password
+	root.value.State.Roles[0].Password = root.value.State.Roles[1].Password
+	root.mu.Unlock()
+	if _, e = producer.Provision(ctx); e == nil {
+		t.Fatal("wrong persisted password silently adopted")
+	}
+	root.mu.Lock()
+	root.value.State.Roles[0].Password = originalPassword
+	root.mu.Unlock()
+	// Preserve the original leaf role OID through a same-name replacement fault.
+	originalRole := pgx.Identifier{firstName + "_old"}.Sanitize()
+	quoted := pgx.Identifier{firstName}.Sanitize()
+	if _, e = admin.Exec(ctx, "ALTER ROLE "+quoted+" RENAME TO "+originalRole+"; CREATE ROLE "+quoted+" LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 1"); e != nil {
+		t.Fatal(e)
+	}
+	refresh()
+	_, replaced := producer.Provision(ctx)
+	if _, e = admin.Exec(ctx, "DROP ROLE "+quoted+"; ALTER ROLE "+originalRole+" RENAME TO "+quoted); e != nil {
+		t.Fatal(e)
+	}
+	if replaced == nil {
+		t.Fatal("same-name replacement role accepted")
+	}
+	refresh()
+	if _, e = producer.Provision(ctx); e != nil {
+		t.Fatal("original exact roles unavailable after fault removal", e)
+	}
+	if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = producer.Provision(ctx); e == nil {
+		t.Fatal("current recovery fence ignored")
+	}
+	t.Log("actual four-purpose owner SQL role creation/SCRAM/privilege matrix passed; inert resource journal, Secret root CAS, accepted owner source and native guard remain explicitly synthetic inputs")
+}
+
+func ownerIdentityFixtureClaimEqual(a, b contracts.PublicRuntimeRoleClaim) bool {
+	return a.OperationID == b.OperationID && a.DatabaseOID == b.DatabaseOID && a.ClaimedAt.Equal(b.ClaimedAt) && a.Until.Equal(b.Until) && a.PostmasterAt.Equal(b.PostmasterAt)
+}

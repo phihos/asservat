@@ -1,0 +1,356 @@
+package kms
+
+import (
+	"bytes"
+	"context"
+	"sync"
+	"time"
+)
+
+// This private mechanism is not a runtime authority provider or selected input
+// profile. The installed coordinator must perform current native, accepted SQL
+// and recovery checks before entering refresh, and retain their original bound
+// through the final publication check. Effects themselves never call refresh.
+type ownerProviderCurrent func(context.Context) (time.Time, error)
+
+type ownerProviderLifetime struct {
+	currentProof                                 ownerProviderCurrent
+	control                                      *ownerProviderControl
+	jwt                                          TokenSource
+	root                                         context.Context
+	cancel                                       context.CancelFunc
+	mu                                           sync.Mutex
+	changed                                      chan struct{}
+	closed, closing, finished, active, uncertain bool
+	current, draining                            *ownerProviderHeldCredential
+	borrows, limit                               int
+	failures                                     int
+	next                                         time.Time
+}
+
+type ownerProviderHeldCredential struct {
+	value   *ownerProviderCredential
+	borrows int
+}
+
+func newOwnerProviderLifetime(ctx context.Context, control *ownerProviderControl, jwt TokenSource, current ownerProviderCurrent, limit int) (*ownerProviderLifetime, error) {
+	if ctx == nil || ctx.Err() != nil || control == nil || control.now == nil || jwt == nil || current == nil || limit < 1 || limit > 64 {
+		return nil, ErrKeyService
+	}
+	root, cancel := context.WithCancel(ctx)
+	return &ownerProviderLifetime{control: control, jwt: jwt, currentProof: current, root: root, cancel: cancel, changed: make(chan struct{}), limit: limit}, nil
+}
+
+func (s *ownerProviderLifetime) signalLocked() {
+	close(s.changed)
+	s.changed = make(chan struct{})
+}
+
+// refresh admits at most one original control operation. Concurrent callers do
+// not share identities/deadlines and cannot dispatch another login. Successful
+// unchanged observations are passive until their own original scheduled end.
+func (s *ownerProviderLifetime) refresh(ctx context.Context) error {
+	return s.refreshOwned(ctx, nil)
+}
+
+// The configuration worker consumes its concrete native initial/final handle.
+// Legacy owner callers keep their existing independent currentProof behavior.
+func (s *ownerProviderLifetime) refreshConfiguration(ctx context.Context, worker *InstalledConfigurationProviderEffects) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || worker == nil || worker.admission == nil || worker.effects == nil || (s != worker.effects.wrap && s != worker.effects.unwrap) {
+		return ErrKeyService
+	}
+	// This is a local scheduling hint, before observing any new authority.
+	// refreshOwned rechecks every value under its own mutex after admission.
+	// No healthy credential heartbeat enters the expensive native queue.
+	s.mu.Lock()
+	now := s.control.now()
+	blocked := s.closed || s.root.Err() != nil || s.active || now.Before(s.next)
+	old := s.current
+	healthy := old != nil && !s.uncertain && now.Before(old.value.until) && now.Before(old.value.reauthenticateAt()) && now.Before(old.value.renewAt())
+	s.mu.Unlock()
+	if blocked {
+		return ErrKeyService
+	}
+	if healthy {
+		return nil
+	}
+	if s == worker.effects.wrap {
+		lease, err := worker.admission.WaitWrapRefresh(ctx)
+		if err != nil {
+			return ErrKeyService
+		}
+		defer lease.Release()
+		if lease.AwaitFleetObservation() != nil {
+			return ErrKeyService
+		}
+		return s.refreshOwned(lease.Context(), worker)
+	}
+	lease, err := worker.admission.WaitUnwrapRefresh(ctx)
+	if err != nil {
+		return ErrKeyService
+	}
+	defer lease.Release()
+	if lease.AwaitFleetObservation() != nil {
+		return ErrKeyService
+	}
+	return s.refreshOwned(lease.Context(), worker)
+}
+
+func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *InstalledConfigurationProviderEffects) error {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return ErrKeyService
+	}
+	s.mu.Lock()
+	now := s.control.now()
+	if s.closed || s.root.Err() != nil || s.active || now.Before(s.next) {
+		s.mu.Unlock()
+		return ErrKeyService
+	}
+	old := s.current
+	login := old == nil || !now.Before(old.value.reauthenticateAt()) || !now.Before(old.value.until)
+	if !login && !s.uncertain && now.Before(old.value.renewAt()) {
+		s.mu.Unlock()
+		return nil
+	}
+	// A stalled old response cannot be discarded or allow a third token slot.
+	if login && s.draining != nil && s.draining.borrows != 0 {
+		s.mu.Unlock()
+		return ErrKeyService
+	}
+	s.active = true
+	reconcile := s.uncertain && !login
+	draining := s.draining
+	s.signalLocked()
+	s.mu.Unlock()
+
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	stop := context.AfterFunc(s.root, cancel)
+	defer func() { stop(); cancel() }()
+	// This hook is installed composition's exact native/source/recovery proof,
+	// never provider policy lookup or a caller-selected authority timestamp.
+	var operation *configurationProviderRefreshOperation
+	var bound time.Time
+	var proofErr error
+	if worker == nil {
+		bound, proofErr = s.currentProof(call)
+	} else {
+		operation, bound, proofErr = worker.beginRefresh(call, s)
+		if operation != nil {
+			defer operation.close()
+		}
+	}
+	finalUntil := bound
+	if proofErr != nil || bound.IsZero() || !s.control.now().Before(bound) || call.Err() != nil {
+		cancel()
+	} else {
+		var boundCancel context.CancelFunc
+		call, boundCancel = context.WithDeadline(call, bound)
+		defer boundCancel()
+	}
+	// This is local retirement only: a failed self-revoke is not evidence that
+	// the provider removed its finite token or refunded external capacity.
+	if login && draining != nil {
+		_ = s.control.revoke(call, draining.value)
+		s.mu.Lock()
+		if s.draining == draining && draining.borrows == 0 {
+			draining.value.destroy()
+			s.draining = nil
+		}
+		s.mu.Unlock()
+	}
+	var next *ownerProviderCredential
+	var err error
+	if call.Err() != nil {
+		err = ErrKeyService
+	} else if login {
+		var jwt []byte
+		jwt, err = s.jwt(call)
+		if err == nil && call.Err() == nil {
+			next, err = s.control.login(call, jwt)
+		}
+		clear(jwt)
+	} else if reconcile {
+		next, err = s.control.reconcile(call, old.value)
+	} else {
+		next, err = s.control.renew(call, old.value)
+	}
+
+	if login && next != nil && old != nil && (next.accessor == old.value.accessor || bytes.Equal(next.token, old.value.token)) {
+		err = ErrKeyService // Fresh login cannot adopt the still-owned token.
+	}
+	if err == nil && next != nil && call.Err() == nil {
+		var final time.Time
+		var e error
+		if operation == nil {
+			final, e = s.currentProof(call)
+		} else {
+			final, e = operation.finish(call)
+		}
+		if final.Before(finalUntil) {
+			finalUntil = final
+		}
+		if e != nil || final.IsZero() || !s.control.now().Before(final) || call.Err() != nil {
+			err = ErrKeyService
+		}
+	}
+	if login && next != nil && err != nil && (old == nil || !bytes.Equal(next.token, old.value.token)) {
+		_ = s.control.revoke(call, next) // bounded restrictive cleanup only
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.active = false
+	defer s.signalLocked()
+	now = s.control.now()
+	if err != nil || next == nil || call.Err() != nil || s.closed || s.root.Err() != nil || !now.Before(next.until) || finalUntil.IsZero() || !now.Before(finalUntil) {
+		if next != nil {
+			next.destroy()
+		}
+		// Generic provider failure cannot be mistaken for a positively verified
+		// unchanged policy. Existing borrows keep their dates; new borrows wait
+		// for exact reconciliation or an independently admitted fresh login.
+		s.uncertain = true
+		if s.failures < 6 {
+			s.failures++
+		}
+		delay := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 30 * time.Second}[s.failures-1]
+		s.next = now.Add(delay)
+		return ErrKeyService
+	}
+	if login {
+		if old != nil {
+			s.draining = old
+		}
+		s.current = &ownerProviderHeldCredential{value: next}
+	} else {
+		// Same-token renewal changes future observations only. Every borrower
+		// already owns its separate token copy and original request cutoff.
+		old.value.destroy()
+		old.value = next
+	}
+	s.failures = 0
+	s.uncertain = false
+	// Even an unexpectedly short positive provider lease cannot spin control
+	// requests synchronously. This never extends that lease's original end.
+	s.next = now.Add(time.Second)
+	return nil
+}
+
+func (s *ownerProviderLifetime) borrow(ctx context.Context) (ownerProviderLease, error) {
+	var zero ownerProviderLease
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return zero, ErrKeyService
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v := s.current
+	if s.closed || s.root.Err() != nil || s.uncertain || v == nil || s.borrows >= s.limit || !s.control.now().Before(v.value.until) {
+		return zero, ErrKeyService
+	}
+	borrow, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(s.root, cancel)
+	s.borrows++
+	v.borrows++
+	var once sync.Once
+	lease := ownerProviderLease{token: bytes.Clone(v.value.token), until: v.value.until, ctx: borrow}
+	lease.release = func() {
+		once.Do(func() {
+			stop()
+			cancel()
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.borrows--
+			v.borrows--
+			s.signalLocked()
+		})
+	}
+	return lease, nil
+}
+
+// close cancels first, then waits for actual control/body closure. Timeout
+// retains all outstanding ownership and allows a later close to finish it.
+// Successful local closure never asserts provider-side revocation on an error.
+func (s *ownerProviderLifetime) close(ctx context.Context) error {
+	if s == nil || ctx == nil {
+		return ErrKeyService
+	}
+	call, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.signalLocked()
+	for s.closing || s.active || s.borrows != 0 {
+		wait := s.changed
+		s.mu.Unlock()
+		select {
+		case <-wait:
+		case <-call.Done():
+			return ErrKeyService
+		}
+		s.mu.Lock()
+	}
+	if s.finished {
+		s.mu.Unlock()
+		return nil
+	}
+	if call.Err() != nil {
+		s.mu.Unlock()
+		return ErrKeyService
+	}
+	s.closing = true
+	current, draining := s.current, s.draining
+	s.mu.Unlock()
+	for _, v := range []*ownerProviderHeldCredential{current, draining} {
+		if v != nil {
+			_ = s.control.revoke(call, v.value)
+			v.value.destroy()
+		}
+	}
+	s.control.close()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.current = nil
+	s.draining = nil
+	s.finished = true
+	s.closing = false
+	s.signalLocked()
+	return nil
+}
+
+// joinClosed relinquishes local ownership only after already admitted work
+// finishes. It is shutdown, not a longer effect or revocation interval. Unlike
+// retrying close with a fresh context, this finalizer performs no provider I/O.
+func (s *ownerProviderLifetime) joinClosed() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	s.cancel()
+	s.signalLocked()
+	for s.closing || s.active || s.borrows != 0 {
+		wait := s.changed
+		s.mu.Unlock()
+		<-wait
+		s.mu.Lock()
+	}
+	if s.finished {
+		s.mu.Unlock()
+		return
+	}
+	s.closing = true
+	current, draining := s.current, s.draining
+	s.mu.Unlock()
+	for _, v := range []*ownerProviderHeldCredential{current, draining} {
+		if v != nil {
+			v.value.destroy()
+		}
+	}
+	s.control.close()
+	s.mu.Lock()
+	s.current, s.draining = nil, nil
+	s.finished, s.closing = true, false
+	s.signalLocked()
+	s.mu.Unlock()
+}

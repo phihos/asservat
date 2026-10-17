@@ -1,0 +1,119 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+    native_exchange_test.go:536: native diagnostic worker opening 0
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    download_sessions_test.go:683: native context initial session resolved
+    native_exchange_test.go:442: native diagnostic connector admission terminal 19.150473ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:683: native context pending metadata read completed
+    download_sessions_test.go:683: native context initial source resolved
+    native_exchange_test.go:536: native diagnostic worker opening 1
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 20.14007ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 2
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:468: native diagnostic connector origin accepted 2.790767965s
+    native_exchange_test.go:441: native diagnostic hub admission entered
+    native_exchange_test.go:457: native diagnostic hub origin accepted 2.744341517s
+    native_exchange_test.go:442: native diagnostic hub admission terminal 670.597197ms <nil>
+    native_exchange_test.go:442: native diagnostic connector admission terminal 840.033923ms <nil>
+    native_exchange_test.go:538: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:545: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:536: native diagnostic worker opening 3
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:468: native diagnostic connector origin accepted 3.510315485s
+    native_exchange_test.go:441: native diagnostic hub admission entered
+    native_exchange_test.go:457: native diagnostic hub origin accepted 3.46583662s
+    native_exchange_test.go:442: native diagnostic hub admission terminal 665.283939ms <nil>
+    native_exchange_test.go:442: native diagnostic connector admission terminal 847.452436ms <nil>
+    native_exchange_test.go:538: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:545: native diagnostic worker conversation terminal 3 Joined <nil>
+    native_exchange_test.go:536: native diagnostic worker opening 4
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 19.683366ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 5
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 20.079348ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 6
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 21.94077ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 7
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 21.022935ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 8
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 21.047994ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 9
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 21.298636ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 10
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 19.556255ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 11
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 18.543579ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 11 no native command admitted
+    download_sessions_test.go:683: native SQL usage phase=enter-interrupted-phase total=38 active=1 idle=37 roles=34 maximum=48
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=authority_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=context_catalog_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=native_metadata_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=peer_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=capture_audit_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=capture_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=context_control_config_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=enter-interrupted-phase role=context_publish_runtime count=1 idle=1
+    native_exchange_test.go:536: native diagnostic worker opening 12
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:442: native diagnostic connector admission terminal 18.211046ms no native command admitted
+    native_exchange_test.go:538: native diagnostic worker open terminal 12 no native command admitted
+    native_exchange_test.go:536: native diagnostic worker opening 13
+    native_exchange_test.go:441: native diagnostic connector admission entered
+    native_exchange_test.go:468: native diagnostic connector origin accepted 3.597647785s
+    native_exchange_test.go:441: native diagnostic hub admission entered
+    native_exchange_test.go:457: native diagnostic hub origin accepted 3.554357039s
+    native_exchange_test.go:442: native diagnostic hub admission terminal 666.625952ms <nil>
+    native_exchange_test.go:442: native diagnostic connector admission terminal 829.063179ms <nil>
+    native_exchange_test.go:538: native diagnostic worker open terminal 13 <nil>
+    native_exchange_test.go:545: native diagnostic worker conversation terminal 13 Uncertain native exchange unavailable
+    native_exchange_test.go:252: worker terminal uncertain original native conversation: native exchange unavailable
+    download_sessions_test.go:683: native SQL usage phase=after-cancellation total=41 active=1 idle=40 roles=37 maximum=48
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=authority_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=context_catalog_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=native_metadata_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=peer_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=capture_audit_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=capture_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=context_control_config_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=after-cancellation role=context_publish_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL usage phase=before-independent-ledger total=41 active=1 idle=40 roles=37 maximum=48
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=authority_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=context_catalog_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=native_metadata_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=peer_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=capture_audit_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=capture_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=context_control_config_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=before-independent-ledger role=context_publish_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL usage phase=before-fresh-worker total=42 active=1 idle=41 roles=37 maximum=48
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=authority_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=context_catalog_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=download_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=native_metadata_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=peer_read_runtime count=2 idle=2
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=capture_audit_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=capture_runtime count=1 idle=1
+    download_sessions_test.go:683: native SQL role phase=before-fresh-worker role=context_control_config_runtime count=1 idle=1
+    download_sessions_test.go:683: custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (25.28s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (24.94s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	25.341s
+FAIL

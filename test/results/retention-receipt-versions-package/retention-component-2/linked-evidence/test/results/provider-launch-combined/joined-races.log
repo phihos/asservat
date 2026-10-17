@@ -1,0 +1,26 @@
+=== RUN   TestConfigurationProviderCloseAndJoinKeepsNativeOwnership
+--- PASS: TestConfigurationProviderCloseAndJoinKeepsNativeOwnership (0.10s)
+=== RUN   TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow
+--- PASS: TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow (0.11s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsCancelledNativeRead
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsCancelledNativeRead (0.11s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsBodyAfterOriginalBound
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsBodyAfterOriginalBound (0.14s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsOriginalControlProof
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsOriginalControlProof (0.11s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinKeepsSuccessfulRetirement
+--- PASS: TestInstalledOwnerProviderCloseAndJoinKeepsSuccessfulRetirement (0.06s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kms	1.673s
+=== RUN   TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper
+--- PASS: TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.050s
+=== RUN   TestOwnerObservationDeploymentExternalCloseJoinsReadinessBeforeDependencies
+--- PASS: TestOwnerObservationDeploymentExternalCloseJoinsReadinessBeforeDependencies (0.11s)
+=== RUN   TestOwnerObservationDeploymentRunCancellationJoinsBeforeDeferredClose
+--- PASS: TestOwnerObservationDeploymentRunCancellationJoinsBeforeDeferredClose (0.11s)
+=== RUN   TestOwnerObservationDeploymentCloseBeforeRunPreventsEnrollment
+--- PASS: TestOwnerObservationDeploymentCloseBeforeRunPreventsEnrollment (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.265s

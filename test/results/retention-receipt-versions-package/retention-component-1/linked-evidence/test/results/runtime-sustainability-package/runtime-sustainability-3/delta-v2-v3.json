@@ -1,0 +1,301 @@
+{
+  "payload_delta": [
+    {
+      "path": "internal/adapters/kms/configuration_provider_refresh_test.go",
+      "before": {
+        "path": "internal/adapters/kms/configuration_provider_refresh_test.go",
+        "base_sha256": null,
+        "payload_sha256": "bb4e0faaf49e6f23d110a5c7ce202d97611ea92539c7890f366e38675fa8c26e",
+        "owner": "mcp-sustainability"
+      },
+      "after": {
+        "path": "internal/adapters/kms/configuration_provider_refresh_test.go",
+        "base_sha256": null,
+        "payload_sha256": "dfafe30c406bf36e170d1d670ea5025d636124928b05f069f1ac86740459ce52",
+        "owner": "mcp-sustainability"
+      }
+    }
+  ],
+  "dependency_changes": [
+    {
+      "path": "docs/architecture/context-publication.md",
+      "before": "dff88908876142cc35a2a6e7f45e84585605fb0434e28217f9cc2fbf28bc939a",
+      "after": "02af78fc33aaa6b9c696b37c5bab43035521d0b6a9acbaa040402284941c06af"
+    },
+    {
+      "path": "docs/architecture/permission-acceptance.md",
+      "before": "2a1ec157a370e8cfdefc69a13c5f18b500ecadc897d9e93e3fa055208c9a2545",
+      "after": "a90e4f5bdd55bc7861ab96b0c5a289a0c0d5d8a3b05be26424e42284460f80e7"
+    },
+    {
+      "path": "docs/architecture/policy-automation.md",
+      "before": "fa24eb072c2046eacb3b8f17a390bcce7b8d39b701f7cfece1cf7ddfb7da3a48",
+      "after": "bfc773f65ddeb7a805ef37f90dec517ad9bedf47d87b4dad0ec4e4f74d428177"
+    },
+    {
+      "path": "docs/implementation-progress.md",
+      "before": "e15624ec91cba9fadd0ec4b45239558369705105dea87546f1f08bbb84242811",
+      "after": "7dfd5acc7f0560dbf9613ba036d3a4d02747d1c2b0c4c3ec95de65a99721561c"
+    },
+    {
+      "path": "internal/adapters/postgres/authority_current_receipt.go",
+      "before": null,
+      "after": "0ab735521b19d2fcbac6e383293e7a44c362e00c0c1b324bc6f9558ea94bd921"
+    },
+    {
+      "path": "internal/adapters/postgres/authority_current_receipt_test.go",
+      "before": null,
+      "after": "8164e58a190f503d52f31ca9126c7ac617e0e8949a869b3180586f61da87a98c"
+    },
+    {
+      "path": "internal/adapters/postgres/automation.go",
+      "before": "ea0f3124a9417f5599ba9468b247d8b2a63dadb1f375ef15c2b7039f5fafe64b",
+      "after": "9e1b6c39340068bc12539d4a159daadc9b02c0fcf3df5b7af8f56cad313ef15d"
+    },
+    {
+      "path": "internal/adapters/postgres/browser_refresh.go",
+      "before": "c45cde668d0e8dd167e282d13c9ba03c7162cf2db6517df47ab894249292f21a",
+      "after": "69312ad68b9651f5fb84b9d99f6d783e1a03367f8530bfb813b184f66fd7ab66"
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit_read.go",
+      "before": "38f7b693348279e535463cd2a5493cecddb6bbd5427472a7a9abd36dab3024cf",
+      "after": "bf259d664dbd4743812ba1d96ccd1d67215f1597eebca512a7cf6d3f1607ece1"
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit_read_test.go",
+      "before": "f3d0dde15f6cd180685385ee4b89b17813a1884157fcd088d69ddece3981d0fb",
+      "after": "105b314be7a0d5dc304929828bc2a09ef157d85ca00b3f6a76fb1698c512419e"
+    },
+    {
+      "path": "internal/adapters/postgres/capture_intent_exact_test.go",
+      "before": "8b6a39a26092bc1243b33d74c4e78a2ec5db0f6333d34ab6dd159ed937994601",
+      "after": "50337c419840adaae4ac4dd39fb9574ec4c43a3df99626974ceb8be6f46d47c1"
+    },
+    {
+      "path": "internal/adapters/postgres/context_audit_receipts.go",
+      "before": null,
+      "after": "6fd4a50bedd4b6e4954f11d155393d55d3ea5f840e3de786514ffea45a3b02c7"
+    },
+    {
+      "path": "internal/adapters/postgres/context_audit_receipts_test.go",
+      "before": null,
+      "after": "7010e787462d06339101b86444702ceec40748aaa1e093ec6be585189961d949"
+    },
+    {
+      "path": "internal/adapters/postgres/context_progress.go",
+      "before": "b933ed0187a7e9646cf715738f3133f59f0289a662d9822c9d62903de01cb3bd",
+      "after": "9b1c2a2ccce197de5be540f732ad62499bd613571b94473303091430c5683e53"
+    },
+    {
+      "path": "internal/adapters/postgres/context_progress_test.go",
+      "before": "0f3455daf639052d06283a242bc5383c0682f6a412830957b5d81e8688c5efb9",
+      "after": "a67b93944ae3830d443e31669249c4534cbffa36536a506d6b9b0e11dc6dac91"
+    },
+    {
+      "path": "internal/adapters/postgres/context_publication.go",
+      "before": "841a4e435b89f818039bb315cedde4dc9901c21b27f9a1c416b9d4810e128639",
+      "after": "aec6fca71088a755a4006698f89cfdcc8baa4260a4e044992029326b3476fdb9"
+    },
+    {
+      "path": "internal/adapters/postgres/context_receipt_before_test.go",
+      "before": null,
+      "after": "e42cb76a0a387865886e0d68aff18f21a704c18891cba2dc36ef0c10206bcbea"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/permissions.sql.go",
+      "before": "aa3ca922e08127bfb95ce482a0bc8f1b58b797f4ac91ab7d6fe2f839f7bea153",
+      "after": "7bddeb68b64909fd9b468749dffdad9c76d9134f516ed3131c5ed538b379809d"
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/publication.sql.go",
+      "before": "86ec529bd058dfe28445c78a222ac1e8c37f67692494e58b9d620b50a8717dc5",
+      "after": "c74305e6e94fec9973e621490c84b48db788170fb19826fada1f3fc19beaa7ec"
+    },
+    {
+      "path": "internal/adapters/postgres/download.go",
+      "before": "4ccf1fff6c3d1d9baa22b8339eac21bca73a89cae3b824da12ad96202a2a9d76",
+      "after": "b78e84ab1c5144745951246619937fb39f1a8e6d6bfc74d08911fb0900ccbbe3"
+    },
+    {
+      "path": "internal/adapters/postgres/download_control.go",
+      "before": "cfd618f223e025562dcbf5619132d2457dbf24989b8fd4b6aac6f499856da60d",
+      "after": "9871fc0c0237d67a4cc82ca33cf555e3611ddf892638947f9bd7efdc06075c1e"
+    },
+    {
+      "path": "internal/adapters/postgres/download_keys.go",
+      "before": "0f2b3b67769e5d0ad59868b0c47dbcf5f098fd065a6b91ac3ecec303fcf5b12e",
+      "after": "dc67b56437912d5fbd10f5b17da8373d22a02971ff244af6a1e60b91bef51fb8"
+    },
+    {
+      "path": "internal/adapters/postgres/native_keys.go",
+      "before": "7245aea23930d212f33b52e24f1be8579a0582ae733693224e36960c83e1a8b7",
+      "after": "43cad858cc0d934400966ccd1d84e9e8ae28ea2da7b2743102dafa1715004b6a"
+    },
+    {
+      "path": "internal/adapters/postgres/permissions.go",
+      "before": "55569aed2643a305439584201e97c0015dff66102109dc203f9db053f07fd74d",
+      "after": "8399306acc851c8247384bab8dc0dc5ef05cc61f38383bdb13b7a6c3abcd92e8"
+    },
+    {
+      "path": "internal/application/audit/capture_exact_test.go",
+      "before": "406636684ff5cbbfc409a1eed91535160c86cc524f83606139f2b16e65c9aa41",
+      "after": "9e1ee89a31fbc9dca480e6ee88f66a8910c929d6b3ca7f6c81adc2e426b0fb5f"
+    },
+    {
+      "path": "internal/application/evidence/context_publication_test.go",
+      "before": "df8ae924ee6c9a54ee3faba910057180277fff9de91245c4200af92ef89b3599",
+      "after": "55230afb49f100b52ff2d0523249dcd9dc9c4d4fb588ded1cd7c7719c3efce11"
+    },
+    {
+      "path": "internal/domain/audit/authority.go",
+      "before": "4062c2a76224126983819f825d244466b9a6bbc99d2de5bed49f580e6db80fff",
+      "after": "de884d76bcfb42f55340f4430c6401b7a783c780a50239d18f6010211c2492cc"
+    },
+    {
+      "path": "internal/domain/audit/capture.go",
+      "before": "b49fee8dd358ad2e11f2d627b165f1313b000828b497e0c93c3240ef88c9728d",
+      "after": "d3d3f5f35bbb1ece8a3b729acba849371f20dedc96e47096c7dbea07519ace57"
+    },
+    {
+      "path": "internal/domain/audit/context_receipt_versions_test.go",
+      "before": null,
+      "after": "d2a57660d087745b662483c2bfa676a1e605858db0da8d51ff1a633457072813"
+    },
+    {
+      "path": "internal/domain/audit/context_verification.go",
+      "before": "228fcb6738cfd87ca27ef31e63bb0d1a339caec4f7127c5d9a5ab76ec9a7cd64",
+      "after": "c496eaf8ae727009fc5295a950df72087601d6b20edf4ef95552fdbf60f1b916"
+    },
+    {
+      "path": "internal/domain/audit/permission_policy_versions_test.go",
+      "before": null,
+      "after": "c196786cee434e318a366ce0f33dc72ab80ef36950b74e5e3f018f70a476affa"
+    },
+    {
+      "path": "internal/domain/audit/policy.go",
+      "before": "2e183459c0e6c9ab6e096acdc312eeebe89111c771773fce68a6653942e6d3ea",
+      "after": "83285ea55c9e412473267952113a8b82482c3fb188259685dff929445f97092a"
+    },
+    {
+      "path": "migrations/queries/permissions.sql",
+      "before": "0366b032200d6d71e1eba0701e210b4bc2dde8728be6bfb728f15a1a02dad832",
+      "after": "6558256bec19a1d0d2fa8b6700d7a748ec3b30a47c14b3786d2b9a878dabf8ec"
+    },
+    {
+      "path": "migrations/queries/publication.sql",
+      "before": "9a9a6222108ed21bc6beb384674ad723a7f387facdc38805e0d76f376aebe90a",
+      "after": "a2c143e3cf8e37b4862b9cbf7324e6f76731cf711bcce2a7e28211c958bcc755"
+    },
+    {
+      "path": "test/fixtures/observation-native/inputs.go",
+      "before": "68532a84d757cbb02e2a108976984d58f3baeb94ce6711a70d9202543ece92c3",
+      "after": "b9962defd1b4986c304ccfb93038d92c021c79b9167464aa59b1c75d93320e82"
+    },
+    {
+      "path": "test/fixtures/observation-native/main.go",
+      "before": "3b79b56a3b7a384030efa18a48cce69def3d053516a7e321e5c874f9056c3a6e",
+      "after": "d2ddf717607e6b0f4dc77a4ff796b408225176d502db62fbc69d7bfb0f44ea82"
+    },
+    {
+      "path": "test/fixtures/observation-native/runtime.go",
+      "before": "9171a3448cad7b359e24cc48149eba44b8510326203cde8410b9b279bc86cece",
+      "after": "d964083f384a728c80404f2c8d81bae8e809559a3fbdeb2e3de56c442be3f427"
+    },
+    {
+      "path": "test/integration/authority_audit_history_versions_test.go",
+      "before": null,
+      "after": "e4ea8ae0384c5cecdee03c0d8e1c8090b873d08533fbb0246ca720000734331d"
+    },
+    {
+      "path": "test/integration/authority_test.go",
+      "before": "e845572fef3bf048d49e3522381d37b87abe4104697e562ff00f35f2cb533a90",
+      "after": "4a5e16d35737922522304b1d8eef8e673f547ed9f7d729a5b3f3053510353bee"
+    },
+    {
+      "path": "test/integration/context_publication_test.go",
+      "before": "f0631c60250d4b0a9993b041f36fbd7a00b9385388fb6bb8a3a7aadb3977ffb6",
+      "after": "2bac9b8b41cbef1c521d0970e1c2642fbdb7ec1baae313cff4055d416ccfe204"
+    },
+    {
+      "path": "test/integration/direct_observation_native_fixture_test.go",
+      "before": "4bc69d49a5bcc7069d06c8bf199e2117f97c25ee803dd63b25a64a8b2cfd7c9d",
+      "after": "3d93efd62b3df39991ebfb565307cbdaf8cdaa90906296102d5a4afa96707e38"
+    },
+    {
+      "path": "test/integration/direct_observation_native_test.go",
+      "before": "8d1a98328905452b8a6ce97982186dc03f552277471f96b555d55e5fecf27cd5",
+      "after": "c8ce3e9eab4d98f07352e86263a640d54d1a7951701562ce7658f26b3df6ba2f"
+    },
+    {
+      "path": "test/integration/download_sessions_test.go",
+      "before": "0f402d095c61e45b06221b32837e2fa08c6b0944edd2160ed14fa6effdd2de3a",
+      "after": "a9f5915b544e0e70d16b78bf6988003d7b62e5d958f15d3810e0cee37ba131ea"
+    },
+    {
+      "path": "test/integration/permission_reconciler_test.go",
+      "before": "9afd8171c0979afc0ba2a32f6d39b07fd274ba08df2d5182346cddd249d7b9c0",
+      "after": "cc33d003cadd8f496a4cfe5fb97a8ceca89aeb149515b31acf2a6c48e70d48f6"
+    },
+    {
+      "path": "test/integration/permission_transaction_audit_history_test.go",
+      "before": null,
+      "after": "6b4a6bd3592bfc1f180138e6b0c9f9dcdf950aeb1c3cabc766f3c7047a3c8b6f"
+    },
+    {
+      "path": "test/integration/policy_authority_test.go",
+      "before": "4aedb8440875617b246da95859150cd9b5f8e4fead28ee107aa4343e9eebcc39",
+      "after": "ccdb6fed98a20a472c391237600cbe9d5b9b59c7db1c1cacc1b0f69374c129d5"
+    },
+    {
+      "path": "test/integration/publication_audit_history_versions_test.go",
+      "before": null,
+      "after": "d079be558a58ff8f0772e107bfa3bd438055c4edbe20f58a757a8703c5dc9b6e"
+    },
+    {
+      "path": "test/results/context-storage-environment.json",
+      "before": "dfc630827a1d23bd5121c6c48125fa35e851b2d698051633039273405335d55b",
+      "after": "8e382fe7167c80b1b8bdbc5df58606aef15437ff94415d1a06e7b5ee8a4d17f4"
+    },
+    {
+      "path": "test/results/context-storage.log",
+      "before": "44cb48063ffebc401e443a01c72d3dfe9b9eef1da82db95c4eeda7b61eb93858",
+      "after": "ca723dc6a82c52074cbb6ae4434145eca7481e998caefff1c55367020b4d643c"
+    },
+    {
+      "path": "test/results/custody-environment.json",
+      "before": "8c05587d61a66459ce79401ca85995618da9b393d0dff4eae99fc99d754b3dea",
+      "after": "79838ff78bf0b9df6a8103ea4eaee8595805ca4df5eb2d5c48088223391c84d6"
+    },
+    {
+      "path": "test/results/custody.log",
+      "before": "a7ccdefa7dc5988705ffb7f97d9b1d06d2d4a5c30c522f24981ddedafc757b5e",
+      "after": "e208b3d02b65c00878c615aa3618ce7419dea1dc972de06b386e11c489cb9af6"
+    },
+    {
+      "path": "test/results/direct-observation-diagnostic-integration.json",
+      "before": null,
+      "after": "3c65f189600d239b7f7bd1c54226809508f054d273e158ceec2a4c6e32028fe9"
+    },
+    {
+      "path": "test/results/direct-observation-native-2/result.json",
+      "before": null,
+      "after": "504723016794c02edd9549bfd2dc50a5b530bbf23bad022addd6775b45a44bfb"
+    },
+    {
+      "path": "test/results/permission-publication-audit-integration.json",
+      "before": null,
+      "after": "a6df5dbdd3a61d7b182764d6f12c5c2a74c9f823557eeec5945609a816b23250"
+    },
+    {
+      "path": "test/results/permission-publication-audit-package/result.json",
+      "before": null,
+      "after": "ccb9dc6c7be7ba9a667fe9ab6df61d274a8cd7337587966e7f6f47476db4fb7d"
+    },
+    {
+      "path": "test/results/permission-publication-native-1/result.json",
+      "before": null,
+      "after": "4971ead144953d20f581e7665675c5daa9e8978a0c8741315a2863e036fad468"
+    }
+  ]
+}

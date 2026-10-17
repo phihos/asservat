@@ -1,0 +1,103 @@
+# ADR-159 — Complete owner projection preflight across the SQL lock
+
+Status: implemented; component qualification passed, installed qualification
+pending. Requirements: REQ-FED-001, REQ-DB-005 and
+REQ-DEP-003; existing implementation work remains under TASK-02/TASK-11.
+
+## Observed failure
+
+The [eighth installed-owner run](../../test/results/runtime-provider-owner-native-8/result.json)
+stops at the first projection's final native fleet-policy read. Its fixed codes
+identify `final-native / source.guards-final / source.guard-fleet /
+source.guard-policy-read`; the same SQL call records exactly one source-client
+limiter refusal while its context remains live. All six original standard
+20-QPS/burst-20 clients are retained. This is a failed installed run, not a
+qualification of the correction. The [log](../../test/results/runtime-provider-owner-native-8/context-storage.log)
+preserves the deciding codes and per-call counters.
+
+The ADR-158 projection completes a native preflight before the retained SQL
+bridge, then reads another current graph immediately after acquiring it. The
+selected correction combines those overlapping reads without removing the
+separate checks after a blocking claim or the independent final graph.
+
+## Decision
+
+Only fresh owner projection, inspection and launch use this fixed split. The
+other six fresh owner paths keep ADR-158's complete preflight; legacy paths are
+unchanged. Provider inspection stays serial and precedes native projection work.
+No generic skip-check option or caller-supplied partial proof is introduced.
+
+1. Under the existing joined root/resource/bridge/source lifetime, read the
+   original resource journal and the first part of the native source graph.
+   Check the complete original input, nineteen receipts and retained dates,
+   original owner configuration and provider configuration equality. Validate
+   the original owner Deployment receipt or existing claimed launch before the
+   SQL wait; retain original account and Service observations. The private
+   role-root UID must already be pinned. This prefix has no completed source
+   proof, credential material or effect authority.
+2. Acquire the unchanged SQL recovery and activation locks using the exact
+   observed fleet identity, revision and issuer. Complete the source graph under
+   those locks: compare current source/guard versions and worker objects, actual
+   public journals, administrator, owner objects and probe identities. Read the
+   final namespace after those public reads. Construct the complete native proof
+   only after those checks succeed, retaining the source prefix's original
+   observation start and earliest end.
+3. Read the accepted owner configuration in its separate short transaction and
+   require complete equality with the native source and the provider's original
+   accepted configuration, including pool and roots. Only then read the original
+   private role journal under the retained bridge. Owner-head locks are never
+   retained across the remaining native graph.
+4. Continue the original projection phase unchanged: claim by exact public resource-journal CAS,
+   acquire role/advisory locks, perform the complete current native and material
+   checks, verify all four SQL roles, and perform at most the original admitted
+   effect. Preserve exact result reads, the independent full final native graph,
+   final SQL checks and joined release.
+
+The complete current check in step 4 still follows a potentially blocking claim
+CAS and role lock. Moving a claim after the sole current check would leave an
+unchecked interval before Secret/ConfigMap CREATE or Deployment launch and is
+not permitted. Unknown attempts stay spent; lookup and the one bounded driver
+inspection cannot create a second attempt or renew its dates.
+
+## Later first private selection
+
+Previously, the first private role-journal read preceded the bridge wait. It now
+occurs after the completed native and short accepted SQL checks under that
+bridge. Its original nonempty root UID, input and retained state constraints
+still apply; a missing or replaced root fails before a claim or credential use.
+
+A valid newer resource version of that same pinned UID may now be selected if it
+changed before this first read. There is no comparison against unread private
+contents and no claim that the version existed before locking. The first actual
+read supplies the full UID/version/state baseline for all subsequent role-lock
+and final comparisons. A later change still refuses effects. This is an explicit
+selection-boundary change, not a new permission to recreate or repair a root.
+
+## Bounds and qualification
+
+The provider's original accepted interval and every sampled native/SQL interval
+can only narrow the original at-most-five-second call. Lock waiting, source
+completion, later private selection and final checks never start a new lifetime.
+Cancellation joins every started branch before dependencies are released.
+
+Source-derived accounting removes thirteen requests from the shared source
+client: parent projection 95 to 82 and the largest normal phase 100 to 87. The
+accepted-owner reads change from five to four by combining the initial and
+post-bridge reads; each remaining observation keeps its original cutoff. These
+counts now pass actual component-path regressions; they are not measured
+installed availability.
+Even 87 requests need 4.35 seconds from a drained 20-QPS bucket without queued
+debt; provider/SQL work and already-aged accepted observations still constrain
+success. No rate, burst, deadline, pool, permission, observer cadence or SQL
+schema change is selected. Provider/native overlap is not part of this decision.
+
+Qualification must exercise the actual Advance/Inspect/Launch paths, all six
+client counts and aliases, zero private reads before admission, prefix and
+post-wait object/body changes, same-UID first selection versus UID replacement,
+post-claim mutation without an external effect, original deadline expiry and
+joined shutdown during both halves. Preserve fixed initial-unavailable versus
+post-lock change/denial diagnostics and independent first-failure/inspection
+codes. Then rerun the original installed chain with ordinary source aging and
+unchanged clients and limits. Component success alone cannot qualify installed
+startup, sustained availability or public investigation. Actual results belong
+in [implementation progress](../implementation-progress.md).

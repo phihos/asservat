@@ -1,0 +1,5 @@
+schemaVersion: approval-policy/v1
+policyGrants:
+  defaultAgeSeconds: 604800
+  maxAgeSeconds: 2592000
+  renewalNoticeSeconds: 86400

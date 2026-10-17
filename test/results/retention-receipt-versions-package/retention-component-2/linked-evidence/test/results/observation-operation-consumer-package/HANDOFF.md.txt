@@ -1,0 +1,28 @@
+# V2 native-operation values, ports and SQL49 consumer checkpoint
+
+This immutable ten-path package is ready for parent integration. It adds seven files and changes three existing files. It does not select v2 runtime, add wire routes, or qualify the complete regional observation workflow.
+
+## Exact integration inputs
+
+Use `files/` with `manifest.json` (path/base/payload entries), `bases.json`, `payload.json` and `dependencies.json`. There are 1,921 exact dependencies. `freeze.json` records the frozen candidate and runner. `originals/` preserves existing-file bases. `overlay.json` is the isolated Go overlay; `mirror-manifest.json` pins all 1,928 architecture-mirror files. `legacy-extraction.json` records exact preservation of the legacy SQL call and result predicates after receiver parameterization. Do not copy the architecture mirror or evidence into product packages.
+
+Manifest SHA256: `f1604c18602884b697284a44ad9112ca74f28708f3347cbe01034ce67019d63e`.
+Freeze SHA256: `22e709476b1274337cf108418b6373f178b25f74733dec63f43675bfef27c22d`.
+
+## Contract and implementation
+
+Domain values distinguish the original native bracket from actual source-value dates, bind the exact operation/channel/leaf, retain shortening and final phase, and own nested slices. Closed C-04 ports expose the two existing concrete native primitives without changing their native I/O or public legacy source contracts. The distinct v2 registry wrapper owns the original scoped SQL ledger and full installed pin, reads actual numbered source values before and after the unchanged SQL49 current-leaf function, and preserves original caller/native/source/workload/SQL/leaf bounds. No new SQL, grants, pools, clients, limiters or deadline extension are introduced.
+
+The first source pair is deliberately incomplete. `FinalMatches` requires final ordinal 4. The next private channel/coordinator must retain the same operation/source instance across both registry invocations and require `final.Last.Continues(first.Last)` before releasing a result; two independently valid source pairs cannot become one conversation. Returned values remain correlations, not independently minted native authority. Current actual TLS/private-key checks and final Receipt/EOF remain required.
+
+## Actual verification
+
+The ten Go payloads are byte-identical across checkpoints v1–v3. Checkpoint v1 compile (six packages, 22.057s), selected races (60.059s wall) and vet (six packages, 5.426s) passed. The race log contains 33 top-level and 245 named PASS entries; application/fleet compiled but selected no tests. The actual HTTPS native-adapter tests use synthetic installation/guard facts, and the fixed generated-query seam tests SQL call ordering/predicates rather than actual PL/pgSQL.
+
+V1's architecture harness failed because its mirror omitted embedded migration files. V2's mirror-only rerun failed because a directory-name ignore excluded the real internal/application/evidence package. Both original failure logs/reports remain intact. V3 copies only exact frozen dependency and payload paths, asserts complete mirror coverage and reruns architecture only: handle 10475, exit 0, 2.651s, 53 packages/298 internal edges. Compile/race/vet are explicitly reused from unchanged v1 source, not rerun. All before/after dependency, base, payload, file-set, mirror, reused-evidence and freeze checks passed. No live repository edit or native lab was performed.
+
+See `RESULT.json` and `evidence-hashes.json` for exact original report/log paths and hashes. Every recorded command is in its phase report; runners enforce GOMAXPROCS=2, GOFLAGS=-p=2 and private TMPDIR. Both prior whole-run failures remain failures; this result combines their successful unchanged gates with the corrected architecture gate.
+
+## Remaining scope and next task
+
+`INTEGRATION-MAP.md` records the approved remaining v2 graph. The next stage must implement original-context ownership through four actual regional ordinals, current SQL/TLS/process checks, owner before/final native brackets, and finite pending-locator delivery/claim/spent state. It must retain operation lifetime after GET completion without deriving it from a cancelled handler context. Legacy v1 behavior stays unchanged; explicit fixed v2 format selection remains unenabled until all consumers exist. Complete HWORK/local/forwarded/regional native composition must still qualify within the original five seconds and existing 20-QPS clients. This component result is not installed availability or native routing qualification.

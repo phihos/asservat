@@ -1,0 +1,1 @@
+cat: /kind/kubeadm.conf: No such file or directory

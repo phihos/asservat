@@ -1,0 +1,100 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "diagnosticRecommendations",
+    "target_handle": "target-checkout",
+    "goal": "network",
+    "catalog_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "expires_at": "2026-10-09T12:05:10Z",
+    "source_capture_ids": [
+      "00000000-0000-4000-8000-000000000090"
+    ],
+    "missing_observations": [
+      "Confirm the intended Service; two candidates share this observed backend."
+    ],
+    "recommendations": [
+      {
+        "diagnostic_handle": "recommendation-transport-ledger",
+        "title": "Follow ledger-api backend transport traffic",
+        "explanation": "Investigate TCP failures while retaining only verified L3/L4 headers. The Service choice remains explicit because the sample is ambiguous.",
+        "answers": [
+          "Connection setup, resets and packet timing on the observed path."
+        ],
+        "limitations": [
+          "No HTTP headers from TLS; one short pod sample does not establish peak traffic."
+        ],
+        "basis": {
+          "confidence": "inferred",
+          "reason": "TLS/TCP observed; ledger-api is one permitted Service candidate."
+        },
+        "evidence_kinds": [
+          "networkHeaders",
+          "networkSnapshot"
+        ],
+        "impact": "observe",
+        "max_bytes": 52428800,
+        "max_process_starts": 0,
+        "retention_seconds": 900,
+        "approval_required": false,
+        "blockers": [],
+        "packet_parameters": {
+          "profile": {
+            "kind": "networkHeaders"
+          },
+          "before": "30s",
+          "after": "10s",
+          "ring": {
+            "maxAge": "30s",
+            "maxBytes": 37748736,
+            "segmentBytes": 4194304,
+            "maxSegments": 9,
+            "medium": "memory"
+          },
+          "peers": {
+            "entries": [
+              {
+                "resourceRef": {
+                  "kind": "Service",
+                  "namespace": "payments",
+                  "name": "ledger-api",
+                  "serviceMode": "backends",
+                  "readyOnly": false
+                }
+              }
+            ],
+            "protocol": "tcp",
+            "ports": [
+              8080
+            ],
+            "resolution": "follow",
+            "maxEndpoints": 256,
+            "maxStaleness": "5s"
+          },
+          "maxFrozenBytes": 50331648,
+          "maxConcurrentSnapshots": 1,
+          "filter": "tcp and port 8080"
+        },
+        "ring_sizing": {
+          "basis": "measuredProjection",
+          "retained_bytes_per_second": 524288,
+          "history_seconds": 30,
+          "burst_factor": 2,
+          "segment_bytes": 4194304,
+          "segments": 9,
+          "ring_bytes": 37748736,
+          "limitations": [
+            "Synthetic example: projection replay rate; burst factor is an assumption."
+          ]
+        }
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

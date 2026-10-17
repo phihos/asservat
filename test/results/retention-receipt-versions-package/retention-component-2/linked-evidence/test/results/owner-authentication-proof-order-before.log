@@ -1,0 +1,6 @@
+--- FAIL: TestOwnerEnrollmentMatchesConfigurationObservedDuringProof (0.00s)
+    --- FAIL: TestOwnerEnrollmentMatchesConfigurationObservedDuringProof/observed-during-proof (0.00s)
+        owner_enrollment_test.go:44: match=false want=true; a configuration read may finish after the original proof start
+FAIL
+FAIL	asservat.local/asservat/internal/domain/fleet	0.002s
+FAIL

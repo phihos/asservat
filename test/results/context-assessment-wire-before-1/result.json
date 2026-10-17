@@ -1,0 +1,127 @@
+{
+  "runnerSHA256": "a1d100e75287ca4923e214f08c09290f504860e49046151fd481ec98cb33b204",
+  "steps": [
+    {
+      "name": "regression",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(TestCompiledContextAssessmentPublicPreview)$",
+        "./internal/transport/presentation"
+      ],
+      "pid": 1362322,
+      "processGroup": 1362322,
+      "exit": 1,
+      "seconds": 1.001,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/transport/presentation",
+          "TestCompiledContextAssessmentPublicPreview"
+        ]
+      ],
+      "requiredTopLevelTests": 1,
+      "missingPackagePasses": [
+        "asservat.local/asservat/internal/transport/presentation"
+      ],
+      "missingRequiredTests": [
+        [
+          "asservat.local/asservat/internal/transport/presentation",
+          "TestCompiledContextAssessmentPublicPreview"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": false,
+      "observedTopLevelRuns": [
+        [
+          "asservat.local/asservat/internal/transport/presentation",
+          "TestCompiledContextAssessmentPublicPreview",
+          1
+        ]
+      ],
+      "observedTopLevelPasses": [],
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/transport/presentation/TestCompiledContextAssessmentPublicPreview/node/canonical-assessment",
+        "asservat.local/asservat/internal/transport/presentation/TestCompiledContextAssessmentPublicPreview/node/public-preview",
+        "asservat.local/asservat/internal/transport/presentation/TestCompiledContextAssessmentPublicPreview/node"
+      ],
+      "failuresOrSkips": [
+        {
+          "Time": "2026-10-14T04:43:34.463683919+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/presentation",
+          "Test": "TestCompiledContextAssessmentPublicPreview/kubernetesAPI/canonical-assessment",
+          "Elapsed": 0.02
+        },
+        {
+          "Time": "2026-10-14T04:43:34.466217981+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/presentation",
+          "Test": "TestCompiledContextAssessmentPublicPreview/kubernetesAPI/public-preview",
+          "Elapsed": 0
+        },
+        {
+          "Time": "2026-10-14T04:43:34.466251271+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/presentation",
+          "Test": "TestCompiledContextAssessmentPublicPreview/kubernetesAPI",
+          "Elapsed": 0.08
+        },
+        {
+          "Time": "2026-10-14T04:43:34.466288801+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/presentation",
+          "Test": "TestCompiledContextAssessmentPublicPreview",
+          "Elapsed": 0.17
+        },
+        {
+          "Time": "2026-10-14T04:43:34.467688548+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/transport/presentation",
+          "Elapsed": 0.196
+        }
+      ]
+    }
+  ],
+  "sourceCount": 3076,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "failed",
+  "reviewedPayloads": {
+    "internal/application/planning/context_assessment.go": "b4cea0c305c8d06777deabe8f8ec9ae7c6c7c3e7c8b935986744efb86ae5f375",
+    "internal/transport/presentation/context_compiled_assessment_test.go": "bc8abf9f84472196b17a18e665593903e18a20637bfe690bb4e593cb22fda716",
+    "specs/contracts/capture-assessment.schema.json": "8c25cfdd172045bbce870a1919dcc1c64726e24cfe9509e74d389b6b95e4c52c",
+    "internal/transport/presentation/context_assessment.go": "d5b7dcd8064976be3120e0190feef9030244fa4d89a97e76b1c5c331aefe5d99",
+    "internal/transport/presentation/context_operations.go": "6899c8d3dd538e656d66a45e3438a7d604d7399f25f32fdcf7f9ec438dc61ae8"
+  },
+  "selections": {
+    "regression": [
+      "./internal/transport/presentation",
+      "^(TestCompiledContextAssessmentPublicPreview)$"
+    ]
+  },
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "f30d397c865cb253a8baacd996a048e3229287c7024e7220fd42d40213f7dc11",
+    "runner.py": "a1d100e75287ca4923e214f08c09290f504860e49046151fd481ec98cb33b204",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "regression.log": "cecf1fd1663ec8a05ac0a8b653d9ba547fbbc3553926fee7ade3bc95c7c44704",
+    "payloads/specs/contracts/capture-assessment.schema.json.txt": "8c25cfdd172045bbce870a1919dcc1c64726e24cfe9509e74d389b6b95e4c52c",
+    "payloads/internal/transport/presentation/context_compiled_assessment_test.go.txt": "bc8abf9f84472196b17a18e665593903e18a20637bfe690bb4e593cb22fda716",
+    "payloads/internal/transport/presentation/context_assessment.go.txt": "d5b7dcd8064976be3120e0190feef9030244fa4d89a97e76b1c5c331aefe5d99",
+    "payloads/internal/transport/presentation/context_operations.go.txt": "6899c8d3dd538e656d66a45e3438a7d604d7399f25f32fdcf7f9ec438dc61ae8",
+    "payloads/internal/application/planning/context_assessment.go.txt": "b4cea0c305c8d06777deabe8f8ec9ae7c6c7c3e7c8b935986744efb86ae5f375"
+  }
+}

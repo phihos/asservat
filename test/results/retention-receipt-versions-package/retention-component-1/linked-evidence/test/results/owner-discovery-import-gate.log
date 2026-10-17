@@ -1,0 +1,2 @@
+/tmp/asservat-openapi-validation/bin/python scripts/check-go-architecture.py
+Go architecture OK: 41 packages, 178 internal import edges; catalog ownership and layer/dependency rules checked

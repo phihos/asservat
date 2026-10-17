@@ -1,0 +1,6 @@
+# asservat.local/asservat/internal/transport/presentation [asservat.local/asservat/internal/transport/presentation.test]
+internal/transport/presentation/operation_audit_healthy_test.go:55:12: undefined: NewHealthyAuditedOperations
+internal/transport/presentation/operation_audit_healthy_test.go:71:15: undefined: NewHealthyAuditedOperations
+internal/transport/presentation/operation_audit_healthy_test.go:74:15: undefined: NewHealthyAuditedOperations
+FAIL	asservat.local/asservat/internal/transport/presentation [build failed]
+FAIL

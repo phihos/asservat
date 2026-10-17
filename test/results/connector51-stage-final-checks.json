@@ -1,0 +1,128 @@
+{
+  "before": {
+    "docs/architecture/connector-retirement.md": "bc1d0f59405e1f19162c131ed7c342c96220277b66c1a362579c455a46aa65d3",
+    "internal/adapters/postgres/connector_audit.go": "852e8be5a6eb5a34a62303395cc91c064cc41cce6f622f0fefd7440500418990",
+    "internal/adapters/postgres/connector_backing.go": "4fa5ede3cc6d9bab517801a90455e82fddd9f4423ba1341345e992223cc8fb70",
+    "internal/adapters/postgres/connector_process.go": "d24b32de8ff60f5804684c342bf9b1876109129377c91bc8341be71ffe353cb8",
+    "internal/adapters/postgres/connector_retirement.go": "1376bcdfe520f6ff78b822887e3de0e7d7b5cde2b1cb9eaecf26afa151de7875",
+    "internal/adapters/postgres/connector_retirement_cleanup.go": "df7c63ce7dab61a2ff4cacfefd5a9f9346b9a6c8a0eb2efb7b39f61df4ca1cac",
+    "internal/application/audit/operation_lifecycle.go": "2fe4ed780f88fce7d224370baea4203c4371a01446e00175311fb4311e861ac9",
+    "internal/application/audit/operation_mac.go": "e7f7ab2d0acc3d1d0e8c54d08c8ba89328f1568030fb94d5d8b437098df2df4b",
+    "internal/application/fleet/connector_backing.go": "9e4659f18fd220c2bd1040c5b1de30d435affd91da60e17a8f6b42109df85999",
+    "internal/application/fleet/connector_retirement_acceptance.go": "9b51284b0719af4bcbbb24c911cb5eb62d713f49c35a7d436a109e2153966ff9",
+    "internal/application/fleet/connector_retirement_digest.go": "5a01c1898c823a8f8289d0ae6cfd05056415849c59f914a935b879674ae1eee9",
+    "internal/application/fleet/connector_retirement_digest_test.go": "435e6688bf05d582c4fd7a2870bcf6a7f1672f06c225d8c33ba890fef04ba19b",
+    "internal/application/fleet/connector_retirement_intent.go": "e1672f3aa008f9f22daa39ec26ada2feeb4fd02f7915b0047d7ea318dd63f5b5",
+    "internal/application/fleet/connector_retirement_intent_test.go": "8a95185aca83e38d97fca1f94e75d1f6f36340c68961b45fed6630f0c4116b40",
+    "internal/application/fleet/connector_retirement_proposal.go": "5ceddf48c5fa1cc8e58924f88aefd1e0d1ae880d5c5c582560baccd3b8ed0d22",
+    "internal/application/fleet/connector_retirement_service.go": "16d2f30d51dc4ab7fa2faf574508b6d6ed5de27610dd638c516fc9140aacf072",
+    "internal/application/fleet/connector_retirement_service_test.go": "65d332fe4ef35286e6527e29369f80e959f4208b4ea9949a353e989edcea8bdd",
+    "internal/application/fleet/connector_retirement_ticket.go": "c86d7ae5ff0827fe5311df067e4fbd3188491b90ce1a362dca92f0582dd5f8c9",
+    "internal/application/fleet/connector_retirement_ticket_test.go": "cc6c4792b06c6db3af31e82071d8c66e5d152893df82b5e569fc2099580e4ae1",
+    "internal/domain/audit/connector_operation.go": "78a8081aa4cd9284c36c832138b344825ed7409af0bcde5640ff813c8051c3da",
+    "internal/domain/audit/connector_retirement.go": "6ce0ea3b3e39b7d7a64b33eb1329fd7e567d19742e3934875967b85cbda106c9",
+    "internal/domain/audit/connector_retirement_origin.go": "595ea588f96f8f42d9aea95e8a661b534cec72695219a961034e0e54fca61c49",
+    "internal/domain/audit/operation.go": "38ae473b662aed2d7bb602ef24a02c5ce8bd0ba4444a148e9c924f2cffa25091",
+    "internal/domain/audit/operation_lifecycle.go": "bdc79d5bc3fac8f484592698a304f9c85fcb99d959a5ddf0f2d980ac47c5f000",
+    "migrations/00051_connector_retirement.sql": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+    "migrations/queries/connector_retirement.sql": "425848b82350a1d8bd2857626c9e81e3ef70048917326e2cf5382da0c19177dd",
+    "specs/contracts/connector-identity.schema.json": "3392ea86c23abcfce9bcd5d1bdb18590490e313374eb46aaead05a6f8adb2a33",
+    "test/integration/capture_admission_test.go": "4f75f4e0d4a5ed79bc62faa5665b3406b653e4bf900dd9f51b84f54248bd92fc",
+    "test/integration/connector_identity_test.go": "d0d5b1fcf45c175dd32a07eba036124a4686ffa07064c9c268dc9269cb310967",
+    "test/integration/connector_retirement_test.go": "0a059931d8a601cfe229658050ac9f851ddfd7f98ec0a12efab58106b2548ff6"
+  },
+  "checks": [
+    {
+      "name": "sqlc-final",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate",
+        "-f",
+        "/home/phil/.cache/asservat-build/planning/connector-retirement-20261012/generation/sqlc.yaml"
+      ],
+      "exit": 0,
+      "seconds": 0.204
+    },
+    {
+      "name": "compile-final",
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "-overlay=/home/phil/.cache/asservat-build/planning/connector-retirement-20261012/overlay.json",
+        "./internal/domain/audit",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 6.124
+    },
+    {
+      "name": "race-final",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-overlay=/home/phil/.cache/asservat-build/planning/connector-retirement-20261012/overlay.json",
+        "./internal/domain/audit",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "seconds": 7.626
+    },
+    {
+      "name": "vet-final",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/connector-retirement-20261012/overlay.json",
+        "./internal/domain/audit",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.38
+    }
+  ],
+  "after": {
+    "docs/architecture/connector-retirement.md": "bc1d0f59405e1f19162c131ed7c342c96220277b66c1a362579c455a46aa65d3",
+    "internal/adapters/postgres/connector_audit.go": "852e8be5a6eb5a34a62303395cc91c064cc41cce6f622f0fefd7440500418990",
+    "internal/adapters/postgres/connector_backing.go": "4fa5ede3cc6d9bab517801a90455e82fddd9f4423ba1341345e992223cc8fb70",
+    "internal/adapters/postgres/connector_process.go": "d24b32de8ff60f5804684c342bf9b1876109129377c91bc8341be71ffe353cb8",
+    "internal/adapters/postgres/connector_retirement.go": "1376bcdfe520f6ff78b822887e3de0e7d7b5cde2b1cb9eaecf26afa151de7875",
+    "internal/adapters/postgres/connector_retirement_cleanup.go": "df7c63ce7dab61a2ff4cacfefd5a9f9346b9a6c8a0eb2efb7b39f61df4ca1cac",
+    "internal/application/audit/operation_lifecycle.go": "2fe4ed780f88fce7d224370baea4203c4371a01446e00175311fb4311e861ac9",
+    "internal/application/audit/operation_mac.go": "e7f7ab2d0acc3d1d0e8c54d08c8ba89328f1568030fb94d5d8b437098df2df4b",
+    "internal/application/fleet/connector_backing.go": "9e4659f18fd220c2bd1040c5b1de30d435affd91da60e17a8f6b42109df85999",
+    "internal/application/fleet/connector_retirement_acceptance.go": "9b51284b0719af4bcbbb24c911cb5eb62d713f49c35a7d436a109e2153966ff9",
+    "internal/application/fleet/connector_retirement_digest.go": "5a01c1898c823a8f8289d0ae6cfd05056415849c59f914a935b879674ae1eee9",
+    "internal/application/fleet/connector_retirement_digest_test.go": "435e6688bf05d582c4fd7a2870bcf6a7f1672f06c225d8c33ba890fef04ba19b",
+    "internal/application/fleet/connector_retirement_intent.go": "e1672f3aa008f9f22daa39ec26ada2feeb4fd02f7915b0047d7ea318dd63f5b5",
+    "internal/application/fleet/connector_retirement_intent_test.go": "8a95185aca83e38d97fca1f94e75d1f6f36340c68961b45fed6630f0c4116b40",
+    "internal/application/fleet/connector_retirement_proposal.go": "5ceddf48c5fa1cc8e58924f88aefd1e0d1ae880d5c5c582560baccd3b8ed0d22",
+    "internal/application/fleet/connector_retirement_service.go": "16d2f30d51dc4ab7fa2faf574508b6d6ed5de27610dd638c516fc9140aacf072",
+    "internal/application/fleet/connector_retirement_service_test.go": "65d332fe4ef35286e6527e29369f80e959f4208b4ea9949a353e989edcea8bdd",
+    "internal/application/fleet/connector_retirement_ticket.go": "c86d7ae5ff0827fe5311df067e4fbd3188491b90ce1a362dca92f0582dd5f8c9",
+    "internal/application/fleet/connector_retirement_ticket_test.go": "cc6c4792b06c6db3af31e82071d8c66e5d152893df82b5e569fc2099580e4ae1",
+    "internal/domain/audit/connector_operation.go": "78a8081aa4cd9284c36c832138b344825ed7409af0bcde5640ff813c8051c3da",
+    "internal/domain/audit/connector_retirement.go": "6ce0ea3b3e39b7d7a64b33eb1329fd7e567d19742e3934875967b85cbda106c9",
+    "internal/domain/audit/connector_retirement_origin.go": "595ea588f96f8f42d9aea95e8a661b534cec72695219a961034e0e54fca61c49",
+    "internal/domain/audit/operation.go": "38ae473b662aed2d7bb602ef24a02c5ce8bd0ba4444a148e9c924f2cffa25091",
+    "internal/domain/audit/operation_lifecycle.go": "bdc79d5bc3fac8f484592698a304f9c85fcb99d959a5ddf0f2d980ac47c5f000",
+    "migrations/00051_connector_retirement.sql": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+    "migrations/queries/connector_retirement.sql": "425848b82350a1d8bd2857626c9e81e3ef70048917326e2cf5382da0c19177dd",
+    "specs/contracts/connector-identity.schema.json": "3392ea86c23abcfce9bcd5d1bdb18590490e313374eb46aaead05a6f8adb2a33",
+    "test/integration/capture_admission_test.go": "4f75f4e0d4a5ed79bc62faa5665b3406b653e4bf900dd9f51b84f54248bd92fc",
+    "test/integration/connector_identity_test.go": "d0d5b1fcf45c175dd32a07eba036124a4686ffa07064c9c268dc9269cb310967",
+    "test/integration/connector_retirement_test.go": "0a059931d8a601cfe229658050ac9f851ddfd7f98ec0a12efab58106b2548ff6"
+  },
+  "unchanged": true
+}

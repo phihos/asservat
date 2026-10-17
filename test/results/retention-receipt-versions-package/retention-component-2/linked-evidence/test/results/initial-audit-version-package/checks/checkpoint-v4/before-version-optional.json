@@ -1,0 +1,35 @@
+{
+  "phase": "before-version-optional",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4/before-overlay.json",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-v",
+    "-run",
+    "^TestInitialInstallerRequiresVersionBeforeAuditReceipt$",
+    "./internal/bootstrap"
+  ],
+  "exit": 1,
+  "expectedExit": 1,
+  "seconds": 2.884,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": []
+  },
+  "markerCount": 4,
+  "topLevelPass": 0,
+  "namedPass": 2,
+  "skips": 0
+}

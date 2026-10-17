@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "collection-scope/v1",
+  "source": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "resourceUID": "00000000-0000-4000-8000-000000000031"
+  },
+  "executor": {
+    "issuer": "https://identity.example.invalid/realms/company",
+    "subject": "service-owner-123",
+    "clientID": "asservat-browser",
+    "identityType": "human"
+  },
+  "collection": {
+    "kind": "DebugCapture",
+    "spec": {
+      "target": {
+        "namespace": "payments",
+        "workloadRef": {
+          "apiVersion": "apps/v1",
+          "kind": "StatefulSet",
+          "name": "ledger",
+          "uid": "workload-ledger-uid"
+        },
+        "maxPods": 1,
+        "selection": "lowestOrdinal",
+        "adoption": "pinUID",
+        "ordinals": [
+          0
+        ]
+      },
+      "recipeRef": {
+        "name": "bounded-live-diagnostics",
+        "digest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43"
+      },
+      "deadline": "2026-10-09T12:05:00Z"
+    }
+  },
+  "dependencies": [
+    {
+      "role": "collectionCeiling",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "role": "recipe",
+      "digest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43"
+    },
+    {
+      "role": "retention",
+      "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+    }
+  ],
+  "podBindings": [
+    {
+      "podUID": "pod-uid",
+      "nodeUID": "node-uid",
+      "nodeBootID": "00000000-0000-4000-8000-000000000006"
+    }
+  ]
+}

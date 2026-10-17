@@ -1,0 +1,63 @@
+{
+  "status": "frozen source-only v2: exact first positive receipt pinned across full verification",
+  "beforeResult": "test/results/owner-launch-receipt-before-1/result.json",
+  "beforeSHA256": "033bce07fe57931109edb140eec1f2b2b48594d82f012ee7d80a74ed0dc44369",
+  "paths": [
+    {
+      "path": "docs/architecture/owner-startup.md",
+      "baseSHA256": "3a4a698d2e9b3c25af55610d8ccec2cae1b7f09bae0f4d9d519258614909e73b",
+      "sha256": "a5cacde88784da0046a9f729eafbf325888405de5bf7b20fac5b02e27bd11342"
+    },
+    {
+      "path": "docs/decisions/164-owner-launch-receipt-convergence.md",
+      "baseSHA256": null,
+      "sha256": "d82d239f3c0bb083bd4d05f6de070ba279bea375e87d5b7811f150c62c40149a"
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "baseSHA256": "023e1817e82a0e3528b92aacb3b67473cb9c1889f60f9230fe58c796d7fb7bda",
+      "sha256": "8cf670d0be6127769b475ed242b8e0c9ec70ae7a4e77087704bb62f724e169c3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_objects_test.go",
+      "baseSHA256": "91645bd6cf375e83ac4973f296cac34b9d11e96dee0e2bb35c4d52eb08b9493e",
+      "sha256": "ea0a565e7a26d0f4cf0460fdbc135c8a8631135d0aef667709fb7e9724eb4951"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_provider_journal_test.go",
+      "baseSHA256": "2aa73309be6ae028eae0c4e9b5968bc6c9230604183a9e045f9d90d192447232",
+      "sha256": "ab9f380c81c42dc3bd7ecb5917f31e5402b1f457c1ee4f27dbe89e0fc56da9f3"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_reader.go",
+      "baseSHA256": "2c96b96f6b05979d04b945eb25d6ebda54db6b03d887bff472eefb5c8086cebd",
+      "sha256": "7bdb1ada44530a66fdd3be54b53e0c3793d5f96bf1fce27852b241d11c654ef7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_reader_test.go",
+      "baseSHA256": "7613f1ef199d543323a1a815e63bd5c6f0deb7e78124e9e69ad14ebae3115094",
+      "sha256": "1ce5442522cfbc52a906529298b5f7949d88c422261de8e13ab1fab2285df893"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_startup.go",
+      "baseSHA256": null,
+      "sha256": "1d86478abe1fa0e1d243c1bb5fc0b61c94bada3d383d1b29f4d8f42470c70a37"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_startup_test.go",
+      "baseSHA256": null,
+      "sha256": "79929bc6c2c27d85d84368bd946e1ec95ab598ac6c0efb1b83ea2585756f4f33"
+    },
+    {
+      "path": "internal/bootstrap/owner_observation_deployment.go",
+      "baseSHA256": "95086a93c5e851110dad1ef4b6cbe40059813be9489302e9925b3ef291ac9f9d",
+      "sha256": "0bb917cfa626cec8cc7c897a5d0f540d533e0ca33723ba538890fddd39c2523f"
+    },
+    {
+      "path": "specs/deployment-profiles.md",
+      "baseSHA256": "306dd79930198215f6524aab7cd56d93eb4376f0177207ba76099d969ac15f63",
+      "sha256": "89e7d67daa9e990c50d620f4f8683c7c96f5fef47f6f8c6ebb5d8004fc2d7cd4"
+    }
+  ],
+  "patchSHA256": "2536c6b92f04184fdedd0dd29fefbea15529d3952516c9e63fe3a026a3ba8abc"
+}

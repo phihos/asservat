@@ -1,0 +1,96 @@
+{
+  "race-resource-compatibility": [
+    "./internal/adapters/kubernetes",
+    [
+      "TestInitialRuntimeResourceInventoryUsesOnlyRecordedOriginalReferences",
+      "TestInitialRuntimeResourcesRequireOriginalOrderedOneUseClaims",
+      "TestInitialRuntimeResourceDecoderRejectsMissingAndInjectedWorkload",
+      "TestInitialRuntimeObjectsStayInertAndDoNotGrantSecretRead",
+      "TestProviderResourcesFixCompletePairOriginalScopeAndCandidateLimit",
+      "TestProviderSecretPlaceholderPinsIdentityWithoutAssertingMaterial",
+      "TestInitialRuntimeRootPinOriginalCreationInputAndReplacement",
+      "TestInitialRuntimeDeploymentDefaultsPreserveOriginalIdentity"
+    ]
+  ],
+  "race-original-selection": [
+    "./internal/adapters/kubernetes",
+    [
+      "TestOwnerBootstrapStateRetainsOmissionAndHistoricalBytes",
+      "TestOwnerBootstrapStateRejectsAliasesAndUnboundedClaims",
+      "TestOwnerBootstrapTransitionsPreserveSiblingsAndSingleAdmission",
+      "TestOwnerBootstrapOriginalAllocationAndGeneratedInput",
+      "TestOwnerBootstrapUnknownClaimCannotIssueCreate",
+      "TestOwnerBootstrapLostCreateAndReceiptRemainExact",
+      "TestOwnerBootstrapFinalGuardAndChildReplacementDeny",
+      "TestOwnerBootstrapCopiedAndClosedProducerHasNoEffect",
+      "TestOwnerBootstrapChildIntentExpiryDoesNotBecomeNewCreateAuthority",
+      "TestOwnerBootstrapPositiveCreatePinsIdentityBeforeReceipt",
+      "TestOwnerBootstrapUnknownParentPinsExactLocalAllocation",
+      "TestOwnerBootstrapGeneratedBindingRejectsCallerAuthoritySubstitution",
+      "TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim",
+      "TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers",
+      "TestOwnerBootstrapDiagnosticRetainsOriginalFailureThroughInspect",
+      "TestOwnerBootstrapDiagnosticFinalNativeRetainsNormalization",
+      "TestOwnerNativeDiagnosticPreservesAcceptedShortCircuitClockReads",
+      "TestOwnerBootstrapDiagnosticOuterBoundaryDoesNotClaimSQLCause",
+      "TestOwnerBootstrapProtectedSourceCapabilityAndDigest",
+      "TestObservationCapabilityIsOriginalResourceBinding",
+      "TestObservationCapabilityRejectsMixedAndUnknownOriginalState",
+      "TestObservationOriginalSelectionPropagatesWithoutRuntimeActivation",
+      "TestObservationV2UnknownSelectionCreateDoesNotRepeat"
+    ]
+  ],
+  "race-participant-provenance": [
+    "./internal/adapters/kubernetes",
+    [
+      "TestOwnerBootstrapWorkerCallerOriginalReceipts",
+      "TestOwnerBootstrapWorkerCallerRejectsUnacknowledgedOrReplacement",
+      "TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent",
+      "TestOwnerBootstrapWorkerCallerCloseAndCopyDeny",
+      "TestOwnerBootstrapWorkerCallerCancellationDuringFinalRead",
+      "TestOwnerBootstrapWorkerCallerUnavailableFinalJournalStaysUnavailable",
+      "TestOwnerBootstrapWorkerCallerExpiredFinalReturnStaysUnavailable",
+      "TestObservationParticipantsBindExactDistinctOwnerAndCaller",
+      "TestObservationParticipantsRejectLegacySelectionBeforeNativeRead",
+      "TestObservationParticipantsRejectOwnerReplacementAtFinalBoundary"
+    ]
+  ],
+  "race-projection-compatibility": [
+    "./internal/adapters/kubernetes",
+    [
+      "TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication",
+      "TestProviderInstalledOwnerRejectsCredentialScopeSubstitution",
+      "TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects",
+      "TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe",
+      "TestProviderOwnerAuditPlaceholderNeverBecomesUsableMaterial",
+      "TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts",
+      "TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects",
+      "TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims",
+      "TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild",
+      "TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState",
+      "TestOwnerIdentityChildObjectUnknownCreateIsIndependentLookupOnly",
+      "TestOwnerIdentityPendingLaunchDoesNotConvertInertOrReplacementIntoCompletion",
+      "TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout"
+    ]
+  ],
+  "race-contracts": [
+    "./internal/contracts",
+    [
+      "TestInitialRuntimeLayoutsRejectMixedIncompleteProfiles",
+      "TestOwnerBootstrapSelectionCodecsStayClosedAndBounded",
+      "TestOwnerOperationWireExactClosedV2",
+      "TestOwnerProviderAuthenticationWireRejectsExtraAuthorityAndAliases",
+      "TestOwnerProviderAuthenticationCannotBeIgnoredByLegacyDeployment"
+    ]
+  ],
+  "race-runtime-refusal": [
+    "./internal/bootstrap",
+    [
+      "TestOwnerObservationInputIsExplicitAndFinite",
+      "TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool",
+      "TestProviderOwnerInputRequiresCompleteSelectedBranch",
+      "TestProviderOwnerProjectionReadsOnlyFiveSQLFilesAndRejectsLegacyMaterial",
+      "TestOwnerObservationSelectionAloneCannotActivateV2Runtime"
+    ]
+  ]
+}

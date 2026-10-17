@@ -1,0 +1,539 @@
+--- a/internal/application/evidence/native_exchange.go
++++ b/internal/application/evidence/native_exchange.go
+@@ -162,6 +162,9 @@
+ // prefetch or the final zero-byte closure marker of the already checked exact
+ // conversation, never data, metadata, commands or new effects. Successful local
+ // retirement can close SQL before a remote relay forwards that final marker.
++// A native-package synchronous constructor/attachment may also use this snapshot
++// solely to veto or shorten its own just-completed Check, never to mint/renew a
++// checked value or authorize a frame/effect. That private value cannot cross I/O.
+ // Known cancellation, revocation and monotonic shortening still stop it.
+ func (g *NativeFrameGate) TerminalLease(ctx context.Context) (value.NativeLease, error) {
+ 	if g == nil || ctx == nil || ctx.Err() != nil {
+--- /dev/null
++++ b/internal/transport/native/admission_budget_test.go
+@@ -0,0 +1,61 @@
++package native_test
++
++import (
++	"context"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	value "asservat.local/asservat/internal/domain/authorization"
++	native "asservat.local/asservat/internal/transport/native"
++)
++
++// A current authority port may consume a material part of the original call.
++// The actual registrar/router must leave that original deadline intact while
++// avoiding repeated constructor/Attach plumbing checks with no intervening I/O.
++// Source, SQL and authority are explicit synthetic values; this is not native
++// database latency qualification or evidence that every five-second flow fits.
++func TestNativeRegistrationPreservesOriginalAdmissionBudget(t *testing.T) {
++	origin, hello, _ := routerFixture(t)
++	source := flowSourceValue(t)
++	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++	defer cancel()
++	deadline, _ := ctx.Deadline()
++	router, err := native.NewHubRouter(1)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer router.Close()
++	var checks atomic.Int32
++	check := func(call context.Context, _ evidence.NativeOrigin) (value.NativeLease, error) {
++		checks.Add(1)
++		until, bounded := call.Deadline()
++		if !bounded || until.After(deadline) {
++			t.Error("current check extended the original caller deadline")
++		}
++		timer := time.NewTimer(500 * time.Millisecond)
++		defer timer.Stop()
++		select {
++		case <-timer.C:
++			return origin.Lease, nil
++		case <-call.Done():
++			return value.NativeLease{}, call.Err()
++		}
++	}
++	registration, err := router.RegisterNativeExchange(ctx, evidence.NativeExchangeRegistration{Operation: origin.Lease.Operation, Source: source, Complete: syntheticNativeCompletion}, func(context.Context, evidence.NativeOrigin) error { return nil }, check)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer registration.Close()
++	conversation, err := router.Attach(ctx, origin, hello)
++	if err != nil || conversation == nil {
++		t.Fatalf("duplicate admission checks exhausted original bounded call: checks=%d err=%v", checks.Load(), err)
++	}
++	if checks.Load() != 3 {
++		t.Fatalf("expected fresh gate, post-Before, and exact attachment checks; got %d", checks.Load())
++	}
++	if until, bounded := conversation.Gate().Context().Deadline(); !bounded || until.After(deadline) {
++		t.Fatal("conversation extended the original admission deadline")
++	}
++}
+--- /dev/null
++++ b/internal/transport/native/admission_check.go
+@@ -0,0 +1,68 @@
++package native
++
++import (
++	"context"
++	"sync/atomic"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/authorization"
++)
++
++// checkedNativeAdmission transfers one just-completed Check through local
++// constructor/attachment validation. It is never retained by an operation,
++// serialized, or reused across I/O. Public entry points always mint their own
++// fresh check. The original call is retained without comparing Context values.
++type checkedNativeAdmission struct {
++	gate  *evidence.NativeFrameGate
++	call  context.Context
++	lease value.NativeLease
++	used  atomic.Bool
++}
++
++func checkNativeAdmission(call context.Context, gate *evidence.NativeFrameGate) (*checkedNativeAdmission, error) {
++	if gate == nil || call == nil {
++		return nil, artifact.ErrInvalid
++	}
++	lease, err := gate.Check(call)
++	if err != nil {
++		return nil, err
++	}
++	if until, bounded := call.Deadline(); bounded && until.Before(lease.Until) {
++		lease.Until = until
++	}
++	checked := &checkedNativeAdmission{gate: gate, call: call, lease: lease}
++	if _, err = checked.restrict(gate); err != nil {
++		return nil, err
++	}
++	return checked, nil
++}
++
++func (c *checkedNativeAdmission) take(gate *evidence.NativeFrameGate) (value.NativeLease, error) {
++	if c == nil || !c.used.CompareAndSwap(false, true) {
++		return value.NativeLease{}, artifact.ErrDownloadUnavailable
++	}
++	return c.restrict(gate)
++}
++
++// The snapshot is only a restrictive veto on the original fresh Check, never
++// a source of authority. Revalidate after local validation/locks and retain the
++// earliest original bound. Neither method invokes the mutable authority port.
++func (c *checkedNativeAdmission) restrict(gate *evidence.NativeFrameGate) (value.NativeLease, error) {
++	if c == nil || gate == nil || c.gate != gate || c.call == nil || c.call.Err() != nil || !c.lease.Valid(time.Now()) || !c.lease.Operation.CurrentValid(time.Now()) {
++		return value.NativeLease{}, artifact.ErrDownloadUnavailable
++	}
++	current, err := gate.TerminalLease(c.call)
++	if err != nil || !current.Operation.Equal(c.lease.Operation) || current.Certificate != c.lease.Certificate || current.Sequence != c.lease.Sequence {
++		return value.NativeLease{}, artifact.ErrDownloadUnavailable
++	}
++	lease := c.lease
++	if current.Until.Before(lease.Until) {
++		lease.Until = current.Until
++	}
++	if !lease.Valid(time.Now()) || c.call.Err() != nil {
++		return value.NativeLease{}, artifact.ErrDownloadUnavailable
++	}
++	return lease, nil
++}
+--- /dev/null
++++ b/internal/transport/native/admission_check_test.go
+@@ -0,0 +1,273 @@
++package native
++
++import (
++	"context"
++	"encoding/json"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/artifact"
++	value "asservat.local/asservat/internal/domain/authorization"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// Synthetic authority/source only. None of these values grants production authority.
++const admissionID = "11111111-1111-4111-8111-111111111111"
++
++func admissionSource(t *testing.T) evidence.NativeContextSource {
++	now := time.Now().UTC().Truncate(time.Microsecond)
++	id := admissionID
++	e := artifact.ContextExpectation{ExecutionClass: artifact.ContextAPIExecution, Registration: artifact.Registration{Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, StoreID: id, AllocationID: id, PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: now.Add(30 * time.Second), ExpiresAt: now.Add(time.Minute), DeleteBy: now.Add(90 * time.Second)}, CaseID: id, OccurrenceID: id, PodUID: id, Namespace: "app", NamespaceUID: id, WorkloadUID: id, CollectorVersion: "synthetic", CollectorImageDigest: artifact.Digest{1}, RecipeDigest: artifact.Digest{2}, PlanDigest: artifact.Digest{3}, CaptureUID: id, ActionID: "pod-status", DataClass: "metadata", PurposeRef: "synthetic", Audience: []artifact.AudienceAssignment{{Kind: "Group", Issuer: "https://id.invalid", SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: id, AssignmentID: id, BasisDigest: artifact.Digest{4}}}, RequestedAgeSeconds: 60, MaximumAgeSeconds: 300, DeletionBudgetSeconds: 30, RetentionRules: []artifact.RetentionRule{{UID: id, Generation: 1, Digest: artifact.Digest{5}}}, TriggeredAt: now}
++	s := evidence.NativeContextSource{Expectation: e}
++	for i := range s.Copies {
++		s.Copies[i] = artifact.CopyReceipt{ETag: "synthetic", Bytes: 128, SHA256: artifact.Digest{byte(i + 1)}}
++	}
++	if !s.Valid(evidence.ContextCopiesDigest(s.Copies)) {
++		t.Fatal("invalid source")
++	}
++	return s
++}
++
++func admissionProcessingPath(o value.NativeOperation) value.NativeOperation {
++	id := o.Reference.InstallationID
++	rev := identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{7}}
++	o.Path = artifact.DownloadPath{ID: id, TargetClusterID: id, StoreID: id, StorageRegion: "fixture", AcquisitionClusterID: id, AcquisitionRegion: "fixture", ConnectorClusterID: id, ConnectorRegion: "fixture", HubClusterID: id, HubRegion: "fixture", WorkerConfiguration: rev, HubConfiguration: rev}
++	o.Processing = artifact.DownloadProcessingProof{RootID: id, Epoch: id, CaptureID: id, Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, Sequence: 1, StateDigest: artifact.Digest{8}, ObservedAt: o.StartedAt, ValidUntil: o.Until}
++	return o
++}
++
++func admissionFixture(t *testing.T) (value.NativeLease, contracts.NativeCommand, evidence.NativeContextSource, contracts.NativeHello) {
++	t.Helper()
++	source := admissionSource(t)
++	n := time.Now()
++	operation := value.NativeOperation{Reference: value.NativeReference{InstallationID: admissionID, SessionID: admissionID, WorkerID: admissionID, OperationID: admissionID, Fence: 1}, Kind: value.NativePrepare, HubPodUID: admissionID, HubProcessEpoch: admissionID, WorkerPodUID: admissionID, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: admissionID, Generation: 1, StartedAt: n, Until: n.Add(4 * time.Second)}
++	operation = admissionProcessingPath(operation)
++	lease := value.NativeLease{Operation: operation, Certificate: artifact.Digest{3}, Sequence: 1, ObservedAt: n, Until: operation.Until}
++	wire, _ := json.Marshal(operation)
++	encoded, _ := json.Marshal(source)
++	command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Source: encoded, Operation: wire, ParentID: operation.ParentID, Generation: 1, LeaseSequence: 1, Until: operation.Until.UTC().Format(time.RFC3339Nano)}
++	hello := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: command.Reference, Nonce: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
++	if !contracts.ValidWorkerNonce(hello.Nonce) || !lease.Valid(n) || !operation.CurrentValid(n) {
++		t.Fatal("invalid synthetic fixture")
++	}
++	return lease, command, source, hello
++}
++func admissionGate(t *testing.T, lease value.NativeLease) *evidence.NativeFrameGate {
++	t.Helper()
++	gate, err := evidence.NewNativeFrameGate(context.Background(), func(context.Context) (value.NativeLease, error) { return lease, nil }, time.Now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		gate.Close()
++		if err := gate.Wait(context.Background()); err != nil {
++			t.Error(err)
++		}
++	})
++	return gate
++}
++func admissionComplete(context.Context, value.NativeLease) error { return nil }
++
++func TestNativePrivateAdmissionRejectsChangedProof(t *testing.T) {
++	for _, entry := range []string{"constructor", "attach"} {
++		for _, mode := range []string{"missing", "wrong-gate", "wrong-operation", "wrong-certificate", "wrong-sequence", "expired", "cancelled", "closed", "used"} {
++			t.Run(entry+"/"+mode, func(t *testing.T) {
++				lease, command, source, hello := admissionFixture(t)
++				gate := admissionGate(t, lease)
++				operation, err := NewHubOperation(gate, command, source, admissionComplete)
++				if err != nil {
++					t.Fatal(err)
++				}
++				defer operation.Close()
++				ctx, cancel := context.WithCancel(context.Background())
++				defer cancel()
++				checked, err := checkNativeAdmission(ctx, gate)
++				if err != nil {
++					t.Fatal(err)
++				}
++				switch mode {
++				case "missing":
++					checked = nil
++				case "wrong-gate":
++					checked.gate = admissionGate(t, lease)
++				case "wrong-operation":
++					checked.lease.Operation.Reference.Fence++
++				case "wrong-certificate":
++					checked.lease.Certificate[0]++
++				case "wrong-sequence":
++					checked.lease.Sequence++
++				case "expired":
++					checked.lease.Until = time.Now().Add(-time.Nanosecond)
++				case "cancelled":
++					cancel()
++				case "closed":
++					gate.Close()
++				case "used":
++					if _, err = checked.take(gate); err != nil {
++						t.Fatal(err)
++					}
++				}
++				if entry == "constructor" {
++					got, err := newHubOperationChecked(gate, checked, command, source, artifact.DownloadDeliveryLease{}, admissionComplete)
++					if err == nil || got != nil {
++						if got != nil {
++							got.Close()
++						}
++						t.Fatal("invalid private constructor proof accepted")
++					}
++				} else {
++					got, err := operation.attachChecked(checked, hello)
++					if err == nil || got != nil || operation.reserved {
++						t.Fatal("invalid private attachment proof accepted")
++					}
++				}
++			})
++		}
++	}
++}
++
++func TestNativePrivateAdmissionRetainsCallerCancellationAcrossLock(t *testing.T) {
++	lease, command, source, hello := admissionFixture(t)
++	gate := admissionGate(t, lease)
++	operation, err := NewHubOperation(gate, command, source, admissionComplete)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer operation.Close()
++	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
++	defer cancel()
++	checked, err := checkNativeAdmission(ctx, gate)
++	if err != nil {
++		t.Fatal(err)
++	}
++	operation.mu.Lock()
++	done := make(chan error, 1)
++	go func() { _, err := operation.attachChecked(checked, hello); done <- err }()
++	<-ctx.Done()
++	operation.mu.Unlock()
++	if err := <-done; err == nil || operation.reserved {
++		t.Fatal("expired original caller became attached after lock")
++	}
++}
++
++func TestNativePrivateAdmissionCannotBroadenKnownShortening(t *testing.T) {
++	lease, command, source, hello := admissionFixture(t)
++	var short atomic.Bool
++	cutoff := time.Now().Add(120 * time.Millisecond)
++	gate, err := evidence.NewNativeFrameGate(context.Background(), func(context.Context) (value.NativeLease, error) {
++		result := lease
++		if short.Load() {
++			result.Until = cutoff
++		}
++		return result, nil
++	}, time.Now)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer func() { gate.Close(); gate.Wait(context.Background()) }()
++	operation, err := NewHubOperation(gate, command, source, admissionComplete)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer operation.Close()
++	construct, err := checkNativeAdmission(context.Background(), gate)
++	if err != nil {
++		t.Fatal(err)
++	}
++	attach, err := checkNativeAdmission(context.Background(), gate)
++	if err != nil {
++		t.Fatal(err)
++	}
++	short.Store(true)
++	if _, err = gate.Check(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	if got, err := newHubOperationChecked(gate, construct, command, source, artifact.DownloadDeliveryLease{}, admissionComplete); err == nil || got != nil {
++		if got != nil {
++			got.Close()
++		}
++		t.Fatal("old command deadline ignored known shortening")
++	}
++	if restricted, err := attach.restrict(gate); err != nil || !restricted.Until.Equal(cutoff) {
++		t.Fatal("private proof broadened known shortening", err)
++	}
++	<-time.After(time.Until(cutoff))
++	if got, err := operation.attachChecked(attach, hello); err == nil || got != nil || operation.reserved {
++		t.Fatal("expired known shortening became attached")
++	}
++}
++
++// A Context may have a noncomparable concrete type. The proof retains its call;
++// it never depends on comparing arbitrary Context interface values.
++type admissionContext struct {
++	context.Context
++	label []byte
++}
++
++func TestNativePrivateAdmissionUsesOriginalNoncomparableContext(t *testing.T) {
++	lease, _, _, _ := admissionFixture(t)
++	gate := admissionGate(t, lease)
++	parent, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	original := admissionContext{Context: parent, label: []byte{1}}
++	checked, err := checkNativeAdmission(original, gate)
++	if err != nil {
++		t.Fatal(err)
++	}
++	cancel()
++	if _, err = checked.take(gate); err == nil {
++		t.Fatal("original context cancellation was lost")
++	}
++}
++
++func TestNativePublicAdmissionAlwaysPerformsCurrentCheck(t *testing.T) {
++	for _, entry := range []string{"constructor", "response-constructor", "attach"} {
++		t.Run(entry, func(t *testing.T) {
++			lease, command, source, hello := admissionFixture(t)
++			var deny atomic.Bool
++			var calls atomic.Int32
++			gate, err := evidence.NewNativeFrameGate(context.Background(), func(context.Context) (value.NativeLease, error) {
++				calls.Add(1)
++				if deny.Load() {
++					return value.NativeLease{}, artifact.ErrDownloadUnavailable
++				}
++				return lease, nil
++			}, time.Now)
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer func() { gate.Close(); gate.Wait(context.Background()) }()
++			var operation *HubOperation
++			if entry == "attach" {
++				operation, err = NewHubOperation(gate, command, source, admissionComplete)
++				if err != nil {
++					t.Fatal(err)
++				}
++				defer operation.Close()
++			}
++			now := time.Now()
++			authority := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: admissionID, ArtifactID: admissionID, CaptureID: admissionID, ClusterID: admissionID, NamespaceUID: admissionID, WorkloadUID: admissionID, PodUID: admissionID, Version: lease.Operation.SourceVersion, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}}, PermissionEpoch: admissionID, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{3}}, CheckedAt: now, ValidUntil: now.Add(time.Second), AccessUntil: now.Add(time.Minute), DeleteBy: now.Add(2 * time.Minute)}
++			delivery := artifact.DownloadDeliveryLease{ResponseID: admissionID, WindowID: admissionID, OwnerID: admissionID, Generation: 1, Sequence: 1, Length: 1, StartedAt: now, Until: authority.ValidUntil, Authority: authority}
++			if !delivery.Valid(now) {
++				t.Fatal("invalid synthetic delivery")
++			}
++			before := calls.Load()
++			deny.Store(true)
++			switch entry {
++			case "constructor":
++				operation, err = NewHubOperation(gate, command, source, admissionComplete)
++			case "response-constructor":
++				command.Kind = string(value.NativeResponse)
++				operation, err = NewHubResponseOperation(gate, command, source, delivery, admissionComplete)
++			case "attach":
++				_, err = operation.Attach(context.Background(), hello)
++			}
++			if err == nil || calls.Load() != before+1 {
++				t.Fatal("public admission skipped current authority", calls.Load()-before, err)
++			}
++		})
++	}
++}
+--- a/internal/transport/native/operation.go
++++ b/internal/transport/native/operation.go
+@@ -59,7 +59,20 @@
+ 	if gate == nil || complete == nil {
+ 		return nil, artifact.ErrInvalid
+ 	}
+-	l, e := gate.Check(gate.Context())
++	checked, e := checkNativeAdmission(gate.Context(), gate)
++	if e != nil {
++		return nil, e
++	}
++	return newHubOperationChecked(gate, checked, c, expected, delivery, complete)
++}
++
++// Only synchronous native-package callers may transfer an already performed
++// check. Public constructors above always perform their own full current check.
++func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNativeAdmission, c contracts.NativeCommand, expected evidence.NativeContextSource, delivery artifact.DownloadDeliveryLease, complete evidence.NativeCompletion) (*HubOperation, error) {
++	if gate == nil || complete == nil {
++		return nil, artifact.ErrInvalid
++	}
++	l, e := checked.take(gate)
+ 	if e != nil {
+ 		return nil, e
+ 	}
+@@ -93,6 +106,9 @@
+ 	var cloned evidence.NativeContextSource
+ 	if json.Unmarshal(encoded, &cloned) != nil {
+ 		return nil, artifact.ErrInvalid
++	}
++	if l, e = checked.restrict(gate); e != nil || until.After(l.Until) {
++		return nil, artifact.ErrDownloadUnavailable
+ 	}
+ 	ctx, cancel := context.WithDeadline(gate.Context(), until)
+ 	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
+@@ -394,14 +410,28 @@
+ 	if o == nil || ctx == nil || h.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(h.Nonce) || h.Reference != o.command.Reference {
+ 		return nil, contracts.ErrNativeProtocol
+ 	}
+-	if _, e := o.gate.Check(ctx); e != nil {
+-		return nil, e
++	checked, err := checkNativeAdmission(ctx, o.gate)
++	if err != nil {
++		return nil, err
++	}
++	return o.attachChecked(checked, h)
++}
++
++func (o *HubOperation) attachChecked(checked *checkedNativeAdmission, h contracts.NativeHello) (Conversation, error) {
++	if o == nil || h.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(h.Nonce) || h.Reference != o.command.Reference {
++		return nil, contracts.ErrNativeProtocol
++	}
++	if _, err := checked.take(o.gate); err != nil {
++		return nil, err
+ 	}
+ 	o.mu.Lock()
+ 	defer o.mu.Unlock()
+ 	if o.reserved || o.attached || o.closed || o.ctx.Err() != nil {
+ 		return nil, contracts.ErrNativeProtocol
+ 	}
++	if _, err := checked.restrict(o.gate); err != nil {
++		return nil, err
++	}
+ 	o.reserved = true
+ 	o.command.Nonce = h.Nonce
+ 	return o, nil
+--- a/internal/transport/native/registration.go
++++ b/internal/transport/native/registration.go
+@@ -48,10 +48,11 @@
+ 		if e = before(admission, origin); e != nil {
+ 			return fail(e)
+ 		}
+-		lease, e := gate.Check(admission)
++		checked, e := checkNativeAdmission(admission, gate)
+ 		if e != nil {
+ 			return fail(e)
+ 		}
++		lease := checked.lease
+ 		wire, e := json.Marshal(operation)
+ 		if e != nil {
+ 			return fail(e)
+@@ -61,15 +62,12 @@
+ 			payload = []byte("null")
+ 		}
+ 		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
+-		var result *HubOperation
+ 		if operation.Kind == value.NativeResponse {
+ 			command.WindowID = delivery.WindowID
+ 			command.Offset = delivery.Offset
+ 			command.Length = delivery.Length
+-			result, e = NewHubResponseOperation(gate, command, source, delivery, input.Complete)
+-		} else {
+-			result, e = NewHubOperation(gate, command, source, input.Complete)
+ 		}
++		result, e := newHubOperationChecked(gate, checked, command, source, delivery, input.Complete)
+ 		if e != nil {
+ 			return fail(e)
+ 		}
+--- a/internal/transport/native/router.go
++++ b/internal/transport/native/router.go
+@@ -85,11 +85,13 @@
+ 	joined := context.AfterFunc(r.ctx, cancel)
+ 	operation, err := factory(r.ctx, call, origin, h)
+ 	if err == nil && operation != nil {
+-		lease, e := operation.Gate().Check(call)
+-		if e != nil || !lease.Operation.Equal(r.operation) || lease.Certificate != origin.Lease.Certificate || lease.Sequence != origin.Lease.Sequence || lease.Until.After(origin.Lease.Until) {
++		checked, e := checkNativeAdmission(call, operation.Gate())
++		if e != nil {
++			err = e
++		} else if lease := checked.lease; !lease.Operation.Equal(r.operation) || lease.Certificate != origin.Lease.Certificate || lease.Sequence != origin.Lease.Sequence || lease.Until.After(origin.Lease.Until) {
+ 			err = artifact.ErrDownloadUnavailable
+ 		} else {
+-			_, err = operation.Attach(call, h)
++			_, err = operation.attachChecked(checked, h)
+ 		}
+ 	}
+ 	joined()

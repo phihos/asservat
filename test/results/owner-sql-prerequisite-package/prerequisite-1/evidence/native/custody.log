@@ -1,0 +1,6 @@
+=== RUN   TestInitialInstallationWithRealServices
+    initial_installation_test.go:142: fixture request failed
+--- FAIL: TestInitialInstallationWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.080s
+FAIL

@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/contracts	0.021s [no tests to run]
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+../../.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v1/files/internal/adapters/mtls/connector_operation_test.go:168:8: undefined: err
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+ok  	asservat.local/asservat/internal/transport/clusterobservation	0.020s [no tests to run]
+ok  	asservat.local/asservat/internal/bootstrap	0.013s [no tests to run]
+FAIL

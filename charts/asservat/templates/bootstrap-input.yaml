@@ -1,0 +1,17 @@
+{{- include "asservat.bootstrap.validate" . -}}
+{{- if .Values.bootstrap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "asservat.bootstrap.inputName" . }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+immutable: true
+data:
+  bootstrap.json: {{ include "asservat.bootstrap.input" . | quote }}
+  runner.json: {{ include "asservat.bootstrap.runner" . | quote }}
+{{- end }}

@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestEnrollmentFleetFreshnessWithRealPostgres$"
+  ],
+  "exit": 0,
+  "seconds": 36.763,
+  "requiredPassed": [
+    "TestEnrollmentFleetFreshnessWithRealPostgres"
+  ],
+  "missing": [],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "passed"
+}

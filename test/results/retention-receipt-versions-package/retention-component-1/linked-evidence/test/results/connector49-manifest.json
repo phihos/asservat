@@ -1,0 +1,377 @@
+{
+  "checkpoint": "SQL49 connector fast component checkpoint",
+  "files": [
+    {
+      "path": "docs/architecture/connector-renewal.md",
+      "base_sha256": null,
+      "sha256": "1b3da335383b9f48b65fa7287886e6607ba16eb3ad5aa3fb4f66904e7cbb36ba",
+      "generated": false
+    },
+    {
+      "path": "docs/decisions/126-connector-process-identity-and-renewal.md",
+      "base_sha256": null,
+      "sha256": "895e442a97ba62d9f60782ae315db0050bd24dafd1dcc77565ce41c332eb77ea",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kms/connector_credentials.go",
+      "base_sha256": null,
+      "sha256": "8f46cc56b90a62a0dfc12a0f953e937c3b4c21606d8f89e8c07ae2999880592b",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kms/connector_credentials_test.go",
+      "base_sha256": null,
+      "sha256": "162694f8af92538a20282b98453433cdfea9bbae7d1c5c691d7bc0e01f98fa28",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_identity.go",
+      "base_sha256": null,
+      "sha256": "6373c4b1f2c97aee82770bf78ffef0d07be10b90d675ebc316aa5f40b5913e98",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_identity_test.go",
+      "base_sha256": null,
+      "sha256": "3eb1c355a29c13f0ae388db9c9d31a727e8395cd0158bccfd341dc3311dc9e40",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_process.go",
+      "base_sha256": null,
+      "sha256": "aee9d7bcab7e90eda884448745f07458f449f2e975a57b093e47ec9fe39d3730",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_process_test.go",
+      "base_sha256": null,
+      "sha256": "f2d31a4a43a45e12ede6feebeb8714b6ef8ef8e846f36a4c269ef0f69cd5df0d",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_retirement_proof.go",
+      "base_sha256": null,
+      "sha256": "67e3f2295207ca5b5cb09723d345231e7cf83951f18ed1540ad4b07637639918",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/kubernetes/connector_retirement_proof_test.go",
+      "base_sha256": null,
+      "sha256": "6b3a01d5f5301382e0a7158dddd1249eabadcddcd34b4894627ed35f7425ab40",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/mtls/connector_issuance.go",
+      "base_sha256": null,
+      "sha256": "34a7a96d07dc4ed4259b179dc8bd5f292cd7436bc35f9c18b259e5ead9717b3c",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/mtls/connector_issuance_test.go",
+      "base_sha256": null,
+      "sha256": "116ce4fa37fd6220d94bdafde99cf201cfbb646b93462f609689ce190638db30",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/mtls/connector_process_credentials.go",
+      "base_sha256": null,
+      "sha256": "21c9570ace4feef266512fabbbc7550e826d09394dcb3cd2def8fdbe184e5774",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/mtls/connector_process_credentials_test.go",
+      "base_sha256": null,
+      "sha256": "b6045d95ff0b7a88abebcc9fb3ec9903d97e418baaa25aac65715819380ac5d0",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_audit.go",
+      "base_sha256": null,
+      "sha256": "87e3dfa51eb2d1f193e2d611c8fee626de8d27219e9b88b671b3ad8fc194d803",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_backing.go",
+      "base_sha256": null,
+      "sha256": "c9be82370c718350a1898727f23c4dcad36691cf4499d7fb437cb314cb16e7f1",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_credentials.go",
+      "base_sha256": null,
+      "sha256": "14ea785f594426172702d00cdb1bbf523536f971634cc77ff2aff64c3962fc46",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_lifecycle.go",
+      "base_sha256": null,
+      "sha256": "ea2a327a1b183322929a21d3df26b7671dfd3295185ee52b56f42d0ffa00796d",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_process.go",
+      "base_sha256": null,
+      "sha256": "3afeae9dfa4d30bf31a121af47d9189e9823da5034f0f1eb24e525e7a495e109",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_registry.go",
+      "base_sha256": null,
+      "sha256": "5b3e743d3ba7bf94b362e537c6feb271a8b2faa3244b6b2fe9427d80677ca119",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_source.go",
+      "base_sha256": null,
+      "sha256": "dc27fbc34fb2289f1f7ba6abc6a1f9e9f23af7e8772404c6001b1ae8e84db2ca",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/connector_identity.sql.go",
+      "base_sha256": null,
+      "sha256": "9d587dba8ad3b9587f2d7d9ff1a18bc68ec0ae6ef923a57b21e7ccb7040281cf",
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/connector_lifecycle.sql.go",
+      "base_sha256": null,
+      "sha256": "ecba15782a0601975c161a19ebd3e05f23cd7b5fb1afe73b9b84650689757c22",
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/models.go",
+      "base_sha256": "f603f3b4d19cacb3195a85855dd5c08f985af30be45078b9bdd47d284988fa8b",
+      "sha256": "4d95b1d7570f0c6385058d76964840f768a10b6ddd24337c2eab7d040f3d6cb4",
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/operation_lifecycle.go",
+      "base_sha256": "b65b83180a0b86e11e2ee8139f94d43debe81ce649628a5d410549049e06fe65",
+      "sha256": "198e1f65dcc3a9444756bc2bef4713edf8592798296dce766c21c0ce9c6650a8",
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/operation_overdue.go",
+      "base_sha256": "d8913fe5fd492be54feb9babeb29f082a6c3dcf8d21e8daecc21acb16ccc07e2",
+      "sha256": "da06901ea13c35b1e85e69084ecc2893b131f2a42a8a20333df0c0264dccb53d",
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/connector_operation_test.go",
+      "base_sha256": null,
+      "sha256": "c1534c9585b7a09c05162f2dc333f730aa0e85e2d36ad789806eb2de536f4aea",
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/operation_mac.go",
+      "base_sha256": "638ec0c1515046bb00c129ee4c7e439057803925fb4d038684d221c0a8f96e6a",
+      "sha256": "a1af7bd37abc0d25c4872439ba3bfd42aa85250a8f507f5516c9ae0415e6d79c",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_audit.go",
+      "base_sha256": null,
+      "sha256": "daf11244edc54fe7cebaf78fa92a4f973ca7425ba0d074d88dceb9ab4b63bced",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_audit_test.go",
+      "base_sha256": null,
+      "sha256": "90161b384af11c8959380ea88ab14459ef666167da3beac9ceafb7196c62f3b1",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_backing.go",
+      "base_sha256": null,
+      "sha256": "a0272ad18c4f6e026cd81670ccb5fc28f32079e17a00ca6f67308ab0bf8c1d1f",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_backing_acceptance.go",
+      "base_sha256": null,
+      "sha256": "123a09daf581bc22b46afb1dadb31b3a03c383cef7ecfeabce75eec379b44c54",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_backing_acceptance_review_test.go",
+      "base_sha256": null,
+      "sha256": "86b5dc8f9fb93f0a8e0c750186b575eb4226d2acc178e3a99d797b732bd477b4",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_backing_renewal_test.go",
+      "base_sha256": null,
+      "sha256": "29051ac771614d17ac3f192e8df33070bfdeaa99922c86a7b79b20216afbaeca",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_backing_test.go",
+      "base_sha256": null,
+      "sha256": "65079bfbcf1c7ec3acd3d522cd292657c3ed143012ad234e2125a4edde764675",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_issuance.go",
+      "base_sha256": null,
+      "sha256": "f0d309eb2c4f18c8d40a7582697c9fce901ae40a6ba0258d491ed618683873f8",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_process.go",
+      "base_sha256": null,
+      "sha256": "a151db7c0c5c23d9f5d299c895d0f84c64a566fabc08cff2f951e595a053d7d8",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_process_test.go",
+      "base_sha256": null,
+      "sha256": "8925432ad92ec04804171dda8f852d1cd2123ace143ef89be842b25dc205e6f3",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_registry.go",
+      "base_sha256": null,
+      "sha256": "bc8a9c82ee15a682c81a750f17f6d5c1e8d9b14154a399e2be99f1e278dc1e94",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_renewal.go",
+      "base_sha256": null,
+      "sha256": "33a66530e8ef67990581ac51686a287be4b699fe0208b1db5821a9e19a5db700",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_renewal_test.go",
+      "base_sha256": null,
+      "sha256": "22151d13c7c27e452fea4b0d549ef0de430a5ed7b1cd836d5e283957f8dc342c",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/connector_retirement_proof.go",
+      "base_sha256": null,
+      "sha256": "1542ca0e6c39912b253bc068fc97bd528471212417e4f7df6f5c442d724ecb72",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/peer.go",
+      "base_sha256": "62c1c33d426f5dd1e6af00ffe0de201762e967e5f3866fa16e2c45f1e3532ca1",
+      "sha256": "37c2e0decd4854eeb3331376f89f611802f0cab861f14a0ab830da6e8b854e17",
+      "generated": false
+    },
+    {
+      "path": "internal/application/fleet/peer_exact_test.go",
+      "base_sha256": null,
+      "sha256": "f0d3edcf77e1d36ae553e5d0b0ae912441c825912f6ffd66de494da145d804b2",
+      "generated": false
+    },
+    {
+      "path": "internal/contracts/connector_identity.go",
+      "base_sha256": null,
+      "sha256": "7b9b091bad3f5d449c8727a261fa267fda06a90380d6112228b0cd98f38287e1",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/connector_operation.go",
+      "base_sha256": null,
+      "sha256": "f5d935754d63ec7658e3de7a98412119ecfb53032098dcaf1c0e22c1c9d90280",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/connector_operation_test.go",
+      "base_sha256": null,
+      "sha256": "53836d28fb9809195be94700cebefa2d079a65d0f46ddcaeddff7b443671f6ea",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/operation.go",
+      "base_sha256": "7dd96c3a952649f882c95357ee1284eaf8fea46e4c15f4b06f57fd9470f5c1d5",
+      "sha256": "e6f308f7b71cb485377c64f8cc0181699254a4a1a5298fa4d193ffaf069c413c",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/operation_lifecycle.go",
+      "base_sha256": "a93be3c371594d5b3ce9d627bd255dc1f1255e1242d19cb840be4ddfb553dd9b",
+      "sha256": "4ffbbabbe118cf7309a2869de8de7daf60e08770886b40368f264810991194fc",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_issuance.go",
+      "base_sha256": null,
+      "sha256": "8af31fedb81c15b798b16f51cac9adf3277d9d46b28a5a00a258b1584aafcc09",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_issuance_test.go",
+      "base_sha256": null,
+      "sha256": "3372f716033a86182a185ace2f69883f57c5d6ebf75bd19e6cc36b3032ebbf0a",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_process.go",
+      "base_sha256": null,
+      "sha256": "ccdb00d740239a546690a1afca2138b4aec8fa603277e5b0bed37378315ae537",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_process_test.go",
+      "base_sha256": null,
+      "sha256": "da30007a0a7140b079304d8cf6982470453c7aab3bc58ecefe732c8102f07035",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_retirement_proof.go",
+      "base_sha256": null,
+      "sha256": "0c0ace7f1a3f86ecb8b9f3be96ea4058174967ffd033b1e29532c98592bf25f8",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_retirement_proof_test.go",
+      "base_sha256": null,
+      "sha256": "2772f2e80182a638af2c0fe325b378360ba70d2b7e11269d36518afdbbad87b2",
+      "generated": false
+    },
+    {
+      "path": "internal/domain/fleet/connector_source.go",
+      "base_sha256": null,
+      "sha256": "49503ed7bd4a8b5ce7722c2b10606a7fe443ae468d8cde2b5e28f148c639b624",
+      "generated": false
+    },
+    {
+      "path": "migrations/00049_connector_identity.sql",
+      "base_sha256": null,
+      "sha256": "c777e78ac0b82b9fb0f1cd9e503fbcddccc17bb4028b6b527740e3551974e1b6",
+      "generated": false
+    },
+    {
+      "path": "migrations/queries/connector_identity.sql",
+      "base_sha256": null,
+      "sha256": "f34cc84f83733b626a7fbc1e40015e5d5026a65399aca80d883700b2eec2cf62",
+      "generated": false
+    },
+    {
+      "path": "migrations/queries/connector_lifecycle.sql",
+      "base_sha256": null,
+      "sha256": "26694a938ccb827bb8b7002a632aeaeb96b0d1eae4ae1565ab9397d62c18b727",
+      "generated": false
+    },
+    {
+      "path": "specs/contracts/connector-identity.schema.json",
+      "base_sha256": null,
+      "sha256": "88dfba840cc15f13d1f68c2fba81a3e4a025fb7fe7f852ac39207fbdfddfc310",
+      "generated": false
+    },
+    {
+      "path": "test/integration/capture_admission_test.go",
+      "base_sha256": "b296ef0a582a4cdeb0cf19c7008c46dfb0a6b43a9274e996ce4d85be9fe978ea",
+      "sha256": "66e456c24afb2685228f9bc839409658e41c315fc516b10abd109d987b8aa181",
+      "generated": false
+    },
+    {
+      "path": "test/integration/connector_identity_test.go",
+      "base_sha256": null,
+      "sha256": "4d6bed6910140a1971473e6e550044b44fa7f2e3a3bab6f263b53c68231163db",
+      "generated": false
+    }
+  ]
+}

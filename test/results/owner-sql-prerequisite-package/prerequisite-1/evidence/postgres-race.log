@@ -1,0 +1,38 @@
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role
+=== RUN   TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection
+--- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/verify (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/inspect-role (0.00s)
+    --- PASS: TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse/projection (0.00s)
+=== RUN   TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery
+--- PASS: TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery (0.00s)
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval
+=== RUN   TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator
+--- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/cancelled (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator-identity (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/query-result (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/schema (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/activation (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/recovery (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-current (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/source-interval (0.00s)
+    --- PASS: TestOwnerIdentitySQLPrerequisiteErrorsStaySanitized/administrator (0.00s)
+=== RUN   TestOwnerIdentityRolesKeepSeparateAuthority
+--- PASS: TestOwnerIdentityRolesKeepSeparateAuthority (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.047s

@@ -1,0 +1,165 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-13 22:12:19.635 UTC [145] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 22:12:19.635 UTC [145] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 22:12:19.645 UTC [151] LOG:  database system was shut down at 2026-10-13 22:12:16 UTC
+2026-10-13 22:12:19.657 UTC [145] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-13 22:12:19.820 UTC [145] LOG:  received fast shutdown request
+.2026-10-13 22:12:19.823 UTC [145] LOG:  aborting any active transactions
+2026-10-13 22:12:19.824 UTC [145] LOG:  background worker "logical replication launcher" (PID 154) exited with exit code 1
+2026-10-13 22:12:19.824 UTC [149] LOG:  shutting down
+2026-10-13 22:12:19.827 UTC [149] LOG:  checkpoint starting: shutdown immediate
+.2026-10-13 22:12:20.823 UTC [149] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.022 s, sync=0.960 s, total=1.000 s; sync files=303, longest=0.008 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-13 22:12:20.838 UTC [145] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-13 22:12:20.941 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 22:12:20.942 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-13 22:12:20.942 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-13 22:12:20.944 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 22:12:20.952 UTC [215] LOG:  database system was shut down at 2026-10-13 22:12:20 UTC
+2026-10-13 22:12:20.957 UTC [1] LOG:  database system is ready to accept connections
+2026-10-13 22:16:33.430 UTC [375] FATAL:  password authentication failed for user "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager"
+2026-10-13 22:16:33.430 UTC [375] DETAIL:  User "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 22:16:33.983 UTC [376] FATAL:  password authentication failed for user "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager"
+2026-10-13 22:16:33.983 UTC [376] DETAIL:  User "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 22:17:07.613 UTC [378] FATAL:  password authentication failed for user "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager"
+2026-10-13 22:17:07.613 UTC [378] DETAIL:  User "asservat_init_e94b7f13bdce46a1bfd27c731f9201d3_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 22:17:21.051 UTC [213] LOG:  checkpoint starting: time
+2026-10-13 22:18:52.347 UTC [213] LOG:  checkpoint complete: wrote 910 buffers (5.6%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=91.137 s, sync=0.141 s, total=91.296 s; sync files=588, longest=0.011 s, average=0.001 s; distance=9692 kB, estimate=9692 kB; lsn=0/250E4D8, redo lsn=0/250BFF8
+2026-10-13 22:18:57.583 UTC [390] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_cfg_00" by role "postgres"
+2026-10-13 22:19:02.134 UTC [390] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_cfg_01" by role "postgres"
+2026-10-13 22:19:06.682 UTC [390] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_cfg_02" by role "postgres"
+2026-10-13 22:19:28.042 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:28.042 UTC [397] CONTEXT:  while locking tuple (0,3) in relation "fleet_trust"
+2026-10-13 22:19:28.042 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:39.687 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:39.687 UTC [397] CONTEXT:  while locking tuple (0,11) in relation "fleet_trust"
+2026-10-13 22:19:39.687 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:43.733 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:43.733 UTC [397] CONTEXT:  while locking tuple (0,13) in relation "fleet_trust"
+2026-10-13 22:19:43.733 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:46.759 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:46.759 UTC [397] CONTEXT:  while locking tuple (0,14) in relation "fleet_trust"
+2026-10-13 22:19:46.759 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:50.801 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:50.801 UTC [397] CONTEXT:  while locking tuple (0,16) in relation "fleet_trust"
+2026-10-13 22:19:50.801 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:53.827 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:53.827 UTC [397] CONTEXT:  while locking tuple (0,17) in relation "fleet_trust"
+2026-10-13 22:19:53.827 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:19:57.868 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:19:57.868 UTC [397] CONTEXT:  while locking tuple (0,19) in relation "fleet_trust"
+2026-10-13 22:19:57.868 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:00.895 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:00.895 UTC [397] CONTEXT:  while locking tuple (0,20) in relation "fleet_trust"
+2026-10-13 22:20:00.895 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:01.360 UTC [402] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_own_00" by role "postgres"
+2026-10-13 22:20:05.725 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:05.725 UTC [397] CONTEXT:  while locking tuple (0,22) in relation "fleet_trust"
+2026-10-13 22:20:05.725 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:10.175 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:10.175 UTC [397] CONTEXT:  while locking tuple (0,24) in relation "fleet_trust"
+2026-10-13 22:20:10.175 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:10.262 UTC [402] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_own_01" by role "postgres"
+2026-10-13 22:20:14.632 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:14.632 UTC [397] CONTEXT:  while locking tuple (0,26) in relation "fleet_trust"
+2026-10-13 22:20:14.632 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:19.075 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:19.075 UTC [397] CONTEXT:  while locking tuple (0,28) in relation "fleet_trust"
+2026-10-13 22:20:19.075 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:19.156 UTC [402] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_own_02" by role "postgres"
+2026-10-13 22:20:23.526 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:23.526 UTC [397] CONTEXT:  while locking tuple (0,30) in relation "fleet_trust"
+2026-10-13 22:20:23.526 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:27.975 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:27.975 UTC [397] CONTEXT:  while locking tuple (0,32) in relation "fleet_trust"
+2026-10-13 22:20:27.975 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:28.062 UTC [402] WARNING:  role "postgres" has not been granted membership in role "as_e94b7f13bdce46a1bfd27c731f9201d3_own_03" by role "postgres"
+2026-10-13 22:20:32.425 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:32.425 UTC [397] CONTEXT:  while locking tuple (0,34) in relation "fleet_trust"
+2026-10-13 22:20:32.425 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:36.876 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:36.876 UTC [397] CONTEXT:  while locking tuple (0,36) in relation "fleet_trust"
+2026-10-13 22:20:36.876 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:41.295 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:41.295 UTC [397] CONTEXT:  while locking tuple (0,38) in relation "fleet_trust"
+2026-10-13 22:20:41.295 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 22:20:45.372 UTC [397] ERROR:  canceling statement due to lock timeout
+2026-10-13 22:20:45.372 UTC [397] CONTEXT:  while locking tuple (0,40) in relation "fleet_trust"
+2026-10-13 22:20:45.372 UTC [397] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	

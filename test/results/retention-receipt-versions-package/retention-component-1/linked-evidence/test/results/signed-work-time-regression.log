@@ -1,0 +1,10 @@
+--- FAIL: TestRunActionRejectsValidlySignedWrongWork (0.01s)
+    --- FAIL: TestRunActionRejectsValidlySignedWrongWork/non-utc-issuance (0.00s)
+        work_test.go:202: unsafe work accepted
+    --- FAIL: TestRunActionRejectsValidlySignedWrongWork/noncanonical-fraction (0.00s)
+        work_test.go:202: unsafe work accepted
+    --- FAIL: TestRunActionRejectsValidlySignedWrongWork/non-utc-reference (0.00s)
+        work_test.go:202: unsafe work accepted
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/jose	0.016s
+FAIL

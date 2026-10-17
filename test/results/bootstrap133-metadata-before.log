@@ -1,0 +1,73 @@
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/original
+    initial_bootstrap_copy_metadata_test.go:133: original producer copy could not retain exact mark permission source identity changed receipt writes 0 copy marks 0
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/original
+    initial_bootstrap_copy_metadata_test.go:133: original producer copy could not retain exact mark permission source identity changed receipt writes 0 copy marks 0
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/original
+    initial_bootstrap_copy_metadata_test.go:133: original producer copy could not retain exact mark permission source identity changed receipt writes 0 copy marks 0
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-mark
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/original
+    initial_bootstrap_copy_metadata_test.go:133: original producer copy could not retain exact mark permission source identity changed receipt writes 0 copy marks 0
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-installation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-request
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/extra-annotation
+=== RUN   TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-mark
+--- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery (7.69s)
+    --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false (1.92s)
+        --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/original (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-false/wrong-mark (0.10s)
+    --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true (1.92s)
+        --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/original (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/1/marked-true/wrong-mark (0.10s)
+    --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false (1.92s)
+        --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/original (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-false/wrong-mark (0.10s)
+    --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true (1.92s)
+        --- FAIL: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/original (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-installation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/missing-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-request (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/extra-annotation (0.10s)
+        --- PASS: TestInitialBootstrapCopyProducerMetadataRemainsBoundDuringMarkRecovery/2/marked-true/wrong-mark (0.10s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	7.704s
+FAIL

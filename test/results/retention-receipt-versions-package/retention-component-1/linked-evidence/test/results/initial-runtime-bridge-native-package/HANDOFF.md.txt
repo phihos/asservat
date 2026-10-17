@@ -1,0 +1,59 @@
+# Fixed resource and native guard bridge checkpoint
+
+This continues ADR140; it does not complete installed public runtime.
+The 32 immutable payloads are `source/`, with exact live bases in `manifest.json`.
+Manifest SHA256: `37d6527def0ce7d5db0966c084d08d604645255d9d5437ae6ea42eca732e4614`.
+Dependency SHA256: `11a1d3c2870ba44f8f074ab9524ee1134e1e347fee5c4955929d2631fbf192ed`.
+
+The corrected SQL bridge, application port, SQL test helper and initial-installation
+hook are integrated dependencies, not payload. Parent's actual before93340 failed
+at the intended administrator constructor; corrected after34797 passed eleven
+SQL cases in 2.432 seconds with 1,512 unchanged source hashes and clean teardown.
+The earlier bridge-2 snapshot retains the obsolete constructor and must not replace it.
+
+## Actual checks
+
+Handle21050 is terminal0: six-package compile13.874s; vet1.622s. All32 payload/base
+paths and1,536 dependencies were unchanged before/after. Exact commands/results
+are in run.py/result.json and the two logs. This job ran no native tests.
+Earlier bridge-2 component races passed on its frozen payload; the new integration
+helper, FleetGuard inventory projection and docs are subsequently added here.
+
+## Native selection
+
+Run the existing owned `--initial-bootstrap-chain` mode with
+`ASSERVAT_INITIAL_RUNTIME_BRIDGE=1`. The existing fixture still performs all four
+actual product commands, original activation/manager retirement and setup-free
+replay, then its added `runtime-resources-guard-bridge` child. The new env opt-in
+has no default behavior and does not enable product runtime. Parent may add its
+usual explicit harness mode/environment evidence before execution. Do not combine
+this with an independently initialized SQL fixture: the original chain requires
+pristine SQL and creates its actual original installation.
+
+The new child uses the original protected bootstrap root and acknowledged SQL
+activation plus a separate fixture administrator. It creates the fixed19 inert
+objects through the new producer, loses one actual committed account CREATE reply,
+then verifies exact lookup without a second CREATE. It installs the two compiled
+guard generations, loses each actual successful CAS reply, and requires exact
+lookup/receipt without another PUT. A separate SELECT-only historical facade checks
+the original installation during current SQL recovery blocking. Finally it observes
+actual zero-replica Deployment-controller progress and foreground GC while guards
+remain in place, then denies missing-owner history. It launches no runtime image.
+Fixture waits only observe exact already-created policy status outside product
+operations; product guards must recheck status/enforcement within their original5s.
+
+## Contracts and remaining work
+
+The new private resource/bridge journals carry bounded original public identities,
+one-use operations and exact receipts. Only positively acknowledged first claims
+may issue effects; unknown outcomes are lookup-only. Initial namespace and fleet
+source UIDs are retained. Optional history fields preserve legacy omission bytes.
+The ADR140/REQ-DB-003 update explicitly confines SQL SHARE locks across bounded
+native work to this administrator-only installer; runtime remote-I/O rules remain.
+Canonical schemas have not yet passed the repository spec gate in this snapshot.
+
+Native composed behavior is unrun. Public/native provider/input generation, full
+role/connection inventory, regional receipt orchestration, final read-only command
+reopen and complete installed listener graph remain pending. Current owner builder
+is the private owner component, not the final public workload. Do not enable Helm,
+public collection, or claim installed runtime based on this checkpoint.

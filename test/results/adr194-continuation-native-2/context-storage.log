@@ -1,0 +1,114 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation d2dda845-0fec-4ea8-8390-400a31e1d070 image docker.io/library/asservat-context-worker@sha256:2f12f9628826a52c458e42a7c7a9b2e09cdce2758c47251dba0a2b98dee0b240 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-e2-vavb4-0", namespace "bootstrap-chain-10000000", installation "36154f4f-5a7f-4bdb-acb0-000a51a6e33a": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-1d028f59fd84c825747ffe6b363e120533d862917fa56a7651f708195137c90c-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-1d028f59fd84c825747ffe6b363e120533d862917fa56a7651f708195137c90c-audit-wrap
+        created: sys/policies/acl/asservat-configuration-1d028f59fd84c825747ffe6b363e120533d862917fa56a7651f708195137c90c-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-1d028f59fd84c825747ffe6b363e120533d862917fa56a7651f708195137c90c-audit-unwrap
+        created: sys/policies/acl/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: applied phase 3 owner-provider:
+        Kubernetes context "kind-asservat-context-e2-vavb4-0", namespace "bootstrap-chain-10000000", installation "36154f4f-5a7f-4bdb-acb0-000a51a6e33a": applying phase 3 owner-provider recipe.
+        created: sys/policies/acl/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-audit-wrap
+        created: auth/owner-auth/role/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-audit-wrap
+        created: sys/policies/acl/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-audit-unwrap
+        created: auth/owner-auth/role/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-audit-unwrap
+        created: sys/policies/acl/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-server-sign
+        created: auth/owner-auth/role/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-server-sign
+        created: sys/policies/acl/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-client-sign
+        created: auth/owner-auth/role/asservat-owner-49aa49d7d399a24260e05d914a72e289afd8c293ad2f1542efdd55694f4a6d00-client-sign
+        created: owner-pki/roles/asservat-owner-pki-9ebe761ec80a6f3fece2fa193c4b62aec022409f2e282bff611fe7f042d0cabd-server
+        created: owner-pki/roles/asservat-owner-pki-9ebe761ec80a6f3fece2fa193c4b62aec022409f2e282bff611fe7f042d0cabd-client
+        created: sys/policies/acl/asservat-owner-public-7154ff8f95ce152c-browser-seal
+        created: auth/owner-auth/role/asservat-owner-public-7154ff8f95ce152c-browser-seal
+        created: sys/policies/acl/asservat-owner-public-7154ff8f95ce152c-browser-open
+        created: auth/owner-auth/role/asservat-owner-public-7154ff8f95ce152c-browser-open
+        created: sys/policies/acl/asservat-owner-public-7154ff8f95ce152c-work-sign
+        created: auth/owner-auth/role/asservat-owner-public-7154ff8f95ce152c-work-sign
+        created: sys/policies/acl/asservat-owner-public-7154ff8f95ce152c-worker-issue
+        created: auth/owner-auth/role/asservat-owner-public-7154ff8f95ce152c-worker-issue
+        created: public-transit-36154f4f/keys/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-browser-sessions
+        created: public-transit-36154f4f/keys/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-work-signing
+        created: worker-pki-36154f4f/roles/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-download-worker
+        created: sys/policies/acl/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-audit-wrap
+        created: auth/owner-auth/role/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-audit-wrap
+        created: sys/policies/acl/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-audit-unwrap
+        created: auth/owner-auth/role/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-audit-unwrap
+        created: sys/policies/acl/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-client-sign
+        created: auth/owner-auth/role/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-client-sign
+        created: sys/policies/acl/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-server-sign
+        created: auth/owner-auth/role/asservat-federation-85b1281f54ece3f40de55b2721af49693fe8a026c58b1ae4f2277a15e3c4db89-server-sign
+        created: connector-pki-36154f4f/roles/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-connector-client
+        created: connector-pki-36154f4f/roles/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-connector-server
+        created: bootstrap-chain-transit/keys/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-federation-audit
+        created: sys/policies/acl/asservat-36154f4f5a7f4bdbacb0000a51a6e33a-owner-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:526: continuation produce 
+    installer_continuation_native_test.go:526: continuation continue installer continuation: resources/audit-secrets done in 4ms
+        installer continuation: resources/producer done in 688ms
+        installer continuation: resources/journal done in 2.102s
+        installer continuation: resources/advance done in 1m6.503s
+        installer continuation: resources/inventory done in 700ms
+        installer continuation: bridge/observer done in 18ms
+        installer continuation: bridge/protection done in 0s
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.235s
+        installer continuation: bridge/probe done in 3.453s
+        installer continuation: bridge/retained done in 4.904s
+        installer continuation: bridge/settle done in 6.016s
+        installer continuation: worker/configuration-documents done in 0s
+        installer continuation: worker/outbox done in 2ms
+        installer continuation: worker/inbox done in 2.003s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 3ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 7ms
+        installer continuation: worker/roles-provision done in 12.386s
+        installer continuation: worker/roles-projection done in 3.317s
+        installer continuation: worker/inputs done in 1ms
+        installer continuation: worker/inputs-complete done in 7.653s
+        installer continuation: worker/launch done in 7.753s
+        installer continuation: public/sources done in 6ms
+        installer continuation: owner/accepted-source done in 3.027s
+        installer continuation: public/roles-binding done in 30ms
+        installer continuation: public/roles-root done in 0s
+        installer continuation: public/roles-sql done in 7ms
+        installer continuation: public/roles-provision done in 3m11.355s
+        installer continuation: public/roles-projection done in 3.506s
+        installer continuation: owner/roles done in 3.402s
+        installer continuation: owner/roles-sql done in 7ms
+        installer continuation: owner/selection done in 0s
+        installer continuation: owner/selection-complete done in 10.544s
+        installer continuation: permission/guard done in 6ms
+        installer continuation: permission/projection done in 1.376s
+        installer continuation: capacity/sources done in 225ms
+        installer continuation: capacity/proofs done in 1.171s
+        installer continuation: capacity/qualification done in 1.95s
+        installer continuation: capacity/initialize done in 13.004s
+        installer continuation: federation/projection done in 3.959s
+        installer continuation: federation/identity done in 1.541s
+        installer continuation: public/download-sources done in 0s
+        installer continuation: public/sources done in 17ms
+        installer continuation: capacity/local-observation done in 3.587s
+        installer continuation: owner/outbox done in 8ms
+        installer continuation: owner/inbox done in 2.002s
+        installer continuation: owner/audit-secret done in 2ms
+        installer continuation: federation/audit-secret done in 2ms
+        installer continuation: federation/verify done in 21ms
+        installer continuation: public/readback done in 20ms
+        installer continuation stopped at public/derive/validate/provider-authentication (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (685.03s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.60s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (373.76s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.80s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	685.091s
+FAIL

@@ -1,0 +1,31 @@
+{
+  "scope": "Read-only original installed configuration-worker caller provenance; no runtime authority, selector or native qualification",
+  "manifest": "56003a7dc8866b6302e599c863b44a2cc863e393ada9b398ec0e2f8b276c21aa",
+  "result": "1dc3b8d56cfe3026baf0881d6a1c7eae7c6d012c7168060fa3d017889ae08c9e",
+  "priorResult": "fe82fb555eb6473fbd8f625a988c65d721ef7eaed807ce49d12075c1307f674e",
+  "dependenciesVerified": 2969,
+  "integrated": [
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller.go",
+      "base_sha256": null,
+      "payload_sha256": "e7b4cc27df7f4e45c25df018ce311f411e73e5418d85988fe59ae33c82fe0fee"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_fixture_test.go",
+      "base_sha256": null,
+      "payload_sha256": "b661a959351cd4df6afbbc9153d0a1e5671c4ded8f6f2ef54da0135ff4278334"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_originals.go",
+      "base_sha256": null,
+      "payload_sha256": "c3b2552c9921b442c3f6f7d710818b4c09dc67c858b933960f3174cc156e3f93"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go",
+      "base_sha256": null,
+      "payload_sha256": "e37501bbfc4d7853b2f7202d8853c310f8dd9d57feee0b360c1f4f168ca15677"
+    }
+  ],
+  "archiveFiles": 72,
+  "sourcePayloadsArchivedAsText": true
+}

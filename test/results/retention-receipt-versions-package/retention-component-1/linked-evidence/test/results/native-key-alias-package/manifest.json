@@ -1,0 +1,18 @@
+{
+  "createdAt": "2026-10-13T12:26:09.766274+00:00",
+  "originalMigrationSHA256": "2431fb290d2613cbc6d96877c047813c54d9af85496c89c86b184d8ea7bd1b11",
+  "paths": [
+    {
+      "path": "migrations/00055_native_key_session_alias.sql",
+      "before": null,
+      "after": "ffb5c2498848036101759072e304a2cf6bbf891fee8426792996f120b4f671e0"
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "before": "825da441c32bb6165c9a6f456b263946dec0f2321ad70a5a537435a623a0b898",
+      "after": "957eb19e3ca79e776c61fd17e5c4d1c1ce35cb4a5bc40ee3a2434c0968c397e3"
+    }
+  ],
+  "onlyFunctionChange": "Rename nested artifact_download table alias s to current_session, including its exact generation/scope references; outer original-session variable unchanged",
+  "failingBefore": "test/results/session-capacity-native-2/native-reads/custody-postgres.log:110; repeated SQLSTATE42702 during actual native key INSERT; sources unchanged and clean teardown"
+}

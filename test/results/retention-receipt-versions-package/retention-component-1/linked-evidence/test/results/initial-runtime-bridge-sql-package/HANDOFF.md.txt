@@ -1,0 +1,66 @@
+# Bridge SQL constructor correction
+
+The proposed administrator facet called the runtime-only Ledger constructor,
+which correctly rejects its required superuser login. No actual administrator
+could construct the bridge. The corrected facet checks its own exact current
+applied schema, original database OID/postmaster start and administrator role;
+it retains the recovery-before-activation lock order and rechecks all current
+bounds before and after its callback. It never constructs a runtime Ledger or
+writes activation/recovery/source state. The runtime constructor is unchanged.
+
+## Frozen source and precise integration
+
+Both `before/source` and `after/source` contain four paths, with independent
+base/payload manifests against live source:
+
+- New application/fleet purpose-specific callback port.
+- New PostgreSQL administrator bridge facet.
+- New integration helper with eleven actual SQL cases.
+- One additive hook in `test/integration/initial_installation_test.go`.
+
+The before variant preserves the exact bridge-2 constructor defect. Three files
+are identical between variants. `after-against-before.json` records the sole
+PostgreSQL replacement if the before source is integrated first. Do not copy
+unrelated bridge/resource sources for this SQL-only qualification.
+
+Before manifest SHA256:
+`973258ac30054910c471dd11c5b8c12f8470cb8f80cbd3cb38c71c61dad17a00`.
+After manifest SHA256:
+`98be457d5d0f93dd44c4b47b9f84329347ee4058926710cc20815e605b1a596b`.
+1,531-dependency manifest SHA256:
+`4d14d0c42914f260117b27cd12da35deabb6b884bdf36b0e6c19f7ca2da24f64`.
+
+## Checks actually run
+
+Handle 19630 finished exit 0. Both variants compiled the PostgreSQL, fleet and
+integration packages (`-run '^$'`); corrected three-package vet passed.
+Times: before compile 12.972s, after compile 9.609s, vet 1.682s. All eight frozen
+variant payloads, their four bases, and 1,531 dependencies remained unchanged.
+`result.json` retains exact commands and exits; no real SQL case ran here.
+
+## Required parent-owned actual SQL comparison
+
+Use the existing owned fleet harness with `ASSERVAT_INITIAL_INSTALLATION=1` so
+OpenBao is present. Plain custody mode lacks the key-service input. The separate
+`--initial-installation` wrapper cannot be combined with `--run`.
+
+Before exact selection:
+`^TestInitialInstallationWithRealServices$/^initial-runtime-bridge-sql-administrator$`
+
+After matrix selection:
+`^TestInitialInstallationWithRealServices$/^initial-runtime-bridge-sql-`
+
+The before positive case should fail at the intended administrator constructor,
+before any modeled native effect. This expectation is not a recorded native
+failure yet. The corrected matrix requires the administrator to construct and
+perform bounded callbacks, while the same credentials remain rejected by the
+runtime Ledger. Other cases deny an ordinary runtime role, unapplied/changed
+schema, changed database/postmaster, recovery, expired held-lock operation,
+recovery committed while blocked, late callback, and schema change after
+construction. Each original activation is produced with real SQL/S3/OpenBao;
+its source/witness are explicitly synthetic. Callbacks model native I/O and do
+not qualify the Kubernetes resource producer or guard enforcement.
+
+Keep the parent lab's selected names, actual exits, source hashes and cleanup
+report with the result. Complete installed bridge and public runtime qualification
+remains pending after these SQL cases.

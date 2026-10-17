@@ -1,0 +1,12 @@
+{
+  "time": 1791882132.8620734,
+  "command": "python3 freeze-check.py",
+  "exit": 1,
+  "failure": "OSError [Errno 28] No space left on device while copying disposable mirror/internal/bootstrap/installer_resume_test.go",
+  "no_go_job_started": true,
+  "deleted_only_incomplete_mirror": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-selection-20261013/checks/selection-1/mirror",
+  "files": 386,
+  "logical_bytes": 2472898,
+  "preserved": "all payloads, original source checkpoint, manifests and before variants",
+  "retry": "runtime-owned tmpfs mirror after >=4GiB check"
+}

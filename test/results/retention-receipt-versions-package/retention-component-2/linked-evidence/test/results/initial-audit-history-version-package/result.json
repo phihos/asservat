@@ -1,0 +1,115 @@
+{
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 24.204,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    },
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/before-overlay.json",
+        "-vet=off",
+        "-count=1",
+        "-v",
+        "-run",
+        "^TestInitialInstallation(ReceiptRequiresImmutableVersion|HistoricalObservation)$",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 4.168,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 9,
+      "skips": 0,
+      "intendedMarkers": true
+    },
+    {
+      "name": "races",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-v",
+        "-run",
+        "^TestInitial(Installation|RuntimeRoot|RuntimeBridge)",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 26.214,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 10,
+      "namedPass": 66,
+      "skips": 0
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/initial-audit-history-version-20261013/checks-1/overlay.json",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/adapters/kubernetes",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 4.628,
+      "sourceChanged": [],
+      "payloadChanged": [],
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0
+    }
+  ],
+  "native": false,
+  "sourceCount": 3025,
+  "scratch": "/tmp/asservat-audit-pinning-67cd9d7w",
+  "manifest": "405da9869d2cac57787f14587eeeb8ceb59cf11d050c10ec29f143978a26f93d",
+  "exit": 0,
+  "scratchRemoved": true,
+  "sourceChanged": [],
+  "files": {
+    "dependencies.json": "f5ac7fecffa9de6c3315335582719c80e04d9ab2b72c1ab0a9c5a1aa07772542",
+    "manifest.json": "405da9869d2cac57787f14587eeeb8ceb59cf11d050c10ec29f143978a26f93d",
+    "overlay.json": "a172c5c2159ecbecd5293f387cc59f061e2a9a1a77155edb157cbe61d21e3e15",
+    "before-overlay.json": "e8ca7d1e8186a29cb84765b658a675d520889eea7cd10943bdcf75d3ebc690ce",
+    "compile.log": "68f327148b58be2d6cb75e81070cc64133f51cacc6179345c6b2d5511b9bf380",
+    "before.log": "f6e88a9400cb7ef527259b5b6d4bb4587290a4abae97b82fb445151eebbecb15",
+    "races.log": "bcbc33635d880a87fc0e68f88e8b6a8613fbce37a968d792a2144d2680afd9b2",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

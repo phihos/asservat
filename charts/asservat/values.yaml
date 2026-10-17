@@ -1,0 +1,102 @@
+# One hub release per installation; one cluster release per workload cluster.
+# combined is the single-cluster evaluation topology.
+mode: hub
+
+# Runnable services are still being implemented. Enabling them is rejected,
+# including when Helm's schema validation is explicitly skipped.
+runtime:
+  enabled: false
+
+# Optional initial-installation checkpoint only; this starts no runtime service.
+# The release namespace must already be a trusted Restricted bootstrap namespace.
+bootstrap:
+  enabled: false
+  name: asservat
+  targetNamespace: asservat-system
+  # Keep this original verified image pin on later chart-only replays.
+  image: ""
+  registrySecret: ""
+  probeAudience: ""
+  secrets:
+    producer: ""
+    schema: ""
+    retirement: ""
+  kubernetes:
+    endpoint: https://kubernetes.default.svc
+    rootsPEM: ""
+  postgres:
+    host: ""
+    port: 5432
+    database: asservat
+    maxConnections: 2
+    rootsPEM: ""
+  auditStore:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    rootsPEM: ""
+  keyService:
+    endpoint: ""
+    auditMount: asservat-audit
+    auditKey: audit
+    rootsPEM: ""
+  fleet:
+    issuer: ""
+    clients: []
+    subjects: []
+    groups: []
+    deliveryProfiles: []
+    maxActiveBootstraps: 1
+    maxBootstrapHistory: 16
+    maxClusters: 1
+  # ADR-183: the in-cluster continuation after first activation. It runs as
+  # the runner account, publishes provider recipes to a public outbox and
+  # waits for `asservat installer-provider-apply` to write the inbox.
+  continuation:
+    enabled: false
+    workerProvider:
+      authMount: ""
+      authMountAccessor: ""
+    ownerProvider:
+      authMount: ""
+      authMountAccessor: ""
+    ownerIssuerRootsPEM: ""
+    ownerPKIMount: owner-pki
+    ownerConnections: 4
+    ownerConcurrency: 2
+    # ADR-185 browser identity for the promoted hub-api; empty origin keeps an
+    # observation-only owner. Clients, subjects and groups are stable IDs.
+    public:
+      origin: ""
+      issuer: ""
+      clientID: ""
+      maxLifetimeSeconds: 28800
+      maxLogins: 64
+      maxSessions: 256
+      maxLogoutEvents: 256
+      clients: []
+      eligibleSubjects: []
+      eligibleGroups: []
+      groupMaxAgeSeconds: 300
+  providers:
+    issuerPolicy: asservat-install-issuer
+    wrapRole: asservat-install-wrap
+    wrapPolicy: asservat-install-encrypt
+    unwrapRole: asservat-install-unwrap
+    unwrapPolicy: asservat-install-decrypt
+
+# ADR-193: with mode=cluster, a post-install/post-upgrade hook installs one
+# regional connector through `asservat installer-cluster --in-cluster`. The
+# release-scoped installer account is the guards' trusted initial
+# administrator. The bootstrap record stays in an operator-created Secret.
+cluster:
+  enabled: false
+  namespace: asservat-connector
+  image: ""
+  registrySecret: ""
+  offer: ""
+  bootstrapSecret: ""
+  # ADR-196: an existing operator Secret with evidence-storage.json, the
+  # write-only regional evidence credential. Required exactly when the offer
+  # names the regional executor.
+  evidenceSecret: ""

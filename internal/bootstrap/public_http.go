@@ -1,0 +1,165 @@
+package bootstrap
+
+import (
+	"context"
+	"crypto/tls"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/presentation"
+)
+
+// newPublicHandler is the ADR-180 P5 assembly: both audited operation lanes,
+// browser refresh owners, the complete operation set and the HTTP routes.
+func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStore, owners *fleetapp.OwnerAuthenticator, closers *[]func()) (http.Handler, error) {
+	in, id, pc, dl := d.inputs, d.publicID, d.publicContext, d.publicDownloads
+	c, p := in.config, in.config.Public
+	root, installation := c.PermissionRootID, c.InstallationID
+	if p == nil || id == nil || pc == nil || dl == nil || d.Runtime == nil || owners == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	// ADR-190: the normal and resolution lanes read their current accepted
+	// profile before each new Begin; each policy gets its own auditor.
+	digest, ok := publicDigest(p.Capacity.QualificationDigest)
+	if !ok {
+		return nil, mounts.ErrUnavailable
+	}
+	profilePool, err := d.public.open(ctx, "capacity-profile-read")
+	if err != nil {
+		return nil, err
+	}
+	profiles, err := postgres.NewCapacityAuditProfiles(ctx, profilePool, root, installation, p.Capacity.QualificationID, digest, p.Capacity.AccountVersion)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	auditor := func(lane string) (*auditapp.SelectedOperationAuditor, error) {
+		journalPool, err := d.public.open(ctx, "audit-"+lane+"-journal")
+		if err != nil {
+			return nil, err
+		}
+		ackPool, err := d.public.open(ctx, "audit-"+lane+"-ack")
+		if err != nil {
+			return nil, err
+		}
+		recovery := d.shared.guards.Recovery
+		return auditapp.NewSelectedOperationAuditor(lane, profiles, func(call context.Context, policy audit.OperationLifecyclePolicy) (*auditapp.HealthyOperationAuditor, error) {
+			if policy.Lane != lane || policy.RootID != root || policy.InstallationID != installation {
+				return nil, mounts.ErrUnavailable
+			}
+			journal, err := postgres.NewHealthyOperationJournal(call, journalPool, policy, recovery)
+			if err != nil {
+				return nil, mounts.ErrUnavailable
+			}
+			acks, err := postgres.NewOperationAcknowledgements(call, ackPool, root, lane, recovery)
+			if err != nil {
+				return nil, mounts.ErrUnavailable
+			}
+			lifecycle, err := postgres.NewOperationLifecycles(call, journalPool, root, lane, recovery)
+			if err != nil {
+				return nil, mounts.ErrUnavailable
+			}
+			closed, err := objectstore.NewClosedOperationAuditObjects(a.store, policy.StoreID, a.seal, a.open)
+			if err != nil {
+				return nil, mounts.ErrUnavailable
+			}
+			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, &objectstore.OperationAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, closed, lifecycle, time.Now)
+		})
+	}
+	normal, err := auditor("normal")
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	resolution, err := auditor("resolution")
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+
+	settings := id.settings
+	b := d.Runtime.binding
+	process := identity.RefreshProcessBinding{RootID: settings.RootID, Epoch: settings.Epoch, InstallationID: installation, ClusterID: b.ClusterID, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}
+	refreshSQL := map[string]*postgres.BrowserSessions{}
+	for _, purpose := range []string{"refresh-admit", "refresh-owner", "refresh-read"} {
+		pool, err := d.public.open(ctx, purpose)
+		if err != nil {
+			return nil, err
+		}
+		if refreshSQL[purpose], err = postgres.NewBrowserSessions(ctx, pool, settings.Binding()); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	journal, err := postgres.NewBrowserRefreshOwners(postgres.BrowserRefreshDatabases{Admission: refreshSQL["refresh-admit"], Maintenance: refreshSQL["refresh-owner"], Reader: refreshSQL["refresh-read"]}, dl.downloads, dl.gate, d.Runtime.server, owners, process, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	refresh, err := identities.NewBrowserRefreshOwners(d.root, *id.sessions, journal, process, p.Origin, ownerRandomID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	*closers = append(*closers, func() { _ = refresh.Close() })
+
+	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native})
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	o := p.OperationAudit
+	services := PublicContextServices{Sessions: id.sessions, RefreshOwners: refresh, RefreshPauses: journal, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
+	if pc.fleet != nil {
+		services.Fleet = pc.fleet
+	}
+	return NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
+		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
+		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},
+		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
+}
+
+// publicCertificate serves the mounted public TLS pair and reloads it when the
+// mounted files change; a failed reload keeps no stale pair beyond the files.
+type publicCertificate struct {
+	inputs *providerInputs
+	mu     sync.Mutex
+	cert   *tls.Certificate
+	raw    []byte
+}
+
+func (c *publicCertificate) get(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	crt, err := mounts.Read(ctx, c.inputs.files, contracts.OwnerPublicTLSCertificate, 64<<10)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cert != nil && string(crt) == string(c.raw) {
+		return c.cert, nil
+	}
+	key, err := mounts.Read(ctx, c.inputs.files, contracts.OwnerPublicTLSKey, 64<<10)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	defer clear(key)
+	pair, err := tls.X509KeyPair(crt, key)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	c.cert, c.raw = &pair, crt
+	return c.cert, nil
+}
+
+// publicTLS is HTTP/2-capable TLS 1.3 for browsers and MCP clients.
+func publicTLS(in *providerInputs) *tls.Config {
+	c := &publicCertificate{inputs: in}
+	return &tls.Config{MinVersion: tls.VersionTLS13, GetCertificate: c.get, NextProtos: []string{"h2", "http/1.1"}}
+}

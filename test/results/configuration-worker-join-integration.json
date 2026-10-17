@@ -1,0 +1,115 @@
+{
+  "integratedAt": 1791860486.4883842,
+  "manifestSHA256": "ddced6cf51b11317008798f871b1cab0324a7fc0102e463ee7d2ffe6616f5755",
+  "dependenciesSHA256": "1ccefb62b900c1763ddb087af14ec01e386fbe95253a99074113a181f40264cf",
+  "dependencyCount": 1920,
+  "files": [
+    {
+      "path": "docs/architecture/configuration-reconciliation.md",
+      "base_sha256": "d33e20b68d40de054d1310d2a3f5ba435700055e2259135470e64f787f9d890c",
+      "payload_sha256": "be4784c01f8abb1eac9d99c7c05a3285a1727bfcdcab7aa5f5dea67f72ce2b5a"
+    },
+    {
+      "path": "internal/application/fleet/reconciliation.go",
+      "base_sha256": "117f5b4fe60d1cdfebbebe615abd98a994ffbd850c083cc281ef82f7e84515ec",
+      "payload_sha256": "1ddc216b571bb88ec2dd9dcec8fb9a595b9aa04c5d3946b2601159746577dd5d"
+    },
+    {
+      "path": "internal/application/fleet/reconciliation_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "c3b47d9b52a67b493c37ef6c814bb6b48446c41934d38cbea1ec3d928e8c28dd"
+    },
+    {
+      "path": "internal/bootstrap/hub_worker.go",
+      "base_sha256": "cac619c17ff67278937f6f85fa1f75c8ad656b9fc2a2e18ffa2752bdffafdf0f",
+      "payload_sha256": "e01407ba819e97364f1cb18028cb841dc81436fec22e3c096a5627a4fc529994"
+    },
+    {
+      "path": "internal/bootstrap/hub_worker_join_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8e837901c3504f7cf3ed3ffb457f8dd595505c850077a1fc860122883c63c8c9"
+    }
+  ],
+  "qualification": {
+    "manifest": "ddced6cf51b11317008798f871b1cab0324a7fc0102e463ee7d2ffe6616f5755",
+    "dependencies": "1ccefb62b900c1763ddb087af14ec01e386fbe95253a99074113a181f40264cf",
+    "runner": "7d39ebb10a212e92667229fa8044da09e2fd5bbd987bf52fe101a60f5091db31",
+    "started": 1791860111.1466923,
+    "before": {
+      "payload": [],
+      "base": [],
+      "dependencies": [],
+      "inventory": []
+    },
+    "phases": [
+      {
+        "name": "before",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/before-overlay.json",
+          "-count=1",
+          "-timeout=90s",
+          "-v",
+          "./internal/application/fleet",
+          "./internal/bootstrap",
+          "-run=^(TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer|TestHubWorkerExternalCloseJoinsRunBeforeClosingResources)$"
+        ],
+        "exit": 1,
+        "timed_out": false,
+        "expected_failure": true,
+        "seconds": 7.476067781448364,
+        "log_sha256": "bfefadfc507ff3ff188c4ed9d1979fde53e5db5d396691114e337e468ca5f0da"
+      },
+      {
+        "name": "corrected-races",
+        "command": [
+          "go",
+          "test",
+          "-race",
+          "-vet=off",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/overlay.json",
+          "-count=1",
+          "-timeout=3m",
+          "-v",
+          "./internal/application/fleet",
+          "./internal/bootstrap"
+        ],
+        "exit": 0,
+        "timed_out": false,
+        "expected_failure": false,
+        "seconds": 27.201915740966797,
+        "log_sha256": "420009c09163616b1fd2d7bcdb564d6f1d09a286ccc25002f43ce0e906903438"
+      },
+      {
+        "name": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/overlay.json",
+          "./internal/application/fleet",
+          "./internal/bootstrap"
+        ],
+        "exit": 0,
+        "timed_out": false,
+        "expected_failure": false,
+        "seconds": 6.6752612590789795,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "exit": 0,
+    "ended": 1791860152.636089,
+    "after": {
+      "payload": [],
+      "base": [],
+      "dependencies": [],
+      "inventory": []
+    }
+  },
+  "scope": "joined configuration observer and HubWorker Run/Close ownership only; no provider2 selection"
+}

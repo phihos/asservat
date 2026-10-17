@@ -1,0 +1,5 @@
+=== RUN   TestContextCapabilityWithRealKubernetes
+    context_capability_native_test.go:250: actual native capability guard, separate RBAC/probe, immutable source/image/cluster/epoch pins and replacement denial passed; image/recovery acceptance remain synthetic
+--- PASS: TestContextCapabilityWithRealKubernetes (6.21s)
+PASS
+ok  	asservat.local/asservat/test/integration	7.267s

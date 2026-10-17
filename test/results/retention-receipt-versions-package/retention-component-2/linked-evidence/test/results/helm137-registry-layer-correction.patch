@@ -1,0 +1,88 @@
+--- a/scripts/helm_registry.py
++++ b/scripts/helm_registry.py
+@@ -4,7 +4,9 @@
+ external publication, node auth file, or credential-bearing diagnostic output.
+ """
+ import base64
++import gzip
+ import hashlib
++import io
+ import json
+ import os
+ from pathlib import Path
+@@ -74,6 +76,24 @@
+         if descriptor.get("size") != len(child) or json.loads(child).get("mediaType") != descriptor.get("mediaType"):
+             raise RuntimeError("exported image descriptor metadata differs")
+     raise RuntimeError("exported image identity exceeds descriptor depth")
++
++
++def exported_layer_media(data, original, maximum=256 << 20):
++    """Verify rootfs diffID while preserving the export's exact layer bytes."""
++    compressed = data.startswith(b"\x1f\x8b")
++    if compressed:
++        try:
++            with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
++                plain = stream.read(maximum+1)
++        except (OSError, EOFError):
++            raise RuntimeError("invalid exported gzip layer") from None
++    else:
++        plain = data
++    if len(plain) > maximum:
++        raise RuntimeError("exported layer exceeds original uncompressed bound")
++    if "sha256:"+hashlib.sha256(plain).hexdigest() != original:
++        raise RuntimeError("exported layer differs from original rootfs identity")
++    return "application/vnd.oci.image.layer.v1.tar" + ("+gzip" if compressed else "")
+ 
+ 
+ class NoRedirect(urllib.request.HTTPRedirectHandler):
+@@ -181,9 +201,7 @@
+             layers = []
+             for path, original in zip(entry["Layers"], diff_ids):
+                 data = content(path, 256 << 20)
+-                if "sha256:"+hashlib.sha256(data).hexdigest() != original:
+-                    raise RuntimeError("fixture archive is not the exact uncompressed layer")
+-                layers.append(blob(data, "application/vnd.oci.image.layer.v1.tar"))
++                layers.append(blob(data, exported_layer_media(data, original)))
+             manifest = json.dumps({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json", "config": config_descriptor, "layers": layers}, separators=(",", ":")).encode()
+             self.digest = "sha256:"+hashlib.sha256(manifest).hexdigest()
+             with self.request("PUT", "/v2/asservat/manifests/"+self.digest, manifest, "application/vnd.oci.image.manifest.v1+json") as done:
+--- a/scripts/test-helm-bootstrap-selection.py
++++ b/scripts/test-helm-bootstrap-selection.py
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ """Pure Helm fixture selection/evidence regressions; no external services."""
+ import importlib.util
++import gzip
+ import hashlib
+ import json
+ from pathlib import Path
+@@ -9,7 +10,7 @@
+ import tempfile
+ from unittest.mock import patch
+ 
+-from helm_registry import HelmRegistry, exported_image_identity, verify_registry_cleanup
++from helm_registry import HelmRegistry, exported_image_identity, exported_layer_media, verify_registry_cleanup
+ 
+ spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
+ fixture = importlib.util.module_from_spec(spec)
+@@ -17,6 +18,20 @@
+ 
+ 
+ class HelmSelection(unittest.TestCase):
++    def test_exported_layer_retains_exact_bytes_and_original_rootfs(self):
++        plain = b"synthetic tar payload"
++        digest = "sha256:"+hashlib.sha256(plain).hexdigest()
++        packed = gzip.compress(plain)
++        self.assertEqual(exported_layer_media(plain, digest), "application/vnd.oci.image.layer.v1.tar")
++        self.assertEqual(exported_layer_media(packed, digest), "application/vnd.oci.image.layer.v1.tar+gzip")
++        for data in (plain, packed):
++            with self.assertRaisesRegex(RuntimeError, "rootfs identity"):
++                exported_layer_media(data, "sha256:"+"0"*64)
++        with self.assertRaisesRegex(RuntimeError, "uncompressed bound"):
++            exported_layer_media(packed, digest, maximum=len(plain)-1)
++        with self.assertRaisesRegex(RuntimeError, "gzip layer"):
++            exported_layer_media(packed[:-4], digest)
++
+     def test_exact_docker_config_or_containerd_descriptor_identity(self):
+         blobs = {}
+         def blob(value):

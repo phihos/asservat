@@ -1,0 +1,19 @@
+{
+  "HANDOFF.md": "07664132bac30f4e30568665baea6bd5fa7f8e465492b42d2ba2208111ec09f6",
+  "changes.patch": "f26f78e1913b9fe8394cd51dbf6b258b02301a5ee9483ae511fc4c7f13897a3b",
+  "dependencies.json": "ad0d4e406840544b071b85dee16b0c209d26d53deb452cb92428947664fef946",
+  "evidence/after.json": "00f23944e8a22ae7393615bd36576073930799c18a3ba3c0478d91373f0ef059",
+  "evidence/before.json": "00f23944e8a22ae7393615bd36576073930799c18a3ba3c0478d91373f0ef059",
+  "evidence/compile.log": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76",
+  "evidence/prior/native-admission-consolidated-final-check.log": "e1be0faef4bbf63c10db3b0f383effb5ce0948d7e08de340cff938b730e8e990",
+  "evidence/prior/native-admission-consolidated-final-environment.json": "a1eb1b02e5096a7f22a781ea20fec5d7434ea249fa00a3f2d75be7eb24bd8a00",
+  "evidence/prior/native-admission-consolidated-final-postgres.log": "0c14e260ced9e37331e3a7ec8bd101b8b9c1c1f67e0f6141dd604749f5abc83e",
+  "evidence/prior/native-admission-consolidated-final.log": "01f95209159e1adead4a2f572ed2860a444ff43221033049854676536ffad0f3",
+  "evidence/results.json": "61d5698a63b5b7ec4a3f12630e7271660b8ebd4418c660d3530e66eb58383786",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "files/test/integration/context_native_content_test.go": "4001e9b4ddfc507ea8118c159799144fc231f6f7cb320f6a07f5db1406888d92",
+  "manifest.json": "abc54809904ba960c1c5182cce255aa567fb7bb930f48d33e2f589255791ce06",
+  "original/context_native_content_test.go.txt": "226526c76ba89381384c7452b48cde0e4b4869f96cf3365abc9782aa7871c976",
+  "overlay.json": "9029c133aeef559e2984f27ae324438e60262660ce6aea8627575e716a3f6cad",
+  "run-check.py": "29de35e707c23b34cef6ff524ead64ce36aed9bc2772140d46d43993154ac5cc"
+}

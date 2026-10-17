@@ -1,0 +1,2 @@
+Custody integration exit: 1
+{"terminalExit": 1, "testExit": 1, "passedEntries": 2, "sourceHashes": 1333, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

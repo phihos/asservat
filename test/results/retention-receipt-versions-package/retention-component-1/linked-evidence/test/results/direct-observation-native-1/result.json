@@ -1,0 +1,33 @@
+{
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "phases": [
+    {
+      "name": "direct",
+      "command": [
+        "python3",
+        "scripts/test-context-storage.py",
+        "--run",
+        "^TestDirectHolderObservationWithRealKubernetes$"
+      ],
+      "exit": 1,
+      "seconds": 175.387,
+      "diskBeforeBytes": 426992713728,
+      "diskAfterBytes": 426681446400,
+      "sourceCount": 2196,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "testExit": 1,
+      "passedTests": [],
+      "testPhases": null,
+      "archiveHashes": {
+        "harness.log": "dbf60749d00b58fbbbd48a6ded853fc7bc9c9fd3213126d763a4f457ebd9eefe",
+        "context-storage.log": "44cb48063ffebc401e443a01c72d3dfe9b9eef1da82db95c4eeda7b61eb93858",
+        "context-storage-environment.json": "dfc630827a1d23bd5121c6c48125fa35e851b2d698051633039273405335d55b",
+        "context-storage-kubelet.log": "2796e7a6fc3d63158f89dfc30cdb355fb313c7e23e5b1cd48940aa964d80984d",
+        "context-storage-postgres.log": "2b4c47291fe1d3175e80280b12cec8debde142fdf226c44305c7afa6524cbe87"
+      }
+    }
+  ],
+  "scope": "Four direct H/A/R purposes using actual Restricted Pods in two owned clusters, retained clients and five-second requests; synthetic original roots, no installed HWORK background or public runtime",
+  "exit": 1
+}

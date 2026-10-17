@@ -1,0 +1,40 @@
+# Qualified shared deletion-inventory correction
+
+Actual component session 97870 terminated with exit 0. No native fixture ran.
+The six-path manifest is 8be34e7a29b037f5f56fdf2b8897da68ceb69369a4fa03bccc120bfe7ce4249f.
+The actual runner is 3ac0adca1a3287860c2ce8365caa893020640743275f19d67422c057344794b2;
+its exact source is copied to run.py. Original product custody.go bytes are saved
+as original-custody.go.txt and match the manifest base hash.
+
+Original-before: actual exit 1 in 19.661s. All six missing-completeness cases
+failed at the required assertion: the original implementation returned nil after
+one version delete and one multipart abort. Actual TLS/AWS decoding exercised
+missing IsTruncated in versions/uploads/current during initial and final scans.
+These are product-defect failures, not constructor, compile or fixture failures.
+
+Corrected whole objectstore race package: exit 0 in 7.154s, 34 top-level / 166 named
+PASS entries. All six new negative cases passed. Existing exact null-version
+positive and both operation/download-stop positive cleanup cases passed, alongside
+retained-marker, foreign-key and true-truncation negatives. Initial malformed
+inventory causes no effects; final malformed inventory cannot certify absence
+after its already-performed exact effects.
+
+Other phases: objectstore/integration compile 17.659s, affected vet 2.654s,
+Go architecture 1.157s and canonical spec/architecture/design 8.655s; all exit 0.
+Canonical results: 121 schemas, 49 MCP tools, 10,698 assertions; architecture
+1,219 positive / 120 rejected cases; 63 screens. Go architecture reports 53
+packages and 304 internal import edges. Generated validation.json was captured
+byte-for-byte and restored; original and generated hashes were identical.
+
+All 4,363 dependencies, original base hashes, six payloads, metadata, source file
+sets and complete mirror stayed unchanged at every phase. Owned processes/groups
+were joined and owned scratch removed. Result hash:
+566f4238b8e930fb4fc83b355b99132b537b8f66eaad2feac5cb4228d1109dbc.
+Dependencies hash:
+f10d6e356213f6bf43b3598d27a924846b837775f0788a0dfd51832dfbf14218.
+
+Ready for root integration of exactly six reviewed paths, archiving Go/Markdown
+payloads with .txt suffixes. This component does not prove pinned-native backend
+behavior, writer closure, SQL charge release or the full product. Run the pending
+whole custody and Go targets on the integrated tree; full fleet and the separate
+real-time connector-retirement qualifications retain their own scopes.

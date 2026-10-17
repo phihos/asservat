@@ -1,0 +1,230 @@
+=== RUN   TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose
+--- PASS: TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose (0.01s)
+=== RUN   TestCaptureAuditAuthenticatesPurposeAndFrozenRecord
+--- PASS: TestCaptureAuditAuthenticatesPurposeAndFrozenRecord (0.01s)
+=== RUN   TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope
+    capture_operation_test.go:90: actual Tink ciphertext under maximum opaque wrapping text: intent=36646 outcome=37143 prepaid=65536 bytes
+--- PASS: TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope (0.03s)
+=== RUN   TestCapturePrivateEnvelopeRejectsControlExpansion
+--- PASS: TestCapturePrivateEnvelopeRejectsControlExpansion (0.00s)
+=== RUN   TestContextDeletionRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestContextDeletionRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestContextVerificationAuditPinsCopiesScopeAndPurpose
+--- PASS: TestContextVerificationAuditPinsCopiesScopeAndPurpose (0.01s)
+=== RUN   TestCursorSequentialPullsKeepOneFrameAndOriginalKeys
+--- PASS: TestCursorSequentialPullsKeepOneFrameAndOriginalKeys (0.15s)
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/native
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/data
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/index
+--- PASS: TestCursorFinalIntegrityAndPartialRangeClaims (0.07s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/native (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/data (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/index (0.02s)
+=== RUN   TestCursorEmptyFileStillReturnsAuthenticatedFinal
+--- PASS: TestCursorEmptyFileStillReturnsAuthenticatedFinal (0.00s)
+=== RUN   TestCursorCloseCancelsAndJoinsPendingRead
+--- PASS: TestCursorCloseCancelsAndJoinsPendingRead (0.00s)
+=== RUN   TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead
+--- PASS: TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead (0.10s)
+=== RUN   TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO
+--- PASS: TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO (0.03s)
+=== RUN   TestCursorCanceledCallBeforeAdmissionDoesNotConsume
+--- PASS: TestCursorCanceledCallBeforeAdmissionDoesNotConsume (0.00s)
+=== RUN   TestCursorRangeCrossesAuthenticatedIndexPageBoundary
+--- PASS: TestCursorRangeCrossesAuthenticatedIndexPageBoundary (0.09s)
+=== RUN   TestCursorUncertainReadRetainsAttemptAndCannotRetry
+--- PASS: TestCursorUncertainReadRetainsAttemptAndCannotRetry (0.00s)
+=== RUN   TestDownloadAuditPinsRangeActorGenerationAndPurpose
+--- PASS: TestDownloadAuditPinsRangeActorGenerationAndPurpose (0.01s)
+=== RUN   TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestDownloadStopAuditExactDecisionAndOneWrap
+--- PASS: TestDownloadStopAuditExactDecisionAndOneWrap (0.00s)
+=== RUN   TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase
+--- PASS: TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase (0.01s)
+=== RUN   TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose
+--- PASS: TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose (0.01s)
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/0
+    framed_test.go:115: nativeBytes=0 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/4096
+    framed_test.go:115: nativeBytes=4096 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/16777295
+    framed_test.go:115: nativeBytes=16777295 wraps=3 unwraps=3 largestKeysetBytes=131
+--- PASS: TestArtifactKeyCallsIndependentOfPayloadSize (0.39s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/0 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/4096 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/16777295 (0.38s)
+=== RUN   TestRoundTripAndRanges
+=== RUN   TestRoundTripAndRanges/0
+=== RUN   TestRoundTripAndRanges/1
+=== RUN   TestRoundTripAndRanges/4000
+=== RUN   TestRoundTripAndRanges/8388608
+=== RUN   TestRoundTripAndRanges/8388635
+=== RUN   TestRoundTripAndRanges/16777295
+--- PASS: TestRoundTripAndRanges (1.00s)
+    --- PASS: TestRoundTripAndRanges/0 (0.00s)
+    --- PASS: TestRoundTripAndRanges/1 (0.01s)
+    --- PASS: TestRoundTripAndRanges/4000 (0.00s)
+    --- PASS: TestRoundTripAndRanges/8388608 (0.20s)
+    --- PASS: TestRoundTripAndRanges/8388635 (0.25s)
+    --- PASS: TestRoundTripAndRanges/16777295 (0.53s)
+=== RUN   TestCorruptionAndFinalBatch
+=== RUN   TestCorruptionAndFinalBatch/data
+=== RUN   TestCorruptionAndFinalBatch/index
+=== RUN   TestCorruptionAndFinalBatch/native-hash
+=== RUN   TestCorruptionAndFinalBatch/data-hash
+=== RUN   TestCorruptionAndFinalBatch/index-hash
+--- PASS: TestCorruptionAndFinalBatch (0.24s)
+    --- PASS: TestCorruptionAndFinalBatch/data (0.03s)
+    --- PASS: TestCorruptionAndFinalBatch/index (0.02s)
+    --- PASS: TestCorruptionAndFinalBatch/native-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/data-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/index-hash (0.06s)
+=== RUN   TestAttemptBindingAndSingleUse
+--- PASS: TestAttemptBindingAndSingleUse (0.01s)
+=== RUN   TestDeliveryRevocation
+--- PASS: TestDeliveryRevocation (0.04s)
+=== RUN   TestPagedRangeBeyondTwoGiB
+    framed_test.go:336: native=2147483721 data=244550 index=71288 tailDataRead=70 tailIndexRead=381
+--- PASS: TestPagedRangeBeyondTwoGiB (3.95s)
+=== RUN   TestLayoutRejectsMalformedBounds
+--- PASS: TestLayoutRejectsMalformedBounds (0.00s)
+=== RUN   TestPublishedContractFixture
+--- PASS: TestPublishedContractFixture (0.00s)
+=== RUN   TestIncompressibleFramesAndAuthenticatedCorruption
+--- PASS: TestIncompressibleFramesAndAuthenticatedCorruption (0.41s)
+=== RUN   TestRejectOtherTinkSuiteBeforeObjectRead
+--- PASS: TestRejectOtherTinkSuiteBeforeObjectRead (0.00s)
+=== RUN   TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution
+--- PASS: TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution (0.01s)
+=== RUN   TestLifecycleRequiresBothSignatureAndEncryptedRecord
+--- PASS: TestLifecycleRequiresBothSignatureAndEncryptedRecord (0.01s)
+=== RUN   TestOperationAuditExactRecordsAndProviderCallCount
+    operation_audit_test.go:33: local Tink audit only: wraps=2 unwraps=2 max_wrapped_key_bytes=131 intent_cipher_bytes=1413 outcome_cipher_bytes=1858 elapsed=2.691777ms; no network provider latency measured
+--- PASS: TestOperationAuditExactRecordsAndProviderCallCount (0.00s)
+=== RUN   TestOperationRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestOperationRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/root
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/source
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/format
+--- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot (0.01s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/root (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/source (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/format (0.00s)
+=== RUN   TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame
+--- PASS: TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame (0.14s)
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json
+--- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory (0.01s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json (0.00s)
+=== RUN   FuzzLayout
+=== RUN   FuzzLayout/seed#0
+=== RUN   FuzzLayout/seed#1
+=== RUN   FuzzLayout/seed#2
+--- PASS: FuzzLayout (0.00s)
+    --- PASS: FuzzLayout/seed#0 (0.00s)
+    --- PASS: FuzzLayout/seed#1 (0.00s)
+    --- PASS: FuzzLayout/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.822s
+=== RUN   TestLargeDownloadOneTiBHasFiniteWindowBackingAndCumulativeCompletion
+--- PASS: TestLargeDownloadOneTiBHasFiniteWindowBackingAndCumulativeCompletion (2.70s)
+=== RUN   TestLargeDownloadUncertaintySpendsWindowAndCannotCloseGaps
+--- PASS: TestLargeDownloadUncertaintySpendsWindowAndCannotCloseGaps (0.00s)
+=== RUN   TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement
+=== RUN   TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/cancelled
+=== RUN   TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/replacement
+=== RUN   TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/expired
+=== RUN   TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/missing-final-verification
+--- PASS: TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement (0.00s)
+    --- PASS: TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/cancelled (0.00s)
+    --- PASS: TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/replacement (0.00s)
+    --- PASS: TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/expired (0.00s)
+    --- PASS: TestLargeDownloadHistoricalOutcomeCannotReviveOrCompleteReplacement/missing-final-verification (0.00s)
+=== RUN   TestLargeDownloadPlanBoundariesAndPartialRange
+--- PASS: TestLargeDownloadPlanBoundariesAndPartialRange (0.00s)
+=== RUN   TestDownloadCannotDiscloseBeforeAuditedPreparation
+--- PASS: TestDownloadCannotDiscloseBeforeAuditedPreparation (0.00s)
+=== RUN   TestDownloadLostRepliesCancellationAndScope
+--- PASS: TestDownloadLostRepliesCancellationAndScope (0.00s)
+=== RUN   TestDownloadBudgetAndPartialOutcomes
+--- PASS: TestDownloadBudgetAndPartialOutcomes (0.00s)
+=== RUN   TestDownloadStatusObservationDoesNotExtendTransferAuthority
+--- PASS: TestDownloadStatusObservationDoesNotExtendTransferAuthority (0.00s)
+=== RUN   TestDownloadObservedExpiryPreservesTerminalOutcomeAndAccounting
+--- PASS: TestDownloadObservedExpiryPreservesTerminalOutcomeAndAccounting (0.00s)
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/empty
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/single
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/interior
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/boundary
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/short-tail
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/page-boundary
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/maximum-tail
+=== RUN   TestFramedRangeWorkIncludesWholeBoundaryFrames/maximum-full
+--- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/empty (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/single (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/interior (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/boundary (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/short-tail (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/page-boundary (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/maximum-tail (0.00s)
+    --- PASS: TestFramedRangeWorkIncludesWholeBoundaryFrames/maximum-full (0.00s)
+=== RUN   TestFramedRangeWorkUsesActualPageCeilingWithoutDiscountingDecode
+--- PASS: TestFramedRangeWorkUsesActualPageCeilingWithoutDiscountingDecode (0.00s)
+=== RUN   TestFramedRangeWorkRejectsOverflowAndMalformedLayout
+--- PASS: TestFramedRangeWorkRejectsOverflowAndMalformedLayout (0.00s)
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/hidden-source
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-hub
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/two-hubs
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/other-local-cluster
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/duplicate-source
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-epoch
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-acceptance
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-snapshot
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-guard
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/overlong-observation
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/future-observation
+=== RUN   TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/excess-sources
+--- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/hidden-source (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-hub (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/two-hubs (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/other-local-cluster (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/duplicate-source (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-epoch (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-acceptance (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-snapshot (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/missing-guard (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/overlong-observation (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/future-observation (0.00s)
+    --- PASS: TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions/excess-sources (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/artifact	3.714s

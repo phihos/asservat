@@ -1,0 +1,15 @@
+{
+  "scripts/test-context-storage.py": "c6ff03a5e077cd8c88b7659e0c3f9dbac61d9db98c08a63efd0a288a7a09bc2e",
+  "test/fixtures/observation-native/data.go": "30f4c2c852a9094895113b02a43058de61499305dd3aa791f0222eb7efefc0fe",
+  "test/fixtures/observation-native/enrollment.go": "8777702ab6a6091d58012bd4a1f513f426121cfe02659dfbc9ce389cfd4fd860",
+  "test/fixtures/observation-native/inputs.go": "68532a84d757cbb02e2a108976984d58f3baeb94ce6711a70d9202543ece92c3",
+  "test/fixtures/observation-native/main.go": "3b79b56a3b7a384030efa18a48cce69def3d053516a7e321e5c874f9056c3a6e",
+  "test/fixtures/observation-native/metrics.go": "363acac5d1729376f75ddf68a648b799c8b99d9ff8b4984b46e7f787826d71f5",
+  "test/fixtures/observation-native/runtime.go": "9171a3448cad7b359e24cc48149eba44b8510326203cde8410b9b279bc86cece",
+  "test/integration/direct_observation_native_access_test.go": "50facf397403a543755923eb8d66373d0af6736de25817845e92791f2c593dfe",
+  "test/integration/direct_observation_native_data_test.go": "fe24efddd35d28c753109c0a1c379964a083b04eb755a913660ca1b27e28e004",
+  "test/integration/direct_observation_native_fixture_test.go": "4bc69d49a5bcc7069d06c8bf199e2117f97c25ee803dd63b25a64a8b2cfd7c9d",
+  "test/integration/direct_observation_native_source_test.go": "6a0d94dacd95d663954a242e85fd274c72a1b8825932d4bfb5008cfc443fee96",
+  "test/integration/direct_observation_native_sql_test.go": "f12ca85f6dc5cf50e55291657e7ee88e5b0ddad5776300c0304b3f8f9baf4fcd",
+  "test/integration/direct_observation_native_test.go": "8d1a98328905452b8a6ce97982186dc03f552277471f96b555d55e5fecf27cd5"
+}

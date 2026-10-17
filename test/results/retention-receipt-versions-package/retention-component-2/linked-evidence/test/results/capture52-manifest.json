@@ -1,0 +1,278 @@
+{
+  "scope": "ADR132/SQL52 capture intent lifecycle; native qualification pending",
+  "paths": [
+    {
+      "path": "docs/architecture/capture-intent-lifecycle.md",
+      "base_sha256": null,
+      "new_sha256": "5cf158f31d67a9bbcbfa63d14b6cf20a9f9217371d29271c6c9dafc7fbe3ca16",
+      "bytes": 10416,
+      "generated": false
+    },
+    {
+      "path": "docs/decisions/132-capture-intent-writer-lifecycle.md",
+      "base_sha256": null,
+      "new_sha256": "c3b959d1fd107e1f59731401eefcc9ec1c1e9cd5547521aa8a3835a8664c6c2b",
+      "bytes": 2966,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/objectstore/capture_operation_test.go",
+      "base_sha256": null,
+      "new_sha256": "8569f704aa6763f92b5cfa008c49f5781b33e486a695068efc27cbe4da19a6e6",
+      "bytes": 5468,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/objectstore/framed/capture_operation.go",
+      "base_sha256": null,
+      "new_sha256": "3c833065df038da27c23420ff9fc0591db56b9999c98f81a113f6b61eb8a9404",
+      "bytes": 3030,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/objectstore/framed/capture_operation_test.go",
+      "base_sha256": null,
+      "new_sha256": "1e150c1609d92ada82d2ff3c9a1d8b5e6cf506e6b6e2b69656db618444061a1f",
+      "bytes": 5598,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/objectstore/framed/operation_audit.go",
+      "base_sha256": "6095add166a9767e56cc4a3bd578f6f82cb6711c737eba24f0dbd6446e8d3bd1",
+      "new_sha256": "385bc9e566f42e977697973f16a0b357484af972fda31d8934bc3306b6473f6e",
+      "bytes": 3071,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture.go",
+      "base_sha256": "d622851bdf781ca972d8b38c995a7be8cf41cd14c8af25ae68eeb308c88ab4b2",
+      "new_sha256": "4f1846efa517568363da8e0e5a5fbb97a52dd9a34b3d9a7deab8f9163ec39859",
+      "bytes": 21577,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit.go",
+      "base_sha256": null,
+      "new_sha256": "bf98231cc2a7bffd166a179292e912cb5e2c1b48970793daa0a74c0ffebf7e77",
+      "bytes": 13123,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit_backing.go",
+      "base_sha256": null,
+      "new_sha256": "16825b6ff2255de2623771a4f669207de6d4174712e421af15f63f96b3c2727c",
+      "bytes": 2930,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit_read.go",
+      "base_sha256": null,
+      "new_sha256": "38f7b693348279e535463cd2a5493cecddb6bbd5427472a7a9abd36dab3024cf",
+      "bytes": 3447,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_audit_read_test.go",
+      "base_sha256": null,
+      "new_sha256": "f3d0dde15f6cd180685385ee4b89b17813a1884157fcd088d69ddece3981d0fb",
+      "bytes": 2291,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_intent.go",
+      "base_sha256": "d196885837cda48b2a8f97d8be04d477c985d23e2e5fa806f7c1e2b2f7d47316",
+      "new_sha256": "61d9c122d29330fe99a21a8551b40e87f217c8a6ac13f5017b4d05278bf825c7",
+      "bytes": 7824,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/capture_lifecycle.go",
+      "base_sha256": null,
+      "new_sha256": "4b0bb9658b3d26b8e702bdd2b6d30fc7a678afd793731632f0f8c6606897e9ea",
+      "bytes": 6935,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/connector_lifecycle.go",
+      "base_sha256": "ea2a327a1b183322929a21d3df26b7671dfd3295185ee52b56f42d0ffa00796d",
+      "new_sha256": "0c45593a61a0f80f606dde457c774e09b9ce357c4acf075f88c3cb19b94bdac9",
+      "bytes": 9845,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/custody.go",
+      "base_sha256": "f94f33c5d47a052cd9bfbeb5af182e132e103b2e20a1f61022632828589350ea",
+      "new_sha256": "1b32b818b130080401320eba83b74e549d2c2910cb8ccc8b511da84a59001515",
+      "bytes": 16876,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/capture.sql.go",
+      "base_sha256": "94a92d165b1e60ab2fe0207d4795d63e4a8cd8170a03c83a734ce5a25f6a1c46",
+      "new_sha256": "93efbeb97ebd5b7a615e356ee342acc06d890f6ef4b3f110ede0588c7af1f66f",
+      "bytes": 17721,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/capture_audit.sql.go",
+      "base_sha256": null,
+      "new_sha256": "d580347d3530fed25dab9a42f5e0d2cd6b0ab2a9c6fc4c5444fd9220caafd257",
+      "bytes": 6539,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/capture_lifecycle.sql.go",
+      "base_sha256": null,
+      "new_sha256": "3e2065069f69bea605474123f9254ada4a4c26625ec6c2b1afe197840d38368a",
+      "bytes": 16630,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/context_progress.sql.go",
+      "base_sha256": "f416cc2972ce10b1aba36a0a619376e16e12ec95834d0a58023447fb91a60430",
+      "new_sha256": "2675ca1bb39ff21e3486b52858f5e474bd63f22a14f4b4265c0d34c48dece530",
+      "bytes": 4781,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/models.go",
+      "base_sha256": "359ad841de45c71e7cfb82412690776030c0f29f1c74aa322b285e7f13b68215",
+      "new_sha256": "84cbc8b5273593b29ccf61cd13605cfc54547f080c483b98b605281f1d2bdf32",
+      "bytes": 45452,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/publication.sql.go",
+      "base_sha256": "7cb0378c90509f3db050b0b68301537bdca09d7fa7d29cd61d35fa48e89bae1b",
+      "new_sha256": "86ec529bd058dfe28445c78a222ac1e8c37f67692494e58b9d620b50a8717dc5",
+      "bytes": 11409,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/custodydb/retention.sql.go",
+      "base_sha256": "2f147d3c5e9ab0a0bfb2bbc85b324b417ba3e7ac2e9ec7e07ff543692eb8774c",
+      "new_sha256": "54efb9e6c4c8cbf9677ea8aa5a42ad913d291dc3201e2e1754397974d9d2f00e",
+      "bytes": 7997,
+      "generated": true
+    },
+    {
+      "path": "internal/adapters/postgres/initial_installation_tables.go",
+      "base_sha256": "098e90a65c7a501b858ccc2c7133233cf2c1584793a8de0b6c4f26d69f34ecd8",
+      "new_sha256": "cc7a51f028cbdead614ee2b9dbe3ece7bec37174416d139f55165a295a31bf65",
+      "bytes": 2528,
+      "generated": false
+    },
+    {
+      "path": "internal/adapters/postgres/operation_lifecycle.go",
+      "base_sha256": "198e1f65dcc3a9444756bc2bef4713edf8592798296dce766c21c0ce9c6650a8",
+      "new_sha256": "ba65b4243e6f5f10fd6db310d46c2831abc468f261028a190373cae8292f3df3",
+      "bytes": 30427,
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/capture_encoding.go",
+      "base_sha256": null,
+      "new_sha256": "2fa9084732a1e3eb5b709db9d5e98877dc8fed0e288d5adc3664263fd2715c52",
+      "bytes": 2349,
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/capture_operation.go",
+      "base_sha256": null,
+      "new_sha256": "7f19fc20db2758d9a0ade3d3f99e6827f0352e437feeffa746f713400e45db6d",
+      "bytes": 10668,
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/capture_operation_test.go",
+      "base_sha256": null,
+      "new_sha256": "9b3166e7caf47b14313ac62dd9519c432b614743604ab61da80c2455c63366f4",
+      "bytes": 16891,
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/operation_lifecycle.go",
+      "base_sha256": "2fe4ed780f88fce7d224370baea4203c4371a01446e00175311fb4311e861ac9",
+      "new_sha256": "7ef7e912c65c3d353a49d6bad0c2360a0fb9716b3d451f4c14496cf7b0954c66",
+      "bytes": 13510,
+      "generated": false
+    },
+    {
+      "path": "internal/application/audit/operation_mac.go",
+      "base_sha256": "8965e54549b852d79055dca8955532c042179a469908ae1630e51d9cd27fd07a",
+      "new_sha256": "3c2dc89c8f9ba1b967fdb93f9838d5b340b02c65a15a412e7f0c726e6c4e5209",
+      "bytes": 5917,
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/capture_operation.go",
+      "base_sha256": null,
+      "new_sha256": "e06b5f4ab83d89e09b12f49d23441bd4a53c2306e1552fa58c10a5b1e66eef20",
+      "bytes": 3510,
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/connector_operation.go",
+      "base_sha256": "78a8081aa4cd9284c36c832138b344825ed7409af0bcde5640ff813c8051c3da",
+      "new_sha256": "2c0ba6f51511abc43d61cdb363fa3e53ee198f3f33205946e2de8935c0eb90b4",
+      "bytes": 5570,
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/operation.go",
+      "base_sha256": "38ae473b662aed2d7bb602ef24a02c5ce8bd0ba4444a148e9c924f2cffa25091",
+      "new_sha256": "27f13860b5824ac9be9371545bd6baac4dab8ed3908139e049c4d5ee68daec6a",
+      "bytes": 6106,
+      "generated": false
+    },
+    {
+      "path": "internal/domain/audit/operation_lifecycle.go",
+      "base_sha256": "bdc79d5bc3fac8f484592698a304f9c85fcb99d959a5ddf0f2d980ac47c5f000",
+      "new_sha256": "1eeee80f89af17d039014d6f3d54a5628e05a9e2591c977b7347e73149ee5977",
+      "bytes": 16259,
+      "generated": false
+    },
+    {
+      "path": "migrations/00052_capture_intent_lifecycle.sql",
+      "base_sha256": null,
+      "new_sha256": "bfd9e13c113a852f5a1858865eccd5e86272a2573e85d36e531fb22d31debea3",
+      "bytes": 70418,
+      "generated": false
+    },
+    {
+      "path": "migrations/queries/capture.sql",
+      "base_sha256": "50de1164fdf09e7d30a03b4d9cdc4c619c890f63ea4c3dba86a09670fc3a94d9",
+      "new_sha256": "6fa8a37789e801c79f87ce4f1d9e42e41a28bee39a16f3fdf2aecb59c66a74c9",
+      "bytes": 2580,
+      "generated": false
+    },
+    {
+      "path": "migrations/queries/capture_audit.sql",
+      "base_sha256": null,
+      "new_sha256": "8d52b12f52ebba5fe34d614114f43f0e6e71c75b7edef62788d25e13e28eb2c6",
+      "bytes": 1555,
+      "generated": false
+    },
+    {
+      "path": "migrations/queries/capture_lifecycle.sql",
+      "base_sha256": null,
+      "new_sha256": "e2766437c887485935c6ee891d75d50532a2bd8e2dbb669e2198e6f1a9d4da2d",
+      "bytes": 3704,
+      "generated": false
+    },
+    {
+      "path": "test/fixtures/sql/runtime-roles.sql",
+      "base_sha256": "9a772e486c773407230da0f4e17a178303727577a9f54c83e98e035054f3d648",
+      "new_sha256": "d0cf471f129477938c57f64561635dce7b999643eb5b7bcb3f56ba47e4c4a6e3",
+      "bytes": 71847,
+      "generated": false
+    },
+    {
+      "path": "test/integration/capture_intent_lifecycle_test.go",
+      "base_sha256": null,
+      "new_sha256": "7fc8ee5d5312d920e7b5a5a0c97d05b499c1d52eff19b10654490abb1dd138c4",
+      "bytes": 26140,
+      "generated": false
+    }
+  ]
+}

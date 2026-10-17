@@ -1,0 +1,45 @@
+[
+  {
+    "name": "cursor-targeted-final",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-overlay=/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/overlay.json",
+      "./internal/adapters/objectstore/framed",
+      "./internal/domain/artifact",
+      "-run",
+      "^(TestCursor|TestFramedRangeWork|TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame)"
+    ],
+    "exit": 0,
+    "seconds": 2.575
+  },
+  {
+    "name": "cursor-full-final",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-v",
+      "-overlay=/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/overlay.json",
+      "./internal/adapters/objectstore/framed",
+      "./internal/domain/artifact"
+    ],
+    "exit": 0,
+    "seconds": 8.276
+  },
+  {
+    "name": "cursor-vet-final",
+    "command": [
+      "go",
+      "vet",
+      "-overlay=/home/phil/.cache/asservat-build/planning/large-native-reader-20261012/overlay.json",
+      "./internal/adapters/objectstore/framed",
+      "./internal/domain/artifact"
+    ],
+    "exit": 0,
+    "seconds": 1.703
+  }
+]

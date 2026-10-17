@@ -1,0 +1,14 @@
+{
+  "observedAtUnix": 1791826469.8333893,
+  "purpose": "host context for selected functional/SQL timing diagnostic, not a performance qualification",
+  "onlineCPUs": 16,
+  "loadavg": "17.89 14.69 9.74 4/2716 2920551",
+  "cpuPressure": "some avg10=1.60 avg60=18.02 avg300=17.66 total=4983561825\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+  "ioPressure": "some avg10=0.45 avg60=3.87 avg300=2.97 total=2187521355\nfull avg10=0.21 avg60=1.03 avg300=0.79 total=1778432223",
+  "foreignGoTestObserved": {
+    "pid": 2861651,
+    "repository": "HAPTIC unrelated scratch worktree",
+    "action": "untouched"
+  },
+  "ownedConcurrentBuilds": 0
+}

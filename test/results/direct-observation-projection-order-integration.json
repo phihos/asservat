@@ -1,0 +1,22 @@
+{
+  "integratedAt": "2026-10-13T15:02:38.020835+00:00",
+  "manifest": "233f123b8a865fdda7442d431fc3569993c76ed618213e601bebe06638a07b77",
+  "result": "aae530ca26684638353b66c17e6746d3fff37a19bb629a99d06a2455135b45c9",
+  "dependencyCount": 2252,
+  "paths": [
+    {
+      "action": "replace",
+      "baseSHA256": "3d93efd62b3df39991ebfb565307cbdaf8cdaa90906296102d5a4afa96707e38",
+      "path": "test/integration/direct_observation_native_fixture_test.go",
+      "payloadSHA256": "591e2ef59a0473ac788069144bd2c0c5a149184cedc2c73193f9db792a69dd30"
+    },
+    {
+      "action": "replace",
+      "baseSHA256": "c8ce3e9eab4d98f07352e86263a640d54d1a7951701562ce7658f26b3df6ba2f",
+      "path": "test/integration/direct_observation_native_test.go",
+      "payloadSHA256": "f278ae8b5f4b45eb33f9421e5b3004d9add28ff373b4c952107a681d19f6ae74"
+    }
+  ],
+  "scope": "fixture-only required Secret, exact Pending identity and original input-create setup deadline; no product selection or bound change",
+  "nativePending": true
+}

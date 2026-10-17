@@ -1,0 +1,14 @@
+--- a/internal/bootstrap/configuration_provider_runtime.go
++++ b/internal/bootstrap/configuration_provider_runtime.go
+@@ -14,8 +14,9 @@
+ )
+ 
+ // NewProviderInstalledHubWorkerDeployment composes only the fresh joint v2
+-// profile. It is deliberately not selected by RunHubWorker until the protected
+-// publication, launch and backend prerequisites are qualified together.
++// profile selected by RunHubWorker from the complete protected provider layout.
++// Native startup and active-actor qualification remain pending; this does not
++// enable Helm or public collection.
+ func NewProviderInstalledHubWorkerDeployment(ctx context.Context, files *os.Root, podUID string) (*InstalledHubWorkerDeployment, error) {
+ 	if ctx == nil || ctx.Err() != nil || files == nil {
+ 		return nil, mounts.ErrUnavailable

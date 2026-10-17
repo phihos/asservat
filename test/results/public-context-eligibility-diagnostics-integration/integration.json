@@ -1,0 +1,15 @@
+{
+  "status": "integrated; component and native qualification pending",
+  "paths": [
+    {
+      "path": "test/integration/public_context_journey_diagnostics_test.go",
+      "base_sha256": "e006be61d36dc67c4c80c60cf6e55e71541db83e9b29f6e0382a4885ba42c4b1",
+      "payload_sha256": "58316bf16d9fb7232019905df5beec34ecb5ceca0e791390800b32c81b608133"
+    },
+    {
+      "path": "test/integration/public_context_regional_diagnostics_test.go",
+      "base_sha256": "851d6fffcffdab8b14655e8d184badce4f7ed52afd6ef3ad671d9cc4b67daa71",
+      "payload_sha256": "72839ba05946879f40a41fe5b7056151d0bab9145ee4fea339ee27e5dd6c60cf"
+    }
+  ]
+}

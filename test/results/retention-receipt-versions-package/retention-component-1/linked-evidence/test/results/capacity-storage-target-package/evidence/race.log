@@ -1,0 +1,4 @@
+=== RUN   TestCapacityNativeStorageTarget
+--- PASS: TestCapacityNativeStorageTarget (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.052s

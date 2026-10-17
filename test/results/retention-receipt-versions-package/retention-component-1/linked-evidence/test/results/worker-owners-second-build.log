@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/evidence	1.058s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.010s
+ok  	asservat.local/asservat/internal/domain/authorization	1.411s
+ok  	asservat.local/asservat/test/integration	1.968s

@@ -1,0 +1,13 @@
+{
+  "target_handle": "target-checkout",
+  "goal": "network",
+  "discovery_capture_ids": [
+    "00000000-0000-4000-8000-000000000090"
+  ],
+  "preferences": {
+    "history_seconds": 30,
+    "max_bytes": 67108864,
+    "max_impact": "observe",
+    "max_ring_bytes": 67108864
+  }
+}

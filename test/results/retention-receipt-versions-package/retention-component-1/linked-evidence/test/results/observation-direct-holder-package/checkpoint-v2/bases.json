@@ -1,0 +1,22 @@
+{
+  "docs/architecture/cluster-observations.md": "c31a58dd526b92d01fca2ba6b38d7c66fa8101da2582e93d0aa82219a7d66aaf",
+  "docs/decisions/144-cluster-local-observations.md": "a86b100358146d4433608b55a8c7c22eba5396a0dd2127d85ad89bf53082093d",
+  "docs/decisions/150-operation-owned-native-observation-proof.md": null,
+  "internal/adapters/kubernetes/cluster_observation_caller.go": "84bdcbc4e046380f404ed91d5138113d51a18ad2d22da5b5468a736de091bb82",
+  "internal/adapters/kubernetes/owner_local_observation_operation.go": null,
+  "internal/adapters/kubernetes/owner_local_observation_operation_test.go": null,
+  "internal/adapters/kubernetes/owner_observation_candidates.go": "2575a154e84d87b421fcbfccf6e3d6daadc4a15dbad9b1d0b185020899cd5aa3",
+  "internal/adapters/kubernetes/owner_observation_dial_candidates.go": null,
+  "internal/adapters/kubernetes/owner_observation_dial_candidates_test.go": null,
+  "internal/adapters/kubernetes/owner_observation_operation.go": "1127c7d83749ca77dab8be1d7e8795d5c031baa9e885cab3eaf53b0e37ce2eb5",
+  "internal/bootstrap/cluster_observation_operation_client.go": null,
+  "internal/bootstrap/cluster_observation_operation_client_test.go": null,
+  "internal/bootstrap/owner_local_observation_pending.go": null,
+  "internal/bootstrap/owner_local_observation_pending_test.go": null,
+  "internal/bootstrap/owner_local_observation_receiver.go": null,
+  "internal/bootstrap/owner_local_observation_receiver_test.go": null,
+  "internal/contracts/observation_local_operation.go": null,
+  "internal/contracts/observation_local_operation_test.go": null,
+  "internal/transport/clusterobservation/hub_operation_holder.go": "865d618c59e9a00cff9a1b59c6e528b6fed1fc21baacee8361481b9801006c27",
+  "internal/transport/clusterobservation/hub_operation_holder_available_test.go": null
+}

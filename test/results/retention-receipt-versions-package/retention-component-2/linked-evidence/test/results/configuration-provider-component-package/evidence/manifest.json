@@ -1,0 +1,69 @@
+{
+  "scope": "nine new pure selection/recipe/builder/test sources plus one qualified dependency-only helper; no live selection",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/hub_worker_provider.go",
+      "base_sha256": null,
+      "payload_sha256": "24e7c4feac55aa5b4c8a0dc150359bed09a79f827f22c825ed270532d470bb4f",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/kubernetes/hub_worker_provider_test.go",
+      "base_sha256": null,
+      "payload_sha256": "045e37550db65caa5fb66e95bdb7daf7343c67107c4140f2effa4c31fc14f793",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_artifact.go",
+      "base_sha256": null,
+      "payload_sha256": "7aa9684e89c00c8534db926448db2a772962cfef1dea0a7ea4eeaca31db34109",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_artifact_test.go",
+      "base_sha256": null,
+      "payload_sha256": "a34ee89de62fcf951e6d899f8b61ee6470630bf84877fe8dde6eda62d52bf265",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_recipe.go",
+      "base_sha256": null,
+      "payload_sha256": "cf7c8ba8f0a998b3b4e387d4e602d6536ed01404c9d9a17f8d3e265aaf28d19c",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/providerconfig/configuration_provider_recipe_test.go",
+      "base_sha256": null,
+      "payload_sha256": "1d71096ce09bf2585a6d8730e644627df7bd8e94495901c1344e49c1d6d77426",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_recipe.go",
+      "base_sha256": "b0a4852552ecfbfd9826310000417c99c7ef92ad8d9111cf3803ce49e49c765f",
+      "payload_sha256": "b0a4852552ecfbfd9826310000417c99c7ef92ad8d9111cf3803ce49e49c765f",
+      "owner": "console_delivery",
+      "dependency_only": true,
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/files/internal/adapters/providerconfig/owner_provider_recipe.go"
+    },
+    {
+      "path": "internal/contracts/configuration_provider_auth.go",
+      "base_sha256": null,
+      "payload_sha256": "4ec8a52092f9a773da8fa7b2ff70637ac49cf7875eb0d9013bf3cc4547592f88",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/contracts/configuration_provider_auth_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7b1e787bc5013d825aca54a2bd0ff4298078e7cbd5eee112cb61a88d2539a639",
+      "owner": "mcp_transport"
+    },
+    {
+      "path": "internal/contracts/configuration_provider_selection.go",
+      "base_sha256": null,
+      "payload_sha256": "fa95ea64e93471d302ca3b1a05850487862106763f515e8e7dd2747554512c88",
+      "owner": "mcp_transport"
+    }
+  ],
+  "previous_manifest": "25b19d2b6b12f71fa50106698a6bfe56dadab4ba89517d748fc9a00200c6bdbe",
+  "integration_delta": "expected-integration-delta.json"
+}

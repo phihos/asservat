@@ -1,0 +1,26 @@
+{
+  "target_ref": {
+    "cluster_id": "00000000-0000-4000-8000-000000000001",
+    "namespace": "payments",
+    "kind": "StatefulSet",
+    "name": "ledger"
+  },
+  "result_access": {
+    "actionIds": [
+      "core"
+    ],
+    "operations": [
+      "read_memory",
+      "download_artifact"
+    ],
+    "clientIDs": [
+      "asservat-browser",
+      "developer-agent"
+    ],
+    "maxArtifacts": 2,
+    "maxBytes": 6442450944,
+    "maxOperations": 20,
+    "notAfter": "2026-10-09T12:50:00Z"
+  },
+  "diagnostic_handle": "bounded-live-diagnostics-ledger"
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "path": "internal/adapters/mtls/owner_operation_routing.go",
+    "base": null,
+    "payload": "c8f3cb1bf43b44feeb5498c496c16ca7dabf6a4374ac6268276c0a57068e8a55"
+  },
+  {
+    "path": "internal/adapters/mtls/owner_operation_routing_test.go",
+    "base": null,
+    "payload": "27d36789fe12ab6c87578587fe8e0708f9538395fdf79d062dd7d9f396e75953"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_operation_pending.go",
+    "base": null,
+    "payload": "721a5eeedb15ebe32da18e44ed0bd6c2666f3764d40c4484348b52586c30e836"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_operation_pending_test.go",
+    "base": null,
+    "payload": "19e15d55211c0482655e20d3e2036b4e7019180b379f3a768d5db6369261f5a6"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_operation_receiver.go",
+    "base": null,
+    "payload": "fd294b9f8512d50613a1c1b3fedde59784533dd41cf0f9492b999d3cf33623de"
+  },
+  {
+    "path": "internal/bootstrap/owner_observation_operation_receiver_test.go",
+    "base": null,
+    "payload": "737ee19f7e530d6d5ac994f04c6bcf131c319f03e54fa62641704332d5a4e804"
+  },
+  {
+    "path": "internal/contracts/observation_operation_routing.go",
+    "base": null,
+    "payload": "3dbf2627334df6e2984cafc81f57e094c6b83e7eb75a7b448853820e59bd9687"
+  },
+  {
+    "path": "internal/contracts/observation_operation_routing_test.go",
+    "base": null,
+    "payload": "58d575051e2e941d8e1cc76246b77242e2938fb8ba105b108055f51d0289a138"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_reservation.go",
+    "base": null,
+    "payload": "c7edb45225856cef3e072d80e34da98eeeb528c6ab4d07e3c7864cf94ac73d56"
+  },
+  {
+    "path": "internal/transport/clusterobservation/hub_operation_reservation_test.go",
+    "base": null,
+    "payload": "1656e1d665d3a8c3ce4f13cb8e914e2fb276ccc918285e0c3fc7da50537dc723"
+  }
+]

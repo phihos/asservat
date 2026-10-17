@@ -1,0 +1,31 @@
+{
+  "name": "asservat-startup-0f8708da32",
+  "image": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+  "scope": "Owned fixture-only startup diagnostic; original default kubeadm startup bounds; owned tmpfs /var, no product tests.",
+  "sourceCount": 2105,
+  "cleanupErrors": [],
+  "ownedTmpfsVolume": "asservat-startup-0f8708da32-var",
+  "tmpfsLimitBytes": 3221225472,
+  "command": [
+    "kind",
+    "create",
+    "cluster",
+    "--name",
+    "asservat-startup-0f8708da32",
+    "--image",
+    "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+    "--config",
+    "/home/phil/Projekte/asservat/test/results/kind-startup-diagnostic-3/kind.json",
+    "--kubeconfig",
+    "/home/phil/Projekte/asservat/test/results/kind-startup-diagnostic-3/kubeconfig",
+    "--wait",
+    "90s",
+    "--retain"
+  ],
+  "createExit": 0,
+  "createSeconds": 31.155,
+  "readyExit": 0,
+  "sourcesUnchanged": true,
+  "elapsedSeconds": 41.067,
+  "exit": 0
+}

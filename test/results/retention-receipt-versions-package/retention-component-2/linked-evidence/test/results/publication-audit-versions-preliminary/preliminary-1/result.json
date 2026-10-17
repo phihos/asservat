@@ -1,0 +1,92 @@
+{
+  "native": false,
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/home/phil/.cache/asservat-build/asservat-publication-0g1cmiqc",
+  "manifest": "991db6a7ca255e88364ace0562dc1b0e392ebd8596decd7123d700e79e403be0",
+  "runner": "9f891d38cc163c33732e78d28b26d9292b33638a0e5d79b5270cb6652dc209ab",
+  "phases": [
+    {
+      "name": "sqlc-version",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "version"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.008,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "7a54f3f1dad67104e41c3998c35716a83134876096c530cf7b6edec81d4b42a7",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "sqlc-generate",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.264,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/evidence",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 1,
+      "expected": 0,
+      "seconds": 6.173,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": []
+      },
+      "logSHA256": "080ada7e512aac6324ab1403ba55f1dbd97cd6e7651e49deb5d17364afddbadb",
+      "passes": 0,
+      "topPasses": 0
+    }
+  ],
+  "sqlcSHA256": "fae55f275d1a5d8722eb5b52b97a2cc2d2f39e3d9135dd0449291be21df26b44",
+  "generated": [
+    {
+      "path": "internal/adapters/postgres/custodydb/publication.sql.go",
+      "base": "86ec529bd058dfe28445c78a222ac1e8c37f67692494e58b9d620b50a8717dc5",
+      "payload": "c74305e6e94fec9973e621490c84b48db788170fb19826fada1f3fc19beaa7ec"
+    }
+  ],
+  "error": "AssertionError('compile')",
+  "finalHashes": {
+    "deps": [],
+    "inventory": [],
+    "payload": [],
+    "bases": []
+  },
+  "scratchRemoved": true,
+  "exit": 1
+}

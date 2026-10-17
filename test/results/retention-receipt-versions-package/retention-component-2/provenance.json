@@ -1,0 +1,11 @@
+{
+  "basis": "/home/phil/.cache/asservat-build/planning/audit-version-authority-inventory-20261013/checks/retention-component-source-2",
+  "basis_manifest": "0f8f8bab07357ebac78bdc9f355d9e836355f73bb99d69531db327e0cf929bd3",
+  "changes": [
+    "internal/adapters/postgres/retention_observation.go",
+    "test/integration/retention_receipt_plan_test.go"
+  ],
+  "prior_failed_check": "/home/phil/.cache/asservat-build/planning/audit-version-authority-inventory-20261013/checks/retention-component-1",
+  "prior_result": "e51e146fad0e6234cefe4e02efcfc393d0ca7842938660dcd3a64b46379d6b46",
+  "scope": "Generated nullable Boolean handling only; absent value denies; planner test uses the same exact result fields. Domain/SQL/migration unchanged."
+}

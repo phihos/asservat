@@ -1,0 +1,5 @@
+=== RUN   TestEnrollmentOwnerConfigurationWithRealServices
+    owner_configuration_sql_test.go:359: real SQL/S3 owner acceptance: failure-before-first-read, encrypted audit gating/replay, restart, eight-way replay, mutation/rollback fencing, immutable source/roles, suspension/recovery/issuer changes, and expiry after proven lock wait
+--- PASS: TestEnrollmentOwnerConfigurationWithRealServices (0.83s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.886s

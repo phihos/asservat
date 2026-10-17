@@ -1,0 +1,286 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"slices"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/uuid"
+	core "k8s.io/api/core/v1"
+)
+
+// The two effect outcomes are deliberately distinct. Pending grants only a
+// later independently current inspection; it never grants another CREATE.
+type OwnerIdentityRoleAdvanceStatus string
+
+const (
+	OwnerIdentityRoleAdvancePending  OwnerIdentityRoleAdvanceStatus = "pending"
+	OwnerIdentityRoleAdvanceComplete OwnerIdentityRoleAdvanceStatus = "complete"
+)
+
+type OwnerIdentityRoleAdvance struct {
+	Status   OwnerIdentityRoleAdvanceStatus
+	Snapshot contracts.OwnerIdentityRoleSnapshot
+}
+
+type OwnerIdentityRoleOperationCreation interface {
+	ReadOwnerIdentityRoleIncarnation(context.Context) (uint32, time.Time, error)
+	AdvanceOwnerIdentityRoleOperation(context.Context, *OwnerIdentityOperation) (OwnerIdentityRoleAdvance, error)
+	InspectOwnerIdentityRoleOperation(context.Context, *OwnerIdentityOperation) (OwnerIdentityRoleAdvance, error)
+}
+
+// AdvanceProviderOwnerIdentityRole performs one fixed role phase. The first
+// positive native claim precedes the stronger SQL role-lock check, and grants
+// no role effect by itself. An existing or unknown claim is always lookup-only.
+func (s *OwnerIdentityRoleRoot) AdvanceProviderOwnerIdentityRole(ctx context.Context, purpose string, producer OwnerIdentityRoleOperationCreation) (OwnerIdentityRoleAdvance, error) {
+	return s.advanceProviderOwnerIdentityRole(ctx, purpose, producer, false)
+}
+
+func (s *OwnerIdentityRoleRoot) InspectProviderOwnerIdentityRole(ctx context.Context, purpose string, producer OwnerIdentityRoleOperationCreation) (OwnerIdentityRoleAdvance, error) {
+	return s.advanceProviderOwnerIdentityRole(ctx, purpose, producer, true)
+}
+
+func (s *OwnerIdentityRoleRoot) advanceProviderOwnerIdentityRole(ctx context.Context, purpose string, producer OwnerIdentityRoleOperationCreation, inspect bool) (OwnerIdentityRoleAdvance, error) {
+	var out OwnerIdentityRoleAdvance
+	index := slices.Index(contracts.OwnerIdentityRolePurposes(), purpose)
+	if s == nil || producer == nil || ctx == nil || ctx.Err() != nil || index < 0 || s.input.OwnerLayout != contracts.OwnerProviderInstalledLayout {
+		return out, cfg.ErrInvalid
+	}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	// A read-only SQL observation supplies the original claim incarnation. The
+	// locked effect verifies it again; this observation cannot authorize CREATE.
+	database, postmaster, err := producer.ReadOwnerIdentityRoleIncarnation(call)
+	if err != nil || database == 0 || !ownerIdentityMicrotime(postmaster) {
+		return out, cfg.ErrUnavailable
+	}
+	err = s.providerOperation(call, true, func(bounded context.Context) (ownerIdentityOperationNative, error) {
+		first, err := s.readOwnerIdentityOperationNative(bounded, s.input.LayoutDigest, true)
+		if err != nil || first.missing || len(first.roles.State.Roles) != len(contracts.OwnerIdentityRolePurposes()) {
+			return ownerIdentityOperationNative{}, cfg.ErrUnavailable
+		}
+		return first, nil
+	}, func(bounded context.Context, first ownerIdentityOperationNative) error {
+		var err error
+		bounded, narrow := context.WithDeadline(bounded, first.until)
+		defer narrow()
+		expected := first.roles
+		fresh := false
+		if inspect && first.roles.State.Roles[index].Receipt == nil && s.attemptedRoleReceipts[purpose] {
+			return cfg.ErrUnavailable
+		}
+		if first.roles.State.Roles[index].Claim == nil {
+			if inspect {
+				return cfg.ErrUnavailable
+			}
+			if first.retained.resources.State.OwnerIdentity != nil || first.retained.resources.State.OwnerLaunch != nil || s.attemptedClaims[purpose] {
+				return cfg.ErrUnavailable
+			}
+			for i, role := range first.roles.State.Roles {
+				if i < index && role.Receipt == nil || i > index && role.Claim != nil {
+					return cfg.ErrChanged
+				}
+			}
+			now := s.resources.now().UTC().Truncate(time.Microsecond)
+			until := identity.Earlier(first.until, first.roles.State.Until).UTC().Truncate(time.Microsecond)
+			if !now.Before(until) || postmaster.After(now) {
+				return cfg.ErrUnavailable
+			}
+			next := first.roles.State
+			next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), next.Roles...)
+			next.Roles[index].Claim = &contracts.PublicRuntimeRoleClaim{OperationID: uuid.NewString(), ClaimedAt: now, Until: until, DatabaseOID: database, PostmasterAt: postmaster.UTC()}
+			if s.attemptedClaims == nil {
+				s.attemptedClaims = map[string]bool{}
+			}
+			s.attemptedClaims[purpose] = true
+			expected, _, err = s.writeOwnerIdentityRoleOperation(bounded, first.roles, first.object, next, until)
+			if err != nil {
+				// Never transform an uncertain claim response into first admission.
+				return err
+			}
+			fresh = true
+		}
+		live, cancel := context.WithDeadline(bounded, identity.Earlier(first.until, expected.ValidUntil))
+		defer cancel()
+		op := &OwnerIdentityOperation{root: s, cancel: cancel, phase: ownerIdentityOperationInitial, initial: first, current: first, expected: expected, purpose: purpose, fresh: fresh, inspection: inspect, original: first.until, until: identity.Earlier(first.until, expected.ValidUntil)}
+		live = context.WithValue(live, ownerIdentityOperationContextKey{}, op)
+		op.ctx = live
+		s.mu.Lock()
+		if s.closed || !s.busy || s.ownerOperation != nil || s.ctx.Err() != nil {
+			s.mu.Unlock()
+			return cfg.ErrUnavailable
+		}
+		s.ownerOperation = op
+		s.mu.Unlock()
+		defer func() {
+			op.closeAndJoin()
+			s.mu.Lock()
+			if s.ownerOperation == op {
+				s.ownerOperation = nil
+			}
+			s.mu.Unlock()
+		}()
+		if inspect {
+			out, err = producer.InspectOwnerIdentityRoleOperation(live, op)
+		} else {
+			out, err = producer.AdvanceOwnerIdentityRoleOperation(live, op)
+		}
+		if err != nil {
+			if fresh {
+				op.mu.Lock()
+				dispatched := op.createDispatched
+				op.mu.Unlock()
+				stop := OwnerInstallationUnverified
+				if !dispatched {
+					stop = OwnerInstallationSpent
+				}
+				return &ownerInstallationPhaseError{stop: stop, operationID: expected.State.Roles[index].Claim.OperationID, cause: err}
+			}
+			return err
+		}
+		op.mu.Lock()
+		complete := op.phase == ownerIdentityOperationFinal && !op.active && (!fresh || op.createDispatched) && live.Err() == nil && s.resources.now().Before(op.until) && !out.Snapshot.ValidUntil.After(op.until)
+		want := op.expected
+		op.mu.Unlock()
+		wantStatus := OwnerIdentityRoleAdvanceComplete
+		if fresh || inspect && want.State.Roles[index].Receipt == nil {
+			wantStatus = OwnerIdentityRoleAdvancePending
+		}
+		if !complete || out.Snapshot.UID != want.UID || out.Snapshot.ResourceVersion != want.ResourceVersion || !equalJSON(out.Snapshot.State, want.State) || out.Status != wantStatus {
+			return cfg.ErrUnavailable
+		}
+		return nil
+	})
+	if err != nil {
+		return OwnerIdentityRoleAdvance{}, err
+	}
+	return out, nil
+}
+
+// BeginOwnerIdentityRoleCreate records only the concrete producer's impending
+// one-use SQL dispatch. It supplies no additional authority and performs no I/O.
+// The producer invokes it immediately before CREATE, after its current locks,
+// exact original claim/incarnation and absence checks. Once marked, even a
+// failed/unknown transaction is reported conservatively as potentially issued.
+func (s *OwnerIdentityOperation) BeginOwnerIdentityRoleCreate(ctx context.Context, root *OwnerIdentityRoleRoot) error {
+	if err := s.begin(ctx, root, ownerIdentityOperationRoleEffect, ownerIdentityOperationRoleEffect); err != nil {
+		return err
+	}
+	defer s.work.Done()
+	s.mu.Lock()
+	valid := s.fresh && !s.inspection && !s.createDispatched
+	if valid {
+		s.createDispatched = true
+	}
+	s.mu.Unlock()
+	if !valid {
+		s.poison()
+		return cfg.ErrUnavailable
+	}
+	return s.finish(ctx, root, ownerIdentityOperationRoleEffect, ownerIdentityOperationRoleEffect, nil)
+}
+
+// OwnerIdentityRoleAttempt can be consumed only after the initial admitted
+// snapshot and actual post-lock read. It never derives freshness from dates or
+// an existing claim: only this root's positive first CAS set the private bit.
+func (s *OwnerIdentityOperation) OwnerIdentityRoleAttempt(ctx context.Context, root *OwnerIdentityRoleRoot) (string, bool, error) {
+	if err := s.begin(ctx, root, ownerIdentityOperationCurrent, ownerIdentityOperationReadingRoleAttempt); err != nil {
+		return "", false, err
+	}
+	defer s.work.Done()
+	if s.purpose == "" || s.finish(ctx, root, ownerIdentityOperationReadingRoleAttempt, ownerIdentityOperationRoleEffect, nil) != nil {
+		s.poison()
+		return "", false, cfg.ErrUnavailable
+	}
+	return s.purpose, s.fresh, nil
+}
+
+// AcknowledgeOwnerIdentityRole is a current acknowledgement of an independently
+// verified existing SQL role, not a claim that CREATE happened within an old
+// interval. The concrete SQL producer calls it with its locks still held.
+func (s *OwnerIdentityOperation) AcknowledgeOwnerIdentityRole(ctx context.Context, root *OwnerIdentityRoleRoot, receipt contracts.PublicRuntimeRoleReceipt) (contracts.OwnerIdentityRoleSnapshot, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if err := s.begin(ctx, root, ownerIdentityOperationRoleEffect, ownerIdentityOperationReadingRoleReceipt); err != nil {
+		return zero, err
+	}
+	defer s.work.Done()
+	index := slices.Index(contracts.OwnerIdentityRolePurposes(), s.purpose)
+	if s.fresh || s.inspection || index < 0 || s.current.retained.resources.State.OwnerLaunch != nil {
+		s.poison()
+		return zero, cfg.ErrUnavailable
+	}
+	current := s.current.roles
+	if old := current.State.Roles[index].Receipt; old != nil {
+		if *old != receipt {
+			s.poison()
+			return zero, cfg.ErrChanged
+		}
+	} else {
+		if root.attemptedRoleReceipts[s.purpose] {
+			s.poison()
+			return zero, cfg.ErrUnavailable
+		}
+		if root.attemptedRoleReceipts == nil {
+			root.attemptedRoleReceipts = map[string]bool{}
+		}
+		root.attemptedRoleReceipts[s.purpose] = true
+		next := current.State
+		next.Roles = append([]contracts.PublicRuntimeRoleMaterial(nil), next.Roles...)
+		next.Roles[index].Receipt = &receipt
+		until := identity.Earlier(s.until, current.State.Until)
+		var err error
+		current, s.current.object, err = root.writeOwnerIdentityRoleOperation(ctx, current, s.current.object, next, until)
+		if err != nil {
+			s.poison()
+			return zero, err
+		}
+	}
+	copy, err := s.roleCopy(current)
+	if err != nil {
+		s.poison()
+		return zero, err
+	}
+	// Keep the phase busy until both the expected CAS identity and bound publish.
+	s.mu.Lock()
+	s.expected, s.current.roles = current, current
+	s.current.until = identity.Earlier(s.current.until, current.ValidUntil)
+	actual := s.current
+	s.mu.Unlock()
+	if s.finish(ctx, root, ownerIdentityOperationReadingRoleReceipt, ownerIdentityOperationRoleAcknowledged, &actual) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	return copy, nil
+}
+
+// No nested proof or retry is hidden here. The caller has the original native
+// bracket, owns the whole operation, and must perform the final bracket after
+// this single exact UID/resource-version CAS before reporting success.
+func (s *OwnerIdentityRoleRoot) writeOwnerIdentityRoleOperation(ctx context.Context, old contracts.OwnerIdentityRoleSnapshot, object *core.Secret, next contracts.OwnerIdentityRoleState, until time.Time) (contracts.OwnerIdentityRoleSnapshot, *core.Secret, error) {
+	var zero contracts.OwnerIdentityRoleSnapshot
+	if object == nil || string(object.UID) != old.UID || object.ResourceVersion != old.ResourceVersion || !ownerIdentityRoleStateValid(s.input, next, s.resources.now()) || initialHandoverDeadline(ctx, s.resources.now, until) != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	encoded, err := json.Marshal(next)
+	defer clear(encoded)
+	if err != nil || len(encoded) > contracts.OwnerIdentityRoleMaxBytes {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	want := object.DeepCopy()
+	want.Data = map[string][]byte{"state.json": encoded}
+	raw, err := s.bridge.source.client.api.Put().AbsPath(s.path()+"/"+s.name()).Param("fieldValidation", "Strict").Body(want).MaxRetries(0).DoRaw(call)
+	defer clear(raw)
+	if err != nil {
+		return zero, nil, cfg.ErrUnavailable
+	}
+	out, actual, err := s.decode(raw, until)
+	if err != nil || out.UID != old.UID || out.ResourceVersion == old.ResourceVersion || !equalJSON(out.State, next) || initialHandoverDeadline(call, s.resources.now, until) != nil {
+		return zero, nil, cfg.ErrChanged
+	}
+	return out, actual, nil
+}

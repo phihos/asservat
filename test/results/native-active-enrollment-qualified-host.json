@@ -1,0 +1,25 @@
+{
+  "observedAt": "2026-10-12T18:33:36.464262+00:00",
+  "cpuPressure": "some avg10=48.10 avg60=37.54 avg300=12.94 total=5194704025\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+  "observation": "Unrelated HAPTIC Go compilation and integration tests started during this run; not stopped or altered. No exclusive-load qualification.",
+  "processes": [
+    "    PID    PPID     ELAPSED %CPU COMMAND",
+    "3321055 3307463       00:03  272 compile",
+    "3321942 3321885       00:00  200 ps",
+    "3317947 3307463       00:16  152 compile",
+    "3282243 3280703       02:07 35.5 integration.tes",
+    "3321885 3321878       00:00 28.5 python3",
+    "3307463 3307420       00:49 22.4 go",
+    "3321568 3321227       00:00 14.7 haproxy",
+    "3283698 3283481       01:40 13.4 containerd",
+    "3321579 3321179       00:00 13.4 haproxy",
+    "3321516 3320974       00:01 11.0 haproxy",
+    "   5072    1482  1-07:24:48  7.0 codex",
+    "3284658 3284223       01:32  6.6 kube-apiserver",
+    "   1296     878  1-07:26:21  5.1 konsole",
+    "4004665 4004228    08:04:05  4.6 codex",
+    "3321227 3320721       00:03  3.9 haproxy",
+    "3321179 3320666       00:03  3.9 haproxy",
+    "3998191 3997687    08:06:25  3.8 codex"
+  ]
+}

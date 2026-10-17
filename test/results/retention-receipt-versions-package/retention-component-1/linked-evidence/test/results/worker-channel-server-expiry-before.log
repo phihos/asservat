@@ -1,0 +1,6 @@
+=== RUN   TestWorkerChannelRechecksExpiredServerAtRenewal
+    worker_channel_test.go:543: reused channel sent token to expired server <nil>
+--- FAIL: TestWorkerChannelRechecksExpiredServerAtRenewal (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.016s
+FAIL

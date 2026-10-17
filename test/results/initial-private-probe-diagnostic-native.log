@@ -1,0 +1,13 @@
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain
+=== NAME  TestInitialPreparationPrivateProbeWithRealKubernetes
+    initial_preparer_private_test.go:163: bounded probe HTTP diagnostics: token requests=1 reviews=0 events=[{private-state-GET 200 false} {private-state-PUT 200 false} {private-state-GET 200 false} {private-state-PUT 200 false} {private-state-GET 200 false} {secret-create 201 false} {probe-anchor-GET 200 false} {private-state-PUT 200 false} {private-state-GET 200 false} {probe-anchor-GET 200 false} {private-state-PUT 200 false} {private-state-GET 200 false} {token-request 422 false}]
+    initial_preparer_private_test.go:163: original private state presence: root=true anchorIntent=true anchorReceipt=true tokenClaim=true tokenResponse=false
+    initial_preparer_private_test.go:164: native private probe initial probe token-request: permission configuration unavailable
+--- FAIL: TestInitialPreparationPrivateProbeWithRealKubernetes (34.74s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationPrivateProbeWithRealKubernetes/healthy-native-request-drain (0.90s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	34.797s
+FAIL

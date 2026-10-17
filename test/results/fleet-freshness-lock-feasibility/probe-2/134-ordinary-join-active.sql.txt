@@ -1,0 +1,2 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+SELECT NOT suspended AND NOT recovery_blocked AND observed_at<=clock_timestamp() AND clock_timestamp()<fresh_until FROM public.fleet_current_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid;

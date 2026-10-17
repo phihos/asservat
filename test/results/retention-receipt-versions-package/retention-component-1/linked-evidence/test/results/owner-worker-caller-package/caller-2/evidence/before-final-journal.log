@@ -1,0 +1,9 @@
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent
+=== RUN   TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed
+    owner_bootstrap_worker_caller_test.go:143: final original mutation returned caller provenance
+    owner_identity_operation_fixture_test.go:405: private-root fixture: creates=0 object=false api="" kind="" namespace=false name=false fields=0 decoded=false valid=false
+--- FAIL: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent (3.66s)
+    --- FAIL: TestOwnerBootstrapWorkerCallerFinalJournalAndGuardAreCurrent/journal_changed (3.66s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	3.709s
+FAIL

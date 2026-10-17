@@ -1,0 +1,6 @@
+{
+  "purpose": "Test-only reversal of the reviewed, previously unqualified staged TLS-hook mitigation; not an earlier live release. Actual TLS bypass must disclose a JWT and fail the regression.",
+  "path": "internal/adapters/kms/owner_provider_control.go",
+  "unmitigated_sha256": "99e6292097f8688e89626ba32d18ee0f33ac6ea22f0539f43dd8968764c278cd",
+  "fixed_sha256": "ba947130f6bcc39b4b3896f130b8e002fc33edbb5da052a5e536fc4ed66ad30f"
+}

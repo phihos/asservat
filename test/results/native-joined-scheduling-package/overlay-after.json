@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/bootstrap/download_worker_native.go": "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/changes/internal/bootstrap/download_worker_native.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/download_worker_native_scheduling_test.go": "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/changes/internal/bootstrap/download_worker_native_scheduling_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/download_worker_native_test.go": "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/changes/internal/bootstrap/download_worker_native_test.go",
+    "/home/phil/Projekte/asservat/test/integration/native_exchange_test.go": "/home/phil/.cache/asservat-build/planning/native-joined-scheduling-20261012/changes/test/integration/native_exchange_test.go"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--helm-cluster"
+  ],
+  "exit": 0,
+  "seconds": 134.176,
+  "requiredPassed": [
+    "TestHelmClusterInstallWithRealServices"
+  ],
+  "scope": "ADR-193 step 6: the packaged chart in mode=cluster; its post-install hook runs the product installer-cluster --in-cluster from the authenticated registry with a synthetic offer and bootstrap record; installer account administers both guards, ungating, upgrade rerun unchanged, denied connector source write. No hub or enrollment.",
+  "missing": [],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "scratchRemoved": true,
+  "status": "passed"
+}

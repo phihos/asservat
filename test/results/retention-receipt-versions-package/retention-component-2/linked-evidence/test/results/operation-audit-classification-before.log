@@ -1,0 +1,20 @@
+--- FAIL: TestAuditedOperationsPreservePrivateDenialDecision (0.08s)
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/capture_scope_absent (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want denied/not_available/none
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/capture_target_denied (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want denied/not_available/unknown
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/identity_denied_by_service (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want denied/not_available/unknown
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/target_resolver_denied (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want denied/not_available/unknown
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/invalid_service_request (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want invalid/invalid_input/unknown
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/collection_disabled (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/unknown, want unavailable/authority_unavailable/none
+    --- FAIL: TestAuditedOperationsPreservePrivateDenialDecision/read_target_denied (0.01s)
+        operation_audit_test.go:264: audit decision = unavailable/authority_unavailable/none, want denied/not_available/none
+--- FAIL: TestAuditedOperationsPreDispatchRejectionsHaveNoInvocationEffect (0.01s)
+    operation_audit_test.go:286: known pre-dispatch rejection has an uncertain invocation effect identity not eligible
+FAIL
+FAIL	asservat.local/asservat/internal/transport/presentation	0.096s
+FAIL

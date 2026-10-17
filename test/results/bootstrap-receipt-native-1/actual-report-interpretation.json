@@ -1,0 +1,26 @@
+{
+  "wrapperError": "Original wrapper expected custody prefix for --fleet; actual producer uses fleet. Preserve original failed wrapper result, interpret fresh actual reports here.",
+  "actualTestExit": 1,
+  "sourceUnchanged": true,
+  "sourceCount": 2227,
+  "cleanupFailures": [],
+  "passedNamedTests": 101,
+  "requiredPassesPresent": [
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-empty",
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-initial-literal-null",
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-empty",
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-intent-receipt-replay-literal-null",
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-empty",
+    "TestEnrollmentBootstrapIssuanceWithRealServices/current-issued-receipt-claim-literal-null"
+  ],
+  "missingRequiredPasses": [
+    "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-empty",
+    "TestEnrollmentSigningWithRealServices/current-issued-receipt-signing-literal-null"
+  ],
+  "cause": "Two synthetic seed INSERTs use UUID parameters with direct text casts, causing PostgreSQL inconsistent parameter inference. Actual issuance/versioned receipt cases pass; signing fixture cannot initialize.",
+  "files": {
+    "fleet.log": "1726689c5328885b361db8c7ac5d7a677e16891b06a3e991fb2a0fb57efd205f",
+    "fleet-postgres.log": "7c0085efbf498482c613fdfd02ce9faf8148c430cd14446afbfdff0a8007c78d",
+    "fleet-environment.json": "5f627d038662e2bdc7f64fa2680870fc5bcc59747730ea89998d003eb3969dc9"
+  }
+}

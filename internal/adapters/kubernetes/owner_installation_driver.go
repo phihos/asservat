@@ -1,0 +1,321 @@
+package kubernetes
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+)
+
+// One fixed implementation satisfies both existing purpose-specific seams.
+// No callback, public source DTO, arbitrary stage or retry policy is accepted.
+type OwnerInstallationSQL interface {
+	OwnerIdentityRoleOperationCreation
+	OwnerIdentityOperationVerification
+}
+
+type OwnerInstallationResult struct {
+	Complete        bool // historical invocation completion, never current runtime authority
+	Stop            OwnerInstallationStop
+	Phase           string
+	OperationID     string
+	RoleRootUID     string
+	ResourceRootUID string
+	Calls           int
+	Inspections     int
+	Finalizations   int
+}
+
+// ProviderOwnerInstallation is a single invocation of the original fixed
+// installation. Its owned cancellation/join retains the caller-owned root,
+// resources and concrete SQL adapter through all admitted work; callers close
+// those dependencies only after Run or Close joins. It does not run a Pod or
+// assert runtime readiness after the positive launch receipt.
+type ProviderOwnerInstallation struct {
+	mu         sync.Mutex
+	work       sync.WaitGroup
+	ctx        context.Context
+	cancel     context.CancelFunc
+	started    bool
+	closed     bool
+	projection *ProviderOwnerProjection
+	sql        OwnerInstallationSQL
+}
+
+func NewProviderOwnerInstallation(projection *ProviderOwnerProjection, sql OwnerInstallationSQL) (*ProviderOwnerInstallation, error) {
+	if projection == nil || projection.projection == nil || projection.projection.root == nil || sql == nil {
+		return nil, cfg.ErrInvalid
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &ProviderOwnerInstallation{ctx: ctx, cancel: cancel, projection: projection, sql: sql}, nil
+}
+
+func (s *ProviderOwnerInstallation) Close() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.closed = true
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.mu.Unlock()
+	s.work.Wait()
+}
+
+func (s *ProviderOwnerInstallation) Run(ctx context.Context) (result OwnerInstallationResult, failure error) {
+	out := OwnerInstallationResult{Phase: "role-root"}
+	if s == nil || ctx == nil {
+		out.Stop = OwnerInstallationClosed
+		return out, cfg.ErrUnavailable
+	}
+	s.mu.Lock()
+	if s.started || s.closed || s.ctx == nil || s.ctx.Err() != nil || ctx.Err() != nil {
+		s.mu.Unlock()
+		out.Stop = OwnerInstallationClosed
+		return out, cfg.ErrUnavailable
+	}
+	s.started = true
+	s.work.Add(1)
+	s.mu.Unlock()
+	defer s.work.Done()
+	call, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.ctx, func() { cancel(); close(joined) })
+	finishCaller := sync.OnceFunc(func() {
+		cancel()
+		if !stop() {
+			<-joined
+		}
+	})
+	defer finishCaller()
+	call, release, err := s.projection.projection.borrowProviderCall(call)
+	if err != nil {
+		out.Stop = OwnerInstallationUnverified
+		return out, err
+	}
+	release = sync.OnceFunc(release)
+	root := s.projection.projection.root
+	defer func() {
+		// Complete is historical, but original cancellation still wins if
+		// releasing and joining the outer borrow delays this return.
+		release()
+		finishCaller()
+		if failure == nil && result.Complete && (ctx.Err() != nil || s.ctx.Err() != nil || root.ctx.Err() != nil || root.resources.ctx.Err() != nil) {
+			result.Complete = false
+			result.Stop = OwnerInstallationCancelled
+			failure = cfg.ErrUnavailable
+		}
+	}()
+	var originalEnd time.Time
+	fail := func(err error) (OwnerInstallationResult, error) {
+		out.Stop = OwnerInstallationUnverified
+		var phase *ownerInstallationPhaseError
+		if errors.As(err, &phase) {
+			out.Stop = phase.stop
+			out.OperationID = phase.operationID
+		}
+		if !originalEnd.IsZero() && !root.resources.now().Before(originalEnd) {
+			out.Stop = OwnerInstallationExpired
+		} else if call.Err() != nil {
+			out.Stop = OwnerInstallationCancelled
+		}
+		return out, err
+	}
+	// Twenty-two original transitions (open, two per identity role, projection
+	// and launch steps) plus eight required read-only finalizations,
+	// and at most one independent unknown-result inspection.
+	// These counters are invocation-wide, not a per-phase retry allowance.
+	normalCalls := 0
+	normal := func() bool {
+		if normalCalls >= 22 || call.Err() != nil {
+			return false
+		}
+		out.Calls++
+		normalCalls++
+		return true
+	}
+	inspect := func(err error) bool {
+		var phase *ownerInstallationPhaseError
+		if errors.As(err, &phase) && phase.stop == OwnerInstallationSpent {
+			return false
+		}
+		if out.Inspections != 0 || call.Err() != nil || !originalEnd.IsZero() && !root.resources.now().Before(originalEnd) {
+			return false
+		}
+		out.Inspections++
+		out.Calls++
+		return true
+	}
+	if !normal() {
+		return fail(cfg.ErrUnavailable)
+	}
+	roles, err := root.OpenProviderOwnerIdentityRoles(call)
+	if err != nil && inspect(err) {
+		roles, err = root.InspectProviderOwnerIdentityRoles(call)
+	}
+	if err != nil {
+		return fail(err)
+	}
+	originalEnd = roles.State.Until
+	out.RoleRootUID = roles.UID
+	call, rootEnd := context.WithDeadline(call, originalEnd)
+	defer rootEnd()
+	if call.Err() != nil {
+		return fail(cfg.ErrUnavailable)
+	}
+	for i, purpose := range contracts.OwnerIdentityRolePurposes() {
+		out.Phase = purpose
+		if roles.State.Roles[i].Receipt != nil {
+			continue
+		}
+		complete := false
+		for phase := 0; phase < 2; phase++ {
+			if !normal() {
+				return fail(cfg.ErrUnavailable)
+			}
+			result, e := root.AdvanceProviderOwnerIdentityRole(call, purpose, s.sql)
+			if e != nil && inspect(e) {
+				result, e = root.InspectProviderOwnerIdentityRole(call, purpose, s.sql)
+			}
+			if e != nil {
+				return fail(e)
+			}
+			roles = result.Snapshot
+			if result.Status == OwnerIdentityRoleAdvanceComplete && roles.State.Roles[i].Receipt != nil {
+				complete = true
+				break
+			}
+			if result.Status != OwnerIdentityRoleAdvancePending || roles.State.Roles[i].Claim == nil || roles.State.Roles[i].Receipt != nil {
+				return fail(cfg.ErrChanged)
+			}
+		}
+		if !complete {
+			return fail(cfg.ErrUnavailable)
+		}
+	}
+	out.Phase = "verify-four-roles"
+	if !normal() {
+		return fail(cfg.ErrUnavailable)
+	}
+	_, err = root.VerifyProviderOwnerIdentityRoles(call, s.sql)
+	if err != nil && inspect(err) {
+		_, err = root.VerifyProviderOwnerIdentityRoles(call, s.sql)
+	}
+	if err != nil {
+		return fail(err)
+	}
+	out.Phase = "projection"
+	rank := -1
+	projectionComplete := false
+	for phase := 0; phase < 6; phase++ {
+		if !normal() {
+			return fail(cfg.ErrUnavailable)
+		}
+		e := s.projection.Execute(call)
+		var result OwnerProjectionAdvance
+		if e != nil {
+			if inspect(e) {
+				first := projectionFixedCodes(e)
+				out.Finalizations++
+				result, e = s.projection.Finalize(call)
+				if e != nil {
+					e = &ownerProjectionInspectionDiagnostic{cause: e, first: first, inspection: projectionFixedCodes(e)}
+				}
+			}
+		} else {
+			if out.Finalizations >= 8 {
+				return fail(cfg.ErrUnavailable)
+			}
+			out.Calls++
+			out.Finalizations++
+			result, e = s.projection.Finalize(call)
+		}
+		if e != nil {
+			return fail(e)
+		}
+		next := ownerInstallationProjectionRank(result.Snapshot.State.OwnerIdentity)
+		if next <= rank {
+			return fail(cfg.ErrChanged)
+		}
+		rank = next
+		out.ResourceRootUID = result.Snapshot.UID
+		if rank == 6 && result.Status == OwnerProjectionAdvanceComplete {
+			projectionComplete = true
+			break
+		}
+		if rank == 6 || result.Status == OwnerProjectionAdvanceComplete {
+			return fail(cfg.ErrChanged)
+		}
+	}
+	if !projectionComplete {
+		return fail(cfg.ErrUnavailable)
+	}
+	out.Phase = "launch"
+	for phase := 0; phase < 2; phase++ {
+		if !normal() {
+			return fail(cfg.ErrUnavailable)
+		}
+		e := s.projection.ExecuteLaunch(call)
+		var result OwnerProjectionAdvance
+		if e != nil {
+			if inspect(e) {
+				first := projectionFixedCodes(e)
+				out.Finalizations++
+				result, e = s.projection.Finalize(call)
+				if e != nil {
+					e = &ownerProjectionInspectionDiagnostic{cause: e, first: first, inspection: projectionFixedCodes(e)}
+				}
+			}
+		} else {
+			if out.Finalizations >= 8 {
+				return fail(cfg.ErrUnavailable)
+			}
+			out.Calls++
+			out.Finalizations++
+			result, e = s.projection.Finalize(call)
+		}
+		if e != nil {
+			return fail(e)
+		}
+		claim := result.Snapshot.State.OwnerLaunch
+		if claim == nil {
+			return fail(cfg.ErrChanged)
+		}
+		out.OperationID = claim.OperationID
+		if result.Status == OwnerProjectionAdvanceComplete && claim.Receipt != nil {
+			out.Complete = true
+			out.Phase = "launch-receipt"
+			return out, nil
+		}
+		if result.Status != OwnerProjectionAdvancePending || claim.Receipt != nil {
+			return fail(cfg.ErrChanged)
+		}
+	}
+	return fail(cfg.ErrUnavailable)
+}
+
+func ownerInstallationProjectionRank(p *contracts.OwnerIdentityProjectionClaim) int {
+	if p == nil {
+		return 0
+	}
+	if p.Receipt != nil {
+		return 6
+	}
+	if p.Configuration != nil {
+		if p.Configuration.Receipt != nil {
+			return 5
+		}
+		return 4
+	}
+	if p.Credentials != nil {
+		if p.Credentials.Receipt != nil {
+			return 3
+		}
+		return 2
+	}
+	return 1
+}

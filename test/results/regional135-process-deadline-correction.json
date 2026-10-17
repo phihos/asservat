@@ -1,0 +1,10 @@
+{
+  "path": "internal/adapters/kubernetes/connector_api_process.go",
+  "beforeSHA256": "cbe58505388eeb187a157744743d2e220c860fd33751694db31f4a2baf741f85",
+  "afterSHA256": "fac67ae7898ee9c262cde024f7cb237591f27ab77b19887841968d717368b180",
+  "scope": "preserve outer original five-second API observation interval through nested current guard",
+  "beforeNative": "regional135-native-reader-after-scale-fix-check.log",
+  "affectedRaces": "regional135-process-deadline-races.log",
+  "afterNative": "regional135-native-reader-after-deadline-fix-check.log",
+  "scopeVerdict": "process and input assertions pass; enclosing native test fails later on repeated local-start check cost"
+}

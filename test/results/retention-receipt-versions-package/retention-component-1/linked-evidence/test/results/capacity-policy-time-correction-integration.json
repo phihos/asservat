@@ -1,0 +1,63 @@
+{
+  "manifest": {
+    "scope": "SQL54 lifecycle policy UTC JSON producer correction; preserve exact SQL52 equality and original cutoffs",
+    "files": [
+      {
+        "path": "docs/architecture/capacity-production.md",
+        "base_sha256": "b6dffec22c5ce9e5c59a868f5ca55e3fde8e89459526213a88cd3f4745a4d178",
+        "payload_sha256": "3a721c305b827cb618beb2aa445600452d4625b4ebcbbc9e9151fb27d6dcf199"
+      },
+      {
+        "path": "migrations/00054_protected_capacity.sql",
+        "base_sha256": "5844e911703801290593c8df205975bafad7811f99323597e962e8d4919ae3b5",
+        "payload_sha256": "2431fb290d2613cbc6d96877c047813c54d9af85496c89c86b184d8ea7bd1b11"
+      },
+      {
+        "path": "test/integration/capacity_policy_time_test.go",
+        "base_sha256": null,
+        "payload_sha256": "7b32e9a532dc59eb34793a1706c745da54412e94f61f2b41cffb0bedba917835"
+      },
+      {
+        "path": "test/integration/capacity_sql_matrix_test.go",
+        "base_sha256": "55f9656075af7f417b39e9d734fe42e570d88e509c2b15b73c84ea634fccc50d",
+        "payload_sha256": "d4bca6614bd24fdcd328496163717c55fc3336f5b5186cb53962b10e8287cd2e"
+      }
+    ],
+    "actual_before": "native38265: exact=false non_time_fields=true same_cutoff=true, terminal1,44PASS,1763 unchanged hashes,clean cleanup"
+  },
+  "dependencies": 3223,
+  "scope": "Original cutoff canonical JSON producers; actual native SQL qualification follows",
+  "local_result": {
+    "manifest": "c1a5cea791a75f3af5e5c12e23e0f815dbe18e68e91de8c09f4c4d5dc68681dd",
+    "dependencies": "497f97cf5263c888b6d294d61785a5c5fdc1ada197f170cc76473209a0674e7e",
+    "runner_sha256": "8e7947e5ee18b0560c44929941d25cd4ea66c4c90253988b40623b6867310535",
+    "before": {
+      "payloads": [],
+      "bases": [],
+      "dependencies": []
+    },
+    "started_at": 1791844017.4508228,
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-vet=off",
+      "-overlay",
+      "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/overlay.json",
+      "./test/integration",
+      "-run",
+      "^TestCapacityPolicyTimestampVectors$",
+      "-count=1",
+      "-v"
+    ],
+    "exit": 0,
+    "log_sha256": "51908cec7e49b9df4b3844f8ab84274a2e14049730740a455288077d404f317d",
+    "ended_at": 1791844038.051015,
+    "after": {
+      "payloads": [],
+      "bases": [],
+      "dependencies": []
+    },
+    "terminal_exit": 0
+  }
+}

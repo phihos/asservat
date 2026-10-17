@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-12T18:15:50.728577+00:00",
+  "cpuPressure": "some avg10=3.63 avg60=7.55 avg300=9.25 total=5119708635\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+  "ioPressure": "some avg10=0.16 avg60=1.63 avg300=4.10 total=2239350969\nfull avg10=0.02 avg60=1.18 avg300=2.70 total=1815625190\n",
+  "memoryPressure": "some avg10=0.00 avg60=0.19 avg300=0.45 total=207240341\nfull avg10=0.00 avg60=0.18 avg300=0.26 total=146756734\n",
+  "loadavg": "7.53 10.52 7.99 2/2661 3124409\n",
+  "ownedBuildJobs": 0,
+  "priorFailure": "owned Kind control-plane creation; no Go tests reached; exact same pinned image and unchanged setup bounds"
+}

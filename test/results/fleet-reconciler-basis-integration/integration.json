@@ -1,0 +1,22 @@
+{
+  "scope": "Three existing source-loop fixtures receive explicit original synthetic basis; no production or deadline change",
+  "files": [
+    {
+      "path": "internal/application/fleet/reconciliation_test.go",
+      "base_sha256": "c61184f7b344d52e2559ae1c71f48009040a970419af93bd367dff3dfe74d230",
+      "sha256": "b870ab0ef55de1a75eb96acc6466cc6cab04cb486706ac6144827ac94b8f369d"
+    },
+    {
+      "path": "internal/application/fleet/reconciliation_join_test.go",
+      "base_sha256": "c3b47d9b52a67b493c37ef6c814bb6b48446c41934d38cbea1ec3d928e8c28dd",
+      "sha256": "cda99de2fa138a8d223d805586c33f15aae6c233c6a7a1ed23463e580774fef0"
+    },
+    {
+      "path": "internal/application/fleet/worker_owner_audit_test.go",
+      "base_sha256": "79918d5e30873c3487c0fbac0a00db4fc8381ee59567663a28a2e27ed87b52ea",
+      "sha256": "99f26f40d638cf91e8adccb3778af211bd5c0a44ac4e08385bcc9f3681af358c"
+    }
+  ],
+  "reproduction": "test/results/fleet-freshness-component-1/internal-application-fleet.log; actual three failures; rerun pending",
+  "qualification": "pending"
+}

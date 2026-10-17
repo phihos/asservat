@@ -1,0 +1,18 @@
+[
+  {
+    "path": "test/integration/worker_current_lifecycle_test.go",
+    "sha256": "c9ae838323c7aa9bc44e1c9aa97046b5163188884c0112fcf31770879ea1111e"
+  },
+  {
+    "path": "internal/application/identity/current_request.go",
+    "sha256": "8c6b951c7e5db64e57a29aca64a99b409d6568bc33d9fc308f1b3b3274193ed1"
+  },
+  {
+    "path": "internal/transport/browser/download_content.go",
+    "sha256": "0e2e568ffae11bbdc71bb254cdacdfb0a085b7e2f68080530b39dfb3af2f7015"
+  },
+  {
+    "path": "internal/application/evidence/download_response_transfer.go",
+    "sha256": "2a2d2c8484e3a3c9e208bcbe72fdb38ba5ffcf8cfe6bed3c15dc940cabcf02f5"
+  }
+]

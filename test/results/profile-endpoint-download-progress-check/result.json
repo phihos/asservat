@@ -1,0 +1,17 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "go-architecture-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "pid": 2002498,
+  "commandExit": 0,
+  "seconds": 8.475,
+  "sourceUnchanged": true,
+  "mirrorRestored": true,
+  "groupAbsent": true,
+  "scratchRemoved": true,
+  "exit": 0
+}

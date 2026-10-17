@@ -1,0 +1,61 @@
+--- a/test/integration/download_sessions_test.go
++++ b/test/integration/download_sessions_test.go
+@@ -19,6 +19,8 @@
+ 	"crypto/tls"
+ 	"encoding/json"
+ 	"errors"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgconn"
+ 	"github.com/jackc/pgx/v5/pgxpool"
+ 	"io"
+ 	"net/http"
+@@ -242,6 +244,36 @@
+ 			if e != nil {
+ 				t.Fatal(e)
+ 			}
++			if mode == "fresh-audit" {
++				// A combined write could fail because one column is denied while
++				// concealing an unintended grant on another. Check every column's
++				// effective INSERT/UPDATE privilege, including inherited grants.
++				for _, table := range []string{"public.download_worker_enrollment", "public.download_worker_certificate"} {
++					var insert, update bool
++					err := identityPool.QueryRow(ctx, "SELECT has_any_column_privilege(current_user,$1,'INSERT'),has_any_column_privilege(current_user,$1,'UPDATE')", table).Scan(&insert, &update)
++					if err != nil || insert || update {
++						t.Fatal("identity reader has enrollment/certificate column write privilege", table, insert, update, err)
++					}
++				}
++				// No-op writes still require their actual SQL privilege. The identity
++				// facet may verify these records but cannot create, replace, acknowledge
++				// or remove enrollment/certificate history. Expect permission denial,
++				// not a trigger/constraint failure that could conceal a broad grant.
++				for _, query := range []string{
++					"INSERT INTO download_worker_enrollment SELECT * FROM download_worker_enrollment WHERE false",
++					"UPDATE download_worker_enrollment SET enrollment_json=enrollment_json,audit_receipt_json=audit_receipt_json WHERE false",
++					"DELETE FROM download_worker_enrollment WHERE false",
++					"INSERT INTO download_worker_certificate SELECT * FROM download_worker_certificate WHERE false",
++					"UPDATE download_worker_certificate SET certificate_json=certificate_json,audit_receipt_json=audit_receipt_json,activated_at=activated_at WHERE false",
++					"DELETE FROM download_worker_certificate WHERE false",
++				} {
++					_, err := identityPool.Exec(ctx, query)
++					var denied *pgconn.PgError
++					if !errors.As(err, &denied) || denied.Code != "42501" {
++						t.Fatal("identity reader enrollment/certificate write privilege", query, err)
++					}
++				}
++			}
+ 			objectAudit := &objectstore.DownloadWorkerAuditObjects{Store: store, Seal: keys, Open: keys}
+ 			r := request(f, a)
+ 			if mode == "native-content-resume" || mode == "native-content-interrupted" {
+@@ -711,8 +743,10 @@
+ 				return
+ 			}
+ 			peer := authorization.KeyPeer{InstallationID: f.installation, PeerID: w.Binding.PodUID, Role: "acquisition", Certificate: artifact.Digest{9}, NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Minute)}
+-			if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); e == nil {
+-				t.Fatal("unregistered certificate became worker identity")
++			// This worker has no enrollment row yet. A missing SQL read grant
++			// must not count as successful rejection of the unregistered peer.
++			if _, e = identities.ReadDownloadWorkerIdentity(ctx, session.ID, peer); !errors.Is(e, pgx.ErrNoRows) {
++				t.Fatal("unregistered certificate must reject the absent enrollment", e)
+ 			}
+ 			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, f.guards, store, keys, f.gate)
+ 			if strings.HasPrefix(mode, "native-") {

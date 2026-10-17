@@ -1,0 +1,125 @@
+{
+  "scope": "ADR162 v4; production v2 unchanged; both spawned-close/publication tests unconditionally joined; frozen source, tests unrun; gofmt only",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+      "base_sha256": "92db4db255cefa8d5c56329f915610b5daefcd8180b7370663eeff0ebf7b21c9",
+      "sha256": "7e2ab93567fafc8222c01d516716a7a5d953fdca9ac7c06c1f6fdaf16d47b103"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_launch.go",
+      "base_sha256": "d41065da184c5ffa42b130502a96ac8ee4d9efbb171c4228d143eeaa543e62aa",
+      "sha256": "a4c2efdee260cf2a931f932b64197c63fccf84f2fc8317d905c919dc6b7a2c5d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection.go",
+      "base_sha256": "3121f8b87c1850f475b65ab6a48fd17367a1ad4bb98342f5c532bb2665b1caac",
+      "sha256": "b5fa1356fceb2cb69a8fce9885d38bb00ef867f87eb7a79c492ea3b1c4f03ee2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_projection_objects.go",
+      "base_sha256": "fe7c1a1f69da9ed21fa690307856d182612aa83631b227ce576fcaa27fd328b2",
+      "sha256": "f5881f71a77fbec90eece0adc3ef12d1dbdedc77e8b5eaae5a422018d0de91d9"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_roles.go",
+      "base_sha256": "e9aba3227ed1362f18cfc85349213dd61741cc8137243c493d168e97763b107a",
+      "sha256": "2a6b8a6be3a605554c8d52af494bbd3cc92bb7f3e68ea634f2bc29c9f8806fc0"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_installation_driver.go",
+      "base_sha256": "dfa85db28cce65146db0dcd312b875a5d8303eb8bfa0eaef4384bc4921ddc94e",
+      "sha256": "2038d2b72dfdb666d075b0d7e294b7a2cbe1c5accf4f1c9a5c23fefdbf1cb2ea"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_installation_driver_test.go",
+      "base_sha256": "b22c86009c780b3cfe5d5670297d1a5c5bf9bf4840516548c9a82a900f56cd18",
+      "sha256": "da7c43fa05bc126332e9754eeba1ac289335976f009aeb4df4e2ef46c04ee06f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_diagnostic_test.go",
+      "base_sha256": "409187bffea994c6431f22acd5e63d1eedae4bc6c15b9b3be5977cd924fb43d8",
+      "sha256": "12d1ce86bff806ed29cc8ff7cf9592655c576bd00ae1367e8f43d6874a3e6f0f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_finalization.go",
+      "base_sha256": null,
+      "sha256": "e6453270b029a84e15e0cc3533bbdfe55f77555aa9ab41bd86d52c9891f795b7"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_finalization_handle_test.go",
+      "base_sha256": null,
+      "sha256": "25ce3c8865fde18706689b06347598a0829cf9983c042b97d3e4e18da99ff5ba"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_finalization_test.go",
+      "base_sha256": null,
+      "sha256": "6c58d99e423cad6083d5d392a619f45b9c901eeda5a6aca7187675e6d9b0f11f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation.go",
+      "base_sha256": "902932ff1398a1abf35b472bd91689954b67c8e8dc5e6634c1e48ee8668ed0b0",
+      "sha256": "0d0ce22340609f8e9f7c6ac01550844a2cbc5d606eed4867e25c03968b851ac6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_composed_test.go",
+      "base_sha256": "0393039cc69e09aeaa42a1f9ec282df97b9076e1c5400e893266e69abae8af36",
+      "sha256": "03c320ee99e79f8c2fe8d3adf0dd4b6eca0fd0dc1a7290cd9b8def1d92726437"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_effects.go",
+      "base_sha256": "c7f0304dba08eb6bf68b24c73dd2d14fb54d9619ffa7cc73dc05b32842a62784",
+      "sha256": "919d93e2ddc5fa43c908d2c60f5a5d80372d4b00ca060e296e2a44b486e46448"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_fixture_test.go",
+      "base_sha256": "a8f1f44dc26b9d61e0896fe5310dab88eb4aa94b6b6b50204e391f027d1519ca",
+      "sha256": "88cfe0e9b9f24c72a20db54b93a26cc24e7c094343de144893e7beb6747e8a0e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_native.go",
+      "base_sha256": "01f583fd95ea41d216304f447099d6048ed77b3ea210edda64575161e47fd724",
+      "sha256": "25961943a534dff8ece10aeb1212b98622bf867ba8c181ff0e67c9bf6fc2a962"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_operation_plan.go",
+      "base_sha256": "bff5748038a099f4bebe98ee54f990a42880347029d0e3b02b6d66a669d90c75",
+      "sha256": "cb90f19a1e9963df5ab3960f1b9090fee9162c8d45e21346211eb294a2196dc2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_pending.go",
+      "base_sha256": null,
+      "sha256": "26bb2ad94978797c2340544e2e1dbdd0254c96d171d6a502085399ad9db53efa"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_preflight.go",
+      "base_sha256": "0f0c21dd0e0b9178213cae42fd461d7393867a8b1aa4cb4c77bc368090c210d4",
+      "sha256": "e631a6f696945ac5042ec24bc11d503ddac3b969c9b098ae49e51f695d1c01d2"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_preflight_test.go",
+      "base_sha256": "a31ea928d3110fd53840177ace2851af80b23a961021475fb3150d2f9e1785f4",
+      "sha256": "5dd91497bd32a8526a22de5655c2b16b77de2123dc77090091cc9c8f9d78591e"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_identity_operation_test.go",
+      "base_sha256": "813b79be1c4fcd08d8572a62c2d7a0b3dcc97cc9e2f7f91eb6a18bf095c3e310",
+      "sha256": "dcf0a61c658a0d65a2189c9b0a58988c1dfe09064e6d7be08af2ab5e9bc3821c"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_finalization.go",
+      "base_sha256": null,
+      "sha256": "dd61ce8af4662b973596ef4efb006e15c67adc0ff0761a6807653d628740f208"
+    },
+    {
+      "path": "internal/adapters/postgres/owner_projection_operation.go",
+      "base_sha256": "899ed8de6904308a237600b5d8bd86ffad0a480055ab7e76b3d869e75f189894",
+      "sha256": "46600cd95f2a6e1f290848bd0e8badaba15ca39195e73a9113c1646bd3adc18b"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "base_sha256": "00cc21882992ed4a6d740f43346a2aff03f3617c31a2af2006df7930f5179405",
+      "sha256": "aec921a90073d5520d59a2c2f4e96748d6991f00908244e217b6f9ab2444e236"
+    }
+  ]
+}

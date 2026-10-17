@@ -1,0 +1,57 @@
+{
+  "manifest": "879eeb84857869bfc9d4e2f09a2a0a040fbc6c394673c89c42fa68500c2ab5f2",
+  "dependencies": "3b8470868a518d5e33b1300b075773a5a610e1595100f1d169db1cda8859d583",
+  "runner_sha256": "a1e845bd66baef79da2301782f52407a536386f5716c2bf017d15ce30fe3952f",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "before_payloads": []
+  },
+  "started_at": 1791842942.8272157,
+  "steps": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-native-storage-target-20261013/candidate-v2/before-overlay.json",
+        "./test/integration",
+        "-run",
+        "^TestCapacityNativeStorageTarget$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 1,
+      "log_sha256": "c436f61d88ba1f8ea07babf2521ac3387f36b28c3c2adbb776d954bb0311cd62"
+    },
+    {
+      "name": "race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-native-storage-target-20261013/candidate-v2/after-overlay.json",
+        "./test/integration",
+        "-run",
+        "^TestCapacityNativeStorageTarget$",
+        "-count=1",
+        "-v"
+      ],
+      "exit": 0,
+      "log_sha256": "b7e9f1852739b19d09711f620176981afe68ea7044ea0f1b38c4cfc344907a64"
+    }
+  ],
+  "ended_at": 1791842964.7664533,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "before_payloads": []
+  },
+  "terminal_exit": 0
+}

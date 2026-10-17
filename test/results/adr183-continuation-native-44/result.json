@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-44",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass of ADR-193 step 2a on top of run 43: after capacity initialization the continuation published the federation runtime projection in one public role operation, with its own one-use claim in the role state. The immutable Secret holds the six federation SQL logins and the audit keys bound to the permission root. Capacity root ReadyAt is still set. Subtest 551.7 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. No federation workload, provider roles or serving certificate yet (steps 2b-2d).",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

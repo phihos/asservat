@@ -1,0 +1,69 @@
+package kubernetes
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"encoding/json/jsontext"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+// One explicitly enrolled, administrator-protected installation object. This
+// GET is not a discovery API and does not establish that writers are trusted.
+func (c *PermissionClient) installationConfig(ctx context.Context, name, uid string) (map[string]string, value.Resource, error) {
+	return c.installationConfigMode(ctx, name, uid, false)
+}
+func (c *PermissionClient) installationConfigMode(ctx context.Context, name, uid string, requireImmutable bool) (map[string]string, value.Resource, error) {
+	var ref value.Resource
+	ns, err := c.namespace(ctx, c.control)
+	if err != nil || ns.Deleting {
+		return nil, ref, value.ErrChanged
+	}
+	raw, err := c.raw(ctx, "/api/v1/namespaces/"+c.control.Name+"/configmaps/"+name, nil)
+	if err != nil {
+		return nil, ref, err
+	}
+	var object, metadata map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil || string(object["apiVersion"]) != `"v1"` || string(object["kind"]) != `"ConfigMap"` || json.Unmarshal(object["metadata"], &metadata) != nil {
+		return nil, ref, value.ErrInvalid
+	}
+	if requireImmutable {
+		var immutable bool
+		if json.Unmarshal(object["immutable"], &immutable) != nil || !immutable {
+			return nil, ref, value.ErrInvalid
+		}
+	}
+	var observedName, observedUID, namespace, rv string
+	for key, dst := range map[string]*string{"name": &observedName, "uid": &observedUID, "namespace": &namespace, "resourceVersion": &rv} {
+		if json.Unmarshal(metadata[key], dst) != nil {
+			return nil, ref, value.ErrInvalid
+		}
+	}
+	if observedName != name || observedUID != uid || namespace != c.control.Name || !identity.Text(rv, 128) || (metadata["deletionTimestamp"] != nil && string(metadata["deletionTimestamp"]) != "null") {
+		return nil, ref, value.ErrChanged
+	}
+	if object["binaryData"] != nil && string(object["binaryData"]) != "{}" && string(object["binaryData"]) != "null" {
+		return nil, ref, value.ErrInvalid
+	}
+	var data map[string]string
+	if len(object["data"]) > 96<<10 || json.Unmarshal(object["data"], &data) != nil || len(data) == 0 {
+		return nil, ref, value.ErrInvalid
+	}
+	canonical := jsontext.Value(object["data"])
+	if canonical.Canonicalize() != nil {
+		return nil, ref, value.ErrInvalid
+	}
+	ref = value.Resource{ClusterID: c.clusterID, Namespace: c.control.Name, NamespaceUID: c.control.UID, Kind: "ConfigMap", Name: name, UID: uid, ResourceVersion: rv, SpecDigest: artifact.Digest(sha256.Sum256(canonical))}
+	ns, err = c.namespace(ctx, c.control)
+	if err != nil || ns.Deleting {
+		return nil, value.Resource{}, value.ErrChanged
+	}
+	return data, ref, nil
+}
+func installationRefValid(name, uid string) bool {
+	return len(validation.IsDNS1123Subdomain(name)) == 0 && identity.Text(uid, 64)
+}

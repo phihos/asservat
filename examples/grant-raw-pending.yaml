@@ -1,0 +1,32 @@
+schemaVersion: grant/v1
+id: 00000000-0000-4000-8000-000000000041
+kind: AccessGrant
+spec:
+  requester:
+    issuer: https://identity.example.invalid/realms/company
+    subject: reviewer-999
+    clientID: developer-agent
+    identityType: human
+  grantType: rawQuery
+  target:
+    kind: artifact
+    caseID: 00000000-0000-4000-8000-000000000002
+    artifacts:
+    - artifactID: 00000000-0000-4000-8000-000000000004
+      digest: '4444444444444444444444444444444444444444444444444444444444444444'
+  operations:
+  - read_memory
+  reason: Inspect a bounded region of the synthetic core.
+  notAfter: '2026-10-09T17:55:00Z'
+  limits:
+    maxBytes: 65536
+    maxExecutions: 4
+    maxDuration: 10s
+  issuedAt: '2026-10-09T12:00:00Z'
+status:
+  phase: Pending
+  revision: 1
+  reservedBytes: 0
+  spentBytes: 0
+  executionsSpent: 0
+  executionsReserved: 0

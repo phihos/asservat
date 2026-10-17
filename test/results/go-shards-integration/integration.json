@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "path": "Makefile",
+      "baseSHA256": "fd4c007ed0e465169822758fc01fcfb613022a2a3f1b313be639b4bf23c7812b",
+      "payloadSHA256": "f71c0a75e0017e099576dbd80929e618ae20a757a029bbfb31481568100d17e1"
+    },
+    {
+      "path": "scripts/check-go-tests.py",
+      "baseSHA256": null,
+      "payloadSHA256": "622e35afcdac6190d1a5fa9f6864ba6bffaa33ff63450093ca8f714ab2c69419"
+    },
+    {
+      "path": "scripts/test-go-shards.py",
+      "baseSHA256": null,
+      "payloadSHA256": "64712df8e5b6435eb850dba57ef559ffcca5aa76c19de8db2e29bc3172a36a7c"
+    }
+  ],
+  "status": "integrated; full gate pending",
+  "beforeEvidence": "test/results/go-regression-20261013-1/result.json"
+}

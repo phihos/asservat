@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Read-only verification of the completed run; never starts a fixture or build."""
+from pathlib import Path
+from collections import Counter
+import ast, hashlib, importlib.util, json, os, re, sys
+sys.dont_write_bytecode = True
+ROOT=Path('/home/phil/Projekte/asservat')
+STAGE=Path(__file__).parent
+OUT=ROOT/'test/results/public-context-assembly-initial-installation-1'
+DEST=STAGE/'native-1-independent.json'
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+def load(name,p):
+ spec=importlib.util.spec_from_file_location(name,p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+base=STAGE/'base-run.py'
+assert sha(base)=='70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07'
+gate=load('reviewed_gate',base)
+r=json.loads((OUT/'result.json').read_text());n=json.loads((OUT/'initial-installation-environment.json').read_text())
+assert r['exit']==1 and r['commandExit']==0 and r['testExit']==0
+assert r['validationErrors']==['full original initial-installation parent/leaves missing, skipped or changed', 'original fresh-fixture selection or aggregate budgets changed']
+assert 'runnerError' not in r and r['missingRequiredTests']==[] and r['failedOrSkippedTests']==[]
+assert r['runnerSHA256']==sha(OUT/'runner.py')=='242fd9163084dba01066374fb2fddf3a45ff564d8ab8629fd94c58c04daf8feb'
+assert r['command']==['make','initial-installation-integration','PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python']
+assert r['processJoined'] and r['finalProcessGroupAbsent'] and r['processGroupAbsentAfterCommand'] and r['signalReceived'] is None
+assert r['sourceSnapshotUnchanged'] and r['runnerUnchanged'] and r['fixtureScratchRemoved'] and r['emptyScratchRemoved']
+# Reconstruct the launch snapshot exactly, including its file set.
+sources=json.loads((OUT/'sources.json').read_text());current=gate.freeze()
+for folder in ('docs','examples','design','web'):
+ current.update({str(p.relative_to(ROOT)):sha(p) for p in (ROOT/folder).rglob('*') if p.is_file() and 'node_modules' not in p.parts and '__pycache__' not in p.parts})
+for name in ('README.md','AGENTS.md','.gitignore'):current[name]=sha(ROOT/name)
+assert sources==current and len(sources)==r['sourceCount']
+expected=json.loads((OUT/'expected-harness-sources.json').read_text())
+assert expected==gate.harness_freeze('initial-installation')==n['sourceHashes']
+assert r['sourceSnapshotSHA256']==sha(OUT/'sources.json')
+assert set(p.name for p in OUT.iterdir())==set(r['archiveHashes'])|{'result.json'}
+assert all(sha(OUT/path)==digest for path,digest in r['archiveHashes'].items())
+# Source-derived callers, not a widened test command. All files above are frozen.
+parent='TestInitialInstallationWithRealServices'
+caller_path='test/integration/initial_installation_test.go'
+history_path='test/integration/initial_installation_read_test.go'
+role_path='test/integration/public_runtime_roles_test.go'
+draft_path='test/integration/public_context_preview_roles_test.go'
+caller=(ROOT/caller_path).read_text().split('func '+parent+'(t *testing.T) {',1)[1]
+assert 'context.WithTimeout(context.Background(), 180*time.Second)' in caller
+leaves=re.findall(r'\bt.Run\("([^"+]+)",',caller)
+leaves.remove('native-witness-source-and-provider-composition')
+leaves += ['reject-missing-version-before-initial-audit-ack','reject-null-version-before-initial-audit-ack']
+for values,prefix in re.findall(r'for _, mode := range \[\]string\{([^}]+)\} \{\s*t.Run\("([^"+]+)"\+mode,',caller):
+ if prefix!='installer-pod-':leaves += [prefix+mode for mode in re.findall(r'"([^"]+)"',values)]
+assert 'history.qualifyBoundsAndRole(t, ctx, admin, s.scope.InstallationID)' in caller
+history=(ROOT/history_path).read_text()
+historical=re.findall(r'\bt.Run\("(historical-[^"]+)",',history)
+assert historical==['historical-reader-role-is-select-only','historical-denial-before-sql','historical-final-check-keeps-original-bound','historical-blocked-sql-keeps-original-bound']
+omitted=[parent+'/audit-witness-and-later-recovery-block/'+name for name in historical]
+leaves += ['audit-witness-and-later-recovery-block/'+name for name in historical]
+assert 'qualifyPublicContextDraftRole(t, ctx, admin, conn, role.Purpose, input.InstallationID)' in (ROOT/role_path).read_text()
+assert 't.Run(purpose+"-generated-role-effects"' in (ROOT/draft_path).read_text()
+for mode in ('matrix','lost-completion'):
+ for purpose in ('capture-preview','capture-resolution'):
+  leaves += ['public-runtime-roles-'+mode+'/'+purpose+'-generated-role-effects']
+required=[parent]+[parent+'/'+leaf for leaf in leaves]
+assert len(required)==len(set(required))==87
+assert set(required)-set(r['requiredPassedTests'])==set(omitted) and set(r['requiredPassedTests'])<=set(required)
+log=(OUT/'initial-installation.log').read_text()
+passes=re.findall(r'^\s*--- PASS: (Test\S+) \([0-9]+(?:\.[0-9]+)?s\)$',log,re.M)
+runs=re.findall(r'^=== RUN\s+(Test\S+)$',log,re.M)
+assert Counter(passes)==Counter(required)==Counter(runs)==Counter(n['passedTestNames'])==Counter(r['passedTests'])
+assert not re.findall(r'^\s*--- (?:FAIL|SKIP):',log,re.M)
+assert re.search(r'^ok\s+asservat.local/asservat/test/integration\s+[0-9.]+s$',log,re.M)
+assert n['testPattern']=='^'+parent+'$' and n['goTestTimeoutSeconds']==300 and n['harnessTestTimeoutSeconds']==360
+assert n['sourceUnchangedDuringTest'] is True and n['cleanupFailures']==[] and n['testExit']==0 and n['connectorRetirementRealtime'] is False
+assert len(n['phases'])==1 and n['phases'][0]['phase']=='suite' and n['phases'][0]['testExit']==0 and n['phases'][0]['qualificationExit']==0
+assert Counter(n['phases'][0]['passedTestNames'])==Counter(required)
+# Actual original process identities were observed during this specific run.
+pids=[982116,982150,982151,982841,983266]
+assert all(not Path('/proc',str(pid)).exists() for pid in pids)
+try:os.killpg(982150,0)
+except ProcessLookupError:pass
+else:raise AssertionError('owned process group remains')
+assert not Path(r['scratch']).exists() and not Path(r['fixtureScratch']).exists()
+assert Path(r['fixtureScratch']).name=='custody-s8hnnxwb'
+assert len(n['images'])==3 and {name.rsplit('-',1)[-1] for name in n['images']}=={'postgres','s3','kms'}
+assert all(name.startswith('asservat-custody-s8hnnxwb-') for name in n['images'])
+docker=gate.docker_cleanup(n,'initial-installation')
+result={'scope':'independent validation of existing native result; no rerun, no report rewrite','nativeQualified':True,'wrapperExitRetained':r['exit'],'wrapperInventoryFailureRetained':r['validationErrors'],'wrapperFailureExplanation':'Both original error strings result from the same four omitted historical leaves, in the full and per-phase name-set comparisons. All original selection and budget predicates were independently checked below.','nativeExit':n['testExit'],'exactNamedRunAndPassCount':len(required),'requiredPassedTests':sorted(required),'fourWrapperOmissions':omitted,'inventorySourceHashes':{path:sources[path] for path in (caller_path,history_path,role_path,draft_path)},'sourceCount':len(sources),'nativeSourceCount':len(expected),'sourceAndFileSetsUnchanged':True,'archiveHashesVerified':r['archiveHashes'],'originalResultSHA256':sha(OUT/'result.json'),'validatorSHA256':sha(Path(__file__)),'originalRunnerSHA256':r['runnerSHA256'],'terminalSeconds':r['seconds'],'nativeSeconds':n['phases'][0]['testElapsedSeconds'],'absentPIDs':pids,'ownedGroupAbsent':982150,'fixtureScratchAbsent':r['fixtureScratch'],'outerScratchAbsent':r['scratch'],'ownedDockerAbsence':docker,'providerImages':n['images']}
+with DEST.open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+print(json.dumps({key:result[key] for key in ('nativeQualified','wrapperExitRetained','exactNamedRunAndPassCount','sourceCount','nativeSourceCount','originalResultSHA256','validatorSHA256','terminalSeconds','nativeSeconds')}))
+print('independentReportSHA256',sha(DEST))

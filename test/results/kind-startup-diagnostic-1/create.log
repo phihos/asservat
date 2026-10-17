@@ -1,0 +1,475 @@
+Creating cluster "asservat-startup-596525d017" ...
+ • Ensuring node image (kindest/node) 🖼️  ...
+ ✓ Ensuring node image (kindest/node) 🖼️
+ • Preparing nodes 📦   ...
+ ✓ Preparing nodes 📦 
+ • Writing configuration 📜  ...
+ ✓ Writing configuration 📜
+ • Starting control-plane 🕹️  ...
+ ✗ Starting control-plane 🕹️
+ERROR: failed to create cluster: failed to init node with kubeadm: command "docker exec --privileged asservat-startup-596525d017-control-plane kubeadm init --config=/kind/kubeadm.conf --skip-token-print --v=6" failed with error: exit status 1
+
+Command Output: I1013 08:02:48.350092     205 initconfiguration.go:262] loading configuration from "/kind/kubeadm.conf"
+W1013 08:02:48.351038     205 initconfiguration.go:363] [config] WARNING: Ignored configuration document with GroupVersionKind kubeadm.k8s.io/v1beta4, Kind=JoinConfiguration
+[init] Using Kubernetes version: v1.37.0
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+I1013 08:02:48.351752     205 certs.go:111] creating a new certificate authority for ca
+[certs] Generating "ca" certificate and key
+I1013 08:02:48.448678     205 certs.go:472] validating certificate period for ca certificate
+[certs] Generating "apiserver" certificate and key
+[certs] apiserver serving cert is signed for DNS names [asservat-startup-596525d017-control-plane kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local localhost] and IPs [10.96.0.1 172.18.0.3 127.0.0.1]
+[certs] Generating "apiserver-kubelet-client" certificate and key
+I1013 08:02:48.584032     205 certs.go:111] creating a new certificate authority for front-proxy-ca
+[certs] Generating "front-proxy-ca" certificate and key
+I1013 08:02:48.618845     205 certs.go:472] validating certificate period for front-proxy-ca certificate
+[certs] Generating "front-proxy-client" certificate and key
+I1013 08:02:48.661291     205 certs.go:111] creating a new certificate authority for etcd-ca
+[certs] Generating "etcd/ca" certificate and key
+I1013 08:02:48.805327     205 certs.go:472] validating certificate period for etcd/ca certificate
+[certs] Generating "etcd/server" certificate and key
+[certs] etcd/server serving cert is signed for DNS names [asservat-startup-596525d017-control-plane localhost] and IPs [172.18.0.3 127.0.0.1 ::1]
+[certs] Generating "etcd/peer" certificate and key
+[certs] etcd/peer serving cert is signed for DNS names [asservat-startup-596525d017-control-plane localhost] and IPs [172.18.0.3 127.0.0.1 ::1]
+[certs] Generating "etcd/healthcheck-client" certificate and key
+[certs] Generating "apiserver-etcd-client" certificate and key
+I1013 08:02:49.046318     205 certs.go:77] creating new public/private key files for signing service account users
+[certs] Generating "sa" key and public key
+[kubeconfig] Using kubeconfig folder "/etc/kubernetes"
+I1013 08:02:49.061478     205 kubeconfig.go:111] creating kubeconfig file for admin.conf
+[kubeconfig] Writing "admin.conf" kubeconfig file
+I1013 08:02:49.162324     205 kubeconfig.go:111] creating kubeconfig file for super-admin.conf
+[kubeconfig] Writing "super-admin.conf" kubeconfig file
+I1013 08:02:49.290995     205 kubeconfig.go:111] creating kubeconfig file for kubelet.conf
+[kubeconfig] Writing "kubelet.conf" kubeconfig file
+I1013 08:02:49.364922     205 kubeconfig.go:111] creating kubeconfig file for controller-manager.conf
+[kubeconfig] Writing "controller-manager.conf" kubeconfig file
+I1013 08:02:49.406702     205 kubeconfig.go:111] creating kubeconfig file for scheduler.conf
+[kubeconfig] Writing "scheduler.conf" kubeconfig file
+[etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
+I1013 08:02:49.438878     205 images.go:86] WARNING: could not find officially supported version of etcd for Kubernetes v1.37.0, falling back to the nearest etcd version (3.7.0-0)
+I1013 08:02:49.502604     205 local.go:66] [etcd] wrote Static Pod manifest for a local etcd member to "/etc/kubernetes/manifests/etcd.yaml"
+I1013 08:02:49.502638     205 manifests.go:125] [control-plane] getting StaticPodSpecs
+[control-plane] Using manifest folder "/etc/kubernetes/manifests"
+[control-plane] Creating static Pod manifest for "kube-apiserver"
+I1013 08:02:49.502948     205 certs.go:472] validating certificate period for CA certificate
+I1013 08:02:49.502981     205 manifests.go:151] [control-plane] adding volume "ca-certs" for component "kube-apiserver"
+I1013 08:02:49.502986     205 manifests.go:151] [control-plane] adding volume "etc-ca-certificates" for component "kube-apiserver"
+I1013 08:02:49.502988     205 manifests.go:151] [control-plane] adding volume "k8s-certs" for component "kube-apiserver"
+I1013 08:02:49.502990     205 manifests.go:151] [control-plane] adding volume "usr-local-share-ca-certificates" for component "kube-apiserver"
+I1013 08:02:49.502993     205 manifests.go:151] [control-plane] adding volume "usr-share-ca-certificates" for component "kube-apiserver"
+[control-plane] Creating static Pod manifest for "kube-controller-manager"
+I1013 08:02:49.503390     205 manifests.go:178] [control-plane] wrote static Pod manifest for component "kube-apiserver" to "/etc/kubernetes/manifests/kube-apiserver.yaml"
+I1013 08:02:49.503400     205 manifests.go:125] [control-plane] getting StaticPodSpecs
+I1013 08:02:49.503485     205 manifests.go:151] [control-plane] adding volume "ca-certs" for component "kube-controller-manager"
+I1013 08:02:49.503495     205 manifests.go:151] [control-plane] adding volume "etc-ca-certificates" for component "kube-controller-manager"
+I1013 08:02:49.503497     205 manifests.go:151] [control-plane] adding volume "k8s-certs" for component "kube-controller-manager"
+I1013 08:02:49.503499     205 manifests.go:151] [control-plane] adding volume "kubeconfig" for component "kube-controller-manager"
+I1013 08:02:49.503502     205 manifests.go:151] [control-plane] adding volume "usr-local-share-ca-certificates" for component "kube-controller-manager"
+I1013 08:02:49.503504     205 manifests.go:151] [control-plane] adding volume "usr-share-ca-certificates" for component "kube-controller-manager"
+[control-plane] Creating static Pod manifest for "kube-scheduler"
+I1013 08:02:49.503837     205 manifests.go:178] [control-plane] wrote static Pod manifest for component "kube-controller-manager" to "/etc/kubernetes/manifests/kube-controller-manager.yaml"
+I1013 08:02:49.503847     205 manifests.go:125] [control-plane] getting StaticPodSpecs
+I1013 08:02:49.503930     205 manifests.go:151] [control-plane] adding volume "kubeconfig" for component "kube-scheduler"
+I1013 08:02:49.504170     205 manifests.go:178] [control-plane] wrote static Pod manifest for component "kube-scheduler" to "/etc/kubernetes/manifests/kube-scheduler.yaml"
+I1013 08:02:49.504178     205 kubelet.go:68] Stopping the kubelet
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/instance-config.yaml"
+[patches] Applied patch of type "application/strategic-merge-patch+json" to target "kubeletconfiguration"
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Starting the kubelet
+I1013 08:02:49.639853     205 loader.go:408] Config loaded from file:  /etc/kubernetes/admin.conf
+I1013 08:02:49.640231     205 envvar.go:195] "Feature gate default state" feature="InOrderInformers" enabled=true
+I1013 08:02:49.640245     205 envvar.go:195] "Feature gate default state" feature="InformerResourceVersion" enabled=true
+I1013 08:02:49.640248     205 envvar.go:195] "Feature gate default state" feature="AtomicFIFO" enabled=true
+I1013 08:02:49.640252     205 envvar.go:195] "Feature gate default state" feature="UnlockWhileProcessingFIFO" enabled=true
+I1013 08:02:49.640257     205 envvar.go:195] "Feature gate default state" feature="ClientsAllowCBOR" enabled=false
+I1013 08:02:49.640265     205 envvar.go:195] "Feature gate default state" feature="ClientsPreferCBOR" enabled=false
+I1013 08:02:49.640269     205 envvar.go:195] "Feature gate default state" feature="InOrderInformersBatchProcess" enabled=true
+I1013 08:02:49.640278     205 envvar.go:195] "Feature gate default state" feature="ClientsAllowTLSCacheGC" enabled=true
+I1013 08:02:49.640281     205 envvar.go:195] "Feature gate default state" feature="ClientsAllowCARotation" enabled=true
+I1013 08:02:49.640284     205 envvar.go:195] "Feature gate default state" feature="WatchListClient" enabled=true
+I1013 08:02:49.641373     205 loader.go:408] Config loaded from file:  /etc/kubernetes/super-admin.conf
+I1013 08:02:49.641635     205 kubeconfig.go:667] ensuring that the ClusterRoleBinding for the kubeadm:cluster-admins Group exists
+I1013 08:02:49.641878     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:50.142755     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:50.642284     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:51.142817     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:51.642702     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:52.141968     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:52.642792     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:53.142573     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:53.642532     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:54.142246     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:54.642787     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:55.142584     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:55.642281     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:56.141949     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:56.642732     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:57.142470     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:57.641930     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:58.142729     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:58.642623     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:59.142552     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:02:59.642292     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:00.142801     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:00.642560     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:01.142414     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:01.642817     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:02.142617     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:02.642303     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:03.142800     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:03.642565     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:04.142239     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:04.642814     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:05.142583     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:05.642276     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:06.141959     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:06.642724     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:07.142486     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:07.642248     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:08.142783     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:08.642549     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:09.142395     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:09.642797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:10.142703     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:10.642484     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:11.142312     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:11.642802     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:12.142580     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:12.641948     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:13.142719     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:13.642485     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:14.142806     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:14.642732     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:15.142202     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:15.642784     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:16.142706     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:16.642122     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:17.141938     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:17.642708     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:18.142629     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:18.641890     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:19.142733     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:19.642649     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:20.142359     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:20.641955     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:21.142719     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:21.642326     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:22.142798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:22.642579     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:23.142242     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:23.642791     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:24.142567     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:24.642255     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:25.142828     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:25.642739     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:26.142513     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:26.642241     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:27.142800     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:27.642577     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:28.142452     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:28.642295     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:29.141946     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:29.642791     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:30.142541     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:30.642240     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:31.142783     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:31.642698     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:32.142616     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:32.642317     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:33.142789     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:33.642336     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:34.142802     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:34.642395     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:35.142258     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:35.642782     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:36.142562     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:36.642240     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:37.142811     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:37.642695     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:38.142495     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:38.642800     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:39.142564     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:39.642265     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:40.142796     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:40.642382     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:41.142806     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:41.642420     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:42.141963     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:42.642711     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:43.142013     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:43.642930     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:44.142736     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:44.642657     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:45.142359     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:45.642786     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:46.142594     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:46.642311     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:47.142007     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:47.642741     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:48.142507     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:48.642390     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:49.142235     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:49.642798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:50.142581     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:50.642276     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:51.142797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:51.642370     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:52.142065     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:52.642785     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:53.142700     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:53.642457     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:54.142795     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:54.642566     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:55.141956     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:55.642709     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:56.142577     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:56.642278     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:57.142814     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:57.642736     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:58.142487     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:58.642782     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:59.142590     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:03:59.643238     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:00.141982     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:00.642818     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:01.142730     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:01.642217     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:02.142797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:02.642707     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:03.142593     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:03.642505     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:04.142353     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:04.642820     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:05.142732     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:05.642122     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:06.142771     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:06.642640     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:07.142541     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:07.642133     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:08.142805     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:08.642711     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:09.142610     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:09.642540     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:10.142350     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:10.642797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:11.142685     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:11.642581     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:12.142512     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:12.641937     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:13.142797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:13.642684     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:14.142563     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:14.641935     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:15.142789     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:15.642497     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:16.142332     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:16.642146     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:17.142804     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:17.642681     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:18.142562     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:18.642384     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:19.141948     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:19.642774     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:20.142646     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:20.642511     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:21.142316     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:21.642778     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:22.142653     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:22.642538     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:23.141993     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:23.642812     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:24.142716     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:24.642623     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:25.142526     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:25.642358     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:26.142802     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:26.642682     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:27.142553     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:27.641943     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:28.142792     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:28.642686     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:29.142572     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:29.642009     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:30.142811     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:30.642703     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:31.142614     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:31.642484     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:32.142322     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:32.642779     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:33.142673     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:33.642145     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:34.142798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:34.642688     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:35.142559     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:35.642386     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:36.142771     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:36.642280     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:37.142107     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:37.642793     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:38.142759     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:38.642272     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:39.142798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:39.642694     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:40.142593     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:40.642497     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:41.141935     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:41.642788     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:42.142689     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:42.642578     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:43.142481     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:43.642314     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:44.142797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:44.642689     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:45.142561     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:45.642384     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:46.142192     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:46.642787     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:47.142676     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:47.642048     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:48.142813     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:48.642698     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:49.142596     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:49.642506     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:50.142340     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:50.642186     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:51.141969     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:51.642803     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:52.142679     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:52.642576     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:53.142466     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:53.642292     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:54.142786     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:54.642680     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:55.142524     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:55.642362     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:56.142030     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:56.642798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:57.142712     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:57.642627     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:58.142497     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:58.642313     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:59.142799     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:04:59.642625     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:00.142528     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:00.642367     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:01.142793     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:01.642675     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:02.142582     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:02.642170     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:03.142782     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:03.642687     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:04.142334     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:04.642796     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:05.142679     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:05.642387     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:06.142769     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:06.642686     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:07.142561     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:07.642322     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:08.141947     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:08.642786     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:09.142702     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:09.642597     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:10.142050     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:10.642785     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:11.142940     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:11.641977     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:12.142808     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:12.642303     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:13.141974     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:13.642740     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:14.142672     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:14.642042     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:15.141894     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:15.642659     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:16.142375     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:16.642222     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:17.142802     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:17.642712     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:18.142657     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:18.642374     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:19.141960     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:19.642797     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:20.142695     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:20.642493     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:21.142790     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:21.642691     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:22.142455     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:22.642781     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:23.142543     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:23.642254     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:24.142566     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:24.642276     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:25.142792     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:25.642576     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:26.141994     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:26.642729     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:27.142503     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:27.642238     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:28.142798     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:28.642559     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:29.141957     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:29.642577     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:30.142854     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:30.642750     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:31.142520     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:31.642796     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:32.142554     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:32.642320     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:33.142777     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:33.642566     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:34.142290     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:34.642815     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:35.142084     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:35.642787     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:36.142716     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:36.642624     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:37.142333     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:37.642799     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:38.142464     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:38.642182     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:39.142886     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:39.642653     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:40.142293     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:40.642805     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:41.142133     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:41.641943     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:42.142728     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:42.642631     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:43.142351     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:43.641985     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:44.142747     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:44.642645     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:45.142354     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:45.641959     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:46.142741     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:46.642504     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:47.142203     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:47.642813     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:48.142747     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:48.642686     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+I1013 08:05:49.142399     205 round_trippers.go:632] "Response" verb="POST" url="https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s" status="" milliseconds=0
+error: error execution phase wait-control-plane: cannot obtain client without bootstrap: could not bootstrap the admin user in file admin.conf: unable to create ClusterRoleBinding: Post "https://172.18.0.3:6443/apis/rbac.authorization.k8s.io/v1/clusterrolebindings?timeout=10s": dial tcp 172.18.0.3:6443: connect: connection refused
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:262
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).visitAll
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:450
+k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow.(*Runner).Run
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow/runner.go:234
+k8s.io/kubernetes/cmd/kubeadm/app/cmd.newCmdInit.func1
+	k8s.io/kubernetes/cmd/kubeadm/app/cmd/init.go:134
+github.com/spf13/cobra.(*Command).execute
+	github.com/spf13/cobra@v1.10.2/command.go:1015
+github.com/spf13/cobra.(*Command).ExecuteC
+	github.com/spf13/cobra@v1.10.2/command.go:1148
+github.com/spf13/cobra.(*Command).Execute
+	github.com/spf13/cobra@v1.10.2/command.go:1071
+k8s.io/kubernetes/cmd/kubeadm/app.Run
+	k8s.io/kubernetes/cmd/kubeadm/app/kubeadm.go:48
+main.main
+	k8s.io/kubernetes/cmd/kubeadm/kubeadm.go:25
+runtime.main
+	runtime/proc.go:290
+runtime.goexit
+	runtime/asm_amd64.s:1771

@@ -1,0 +1,310 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-10 05:48:52.687 UTC [61] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-10 05:48:52.687 UTC [61] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-10 05:48:52.706 UTC [73] LOG:  database system was shut down at 2026-10-10 05:48:51 UTC
+2026-10-10 05:48:52.720 UTC [61] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-10 05:48:52.863 UTC [61] LOG:  received fast shutdown request
+.2026-10-10 05:48:52.866 UTC [61] LOG:  aborting any active transactions
+2026-10-10 05:48:52.867 UTC [61] LOG:  background worker "logical replication launcher" (PID 76) exited with exit code 1
+2026-10-10 05:48:52.867 UTC [71] LOG:  shutting down
+2026-10-10 05:48:52.870 UTC [71] LOG:  checkpoint starting: shutdown immediate
+2026-10-10 05:48:53.759 UTC [71] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.024 s, sync=0.852 s, total=0.893 s; sync files=303, longest=0.009 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-10 05:48:53.774 UTC [61] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-10 05:48:53.884 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-10 05:48:53.885 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-10 05:48:53.885 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-10 05:48:53.887 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-10 05:48:53.895 UTC [131] LOG:  database system was shut down at 2026-10-10 05:48:53 UTC
+2026-10-10 05:48:53.899 UTC [1] LOG:  database system is ready to accept connections
+2026-10-10 05:48:54.030 UTC [142] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-10 05:48:54.030 UTC [142] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-10 05:48:57.241 UTC [151] ERROR:  permission denied for table custody_pool
+2026-10-10 05:48:57.241 UTC [151] STATEMENT:  UPDATE custody_pool SET paused=true
+2026-10-10 05:48:57.242 UTC [151] ERROR:  permission denied for table permission_assignment
+2026-10-10 05:48:57.242 UTC [151] STATEMENT:  DELETE FROM permission_assignment
+2026-10-10 05:48:58.978 UTC [154] ERROR:  bootstrap issuance receipts are immutable
+2026-10-10 05:48:58.978 UTC [154] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-10 05:48:58.978 UTC [154] STATEMENT:  UPDATE fleet_bootstrap_intent SET credential_sha256=decode(repeat('ab',32),'hex') WHERE installation_id=$1
+2026-10-10 05:48:58.978 UTC [154] ERROR:  bootstrap issuance receipts are immutable
+2026-10-10 05:48:58.978 UTC [154] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-10 05:48:58.978 UTC [154] STATEMENT:  UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1
+2026-10-10 05:48:59.526 UTC [156] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:48:59.526 UTC [156] STATEMENT:  -- name: AcknowledgeBootstrapIssue :execrows
+	UPDATE fleet_bootstrap_intent SET audit_acknowledged_at=clock_timestamp(),audit_digest=$3,
+	 audit_object_key=$4,audit_object_version=$5,audit_object_etag=$6,audit_object_bytes=$7,audit_object_sha256=$8
+	WHERE installation_id=$1 AND id=$2 AND credential_recorded_at IS NOT NULL AND audit_acknowledged_at IS NULL
+	
+2026-10-10 05:48:59.532 UTC [157] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:48:59.532 UTC [157] STATEMENT:  -- name: CreateIssuedBootstrap :exec
+	INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,
+	 issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$2,$10,$11,$12)
+	
+2026-10-10 05:48:59.539 UTC [154] ERROR:  bootstrap issuance receipts are immutable
+2026-10-10 05:48:59.539 UTC [154] CONTEXT:  PL/pgSQL function guard_bootstrap_issuance() line 14 at RAISE
+2026-10-10 05:48:59.539 UTC [154] STATEMENT:  UPDATE fleet_bootstrap_intent SET issued_at=NULL WHERE installation_id=$1
+2026-10-10 05:48:59.539 UTC [155] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:48:59.539 UTC [155] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:48:59.540 UTC [155] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:48:59.540 UTC [155] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:48:59.540 UTC [155] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:48:59.540 UTC [155] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-10 05:48:59.541 UTC [155] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:48:59.541 UTC [155] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:48:59.541 UTC [156] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:48:59.541 UTC [156] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:48:59.542 UTC [156] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:48:59.542 UTC [156] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:48:59.542 UTC [156] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:48:59.542 UTC [156] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-10 05:48:59.542 UTC [156] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:48:59.542 UTC [156] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:48:59.543 UTC [157] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:48:59.543 UTC [157] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:48:59.543 UTC [157] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:48:59.543 UTC [157] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:48:59.544 UTC [157] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:48:59.544 UTC [157] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-10 05:48:59.544 UTC [157] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:48:59.544 UTC [157] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:48:59.544 UTC [161] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:48:59.544 UTC [161] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:48:59.545 UTC [161] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:48:59.545 UTC [161] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:48:59.545 UTC [161] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:48:59.545 UTC [161] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-10 05:48:59.546 UTC [161] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:48:59.546 UTC [161] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:00.076 UTC [174] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:49:00.076 UTC [174] STATEMENT:  UPDATE fleet_bootstrap_intent SET not_after=not_after+interval '1 minute' WHERE installation_id=$1
+2026-10-10 05:49:00.077 UTC [174] ERROR:  permission denied for table fleet_bootstrap_intent
+2026-10-10 05:49:00.077 UTC [174] STATEMENT:  DELETE FROM fleet_bootstrap_intent WHERE installation_id=$1
+2026-10-10 05:49:00.077 UTC [174] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:00.077 UTC [174] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:00.077 UTC [174] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:00.077 UTC [174] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:49:00.078 UTC [174] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:00.078 UTC [174] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:49:00.078 UTC [166] ERROR:  bootstrap intent binding is immutable
+2026-10-10 05:49:00.078 UTC [166] CONTEXT:  PL/pgSQL function guard_bootstrap_intent() line 9 at RAISE
+2026-10-10 05:49:00.078 UTC [166] STATEMENT:  UPDATE fleet_bootstrap_intent SET display_name='replacement' WHERE installation_id=$1
+2026-10-10 05:49:00.097 UTC [175] ERROR:  permission denied for table permission_stream
+2026-10-10 05:49:00.097 UTC [175] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-10 05:49:00.097 UTC [175] ERROR:  permission denied for table context_storage_binding
+2026-10-10 05:49:00.097 UTC [175] STATEMENT:  UPDATE context_storage_binding SET fresh_until=clock_timestamp()+interval '1 day'
+2026-10-10 05:49:00.098 UTC [175] ERROR:  permission denied for table context_capture
+2026-10-10 05:49:00.098 UTC [175] STATEMENT:  UPDATE context_capture SET deadline=clock_timestamp()+interval '1 day'
+2026-10-10 05:49:00.098 UTC [175] ERROR:  permission denied for table context_capture
+2026-10-10 05:49:00.098 UTC [175] STATEMENT:  DELETE FROM context_capture
+2026-10-10 05:49:00.140 UTC [177] ERROR:  permission denied for table context_catalog
+2026-10-10 05:49:00.140 UTC [177] STATEMENT:  INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0
+2026-10-10 05:49:00.141 UTC [177] ERROR:  permission denied for table context_verification
+2026-10-10 05:49:00.141 UTC [177] STATEMENT:  UPDATE context_verification SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:00.157 UTC [178] ERROR:  permission denied for table context_verification
+2026-10-10 05:49:00.157 UTC [178] STATEMENT:  UPDATE context_verification SET authority_digest=authority_digest
+2026-10-10 05:49:00.157 UTC [178] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:00.157 UTC [178] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-10 05:49:00.173 UTC [179] ERROR:  permission denied for table context_verification
+2026-10-10 05:49:00.173 UTC [179] STATEMENT:  UPDATE context_verification SET expectation_digest=expectation_digest
+2026-10-10 05:49:00.189 UTC [180] ERROR:  permission denied for table context_catalog
+2026-10-10 05:49:00.189 UTC [180] STATEMENT:  UPDATE context_catalog SET published_at=clock_timestamp()
+2026-10-10 05:49:01.016 UTC [180] ERROR:  permission denied for table context_catalog
+2026-10-10 05:49:01.016 UTC [180] STATEMENT:  DELETE FROM context_catalog
+2026-10-10 05:49:01.767 UTC [182] ERROR:  immutable context verification
+2026-10-10 05:49:01.767 UTC [182] CONTEXT:  PL/pgSQL function protect_context_verification() line 5 at RAISE
+2026-10-10 05:49:01.767 UTC [182] STATEMENT:  UPDATE context_verification SET authority_digest=decode(repeat('01',32),'hex') WHERE capture_id=$1
+2026-10-10 05:49:02.012 UTC [207] ERROR:  permission denied for table artifact_download
+2026-10-10 05:49:02.012 UTC [207] STATEMENT:  UPDATE artifact_download SET deadline=deadline
+2026-10-10 05:49:02.012 UTC [207] ERROR:  permission denied for table download_batch
+2026-10-10 05:49:02.012 UTC [207] STATEMENT:  UPDATE download_batch SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:02.013 UTC [207] ERROR:  permission denied for table download_allocation
+2026-10-10 05:49:02.013 UTC [207] STATEMENT:  UPDATE download_allocation SET output_limit=output_limit
+2026-10-10 05:49:02.029 UTC [208] ERROR:  permission denied for table artifact_download
+2026-10-10 05:49:02.029 UTC [208] STATEMENT:  UPDATE artifact_download SET charged_output=0
+2026-10-10 05:49:02.029 UTC [208] ERROR:  permission denied for table download_batch
+2026-10-10 05:49:02.029 UTC [208] STATEMENT:  UPDATE download_batch SET outcome_json=outcome_json
+2026-10-10 05:49:02.045 UTC [209] ERROR:  permission denied for table artifact_download
+2026-10-10 05:49:02.045 UTC [209] STATEMENT:  UPDATE artifact_download SET state='Ready'
+2026-10-10 05:49:03.342 UTC [182] ERROR:  terminal download session
+2026-10-10 05:49:03.342 UTC [182] CONTEXT:  PL/pgSQL function protect_download_session() line 7 at RAISE
+2026-10-10 05:49:03.342 UTC [182] STATEMENT:  UPDATE artifact_download SET state='Ready' WHERE id=$1
+2026-10-10 05:49:03.342 UTC [182] ERROR:  immutable download session or decreasing spend
+2026-10-10 05:49:03.342 UTC [182] CONTEXT:  PL/pgSQL function protect_download_session() line 4 at RAISE
+2026-10-10 05:49:03.342 UTC [182] STATEMENT:  UPDATE artifact_download SET charged_output=0 WHERE id=$1
+2026-10-10 05:49:05.978 UTC [223] ERROR:  permission denied for table retention_decision
+2026-10-10 05:49:05.978 UTC [223] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:05.978 UTC [223] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:05.978 UTC [223] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-10 05:49:05.994 UTC [224] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:05.994 UTC [224] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-10 05:49:05.994 UTC [224] ERROR:  permission denied for table retention_decision
+2026-10-10 05:49:05.994 UTC [224] STATEMENT:  UPDATE retention_decision SET decision_json=decision_json
+2026-10-10 05:49:06.010 UTC [225] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:06.010 UTC [225] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=effective_expires_at
+2026-10-10 05:49:06.489 UTC [182] ERROR:  retention decision mismatch
+2026-10-10 05:49:06.489 UTC [182] CONTEXT:  PL/pgSQL function protect_custody_retention() line 10 at RAISE
+2026-10-10 05:49:06.489 UTC [182] STATEMENT:  UPDATE custody_attempt SET effective_expires_at=expires_at WHERE id=$1
+2026-10-10 05:49:06.490 UTC [182] ERROR:  immutable custody registration
+2026-10-10 05:49:06.490 UTC [182] CONTEXT:  PL/pgSQL function protect_custody_retention() line 8 at RAISE
+2026-10-10 05:49:06.490 UTC [182] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at+interval '1 second' WHERE id=$1
+2026-10-10 05:49:06.490 UTC [182] ERROR:  immutable retention journal
+2026-10-10 05:49:06.490 UTC [182] CONTEXT:  PL/pgSQL function protect_retention_decision() line 5 at RAISE
+2026-10-10 05:49:06.490 UTC [182] STATEMENT:  UPDATE retention_decision SET decision_json=decode('00','hex') WHERE id=$1
+2026-10-10 05:49:07.488 UTC [239] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:07.488 UTC [239] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-10 05:49:07.489 UTC [239] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:07.489 UTC [239] STATEMENT:  UPDATE retention_source SET protection_digest=protection_digest
+2026-10-10 05:49:07.489 UTC [239] ERROR:  permission denied for table retention_checkpoint
+2026-10-10 05:49:07.489 UTC [239] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:07.489 UTC [239] ERROR:  permission denied for table retention_checkpoint
+2026-10-10 05:49:07.489 UTC [239] STATEMENT:  DELETE FROM retention_checkpoint
+2026-10-10 05:49:07.506 UTC [240] ERROR:  permission denied for table retention_checkpoint
+2026-10-10 05:49:07.506 UTC [240] STATEMENT:  UPDATE retention_checkpoint SET transition_json=transition_json
+2026-10-10 05:49:07.506 UTC [240] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:07.506 UTC [240] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-10 05:49:07.507 UTC [239] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:07.507 UTC [239] STATEMENT:  UPDATE custody_attempt SET effective_delete_by=delete_by
+2026-10-10 05:49:07.522 UTC [241] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:07.522 UTC [241] STATEMENT:  UPDATE retention_source SET fresh_until=clock_timestamp()
+2026-10-10 05:49:07.523 UTC [241] ERROR:  permission denied for table retention_catchup
+2026-10-10 05:49:07.523 UTC [241] STATEMENT:  UPDATE retention_catchup SET completed_at=clock_timestamp()
+2026-10-10 05:49:07.523 UTC [241] ERROR:  permission denied for table retention_checkpoint
+2026-10-10 05:49:07.523 UTC [241] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:07.523 UTC [241] ERROR:  permission denied for table retention_decision
+2026-10-10 05:49:07.523 UTC [241] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:07.730 UTC [182] ERROR:  retention checkpoint is immutable
+2026-10-10 05:49:07.730 UTC [182] CONTEXT:  PL/pgSQL function retention_checkpoint_immutable() line 6 at RAISE
+2026-10-10 05:49:07.730 UTC [182] STATEMENT:  UPDATE retention_checkpoint SET transition_json='{}' WHERE id=$1
+2026-10-10 05:49:07.760 UTC [248] ERROR:  duplicate key value violates unique constraint "retention_source_epoch_pkey"
+2026-10-10 05:49:07.760 UTC [248] DETAIL:  Key (root_id, cluster_id, namespace_uid, epoch)=(10000000-0000-4000-8000-000000000233, 10000000-0000-4000-8000-000000000234, control, 10000000-0000-4000-8000-000000000236) already exists.
+2026-10-10 05:49:07.760 UTC [248] STATEMENT:  -- name: InsertRetentionEpoch :exec
+	INSERT INTO retention_source_epoch(root_id,cluster_id,namespace_uid,epoch) VALUES($1,$2,$3,$4)
+	
+2026-10-10 05:49:08.057 UTC [250] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:08.057 UTC [250] STATEMENT:  UPDATE retention_source SET recovery_blocked=false
+2026-10-10 05:49:08.058 UTC [250] ERROR:  permission denied for table retention_source
+2026-10-10 05:49:08.058 UTC [250] STATEMENT:  UPDATE retention_source SET suspended=false
+2026-10-10 05:49:08.058 UTC [250] ERROR:  permission denied for table retention_checkpoint
+2026-10-10 05:49:08.058 UTC [250] STATEMENT:  UPDATE retention_checkpoint SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:08.058 UTC [250] ERROR:  permission denied for table retention_decision
+2026-10-10 05:49:08.058 UTC [250] STATEMENT:  UPDATE retention_decision SET audit_acknowledged_at=clock_timestamp()
+2026-10-10 05:49:08.059 UTC [250] ERROR:  permission denied for table custody_attempt
+2026-10-10 05:49:08.059 UTC [250] STATEMENT:  UPDATE custody_attempt SET expires_at=expires_at
+2026-10-10 05:49:08.059 UTC [250] ERROR:  permission denied for table retention_catchup
+2026-10-10 05:49:08.059 UTC [250] STATEMENT:  DELETE FROM retention_catchup
+2026-10-10 05:49:08.340 UTC [182] ERROR:  retention catch-up cannot rewind
+2026-10-10 05:49:08.340 UTC [182] CONTEXT:  PL/pgSQL function protect_retention_catchup() line 6 at RAISE
+2026-10-10 05:49:08.340 UTC [182] STATEMENT:  UPDATE retention_catchup SET completed_at=NULL WHERE checkpoint_id=$1
+2026-10-10 05:49:14.872 UTC [270] ERROR:  permission denied for schema public at character 14
+2026-10-10 05:49:14.872 UTC [270] STATEMENT:  CREATE TABLE forbidden (id int)
+2026-10-10 05:49:14.872 UTC [270] ERROR:  permission denied for table goose_db_version
+2026-10-10 05:49:14.872 UTC [270] STATEMENT:  UPDATE goose_db_version SET version_id=1
+2026-10-10 05:49:35.874 UTC [317] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:35.874 UTC [317] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:35.875 UTC [317] ERROR:  certificate issue history is immutable
+2026-10-10 05:49:35.875 UTC [317] CONTEXT:  PL/pgSQL function guard_certificate_issue() line 16 at RAISE
+2026-10-10 05:49:35.875 UTC [317] STATEMENT:  UPDATE fleet_certificate_issue SET signed_at=NULL,certificate_json=NULL,certificate_sha256=NULL,certificate_not_before=NULL,certificate_not_after=NULL WHERE installation_id=$1
+2026-10-10 05:49:35.875 UTC [317] ERROR:  permission denied for table fleet_certificate_issue
+2026-10-10 05:49:35.875 UTC [317] STATEMENT:  DELETE FROM fleet_certificate_issue WHERE installation_id=$1
+2026-10-10 05:49:35.876 UTC [307] ERROR:  certificate issue history is immutable
+2026-10-10 05:49:35.876 UTC [307] CONTEXT:  PL/pgSQL function guard_certificate_issue() line 16 at RAISE
+2026-10-10 05:49:35.876 UTC [307] STATEMENT:  UPDATE fleet_certificate_issue SET audit_acknowledged_at=NULL,audit_digest=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_etag=NULL,audit_object_bytes=NULL,audit_object_sha256=NULL WHERE installation_id=$1
+2026-10-10 05:49:35.876 UTC [309] ERROR:  certificate issue history is immutable
+2026-10-10 05:49:35.876 UTC [309] CONTEXT:  PL/pgSQL function guard_certificate_issue() line 16 at RAISE
+2026-10-10 05:49:35.876 UTC [309] STATEMENT:  UPDATE fleet_certificate_issue SET activated_at=NULL WHERE installation_id=$1
+2026-10-10 05:49:35.877 UTC [309] ERROR:  permission denied for table fleet_certificate_issue
+2026-10-10 05:49:35.877 UTC [309] STATEMENT:  UPDATE fleet_certificate_issue SET certificate_json='replacement' WHERE installation_id=$1
+2026-10-10 05:49:35.877 UTC [309] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:35.877 UTC [309] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:36.301 UTC [321] ERROR:  enrollment audit receipt is immutable
+2026-10-10 05:49:36.301 UTC [321] CONTEXT:  PL/pgSQL function guard_enrollment_receipt() line 9 at RAISE
+2026-10-10 05:49:36.301 UTC [321] STATEMENT:  UPDATE fleet_bootstrap SET claim_acknowledged_at=NULL,claim_audit_digest=NULL,claim_object_key=NULL,claim_object_version=NULL,claim_object_etag=NULL,claim_object_bytes=NULL,claim_object_sha256=NULL WHERE installation_id=$1
+2026-10-10 05:49:36.302 UTC [321] ERROR:  enrollment audit receipt is immutable
+2026-10-10 05:49:36.302 UTC [321] CONTEXT:  PL/pgSQL function guard_enrollment_receipt() line 9 at RAISE
+2026-10-10 05:49:36.302 UTC [321] STATEMENT:  UPDATE fleet_bootstrap SET claim_object_sha256=decode(repeat('ff',32),'hex') WHERE installation_id=$1
+2026-10-10 05:49:36.302 UTC [321] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:36.302 UTC [321] STATEMENT:  UPDATE fleet_bootstrap SET claimed_at=NULL,public_key_sha256=NULL WHERE installation_id=$1
+2026-10-10 05:49:36.303 UTC [321] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:36.303 UTC [321] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:36.304 UTC [320] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:36.304 UTC [320] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false
+2026-10-10 05:49:36.304 UTC [320] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:36.304 UTC [320] STATEMENT:  UPDATE fleet_bootstrap SET not_after=clock_timestamp()+interval '5 minutes'
+2026-10-10 05:49:36.304 UTC [320] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:36.304 UTC [320] STATEMENT:  DELETE FROM fleet_bootstrap
+2026-10-10 05:49:36.305 UTC [320] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:36.305 UTC [320] STATEMENT:  UPDATE fleet_peer SET enabled=true
+2026-10-10 05:49:36.305 UTC [320] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:36.305 UTC [320] STATEMENT:  UPDATE fleet_trust SET suspended=false
+2026-10-10 05:49:36.367 UTC [326] ERROR:  bootstrap binding and consumed claim are immutable
+2026-10-10 05:49:36.367 UTC [326] CONTEXT:  PL/pgSQL function guard_bootstrap_claim() line 19 at RAISE
+2026-10-10 05:49:36.367 UTC [326] STATEMENT:  UPDATE fleet_bootstrap SET claimed_at=NULL,public_key_sha256=NULL WHERE installation_id=$1
+2026-10-10 05:49:36.368 UTC [326] ERROR:  bootstrap binding and consumed claim are immutable
+2026-10-10 05:49:36.368 UTC [326] CONTEXT:  PL/pgSQL function guard_bootstrap_claim() line 19 at RAISE
+2026-10-10 05:49:36.368 UTC [326] STATEMENT:  UPDATE fleet_bootstrap SET public_key_sha256=decode(repeat('ff',32),'hex') WHERE installation_id=$1
+2026-10-10 05:49:37.196 UTC [329] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.196 UTC [329] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-10 05:49:37.197 UTC [329] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.197 UTC [329] STATEMENT:  UPDATE fleet_trust SET issuer_epoch=gen_random_uuid() WHERE installation_id=$1
+2026-10-10 05:49:37.197 UTC [329] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.197 UTC [329] STATEMENT:  UPDATE fleet_trust SET source_uid='replacement' WHERE installation_id=$1
+2026-10-10 05:49:37.198 UTC [329] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.198 UTC [329] STATEMENT:  DELETE FROM fleet_trust WHERE installation_id=$1
+2026-10-10 05:49:37.198 UTC [329] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:37.198 UTC [329] STATEMENT:  UPDATE fleet_peer SET enabled=true WHERE installation_id=$1
+2026-10-10 05:49:37.199 UTC [329] ERROR:  permission denied for table fleet_bootstrap
+2026-10-10 05:49:37.199 UTC [329] STATEMENT:  UPDATE fleet_bootstrap SET revoked=false WHERE installation_id=$1
+2026-10-10 05:49:37.199 UTC [329] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.199 UTC [329] STATEMENT:  INSERT INTO fleet_trust(installation_id,issuer_epoch,source_uid,source_generation,source_digest,observed_at,fresh_until,recovery_blocked) VALUES($1,$2,'injected',1,$3,clock_timestamp(),clock_timestamp()+interval '1 second',false)
+2026-10-10 05:49:37.216 UTC [331] ERROR:  permission denied for table fleet_peer
+2026-10-10 05:49:37.216 UTC [331] STATEMENT:  UPDATE fleet_peer SET enabled=true
+2026-10-10 05:49:37.216 UTC [331] ERROR:  permission denied for table fleet_peer_certificate
+2026-10-10 05:49:37.216 UTC [331] STATEMENT:  DELETE FROM fleet_peer_certificate
+2026-10-10 05:49:37.217 UTC [331] ERROR:  permission denied for table fleet_trust
+2026-10-10 05:49:37.217 UTC [331] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false
+2026-10-10 05:49:37.217 UTC [331] ERROR:  permission denied for table permission_stream
+2026-10-10 05:49:37.217 UTC [331] STATEMENT:  UPDATE permission_stream SET suspended=false
+2026-10-10 05:49:37.217 UTC [331] ERROR:  permission denied for table context_capture
+2026-10-10 05:49:37.217 UTC [331] STATEMENT:  UPDATE context_capture SET state='intent_audited'
+2026-10-10 05:49:37.317 UTC [332] ERROR:  new row for relation "fleet_peer" violates check constraint "fleet_peer_check3"
+2026-10-10 05:49:37.317 UTC [332] DETAIL:  Failing row contains (040e943c-1915-4071-bd1f-bdba0fb79ef7, 6e0f4b68-9f21-40db-95ee-48bdf9eb713c, 624ef558-5bc4-474e-a9de-e326fcd20ae9, f075aff9-00b4-4e25-89a1-d50af14b88c9, connector, 1, t, 2026-10-10 06:49:37.305784+00, null, null, null, null).
+2026-10-10 05:49:37.317 UTC [332] STATEMENT:  UPDATE fleet_peer SET audit_id=NULL,audit_object_key=NULL,audit_object_version=NULL,audit_object_sha256=NULL WHERE installation_id=$1

@@ -1,0 +1,1 @@
+{"exit":1,"status":"failed","finding":"Test-side defect: the timed start binding used the process observation raw (non-microsecond) times, which Binding.Valid rejects, so the observed PrepareStart was denied without any API call. The cold work process read took 1.81 s with 71 API calls.","log":"context-storage.log"}

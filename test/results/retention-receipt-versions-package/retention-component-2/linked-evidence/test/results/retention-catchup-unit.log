@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/configuration	1.056s
+ok  	asservat.local/asservat/internal/domain/privacy	(cached)
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+ok  	asservat.local/asservat/test/integration	1.051s

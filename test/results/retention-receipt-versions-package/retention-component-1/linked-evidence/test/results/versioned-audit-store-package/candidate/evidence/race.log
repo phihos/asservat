@@ -1,0 +1,463 @@
+=== RUN   TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion
+    capture_operation_test.go:107: maximum completed capture pair: legacy expansion=36126 ciphertext total=24165 bytes
+--- PASS: TestClosedCaptureWriterMaximumIdentityKeepsPositiveCompletion (0.02s)
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/0
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/1
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/2
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/3
+=== RUN   TestContextWriterCompletionRequiresEveryPositiveReceipt/4
+--- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt (0.27s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/0 (0.06s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/1 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/2 (0.05s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/3 (0.06s)
+    --- PASS: TestContextWriterCompletionRequiresEveryPositiveReceipt/4 (0.06s)
+=== RUN   TestContextWriterCloseJoinsInFlightWrites
+--- PASS: TestContextWriterCloseJoinsInFlightWrites (0.07s)
+=== RUN   TestUnusedContextHandleCannotCertifyCompletion
+--- PASS: TestUnusedContextHandleCannotCertifyCompletion (0.04s)
+=== RUN   TestContextWriterUnknownFinalPutCannotCertifyCompletion
+--- PASS: TestContextWriterUnknownFinalPutCannotCertifyCompletion (0.06s)
+=== RUN   TestPurgeRequiresCompleteConfinedInventory
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/denied
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/delete-failed
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/retained-marker
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/foreign-key
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/truncated
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/oversized
+=== RUN   TestPurgeRequiresCompleteConfinedInventory/null-version
+--- PASS: TestPurgeRequiresCompleteConfinedInventory (0.61s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/denied (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/delete-failed (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/retained-marker (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/foreign-key (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/truncated (0.01s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/oversized (0.56s)
+    --- PASS: TestPurgeRequiresCompleteConfinedInventory/null-version (0.01s)
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedDownloadStopWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedDownloadStopWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestDownloadStopPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt
+=== RUN   TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing
+--- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry (0.05s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/ok (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/exists (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/uncertain (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/changed (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/corrupt (0.01s)
+    --- PASS: TestDownloadWindowWriterRequiresFirstPutExactReadAndNoUnknownRetry/missing (0.01s)
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification
+=== RUN   TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification
+--- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification (0.06s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/success (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/exists (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/unknown-put (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-etag (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-version (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/wrong-bytes (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/bad-verification (0.01s)
+    --- PASS: TestClosedOperationWriterRequiresPositivePUTAndExactJoinedVerification/canceled-at-verification (0.01s)
+=== RUN   TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins
+--- PASS: TestClosedOperationWriterDoesNotReturnBeforeOwnedVerificationJoins (0.01s)
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated
+=== RUN   TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker
+--- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot (0.07s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/original (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/terminal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdueOriginal (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/overdue-unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-certificate (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/unexpected-key (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/truncated (0.01s)
+    --- PASS: TestOperationPurgeConfinesAllVersionsAndTerminalSlot/retained-marker (0.01s)
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ok
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size
+=== RUN   TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version
+--- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse (0.03s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ok (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/changed-etag (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/ignored-range (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-size (0.01s)
+    --- PASS: TestPinnedRangeRejectsChangedOrUnboundedResponse/wrong-version (0.01s)
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/put/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/read/original-version
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/null
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized
+=== RUN   TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version
+--- PASS: TestVersionedAuditRejectsUnpinnedReceipts (0.06s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/put/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/ (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/null (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/oversized (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/read/original-version (0.01s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/ (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/null (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/oversized (0.00s)
+    --- PASS: TestVersionedAuditRejectsUnpinnedReceipts/pin/original-version (0.00s)
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/null
+=== RUN   TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00
+--- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement (0.03s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/original-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/other-version (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/null (0.01s)
+    --- PASS: TestVersionedAuditPinnedReadSurvivesLatestReplacement/#00 (0.01s)
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-""
+=== RUN   TestLegacyStoreRetainsVersionOptionalContract/version-"null"
+--- PASS: TestLegacyStoreRetainsVersionOptionalContract (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"" (0.01s)
+    --- PASS: TestLegacyStoreRetainsVersionOptionalContract/version-"null" (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore	2.570s
+=== RUN   TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose
+--- PASS: TestBootstrapIssueAuditAuthenticatesActorCredentialAndPurpose (0.01s)
+=== RUN   TestCaptureAuditAuthenticatesPurposeAndFrozenRecord
+--- PASS: TestCaptureAuditAuthenticatesPurposeAndFrozenRecord (0.01s)
+=== RUN   TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope
+    capture_operation_test.go:90: actual Tink ciphertext under maximum opaque wrapping text: intent=36590 outcome=37079 prepaid=65536 bytes
+--- PASS: TestCapturePrivateFormatFitsMaxTextAndWrappingEnvelope (0.03s)
+=== RUN   TestCapturePrivateEnvelopeRejectsControlExpansion
+--- PASS: TestCapturePrivateEnvelopeRejectsControlExpansion (0.00s)
+=== RUN   TestContextDeletionRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestContextDeletionRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestContextVerificationAuditPinsCopiesScopeAndPurpose
+--- PASS: TestContextVerificationAuditPinsCopiesScopeAndPurpose (0.01s)
+=== RUN   TestCursorSequentialPullsKeepOneFrameAndOriginalKeys
+--- PASS: TestCursorSequentialPullsKeepOneFrameAndOriginalKeys (0.14s)
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/native
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/data
+=== RUN   TestCursorFinalIntegrityAndPartialRangeClaims/index
+--- PASS: TestCursorFinalIntegrityAndPartialRangeClaims (0.07s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/native (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/data (0.02s)
+    --- PASS: TestCursorFinalIntegrityAndPartialRangeClaims/index (0.02s)
+=== RUN   TestCursorEmptyFileStillReturnsAuthenticatedFinal
+--- PASS: TestCursorEmptyFileStillReturnsAuthenticatedFinal (0.00s)
+=== RUN   TestCursorCloseCancelsAndJoinsPendingRead
+--- PASS: TestCursorCloseCancelsAndJoinsPendingRead (0.00s)
+=== RUN   TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead
+--- PASS: TestCursorCurrentCallExpiryCannotBeRenewedAfterAdmittedRead (0.10s)
+=== RUN   TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO
+--- PASS: TestCursorCanceledOwnerDeniesRetainedFrameWithoutMoreIO (0.03s)
+=== RUN   TestCursorCanceledCallBeforeAdmissionDoesNotConsume
+--- PASS: TestCursorCanceledCallBeforeAdmissionDoesNotConsume (0.00s)
+=== RUN   TestCursorRangeCrossesAuthenticatedIndexPageBoundary
+--- PASS: TestCursorRangeCrossesAuthenticatedIndexPageBoundary (0.09s)
+=== RUN   TestCursorUncertainReadRetainsAttemptAndCannotRetry
+--- PASS: TestCursorUncertainReadRetainsAttemptAndCannotRetry (0.00s)
+=== RUN   TestDownloadAuditPinsRangeActorGenerationAndPurpose
+--- PASS: TestDownloadAuditPinsRangeActorGenerationAndPurpose (0.01s)
+=== RUN   TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestDownloadStopRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestDownloadStopAuditExactDecisionAndOneWrap
+--- PASS: TestDownloadStopAuditExactDecisionAndOneWrap (0.00s)
+=== RUN   TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase
+--- PASS: TestDownloadWindowAuditPinsResponseRangeOwnerAndPhase (0.01s)
+=== RUN   TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose
+--- PASS: TestEnrollmentClaimAuditAuthenticatesIdentityAndPurpose (0.01s)
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/0
+    framed_test.go:115: nativeBytes=0 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/4096
+    framed_test.go:115: nativeBytes=4096 wraps=3 unwraps=3 largestKeysetBytes=131
+=== RUN   TestArtifactKeyCallsIndependentOfPayloadSize/16777295
+    framed_test.go:115: nativeBytes=16777295 wraps=3 unwraps=3 largestKeysetBytes=131
+--- PASS: TestArtifactKeyCallsIndependentOfPayloadSize (0.39s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/0 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/4096 (0.01s)
+    --- PASS: TestArtifactKeyCallsIndependentOfPayloadSize/16777295 (0.38s)
+=== RUN   TestRoundTripAndRanges
+=== RUN   TestRoundTripAndRanges/0
+=== RUN   TestRoundTripAndRanges/1
+=== RUN   TestRoundTripAndRanges/4000
+=== RUN   TestRoundTripAndRanges/8388608
+=== RUN   TestRoundTripAndRanges/8388635
+=== RUN   TestRoundTripAndRanges/16777295
+--- PASS: TestRoundTripAndRanges (0.95s)
+    --- PASS: TestRoundTripAndRanges/0 (0.00s)
+    --- PASS: TestRoundTripAndRanges/1 (0.01s)
+    --- PASS: TestRoundTripAndRanges/4000 (0.01s)
+    --- PASS: TestRoundTripAndRanges/8388608 (0.20s)
+    --- PASS: TestRoundTripAndRanges/8388635 (0.25s)
+    --- PASS: TestRoundTripAndRanges/16777295 (0.48s)
+=== RUN   TestCorruptionAndFinalBatch
+=== RUN   TestCorruptionAndFinalBatch/data
+=== RUN   TestCorruptionAndFinalBatch/index
+=== RUN   TestCorruptionAndFinalBatch/native-hash
+=== RUN   TestCorruptionAndFinalBatch/data-hash
+=== RUN   TestCorruptionAndFinalBatch/index-hash
+--- PASS: TestCorruptionAndFinalBatch (0.23s)
+    --- PASS: TestCorruptionAndFinalBatch/data (0.03s)
+    --- PASS: TestCorruptionAndFinalBatch/index (0.02s)
+    --- PASS: TestCorruptionAndFinalBatch/native-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/data-hash (0.06s)
+    --- PASS: TestCorruptionAndFinalBatch/index-hash (0.06s)
+=== RUN   TestAttemptBindingAndSingleUse
+--- PASS: TestAttemptBindingAndSingleUse (0.01s)
+=== RUN   TestDeliveryRevocation
+--- PASS: TestDeliveryRevocation (0.04s)
+=== RUN   TestPagedRangeBeyondTwoGiB
+    framed_test.go:336: native=2147483721 data=244550 index=71288 tailDataRead=70 tailIndexRead=381
+--- PASS: TestPagedRangeBeyondTwoGiB (3.81s)
+=== RUN   TestLayoutRejectsMalformedBounds
+--- PASS: TestLayoutRejectsMalformedBounds (0.00s)
+=== RUN   TestPublishedContractFixture
+--- PASS: TestPublishedContractFixture (0.01s)
+=== RUN   TestIncompressibleFramesAndAuthenticatedCorruption
+--- PASS: TestIncompressibleFramesAndAuthenticatedCorruption (0.41s)
+=== RUN   TestRejectOtherTinkSuiteBeforeObjectRead
+--- PASS: TestRejectOtherTinkSuiteBeforeObjectRead (0.00s)
+=== RUN   TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution
+--- PASS: TestInitialInstallationAuditRejectsScopeClaimAndPurposeSubstitution (0.01s)
+=== RUN   TestLifecycleRequiresBothSignatureAndEncryptedRecord
+--- PASS: TestLifecycleRequiresBothSignatureAndEncryptedRecord (0.01s)
+=== RUN   TestOperationAuditExactRecordsAndProviderCallCount
+    operation_audit_test.go:33: local Tink audit only: wraps=2 unwraps=2 max_wrapped_key_bytes=131 intent_cipher_bytes=1413 outcome_cipher_bytes=1854 elapsed=2.48237ms; no network provider latency measured
+--- PASS: TestOperationAuditExactRecordsAndProviderCallCount (0.00s)
+=== RUN   TestOperationRetirementRequiresExactEncryptedSignedCheckpoint
+--- PASS: TestOperationRetirementRequiresExactEncryptedSignedCheckpoint (0.01s)
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/root
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/source
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper
+=== RUN   TestOwnerConfigurationAuditExactPurposeAndSnapshot/format
+--- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot (0.01s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/root (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/issuer (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/revision (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/source (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/protection (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/suspend (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/tamper (0.00s)
+    --- PASS: TestOwnerConfigurationAuditExactPurposeAndSnapshot/format (0.00s)
+=== RUN   TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame
+--- PASS: TestReaderDenialAtFrameBoundaryDoesNotReadNextFrame (0.14s)
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format
+=== RUN   TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json
+--- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory (0.01s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/root (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/policy (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/epoch (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/sequence (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/corrupt (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/format (0.00s)
+    --- PASS: TestRetentionAcceptanceEncryptedExactPurposeAndHistory/duplicate-json (0.00s)
+=== RUN   FuzzLayout
+=== RUN   FuzzLayout/seed#0
+=== RUN   FuzzLayout/seed#1
+=== RUN   FuzzLayout/seed#2
+--- PASS: FuzzLayout (0.00s)
+    --- PASS: FuzzLayout/seed#0 (0.00s)
+    --- PASS: FuzzLayout/seed#1 (0.00s)
+    --- PASS: FuzzLayout/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.617s
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/larger_payload
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/different_mechanism
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/different_action
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/missing_class
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/unknown_class
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/invented_node
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/invented_boot
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/raw_data
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_node
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_boot
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_raw
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_action
+=== RUN   TestAPIContextManifestBindsExplicitProjectionClass/expectation_larger_ceiling
+--- PASS: TestAPIContextManifestBindsExplicitProjectionClass (0.09s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/larger_payload (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/different_mechanism (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/different_action (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/missing_class (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/unknown_class (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/invented_node (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/invented_boot (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/raw_data (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_node (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_boot (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_raw (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_action (0.00s)
+    --- PASS: TestAPIContextManifestBindsExplicitProjectionClass/expectation_larger_ceiling (0.00s)
+=== RUN   TestContextManifestRejectsChangedClaims
+=== RUN   TestContextManifestRejectsChangedClaims/collector_identity
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_occurrence
+=== RUN   TestContextManifestRejectsChangedClaims/target_container
+=== RUN   TestContextManifestRejectsChangedClaims/changed_owner
+=== RUN   TestContextManifestRejectsChangedClaims/manual_policy_invented
+=== RUN   TestContextManifestRejectsChangedClaims/truncated_source
+=== RUN   TestContextManifestRejectsChangedClaims/null_scalar
+=== RUN   TestContextManifestRejectsChangedClaims/plan
+=== RUN   TestContextManifestRejectsChangedClaims/capture
+=== RUN   TestContextManifestRejectsChangedClaims/layout_hash
+=== RUN   TestContextManifestRejectsChangedClaims/reversed_time
+=== RUN   TestContextManifestRejectsChangedClaims/unqualified_format
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_cluster
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_artifact
+=== RUN   TestContextManifestRejectsChangedClaims/foreign_case
+=== RUN   TestContextManifestRejectsChangedClaims/scope_promotion
+=== RUN   TestContextManifestRejectsChangedClaims/grant_invented
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_pod
+=== RUN   TestContextManifestRejectsChangedClaims/purpose
+=== RUN   TestContextManifestRejectsChangedClaims/expiry_extension
+=== RUN   TestContextManifestRejectsChangedClaims/deletion_extension
+=== RUN   TestContextManifestRejectsChangedClaims/parent_laundering
+=== RUN   TestContextManifestRejectsChangedClaims/layout_size
+=== RUN   TestContextManifestRejectsChangedClaims/invalid_time
+=== RUN   TestContextManifestRejectsChangedClaims/privacy_downgrade
+=== RUN   TestContextManifestRejectsChangedClaims/retention_policy
+=== RUN   TestContextManifestRejectsChangedClaims/action
+=== RUN   TestContextManifestRejectsChangedClaims/projection
+=== RUN   TestContextManifestRejectsChangedClaims/data_version
+=== RUN   TestContextManifestRejectsChangedClaims/index_identity
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_namespace
+=== RUN   TestContextManifestRejectsChangedClaims/replacement_boot
+=== RUN   TestContextManifestRejectsChangedClaims/anchor_reset
+=== RUN   TestContextManifestRejectsChangedClaims/raw_filename
+=== RUN   TestContextManifestRejectsChangedClaims/late_completion
+--- PASS: TestContextManifestRejectsChangedClaims (0.17s)
+    --- PASS: TestContextManifestRejectsChangedClaims/collector_identity (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_occurrence (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/target_container (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/changed_owner (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/manual_policy_invented (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/truncated_source (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/null_scalar (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/plan (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/capture (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/layout_hash (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/reversed_time (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/unqualified_format (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_cluster (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_artifact (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/foreign_case (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/scope_promotion (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/grant_invented (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_pod (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/purpose (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/expiry_extension (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/deletion_extension (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/parent_laundering (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/layout_size (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/invalid_time (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/privacy_downgrade (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/retention_policy (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/action (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/projection (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/data_version (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/index_identity (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_namespace (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/replacement_boot (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/anchor_reset (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/raw_filename (0.00s)
+    --- PASS: TestContextManifestRejectsChangedClaims/late_completion (0.00s)
+=== RUN   TestCommitStrictBinding
+--- PASS: TestCommitStrictBinding (0.04s)
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_pod
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_namespace
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/impossible_states
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/old_observation
+=== RUN   TestNativeProjectionRejectsHiddenAndInconsistentData/null_count
+--- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData (0.05s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_pod (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/wrong_namespace (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/impossible_states (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/old_observation (0.00s)
+    --- PASS: TestNativeProjectionRejectsHiddenAndInconsistentData/null_count (0.00s)
+=== RUN   TestStrictJSONBoundsAndOfflineLoader
+--- PASS: TestStrictJSONBoundsAndOfflineLoader (0.00s)
+=== RUN   FuzzManifest
+=== RUN   FuzzManifest/seed#0
+=== RUN   FuzzManifest/seed#1
+=== RUN   FuzzManifest/seed#2
+--- PASS: FuzzManifest (0.04s)
+    --- PASS: FuzzManifest/seed#0 (0.00s)
+    --- PASS: FuzzManifest/seed#1 (0.00s)
+    --- PASS: FuzzManifest/seed#2 (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.420s

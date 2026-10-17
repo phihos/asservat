@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/action-lifecycle.schema.json",
+  "title": "Resolved action lifecycles and acquisition provenance",
+  "$defs": {
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "action-lifecycle/v1"
+        },
+        "requestKind": {
+          "enum": [
+            "DebugCapture",
+            "DebugPolicy"
+          ]
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "actionID": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "kind": {
+                    "enum": [
+                      "kubernetesSnapshot",
+                      "logs",
+                      "processSnapshot",
+                      "fileRead",
+                      "packetCapture",
+                      "networkSnapshot",
+                      "runtimeDiagnostic",
+                      "kernelCore",
+                      "liveCore",
+                      "command",
+                      "httpDiagnostic",
+                      "artifactCollect",
+                      "profile",
+                      "syscallTrace"
+                    ]
+                  },
+                  "executionMode": {
+                    "const": "onTrigger"
+                  },
+                  "requestedBefore": {
+                    "const": "0s"
+                  },
+                  "after": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                    "maxLength": 16
+                  }
+                },
+                "required": [
+                  "actionID",
+                  "kind",
+                  "executionMode"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "packetCapture",
+                            "syscallTrace"
+                          ]
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "requestedBefore",
+                        "after"
+                      ]
+                    },
+                    "else": {
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "requestedBefore"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "after"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "actionID": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "kind": {
+                    "enum": [
+                      "packetCapture",
+                      "syscallTrace"
+                    ]
+                  },
+                  "executionMode": {
+                    "const": "ongoing"
+                  },
+                  "activation": {
+                    "enum": [
+                      "policyArming",
+                      "manualSession"
+                    ]
+                  },
+                  "requestedBefore": {
+                    "type": "string",
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                    "maxLength": 16
+                  },
+                  "after": {
+                    "type": "string",
+                    "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                    "maxLength": 16
+                  }
+                },
+                "required": [
+                  "actionID",
+                  "kind",
+                  "executionMode",
+                  "activation",
+                  "requestedBefore",
+                  "after"
+                ]
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "ongoingPodScope": {
+          "enum": [
+            "allAuthorizedWithinObservationLimits",
+            "acceptedCapturePods",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestKind",
+        "actions",
+        "ongoingPodScope"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requestKind": {
+                "const": "DebugPolicy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "actions": {
+                "items": {
+                  "properties": {
+                    "activation": {
+                      "const": "policyArming"
+                    }
+                  }
+                }
+              },
+              "ongoingPodScope": {
+                "enum": [
+                  "none",
+                  "allAuthorizedWithinObservationLimits"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requestKind": {
+                "const": "DebugCapture"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "actions": {
+                "items": {
+                  "properties": {
+                    "activation": {
+                      "const": "manualSession"
+                    }
+                  }
+                }
+              },
+              "ongoingPodScope": {
+                "enum": [
+                  "none",
+                  "acceptedCapturePods"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "executionMode": {
+          "enum": [
+            "onTrigger",
+            "ongoing"
+          ]
+        },
+        "triggeredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "triggerKind": {
+          "enum": [
+            "policy",
+            "manual",
+            "naturalCrash",
+            "recordingSave"
+          ]
+        },
+        "sourceSessionID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceStartedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "snapshotID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestedBefore": {
+          "type": "string",
+          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+          "maxLength": 16
+        },
+        "after": {
+          "type": "string",
+          "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+          "maxLength": 16
+        },
+        "historyCoverage": {
+          "enum": [
+            "full",
+            "partial",
+            "none",
+            "unknown"
+          ]
+        },
+        "gapReasons": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "notPreviouslyArmed",
+              "warming",
+              "capacityLimited",
+              "sourceLost",
+              "targetGone",
+              "permitExpired",
+              "retentionCutoff",
+              "snapshotRefused",
+              "clockUncertain",
+              "unknownLoss",
+              "historyEvicted"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 11,
+          "uniqueItems": true
+        },
+        "sourceStoppedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "windowCoverage": {
+          "enum": [
+            "full",
+            "partial",
+            "none",
+            "unknown"
+          ]
+        },
+        "recordingSaveOrigin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policyUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "policyExecutionDigest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            }
+          },
+          "required": [
+            "policyUID",
+            "policyExecutionDigest"
+          ]
+        }
+      },
+      "required": [
+        "executionMode",
+        "triggeredAt",
+        "triggerKind"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "executionMode": {
+                "const": "ongoing"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sourceSessionID",
+              "sourceStartedAt",
+              "snapshotID",
+              "requestedBefore",
+              "after",
+              "historyCoverage",
+              "gapReasons",
+              "windowCoverage"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "sourceSessionID"
+                  ]
+                },
+                {
+                  "required": [
+                    "sourceStartedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "snapshotID"
+                  ]
+                },
+                {
+                  "required": [
+                    "requestedBefore"
+                  ]
+                },
+                {
+                  "required": [
+                    "after"
+                  ]
+                },
+                {
+                  "required": [
+                    "historyCoverage"
+                  ]
+                },
+                {
+                  "required": [
+                    "gapReasons"
+                  ]
+                },
+                {
+                  "required": [
+                    "sourceStoppedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "windowCoverage"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "triggerKind": {
+                "const": "recordingSave"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "recordingSaveOrigin"
+            ],
+            "properties": {
+              "executionMode": {
+                "const": "ongoing"
+              },
+              "after": {
+                "const": "0s"
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "recordingSaveOrigin"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/action-lifecycle.schema.json#/$defs/plan"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/action-lifecycle.schema.json#/$defs/acquisition"
+    }
+  ]
+}

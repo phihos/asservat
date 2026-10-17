@@ -1,0 +1,44 @@
+# Original owner runtime continuation: component-qualified, native pending
+
+Final candidate: `owner-component-2/files`, nine fixture/harness paths, no production Go or schema changes. Five existing live bases matched exactly; four Go files are new. The two original console helpers retain hashes `147192f7fa86aec8ff896cd1f505aea700caa34b5ffcbf35ae083f689082b191` and `de390b31b8ee1a50de099ac2c014dfeae71914610848fe261526b98ad0b673a5`.
+
+Manifest `75f015f9b7e0258eb1829c05a83f7d3ae9c2ded9657a28db6eaaedfb35153ed1`; 2,938 current-tree dependencies `56c191bd6685f980841e7e43ef8e4cdc55df450b2ebd6cf5caf8a966264cb764`. This includes the parent's latest two enrollment seed casts and progress boundary. `manifest.json` records every base/payload. `delta.json` (`87c270d7db069c16c8bf7fee977421d538747937715b36701868b139fdb16d7d`) and `delta.patch` record the only two changes from passing component1.
+
+## Scope and original bounds
+
+The separate `--runtime-provider-owner` selector requires the passing original bootstrap/provider-pair/provider-worker flags, retains their concrete objects and running worker, then creates the original owner selection, SQL4, scoped provider material, immutable projection and launch. It requires the original actual owner Pod/ReplicaSet/template/image, paired same-process activated SQL30 identities, independently decrypted immutable-version enrollment/certificate audits and current registry checks. There is no host Pod token, host enrollment, acceptance seed, root renewal or repeated effect.
+
+The first Pod UID/name/controller are pinned before dependent reads; a transient read cannot adopt a replacement. Original RS, Deployment and account deletion/replacement deny. Logs expose only fixed restart/exit diagnostics, not raw container termination messages. Owner cleanup is registered before the sole launch, but belongs to the enclosing worker, so the owner remains present through the existing deliberate worker source-loss/history/Lease assertions. Cleanup retains original UID foreground GC and its existing 60-second bound.
+
+Owner-only aggregate fixture context is 12 minutes and Go ceiling 14 minutes, selected before original setup. Worker-only remains 8 minutes and default Go 10 minutes. Existing Helm 12-minute Go ceiling is unchanged. Provider/root/role/token/credential dates and all original <=5-second authority windows are unchanged. The Python harness also owns pre-Go setup/build and post-Go teardown; 14 minutes is not a total harness wall-time promise. This predeclared owner envelope accounts for the measured worker baseline plus the finite 95-second driver, bounded predecessors and two 45-second read-only witnesses. No retry can refresh a selected authority or root.
+
+The six original installer clients stay 20QPS/burst20 and are wrapped only for bounded counters and actual request-deadline minima. The already-qualified in-Pod worker retains its reviewed 40/20 observer and other five 20/20 clients. Owner source-age/provider/SQL headroom remains an actual-native question; S83/4.15s drained is only a source estimate.
+
+## Actual checks
+
+Both runs used GOMAXPROCS2/-p2, one sequential owned job, clean ASSERVAT environment, a fresh /tmp scratch directory with >=4GiB preflight, and a finite 600-second infrastructure ceiling per phase. Every phase and final check found all payloads, bases, dependencies and mirrors unchanged; both scratch directories were removed. No native fixture ran.
+
+| Checkpoint / handle | Phase | Actual result |
+| --- | --- | --- |
+| component1 / 10217 | Python selectors | exit0, 9 tests, 0.501s |
+| component1 / 10217 | integration + command compile | exit0, 17.505s |
+| component1 / 10217 | aggregate fixture bound | exit0, 1 test, 2.001s |
+| component1 / 10217 | OwnerBootstrap + ProviderOwnerInstallation races | exit0, 26 top-level / 73 named, 143.033s |
+| component1 / 10217 | affected integration/Kubernetes/bootstrap/command vet | exit0, 2.501s |
+| component1 / 10217 | make go-architecture-check | exit0, 53 packages / 303 edges, 1.001s |
+| component2 / 5010 | final two-file cleanup layer integration compile | exit0, 17.504s |
+| component2 / 5010 | final integration vet | exit0, 2.501s |
+
+Component1 immutable manifest is `c0843d5bff32a156af35d392009a2b94338375b38f9f26ac5d1c004dca29f300`; its result SHA is `3d1f916b5388e672340331763d949f053f22255ea2072b62493bce810f525599`. Its pre-layer evidence is retained, not relabelled as the final source. Component2 result SHA is `69d8d0b00355097cd0f45d999573fefb1da5a5444a6537b3f5768be818862a63`; runner SHA `cf717d34972f0c36d51eab21135359491e6c43bb6a46d7ce4764529da7dafef1`. The unchanged selectors/races/architecture were not needlessly rerun for the cleanup scope correction. Exact commands, timings and log hashes are in each result.json.
+
+## Next actual qualification
+
+Parent owns integration and the exclusive native window. Intended command from the reviewed live tree:
+
+```sh
+GOMAXPROCS=2 GOFLAGS=-p=2 python scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --runtime-provider-worker --runtime-provider-owner
+```
+
+The harness must observe `TestInitialBootstrapChainWithRealServices/runtime-provider-owner-identity` PASS, terminal source integrity and complete owned cleanup; an old worker-only PASS is insufficient. Preserve the previous worker-native98578 pass separately. Native failure must retain the exact phase, original deadlines and six-client counts; do not reset roots, retry writes, replace Pods or widen the five-second bounds.
+
+Even a native owner identity pass would not supply the receipt-gated owner-observation/v2 backend or original HWORK caller route, prove TLS peer delivery/Ready routing, provider renewal or kubelet token rotation, active capacity/cleanup progress, full version accounting/recovery, or public workflow. That backend/caller producer is the next concrete composition gap; original generated inputs and exact ReadWorkerCaller receipt remain required. No Helm/public enablement is part of these nine paths.

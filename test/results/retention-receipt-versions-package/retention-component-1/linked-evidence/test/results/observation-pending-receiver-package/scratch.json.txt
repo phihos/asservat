@@ -1,0 +1,6 @@
+{
+  "path": "/tmp/asservat-observation-pending-v2-vm511byw",
+  "freeBefore": 7732764672,
+  "uid": 1000,
+  "mode": "0700"
+}

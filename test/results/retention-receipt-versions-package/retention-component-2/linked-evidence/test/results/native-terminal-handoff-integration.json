@@ -1,0 +1,117 @@
+{
+  "integratedAt": "2026-10-12T14:44:01.263858+00:00",
+  "manifestSHA256": "f7fb151020fb1a179262800aa490471c3ff884a2fc61bc570f35033e3b667af3",
+  "verifiedOriginalDependencies": 1497,
+  "files": [
+    {
+      "path": "docs/architecture/native-exchange.md",
+      "base_sha256": "cd881d519fdf1256d49f139de0b07162564ad1fcf260928eb0b9b57bef2f118c",
+      "sha256": "73275480a802e3d3b2a025b2c4f080b2a61b5cd3681e467685abbfaeb549810c",
+      "bytes": 14326
+    },
+    {
+      "path": "docs/architecture/worker-startup.md",
+      "base_sha256": "6a3d7a3f7430c146e84f11429fd2612ca6499dee01c4219ba9524573c146a8e5",
+      "sha256": "903270f71d8f36feb457ab4e0bcb2179fab5c676632ce964aeceec17d9830ead",
+      "bytes": 12711
+    },
+    {
+      "path": "docs/decisions/116-context-native-exchange.md",
+      "base_sha256": "ec5e75b4a432a89a21f81d6513a199d22be2cc564143c74d84ef363196221035",
+      "sha256": "1a5039684eeac39338ffddbe40c2d0279dad3865515c8764befcd2a70fd559cb",
+      "bytes": 3899
+    },
+    {
+      "path": "internal/adapters/postgres/native_completion.go",
+      "base_sha256": null,
+      "sha256": "a6e116cf786d4a0c75e1679cddcb68d7f25792cd1b5fa543f03cdd40ac61e9ee",
+      "bytes": 2707
+    },
+    {
+      "path": "internal/adapters/postgres/native_completion_test.go",
+      "base_sha256": null,
+      "sha256": "92e008fb6f979a71946e2c2e0d74363704c270cb5d3a34d5bb512b24f5428eed",
+      "bytes": 3913
+    },
+    {
+      "path": "internal/application/evidence/native_attachment.go",
+      "base_sha256": "c3ee433b797eb7c49383d20820199616cef8a4dab6155da5e215464f61aef931",
+      "sha256": "a69c9ccab72c27112de999bcf3af64d5f4572e9bd98c8e84b690be91b2643f99",
+      "bytes": 11260
+    },
+    {
+      "path": "internal/application/evidence/native_completion_test.go",
+      "base_sha256": null,
+      "sha256": "014d1620adfbb2cc7287ffb84f9b6a7c7739dbd9c07fd6371999d9c368aec026",
+      "bytes": 1637
+    },
+    {
+      "path": "internal/application/evidence/native_exchange.go",
+      "base_sha256": "be1f1f89aa237ea8843b761fc2b927c25a738348f08dccd28e29f7f1f7155e27",
+      "sha256": "9520254a39a515f868edf3e12e755a173d7584019e04afc8fbd117d4e0724b36",
+      "bytes": 6289
+    },
+    {
+      "path": "internal/transport/native/flow_test.go",
+      "base_sha256": "ea7febae0b22cc7ecfc5f20d89274f7539457b37cfdf8d3d35411ba1c0a4fc68",
+      "sha256": "0b50fab6d49dc096b7000eae0bd6294b3b3e2bb98dcb2fef1a3193349ac44cbf",
+      "bytes": 13788
+    },
+    {
+      "path": "internal/transport/native/handler.go",
+      "base_sha256": "a48335bd147ff8512a5c902e5f7bb766d1a506563147d83203990cbe1cc6927c",
+      "sha256": "81422d85eba7cd2de086b2a9481f709359897bec5176713916f7fa0c1190a1a4",
+      "bytes": 12569
+    },
+    {
+      "path": "internal/transport/native/operation.go",
+      "base_sha256": "a75fcb88c4b99ffda213d278fe551b2874ccdfbbb7a7dd0511a3c903097b5518",
+      "sha256": "dcc871ca7e3a9d37c1e4315b2cfad5b039da4ca5d0dc974b9ba6dac315216815",
+      "bytes": 14806
+    },
+    {
+      "path": "internal/transport/native/registration.go",
+      "base_sha256": "76dc5804045bbb0fe261a8eb21c15f8fe6c736ffd580d56bd20d56ee9a7df141",
+      "sha256": "aac903fde4097fb5e00a1c1d372701443861dbd75a33a6d361b8ff96dd518ca4",
+      "bytes": 3076
+    },
+    {
+      "path": "internal/transport/native/router_test.go",
+      "base_sha256": "85eb729820e6c9ac69941609f5d31ffc1a289a66bb0c971405442aa6bda2da09",
+      "sha256": "8e56154f5109dff09a31ed9c374bf7934e846642d1629c8fc621eeda0d38e93c",
+      "bytes": 6629
+    },
+    {
+      "path": "internal/transport/native/terminal_handoff_compat_test.go",
+      "base_sha256": null,
+      "sha256": "48bf107896b9e40e5ad906179ebdc0a525c8d7c24f888b19f14219e4647460e7",
+      "bytes": 909
+    },
+    {
+      "path": "internal/transport/native/terminal_handoff_test.go",
+      "base_sha256": null,
+      "sha256": "70fbb95f502858a27e9c95e2749c1e86bec2b6dc10f8a7f3769d43b6dbe7dbc7",
+      "bytes": 8071
+    },
+    {
+      "path": "specs/artifact-downloads.md",
+      "base_sha256": "2943a5abd6ce804dfd0e43d9590c95f6cb794b2442533fb41bf84be56aa3d339",
+      "sha256": "b257d6969a8f71937a7bac2d0ce80a76c5165cf76d8876bb791fa9e4c3f39765",
+      "bytes": 25300
+    },
+    {
+      "path": "test/integration/context_native_content_test.go",
+      "base_sha256": "a2dc5ee6f6049151dd5d64a69d0a58e34082d6286eae77bfb0717d1022b19d23",
+      "sha256": "669476a65447579fb52ec63e6d6266f12fcbbf98e43b43fd1665878beb90c9ff",
+      "bytes": 36182
+    },
+    {
+      "path": "test/integration/native_completion_test.go",
+      "base_sha256": null,
+      "sha256": "1b096434f5f15a3d59d770bd26613f397b997545a766469daf9c1b384678737f",
+      "bytes": 4979
+    }
+  ],
+  "scope": "Exact acknowledged native SQL owner closure before existing successful v1 Done; original deadlines, one-second schedule and uncertainty unchanged. Component-tested; native SQL helper qualification pending.",
+  "qualification": "Stage evidence archived; integrated and native qualification pending."
+}

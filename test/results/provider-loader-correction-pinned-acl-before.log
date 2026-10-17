@@ -1,0 +1,5 @@
+--- FAIL: TestInitialProviderPinnedACLReadMetadata (0.00s)
+    initial_provider_diagnostic_test.go:27: pinned OpenBao ACL response rejected initial provider preflight policies: unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.009s
+FAIL

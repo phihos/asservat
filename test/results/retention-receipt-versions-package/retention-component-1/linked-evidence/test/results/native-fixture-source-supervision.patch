@@ -1,0 +1,79 @@
+--- test/integration/download_sessions_test.go
++++ test/integration/download_sessions_test.go
+@@ -155,6 +155,7 @@
+ 
+ 	for _, mode := range []string{"native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+ 		t.Run("download-worker-"+mode, func(t *testing.T) {
++			ctx := ctx // This subtest owns any native source-observer cancellation.
+ 			var nativeScope authorization.KeyScope
+ 			var nativeBackend *kms.LocalOperations
+ 			var f fixture
+@@ -220,6 +221,21 @@
+ 				t.Fatal("current accepted worker configuration", e)
+ 			}
+ 
++			refresh := func(call context.Context) error {
++				batch := f.s.batch
++				batch.Initial = nil
++				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
++				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
++				if e := f.s.p.RefreshPermissions(call, batch); e != nil {
++					return e
++				}
++				return observer.Observe(call)
++			}
++			if strings.HasPrefix(mode, "native-") {
++				var stopObservations func()
++				ctx, stopObservations = startNativeFixtureObservations(t, ctx, refresh)
++				defer stopObservations()
++			}
+ 			if mode == "configuration-mutated" {
+ 				settings.Profile.CPUMillis++
+ 				if e = observer.Observe(ctx); e == nil {
+@@ -376,6 +392,11 @@
+ 				}
+ 				return
+ 			}
++			if strings.HasPrefix(mode, "native-") {
++				// This is a new independent admission after fixture setup, not
++				// an extension of the earlier session-reservation observation.
++				a = f.authority()
++			}
+ 			i, e := ledger.ReserveDownloadWorker(ctx, session.ID, intentID, a, profile)
+ 			if e != nil {
+ 				t.Fatal("reserve worker", e)
+@@ -492,25 +513,6 @@
+ 					t.Fatal("cancellation refunded unknown worker", e)
+ 				}
+ 				return
+-			}
+-			refresh := func(call context.Context) error {
+-				batch := f.s.batch
+-				batch.Initial = nil
+-				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+-				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
+-				if e := f.s.p.RefreshPermissions(call, batch); e != nil {
+-					return e
+-				}
+-				return observer.Observe(call)
+-			}
+-			if strings.HasPrefix(mode, "native-") {
+-				// Schema/role/publication setup can outlast the first observation.
+-				// Observe the same explicitly synthetic protected fixture sources
+-				// before dispatch, as the native loop also does subsequently.
+-				// This does not renew a human/operation observation or a permit.
+-				if e = refresh(ctx); e != nil {
+-					t.Fatal("native fixture observations before dispatch", e)
+-				}
+ 			}
+ 			jobs := &syntheticDownloadJobs{loseCreate: mode == "coordinator-recovery"}
+ 			countedAudit := &countedWorkerAudit{writer: objectAudit}
+@@ -678,7 +680,7 @@
+ 					service.CurrentAuthority = f.gate
+ 					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader, recovery: f.s.recovery.reader}
+ 				}
+-				qualifyNativeExchange(t, ctx, nativeExchangeFixture{content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, refresh: refresh, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
++				qualifyNativeExchange(t, ctx, nativeExchangeFixture{content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+ 				return
+ 			}
+ 			if mode == "request-owners" {

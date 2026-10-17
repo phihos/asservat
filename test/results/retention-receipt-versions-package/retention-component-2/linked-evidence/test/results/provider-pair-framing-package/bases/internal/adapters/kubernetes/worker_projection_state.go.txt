@@ -1,0 +1,64 @@
+package kubernetes
+
+import (
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// Fixed public provenance validation only. A pending or completed journal does
+// not grant a subsystem access to a Secret or make its SQL setup current.
+func workerProjectionStateValid(installation string, state contracts.InitialRuntimeResourceState, now time.Time) bool {
+	if !ownerIdentityResourceStateValid(state, now) || state.OwnerLayout != "" && state.OwnerLayout != contracts.OwnerInstalledLayout || !capacityProjectionStateValid(installation, state, now) || !cleanupProjectionStateValid(installation, state, now) {
+		return false
+	}
+	c, p := state.CleanupProjection, state.CapacityProjection
+	if c == nil || p == nil {
+		return true
+	}
+	// Both compartments refer to the same original paired-root setup. Neither
+	// may substitute a different setup or consume its sibling's one-use claim.
+	if !equalJSON(c.Setup, p.Setup) || c.OperationID == p.OperationID {
+		return false
+	}
+	return c.Receipt == nil || p.Receipt == nil || c.Receipt.Secret.UID != p.Receipt.Secret.UID
+}
+
+func cleanupProjectionStateValid(installation string, state contracts.InitialRuntimeResourceState, now time.Time) bool {
+	p := state.CleanupProjection
+	if p == nil {
+		return true
+	}
+	if !authorization.UUID(installation) || state.WorkerLayout != contracts.HubWorkerInstalledLayout ||
+		!authorization.UUID(state.SetupID) || len(state.Objects) != contracts.InitialRuntimeResourceCount ||
+		state.CreatedAt.Year() < 2020 || state.CreatedAt.After(now) || !capacityProjectionMicrotime(state.CreatedAt) ||
+		state.Until.Sub(state.CreatedAt) != 30*time.Minute {
+		return false
+	}
+	ids, uids := map[string]bool{state.SetupID: true}, map[string]bool{}
+	for _, object := range state.Objects {
+		if object.Receipt == nil || !authorization.UUID(object.OperationID) || ids[object.OperationID] ||
+			!authorization.UUID(object.Receipt.UID) || uids[object.Receipt.UID] {
+			return false
+		}
+		ids[object.OperationID], uids[object.Receipt.UID] = true, true
+	}
+	if !authorization.UUID(p.OperationID) || p.OperationID == p.Setup.OperationID || ids[p.OperationID] ||
+		!capacitySetupDigest(p.PublicDigest) || p.ClaimedAt.Before(state.CreatedAt) || p.ClaimedAt.After(now) ||
+		!capacityProjectionMicrotime(p.ClaimedAt) || !capacityProjectionMicrotime(p.Until) ||
+		!p.Until.After(p.ClaimedAt) || p.Until.Sub(p.ClaimedAt) > 5*time.Second || p.Until.After(state.Until) ||
+		!capacityProjectionSetupValid(installation, p.Setup, state.CreatedAt, p.ClaimedAt) {
+		return false
+	}
+	if r := p.Receipt; r != nil {
+		if r.Secret.Name != contracts.HubWorkerCleanupProjectionName(installation) || !authorization.UUID(r.Secret.UID) ||
+			r.Secret.UID == p.Setup.RoleRootUID || uids[r.Secret.UID] || !identity.Text(r.ResourceVersion, 128) ||
+			!capacityProjectionMicrotime(r.ObservedAt) || r.ObservedAt.Before(p.ClaimedAt) || r.ObservedAt.After(now) ||
+			!r.ObservedAt.Before(state.Until) {
+			return false
+		}
+	}
+	return true
+}

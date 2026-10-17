@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-21",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Diagnostic run. 'worker/roles-provision/role:configuration-fleet/lookup after ... after 13 attempts; first role:configuration-fleet/root-read after current=1ms claim=1.801s role=2.701s stop=2.701s, 2.299s, operation 2.299s left (unavailable)'. The first attempt's post-lock root read failed after 0.9 s, inside the source recheck, with 2.3 s left. The 12 replays then stopped at the lookup, since a non-fresh claim without a role is lookup-only. ReadConfigurationRoleSource normalized the recheck's cause to unavailable, so run 22 carries the fixed check codes.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL. The other two subtests passed.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

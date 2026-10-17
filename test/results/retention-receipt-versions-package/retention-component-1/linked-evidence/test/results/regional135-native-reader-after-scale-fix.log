@@ -1,0 +1,7 @@
+=== RUN   TestConnectorAPIProcessWithRealKubernetes
+    context_start_connector_test.go:327: current API process: elapsed=2.800203409s err=local start state unavailable
+    context_start_connector_test.go:68: bounded actual API classes: counts=map[GET configmaps:8 GET deployments:21 GET other:40 GET pods:8 GET replicasets:8 GET secrets:2 GET serviceaccounts:6 GET validatingadmissionpolicies:30 GET validatingadmissionpolicybindings:30 POST other:17 POST selfsubjectreviews:19 POST tokenreviews:6 PUT configmaps/dry-run:4 PUT deployments/dry-run:13] total_roundtrip=map[GET configmaps:9.202899ms GET deployments:19.498587ms GET other:44.431378ms GET pods:7.976155ms GET replicasets:23.647426ms GET secrets:8.787737ms GET serviceaccounts:5.036597ms GET validatingadmissionpolicies:33.073377ms GET validatingadmissionpolicybindings:26.520915ms POST other:11.212564ms POST selfsubjectreviews:21.016296ms POST tokenreviews:4.915065ms PUT configmaps/dry-run:4.656115ms PUT deployments/dry-run:27.202425ms]
+--- FAIL: TestConnectorAPIProcessWithRealKubernetes (8.18s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	8.237s
+FAIL

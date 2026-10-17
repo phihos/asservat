@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-12",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Retained-reader worker binding, public role root and SQL producer passed. Public role provisioning ran about 130 s and stopped with class changed, which the bounded replay does not retry. The public producer reported no fixed sub-step; run 13 adds current/claim/role/authenticate/complete/verify steps with the purpose and its position among the 66 purposes.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

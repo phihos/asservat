@@ -1,0 +1,7 @@
+{
+  "session": 26242,
+  "terminalExit": 0,
+  "candidatePassed": false,
+  "cause": "Original version GET returned500 immediately after list-buckets readiness during restart; conditional race and exact deletion passed; no native installed qualification",
+  "sourceSHA256": "382ca0d1117938a7913bd80daeaffc07c8c95eadfddb11c3e9f0c08ef9f727da"
+}

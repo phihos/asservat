@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-2",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "The actual continuation Pod passed open, the 19 runtime resources and both guard bridge steps under the runner account and chart continuation rules, then stopped at worker/documents (unavailable). Cause: the installer configuration ConfigMap is updated during preparation and is not immutable; the helper wrongly required immutability. Fixed for run 3 by pinning the handover receipt's exact input name and UID.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

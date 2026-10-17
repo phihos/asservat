@@ -1,0 +1,429 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	admission "k8s.io/api/admissionregistration/v1"
+	auth "k8s.io/api/authentication/v1"
+	authz "k8s.io/api/authorization/v1"
+	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
+)
+
+// Real API admission, guarded sources, Secret claim/projection, and Deployment
+// CAS. SQL receipts and provider material are explicitly synthetic. The native
+// Pod is scheduling-gated throughout; this is not runtime execution, initial
+// historical cleanliness, an installed bridge, or a product image qualification.
+func TestConfigurationRuntimeLaunchWithRealKubernetes(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+	if path == "" {
+		t.Skip("requires owned context fixture")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f fixture
+	if json.Unmarshal(b, &f) != nil || len(f.Clusters) == 0 {
+		t.Fatal("native launch fixture unavailable")
+	}
+	clear(b)
+	kc, err := clientcmd.BuildConfigFromFlags("", f.Clusters[0].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"matrix", "lost-claim", "lost-launch", "changed-enforcement", "changed-input"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			defer cancel()
+			qualifyConfigurationNativeLaunch(t, ctx, kc, mode)
+		})
+	}
+}
+
+func qualifyConfigurationNativeLaunch(t *testing.T, ctx context.Context, config *rest.Config, mode string) {
+	t.Helper()
+	api, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// custodyID uses a fixed prefix; retain the unique suffix for each subtest.
+	name := "configuration-launch-" + strings.ReplaceAll(custodyID(), "-", "")
+	ns, err := api.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var policies []string
+	t.Cleanup(func() {
+		clean, end := context.WithTimeout(context.Background(), 60*time.Second)
+		defer end()
+		// Keep protection in place during actual controller/foreground cleanup.
+		for _, deployment := range []string{"worker", "owner"} {
+			if e := api.AppsV1().Deployments(name).Delete(clean, deployment, meta.DeleteOptions{PropagationPolicy: ptr.To(meta.DeletePropagationForeground)}); e != nil && !apierrors.IsNotFound(e) {
+				t.Error("protected deployment cleanup", e)
+			}
+		}
+		for {
+			pods, e := api.CoreV1().Pods(name).List(clean, meta.ListOptions{})
+			deployments, de := api.AppsV1().Deployments(name).List(clean, meta.ListOptions{})
+			if e == nil && de == nil && len(pods.Items) == 0 && len(deployments.Items) == 0 {
+				break
+			}
+			select {
+			case <-clean.Done():
+				t.Error("protected controller cleanup did not join")
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		for _, policy := range policies {
+			if e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(clean, policy, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+				t.Error(e)
+			}
+			if e := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(clean, policy, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+				t.Error(e)
+			}
+		}
+		if e := api.CoreV1().Namespaces().Delete(clean, name, meta.DeleteOptions{}); e != nil && !apierrors.IsNotFound(e) {
+			t.Error(e)
+		}
+	})
+	who, err := api.AuthenticationV1().SelfSubjectReviews().Create(ctx, &auth.SelfSubjectReview{}, meta.CreateOptions{})
+	if err != nil || who.Status.UserInfo.Username == "" {
+		t.Fatal("current fixture administrator", err)
+	}
+	installation, cluster, epoch := custodyID(), custodyID(), custodyID()
+	ref := func(name, uid string) contracts.WorkerObjectReference {
+		return contracts.WorkerObjectReference{Name: name, UID: uid}
+	}
+	accounts := map[string]*core.ServiceAccount{}
+	for _, account := range []string{"owner", "worker", "probe"} {
+		accounts[account], err = api.CoreV1().ServiceAccounts(name).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: account}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	plan := kube.HubWorkerWorkloadPlan{Namespace: name, Name: "worker", ServiceAccount: "worker", Configuration: "worker-inputs", Credentials: "worker-providers", Image: "registry.invalid/synthetic@sha256:" + strings.Repeat("a", 64), FleetSource: "fleet", OwnerSource: "owner", FleetGuard: name + "-fleet", OwnerGuard: name + "-owner", LeaderLease: "leader"}
+	worker, err := kube.BuildProvisionedHubWorkerWorkload(plan, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This fixture-only gate prevents any image pull/execution. It remains part
+	// of the immutable original spec through launch and all replay comparisons.
+	worker.Deployment.Spec.Template.Spec.SchedulingGates = []core.PodSchedulingGate{{Name: "asservat.io/native-launch-fixture"}}
+	deployment, err := api.AppsV1().Deployments(name).Create(ctx, worker.Deployment, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerPlan := plan
+	ownerPlan.Name, ownerPlan.ServiceAccount = "owner", "owner"
+	ownerWorkload, err := kube.BuildProvisionedHubWorkerWorkload(ownerPlan, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := api.AppsV1().Deployments(name).Create(ctx, ownerWorkload.Deployment, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	control := cfg.NamespaceRef{Name: name, UID: string(ns.UID)}
+	administrators := []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}
+	workloadProtection := cfg.OwnerWorkloadAdministration{Name: name + "-workload", Deployment: owner.Name, DeploymentUID: string(owner.UID), ControlNamespace: control, Administrators: administrators, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: "fleet", ServiceAccount: "probe"}, {ConfigMap: "owner", ServiceAccount: "probe"}}}
+	rootCA, _ := connectorSQLCA(t)
+	fleet := contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: installation, IssuerEpoch: epoch, Issuer: "https://identity.synthetic.invalid", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{}, DeliveryProfiles: []string{"operators"}, MaxActiveBootstraps: 2, MaxBootstrapHistory: 4, MaxClusters: 2}
+	ownerWire := contracts.OwnerConfiguration{Format: contracts.OwnerConfigurationFormat, InstallationID: installation, ClusterID: cluster, IssuerEpoch: epoch, Revision: 1, Namespace: ref(name, string(ns.UID)), Service: ref("owner", custodyID()), Deployment: ref(owner.Name, string(owner.UID)), ServiceAccount: ref("owner", string(accounts["owner"].UID)), Port: 9443, IssuerRoots: [][]byte{rootCA.Raw}}
+	createConfig := func(n, key string, v any, immutable bool) *core.ConfigMap {
+		t.Helper()
+		encoded, e := json.Marshal(v)
+		if e != nil {
+			t.Fatal(e)
+		}
+		object, e := api.CoreV1().ConfigMaps(name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: n}, Immutable: ptr.To(immutable), Data: map[string]string{key: string(encoded)}}, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		return object
+	}
+	fleetCM, ownerCM := createConfig("fleet", "fleet.json", fleet, false), createConfig("owner", "owner-pool.json", ownerWire, false)
+	in := contracts.ConfigurationRuntimeRoles{Format: contracts.ConfigurationRuntimeRolesFormat, InstallationID: installation, InitialClaimID: custodyID(), ClusterID: cluster, Namespace: ref(name, string(ns.UID)), Deployment: ref(deployment.Name, string(deployment.UID)), ServiceAccount: ref("worker", string(accounts["worker"].UID)), FleetSource: ref("fleet", string(fleetCM.UID)), OwnerSource: ref("owner", string(ownerCM.UID)), LayoutDigest: postgres.ConfigurationRuntimeRoleLayoutDigest()}
+	install := func(p *admission.ValidatingAdmissionPolicy, b *admission.ValidatingAdmissionPolicyBinding, e error) kube.GuardPin {
+		t.Helper()
+		if e != nil {
+			t.Fatal(e)
+		}
+		p, e = api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, p, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		policies = append(policies, p.Name)
+		p = initialBootstrapGuardTypecheck(t, ctx, api, p)
+		if len(p.Status.TypeChecking.ExpressionWarnings) != 0 {
+			t.Fatal("native guard type warnings")
+		}
+		b, e = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, b, meta.CreateOptions{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		return kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(b.UID), BindingResourceVersion: b.ResourceVersion}
+	}
+	wp := install(kube.OwnerWorkloadAdmission(workloadProtection))
+	fp := cfg.ConfigMapAdministration{Name: plan.FleetGuard, SourceName: in.FleetSource.Name, ControlNamespace: control, Administrators: administrators}
+	op := cfg.ConfigMapAdministration{Name: plan.OwnerGuard, SourceName: in.OwnerSource.Name, ControlNamespace: control, Administrators: administrators}
+	fg, og := install(kube.FleetConfigurationAdmission(fp)), install(kube.OwnerConfigurationAdmission(op))
+	_, err = api.RbacV1().Roles(name).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: "probe"}, Rules: []rbac.PolicyRule{{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{"owner"}, Verbs: []string{"get", "update"}}, {APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{"fleet", "owner"}, Verbs: []string{"get", "update"}}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	probeBinding := &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: "probe"}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: "probe", Namespace: name}}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "probe"}}
+	if _, err = api.RbacV1().RoleBindings(name).Create(ctx, probeBinding, meta.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	token, err := api.CoreV1().ServiceAccounts(name).CreateToken(ctx, "probe", &auth.TokenRequest{}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	probeConfig := &rest.Config{Host: config.Host, BearerToken: token.Status.Token, TLSClientConfig: rest.TLSClientConfig{CAData: config.CAData, CAFile: config.CAFile}}
+	probe, err := kube.NewPermissionClient(probeConfig, cluster, control, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	probeAPI, err := kubernetes.NewForConfig(probeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fault atomic.Int32 // exact successful response loss, never fake API success
+	var writes atomic.Int32
+	rootPath := "/api/v1/namespaces/" + name + "/secrets/asservat-configuration-roles-" + strings.ReplaceAll(installation, "-", "")
+	deploymentPath := "/apis/apps/v1/namespaces/" + name + "/deployments/worker"
+	observerConfig := rest.CopyConfig(config)
+	observerConfig.Wrap(func(next http.RoundTripper) http.RoundTripper {
+		return ownerProbeRoundTripper(func(r *http.Request) (*http.Response, error) {
+			response, e := next.RoundTrip(r)
+			if e != nil || response.StatusCode >= 300 || r.Method != http.MethodPut || r.URL.Query().Get("dryRun") != "" {
+				return response, e
+			}
+			if r.URL.Path == deploymentPath {
+				writes.Add(1)
+			}
+			lose := r.URL.Path == rootPath && fault.CompareAndSwap(1, 0) || r.URL.Path == deploymentPath && fault.CompareAndSwap(2, 0)
+			if r.URL.Path == rootPath && fault.CompareAndSwap(3, 0) {
+				e = api.RbacV1().RoleBindings(name).Delete(r.Context(), "probe", meta.DeleteOptions{})
+				if e != nil {
+					_ = response.Body.Close()
+					return nil, e
+				}
+				// Wait only within this same original request for actual RBAC
+				// denial, so propagation cannot turn the negative into a race.
+				for {
+					check, re := probeAPI.AuthorizationV1().SelfSubjectAccessReviews().Create(r.Context(), &authz.SelfSubjectAccessReview{Spec: authz.SelfSubjectAccessReviewSpec{ResourceAttributes: &authz.ResourceAttributes{Namespace: name, Verb: "update", Group: "apps", Resource: "deployments", Name: "owner"}}}, meta.CreateOptions{})
+					if re == nil && check.Status.EvaluationError == "" && !check.Status.Allowed {
+						break
+					}
+					select {
+					case <-r.Context().Done():
+						_ = response.Body.Close()
+						return nil, r.Context().Err()
+					case <-time.After(20 * time.Millisecond):
+					}
+				}
+			}
+			if lose {
+				_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+				_ = response.Body.Close()
+				return nil, errors.New("synthetic lost committed API reply")
+			}
+			return response, nil
+		})
+	})
+	observer, err := kube.NewPermissionClient(observerConfig, cluster, control, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wg, err := kube.NewOwnerWorkloadProtection(observer, probe, workloadProtection, wp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleetGuard, err := kube.NewFleetConfigurationProtection(observer, probe, fp, fg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleetSource, err := kube.NewProtectedFleetSettings(observer, fleetGuard, in.FleetSource.Name, in.FleetSource.UID, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerGuard, err := kube.NewOwnerConfigurationProtection(observer, probe, op, og)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerSource, err := kube.NewOwnerConfigurationSource(observer, ownerGuard, in.OwnerSource.Name, in.OwnerSource.UID, installation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := kube.NewConfigurationRoleSource(observer, wg, fleetSource, ownerSource, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Installation readiness only, before any claim/effect. No later failure
+	// retries or refreshes an original operation interval.
+	ready, readyEnd := context.WithTimeout(ctx, 15*time.Second)
+	defer readyEnd()
+	for {
+		if _, err = source.ReadConfigurationRoleSource(ready); err == nil {
+			break
+		}
+		select {
+		case <-ready.Done():
+			t.Fatal("native source enforcement not ready", err)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	root, err := kube.NewConfigurationRuntimeRoleRoot(ctx, source, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if _, err = root.OpenConfigurationRuntimeRoles(ctx); err != nil {
+		t.Fatal("actual protected role journal", err)
+	}
+	for i, purpose := range contracts.ConfigurationRuntimeRolePurposes() {
+		err = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
+			claimed, fresh, e := root.ClaimConfigurationRuntimeRole(call, purpose, 42, time.Now().UTC().Add(-time.Hour))
+			if e != nil || !fresh {
+				return errors.New("synthetic SQL receipt claim unavailable")
+			}
+			roleName, _ := postgres.ConfigurationRuntimeRoleName(installation, purpose)
+			return root.CompleteConfigurationRuntimeRole(call, claimed, purpose, contracts.PublicRuntimeRoleReceipt{RoleName: roleName, RoleOID: uint32(100 + i), LayoutDigest: in.LayoutDigest})
+		})
+		if err != nil {
+			t.Fatal("explicit synthetic SQL receipt fixture", err)
+		}
+	}
+	var projection contracts.WorkerObjectReference
+	err = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
+		v, e := root.ReadConfigurationRuntimeRoles(call)
+		if e != nil {
+			return e
+		}
+		projection, e = root.PublishConfigurationRuntimeProjection(call, v)
+		return e
+	})
+	if err != nil {
+		t.Fatal("native immutable SQL projection", err)
+	}
+	workerInput := contracts.HubWorkerDeployment{Format: contracts.HubWorkerDeploymentFormat, InstallationID: installation, ClusterID: cluster, Namespace: in.Namespace, FleetSource: in.FleetSource, OwnerSource: in.OwnerSource, FleetGuard: contracts.OwnerDeploymentGuard{Name: plan.FleetGuard}, OwnerGuard: contracts.OwnerDeploymentGuard{Name: plan.OwnerGuard}, LeaderLease: ref("leader", custodyID())}
+	input := createConfig("worker-inputs", "deployment.json", workerInput, true)
+	providers, err := api.CoreV1().Secrets(name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "worker-providers"}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: map[string][]byte{"audit-storage.json": []byte("synthetic"), "audit-wrap.token": []byte("synthetic"), "audit-unwrap.token": []byte("synthetic")}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	configurationRef, providersRef := ref(input.Name, string(input.UID)), ref(providers.Name, string(providers.UID))
+	var original contracts.ConfigurationRuntimeRoleSnapshot
+	switch mode {
+	case "lost-claim":
+		fault.Store(1)
+	case "lost-launch":
+		fault.Store(2)
+	case "changed-enforcement":
+		fault.Store(3)
+	}
+	started := time.Now()
+	err = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
+		var e error
+		original, e = root.ReadConfigurationRuntimeRoles(call)
+		if e != nil {
+			return e
+		}
+		return root.LaunchConfigurationRuntime(call, original, configurationRef, providersRef)
+	})
+	t.Logf("native launch original operation: %s; mode=%s", time.Since(started), mode)
+	if mode == "lost-claim" || mode == "changed-enforcement" {
+		if err == nil || writes.Load() != 0 {
+			t.Fatal("unacknowledged claim or changed enforcement authorized launch", err)
+		}
+		current, e := api.AppsV1().Deployments(name).Get(ctx, "worker", meta.GetOptions{})
+		if e != nil || current.Spec.Replicas == nil || *current.Spec.Replicas != 0 {
+			t.Fatal("failed launch changed inert workload", e)
+		}
+		if e = root.LaunchConfigurationRuntime(ctx, original, configurationRef, providersRef); e == nil || writes.Load() != 0 {
+			t.Fatal("uncertain launch replay obtained another effect", e)
+		}
+		return
+	}
+	if mode == "lost-launch" && err == nil || mode != "lost-launch" && err != nil || writes.Load() != 1 {
+		t.Fatal("native exact launch verdict", err)
+	}
+	var launched contracts.ConfigurationRuntimeRoleSnapshot
+	err = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
+		var e error
+		launched, e = root.ReadLaunchedConfigurationRuntimeRoles(call)
+		if e != nil {
+			return e
+		}
+		return root.RecordConfigurationRuntimeLaunch(call, launched)
+	})
+	if err != nil {
+		t.Fatal("native exact launched readback/receipt", err)
+	}
+	if mode == "changed-input" {
+		if err = api.CoreV1().Secrets(name).Delete(ctx, projection.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &providers.UID}}); err == nil {
+			t.Fatal("wrong UID projection deletion unexpectedly succeeded")
+		}
+		if err = api.CoreV1().Secrets(name).Delete(ctx, projection.Name, meta.DeleteOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = root.ReadLaunchedConfigurationRuntimeRoles(ctx); err == nil || writes.Load() != 1 {
+			t.Fatal("missing original projection accepted or recreated", err)
+		}
+		return
+	}
+	if err = root.LaunchConfigurationRuntime(ctx, original, configurationRef, providersRef); err == nil || writes.Load() != 1 {
+		t.Fatal("completed or lost-reply launch repeated Deployment UPDATE", err)
+	}
+	current, err := root.ReadLaunchedConfigurationRuntimeRoles(ctx)
+	if err != nil || current.State.Launch == nil || current.State.Launch.Receipt == nil || !reflect.DeepEqual(current.State.Roles, original.State.Roles) {
+		t.Fatal("successful replay lost original credential provenance", err)
+	}
+	// Native ReplicaSet controller may create the gated Pod, but cannot mutate
+	// its original template or remove the fixture's gate. No image is executed.
+	until := time.NewTimer(15 * time.Second)
+	defer until.Stop()
+	for {
+		pods, e := api.CoreV1().Pods(name).List(ctx, meta.ListOptions{LabelSelector: "asservat.io/workload=worker"})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if len(pods.Items) == 1 && len(pods.Items[0].Spec.SchedulingGates) == 1 && pods.Items[0].Spec.NodeName == "" {
+			break
+		}
+		if len(pods.Items) > 1 {
+			t.Fatal("native launch exceeded the original single desired process")
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-until.C:
+			t.Fatal("native controller did not create the protected gated Pod")
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	t.Log("actual Kubernetes source/guard/Secret/CAS and joined controller cleanup; synthetic SQL receipts/provider material and gated nonexecuting Pod; no initial guard bridge or installed runtime qualification")
+}

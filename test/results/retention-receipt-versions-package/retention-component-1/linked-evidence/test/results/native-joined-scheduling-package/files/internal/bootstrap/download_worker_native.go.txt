@@ -1,0 +1,223 @@
+package bootstrap
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
+	"errors"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/transport/native"
+	"github.com/aws/aws-sdk-go-v2/aws"
+)
+
+// Only a positively authenticated NoCommand or positively joined conversation
+// permits another connection. A timeout/lost acknowledgement cannot turn into
+// a retry of a spent operation. These callbacks are private runtime composition,
+// not public extension points or substitutes for the transport's authority.
+type workerNativeLoop struct {
+	target value.WorkerCredentialTarget
+	token  evidence.DownloadPeerToken
+	open   func(context.Context, contracts.NativeHello) (contracts.NativeStream, error)
+	run    func(context.Context, contracts.NativeStream, contracts.NativeHello) (contracts.NativeConversationResult, error)
+	now    func() time.Time
+	wait   func(context.Context, time.Duration) error
+	nonce  func() string
+}
+
+func workerNativeNonce() string {
+	var nonce [32]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(nonce[:])
+}
+
+func (l workerNativeLoop) Run(parent context.Context) error {
+	if parent == nil || !l.target.Valid() || l.token == nil || l.open == nil || l.run == nil || l.now == nil || l.wait == nil || l.nonce == nil {
+		return artifact.ErrInvalid
+	}
+	ctx, cancel := context.WithDeadline(parent, l.target.RunUntil)
+	defer cancel()
+	for i := 0; i < contracts.NativeMaximumConversations; i++ {
+		if ctx.Err() != nil || !l.now().Before(l.target.RunUntil) {
+			return artifact.ErrDownloadExpired
+		}
+		token, err := l.token.ReadDownloadPeerToken(ctx)
+		if err != nil {
+			clear(token)
+			return artifact.ErrDownloadUnavailable
+		}
+		h := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: l.target.InstallationID, SessionID: l.target.SessionID, WorkerID: l.target.WorkerID}, Nonce: l.nonce(), WorkerToken: token}
+		if !contracts.ValidWorkerNonce(h.Nonce) || !contracts.ValidWorkerToken(token) {
+			clear(token)
+			return artifact.ErrInvalid
+		}
+		openedAt := l.now()
+		stream, err := l.open(ctx, h)
+		if err != nil {
+			clear(token)
+			if stream != nil {
+				stream.Close()
+				return artifact.ErrDownloadUnavailable
+			}
+			var idle *contracts.NativeNoCommand
+			receivedAt := l.now()
+			// The server's current observation starts after connection setup.
+			// Check its remaining freshness at receipt, independently of the
+			// original setup budget. Neither interval extends the worker lifetime.
+			if !errors.As(err, &idle) || idle == nil || idle.Reference != h.Reference || idle.Nonce != h.Nonce || !receivedAt.Before(openedAt.Add(5*time.Second)) || !receivedAt.Before(idle.Until) || idle.Until.After(receivedAt.Add(5*time.Second)) || idle.Until.After(l.target.RunUntil) {
+				return artifact.ErrDownloadUnavailable
+			}
+			if err := l.wait(ctx, contracts.NativeIdleRetry); err != nil {
+				return err
+			}
+			continue
+		}
+		if stream == nil {
+			clear(token)
+			return artifact.ErrDownloadUnavailable
+		}
+		outcome, err := l.run(ctx, stream, h)
+		// The actual conversation joins its reader/buffers/stream before return.
+		// Close again is idempotent and covers a failed precondition before Run.
+		closeErr := stream.Close()
+		clear(token)
+		if err != nil || closeErr != nil || outcome.State != contracts.NativeJoined {
+			return artifact.ErrDownloadUnavailable
+		}
+		// A joined command is completed work, not an idle lookup. Reconnect
+		// immediately with a fresh token/nonce and normal admission; applying
+		// idle backoff here spends the next operation's original short budget.
+		// NoCommand retains its backoff above, and every loop uses one slot.
+	}
+	return artifact.ErrDownloadUnavailable
+}
+
+// Both child lifetimes are joined even if the initiating context is already
+// cancelled. Native work starts only after credential readiness; readiness is
+// not reported as a successful download. A failed child cancels the other.
+func runWorkerNativePair(ctx context.Context, ready <-chan value.KeyPeer, credentials, work func(context.Context) error) error {
+	if ctx == nil || ready == nil || credentials == nil || work == nil {
+		return artifact.ErrInvalid
+	}
+	joined, cancel := context.WithCancel(ctx)
+	defer cancel()
+	credentialDone := make(chan error, 1)
+	go func() { credentialDone <- credentials(joined) }()
+	select {
+	case err := <-credentialDone:
+		if err == nil {
+			return artifact.ErrDownloadUnavailable
+		}
+		return err
+	case <-ctx.Done():
+		cancel()
+		<-credentialDone
+		return ctx.Err()
+	case <-ready:
+	}
+	if joined.Err() != nil {
+		cancel()
+		<-credentialDone
+		return joined.Err()
+	}
+	workDone := make(chan error, 1)
+	go func() { workDone <- work(joined) }()
+	var err error
+	select {
+	case err = <-credentialDone:
+		cancel()
+		<-workDone
+	case err = <-workDone:
+		cancel()
+		<-credentialDone
+	case <-ctx.Done():
+		err = ctx.Err()
+		cancel()
+		<-credentialDone
+		<-workDone
+	}
+	if err == nil {
+		return artifact.ErrDownloadUnavailable
+	}
+	return err
+}
+
+func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.WorkerNativeTrust, credentials *mtls.WorkerCredentials, private contracts.WorkerStoreCredentials) error {
+	if ctx == nil || trust == nil || credentials == nil || !input.Target.Valid() {
+		return artifact.ErrInvalid
+	}
+	exchangeRoots, storeRoots, keyRoots, err := trust.Roots(time.Now())
+	if err != nil {
+		return err
+	}
+	key, err := credentials.PublicKeyDigest()
+	if err != nil {
+		return err
+	}
+	if err = workerStoreCredentialLifetime(private, time.Now(), input.Target.RunUntil); err != nil {
+		return err
+	}
+	pins := trust.Settings()
+	provider := aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		if ctx.Err() != nil {
+			return aws.Credentials{}, ctx.Err()
+		}
+		if err := workerStoreCredentialLifetime(private, time.Now(), input.Target.RunUntil); err != nil {
+			return aws.Credentials{}, err
+		}
+		c := aws.Credentials{AccessKeyID: private.AccessKeyID, SecretAccessKey: private.SecretAccessKey, SessionToken: private.SessionToken, Source: "protected worker projection"}
+		if private.ExpiresAt != "" {
+			c.CanExpire = true
+			c.Expires, _ = time.Parse(time.RFC3339Nano, private.ExpiresAt)
+		}
+		return c, nil
+	})
+	storeHTTP := workerNativeHTTP(storeRoots, nil)
+	defer storeHTTP.CloseIdleConnections()
+	store, err := objectstore.New(pins.StoreEndpoint, pins.StoreRegion, pins.StoreBucket, provider, storeHTTP)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	bound, err := store.ForCustody(pins.StoreID)
+	if err != nil {
+		return err
+	}
+	keyHTTP := workerNativeHTTP(keyRoots, credentials)
+	defer keyHTTP.CloseIdleConnections()
+	reader, err := objectstore.NewNativeContextReader(bound, pins.KeyScope, pins.KeyEndpoint, keyHTTP)
+	if err != nil {
+		return err
+	}
+	result, err := evidence.NewRegionalContextResult(ctx, input.Target, reader, time.Now)
+	if err != nil {
+		return err
+	}
+	defer func() { result.Close(); _ = result.Wait(context.Background()) }()
+	client, err := mtls.NewNativeClient(pins.ExchangeEndpoint, &tls.Config{RootCAs: exchangeRoots, GetClientCertificate: credentials.GetClientCertificate, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13})
+	if err != nil {
+		return err
+	}
+	loop := workerNativeLoop{target: input.Target, token: mtls.NewProjectedWorkerToken(), now: time.Now, wait: waitWorker, nonce: workerNativeNonce,
+		open: func(ctx context.Context, h contracts.NativeHello) (contracts.NativeStream, error) {
+			s, err := client.Open(ctx, h)
+			if err != nil {
+				return nil, err
+			}
+			return s, nil
+		},
+		run: func(ctx context.Context, s contracts.NativeStream, h contracts.NativeHello) (contracts.NativeConversationResult, error) {
+			return native.RunWorkerConversation(ctx, s, h, input.Target, key, result)
+		},
+	}
+	return loop.Run(ctx)
+}

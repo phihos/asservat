@@ -1,0 +1,13 @@
+{
+  "BASELINE.md": "b4314e92941b290f3053e99a2ca8d04058e3da8131b6ceb517f2c159d4f894a9",
+  "HANDOFF.md": "0eff028fc64f2c67758fe4cdc83e028d9130532ef71da625a121e2c60f030c6f",
+  "RESULT.json": "38e3d992a364b2eeaa5d94726fea0096558ad864c67aa73e7b8941520a075dd4",
+  "evidence/architecture.json": "f46d624e9d92e6cf9a8837226548a40f89b0c90341c6061b32909bca39137d42",
+  "evidence/architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "evidence/compile.json": "356e157799012674cd20c84f3f586c8917129ca49969d985d3716a58e22e8621",
+  "evidence/compile.log": "bc32afa3a6e1c220e69cb5b080906e8bd73296c7bf8acf35c04b988411aba2ea",
+  "evidence/race.json": "3046150973a10584b00df756374b37fca114984cf8549dcb593b28d2be43807e",
+  "evidence/race.log": "8e57d3593c3718aed37083ded9cf85c14f795ec13a9a290e1df70b3c57acbc92",
+  "evidence/vet.json": "e091f4bbafed854023d536b1abcf3f1f3eb851e7ab7d25f58a54aa830e839797",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

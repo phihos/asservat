@@ -1,0 +1,5 @@
+--- FAIL: TestProjectedWorkerTokenRejectsFIFOWithoutWaiting (0.20s)
+    projected_worker_token_linux_test.go:29: credential open blocked on a FIFO before checking its type
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.203s
+FAIL

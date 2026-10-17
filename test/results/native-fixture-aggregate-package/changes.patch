@@ -1,0 +1,227 @@
+--- a/test/integration/context_native_content_test.go
++++ b/test/integration/context_native_content_test.go
+@@ -174,7 +174,7 @@
+ 	enrollment.CurrentAuthority = f.gate
+ 	cfg := evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{target.RunUntil}, Profile: f.worker.Intent.Profile, Configuration: f.content.configuration, Workers: f.content.workers, Preparation: first, Dispatcher: f.content.dispatcher, Enrollments: enrollment, Proofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
+ 		return channelSQLProof{token, f.worker}, nil
+-	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
++	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: f.admissionTrace.registrar(router), PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
+ 	runtime, e := evidence.NewContextNativeRuntime(cfg)
+ 	if e != nil {
+ 		t.Fatal("actual native runtime", e)
+@@ -198,6 +198,7 @@
+ 		t.Fatal("native context initial source lookup", e)
+ 	}
+ 	t.Log("native context initial source resolved")
++	f.admissionTrace.mark(ctx, "prepare-entry")
+ 	if result, e := runtime.ContinueContextDownload(ctx, current(), session, source); e != nil || result.Pending {
+ 		t.Fatal("original preparation continuation", result, e)
+ 	}
+@@ -231,6 +232,7 @@
+ 		qualifyContextNativeControlRaces(t, ctx, f, en, firstOwners, responses, runtime, prep, ownerPod, epoch)
+ 		return
+ 	}
++	f.admissionTrace.mark(ctx, "metadata-entry")
+ 	firstMetadata, found, e := runtime.ReadPreparedContextDownload(ctx, current(), session)
+ 	if e != nil || !found {
+ 		t.Fatal("original acknowledged native result", found, e)
+@@ -606,6 +608,7 @@
+ 	original := before()
+ 	request := func(condition string) *http.Response {
+ 		t.Helper()
++		f.admissionTrace.mark(ctx, "http-entry")
+ 		r, e := http.NewRequestWithContext(ctx, http.MethodGet, origin+browser.DownloadContentPrefix+session.ID+"/content", nil)
+ 		if e != nil {
+ 			t.Fatal(e)
+--- a/test/integration/context_native_interrupted_test.go
++++ b/test/integration/context_native_interrupted_test.go
+@@ -111,6 +111,7 @@
+ 	}
+ 	state.handler.Store(handler)
+ 	request := func(call context.Context, offset int64) (*http.Response, error) {
++		f.admissionTrace.mark(call, "http-entry")
+ 		r, e := http.NewRequestWithContext(call, http.MethodGet, origin+browser.DownloadContentPrefix+session.ID+"/content", nil)
+ 		if e != nil {
+ 			return nil, e
+--- /dev/null
++++ b/test/integration/native_admission_trace_test.go
+@@ -0,0 +1,128 @@
++package integration
++
++import (
++	"context"
++	"sync"
++	"testing"
++	"time"
++
++	"asservat.local/asservat/internal/application/evidence"
++	value "asservat.local/asservat/internal/domain/authorization"
++)
++
++// Temporary fixture-only timings. No IDs, credentials, errors or metadata are
++// retained. The original callbacks see the exact original context/values and
++// run exactly once. This observer adds no API/SQL traffic or background owner.
++type nativeAdmissionTrace struct {
++	mu                     sync.Mutex
++	started, outer, worker time.Time
++	events                 [16]nativeAdmissionTraceEvent
++	total                  int
++	firstError             *nativeAdmissionTraceEvent
++}
++type nativeAdmissionTraceEvent struct {
++	Number                     int
++	Step, Kind                 string
++	AtMS, ElapsedMS            int64
++	CallerBound                bool
++	CallerStartMS, CallerEndMS int64
++	OuterEndMS, WorkerEndMS    int64
++	LeaseBound                 bool
++	LeaseEndMS                 int64
++	OK, Cancelled              bool
++}
++
++func newNativeAdmissionTrace(ctx context.Context, worker time.Time) *nativeAdmissionTrace {
++	outer, _ := ctx.Deadline()
++	return &nativeAdmissionTrace{started: time.Now(), outer: outer, worker: worker}
++}
++func (t *nativeAdmissionTrace) record(ctx context.Context, step string, kind value.NativeOperationKind, started, lease time.Time, err error) {
++	if t == nil {
++		return
++	}
++	ended := time.Now()
++	deadline, bounded := ctx.Deadline()
++	e := nativeAdmissionTraceEvent{Step: step, Kind: string(kind), AtMS: started.Sub(t.started).Milliseconds(), ElapsedMS: ended.Sub(started).Milliseconds(), CallerBound: bounded, OK: err == nil, Cancelled: ctx.Err() != nil}
++	if bounded {
++		e.CallerStartMS, e.CallerEndMS = deadline.Sub(started).Milliseconds(), deadline.Sub(ended).Milliseconds()
++	}
++	if !t.outer.IsZero() {
++		e.OuterEndMS = t.outer.Sub(ended).Milliseconds()
++	}
++	e.WorkerEndMS = t.worker.Sub(ended).Milliseconds()
++	if !lease.IsZero() {
++		e.LeaseBound, e.LeaseEndMS = true, lease.Sub(ended).Milliseconds()
++	}
++	t.mu.Lock()
++	defer t.mu.Unlock()
++	t.total++
++	e.Number = t.total
++	t.events[(t.total-1)%len(t.events)] = e
++	if err != nil && t.firstError == nil {
++		first := e
++		t.firstError = &first
++	}
++}
++func (t *nativeAdmissionTrace) mark(ctx context.Context, step string) {
++	t.record(ctx, step, "", time.Now(), time.Time{}, nil)
++}
++func (t *nativeAdmissionTrace) report(test *testing.T) {
++	if t == nil {
++		return
++	}
++	t.mu.Lock()
++	defer t.mu.Unlock()
++	test.Log("native callback trace total", t.total, "omitted", max(0, t.total-len(t.events)))
++	if t.firstError != nil {
++		test.Logf("native callback trace first error %+v", *t.firstError)
++	}
++	for i := max(0, t.total-len(t.events)); i < t.total; i++ {
++		test.Logf("native callback trace %+v", t.events[i%len(t.events)])
++	}
++}
++func (t *nativeAdmissionTrace) registrar(next evidence.NativeExchangeRegistrar) evidence.NativeExchangeRegistrar {
++	if t == nil {
++		return next
++	}
++	return nativeAdmissionTraceRegistrar{next: next, trace: t}
++}
++
++type nativeAdmissionTraceRegistrar struct {
++	next  evidence.NativeExchangeRegistrar
++	trace *nativeAdmissionTrace
++}
++
++func (r nativeAdmissionTraceRegistrar) RegisterNativeExchange(ctx context.Context, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, current func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
++	kind := in.Operation.Kind
++	if before != nil {
++		original := before
++		before = func(call context.Context, origin evidence.NativeOrigin) error {
++			started := time.Now()
++			err := original(call, origin)
++			r.trace.record(call, "before", kind, started, origin.Lease.Until, err)
++			return err
++		}
++	}
++	if current != nil {
++		original := current
++		current = func(call context.Context, origin evidence.NativeOrigin) (value.NativeLease, error) {
++			started := time.Now()
++			lease, err := original(call, origin)
++			r.trace.record(call, "current", kind, started, origin.Lease.Until, err)
++			return lease, err
++		}
++	}
++	if in.Complete != nil {
++		original := in.Complete
++		in.Complete = func(call context.Context, lease value.NativeLease) error {
++			started := time.Now()
++			err := original(call, lease)
++			r.trace.record(call, "complete", kind, started, lease.Until, err)
++			return err
++		}
++	}
++	started := time.Now()
++	pending, err := r.next.RegisterNativeExchange(ctx, in, before, current)
++	r.trace.record(ctx, "register", kind, started, in.Operation.Until, err)
++	return pending, err
++}
+--- a/test/integration/native_exchange_test.go
++++ b/test/integration/native_exchange_test.go
+@@ -40,6 +40,7 @@
+ )
+ 
+ type nativeExchangeFixture struct {
++	admissionTrace         *nativeAdmissionTrace
+ 	content                *nativeContextFixture
+ 	worker                 value.DownloadWorker
+ 	enrollment             workerEnrollmentFixture
+@@ -110,14 +111,19 @@
+ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExchangeFixture) {
+ 	t.Helper()
+ 	fixtureDuration := 20 * time.Second
+-	if f.content != nil && (f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted") {
+-		// Multiple distinct requests, expiry crossing and a fresh session can
+-		// outlast the single-transfer test. This bounds the fixture only; every
+-		// original authority, worker, operation and socket deadline is unchanged.
++	if f.content != nil && (f.content.mode == "native-content" || f.content.mode == "native-content-resume" || f.content.mode == "native-content-interrupted") {
++		// Setup, forty current warm-status checks and multiple audited HTTP
++		// requests can outlast the old 20-second aggregate lab cancellation.
++		// Give these assertions one finite outer interval from the start; do not
++		// renew the separately admitted worker/session, five-second authority,
++		// native operation, HTTP preflight or individual socket deadlines.
+ 		fixtureDuration = 2 * time.Minute
+ 	}
+ 	ctx, stop := context.WithTimeout(ctx, fixtureDuration)
+ 	defer stop()
++	f.admissionTrace = newNativeAdmissionTrace(ctx, f.worker.Intent.RunUntil)
++	t.Cleanup(func() { f.admissionTrace.report(t) })
++	f.admissionTrace.mark(ctx, "phase-entry")
+ 	if f.content == nil || f.content.retry == nil || !f.content.retry.second {
+ 		nativeSQLRoles(t, ctx, f.admin)
+ 	}
+@@ -252,7 +258,7 @@
+ 			t.Fatal(e)
+ 		}
+ 	}
+-	attachment, e := evidence.NewNativeAttachment(evidence.NativeAttachmentConfig{Enrollment: enrollment, HubPodUID: custodyID(), HubProcessEpoch: custodyID(), KeyScope: f.keyScope, Owners: nativeOperations, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: preparationKeys, WindowKeys: windowKeys, Authority: f.gate, Now: time.Now, NewID: custodyID})
++	attachment, e := evidence.NewNativeAttachment(evidence.NativeAttachmentConfig{Enrollment: enrollment, HubPodUID: custodyID(), HubProcessEpoch: custodyID(), KeyScope: f.keyScope, Owners: nativeOperations, Fences: owners, Origins: origins, Registrar: f.admissionTrace.registrar(router), PreparationKeys: preparationKeys, WindowKeys: windowKeys, Authority: f.gate, Now: time.Now, NewID: custodyID})
+ 	if e != nil {
+ 		t.Fatal(e)
+ 	}
+@@ -292,6 +298,7 @@
+ 	var batchID string
+ 	worker := evidence.ContextDownloadWorker{Sessions: f.runtime, AuditAcknowledgements: f.audit, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, CurrentAuthority: f.gate, RegionalPreparation: attachment, Now: time.Now, NewID: func() string { batchID = custodyID(); return batchID }}
+ 	current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
++	f.admissionTrace.mark(ctx, "prepare-entry")
+ 	t.Log("native diagnostic preparation started")
+ 	metadata, e := worker.PrepareCurrent(ctx, current, work)
+ 	t.Log("native diagnostic preparation terminal", e)

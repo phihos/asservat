@@ -1,0 +1,11 @@
+=== RUN   TestContextAdmissionWithRealServices
+    capture_admission_test.go:159: invalid artifact storage descriptor
+    capture_admission_test.go:106: journey SQL connect role=capture_audit_runtime calls=0 refusals=0 sqlstate-53300=0
+    capture_admission_test.go:106: journey SQL connect role=context_control_config_runtime calls=0 refusals=0 sqlstate-53300=0
+    capture_admission_test.go:106: journey SQL connect role=custody_runtime calls=0 refusals=0 sqlstate-53300=0
+    capture_admission_test.go:106: journey SQL connect role=capture_runtime calls=1 refusals=0 sqlstate-53300=0
+    capture_admission_test.go:106: journey SQL connect role=authority_runtime calls=0 refusals=0 sqlstate-53300=0
+--- FAIL: TestContextAdmissionWithRealServices (0.03s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.083s
+FAIL

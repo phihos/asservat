@@ -1,0 +1,61 @@
+from pathlib import Path
+import hashlib, json, os, signal, subprocess, time
+
+stage = Path(__file__).resolve().parent
+repo = Path('/home/phil/Projekte/asservat')
+digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+maps = {n: json.loads((stage / (n + '.json')).read_text()) for n in ['payload', 'bases', 'dependencies']}
+
+def check():
+    actual = set(subprocess.run(['rg', '--files', '-g', '*.go', '-g', 'go.mod', '-g', 'go.sum'], cwd=repo, capture_output=True, text=True, check=True).stdout.splitlines())
+    expected = {p for p in maps['dependencies'] if p.endswith('.go') or Path(p).name in {'go.mod', 'go.sum'}}
+    return {'live': [p for p, h in maps['dependencies'].items() if digest(repo / p) != h],
+            'bases': [p for p, h in maps['bases'].items() if digest(repo / p) != h],
+            'payload': [p for p, h in maps['payload'].items() if (digest(stage / 'files' / p) if h is not None else None) != h],
+            'fileSet': sorted(actual ^ expected),
+            'freeze': [p for p, h in json.loads((stage / 'freeze.json').read_text()).items() if digest(stage / p) != h]}
+
+# Refuse an existing evidence destination before launching any subprocess.
+evidence = stage / 'evidence'
+evidence.mkdir(exist_ok=False)
+env = os.environ.copy()
+env.update(GOMAXPROCS='2', GOFLAGS='-p=2', TMPDIR=str(stage / 'tmp'))
+overlay = ['-overlay', str(stage / 'overlay.json')]
+packages = ['./internal/domain/fleet', './internal/application/fleet', './internal/adapters/mtls', './internal/transport/clusterobservation']
+selected = '^Test(ConnectorObservationChannel|ClusterObservation)'
+steps = [
+    ('after-architecture', ['make', 'go-architecture-check'], 0, True),
+    ('race', ['go', 'test', *overlay, '-race', '-vet=off', '-count=1', '-timeout=120s', '-run', selected, '-v', *packages], 0, False),
+    ('vet', ['go', 'vet', *overlay, *packages], 0, False),
+]
+for name, command, expected, overlay_env in steps:
+    before = check()
+    if any(before.values()):
+        (evidence / (name + '-preflight.json')).write_text(json.dumps(before, indent=2) + '\n')
+        raise SystemExit('immutable input preflight failed')
+    start = time.monotonic()
+    with (evidence / (name + '.log')).open('x') as log:
+        step_env = env.copy()
+        if overlay_env:
+            step_env['GOFLAGS'] = '-p=2 -overlay=' + str(stage / 'overlay.json')
+        process = subprocess.Popen(command, cwd=repo, env=step_env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        print(json.dumps({'phase': name, 'pid': process.pid, 'command': command}), flush=True)
+        try:
+            code = process.wait(timeout=240)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+            code = 124
+    after = check()
+    meaningful_before = name != 'before-architecture' or 'Domain import is not a pure value utility: crypto/sha256' in (evidence / (name + '.log')).read_text()
+    report = {'expected': expected, 'meaningfulBefore': meaningful_before, 'phase': name, 'command': command, 'exit': code, 'seconds': round(time.monotonic() - start, 3), 'before': before, 'after': after}
+    with (evidence / (name + '.json')).open('x') as target:
+        json.dump(report, target, indent=2)
+        target.write('\n')
+    print(json.dumps(report), flush=True)
+    if code != expected or not meaningful_before or any(after.values()):
+        raise SystemExit(1)

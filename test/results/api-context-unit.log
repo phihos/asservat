@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/domain/artifact	(cached) [no tests to run]
+ok  	asservat.local/asservat/internal/domain/targets	(cached) [no tests to run]
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/capture	(cached)
+ok  	asservat.local/asservat/internal/application/planning	1.035s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.514s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	(cached)

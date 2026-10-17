@@ -1,0 +1,10 @@
+=== RUN   TestInstallationWitnessWithRealKubernetes
+=== RUN   TestInstallationWitnessWithRealKubernetes/consume-retry-native-immutability-and-replacement
+=== RUN   TestInstallationWitnessWithRealKubernetes/four-way-race-retains-one-exact-consumption
+=== RUN   TestInstallationWitnessWithRealKubernetes/expired-claim-and-missing-protection-do-not-consume
+--- PASS: TestInstallationWitnessWithRealKubernetes (9.26s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/consume-retry-native-immutability-and-replacement (3.07s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/four-way-race-retains-one-exact-consumption (4.74s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/expired-claim-and-missing-protection-do-not-consume (1.44s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.318s

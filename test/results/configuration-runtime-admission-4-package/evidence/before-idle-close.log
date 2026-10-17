@@ -1,0 +1,6 @@
+=== RUN   TestConfigurationWorkerTokenTransportRetainsOriginalIdleClose
+    configuration_worker_tokens_test.go:87: token observation hid the original transport close
+--- FAIL: TestConfigurationWorkerTokenTransportRetainsOriginalIdleClose (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.045s
+FAIL

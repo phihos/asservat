@@ -1,0 +1,43 @@
+# Public interface design
+
+The [interface inventory](../docs/interfaces/README.md), [OpenAPI](../docs/interfaces/browser-openapi.yaml), [operation registry](../docs/interfaces/operations.yaml) and [MCP workflow guide](../docs/interfaces/mcp-workflows.md) describe outward boundaries. These are design artifacts, not a deployed service.
+
+## REQ-INT-001 — Shared domain behavior and explicit transports
+
+Map browser and MCP operations to the same authenticated application services. Reuse canonical MCP input/output schemas for shared operations; human review and operator operations have separate bounded contracts. Keep HTML routes, OAuth, Kubernetes, Alertmanager, CloudEvents, health/metrics and connector interfaces explicitly documented with audiences, versioning and trust boundaries. No generic shell/SQL/Kubernetes proxy is added. Authenticated native evidence downloads are required under [artifact downloads](artifact-downloads.md); anonymous or bearer-only file access remains prohibited.
+
+### SC-INT-001
+
+Given equivalent browser and MCP requests, when current scope/permissions/limits are equal, then plan, assessment, evidence projection and domain error behavior agree; no adapter bypasses approval or capacity.
+
+## REQ-INT-002 — Configuration and human authority
+
+Administrator permission/retention/budget configuration writes remain Kubernetes-only. Browser drafts/preview/export do not create a second authority. Authenticated maintainer submission is restricted to reviewed configuration kinds and existing provenance/current-rights rules. Review decisions require independent human authority and verified step-up; no MCP tool approves grants. Enrollment secrets use approved secret delivery, not response bodies or command history.
+
+### SC-INT-002
+
+Given a permission editor draft or an agent attempting review, when it submits through the browser/MCP boundary, then unsupported configuration mutation or agent approval is rejected; a permitted maintainer change still faces Kubernetes conflict and execution acceptance checks.
+
+## REQ-INT-003 — Bounded errors, retries and asynchronous work
+
+Specify byte/item/time limits, authenticated expiring cursors, idempotency, expected revisions, pending handles and cancellation semantics. Shared operations preserve MCP result envelopes; transport/console failures use safe problem details with stable domain codes. Before visibility is established, avoid existence oracles. Lost responses recover the original operation; changing the body under a key conflicts. Reauthorize every poll and result delivery.
+
+### SC-INT-003
+
+Given a command accepted before connection loss, when browser or agent retries, then it receives the original bounded operation; a revoked share fails on the next poll and error output contains no evidence or hidden resource details.
+
+## REQ-INT-004 — External integration minimization
+
+Incoming alerts authenticate configured receiver identities, validate bounded standard payloads and preserve episode/transition deduplication. Outgoing events carry only allowlisted minimized identifiers and authenticated references, signed exact bytes and stable retry identities. Metrics and probes have bounded cardinality and no evidence/identity leakage. No capture supplies an arbitrary notification destination.
+
+### SC-INT-004
+
+Given duplicate/reordered alerts and an artifact containing a credential-like string, when collection and event delivery run, then duplicate input does not create an extra action and notification/metrics fields never contain the artifact string.
+
+## REQ-INT-005 — Compatible evolution and agent ergonomics
+
+Maintain stable tool names/ordering, typed schemas, bounded structured/text results, explicit version negotiation and schema parity checks. Explain retained versus live acquisition, missing evidence, coverage and next actions. Case handoff references carry no authority. Treat evidence as untrusted data; no automatic following of evidence instructions. Pin profile versions and preserve unknown/unsupported outcomes rather than widening defaults.
+
+### SC-INT-005
+
+Given an agent reading partial evidence or repeating a recording save, when the response is generated, then it can identify missing coverage and the correct next tool without interpreting a free-form command; an expired source requires fresh selection, not an expanded capture.

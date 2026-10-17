@@ -1,0 +1,101 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/investigation-schemas.py
+Investigation schemas OK: nine bounded implemented subsets; all references local
+go vet ./...
+go test -race -count=1 ./...
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/jose	1.696s
+ok  	asservat.local/asservat/internal/adapters/kms	2.980s
+ok  	asservat.local/asservat/internal/adapters/kubernetes	347.700s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.006s
+ok  	asservat.local/asservat/internal/adapters/mtls	11.799s
+ok  	asservat.local/asservat/internal/adapters/objectstore	4.117s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	11.612s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.469s
+ok  	asservat.local/asservat/internal/adapters/oidc	3.378s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.293s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+ok  	asservat.local/asservat/internal/adapters/providerconfig	1.037s
+ok  	asservat.local/asservat/internal/application/audit	1.141s
+ok  	asservat.local/asservat/internal/application/authorization	1.023s
+?   	asservat.local/asservat/internal/application/capacity	[no test files]
+ok  	asservat.local/asservat/internal/application/capture	1.273s
+ok  	asservat.local/asservat/internal/application/catalog	1.014s
+ok  	asservat.local/asservat/internal/application/configuration	2.190s
+ok  	asservat.local/asservat/internal/application/evidence	1.708s
+ok  	asservat.local/asservat/internal/application/execution	1.136s
+ok  	asservat.local/asservat/internal/application/fleet	2.176s
+ok  	asservat.local/asservat/internal/application/identity	1.073s
+ok  	asservat.local/asservat/internal/application/planning	1.065s
+ok  	asservat.local/asservat/internal/application/privacy	1.036s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+ok  	asservat.local/asservat/internal/bootstrap	10.931s
+ok  	asservat.local/asservat/internal/console	1.061s
+ok  	asservat.local/asservat/internal/contracts	1.858s
+ok  	asservat.local/asservat/internal/domain/artifact	3.805s
+ok  	asservat.local/asservat/internal/domain/audit	1.011s
+ok  	asservat.local/asservat/internal/domain/authorization	1.489s
+ok  	asservat.local/asservat/internal/domain/capture	1.006s
+ok  	asservat.local/asservat/internal/domain/catalog	1.005s
+ok  	asservat.local/asservat/internal/domain/configuration	1.006s
+ok  	asservat.local/asservat/internal/domain/execution	1.005s
+ok  	asservat.local/asservat/internal/domain/fleet	1.011s
+ok  	asservat.local/asservat/internal/domain/identity	1.009s
+?   	asservat.local/asservat/internal/domain/planning	[no test files]
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+ok  	asservat.local/asservat/internal/domain/targets	1.005s
+ok  	asservat.local/asservat/internal/transport/browser	5.535s
+ok  	asservat.local/asservat/internal/transport/contextstart	1.152s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/mcp	10.296s
+ok  	asservat.local/asservat/internal/transport/native	15.131s
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.462s
+ok  	asservat.local/asservat/internal/transport/presentation	9.307s
+?   	asservat.local/asservat/internal/transport/worker	[no test files]
+?   	asservat.local/asservat/migrations	[no test files]
+ok  	asservat.local/asservat/test/integration	2.026s
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 52 packages, 280 internal import edges; catalog ownership and layer/dependency rules checked
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 46 files match sqlc v1.31.1
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 91 schemas, 49 MCP tools, 173 examples, 176 requirements, 176 scenarios, 11 tasks, 3116 local links, 608 rejected invalid examples (10002 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-architecture.py
+PASS: {"date": "2026-10-09", "scope": "Design catalog, DTO and synthetic state checks only; no runtime/cryptographic qualification", "applications": 12, "components": 24, "interfaces": 14, "domainEntitiesMapped": 49, "requirementsMapped": 176, "positiveChecks": 1206, "rejectedInvalidCases": 120}
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 foundation modes, 4 canonical CRDs, fixed bootstrap hook/compartments/revisions, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-design.py
+PASS: 63 screens, 9 journeys, 49 domain entities, 73 browser operations, 49 MCP schema pairs, 337 resolved references.
+cd web && npm run check
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+Native ESM auth and all five capture operation validators passed positive and negative checks.
+Native ESM case and download validators passed positive and negative checks.
+Native ESM download terminal-only status and complete native metadata guards passed for all three operations.
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+
+ Test Files  8 passed (8)
+      Tests  133 passed (133)
+   Start at  13:42:24
+   Duration  2.50s (environment 42%, tests 26%, transform 18%, import 14%)
+

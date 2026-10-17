@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/contracts	(cached) [no tests to run]
+# asservat.local/asservat/internal/bootstrap [asservat.local/asservat/internal/bootstrap.test]
+../../.cache/asservat-build/planning/initial-activation-handover-20261012/changes/internal/bootstrap/initial_preparer_cleanup.go:50:3: declared and not used: ctx
+ok  	asservat.local/asservat/internal/adapters/kubernetes	0.009s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached) [no tests to run]
+FAIL	asservat.local/asservat/internal/bootstrap [build failed]
+FAIL

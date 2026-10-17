@@ -1,0 +1,38 @@
+{
+  "phase": "after-current-relay",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-terminal-handoff-20261012/overlay-after.json",
+    "-race",
+    "./internal/transport/native",
+    "-run",
+    "^TestNative(JoinedWaitsForExactSQLClosureBeyondIdleDelay|HandoffRejectsUnacknowledgedClosure)$",
+    "-count=1",
+    "-timeout=60s",
+    "-v"
+  ],
+  "exit": 0,
+  "seconds": 4.078,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": [],
+    "before_helper": false
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": [],
+    "before_helper": false
+  },
+  "payloadSHA256": "ad4421abe21f6b72db80d5057c72b8ba0d1c47d94e8d3f854ce28b2a044a7f1c",
+  "dependencySHA256": "474c6954be03c82bc0e702caa53ec433b9aa64cd3fb039362d9c2d51fd1b4d21",
+  "dependenciesCount": 1497,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-terminal-handoff-20261012/tmp"
+  }
+}

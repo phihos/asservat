@@ -1,0 +1,190 @@
+package integration
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	fleet "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Source observations remain explicitly synthetic here. SQL provisioning,
+// scoped login, all three runtime adapters and encrypted S3/provider audit are
+// actual components. This is not current Kubernetes enforcement qualification.
+func qualifyConfigurationRoleReconciliation(t *testing.T, ctx context.Context, admin *pgxpool.Pool, connection *pgx.ConnConfig, original contracts.ConfigurationRuntimeRoleSnapshot, manifest contracts.ConfigurationRuntimeCredentialManifest, administration fleet.Administration, c fleet.OwnerConfiguration, writer auditapp.OwnerConfigurationWriter, mode string) {
+	t.Helper()
+	in := original.State.Input
+	pools := make(map[string]*pgxpool.Pool, 3)
+	for _, role := range original.State.Roles {
+		config, e := pgxpool.ParseConfig("")
+		if e != nil {
+			t.Fatal(e)
+		}
+		config.ConnConfig = connection.Copy()
+		config.ConnConfig.User, config.ConnConfig.Password = role.Receipt.RoleName, role.Password
+		config.MaxConns, config.MinConns = 1, 0
+		pool, e := pgxpool.NewWithConfig(ctx, config)
+		if e != nil {
+			t.Fatal(e)
+		}
+		t.Cleanup(pool.Close)
+		if e = postgres.VerifyConfigurationRuntimeCredential(ctx, pool, manifest, role.Purpose); e != nil {
+			t.Fatal("exact runtime credential", e)
+		}
+		pools[role.Purpose] = pool
+	}
+	// This cleanup is fixture ownership only and runs before the original fleet
+	// root cleanup. Runtime roles receive no DELETE grant.
+	t.Cleanup(func() {
+		clean, end := context.WithTimeout(context.Background(), 5*time.Second)
+		defer end()
+		for _, table := range []string{"hub_owner_configuration_revision", "hub_owner_configuration"} {
+			if _, e := admin.Exec(clean, "DELETE FROM "+table+" WHERE installation_id=$1", in.InstallationID); e != nil {
+				t.Error(e)
+			}
+		}
+	})
+	observation, e := postgres.NewFleetObservation(ctx, pools["configuration-fleet"], in.InstallationID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	source, e := postgres.NewOwnerConfigurations(ctx, pools["configuration-source"], in.InstallationID, in.ClusterID, in.Namespace.UID, in.OwnerSource.UID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ack, e := postgres.NewCurrentOwnerConfigurationAcknowledgements(ctx, pools["configuration-audit"], in.InstallationID, in.ClusterID, in.Namespace.UID, in.OwnerSource.UID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	start := time.Now().UTC().Truncate(time.Microsecond)
+	live, cancel := context.WithDeadline(ctx, start.Add(5*time.Second))
+	defer cancel()
+	administration.ObservedAt, administration.FreshUntil = start, start.Add(5*time.Second)
+	if e = observation.ObserveAdministration(live, administration); e != nil {
+		t.Fatal("actual fleet observation under fixed role", e)
+	}
+	o := fleet.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: administration.FreshUntil}
+	if mode == "ack-source-expired" {
+		o.FreshUntil = start.Add(2 * time.Second)
+	}
+	if _, accepted, e := source.ObserveOwnerConfiguration(live, o); e != nil || accepted {
+		t.Fatal("actual pending owner source", e)
+	}
+	if _, e = source.ReadOwnerConfiguration(live); e == nil {
+		t.Fatal("unaudited source became accepted")
+	}
+	r, e := writer.WriteOwnerConfiguration(live, c)
+	if e != nil {
+		t.Fatal("actual encrypted configuration audit", e)
+	}
+	if mode == "reconcile" {
+		if e = ack.AcknowledgeOwnerConfiguration(live, c, r); e != nil {
+			t.Fatal("current separate acknowledgement", e)
+		}
+		got, e := source.ReadOwnerConfiguration(live)
+		if e != nil || !got.Configuration.Equal(c) || got.FreshUntil.After(o.FreshUntil) {
+			t.Fatal("current accepted result under original interval", e)
+		}
+		var blocked bool
+		if e = admin.QueryRow(live, "SELECT recovery_blocked OR suspended FROM fleet_current_trust WHERE installation_id=$1", in.InstallationID).Scan(&blocked); e != nil || blocked {
+			t.Fatal("configuration reconciliation changed original recovery", e)
+		}
+		t.Logf("actual three-role source/audit/read graph completed within original five seconds: %s; protected source/Secret facts synthetic", time.Since(start))
+		return
+	}
+	var blocker pgx.Tx
+	if mode == "ack-current-generation" {
+		next := o
+		next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+		next.Configuration.Revision.Generation++
+		if _, _, e = source.ObserveOwnerConfiguration(live, next); e != nil {
+			t.Fatal("new independently observed generation", e)
+		}
+	} else if mode == "ack-recovery" {
+		blocker, e = admin.Begin(live)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(live, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", in.InstallationID); e != nil {
+			t.Fatal(e)
+		}
+	} else {
+		blocker, e = admin.Begin(live)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer blocker.Rollback(context.Background())
+		if _, e = blocker.Exec(live, "SELECT 1 FROM hub_owner_configuration WHERE installation_id=$1 AND cluster_id=$2 FOR UPDATE", in.InstallationID, in.ClusterID); e != nil {
+			t.Fatal(e)
+		}
+	}
+	call := live
+	if mode == "ack-lock-expired" {
+		var end context.CancelFunc
+		call, end = context.WithTimeout(live, 200*time.Millisecond)
+		defer end()
+	}
+	done := make(chan error, 1)
+	go func() { done <- ack.AcknowledgeOwnerConfiguration(call, c, r) }()
+	if blocker != nil {
+		name, _ := postgres.ConfigurationRuntimeRoleName(in.InstallationID, "configuration-audit")
+		waiting := false
+		limit := time.NewTimer(time.Second)
+		defer limit.Stop()
+		for !waiting {
+			if e = admin.QueryRow(ctx, "SELECT EXISTS(SELECT FROM pg_stat_activity WHERE usename=$1 AND $2=ANY(pg_blocking_pids(pid)))", name, blocker.Conn().PgConn().PID()).Scan(&waiting); e != nil {
+				t.Fatal(e)
+			}
+			if waiting {
+				break
+			}
+			select {
+			case result := <-done:
+				t.Fatal("acknowledgement did not reach held SQL lock", result)
+			case <-limit.C:
+				t.Fatal("acknowledgement did not block on exact lock")
+			case <-time.After(5 * time.Millisecond):
+			}
+		}
+		if mode == "ack-recovery" {
+			if e = blocker.Commit(ctx); e != nil {
+				t.Fatal(e)
+			}
+		} else {
+			// Wait for the real original caller/source end, never rewrite dates.
+			if mode == "ack-source-expired" {
+				timer := time.NewTimer(time.Until(o.FreshUntil.Add(time.Millisecond)))
+				select {
+				case <-timer.C:
+				case <-ctx.Done():
+					timer.Stop()
+					t.Fatal(ctx.Err())
+				}
+			} else {
+				<-call.Done()
+			}
+			if e = blocker.Rollback(ctx); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	if e = <-done; e == nil {
+		t.Fatal("current acknowledgement ignored changed/expired original authority")
+	}
+	var count int
+	if e = admin.QueryRow(ctx, "SELECT count(*) FROM hub_owner_configuration_revision WHERE installation_id=$1 AND generation=1 AND audit_receipt_json IS NOT NULL", in.InstallationID).Scan(&count); e != nil || count != 0 {
+		t.Fatal("denied current acknowledgement persisted receipt", e)
+	}
+}
+
+func configurationRoleSQLConfiguration(in contracts.ConfigurationRuntimeRoles, issuer string) fleet.OwnerConfiguration {
+	return fleet.OwnerConfiguration{Pool: fleet.OwnerPool{InstallationID: in.InstallationID, ClusterID: in.ClusterID, IssuerEpoch: issuer, Namespace: in.Namespace.Name, NamespaceUID: in.Namespace.UID, Service: "hub", ServiceUID: custodyID(), Deployment: "hub", DeploymentUID: custodyID(), ServiceAccount: "hub", AccountUID: custodyID(), Port: 8443}, Revision: identity.Revision{UID: in.OwnerSource.UID, Generation: 1, Digest: artifact.Digest{4}}, ProtectionDigest: artifact.Digest{2}, IssuerRoots: [][]byte{[]byte("synthetic public CA input; no TLS authentication exercised")}}
+}

@@ -1,0 +1,6 @@
+{
+  "docs/implementation-progress.md": "0f24621bbf882450412e9115b1f894cf84527444a8855ddf184babfb660489cc",
+  "docs/architecture/public-context-composition.md": "7d52538390ce9d5f0d69db71e8a8b976960590804b4cb3563c6722e3b7be4d5b",
+  "docs/decisions/160-public-context-service-assembly.md": "725d029143b5df350deff361d4159db55dcfa53e326f05470ee6050429b18769",
+  "docs/decisions/README.md": "14cd4ae784e60e033608b3d443f086a662fd508d680848d9affc0a0f6ab174c6"
+}

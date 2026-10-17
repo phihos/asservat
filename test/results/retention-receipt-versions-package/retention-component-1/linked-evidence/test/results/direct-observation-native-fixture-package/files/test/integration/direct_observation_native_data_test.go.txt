@@ -1,0 +1,92 @@
+// Fixed native test process input/output. No product executable accepts these
+// synthetic initial roots. The integration copy is checked byte-for-byte.
+package integration
+
+import (
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	app "asservat.local/asservat/internal/application/fleet"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+type API struct {
+	Host              string
+	CA                []byte
+	ClusterID         string
+	Control           cfg.NamespaceRef
+	ObserverTokenFile string
+	ProbeTokenFile    string
+	Workload          cfg.OwnerWorkloadAdministration
+	WorkloadPin       kube.GuardPin
+}
+type SQL struct {
+	DSN        string
+	Roots      []byte
+	ServerName string
+}
+type Audit struct {
+	Endpoint, Region, Bucket, AccessKey, SecretKey string
+	Roots                                          []byte
+	// This is the fixture's synthetic wrapping boundary only. Object bytes,
+	// SQL intent/acknowledgement and certificate activation remain real.
+	WrapKey []byte
+}
+type CA struct{ DER, PKCS8 []byte }
+
+type Input struct {
+	Format, Mode, PodUID string
+	Until                time.Time
+	API                  API
+	Owner                value.OwnerObservationPin
+	Caller               value.ClusterObservationCallerPin
+	Regional             value.ConnectorObservationPin
+	// Named fixed SQL purposes only; the helper never receives the admin DSN.
+	SQL                                           map[string]SQL
+	Audit                                         Audit
+	OwnerCA, ConnectorClientCA, ConnectorServerCA CA
+	ConnectorConfiguration                        app.ConnectorIdentityConfiguration
+	ConnectorSourcePlan                           cfg.ConfigMapAdministration
+	ConnectorSourcePin                            kube.GuardPin
+	ConnectorSourceName, ConnectorSourceUID       string
+	ConnectorTokenFile                            string
+	OwnerTokenFile                                string
+	CallerTokenFile                               string
+	CapacityPlan                                  cfg.CapacityNamespaceAdministration
+	CapacityPin                                   kube.GuardPin
+	// A distinct test-only reachable Service is a dial hint. The original
+	// protected owner's Service UID/common name and exact peer remain pinned.
+	RegionalDial                   string
+	OperationMACKey, AccountMACKey []byte
+}
+
+type ControlRequest struct {
+	Command    string
+	Until      time.Time
+	Request    value.ClusterObservationRequest
+	ExchangeID string
+}
+type ControlResult struct {
+	OK                      bool
+	Phase, Category         string
+	Available               bool
+	ElapsedNanos            int64
+	RemainingNanos          int64
+	CompletedAt             time.Time
+	LastPhase, LastCategory string
+	LastElapsedNanos        int64
+	RegionalFinished        bool
+	RegionalCategory        string
+	Result                  *value.ClusterObservationResult
+	Metrics                 MetricsSnapshot
+	// Public correlation only, never a private proof or credential.
+	ExchangeID string
+}
+
+type APISnapshot struct{ Requests, Denied, Errors, HeaderNanos int64 }
+type PoolSnapshot struct{ Acquires, AcquireNanos, EmptyAcquires, CancelledAcquires int64 }
+type MetricsSnapshot struct {
+	Observer, Probe APISnapshot
+	SQL             map[string]PoolSnapshot
+}

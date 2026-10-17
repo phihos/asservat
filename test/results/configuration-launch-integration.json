@@ -1,0 +1,90 @@
+{
+  "name": "configuration-launch",
+  "manifest": [
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_source_path_test.go",
+      "base_sha256": "f68904df666f016fc63c3af471bf58bdebc172f6226ab28ab9bd87f689b89873",
+      "payload_sha256": "b2d155b1f9edebcf0b3aafd4249031eaf3f36ee1acc9d3190536a763e15e988e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_launch.go",
+      "base_sha256": null,
+      "payload_sha256": "cfc25660ca4cbbeeb19111abb0cbe8fdd5e4bb4d0a9683281d98026b2ee6b75c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_launch_test.go",
+      "base_sha256": null,
+      "payload_sha256": "3cb38f4bac670d9b69a44eb3d219e1d362c4c4718142979164536642dc58247d"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_runtime_roles.go",
+      "base_sha256": "7fd8f9276e7c270ce4af151fd71805a397bb44b4ee089ba404358c415805296e",
+      "payload_sha256": "b05ef46760bf7cacdb5cf29ecb579bf54a94846636616dc49ed92a1917401249"
+    },
+    {
+      "path": "internal/adapters/postgres/configuration_runtime_roles.go",
+      "base_sha256": "928dc60903a3086d79c6899285028d97a6932be10265a19fd01401fe7613cc2f",
+      "payload_sha256": "ea65b03629c8320087e8a7118516539fb4e9622aae0c07877351cfbe1476be6c"
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_inputs.go",
+      "base_sha256": "51b06ddd852438f5760769bbf048debf7b1c5b5c7022a65f247c783b24d1e663",
+      "payload_sha256": "813ddc0669f4e37bc81d4a8ddd219495ca5926a757474ab12195a2c570589463"
+    },
+    {
+      "path": "internal/bootstrap/configuration_role_installer.go",
+      "base_sha256": "6a93d189b8a37f18eb135fe7b794820574d98cf713abc24a80e969e7417226d7",
+      "payload_sha256": "8c019e8580e0497dddb3abad0235afcf65c7a7dd72785861a6d00ebbb7d566fd"
+    },
+    {
+      "path": "internal/contracts/configuration_role_installer.go",
+      "base_sha256": "6f4da5a8ccdd75c34dca547be9129ae0de1a27e766641ad17a46c2605a181b57",
+      "payload_sha256": "64b9f8fd2c1d4a06bdef0665c490c4c12eb83f3a43051a7edae72126b1a3b02a"
+    },
+    {
+      "path": "internal/contracts/configuration_runtime_roles.go",
+      "base_sha256": "32eac2ee070d594d595df49279d37a414bc06218c53f911ca12f95cfd3ce87a1",
+      "payload_sha256": "44edf0a578688f456b488469436250e0e365c86e70173854ae14e6f68a9f3a4c"
+    },
+    {
+      "path": "specs/contracts/configuration-role-installer.schema.json",
+      "base_sha256": "eb34031acdafe8885e23b37dbeba97a31bd033f01bed9d8f40a898b10e623a10",
+      "payload_sha256": "087ae7811705bcdacdf544cfc7309a06788627e61fa4b0d1294b1cf763acd468"
+    },
+    {
+      "path": "specs/contracts/configuration-runtime-role-state.schema.json",
+      "base_sha256": "63dfc03c7012fc1e667c3e248806978685f75660156e3a56b4802e8ffd1a35ce",
+      "payload_sha256": "b27125d50f46447b78b486534d41b4cd3f498990b80051ce99362e6fa45ea25a"
+    }
+  ],
+  "dependencies": 1501,
+  "dependency_delta": [
+    {
+      "path": "test/integration/context_native_content_test.go",
+      "expected": "c22f1dc23b7b0790dfa55d81c888ab22e5a257fd192105312db241bcf2b92510",
+      "actual": "226526c76ba89381384c7452b48cde0e4b4869f96cf3365abc9782aa7871c976"
+    },
+    {
+      "path": "test/integration/context_native_interrupted_test.go",
+      "expected": "dfb9d7d5127f8729e0d700e89d3374573a46201d8674e21b34439ac7813dce5b",
+      "actual": "4ead0cac80f138c7e2faa0bcd1a263970ea47b5b32e1a909bc6900dc5a7a57e0"
+    },
+    {
+      "path": "test/integration/download_sessions_test.go",
+      "expected": "0ea446dd15a86a87395f06c6e5bd8972f36861f0c27409a32977aae2f1fb9707",
+      "actual": "4353d6ab18089b04c4042f6015fff415e9e5dec5f58974826d079aff6077622d"
+    },
+    {
+      "path": "test/integration/native_admission_trace_test.go",
+      "expected": "aa5a042dd5371001321526f51ea2e27da2ed415b455aa47a9567ad2fd309872e",
+      "actual": null
+    },
+    {
+      "path": "test/integration/native_exchange_test.go",
+      "expected": "c2cce8b96befa6e08cd2e822226525d02a0d115441e74710b82646b654e45b97",
+      "actual": "3bf6118867a895192e04713278037d1a11a0405fd48eb575a3a172084a9dbd9c"
+    }
+  ],
+  "manifest_sha256": "8d8599f895f475eef9555848bac0e88dbbc69cbc94f4bca72f25264b0e678d15",
+  "integrated_at": "2026-10-12T17:59:45.642853+00:00"
+}

@@ -1,0 +1,11 @@
+{
+  "status": "source-only; not reproduced or qualified",
+  "candidateFunction": "guard_connector_identity_profile",
+  "candidateBranch": "UPDATE by exact cleanup role",
+  "reason": "declared operation_audit composite a and nested connector_credential_attempt alias a both expose id",
+  "base": {
+    "path": "test/integration/connector_identity_test.go",
+    "sha256": "d0d5b1fcf45c175dd32a07eba036124a4686ffa07064c9c268dc9269cb310967"
+  },
+  "testScope": "Existing genuine unexpired SQL connector, no timestamp rewriting or migration/role changes. Temporary fixture-only definer calls actual trigger under original cleanup login; expected safe 23514 denial, original exact row unchanged. Full positive lifetime cleanup remains separate."
+}

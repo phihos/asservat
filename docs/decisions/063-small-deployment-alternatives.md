@@ -1,0 +1,15 @@
+# ADR-063 — Small deployments with internal dependency alternatives
+
+Date: 2026-10-10. Status: **requirement and recommendations accepted by the maintainer; implementation and qualification in progress.**
+
+The maintainer requests internal accounts/login and static-key encryption as alternatives to separately operated SSO and Transit, a Helm-provided PostgreSQL option, and research into a small evidence store. Support an explicit self-contained deployment profile with independently selectable providers. Keycloak remains the first tested external IdP; OpenBao and Ceph remain external reference integrations. They are not mandatory for the planned small profile.
+
+This supersedes ADR-009's external-only dependency assumption and the no-built-in-identity choice in the technology document. It refines ADR-058: dependencies may be installed when the administrator explicitly selects a bundled profile; no hidden service/operator installation or credentials in Helm release data. Existing role isolation, Kubernetes-only permission configuration, envelope encryption, TLS, evidence limits and recovery/deletion requirements remain unchanged. ADR-053/060's measured Keycloak behavior and ADR-062's signature semantics remain valid; provider-specific implementation does not define all future authentication/key providers.
+
+Selected packaging: local accounts with a maintained embedded OAuth library for MCP, an isolated local key service using Secret-referenced purpose-specific static keys, single-instance PostgreSQL plus pgBackRest, and single-instance SeaweedFS exposing the existing S3 contract. Keep CloudNativePG optional for existing/operator-managed PostgreSQL or HA needs. Do not create a second SQLite or filesystem evidence implementation merely to remove a small server. The maintainer authorized implementing these recommendations as their components become ready. These choices still need the exact-version qualification in the [research report](../research/small-deployments.md); no maintenance or security guarantee follows from a feature list.
+
+The local key provider must cover evidence wrapping, credential encryption, signatures and PKI without granting raw unwrap to the hub or collectors. Local accounts must support recent verified step-up and current membership/session revocation. Static key loss is a recovery failure, not permission to regenerate keys over existing data. Neither bundled storage nor an extra PVC implies independent backups or HA. Optional offline analysis still needs qualified encrypted scratch; native downloads do not.
+
+[REQ-DEP-001–005](../../specs/deployment-profiles.md) define the provider-neutral contract. Actual Helm values, local identity endpoints/SQL records and key-provider DTOs must be specified and validated together with their implementations; this ADR does not add silently ignored settings to the foundation chart.
+
+[ADR-064](064-local-key-material.md) implements the first local wrapping/signing backends and private key payload. Authenticated service composition, local identity and bundled service packaging remain pending; these backends alone do not enable the small profile.

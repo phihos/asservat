@@ -1,0 +1,28 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback
+=== RUN   TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:564: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (1.38s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-administrator (0.41s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-runtime-role (0.06s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-unapplied (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-head (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-database (0.06s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-postmaster (0.06s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-held-lock (0.19s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-recovery-after-lock (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-late-callback (0.17s)
+    --- PASS: TestInitialInstallationWithRealServices/initial-runtime-bridge-sql-schema-after-construction (0.07s)
+PASS
+ok  	asservat.local/asservat/test/integration	2.432s

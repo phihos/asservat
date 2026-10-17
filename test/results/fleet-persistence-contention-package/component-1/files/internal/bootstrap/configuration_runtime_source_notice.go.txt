@@ -1,0 +1,48 @@
+package bootstrap
+
+import (
+	"context"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/fleet"
+)
+
+// This fixed wrapper forwards only the actual observer. Scheduling notices
+// cannot supply accepted authority or stand in for the separate recovery read.
+// It owns no SQL pool, source loop, retry, timestamp renewal or new lifetime.
+type configurationRuntimeFleetProjection struct {
+	actual    *postgres.FleetObservation
+	admission *app.WorkerRuntimeAdmission
+}
+
+func (s *configurationRuntimeFleetProjection) ObserveAdministration(ctx context.Context, a fleet.Administration) error {
+	if s == nil || s.actual == nil || s.admission == nil {
+		return fleet.ErrUnavailable
+	}
+	s.admission.NoteFleetObservation(a)
+	return s.finishObservation(ctx, a, s.actual.ObserveAdministration(ctx, a))
+}
+
+// Keep every failed SQL outcome on the same notice-invalidating path, including
+// unchanged persistence contention. This private completion grants no authority.
+func (s *configurationRuntimeFleetProjection) finishObservation(ctx context.Context, a fleet.Administration, err error) error {
+	if err != nil || ctx.Err() != nil || !a.Valid(time.Now()) {
+		s.admission.InvalidateFleetNotice()
+		if err != nil {
+			return err
+		}
+		return fleet.ErrUnavailable
+	}
+	s.admission.NoteFleetCommitted(ctx, a)
+	return nil
+}
+
+func (s *configurationRuntimeFleetProjection) FenceAdministration(ctx context.Context, started time.Time) error {
+	if s == nil || s.actual == nil || s.admission == nil {
+		return fleet.ErrUnavailable
+	}
+	s.admission.InvalidateFleetNotice()
+	return s.actual.FenceAdministration(ctx, started)
+}

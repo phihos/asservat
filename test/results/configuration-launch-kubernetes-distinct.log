@@ -1,0 +1,21 @@
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/matrix
+    configuration_launch_kube_test.go:59: native launch original operation: 4.670920492s; mode=matrix
+    configuration_launch_kube_test.go:59: actual Kubernetes source/guard/Secret/CAS and joined controller cleanup; synthetic SQL receipts/provider material and gated nonexecuting Pod; no initial guard bridge or installed runtime qualification
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/lost-claim
+    configuration_launch_kube_test.go:59: native launch original operation: 3.303997295s; mode=lost-claim
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/lost-launch
+    configuration_launch_kube_test.go:59: native launch original operation: 4.681743973s; mode=lost-launch
+    configuration_launch_kube_test.go:59: actual Kubernetes source/guard/Secret/CAS and joined controller cleanup; synthetic SQL receipts/provider material and gated nonexecuting Pod; no initial guard bridge or installed runtime qualification
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/changed-enforcement
+    configuration_launch_kube_test.go:59: native launch original operation: 3.715290853s; mode=changed-enforcement
+=== RUN   TestConfigurationRuntimeLaunchWithRealKubernetes/changed-input
+    configuration_launch_kube_test.go:59: native launch original operation: 4.698619151s; mode=changed-input
+--- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes (136.14s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/matrix (31.59s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/lost-claim (23.18s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/lost-launch (29.57s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/changed-enforcement (22.71s)
+    --- PASS: TestConfigurationRuntimeLaunchWithRealKubernetes/changed-input (29.08s)
+PASS
+ok  	asservat.local/asservat/test/integration	137.201s

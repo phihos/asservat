@@ -1,0 +1,15 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-resume
+    native_exchange_test.go:520: native diagnostic worker opening 0
+    native_exchange_test.go:425: native diagnostic connector admission entered
+    download_sessions_test.go:672: native context initial session resolved
+    native_exchange_test.go:426: native diagnostic connector admission terminal 22.566883ms no native command admitted
+    native_exchange_test.go:522: native diagnostic worker open terminal 0 native exchange unavailable
+    download_sessions_test.go:672: native context pending metadata read completed
+    download_sessions_test.go:672: native context initial source lookup download unavailable
+    native_exchange_test.go:283: worker terminal native exchange unavailable
+--- FAIL: TestContextAdmissionWithRealServices (3.98s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-content-resume (3.62s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	4.040s
+FAIL

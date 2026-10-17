@@ -1,0 +1,110 @@
+from pathlib import Path
+import os,json,hashlib,hmac,datetime,urllib.request,urllib.error,urllib.parse,xml.etree.ElementTree as ET,subprocess,tempfile,time,uuid,concurrent.futures
+out=Path(__file__).parent
+image='chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d'
+name='asservat-audit-scope-'+uuid.uuid4().hex[:12];network=name+'-net';label='asservat.test='+name
+bucket='synthetic-audit';prefix='hub-owner-enrollment/v1/'+str(uuid.uuid4())+'/'
+credentials={role:(role+'-synthetic-access',uuid.uuid4().hex+uuid.uuid4().hex) for role in ['admin','writer']}
+report={'scope':'Owned synthetic S3 policy diagnostics only; private HTTP, no TLS, product runtime, durable storage or installation authority qualification','image':image,'name':name,'prefix':prefix,'observations':[],'cleanupFailures':[],'runnerSHA256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+def run(args,**kw):return subprocess.check_output(args,text=True,stderr=subprocess.PIPE,timeout=120,**kw).strip()
+def sig(key,msg):return hmac.new(key,msg.encode(),hashlib.sha256).digest()
+endpoint='';host=''
+def request(actor,method,path,body=b'',query=None,headers=None):
+ query=urllib.parse.urlencode(sorted((query or {}).items()));uri=urllib.parse.quote(path,safe='/~');stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ');date=stamp[:8]
+ payload=hashlib.sha256(body).hexdigest();fields={'host':host,'x-amz-date':stamp,'x-amz-content-sha256':payload,**(headers or {})};names=';'.join(sorted(fields));canonical=method+'\n'+uri+'\n'+query+'\n'+''.join(k+':'+fields[k].strip()+'\n' for k in sorted(fields))+'\n'+names+'\n'+payload
+ if actor:
+  access,secret=credentials[actor];scope=date+'/us-east-1/s3/aws4_request';key=sig(sig(sig(sig(('AWS4'+secret).encode(),date),'us-east-1'),'s3'),'aws4_request');string='AWS4-HMAC-SHA256\n'+stamp+'\n'+scope+'\n'+hashlib.sha256(canonical.encode()).hexdigest();signature=hmac.new(key,string.encode(),hashlib.sha256).hexdigest();fields['Authorization']='AWS4-HMAC-SHA256 Credential='+access+'/'+scope+', SignedHeaders='+names+', Signature='+signature
+ req=urllib.request.Request(endpoint+uri+('?' + query if query else ''),data=body if method in ['PUT','POST'] else None,method=method,headers=fields)
+ try:
+  with urllib.request.urlopen(req,timeout=5) as res:status=res.status;data=res.read(65537);version=res.headers.get('x-amz-version-id');etag=res.headers.get('etag')
+ except urllib.error.HTTPError as e:status=e.code;data=e.read(65537);version=e.headers.get('x-amz-version-id');etag=e.headers.get('etag')
+ assert len(data)<=65536
+ code=None
+ if status>=400 and data:
+  try:code=ET.fromstring(data).findtext('Code')
+  except ET.ParseError:code='non-XML'
+ return {'responseText':data.decode('utf-8','replace'),'status':status,'version':version,'etag':etag,'errorCode':code,'bodySHA256':hashlib.sha256(data).hexdigest(),'bodyBytes':len(data)}
+def observe(title,actor,method,path,body=b'',query=None,headers=None):
+ r=request(actor,method,path,body,query,headers);r.pop('responseText');report['observations'].append({'name':title,'actor':actor or 'anonymous','method':method,'path':path,'query':query or {},'conditional':(headers or {}).get('if-none-match'),**r});return r['status']
+created_network=False;created=False;exitcode=1
+with tempfile.TemporaryDirectory(prefix=name+'-',dir='/home/phil/.cache/asservat-build') as work:
+ try:
+  work=Path(work);work.chmod(0o755);config=work/'s3.json';config.write_text(json.dumps({'identities':[{'name':role,'credentials':[{'accessKey':pair[0],'secretKey':pair[1]}],'actions':['Admin','Read','Write','List'] if role=='admin' else ['Read:'+bucket+'/'+prefix+'*','Write:'+bucket+'/'+prefix+'*']} for role,pair in credentials.items()]}));config.chmod(0o444)
+  run(['docker','network','create','--internal','--label',label,network]);created_network=True
+  run(['docker','create','--name',name,'--network',network,'--label',label,'--memory','768m','--cpus','2','--pids-limit','256','--cap-drop','ALL','--security-opt','no-new-privileges','--user','1000:1000','--read-only','--tmpfs','/tmp:rw,nosuid,nodev,size=64m','-v','/data','-v',str(config)+':/config/s3.json:ro','--entrypoint','/usr/bin/weed',image,'mini','-dir=/data','-ip.bind=0.0.0.0','-admin.ui=false','-s3.port=8333','-s3.config=/config/s3.json']);created=True;run(['docker','start',name]);inspect=json.loads(run(['docker','inspect',name]))[0];host=inspect['NetworkSettings']['Networks'][network]['IPAddress']+':8333';endpoint='http://'+host;report['imageID']=inspect['Image'];report['containerID']=inspect['Id']
+  for i in range(80):
+   try:
+    if request('admin','GET','/')['status']==200:break
+   except (OSError,urllib.error.URLError):pass
+   time.sleep(.25)
+  else:raise RuntimeError('owned store readiness unavailable')
+  assert observe('create-bucket','admin','PUT','/'+bucket)==200
+  versioning=b'<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>'
+  assert observe('enable-versioning','admin','PUT','/'+bucket,versioning,query={'versioning':''})==200
+  key='/'+bucket+'/'+prefix+'original';data=b'synthetic original immutable version'
+  assert observe('versioned-conditional-create','writer','PUT',key,data,headers={'if-none-match':'*'})==200
+  original=report['observations'][-1]['version'];assert original and original!='null'
+  assert observe('versioned-conditional-conflict','writer','PUT',key,b'replacement',headers={'if-none-match':'*'})==412
+  writer='arn:aws:iam::000000000000:user/writer';resources=['arn:aws:s3:::'+bucket+'/'+prefix+'*']
+  policy={'Version':'2012-10-17','Statement':[{'Sid':'DenyRuntimeDelete','Effect':'Deny','Principal':{'AWS':writer},'Action':['s3:DeleteObject','s3:DeleteObjectVersion'],'Resource':resources}]}
+  (out/'policy.json').write_text(json.dumps(policy,indent=2)+'\n');assert observe('install-no-delete-policy','admin','PUT','/'+bucket,json.dumps(policy).encode(),query={'policy':''})==204
+  replaced=observe('unconditional-put-adds-version','writer','PUT',key,b'newer synthetic version');newversion=report['observations'][-1]['version']
+  oldread=observe('original-version-remains-readable','writer','GET',key,query={'versionId':original});oldhash=report['observations'][-1]['bodySHA256']
+  latest=observe('latest-key-is-new-version','writer','GET',key);latestversion=report['observations'][-1]['version']
+  inject=observe('supplied-original-version-cannot-overwrite','writer','PUT',key,b'caller-supplied old version ID',query={'versionId':original});injectedversion=report['observations'][-1]['version']
+  oldagain=observe('original-version-after-supplied-id','writer','GET',key,query={'versionId':original});oldagainhash=report['observations'][-1]['bodySHA256']
+  deleted=observe('runtime-delete-version-denied','writer','DELETE',key,query={'versionId':original})
+  deletecurrent=observe('runtime-delete-key-denied','writer','DELETE',key)
+  suspend=observe('runtime-versioning-suspension-denied','writer','PUT','/'+bucket,b'<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Suspended</Status></VersioningConfiguration>',query={'versioning':''})
+  anonymous=observe('anonymous-version-read-denied','', 'GET',key,query={'versionId':original})
+  foreign=observe('foreign-version-read-denied','writer','GET','/'+bucket+'/foreign/new',query={'versionId':original})
+  final=observe('original-version-final-read','writer','GET',key,query={'versionId':original});finalhash=report['observations'][-1]['bodySHA256']
+  expected=hashlib.sha256(data).hexdigest()
+  report['versionImmutabilityObserved']=replaced==200 and newversion and newversion!=original and oldread==200 and oldhash==expected and latest==200 and latestversion==newversion and (inject!=200 or injectedversion!=original) and oldagain==200 and oldagainhash==expected and deleted==403 and deletecurrent==403 and suspend==403 and anonymous==403 and foreign==403 and final==200 and finalhash==expected
+  racekey='/'+bucket+'/'+prefix+'concurrent'
+  with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+   races=list(pool.map(lambda i:request('writer','PUT',racekey,('synthetic winner '+str(i)).encode(),headers={'if-none-match':'*'}),range(12)))
+  report['conditionalRace']=[{k:v for k,v in r.items() if k!='responseText'} for r in races]
+  raceok=sum(r['status']==200 for r in races)==1 and sum(r['status']==412 for r in races)==11
+  run(['docker','restart','--time','10',name])
+  for i in range(80):
+   try:
+    if request('admin','GET','/')['status']==200:break
+   except (OSError,urllib.error.URLError):pass
+   time.sleep(.25)
+  else:raise RuntimeError('owned restart readiness unavailable')
+  restartread=observe('original-version-after-restart','writer','GET',key,query={'versionId':original});restarthash=report['observations'][-1]['bodySHA256']
+  restartdeny=observe('version-deletion-denied-after-restart','writer','DELETE',key,query={'versionId':original})
+  def inventory():
+   response=request('admin','GET','/'+bucket,query={'versions':'','prefix':prefix})
+   assert response['status']==200
+   doc=ET.fromstring(response['responseText']);assert doc.findtext('{*}IsTruncated')=='false'
+   versions=[{'key':v.findtext('{*}Key'),'version':v.findtext('{*}VersionId'),'bytes':int(v.findtext('{*}Size'))} for v in doc.findall('{*}Version')]
+   assert not doc.findall('{*}DeleteMarker')
+   assert all(v['key'].startswith(prefix) and v['version'] not in ['',None,'null'] for v in versions)
+   return versions
+  versions=inventory();report['versionsBeforeCleanup']=versions;assert len(versions)==4
+  cleanup=True
+  for v in versions:
+   status=observe('independent-retirement-version-delete','admin','DELETE','/'+bucket+'/'+v['key'],query={'versionId':v['version']});cleanup=cleanup and status==204
+  report['versionsAfterCleanup']=inventory();cleanup=cleanup and not report['versionsAfterCleanup']
+  erased=observe('original-version-erased','admin','GET',key,query={'versionId':original})
+  report['immutableVersionCandidateChecksPassed']=report['versionImmutabilityObserved'] and raceok and restartread==200 and restarthash==expected and restartdeny==403 and cleanup and erased==404
+  report['qualificationPassed']=False
+  report['remaining']='Does not enforce one logical version per key. Component diagnostics cover conditional concurrency, process restart and exact version deletion; product accounting/recovery, persistent power-loss behavior and the installed version-required audit profile remain unqualified.'
+  report['completed']=True;exitcode=0
+ except Exception as e:
+  report['completed']=False;report['exceptionType']=type(e).__name__;report['exception']=str(e)[:256]
+ finally:
+  if created:
+   try:
+    inspect=json.loads(run(['docker','inspect',name]))[0];assert inspect['Config']['Labels']['asservat.test']==name
+    logs=run(['docker','logs','--tail','120',name]);(out/'provider.log').write_text(logs)
+    run(['docker','rm','-f','-v',name])
+   except Exception as e:report['cleanupFailures'].append({'resource':name,'error':type(e).__name__})
+  if created_network:
+   try:run(['docker','network','rm',network])
+   except Exception as e:report['cleanupFailures'].append({'resource':network,'error':type(e).__name__})
+  report['exit']=exitcode if not report['cleanupFailures'] else 1
+  with (out/'result.json').open('x') as f:json.dump(report,f,indent=2);f.write('\n')
+print(json.dumps({'exit':report['exit'],'completed':report.get('completed'),'qualificationPassed':report.get('qualificationPassed'),'cleanupFailures':report['cleanupFailures'],'observations':report['observations']}));raise SystemExit(report['exit'])

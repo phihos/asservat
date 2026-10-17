@@ -1,0 +1,20 @@
+{
+  "liveBaseMatchesBeforeIntegration": true,
+  "baseFiles": {
+    "internal/domain/planning/go_profile_endpoint.go": null,
+    "internal/domain/planning/go_profile_endpoint_test.go": null,
+    "internal/domain/targets/profile_network.go": null,
+    "internal/domain/targets/profile_network_test.go": null,
+    "internal/application/planning/go_profile_endpoint.go": null,
+    "internal/application/planning/go_profile_endpoint_test.go": null,
+    "internal/application/targets/profile_network.go": null,
+    "internal/adapters/kubernetes/profile_network.go": null,
+    "internal/adapters/kubernetes/profile_network_test.go": null,
+    "docs/architecture/runtime-profiles.md": "18f5d87dcbdfc03ae6d60391718431f1e0fd0e80e28d2e861189375855014f79",
+    "specs/profiles.md": "4adc90bbd066081cac588ea148c4ef60a8d642221df034dc100377da86e0ed56"
+  },
+  "originManifestSHA256": "777fcdd9e0a6b6f3fb7cbc76bb71f18a96abe8adfae0a617909e2f5bae1ef4c4",
+  "newParents": 13,
+  "selectedParents": 28,
+  "dependencies": 27
+}

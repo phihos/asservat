@@ -1,0 +1,5 @@
+=== RUN   TestCustodyWithRealServices
+--- PASS: TestCustodyWithRealServices (0.03s)
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/test/integration	1.082s [no tests to run]

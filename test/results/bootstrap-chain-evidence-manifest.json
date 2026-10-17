@@ -1,0 +1,27 @@
+[
+  {
+    "path": "evidence/compile-first.log",
+    "sha256": "c6be6a363cc1e82295cf62780874a614ddbfd70d2bd40fad4e4480ef1edd47b5",
+    "bytes": 144
+  },
+  {
+    "path": "evidence/scratch-before.log",
+    "sha256": "e074cb0993680b02db7b953fbee2805d8b384e2ce62dacf4cb1993620f2fef23",
+    "bytes": 212
+  },
+  {
+    "path": "evidence/scratch-chain-race.log",
+    "sha256": "4ddf6fbab7816c37576b33e822d8bc239414cf6d9156a5fbce70e850777dd76a",
+    "bytes": 108
+  },
+  {
+    "path": "evidence/selector-tests.log",
+    "sha256": "33060fd73862c5e1af97335504d5b45211fce6d229657f556d8deceeadc52ce4",
+    "bytes": 101
+  },
+  {
+    "path": "evidence/vet.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+]

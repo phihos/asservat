@@ -1,0 +1,2 @@
+python3 scripts/check-go-architecture.py
+Go architecture OK: 53 packages, 304 internal import edges; catalog ownership and layer/dependency rules checked

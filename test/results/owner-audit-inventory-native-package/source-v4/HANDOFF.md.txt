@@ -1,0 +1,25 @@
+# Qualified owner audit inventory follow-up
+
+Six paths in `manifest.json` are ready for exact parent integration. Manifest SHA256 f348bbbe2f65d4feb489dc174feb4749256c390fa088fb91f0caba68747da77c. The production change is only symmetric complete-version/current-LIST inconsistency detection. The new test/harness path qualifies read-only exact-key historical inventory and pinned SeaweedFS's narrow multipart-list policy. No public/runtime inventory selection, reserve, capacity release, writer quiescence or retirement is implemented.
+
+The two existing bases remain the original inventory adapter and custody harness; the other four paths are new. Source checkpoints 1–3 remain immutable. Native41351 remains the original LIST failure. Native94247 remains the later fixture constructor failure (invalid client transport), with no production constructor relaxation. The final server-side trace is tested through the actual constructor/reader before native use.
+
+## Component evidence
+
+`../checks/native-policy-component-2/result.json` SHA256 e74f246811a46e89882a07cfd75869fac6891e732ffe4f281f6c095c578bc239, actual session53050 terminal0. Selectors0; two-package compile17.239s0; named actual-constructor/TLS trace race32.159s0; native opt-in exact skip0; vet2.217s0; Go architecture0.815s0. Six payloads/bases and 2,309 dependencies stable; no mirror mutations; owned scratch joined and removed.
+
+The prior exact production regression evidence is preserved in `../checks/native-component-1`: intended integrated-body missing-current failure, corrected11 top/47 named objectstore races, compile/vet/architecture. `prior-evidence.json` in component2 pins all old logs and records complete dependency comparison: all production/module/embed/objectstore sources unchanged; only three separately owned native enrollment fixture paths changed. This is explicit unchanged-source evidence reuse, not a claim of rerunning the older race suite.
+
+## Actual provider evidence
+
+`../checks/native-policy-real-2/result.json` SHA256 a94876fecd9d2a7346cdfcc99a490cdb0df945ec97a06d41c3e493c55bf0f95b, actual session70626 terminal0. Command: `python3 scripts/test-custody.py --owner-audit-inventory`, in the owned frozen mirror. All six required top/child names passed; test0.31s, Go1.365s, runner39.917s. Exact2,249 native source hashes matched the independent prelaunch source set and stayed unchanged. All2,309 component dependencies/payloads/bases stayed exact; cleanup empty; owned scratch removed after joined teardown.
+
+The actual pinned provider first rejects the unchanged coarse List-only role at multipart inventory: versions200/uploads403/current unissued, retaining five exact known entries. An independent fixture administrator then installs only `s3:ListBucketMultipartUploads` Allow for the exact inventory principal, bucket and original `s3:prefix`. The same reader's new bounded operation succeeds with versions200/uploads200/current200. Missing/neighbor prefixes and the foreign bucket still deny multipart listing. ListParts of the known upload, plain and exact-version GET, foreign version LIST, PUT, delete-version, abort and versioning suspension all deny. No broad Read grant is added.
+
+Independent administrator before/after reads confirm seven total version/marker entries including neighboring generations, exact version body hashes/lengths, the historical zero-byte null version, and one retained upload/part unchanged. Product inventory returns only the original generation's four data versions plus marker and upload; unknown multipart bytes remain unknown/reserved. Historical source observation is expired; it is provenance, not continuing current authority. The test creates arbitrary synthetic physical bytes and fixture IAM, not a real audit reserve or production retirement permission.
+
+Pinned image/source provenance and proposed narrow policy route are recorded in `../PINNED-INVENTORY-IAM-REVIEW.md`; now this precise route has actual provider qualification. Production setup policy generation and complete multi-page inventory/retirement still require separate implementation. Both earlier native failures remain preserved under `../checks/native-real-1` and `../checks/native-policy-real-1`.
+
+## Next work
+
+Parent owns integration and canonical status updates. ADR156's independently audited finite epochs and consumer map remain a separate unselected source stage. New work must use the current epoch; already admitted work checks original epoch non-revocation/retention and original dependency end. Dedicated backing, SQL effect/retirement facets, uncertain-copy accounting and restore qualification remain outstanding. No migration number is reserved.

@@ -1,0 +1,18 @@
+# Pending observation receiver checkpoint v1
+
+Ten new paths, all with absent live bases in manifest.json. Concrete bootstrap receiver composes actual common-SNI locator GET, exact-SNI claim POST, strict current sender/server SQL and one original two-peer native operation with the existing regional four-ordinal framed coordinator. Pending state retains the original query/caller/socket/leaf minimum independently of ordinary GET return. Before possible locator output it reserves the exact regional standby; unknown GET/POST delivery cannot return that stream to lookup, repeat metadata or create a replacement native operation. Claims spend once before I/O; original slots include preparation, output, closing and the spent marker. Close joins actual admitted native, stream and HTTP work. Existing v1/general authenticators are unchanged.
+
+Actual handle 42557 terminal 0: compile 15.798s; affected races 27.693s (81 top-level / 295 named PASS entries, 0 skips); vet 3.834s; Go architecture 8.457s. Per-phase reports record exact commands and unchanged before/after hashes. All ten payloads/absent bases, 2,082 dependencies, 2,092 architecture mirror files and file sets remained unchanged. Owned tmpfs build scratch was removed.
+
+The freeze-only preparation (98350) briefly blocked in HOME Btrfs reserve_bytes.cold while copying the mirror, then completed naturally with exit0 before any signal. No build ran during that stall. The complete frozen candidate was tested unchanged. Future mirrors will use owned tmpfs as coordinated; no unknown file/process was modified.
+
+Meaningful coverage: actual TLS1.3/HTTP2 common GET and new exact POST with the actual complete regional framed exchange; final owner/regional mutation and sender revocation deny; lost GET/POST and repeated claim never repeat native/metadata work; native Begin cancellation propagates and Close waits until its actual admitted read returns; pending/reservation concurrency, deadline shortening/expiry, incorrect query/leaf/holder identity, sequence replacement and old cleanup; selected integrated v1/v2 coordinator/holder/stream tests. The joined receiver case asserts 22 A-side registry port reads, one original native handle, one Original and one Final, four real regional value reads, one selected metadata read and two SQL-pair invocations. These counts are component port counts, not native API or SQL query timing.
+
+Fixture CA/installer/SQL/native authority is synthetic. This qualifies concrete handler/transport/lifetime composition, not production authorization, sustained native availability or an installed service. No runtime/listener/profile selection, producer, SQL role, wire-v1 change or deadline/rate expansion is included. Remaining: actual outbound v2 forwarder and HWORK operation, original regional settings/receipt/issuer/provisioning, deliberate installed layout selection, and full shared-client HWORK→B→A→R native <=5s qualification. Source-only next composition uses the same original proofs; no extra optimization is justified by these loopback results.
+
+Manifest SHA256: 4c70a7ab8a651b2c20aa2fb9f5d5912401dd8330fc31b6b094ba455747695024
+Runner SHA256: 654446a4983ebf44c9deff2876a387d12a920448a1e0828acb5f23d1325ebe05
+Freeze SHA256: c02ab1b18a66524e11e1efa67fa9683bbf39b17d8efea1866f2457d201ecf02e
+Dependencies SHA256: 78d8e9f5cda624a13cd6816974ad6a0e7478c9603d0b4b14d4f23b45c8e6822e
+Result SHA256: 5e44967fb7a33559078a08a6e0fba7ebcbfebe3b3ddf636d9c66ba052223cf85
+Evidence index SHA256: 2de3d6ec0c92d4b9dddf1398eac241e161d70f9602f82bfa8c5c1b3342d132fb

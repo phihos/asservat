@@ -1,0 +1,20 @@
+[
+  {
+    "path": "internal/bootstrap/configuration_provider_runtime.go",
+    "base_checkpoint": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-4",
+    "base_payload_sha256": "8244ebb3b9e9b45846306210905acb08537838d738f54479f4d0c1b4d8292d24",
+    "payload_sha256": "b032cb66e6a1c224471fcbd43b7582e42f74da48ed1669b1b016ead5b26901db",
+    "patch": "patches/configuration_provider_runtime.go.patch",
+    "patch_sha256": "7b2c1db579b3d00d8298ae41409dd220194e3465051c2d5dedb07264809fc2f7",
+    "comment_only": true
+  },
+  {
+    "path": "internal/bootstrap/installed_hub_worker.go",
+    "base_checkpoint": "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/runtime-sustainability-4",
+    "base_payload_sha256": "3b8bc72b5e37ce3495125c46a07d3f8294760e3ebe5ce267a1e01c3117aa9a8f",
+    "payload_sha256": "d5db04cd579d56a9c029528626b25ec8439003cd84eeca72c37418a1374f653a",
+    "patch": "patches/installed_hub_worker.go.patch",
+    "patch_sha256": "19b2a314963b0daaddf563247524bd79a30ff96aa028e4c73495a8dae1190bac",
+    "comment_only": true
+  }
+]

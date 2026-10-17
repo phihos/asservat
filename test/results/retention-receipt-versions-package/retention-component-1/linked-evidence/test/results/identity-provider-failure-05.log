@@ -1,0 +1,6 @@
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:140: fixture token response status 400, want 200
+--- FAIL: TestKeycloakProvider (1.64s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.695s
+FAIL

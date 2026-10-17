@@ -1,0 +1,54 @@
+package integration
+
+import (
+	"net/http"
+	"sync"
+)
+
+// This test-only trace records fixed API names/statuses from the original
+// product calls. It retains no paths, keys, credentials, IDs, headers or bodies;
+// it neither retries nor changes the request, deadline, response or transport.
+type nativeOwnerAuditTransport struct {
+	base  http.RoundTripper
+	mu    sync.Mutex
+	calls []nativeOwnerAuditCall
+}
+type nativeOwnerAuditCall struct {
+	Operation      string
+	Status         int
+	TransportError bool
+}
+
+func (t *nativeOwnerAuditTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	name := "unexpected"
+	q := r.URL.Query()
+	if r.Method == http.MethodGet {
+		switch {
+		case q.Has("versions"):
+			name = "ListObjectVersions"
+		case q.Has("uploads"):
+			name = "ListMultipartUploads"
+		case q.Get("list-type") == "2":
+			name = "ListObjectsV2"
+		}
+	}
+	response, err := t.base.RoundTrip(r)
+	call := nativeOwnerAuditCall{Operation: name, TransportError: err != nil}
+	if response != nil {
+		call.Status = response.StatusCode
+	}
+	t.mu.Lock()
+	t.calls = append(t.calls, call)
+	t.mu.Unlock()
+	return response, err
+}
+func (t *nativeOwnerAuditTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+func (t *nativeOwnerAuditTransport) observations() []nativeOwnerAuditCall {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]nativeOwnerAuditCall(nil), t.calls...)
+}

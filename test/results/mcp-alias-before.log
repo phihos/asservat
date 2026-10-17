@@ -1,0 +1,6 @@
+--- FAIL: TestIngressRejectsAmbiguityAndResourceAbuse (0.00s)
+    --- FAIL: TestIngressRejectsAmbiguityAndResourceAbuse/case_alias (0.00s)
+        handler_test.go:288: status 200 want 400: {"jsonrpc":"2.0","id":1,"result":{}}
+FAIL
+FAIL	asservat.local/asservat/internal/transport/mcp	0.005s
+FAIL

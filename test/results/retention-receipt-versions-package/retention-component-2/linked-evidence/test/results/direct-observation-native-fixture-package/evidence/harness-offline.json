@@ -1,0 +1,32 @@
+{
+  "phase": "harness-offline",
+  "command": [
+    "python3",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/check_harness.py",
+    "/tmp/asservat-direct-har-k3xddyq8/mirror"
+  ],
+  "exit": 0,
+  "seconds": 0.226,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "namedPass": 0,
+  "skips": 0
+}

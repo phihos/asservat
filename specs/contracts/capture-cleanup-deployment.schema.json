@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capture-cleanup-deployment.schema.json",
+  "title": "Generated worker capture cleanup inputs",
+  "description": "Fixed A-HWORK cleanup compartment with independently provisioned provider scope. Original per-record audit policy and writer bounds remain authoritative; this input cannot replace them or authorize deletion by expiry alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "rootID",
+    "storeID",
+    "roleRootUID",
+    "roleSetupID",
+    "postgres",
+    "auditStore",
+    "keyService",
+    "signing"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-capture-cleanup-deployment/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "rootID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "storeID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "roleRootUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "roleSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "postgres": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/postgres"
+    },
+    "auditStore": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/auditStore"
+    },
+    "keyService": {
+      "$ref": "https://asservat.io/spec/v1/hub-worker-deployment.schema.json#/properties/keyService"
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mount",
+        "name",
+        "version",
+        "keyID",
+        "publicKeys"
+      ],
+      "properties": {
+        "mount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^/\\\\?#%]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^/\\\\?#%]+$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "keyID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "publicKeys": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "additionalProperties": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 44,
+            "maxLength": 44
+          }
+        }
+      }
+    }
+  }
+}

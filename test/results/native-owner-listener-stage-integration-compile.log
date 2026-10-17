@@ -1,0 +1,6 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+../../.cache/asservat-build/planning/native-listeners-20261012/runtime/work/test/integration/native_exchange_test.go:212:14: no new variables on left side of :=
+../../.cache/asservat-build/planning/native-listeners-20261012/runtime/work/test/integration/native_exchange_test.go:212:17: cannot use 1st function result (value of struct type "asservat.local/asservat/internal/domain/authorization".DownloadWorkerIdentity) as chan error value in multiple assignment
+../../.cache/asservat-build/planning/native-listeners-20261012/runtime/work/test/integration/native_exchange_test.go:213:26: observed.Worker undefined (type chan error has no field or method Worker)
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

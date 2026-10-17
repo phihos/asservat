@@ -1,0 +1,20 @@
+{
+  "docs/architecture/native-exchange.md": "73275480a802e3d3b2a025b2c4f080b2a61b5cd3681e467685abbfaeb549810c",
+  "docs/architecture/worker-startup.md": "903270f71d8f36feb457ab4e0bcb2179fab5c676632ce964aeceec17d9830ead",
+  "docs/decisions/116-context-native-exchange.md": "1a5039684eeac39338ffddbe40c2d0279dad3865515c8764befcd2a70fd559cb",
+  "internal/adapters/postgres/native_completion.go": "a6e116cf786d4a0c75e1679cddcb68d7f25792cd1b5fa543f03cdd40ac61e9ee",
+  "internal/adapters/postgres/native_completion_test.go": "92e008fb6f979a71946e2c2e0d74363704c270cb5d3a34d5bb512b24f5428eed",
+  "internal/application/evidence/native_attachment.go": "a69c9ccab72c27112de999bcf3af64d5f4572e9bd98c8e84b690be91b2643f99",
+  "internal/application/evidence/native_completion_test.go": "014d1620adfbb2cc7287ffb84f9b6a7c7739dbd9c07fd6371999d9c368aec026",
+  "internal/application/evidence/native_exchange.go": "9520254a39a515f868edf3e12e755a173d7584019e04afc8fbd117d4e0724b36",
+  "internal/transport/native/flow_test.go": "0b50fab6d49dc096b7000eae0bd6294b3b3e2bb98dcb2fef1a3193349ac44cbf",
+  "internal/transport/native/handler.go": "81422d85eba7cd2de086b2a9481f709359897bec5176713916f7fa0c1190a1a4",
+  "internal/transport/native/operation.go": "dcc871ca7e3a9d37c1e4315b2cfad5b039da4ca5d0dc974b9ba6dac315216815",
+  "internal/transport/native/registration.go": "aac903fde4097fb5e00a1c1d372701443861dbd75a33a6d361b8ff96dd518ca4",
+  "internal/transport/native/router_test.go": "8e56154f5109dff09a31ed9c374bf7934e846642d1629c8fc621eeda0d38e93c",
+  "internal/transport/native/terminal_handoff_compat_test.go": "48bf107896b9e40e5ad906179ebdc0a525c8d7c24f888b19f14219e4647460e7",
+  "internal/transport/native/terminal_handoff_test.go": "e4eb4bbbd0e9881f11759195d9ee9e265c17d7b57adb30898ce3a99f54d82ade",
+  "specs/artifact-downloads.md": "b257d6969a8f71937a7bac2d0ce80a76c5165cf76d8876bb791fa9e4c3f39765",
+  "test/integration/context_native_content_test.go": "669476a65447579fb52ec63e6d6266f12fcbbf98e43b43fd1665878beb90c9ff",
+  "test/integration/native_completion_test.go": "1b096434f5f15a3d59d770bd26613f397b997545a766469daf9c1b384678737f"
+}

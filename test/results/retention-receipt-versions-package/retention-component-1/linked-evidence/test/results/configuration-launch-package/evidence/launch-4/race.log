@@ -1,0 +1,46 @@
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.025s [no tests to run]
+=== RUN   TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay
+    configuration_runtime_launch_test.go:205: original launch operation wall=4.69923196s
+--- PASS: TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay (15.88s)
+=== RUN   TestConfigurationLaunchUnknownWriteOnlyObservesOriginal
+--- PASS: TestConfigurationLaunchUnknownWriteOnlyObservesOriginal (10.52s)
+=== RUN   TestConfigurationLaunchUnknownClaimNeverWritesWorkload
+--- PASS: TestConfigurationLaunchUnknownClaimNeverWritesWorkload (10.72s)
+=== RUN   TestConfigurationLaunchRechecksEnforcementAfterClaim
+--- PASS: TestConfigurationLaunchRechecksEnforcementAfterClaim (7.68s)
+=== RUN   TestConfigurationLaunchExactRunningTransition
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_launch
+=== RUN   TestConfigurationLaunchExactRunningTransition/still_inert
+=== RUN   TestConfigurationLaunchExactRunningTransition/excess_replicas
+=== RUN   TestConfigurationLaunchExactRunningTransition/different_account
+=== RUN   TestConfigurationLaunchExactRunningTransition/new_spec_field
+=== RUN   TestConfigurationLaunchExactRunningTransition/other_UID
+=== RUN   TestConfigurationLaunchExactRunningTransition/original_version
+=== RUN   TestConfigurationLaunchExactRunningTransition/missing_launch
+--- PASS: TestConfigurationLaunchExactRunningTransition (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_launch (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/still_inert (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/excess_replicas (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/different_account (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/new_spec_field (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/other_UID (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/original_version (0.00s)
+    --- PASS: TestConfigurationLaunchExactRunningTransition/missing_launch (0.00s)
+=== RUN   TestConfigurationLaunchReceiptRechecksEnforcementAfterObjectReads
+--- PASS: TestConfigurationLaunchReceiptRechecksEnforcementAfterObjectReads (8.17s)
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/input-read
+=== RUN   TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/receipt-cas
+--- PASS: TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO (20.95s)
+    --- PASS: TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/input-read (10.47s)
+    --- PASS: TestConfigurationLaunchReceiptKeepsOriginalEndDuringBlockedIO/receipt-cas (10.47s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	74.959s
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.026s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.051s [no tests to run]

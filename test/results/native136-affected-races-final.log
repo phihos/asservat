@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/application/evidence	1.663s
+ok  	asservat.local/asservat/internal/application/audit	1.136s
+ok  	asservat.local/asservat/internal/domain/audit	1.010s
+ok  	asservat.local/asservat/internal/transport/browser	4.813s
+ok  	asservat.local/asservat/internal/transport/presentation	8.648s
+ok  	asservat.local/asservat/internal/adapters/postgres	1.282s

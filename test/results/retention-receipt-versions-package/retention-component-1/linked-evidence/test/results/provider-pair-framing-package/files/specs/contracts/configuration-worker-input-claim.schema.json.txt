@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/configuration-worker-input-claim.schema.json",
+  "title": "Original one-use configuration worker ConfigMap claim",
+  "description": "Public original-resource-journal child. Only acknowledged fresh claim allows one CREATE. Unknown outcomes remain exact lookup-only, positive receipt immutable. Five-second original claim bounded by original resource end; fresh readback can reconcile original result without renewing CREATE. Native/SQL/provider and sibling identity relationships require runtime validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationID",
+    "configurationRoot",
+    "configurationSetupID",
+    "sqlProjection",
+    "publicDigest",
+    "auditCredentials",
+    "claimedAt",
+    "until"
+  ],
+  "properties": {
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "configurationRoot": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "configurationSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "sqlProjection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+    },
+    "publicDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "auditCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^asservat-[0-9a-f]{32}-worker-providers(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "claimedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration",
+        "resourceVersion",
+        "observedAt"
+      ],
+      "properties": {
+        "configuration": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+        },
+        "resourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

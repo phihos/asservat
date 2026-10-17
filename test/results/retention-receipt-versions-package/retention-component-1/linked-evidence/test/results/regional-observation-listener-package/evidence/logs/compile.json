@@ -1,0 +1,29 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-listener-20261013/checkpoint-v1/overlay.json",
+    "-vet=off",
+    "-run",
+    "^$",
+    "./internal/transport/native"
+  ],
+  "exit": 0,
+  "seconds": 1.514,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

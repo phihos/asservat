@@ -1,0 +1,27 @@
+[
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "abf7d335d76292bdb6104e26a1da7e963bad5855bcb1cdd9bafbccccc778bee4",
+    "sha256": "63dc1b37dec7f90dabe6f2781399486673c33d22bd17f7639105fb3ea9c196b5"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_diagnostic_test.go",
+    "base_sha256": "acc077ae35018697d2e336760d06b8ebcee4dce322250418e0c739182e9cade3",
+    "sha256": "0d258da72f32e722c6fd3d7ea030e8f8ac3aebec2baba0d68060a78887c2d7fb"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider.go",
+    "base_sha256": "75bb07b0e3a55af4222df103c97358b48f24add1a410b5e912389960df54cd2a",
+    "sha256": "c5d7caf3a05e42719d251dcb3f2bb5792dd2fb2e15738036cb5db37c18e98231"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider_diagnostic.go",
+    "base_sha256": null,
+    "sha256": "f16d326119276a92c025e94d50f0cd82c805d9c58637351bc66127e47da817c4"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider_diagnostic_test.go",
+    "base_sha256": null,
+    "sha256": "c2cd1441bd2c60953138533cfc3417c6c3c470bd341dbf40de35dd97e3de4b25"
+  }
+]

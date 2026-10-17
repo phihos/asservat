@@ -1,0 +1,9 @@
+=== RUN   TestConfigurationProviderCloseAndJoinKeepsNativeOwnership
+    configuration_provider_join_test.go:52: bounded shutdown returned before native read joined
+--- FAIL: TestConfigurationProviderCloseAndJoinKeepsNativeOwnership (0.05s)
+=== RUN   TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow
+    configuration_provider_join_test.go:105: shutdown detached provider body
+--- FAIL: TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow (0.06s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	0.158s
+FAIL

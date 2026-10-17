@@ -1,0 +1,55 @@
+package fleet
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+// FleetTrustProjection observes current protected configuration. It has no
+// recovery-clear, epoch-rotation, enrollment, certificate or revocation port.
+type FleetTrustProjection interface {
+	ObserveAdministration(context.Context, value.Administration) error
+	FenceAdministration(context.Context, time.Time) error
+}
+
+type TrustObserver struct {
+	Settings   AdministrationReader
+	Projection FleetTrustProjection
+	Now        func() time.Time
+}
+
+// Reconcile refreshes only within the reader's original observation interval.
+// A failed read fences prior observations; a newer successful read wins over a
+// delayed failure. Recovery remains blocked until its separate protocol passes.
+func (s TrustObserver) Reconcile(ctx context.Context) error {
+	if s.Settings == nil || s.Projection == nil || s.Now == nil {
+		return value.ErrUnavailable
+	}
+	started := s.Now().UTC()
+	readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	a, err := s.Settings.FleetAdministration(readCtx)
+	cancel()
+	if err == nil && !a.Valid(s.Now()) {
+		err = value.ErrDenied
+	}
+	unchangedContention := false
+	if err == nil {
+		err = s.Projection.ObserveAdministration(ctx, a)
+		// Only the persistence call may classify its exact aborted lock attempt.
+		// A source reader returning this error still follows the original fence.
+		unchangedContention = errors.Is(err, value.ErrObservationPersistenceContended) && ctx.Err() == nil && !a.Suspended && a.Valid(s.Now())
+	}
+	if err != nil && !unchangedContention {
+		// The read deadline is not reused for fencing. The parent cancellation is
+		// still respected; an unreachable database leaves the old expiry in force.
+		fenceCtx, done := context.WithTimeout(ctx, 5*time.Second)
+		defer done()
+		if fenceErr := s.Projection.FenceAdministration(fenceCtx, started); fenceErr != nil {
+			return value.ErrUnavailable
+		}
+	}
+	return err
+}

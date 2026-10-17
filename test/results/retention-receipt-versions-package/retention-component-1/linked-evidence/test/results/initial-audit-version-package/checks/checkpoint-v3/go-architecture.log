@@ -1,0 +1,17 @@
+internal/adapters/jose/work.go:33:12: pattern schemas/*.json: cannot embed irregular file schemas/internal-work.schema.json
+internal/adapters/kubernetes/capacity_decode.go:18:12: pattern capacity-schemas/*.json: cannot embed irregular file capacity-schemas/budget-policy.schema.json
+internal/adapters/objectstore/manifest/schema.go:17:12: pattern schemas/*.json: cannot embed irregular file schemas/action-lifecycle.schema.json
+internal/contracts/investigation_schema.go:14:12: pattern investigation-schemas/*.json: cannot embed irregular file investigation-schemas/cancel_artifact_download.json
+migrations/files.go:11:12: pattern *.sql: cannot embed irregular file 00001_custody.sql
+Traceback (most recent call last):
+  File "/tmp/asservat-initial-versioned-audit-build-95vbgjqy/mirror/scripts/check-go-architecture.py", line 13, in <module>
+    output = subprocess.check_output(["go", "list", "-json", "./..."], cwd=ROOT, text=True)
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['go', 'list', '-json', './...']' returned non-zero exit status 1.

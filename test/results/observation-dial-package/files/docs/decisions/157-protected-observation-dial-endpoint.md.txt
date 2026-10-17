@@ -1,0 +1,42 @@
+# ADR-157: Separate protected observation dial ports from serving identity
+
+- Status: accepted design; staged implementation, qualification pending
+- Date: 2026-10-13
+- Related: ADR-144, ADR-150
+- Requirements: [REQ-FED-001](../../specs/federation.md#req-fed-001--enrollment-and-trust), [REQ-FED-003](../../specs/federation.md#req-fed-003--locality-and-partial-availability)
+
+## Evidence and problem
+
+The fifth direct H/A/R native fixture completed original regional enrollment in 14.80821159 seconds, then failed regional backend construction with invalid after 136.931 microseconds. No observation request passed. The coarse event does not name the first failing constructor. Independently, the fixture supplies a standard allocated NodePort while NewOwnerObservationClient rejects every address whose TCP port differs from Pool.NativePort=9444. This prevents its final client constructor from accepting that route before any dial.
+
+Kubernetes documents default NodePorts 30000–32767 and forwarding from a node port through the Service; Service port and targetPort may also differ. These are routing relationships, not alternative peer identities. [Official Kubernetes Service documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport).
+
+ADR-144 already distinguishes the installer-owned reachable TCP hint from the independently retained original Service identity and common TLS name. The protected installed Service, EndpointSlices, local listener and HTTP authority must retain their exact original 9444. That requirement does not establish why an external TCP dial port must be 9444.
+
+## Decision
+
+Accept a separately fixed constructor-owned host:port with a finite numeric TCP port 1–65535. Preserve the current host syntax/length restrictions. Remove only the dial-port-equals-NativePort requirement from NewOwnerObservationClient; make its documented input provenance explicit. Do not introduce a request-selected address, URL callback, fallback, proxy setting, redirect or retry. The address remains immutable for the client lifetime and is supplied by the accepted regional composition, never by a remote response or a capacity request.
+
+Dial the fixed endpoint once under the original setup/request deadline. Verify ordinary TLS 1.3 roots and the common name derived from original ServiceUID/issuer/cluster/installation. Require the actual leaf to match the independently read complete current owner candidate set, then the unchanged purpose-specific current registry/source/native/channel checks. Use the original common-SNI plus Pool.NativePort for HTTP authority and fixed path, even when the TCP dial port differs. The already authenticated socket is the sole transport socket; redirects and second dials remain unavailable.
+
+The protected Service/EndpointSlice port profile and original owner listener remain unchanged. Same-cluster HWORK exact-Pod routing remains unchanged. This expands only the accepted installation-owned connection hint, not identity, issuer roots, grants, source freshness, deadlines or standby/effect authority.
+
+## Current consumers and ownership
+
+- NewOwnerObservationClient owns validation/storage of the address. Its finite own-proof method dials c.address, verifies derived common TLS, reads current registration before request, and builds HTTP authority from c.name plus original NativePort.
+- NewConnectorObservationClient (v1) delegates construction to it. Open dials b.address but retains original common SNI/NativePort authority and the existing v1 live stream, source/registry and terminal protocol.
+- NewConnectorObservationOperationClient (v2) delegates construction to it. Open similarly retains original SNI/authority; four real ordinals, operation-owned native proofs, original standby residency, SQL checks and joined closure are unchanged.
+- The only current caller of the v2 constructor outside `_test.go` files is the build-ignore native fixture helper, which is itself test-only. Other calls are actual-TLS component tests. No installed regional runtime loader, public route or production endpoint producer currently selects either connector client. OwnerObservationDeployment is the owner-side identity/listener composition; it does not produce this regional dial address.
+- Existing stream tests rewrite their synthetic pool.NativePort to their loopback listener port, so they do not exercise standard port translation. Add an independently pinned 9444 versus ephemeral TCP-port regression.
+
+A future installed regional input/receipt producer must independently acknowledge the fixed endpoint along with the original owner pool/root/template pins. This decision does not authorize an unproduced or ambient endpoint fallback. No new public DTO/selector is selected in this slice.
+
+## Qualification and scope
+
+Use an actual constructor failing-before test with an otherwise valid pin and a different dial port. Then exercise real TLS/h2 with fixed pool 9444 and a different loopback listener port: assert actual TLS SNI and HTTP authority remain original, candidate exclusion/wrong roots/wrong SNI still deny, no second dial/POST replay occurs, and cancellation retains joined cleanup. Cover both unchanged v1 and v2 constructors plus finite own-proof behavior where the shared path differs. Keep malformed address/nonfinite/out-of-range ports rejected and same-port behavior intact.
+
+Run the explicit ignored-helper issuer regression from the selected native harness. Then rerun the original H/A/R native fixture through its existing normal NodePort, with all source hashes and positive joins verified. Local constructor/TLS tests are not native availability or installed production qualification. The original five-second operations, thirty-second socket/Reconcile and native fixture envelopes remain unchanged.
+
+## Alternative
+
+A test-only transparent TCP forwarder exposing 9444 could make the fixture fit the current restriction. It adds a container, concurrency/lifetime code, joined cleanup and another test-only network leg solely to work around an equality not required by the identity contract. Keep the archived forwarder proposal as an alternative; do not implement both without a separate reason.

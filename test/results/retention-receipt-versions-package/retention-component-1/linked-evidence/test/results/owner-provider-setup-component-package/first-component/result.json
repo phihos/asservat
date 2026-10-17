@@ -1,0 +1,108 @@
+{
+  "freeze": {
+    "manifest.json": "5df2e63a32f3595c1b5465dd0c4679b2c53dac38d0804b07f2fd7de4cabf4f9c",
+    "dependencies.json": "5b42fd41f822a7da7acd3603a7ade83c456ccd35fb6dbfe6b8c08645f4d0805c",
+    "overlay.json": "22789f7717dc12533307121a4f9ebbd6474ee4459c71b8585e5cc965d6aeb48e",
+    "run.py": "08be6962836029770fdd34952371b90e823429ee22b19a2c46935ef085af103f"
+  },
+  "dependencies": 1883,
+  "paths": 4,
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/overlay.json",
+        "-run=^$",
+        "./internal/adapters/providerconfig"
+      ],
+      "exit": 0,
+      "seconds": 0.855,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "logSHA256": "6d26b5586c251318a76344d337b2ba92ac54b8ad9bae992be75468b2dd5de88a"
+    },
+    {
+      "name": "race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/overlay.json",
+        "-count=1",
+        "-timeout=2m",
+        "-v",
+        "./internal/adapters/providerconfig"
+      ],
+      "exit": 0,
+      "seconds": 3.108,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "logSHA256": "1ee8cfe7a411acb187137b0073a5384bda479e6b2a753c3dc2b8ce1a382aaea1"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/provider-setup-verification-20261013/checks/component-1/overlay.json",
+        "./internal/adapters/providerconfig"
+      ],
+      "exit": 0,
+      "seconds": 0.303,
+      "before": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "after": {
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "inventory": [],
+        "freeze": []
+      },
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "exit": 0,
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "inventory": [],
+    "freeze": []
+  }
+}

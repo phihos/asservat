@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/docs/architecture/capacity-production.md": "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/changes/docs/architecture/capacity-production.md",
+    "/home/phil/Projekte/asservat/migrations/00054_protected_capacity.sql": "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/changes/migrations/00054_protected_capacity.sql",
+    "/home/phil/Projekte/asservat/test/integration/capacity_policy_time_test.go": "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/changes/test/integration/capacity_policy_time_test.go",
+    "/home/phil/Projekte/asservat/test/integration/capacity_sql_matrix_test.go": "/home/phil/.cache/asservat-build/planning/capacity-policy-time-20261013/correction-v1/changes/test/integration/capacity_sql_matrix_test.go"
+  }
+}

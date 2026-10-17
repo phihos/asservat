@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--initial-installation"
+  ],
+  "exit": 0,
+  "status": "passed",
+  "scope": "Real PostgreSQL provisioning and exact ACL verification of all 64 public runtime roles, including the 22 ADR-177 hub extension purposes generated from the qualified fixture grants, at schema head 62 (migration 00062 context_key_wrap)",
+  "passedCount": 87,
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "retained": "An earlier run in this session failed because the initial-installation table inventory did not yet list context_key_wrap; first activation correctly rejected the unknown relation.",
+  "log": "initial-installation.log"
+}

@@ -1,0 +1,117 @@
+package postgres
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+)
+
+// The computed trust view remains unchanged. The same semantic authority row
+// supplies its original version while SHARE-locked; observation renewal remains
+// independent, whereas a restrictive transition waits through this operation.
+const ownerProjectionVersionLockSQL = `SELECT v.installation_id::text,t.semantic_version
+ FROM public.fleet_current_trust v JOIN public.fleet_trust t USING(installation_id)
+ WHERE v.installation_id=$1 FOR SHARE OF t`
+
+// FinalizeOwnerProjectionOperation performs reads and existing authority locks
+// only. Its concrete handle has no effect/CAS/DDL method. The original execution
+// transaction and deadline have already ended; this is fresh current validation
+// of an exact original result, never renewed execution permission.
+func (s *OwnerIdentityOperationSQL) FinalizeOwnerProjectionOperation(ctx context.Context, operation *kubernetes.OwnerProjectionFinalization) (_ kubernetes.OwnerProjectionAdvance, failure error) {
+	check := ownerProjectionSQLEntry
+	defer func() {
+		if failure != nil {
+			failure = &OwnerProjectionSQLFailure{check: check, cause: failure}
+		}
+	}()
+	var zero kubernetes.OwnerProjectionAdvance
+	if s == nil || s.roles == nil || s.root == nil || operation == nil {
+		return zero, cfg.ErrUnavailable
+	}
+	check = ownerProjectionSQLLifetime
+	call, leave, err := s.roles.enter(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer leave()
+	check = ownerProjectionSQLFinalizeAdmit
+	input, until, err := operation.AdmitOwnerProjectionFinalization(call, s.root)
+	if err != nil || input != s.roles.input {
+		return zero, cfg.ErrUnavailable
+	}
+	call, stop := context.WithDeadline(call, until)
+	defer stop()
+	check = ownerProjectionSQLFinalizeBegin
+	tx, err := s.roles.pool.BeginTx(call, pgx.TxOptions{})
+	if err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	defer func() {
+		rollback, end := context.WithTimeout(context.WithoutCancel(call), time.Second)
+		defer end()
+		_ = tx.Rollback(rollback)
+	}()
+	var locked string
+	var version int64
+	check = ownerProjectionSQLFinalizeVersionLock
+	if err = tx.QueryRow(call, ownerProjectionVersionLockSQL, s.roles.input.InstallationID).Scan(&locked, &version); err != nil || locked != s.roles.input.InstallationID || operation.MatchOwnerProjectionSemanticVersion(call, s.root, version) != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	check = ownerProjectionSQLFinalizeInstallationLock
+	if _, err = tx.Exec(call, `SELECT pg_advisory_xact_lock(1095979854,hashtext($1))`, s.roles.input.InstallationID); err != nil {
+		return zero, cfg.ErrUnavailable
+	}
+	check = ownerProjectionSQLFinalizeCurrentBefore
+	if _, _, err = s.roles.current(call, tx); err != nil {
+		return zero, err
+	}
+	// The first private journal GET occurs inside this method after both locks.
+	check = ownerProjectionSQLFinalizeFirstRead
+	first, err := operation.ReadOwnerProjectionFinalizationAfterLock(call, s.root)
+	if err != nil || first.State.Input != s.roles.input || len(first.State.Roles) != len(contracts.OwnerIdentityRolePurposes()) {
+		return zero, cfg.ErrUnavailable
+	}
+	until = identity.Earlier(until, first.ValidUntil)
+	call, narrow := context.WithDeadline(call, until)
+	defer narrow()
+	for _, material := range first.State.Roles {
+		check = ownerProjectionSQLFinalizeRoleClaims
+		if material.Claim == nil || material.Receipt == nil {
+			return zero, cfg.ErrUnavailable
+		}
+		provenance, e := json.Marshal(s.roles.provenance(first, material.Purpose, *material.Claim))
+		if e != nil {
+			return zero, cfg.ErrUnavailable
+		}
+		check = ownerProjectionSQLFinalizeRoleVerify
+		_, e = s.roles.verify(call, tx, material, provenance)
+		clear(provenance)
+		if e != nil {
+			return zero, e
+		}
+	}
+	check = ownerProjectionSQLFinalizeFinalRead
+	final, err := operation.ReadOwnerProjectionFinalizationCurrent(call, s.root)
+	if err != nil || !ownerIdentityOperationSameSnapshot(first, final) {
+		return zero, cfg.ErrUnavailable
+	}
+	until = identity.Earlier(until, final.ValidUntil)
+	call, last := context.WithDeadline(call, until)
+	defer last()
+	check = ownerProjectionSQLFinalizeCurrentAfter
+	if _, _, err = s.roles.current(call, tx); err != nil || call.Err() != nil || !time.Now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	check = ownerProjectionSQLFinalizeCommit
+	if err = tx.Commit(call); err != nil || call.Err() != nil || !time.Now().Before(until) {
+		return zero, cfg.ErrUnavailable
+	}
+	check = ownerProjectionSQLFinalizeResult
+	return operation.OwnerProjectionFinalizationResult(call, s.root)
+}

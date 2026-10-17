@@ -1,0 +1,72 @@
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/own-retirement
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-revocation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-cancellation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-shortening
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-phase
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-reference
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonzero-bytes
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonterminal
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal native exchange unavailable
+--- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement (0.46s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/own-retirement (0.06s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-revocation (0.05s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-cancellation (0.05s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/known-shortening (0.07s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-phase (0.05s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/wrong-reference (0.05s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonzero-bytes (0.05s)
+    --- PASS: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/nonterminal (0.05s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	1.487s
+=== RUN   TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority
+--- PASS: TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority (0.00s)
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened
+--- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.007s

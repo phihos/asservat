@@ -1,0 +1,24 @@
+=== RUN   TestInitialPreparationHandoverWithRealServices
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/premature-retirement-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/terminal-delete-without-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-change-spec
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-original-uid-marker
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-be-removed
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-kubelet-node
+    initial_handover_admission_test.go:241: request escaped native handover policy: pods "installer" is forbidden: node "nonexistent-other-admission-node" can only delete pods with spec.nodeName set to itself
+=== RUN   TestInitialPreparationHandoverWithRealServices/native-handover-admission/delayed-original-create-stays-occupied
+=== NAME  TestInitialPreparationHandoverWithRealServices
+    initial_preparer_handover_test.go:317: actual handover Run initial preparation run sql-and-providers/history-role-provision: unavailable
+--- FAIL: TestInitialPreparationHandoverWithRealServices (72.89s)
+    --- FAIL: TestInitialPreparationHandoverWithRealServices/native-handover-admission (14.41s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/premature-retirement-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/terminal-delete-without-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-change-spec (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-original-uid-marker (0.20s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/marker-cannot-be-removed (0.19s)
+        --- FAIL: TestInitialPreparationHandoverWithRealServices/native-handover-admission/wrong-kubelet-node (0.00s)
+        --- PASS: TestInitialPreparationHandoverWithRealServices/native-handover-admission/delayed-original-create-stays-occupied (0.40s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	72.951s
+FAIL

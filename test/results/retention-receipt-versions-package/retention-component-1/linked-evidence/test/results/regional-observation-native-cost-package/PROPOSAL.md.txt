@@ -1,0 +1,42 @@
+# Native observation availability: first measured boundary
+
+This is a source-backed diagnosis and fixture proposal, not native test evidence or a production optimization. The forwarder checkpoint-v1 passed actual mutual TLS/h2 with synthetic current ports; it did not qualify the concrete Kubernetes composition. No product limits may change to make this fixture pass.
+
+## Concrete structural lower bound
+
+For the simple single-positive-Pod GET then claim path, checkpoint-v1's actual component counters are 16 registry reads, 16 `ReadOwnerProtection` calls, 10 route calls, and 8 workload calls on the forwarding process. Those counters exclude the receiver's independent calls.
+
+Expand only the real Kubernetes guard and workload adapters:
+
+| Port | Observer requests | Independent probe requests | Exact source path |
+|---|---:|---:|---|
+| One `OwnerWorkloadProtection.Current`, without a Deployment CAS conflict | 7 | 3 | namespace twice, policy/binding twice, Deployment GET once; SSR, SSAR, denied dry-run UPDATE |
+| One `OwnerObservationWorkload.ObserveOwnerWorkload` | 24 | 6 | two complete Current checks plus two live chains of namespace/account/Deployment/Pod/ReplicaSet |
+| One `OwnerEndpoints.OwnerEndpoint`, one EndpointSlice page | 9 | 0 | namespace, Service twice, account, Deployment, EndpointSlice, Pod twice, ReplicaSet |
+| Complete Ready candidate intersection, one page | 5 | 0 | namespace twice, Service twice, EndpointSlice |
+
+The 16 guard calls plus 8 workload calls alone therefore require `16*7 + 8*24 = 304` observer requests on the mandatory shared guard/workload `PermissionClient`. `NewOwnerObservationWorkload` explicitly requires its client to equal `guard.observer`; splitting these over extra clients is not an accepted fix. Its 20-QPS/burst20 limiter can admit at most approximately 120 requests during five seconds even with a full initial burst and zero server time. The ideal scheduling lower bound for 304 requests is `(304-20)/20 = 14.2 seconds`. If the original endpoint reader shares that same client, the simple path needs `304 + 10*9 + 5 = 399` observer requests, lower bound 18.95 seconds. All these bounds exclude receiver work, SQL, TLS, proof conflicts, source supervision and the four regional proofs.
+
+This proves an availability incompatibility in the current composition under the intended shared clients. It does not prove a particular observed native failure phase. No new reader/pool, enlarged burst/QPS, deadline extension, whole-request cache or automatic retry is proposed.
+
+## Smallest first native counterexample
+
+Before constructing a new installed workflow, use the owned context Kubernetes/SQL/S3 fixture to assemble the exact current owner observer/probe, original native workload guard, actual Deployment/Pod/ReplicaSet/account, accepted owner source and activated SQL registration. Explicit fixture authority remains only installation/recovery/source bootstrap and the initial CA/profile/pin producer. Current request admission must use the concrete existing read adapters.
+
+The first named test should measure the complete forwarding admission graph under a fresh original five-second caller interval, keeping the production 20/20 clients. A fixed-label `rest.Config.WrapTransport` records only method/resource-category, request count, monotonic start/end and bounded error class. It does not read bodies, tokens, names, UIDs, query strings, headers or response payloads. Because the wrapper executes after client-go's limiter, separately record enclosing fixed phase duration; it includes any pre-transport limiter delay. Never identify all elapsed time as SQL or server lock time.
+
+The existing native owner fixture cannot be reused unchanged: `nativeOwnerConfiguration.ReadOwnerConfiguration` writes fixture recovery on every read, and `refreshedOwnerConfiguration` synchronously observes source on read. The new fixture must instead supervise those synthetic accepted sources in one joined owner loop and give runtime only `*postgres.OwnerConfigurations`. Fail the test on owner-loop failure, including Fatal/cancellation cleanup, rather than logging and continuing. This follows the already qualified native download source-owner correction.
+
+Concrete owner endpoint/native template fields should be derived from actual original native objects and retained before requests. Do not fabricate EndpointSlices/Pod IPs or relax installed template checks. Existing `ownerConfigLab` plus the current candidate fixture's scoped actual enrollment/audit/activation supplies reusable SQL setup. The original deployment fixture is single-SAN and mutates the source during tests; use a separate opted pool and avoid modifying its legacy assertions.
+
+## Complete forwarding fixture follows the counterexample
+
+A full real forwarder constructor requires native Pod IP reachability because it deliberately exposes no address override. Current external integration tests that use a synthetic route to a host bridge do not prove this. Either run the actual test composition inside the owned cluster, or use a test-package-only dial remap while explicitly limiting the claim to real API/SQL admission cost, not native routing. Do not add a production override or synthesize a Ready endpoint to reach the host.
+
+The receiver must use the concrete `OwnerObservationRoutingPeers`; a synthetic regional result may isolate routing admission cost first, but cannot qualify the four-proof regional exchange. The final fixture must bind a real current connector and four numbered replies, actual holder, complete forwarder/receiver and positive terminal EOF/join. It remains separate from installed-v2 automatic input/provider generation.
+
+SQL counting must not use `ConnConfig.Tracer`: production rejects it. Initial evidence can report exact fixed application-port calls and pool.Stat acquisition counters, clearly distinguished from actual SQL statement counts. If statement-level counts are required for this fixture, use an independently reviewed bounded fixture-owned PostgreSQL protocol counter at the existing TLS bridge, recording only Query/Execute frame counts (no text/arguments), or an end-of-run server statistics source configured only in the owned lab. No hidden BeforeConnect hook or production guard bypass.
+
+## Proposed bounded path ownership
+
+First source scope after review: new test-only owner-observation timing/counter fixture files under `test/integration/`, with an exact new selector in the owned context harness only if needed. No shared production interface, listener, loader or issuer field changes. Preserve the unmodified legacy native owner tests and all forwarder checkpoint evidence. The first result is expected to expose the original bound, not to be labeled a usable success. Any subsequent operation-local composite proof design needs a separate exact invariants review before implementation.

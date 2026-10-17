@@ -1,0 +1,56 @@
+{
+  "dependencies_sha256": "4d14d0c42914f260117b27cd12da35deabb6b884bdf36b0e6c19f7ca2da24f64",
+  "manifest_sha256": {
+    "before": "973258ac30054910c471dd11c5b8c12f8470cb8f80cbd3cb38c71c61dad17a00",
+    "after": "98be457d5d0f93dd44c4b47b9f84329347ee4058926710cc20815e605b1a596b"
+  },
+  "commands": [
+    {
+      "phase": "before-compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/before/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/postgres",
+        "./internal/application/fleet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 12.972417352997581
+    },
+    {
+      "phase": "after-compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay=/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/after/overlay.json",
+        "-run",
+        "^$",
+        "./internal/adapters/postgres",
+        "./internal/application/fleet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 9.609488895002869
+    },
+    {
+      "phase": "after-vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay=/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/after/overlay.json",
+        "./internal/adapters/postgres",
+        "./internal/application/fleet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 1.6823871099913958
+    }
+  ],
+  "terminal_exit": 0,
+  "source_changes": [],
+  "checked_payloads": 8,
+  "checked_dependencies": 1531
+}

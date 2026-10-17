@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/bootstrap	4.112s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.266s
+ok  	asservat.local/asservat/internal/application/fleet	(cached)
+ok  	asservat.local/asservat/test/integration	2.060s

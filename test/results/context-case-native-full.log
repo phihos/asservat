@@ -1,0 +1,323 @@
+=== RUN   TestPermissionAuthorityWithRealServices
+    authority_test.go:54: run make custody-integration for owned real-service fixtures
+--- SKIP: TestPermissionAuthorityWithRealServices (0.00s)
+=== RUN   TestBootstrapChannelWithRealOpenBao
+    bootstrap_channel_test.go:23: run make fleet-integration
+--- SKIP: TestBootstrapChannelWithRealOpenBao (0.00s)
+=== RUN   TestEnrollmentBootstrapIssuanceWithRealServices
+    bootstrap_issuance_test.go:33: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapIssuanceWithRealServices (0.00s)
+=== RUN   TestEnrollmentBootstrapReservationsWithRealServices
+    bootstrap_reservation_test.go:25: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentBootstrapReservationsWithRealServices (0.00s)
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    capture_admission_test.go:282: actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; 362 native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority
+--- PASS: TestContextAdmissionWithRealServices (9.59s)
+    --- PASS: TestContextAdmissionWithRealServices/native-api-runner (9.52s)
+=== RUN   TestConsoleBrowserWithBuiltPackage
+    console_test.go:41: set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist
+--- SKIP: TestConsoleBrowserWithBuiltPackage (0.00s)
+=== RUN   TestContextCommitWithRealServices
+=== RUN   TestContextCommitWithRealServices/cluster-1
+    context_commit_test.go:225: native=353, encrypted manifest=4705, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+=== RUN   TestContextCommitWithRealServices/cluster-2
+    context_commit_test.go:225: native=352, encrypted manifest=4702, envelope=931 bytes; real KMS/S3/full native verification; immutable SQL state=stored_unpublished; audience mismatch rejected
+=== RUN   TestContextCommitWithRealServices/unscheduled-api-context
+    context_commit_test.go:229: actual unscheduled Pod resolved and captured with Node/exec denied; 362 native bytes; encrypted full verification and exact native read; stored_unpublished, synthetic authority remains fixture-only
+--- PASS: TestContextCommitWithRealServices (20.82s)
+    --- PASS: TestContextCommitWithRealServices/cluster-1 (10.01s)
+    --- PASS: TestContextCommitWithRealServices/cluster-2 (10.01s)
+    --- PASS: TestContextCommitWithRealServices/unscheduled-api-context (0.76s)
+=== RUN   TestContextStorageWithRealServices
+=== RUN   TestContextStorageWithRealServices/cluster-a
+    context_storage_test.go:319: nativeBytes=353 dataBytes=325 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+=== RUN   TestContextStorageWithRealServices/cluster-b
+    context_storage_test.go:319: nativeBytes=353 dataBytes=325 indexBytes=367 wrappedMetadataBytes=1828; exact JSON and range verified; readonly pod scope and wrap/unwrap role denials verified
+--- PASS: TestContextStorageWithRealServices (0.56s)
+    --- PASS: TestContextStorageWithRealServices/cluster-a (0.39s)
+    --- PASS: TestContextStorageWithRealServices/cluster-b (0.16s)
+=== RUN   TestCustodyWithRealServices
+    custody_test.go:111: run make custody-integration for owned real-service fixtures
+--- SKIP: TestCustodyWithRealServices (0.00s)
+=== RUN   TestDatabaseRecoveryAfterRestartAndRestore
+    database_recovery_test.go:24: run make database-recovery-integration
+--- SKIP: TestDatabaseRecoveryAfterRestartAndRestore (0.00s)
+=== RUN   TestDownloadJobsWithRealKubernetes
+    download_jobs_kube_test.go:173: actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs
+    download_jobs_kube_test.go:366: restricted real Job creation, immutable image/config pins, projected token, exact Pod binding and confirmed termination/foreground cleanup passed; compiled credential-phase executable and OpenBao-issued process credential; dispatch authority/registry and issuance audit remain fixture inputs, no native transfer
+--- PASS: TestDownloadJobsWithRealKubernetes (17.97s)
+=== RUN   TestDownloadWorkerProofWithRealKubernetesTLS
+    download_peer_kube_test.go:306: real dedicated-audience TokenReview, pod binding, live Job/account/spec checks, verified mTLS identity, API role separation and deleting-pod rejection passed; dispatch and certificate issuance remain fixtures
+--- PASS: TestDownloadWorkerProofWithRealKubernetesTLS (1.81s)
+=== RUN   TestEnrollmentSigningWithRealServices
+    enrollment_signing_test.go:77: run make custody-integration
+--- SKIP: TestEnrollmentSigningWithRealServices (0.00s)
+=== RUN   TestEnrollmentWithRealServices
+    enrollment_test.go:33: run make custody-integration
+--- SKIP: TestEnrollmentWithRealServices (0.00s)
+=== RUN   TestEnrollmentFleetObservationWithRealPostgres
+    fleet_observation_test.go:24: run make fleet-integration or custody-integration
+--- SKIP: TestEnrollmentFleetObservationWithRealPostgres (0.00s)
+=== RUN   TestHubConfigurationWorkerWithRealKubernetes
+    hub_worker_test.go:270: private namespace scheduling: exact non-administrator Lease update allowed; actual RBAC is narrow; broader fixture rights cannot create/delete Leases, update other objects or mint tokens; runtime starts only after extra rights are removed
+I1011 20:21:13.247410 1499803 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+I1011 20:21:13.272534 1499803 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+E1011 20:21:17.289405 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1011 20:21:19.289958 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1011 20:21:21.289906 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1011 20:21:23.290455 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1011 20:21:25.290223 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1011 20:21:27.284150 1499803 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+I1011 20:21:27.284207 1499803 leaderelection.go:304] "Failed to renew lease" lock="asservat configuration reconciliation" err="context deadline exceeded"
+    hub_worker_test.go:385: nativePod=false; mounted reconciliation used real protected sources, scheduling Lease and scoped SQL/S3/OpenBao; missing root stayed recovery-blocked, one fixture recovery acceptance enabled automatic audited observation, guard removal fenced reads and lease loss joined shutdown
+--- PASS: TestHubConfigurationWorkerWithRealKubernetes (15.08s)
+=== RUN   TestHubConfigurationWorkerInRestrictedPod
+    hub_worker_test.go:282: native worker image docker.io/library/asservat-context-worker@sha256:48a6eee38da44c707503bfdce696bb902a5559d57220aae752c6975b0a0ed296 Deployment 79a65b95-7380-40ca-9e5f-b66668400dc4 Restricted Pod with projected API tokens; native timed token renewal not measured
+    hub_worker_native_test.go:194: observed native Pod 69bc683c-75c4-4cfd-b7e4-a0d2e4f6251b image docker.io/library/asservat-context-worker@sha256:48a6eee38da44c707503bfdce696bb902a5559d57220aae752c6975b0a0ed296
+    hub_worker_test.go:385: nativePod=true; mounted reconciliation used real protected sources, scheduling Lease and scoped SQL/S3/OpenBao; missing root stayed recovery-blocked, one fixture recovery acceptance enabled automatic audited observation, guard removal fenced reads and lease loss joined shutdown
+    hub_worker_native_test.go:130: GC dry-run checks: metadata maintenance allowed for Deployment/ReplicaSet/Pod; spec, labels, annotations, Secret and configuration changes denied
+--- PASS: TestHubConfigurationWorkerInRestrictedPod (17.41s)
+=== RUN   TestKeycloakProvider
+    identity_provider_test.go:151: run make identity-integration
+--- SKIP: TestKeycloakProvider (0.00s)
+=== RUN   TestInitialInstallationWithRealServices
+    initial_installation_test.go:82: run make initial-installation-integration on its own fresh fixtures
+--- SKIP: TestInitialInstallationWithRealServices (0.00s)
+=== RUN   TestInitialNamespaceProtectionWithRealKubernetes
+    initial_namespace_test.go:375: product creator, durable journal and account/RBAC producer retain one concurrent create intent, exact receipts and lookup-only resumption; all seven predefined setup resources survive repeated Ensure; plan/guard replacement deny; no Pod, provider credentials or activation
+--- PASS: TestInitialNamespaceProtectionWithRealKubernetes (35.56s)
+=== RUN   TestInstallationWitnessWithRealKubernetes
+=== RUN   TestInstallationWitnessWithRealKubernetes/consume-retry-native-immutability-and-replacement
+=== RUN   TestInstallationWitnessWithRealKubernetes/four-way-race-retains-one-exact-consumption
+=== RUN   TestInstallationWitnessWithRealKubernetes/expired-claim-and-missing-protection-do-not-consume
+--- PASS: TestInstallationWitnessWithRealKubernetes (9.19s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/consume-retry-native-immutability-and-replacement (3.03s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/four-way-race-retains-one-exact-consumption (4.53s)
+    --- PASS: TestInstallationWitnessWithRealKubernetes/expired-claim-and-missing-protection-do-not-consume (1.63s)
+=== RUN   TestLocalKeyServiceTLSIsolationAndRevocation
+    key_service_test.go:250: real TLS wrap/read; exact binding and authority; collector/publisher/hub unwrap denial; current revocation on existing TLS connection
+--- PASS: TestLocalKeyServiceTLSIsolationAndRevocation (0.08s)
+=== RUN   TestLocalKeyServicePurposeAndSigning
+=== RUN   TestLocalKeyServicePurposeAndSigning/audit
+=== RUN   TestLocalKeyServicePurposeAndSigning/browser-credentials
+=== RUN   TestLocalKeyServicePurposeAndSigning/policy-submission
+--- PASS: TestLocalKeyServicePurposeAndSigning (0.09s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/audit (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/browser-credentials (0.03s)
+    --- PASS: TestLocalKeyServicePurposeAndSigning/policy-submission (0.03s)
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/alias
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/duplicate
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/trailing
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/oversized
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/null-input
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed
+=== RUN   TestLocalKeyServiceRejectsWireSubstitution/unknown
+--- PASS: TestLocalKeyServiceRejectsWireSubstitution (0.06s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/alias (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/duplicate (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/trailing (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/oversized (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/null-input (0.00s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/irrelevant-sealed (0.01s)
+    --- PASS: TestLocalKeyServiceRejectsWireSubstitution/unknown (0.00s)
+=== RUN   TestLocalKeyClientRejectsMalformedResponses
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/digest
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/expired
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/operation
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/unknown
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/duplicate
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/oversized
+=== RUN   TestLocalKeyClientRejectsMalformedResponses/redirect
+--- PASS: TestLocalKeyClientRejectsMalformedResponses (0.15s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/digest (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/expired (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/operation (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/irrelevant-sealed (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/unknown (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/duplicate (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/oversized (0.02s)
+    --- PASS: TestLocalKeyClientRejectsMalformedResponses/redirect (0.02s)
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection
+=== RUN   TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue
+--- PASS: TestLocalKeyServiceBoundsAndCurrentTLS (0.05s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/certificate-expiry-on-reused-connection (0.02s)
+    --- PASS: TestLocalKeyServiceBoundsAndCurrentTLS/no-unbounded-queue (0.03s)
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/ready
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/upgrade
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/other-error
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/forbidden
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/malformed
+=== RUN   TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/deadline
+--- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup (0.09s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/ready (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/upgrade (0.05s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/other-error (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/forbidden (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/malformed (0.00s)
+    --- PASS: TestKVFixtureReadinessOnlyRetriesKnownReadOnlyStartup/deadline (0.04s)
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/changed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/removed
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock
+=== RUN   TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked
+=== NAME  TestLocalKeyLifecycleWithRealKubernetesSQL
+    local_key_lifecycle_test.go:408: real Kubernetes named RBAC, immutable Secret pins, SQL rotation history, mTLS wrap/unwrap, old-process fencing, retained-key reads, rollback/suspension, lock expiry and recovery denial passed; operation approvals remain synthetic
+--- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL (6.01s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/changed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/removed (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/rolled-active (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/cross-purpose-material-reuse (0.35s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/expiry-during-sql-lock (0.81s)
+    --- PASS: TestLocalKeyLifecycleWithRealKubernetesSQL/recovery-blocked (0.01s)
+=== RUN   TestLocalKeysWithRealStorage
+    local_keys_storage_test.go:159: local wrapping, encrypted manifest reload and TLS S3: exact 8389341-byte native file/hash and cross-frame range
+--- PASS: TestLocalKeysWithRealStorage (1.09s)
+=== RUN   TestLocalStartWithRealKubernetes
+    local_start_test.go:36: run make permission-integration
+--- SKIP: TestLocalStartWithRealKubernetes (0.00s)
+=== RUN   TestEnrollmentOwnerConfigurationWithRealServices
+    owner_configuration_sql_test.go:123: run make custody-integration for owned SQL/S3
+--- SKIP: TestEnrollmentOwnerConfigurationWithRealServices (0.00s)
+=== RUN   TestOwnerEndpointsWithRealKubernetes
+    owner_endpoints_test.go:149: actual EndpointSlice, restricted Pod, ReplicaSet, Deployment, Service and account identities resolved with read-only role
+    owner_workload_kube_test.go:72: synthetic owner probe response: HTTP 200, content-type="application/json", body="{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"owner\",\"namespace\":\"owner-discovery\",\"uid\":\"ea663048-64c5-46db-bec5-090d7c15863d\",\"resourceVersion\":\"1301\",\"generation\":1,\"creationTimestamp\":\"2026-10-11T18:22:37Z\",\"annotations\":{\"deployment.kubernetes.io/revision\":\"1\"},\"managedFields\":[{\"manager\":\"integration.test\",\"operation\":\"Update\",\"apiVersion\":\"apps/v1\",\"time\":\"2026-10-11T18:22:37Z\",\"fieldsType\":\"FieldsV1\",\"fieldsV1\":{\"f:spec\":{\"f:progressDeadlineSeconds\":{},\"f:replicas\":{},\"f:revisionHistoryLimit\":{},\"f:selector\":{},\"f:strategy\":{\"f:rollingUpdate\":{\".\":{},\"f:maxSurge\":{},\"f:maxUnavailable\":{}},\"f:type\":{}},\"f:template\":{\"f:metadata\":{\"f:labels\":{\".\":{},\"f:app\":{}}},\"f:spec\":{\"f:automountServiceAccountToken\":{},\"f:containers\":{\"k:{\\\"name\\\":\\\"fixture\\\"}\":{\".\":{},\"f:image\":{},\"f:imagePullPolicy\":{},\"f:name\":{},\"f:resources\":{\".\":{},\"f:limits\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}},\"f:requests\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}}},\"f:securityContext\":{\".\":{},\"f:allowPrivilegeEscalation\":{},\"f:capabilities\":{\".\":{},\"f:drop\":{}}},\"f:terminationMessagePath\":{},\"f:terminationMessagePolicy\":{}}},\"f:dnsPolicy\":{},\"f:restartPolicy\":{},\"f:schedulerName\":{},\"f:securityContext\":{\".\":{},\"f:runAsNonRoot\":{},\"f:runAsUser\":{},\"f:seccompProfile\":{\".\":{},\"f:type\":{}}},\"f:serviceAccount\":{},\"f:serviceAccountName\":{},\"f:terminationGracePeriodSeconds\":{}}}}}},{\"manager\":\"kube-controller-manager\",\"operation\":\"Update\",\"apiVersion\":\"apps/v1\",\"time\":\"2026-10-11T18:22:37Z\",\"fieldsType\":\"FieldsV1\",\"fieldsV1\":{\"f:metadata\":{\"f:annotations\":{\".\":{},\"f:deployment.kubernetes.io/revision\":{}}},\"f:status\":{\"f:availableReplicas\":{},\"f:conditions\":{\".\":{},\"k:{\\\"type\\\":\\\"Available\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}},\"k:{\\\"type\\\":\\\"Progressing\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}}},\"f:observedGeneration\":{},\"f:readyReplicas\":{},\"f:replicas\":{},\"f:terminatingReplicas\":{},\"f:updatedReplicas\":{}}},\"subresource\":\"status\"}]},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"owner-discovery\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"owner-discovery\"}},\"spec\":{\"containers\":[{\"name\":\"fixture\",\"image\":\"registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a\",\"resources\":{\"limits\":{\"cpu\":\"50m\",\"memory\":\"32Mi\"},\"requests\":{\"cpu\":\"5m\",\"memory\":\"8Mi\"}},\"terminationMessagePath\":\"/dev/termination-log\",\"terminationMessagePolicy\":\"File\",\"imagePullPolicy\":\"IfNotPresent\",\"securityContext\":{\"capabilities\":{\"drop\":[\"ALL\"]},\"allowPrivilegeEscalation\":false}}],\"restartPolicy\":\"Always\",\"terminationGracePeriodSeconds\":30,\"dnsPolicy\":\"ClusterFirst\",\"serviceAccountName\":\"owner\",\"serviceAccount\":\"owner\",\"automountServiceAccountToken\":false,\"securityContext\":{\"runAsUser\":65532,\"runAsNonRoot\":true,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"schedulerName\":\"default-scheduler\"}},\"strategy\":{\"type\":\"RollingUpdate\",\"rollingUpdate\":{\"maxUnavailable\":\"25%\",\"maxSurge\":\"25%\"}},\"revisionHistoryLimit\":10,\"progressDeadlineSeconds\":600},\"status\":{\"observedGeneration\":1,\"replicas\":1,\"updatedReplicas\":1,\"readyReplicas\":1,\"availableReplicas\":1,\"terminatingReplicas\":0,\"conditions\":[{\"type\":\"Available\",\"status\":\"True\",\"lastUpdateTime\":\"2026-10-11T18:22:37Z\",\"lastTransitionTime\":\"2026-10-11T18:22:37Z\",\"reason\":\"MinimumReplicasAvailable\",\"message\":\"Deployment has minimum availability.\"},{\"type\":\"Progressing\",\"status\":\"True\",\"lastUpdateTime\":\"2026-10-11T18:22:37Z\",\"lastTransitionTime\":\"2026-10-11T18:22:37Z\",\"reason\":\"NewReplicaSetAvailable\",\"message\":\"ReplicaSet \\\"owner-5bb77f8697\\\" has successfully progressed.\"}]}}\n", read=<nil>
+    owner_workload_kube_test.go:72: synthetic owner probe response: HTTP 200, content-type="application/json", body="{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"owner\",\"namespace\":\"owner-discovery\",\"uid\":\"ea663048-64c5-46db-bec5-090d7c15863d\",\"resourceVersion\":\"1301\",\"generation\":1,\"creationTimestamp\":\"2026-10-11T18:22:37Z\",\"annotations\":{\"deployment.kubernetes.io/revision\":\"1\"},\"managedFields\":[{\"manager\":\"integration.test\",\"operation\":\"Update\",\"apiVersion\":\"apps/v1\",\"time\":\"2026-10-11T18:22:37Z\",\"fieldsType\":\"FieldsV1\",\"fieldsV1\":{\"f:spec\":{\"f:progressDeadlineSeconds\":{},\"f:replicas\":{},\"f:revisionHistoryLimit\":{},\"f:selector\":{},\"f:strategy\":{\"f:rollingUpdate\":{\".\":{},\"f:maxSurge\":{},\"f:maxUnavailable\":{}},\"f:type\":{}},\"f:template\":{\"f:metadata\":{\"f:labels\":{\".\":{},\"f:app\":{}}},\"f:spec\":{\"f:automountServiceAccountToken\":{},\"f:containers\":{\"k:{\\\"name\\\":\\\"fixture\\\"}\":{\".\":{},\"f:image\":{},\"f:imagePullPolicy\":{},\"f:name\":{},\"f:resources\":{\".\":{},\"f:limits\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}},\"f:requests\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}}},\"f:securityContext\":{\".\":{},\"f:allowPrivilegeEscalation\":{},\"f:capabilities\":{\".\":{},\"f:drop\":{}}},\"f:terminationMessagePath\":{},\"f:terminationMessagePolicy\":{}}},\"f:dnsPolicy\":{},\"f:restartPolicy\":{},\"f:schedulerName\":{},\"f:securityContext\":{\".\":{},\"f:runAsNonRoot\":{},\"f:runAsUser\":{},\"f:seccompProfile\":{\".\":{},\"f:type\":{}}},\"f:serviceAccount\":{},\"f:serviceAccountName\":{},\"f:terminationGracePeriodSeconds\":{}}}}}},{\"manager\":\"kube-controller-manager\",\"operation\":\"Update\",\"apiVersion\":\"apps/v1\",\"time\":\"2026-10-11T18:22:37Z\",\"fieldsType\":\"FieldsV1\",\"fieldsV1\":{\"f:metadata\":{\"f:annotations\":{\".\":{},\"f:deployment.kubernetes.io/revision\":{}}},\"f:status\":{\"f:availableReplicas\":{},\"f:conditions\":{\".\":{},\"k:{\\\"type\\\":\\\"Available\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}},\"k:{\\\"type\\\":\\\"Progressing\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}}},\"f:observedGeneration\":{},\"f:readyReplicas\":{},\"f:replicas\":{},\"f:terminatingReplicas\":{},\"f:updatedReplicas\":{}}},\"subresource\":\"status\"}]},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"owner-discovery\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"owner-discovery\"}},\"spec\":{\"containers\":[{\"name\":\"fixture\",\"image\":\"registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a\",\"resources\":{\"limits\":{\"cpu\":\"50m\",\"memory\":\"32Mi\"},\"requests\":{\"cpu\":\"5m\",\"memory\":\"8Mi\"}},\"terminationMessagePath\":\"/dev/termination-log\",\"terminationMessagePolicy\":\"File\",\"imagePullPolicy\":\"IfNotPresent\",\"securityContext\":{\"capabilities\":{\"drop\":[\"ALL\"]},\"allowPrivilegeEscalation\":false}}],\"restartPolicy\":\"Always\",\"terminationGracePeriodSeconds\":30,\"dnsPolicy\":\"ClusterFirst\",\"serviceAccountName\":\"owner\",\"serviceAccount\":\"owner\",\"automountServiceAccountToken\":false,\"securityContext\":{\"runAsUser\":65532,\"runAsNonRoot\":true,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"schedulerName\":\"default-scheduler\"}},\"strategy\":{\"type\":\"RollingUpdate\",\"rollingUpdate\":{\"maxUnavailable\":\"25%\",\"maxSurge\":\"25%\"}},\"revisionHistoryLimit\":10,\"progressDeadlineSeconds\":600},\"status\":{\"observedGeneration\":1,\"replicas\":1,\"updatedReplicas\":1,\"readyReplicas\":1,\"availableReplicas\":1,\"terminatingReplicas\":0,\"conditions\":[{\"type\":\"Available\",\"status\":\"True\",\"lastUpdateTime\":\"2026-10-11T18:22:37Z\",\"lastTransitionTime\":\"2026-10-11T18:22:37Z\",\"reason\":\"MinimumReplicasAvailable\",\"message\":\"Deployment has minimum availability.\"},{\"type\":\"Progressing\",\"status\":\"True\",\"lastUpdateTime\":\"2026-10-11T18:22:37Z\",\"lastTransitionTime\":\"2026-10-11T18:22:37Z\",\"reason\":\"NewReplicaSetAvailable\",\"message\":\"ReplicaSet \\\"owner-5bb77f8697\\\" has successfully progressed.\"}]}}\n", read=<nil>
+    owner_workload_kube_test.go:72: synthetic owner probe response: HTTP 409, content-type="application/json", body="{\"kind\":\"Status\",\"apiVersion\":\"v1\",\"metadata\":{},\"status\":\"Failure\",\"message\":\"Operation cannot be fulfilled on deployments.apps \\\"owner\\\": the object has been modified; please apply your changes to the latest version and try again\",\"reason\":\"Conflict\",\"details\":{\"name\":\"owner\",\"group\":\"apps\",\"kind\":\"deployments\"},\"code\":409}\n", read=<nil>
+    owner_endpoints_test.go:197: mounted scoped SQL/Kubernetes/S3/OpenBao providers established pre-Ready owner identity, current token loss/recovery and joined catalog-failure shutdown; initial recovery and mount delivery remain fixture-owned
+    owner_endpoints_test.go:197: process-owned separate keys enrolled/activated through native proof and real providers; actual mutual TLS callbacks passed; replacement key rejected before provider signing
+    owner_endpoints_test.go:197: native Pod/token/CSR, protected accepted configuration, SQL spend, real scoped OpenBao signing/audit and activation composed before Ready; source suspension fenced activation and resume reused the exact leaf
+    owner_endpoints_test.go:197: real Pod-bound token/CSR + audited configuration + native workload guard proved enrollment before readiness; routing waited, then succeeded; foreign/unbound/deleted tokens denied
+    owner_endpoints_test.go:196: source probe exception permits only the named account's ConfigMap dry-run UPDATE; real writes, other actors/objects, Secrets and create/delete remain denied without the source guard
+    owner_workload_kube_test.go:72: synthetic owner probe response: HTTP 200, content-type="application/vnd.kubernetes.protobuf", body="k8s\x00\n\x15\n\aapps/v1\x12\nDeployment\x12\xb8\x14\n\xb8\x0e\n\x05owner\x12\x00\x1a\x0fowner-discovery\"\x00*$ea663048-64c5-46db-bec5-090d7c15863d2\x0415288\x03B\b\b\xed\xa7\xaf\xd6\x06\x10\x00b$\n\x18asservat-test/probe-race\x12\badvancedb&\n!deployment.kubernetes.io/revision\x12\x012\x8a\x01\xb8\b\n\x10integration.test\x12\x06Update\x1a\aapps/v1\"\b\b\xf4\xa7\xaf\xd6\x06\x10\x002\bFieldsV1:\xfc\a\n\xf9\a{\"f:metadata\":{\"f:annotations\":{\"f:asservat-test/probe-race\":{}}},\"f:spec\":{\"f:progressDeadlineSeconds\":{},\"f:replicas\":{},\"f:revisionHistoryLimit\":{},\"f:selector\":{},\"f:strategy\":{\"f:rollingUpdate\":{\".\":{},\"f:maxSurge\":{},\"f:maxUnavailable\":{}},\"f:type\":{}},\"f:template\":{\"f:metadata\":{\"f:labels\":{\".\":{},\"f:app\":{}}},\"f:spec\":{\"f:automountServiceAccountToken\":{},\"f:containers\":{\"k:{\\\"name\\\":\\\"fixture\\\"}\":{\".\":{},\"f:image\":{},\"f:imagePullPolicy\":{},\"f:name\":{},\"f:resources\":{\".\":{},\"f:limits\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}},\"f:requests\":{\".\":{},\"f:cpu\":{},\"f:memory\":{}}},\"f:securityContext\":{\".\":{},\"f:allowPrivilegeEscalation\":{},\"f:capabilities\":{\".\":{},\"f:drop\":{}}},\"f:terminationMessagePath\":{},\"f:terminationMessagePolicy\":{}}},\"f:dnsPolicy\":{},\"f:readinessGates\":{},\"f:restartPolicy\":{},\"f:schedulerName\":{},\"f:securityContext\":{\".\":{},\"f:runAsNonRoot\":{},\"f:runAsUser\":{},\"f:seccompProfile\":{\".\":{},\"f:type\":{}}},\"f:serviceAccount\":{},\"f:serviceAccountName\":{},\"f:terminationGracePeriodSeconds\":{}}}}}B\x00\x8a\x01\xd6\x04\n\x17kube-controller-manager\x12\x06Update\x1a\aapps/v1\"\b\b\xb8\xa8\xaf\xd6\x06\x10\x002\bFieldsV1:\x8d\x04\n\x8a\x04{\"f:metadata\":{\"f:annotations\":{\".\":{},\"f:deployment.kubernetes.io/revision\":{}}},\"f:status\":{\"f:conditions\":{\".\":{},\"k:{\\\"type\\\":\\\"Available\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}},\"k:{\\\"type\\\":\\\"Progressing\\\"}\":{\".\":{},\"f:lastTransitionTime\":{},\"f:lastUpdateTime\":{},\"f:message\":{},\"f:reason\":{},\"f:status\":{},\"f:type\":{}}},\"f:observedGeneration\":{},\"f:replicas\":{},\"f:terminatingReplicas\":{},\"f:unavailableReplicas\":{},\"f:updatedReplicas\":{}}}B\x06status\x12\xf8\x03\b\x01\x12\x18\n\x16\n\x03app\x12\x0fowner-discovery\x1a\xa7\x03\n(\n\x00\x12\x00\x1a\x00\"\x00*\x002\x008\x00B\x00Z\x16\n\x03app\x12\x0fowner-discovery\x12\xfa\x02\x12\xe9\x01\n\afixture\x12]registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a*\x00B>\n\f\n\x03cpu\x12\x05\n\x0350m\n\x10\n\x06memory\x12\x06\n\x0432Mi\x12\v\n\x03cpu\x12\x04\n\x025m\x12\x0f\n\x06memory\x12\x05\n\x038Mij\x14/dev/termination-logr\fIfNotPresentz\t\n\x05\x12\x03ALL8\x00\x80\x01\x00\x88\x01\x00\x90\x01\x00\xa2\x01\x04File\x1a\x06Always \x1e2\fClusterFirstB\x05ownerJ\x05ownerR\x00X\x00`\x00h\x00r\x18\x10\xfc\xff\x03\x18\x01R\x10\n\x0eRuntimeDefault\x82\x01\x00\x8a\x01\x00\x9a\x01\x11default-scheduler\xa8\x01\x00\xc2\x01\x00\xe2\x01#\n!asservat.io/OwnerCertificateReady\"'\n\rRollingUpdate\x12\x16\n\t\b\x01\x10\x00\x1a\x0325%\x12\t\b\x01\x10\x00\x1a\x0325%(\x000\n8\x00H\xd8\x04\x1a\xff\x01\b\x03\x10\x01\x18\x01 \x00(\x012{\n\vProgressing\x12\x04True\"\x16NewReplicaSetAvailable*:ReplicaSet \"owner-7849b5fc5b\" has successfully progressed.2\b\b\xa6\xa8\xaf\xd6\x06\x10\x00:\b\b\xed\xa7\xaf\xd6\x06\x10\x002r\n\tAvailable\x12\x05False\"\x1aMinimumReplicasUnavailable*.Deployment does not have minimum availability.2\b\b\xb8\xa8\xaf\xd6\x06\x10\x00:\b\b\xb8\xa8\xaf\xd6\x06\x10\x008\x00H\x00\x1a\x00\"\x00", read=<nil>
+    owner_endpoints_test.go:196: native workload guard denied namespace-writer credential/workload/exec injection, preserved real controller replacement and rejected missing protection; dry-runs made no persisted change
+    owner_endpoints_test.go:195: protected owner configuration, audited SQL acceptance and routing passed: pinned admission, separate probe, no dry-run writes, suspension/resume, and missing-protection rejection
+    owner_endpoints_test.go:208: missing rights, foreign identity, readiness override, Pod deletion and forbidden credential/mutation checks passed
+--- PASS: TestOwnerEndpointsWithRealKubernetes (82.92s)
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:115: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:171: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerPKIWithRealServices (11.92s)
+=== RUN   TestPeerRegistryWithRealServices
+    peer_registry_test.go:23: run make custody-integration
+--- SKIP: TestPeerRegistryWithRealServices (0.00s)
+=== RUN   TestPermissionAdmissionWithRealKubernetes
+    permission_admission_test.go:29: run make permission-integration
+--- SKIP: TestPermissionAdmissionWithRealKubernetes (0.00s)
+=== RUN   TestPermissionsWithRealKubernetes
+    permissions_test.go:28: owned Kubernetes fixture required; run make permission-integration
+--- SKIP: TestPermissionsWithRealKubernetes (0.00s)
+=== RUN   TestConnectorPKIWithRealOpenBao
+=== RUN   TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate
+=== RUN   TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit
+=== RUN   TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS
+=== RUN   TestConnectorPKIWithRealOpenBao/provider-role-and-revocation
+--- PASS: TestConnectorPKIWithRealOpenBao (0.68s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/same-claim-cannot-extend-certificate (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/wrong-key-epoch-or-audit (0.00s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/audited-activation-with-SQL-S3-and-current-TLS (0.64s)
+    --- PASS: TestConnectorPKIWithRealOpenBao/provider-role-and-revocation (0.01s)
+=== RUN   TestPermissionAuthorityPoliciesWithRealServices
+    policy_authority_test.go:43: run make custody-integration
+--- SKIP: TestPermissionAuthorityPoliciesWithRealServices (0.00s)
+=== RUN   TestRetentionWithRealKubernetes
+    retention_test.go:30: run make permission-integration
+--- SKIP: TestRetentionWithRealKubernetes (0.00s)
+=== RUN   TestWorkerChannelRenewalAndProcessKey
+--- PASS: TestWorkerChannelRenewalAndProcessKey (0.02s)
+=== RUN   TestWorkerChannelActualMutualTLS
+--- PASS: TestWorkerChannelActualMutualTLS (0.02s)
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/key
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/pod
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/installation
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/role
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/expiry
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/old-start
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/dns
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/server-usage
+=== RUN   TestWorkerChannelRejectsCertificateSubstitution/expired
+--- PASS: TestWorkerChannelRejectsCertificateSubstitution (0.08s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/key (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/pod (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/installation (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/role (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/expiry (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/old-start (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/dns (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/server-usage (0.01s)
+    --- PASS: TestWorkerChannelRejectsCertificateSubstitution/expired (0.01s)
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/nonce
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/worker
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/unknown
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/null-chain
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/duplicate
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/oversize
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/redirect
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/encoding
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/media
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/trailer
+=== RUN   TestWorkerChannelResponseFramingAndNoRedirect/lost-reply
+--- PASS: TestWorkerChannelResponseFramingAndNoRedirect (0.09s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/nonce (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/worker (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/unknown (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/null-chain (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/duplicate (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/oversize (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/redirect (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/encoding (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/media (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/trailer (0.01s)
+    --- PASS: TestWorkerChannelResponseFramingAndNoRedirect/lost-reply (0.01s)
+=== RUN   TestWorkerChannelCancellationAndSingleFlight
+--- PASS: TestWorkerChannelCancellationAndSingleFlight (0.01s)
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/http
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/cookie
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/duplicate-auth
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/unknown
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/missing
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/token-space
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/install
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/principal
+=== RUN   TestWorkerChannelIngressRejectsPublicAndMalformedInputs/query
+--- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs (0.06s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/http (0.00s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/cookie (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/duplicate-auth (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/unknown (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/missing (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/token-space (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/install (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/principal (0.01s)
+    --- PASS: TestWorkerChannelIngressRejectsPublicAndMalformedInputs/query (0.01s)
+=== RUN   TestWorkerChannelFailedRenewalKeepsOnlyOriginalCredential
+--- PASS: TestWorkerChannelFailedRenewalKeepsOnlyOriginalCredential (0.02s)
+=== RUN   TestWorkerChannelPinnedTrustAndEndpoint
+2026/10/11 20:24:12 http: TLS handshake error from 127.0.0.1:56934: remote error: tls: bad certificate
+--- PASS: TestWorkerChannelPinnedTrustAndEndpoint (0.02s)
+=== RUN   TestWorkerChannelRechecksExpiredServerAtRenewal
+2026/10/11 20:24:12 http: TLS handshake error from 127.0.0.1:49790: remote error: tls: bad certificate
+--- PASS: TestWorkerChannelRechecksExpiredServerAtRenewal (0.01s)
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel
+=== RUN   TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry
+--- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite (0.10s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/cancel (0.00s)
+    --- PASS: TestWorkerCredentialDeliveryRetainsOwnerLifetimeThroughWrite/expiry (0.10s)
+=== RUN   TestWorkloadTargetsWithRealKubernetes
+=== RUN   TestWorkloadTargetsWithRealKubernetes/cluster-a
+=== RUN   TestWorkloadTargetsWithRealKubernetes/cluster-b
+--- PASS: TestWorkloadTargetsWithRealKubernetes (10.21s)
+    --- PASS: TestWorkloadTargetsWithRealKubernetes/cluster-a (4.91s)
+    --- PASS: TestWorkloadTargetsWithRealKubernetes/cluster-b (5.30s)
+PASS
+ok  	asservat.local/asservat/test/integration	242.822s

@@ -1,0 +1,38 @@
+[
+  {
+    "path": "specs/contracts/owner-configuration.schema.json",
+    "base_sha256": "54f2c88ea5145fa0aef1d075254a00b0ff75952110b2facb64534eea973dcf0c",
+    "payload_sha256": "23c76f4c8e07a4af07b512f03ed664641f69c1a3a40fb38e338ee59fc3924ca3",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-deployment.schema.json",
+    "base_sha256": "cb5cac7afe7d0db52ad91417b3b71ee7e5524d6d4f0ab6a4258607c7956022ce",
+    "payload_sha256": "ca95d2209cb2cc6b025d2f58f55a696b29f8019fc2a891416b24b04aebedac00",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-identity-roles.schema.json",
+    "base_sha256": "185d37d9888708c98bbbff079de977b39e8a60c88f15618f9bf0c1fb35a08f23",
+    "payload_sha256": "ea2233f95a58193270de24711c83f16903fcbd5f4ea175c97cb2777566be1617",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/initial-runtime-resources.schema.json",
+    "base_sha256": "ecaf0e1b5aba82b4ffc8ed79663dc9ed1ccc657cbdc3232fe156f80922f74f40",
+    "payload_sha256": "f143d977aa83032f8c037b0634932e285fb1f8ba6add1e4eb67c1d294c918be1",
+    "owner": "console"
+  },
+  {
+    "path": "specs/contracts/owner-provider-selection.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "561c513f4a38df765a90c3c4effa4d7f6580e63648468a3ca856c0ba610f56ea",
+    "owner": "console"
+  },
+  {
+    "path": "scripts/check-specs.py",
+    "base_sha256": "dbcc9e2a1c36b3f9f0aacb507493bc7d4cbb46ff5b80a9fc6925a01f75439efa",
+    "payload_sha256": "18203ef3306b69254d3ca7143a24080adb82afb93e562dd48c6b8ffe07dc261f",
+    "owner": "console"
+  }
+]

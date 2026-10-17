@@ -1,0 +1,16 @@
+# Channel deadline propagation checkpoint v2
+
+Scope: two paths only, as listed in manifest.json. The v2 regional channel immediately carries every retained earlier selected-owner cutoff into following candidate/SQL calls, post-metadata validation, returned metadata and blocking current-key checks. Expired retained state denies before another candidate read. Original request, socket, certificate and native dates remain caps; no renewal, retry, source refresh, rate or v1 wire change.
+
+Actual handle 77428 exited 0. Compile 11.372s; selected race suite 20.527s (44 top-level / 184 named PASS entries, 0 skipped); vet 4.05s; Go architecture 4.699s. Exact commands, per-phase exits and before/after hashes are under evidence/. All 2,081 live dependencies, two bases/payloads and 2,082 mirror paths/file sets remained unchanged. Owned tmpfs scratch was removed. No external lab ran.
+
+Counterfactual: sibling checkpoint-v1 handle 96138 first exited 1 at all four intended regression messages, once each (see evidence/before-boundaries.json there). It then failed candidate compilation because a new context local reused an existing candidate value name; no later gate ran. V2 changes only that declaration/use to currentKeys. Test source, bases and dependencies are byte-identical. The prior results are preserved and hashed in ../checkpoint-v2-before-reuse.json; the before run was not repeated.
+
+The tests compose actual keys/TLS and the real typed coordinator with explicitly synthetic SQL/native sources. They qualify original-bound propagation, including a real blocked private-key lock, not installed multi-cluster availability. Full shared-client HWORK→B→A→R five-second qualification, runtime selection and regional provisioning remain pending. Next scope is the separate pending receiver/standby reservation draft, then outbound/HWORK composition; no additional build is active or implied by this handoff.
+
+Frozen manifest SHA256: ec5a9c800213536c471e05dd7217fefdf02cc8009e0bc4d61483c7c8f0501470
+Runner SHA256: 75a3ba05416232014376c892adae1074ad70bca39d3755c45c3c10dbec4c4615
+Freeze SHA256: 537638d77c163413cef661c5cd9dd6bc932f0f78bece5fb9313d554caf4b79c8
+Dependencies SHA256: fff422e7974c3f3cec6801cf745621bb95c626f616f5636371903cfa74401cf8
+Result SHA256: 0c0fe7a22ac704aefd066d40da5547461cf1624e53e28b9b8bc660559cbe4392
+Evidence index SHA256: cbc70b6deae5dc2cfc6faba5cb3dfb29c8f93954c34b8de19d7f5f1af146ccf6

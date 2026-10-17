@@ -1,0 +1,11 @@
+version: '2'
+sql:
+  - engine: postgresql
+    schema: migrations
+    queries: migrations/queries
+    gen:
+      go:
+        package: custodydb
+        out: internal/adapters/postgres/custodydb
+        sql_package: pgx/v5
+        emit_empty_slices: true

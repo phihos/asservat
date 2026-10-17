@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-1",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Bootstrap chain and passive replay passed. The actual installer-continue Pod's produce step succeeded; the continue container stopped after about 85 s with the generic product error before publishing any outbox. The product did not name the stopping step, so fixed step names were added for run 2.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

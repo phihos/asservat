@@ -1,0 +1,123 @@
+{
+  "mode": "database-recovery",
+  "qualificationScope": "full existing database-recovery target after SQL59 integration; retains explicit synthetic fixture authority and does not qualify installed owner/public-runtime composition",
+  "command": [
+    "make",
+    "database-recovery-integration",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "runnerSHA256": "afe30baa117d6ceef4c66fa4c38eeaad0139d9db4c254c2f69be55422eae3434",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "sourceCount": 3075,
+  "sourceSnapshotSHA256": "39fbd6e81cda8f1eb89ed296f530489e2f4a4bd6a3794d03850f27f7d555df7d",
+  "expectedHarnessSourceCount": 2304,
+  "requiredPassedTests": [
+    "TestDatabaseRecoveryAfterRestartAndRestore"
+  ],
+  "expectedSkippedTests": [],
+  "excludedNativeQualifications": [
+    "Kubernetes installer Pod and native witness/source composition",
+    "installed owner runtime and provider projections",
+    "regional capture/public journey/native transfer",
+    "separately opted-in 31-minute connector retirement"
+  ],
+  "scratch": "/home/phil/.cache/asservat-build/fleet-freshness-database-recovery-1-tmp",
+  "validationErrors": [],
+  "processJoined": true,
+  "diskBeforeBytes": 418973442048,
+  "tmpFreeBeforeBytes": 16779939840,
+  "reviewedPayloadsSHA256": "c841972188e52f5061bf8e68fc745a084fb193078dd9d3e5b345c09f0e913e61",
+  "reviewedPayloadsMatch": true,
+  "processPID": 1346618,
+  "processGroup": 1346618,
+  "processGroupAbsentAfterCommand": true,
+  "commandExit": 0,
+  "seconds": 30.722,
+  "passedTests": [
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore"
+  ],
+  "missingRequiredTests": [],
+  "cleanupFailures": [],
+  "testExit": 0,
+  "exactHarnessSources": true,
+  "requiredLogTests": [
+    "TestDatabaseRecoveryAfterRestartAndRestore"
+  ],
+  "startedTests": [
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore"
+  ],
+  "loggedPassedTests": [
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore",
+    "TestDatabaseRecoveryAfterRestartAndRestore"
+  ],
+  "skippedTests": [],
+  "failedTests": [],
+  "completeSelectedInventory": true,
+  "databaseIncarnations": [
+    {
+      "serverStart": "2026-10-14T02:39:34.003524+00:00",
+      "databaseOID": "16384"
+    },
+    {
+      "serverStart": "2026-10-14T02:39:40.580234+00:00",
+      "databaseOID": "16384"
+    },
+    {
+      "serverStart": "2026-10-14T02:39:40.580234+00:00",
+      "databaseOID": "20748"
+    }
+  ],
+  "completeOriginalPhases": true,
+  "actualFixtureImages": {
+    "asservat-custody-qp1rqqfx-postgres": {
+      "requested": "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+      "imageID": "sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+      "containerID": "a476883d238c605cfab847532a4b321f03eff57863ba4881d763d526d6ac4ca6"
+    },
+    "asservat-custody-qp1rqqfx-s3": {
+      "requested": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+      "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+      "containerID": "b116a15a9afb34e72d800354bb84e9f9268293676ff138d298f4bdb8a0b44c1f"
+    }
+  },
+  "fixtureScratch": "/home/phil/.cache/asservat-build/custody-qp1rqqfx",
+  "fixtureScratchRemoved": true,
+  "ownedDockerCleanup": {
+    "container": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "network": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "volume": {
+      "exit": 0,
+      "remainingIDs": []
+    },
+    "image": {
+      "exit": 0,
+      "remainingIDs": []
+    }
+  },
+  "signalReceived": null,
+  "runnerUnchanged": true,
+  "finalProcessGroupAbsent": true,
+  "sourceSnapshotUnchanged": true,
+  "emptyScratchRemoved": true,
+  "archiveHashes": {
+    "sources.json": "39fbd6e81cda8f1eb89ed296f530489e2f4a4bd6a3794d03850f27f7d555df7d",
+    "runner.py": "afe30baa117d6ceef4c66fa4c38eeaad0139d9db4c254c2f69be55422eae3434",
+    "expected-harness-sources.json": "5da0a1ae6f0cb9d92156f93e2c56f213f843b317fad04edb26818837291170e9",
+    "reviewed-payloads.json": "c841972188e52f5061bf8e68fc745a084fb193078dd9d3e5b345c09f0e913e61",
+    "gate.log": "c425bf4a80f9788416545ea13fbc8570042984267110ea2dc43e33cf28ffa1f1",
+    "database-recovery.log": "4ab6a22f93f3afb63d5bb39d707ea8a3c866c2ccc4937baafcec6cb070393521",
+    "database-recovery-environment.json": "b77d46b9164f85ace41f1ce3c09cb0b6b1fa80e642110e6fe74da0e46c30ea39"
+  },
+  "exit": 0
+}

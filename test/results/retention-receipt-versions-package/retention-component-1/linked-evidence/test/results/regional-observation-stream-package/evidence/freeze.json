@@ -1,0 +1,15 @@
+{
+  "bases.json": "f69cb75478d9ec93af0d06cbb58e2e4ca5191bd367be0433d9c455692a06b0b8",
+  "dependencies.json": "a43f229d0368835af090dd768772c9e915001f665ce93b06e3c4ec10833bcf20",
+  "files/docs/architecture/cluster-observations.md": "d47faf271f4591d75f4c528a23b9aa7b9a8ef0b8e5fac618a501f5cea6c7d716",
+  "files/docs/decisions/144-cluster-local-observations.md": "1bd33735443e513340d4fb4753171ba75cffcf6c3f9fb5c1b0d75c4f97879790",
+  "files/internal/adapters/mtls/connector_observation_client.go": "949e99ac45d1106d0bbb281d5f9c08cad4219d93286af22089cd3bd6d2104816",
+  "files/internal/adapters/mtls/connector_observation_connection.go": "628738eac95fddfff8d85f37f05206b30580d39c3039fec3e550aa86960be098",
+  "files/internal/adapters/mtls/connector_observation_connection_test.go": "c99a9ea5166b40cac7f4035ec3687eb106520179411d91a90e2f198116968c09",
+  "files/internal/transport/clusterobservation/regional_exchange.go": "eb085bc6676ba1f678329184aae2943d6eba59af2021eeb226ae53b34ecb2b05",
+  "files/internal/transport/clusterobservation/regional_exchange_test.go": "92b2b76d5302bad009dc997a296db48d3f1186420d08eb08ee081546ba1a0c61",
+  "manifest.json": "7ee1a55d0ffd09826eab08c402119317448ebead2a1d24cbef2dcf9a121f411c",
+  "overlay.json": "bb750f8b210b84fd1ce9ff3935b77df39a83055b363111b51119106c4124811e",
+  "payload.json": "eb228d61ad57adfd7f8081325fc85dcfe32591cb908a6f13caaed2dcb3093337",
+  "run.py": "f8f43c78a0f798a58c7a1f20d2646ec168212a0036b5815aad6cee9ed0f9f70c"
+}

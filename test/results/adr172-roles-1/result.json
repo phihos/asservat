@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--initial-installation"
+  ],
+  "exit": 0,
+  "testExit": 0,
+  "scope": "Real PostgreSQL provisioning and exact ACL verification of all 42 public runtime roles, including ADR-172 connector-owner-read (ordinal 56)",
+  "passedCount": 87,
+  "publicRuntimeRoleTests": [
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-held-lock",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock"
+  ],
+  "cleanupFailures": [],
+  "sourceUnchangedDuringTest": true,
+  "status": "passed",
+  "log": "initial-installation.log",
+  "environment": "environment.json"
+}

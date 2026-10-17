@@ -1,0 +1,14 @@
+{
+  "SCOPE.md": "31e2f249a5250af0c9113fb8f55b7ad25cefadf1f99fe1bbc3fcb1bbd594a6f1",
+  "bases.json": "2b26c5279c89fea2b611b968323722790d603cccb174a404ec651e4017d99f6c",
+  "dependencies.json": "6d5b0925b263fb69d85c56f6b6862c5cc87c27e0c9bb93a45349462ad5688895",
+  "files/internal/adapters/kubernetes/cluster_observation_metadata.go": "660a90b476f65290fec0d2d9fc818a44ca386dcb76728f353cfc1f8bd8ff272c",
+  "files/internal/adapters/kubernetes/cluster_observation_metadata_test.go": "e4bc8397358a9d3ecc3e5b0b72b7836c2a12d625ac169bcdc6128f66ae6f6803",
+  "files/internal/transport/native/owner_observation_operation_lifetime_test.go": "d10b6325c4939d206fa4a8e4e722b29327f411bb91b367e1a3d7be54072b4c8b",
+  "files/internal/transport/native/owner_observation_operation_server.go": "58587153dd84dbfc16c1e1ad4a83916c7b63307d2f0bd27f8588664fa00877b6",
+  "files/internal/transport/native/owner_observation_operation_server_test.go": "4d65d04c4c4bd08207a1e4164671ca7e6d49275293f80ff624a678aa8966173a",
+  "manifest.json": "3990e7b5486674d6e21cc9ef6e9bfbd10682861c4b22843a95d67177471d582b",
+  "overlay.json": "9db9f9f84bfe87572131f15e1bd141a95a8e69d237b2e3857e613fa7c9d556e9",
+  "payload.json": "5b1b305d6e9e76041b7f8b7b1750187c464783fc9e3730778d30d139885ce3e0",
+  "run.py": "51180a48b81b72199e29f1430f494a0921cf542f2f7991f274c3450a2702a4b5"
+}

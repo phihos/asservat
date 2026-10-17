@@ -1,0 +1,6 @@
+{
+  "path": "test/integration/context_native_interrupted_test.go",
+  "before": "2a3f5eefe20a66dd74ec9c3f681f983e9a9c66ee0a088a8ae95600c3ab690d96",
+  "after": "aa0414732142ad2bc0048fc4260b9cffe43314a984c84a1bdcb9d4f16011ec59",
+  "scope": "Failure labels only; assertions and behavior unchanged"
+}

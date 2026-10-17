@@ -1,0 +1,69 @@
+package fleet
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"testing"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+type contentionTrustFixture struct {
+	a                   value.Administration
+	readErr, persistErr error
+	observed, fenced    bool
+	afterPersist        func()
+}
+
+func (f *contentionTrustFixture) FleetAdministration(context.Context) (value.Administration, error) {
+	return f.a, f.readErr
+}
+func (f *contentionTrustFixture) ReadAdministrationBasis(context.Context) (value.ObservationBasis, error) {
+	return trustObservationBasis(f.a.ObservedAt), nil
+}
+func (f *contentionTrustFixture) ObserveAdministration(context.Context, value.ObservationBasis, value.Administration) error {
+	f.observed = true
+	if f.afterPersist != nil {
+		f.afterPersist()
+	}
+	return f.persistErr
+}
+func (f *contentionTrustFixture) FenceAdministration(context.Context, value.ObservationBasis, time.Time) error {
+	f.fenced = true
+	return nil
+}
+
+func TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence(t *testing.T) {
+	for _, mode := range []string{"unchanged-persistence", "wrapped-persistence", "source-error", "suspended-source", "unavailable-persistence", "unknown-commit", "expired-after-persistence", "cancelled-after-persistence"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			a := workerSchedulingAdministration()
+			now := a.ObservedAt
+			f := &contentionTrustFixture{a: a, persistErr: value.ErrObservationPersistenceContended}
+			switch mode {
+			case "wrapped-persistence":
+				f.persistErr = fmt.Errorf("fixed context: %w", f.persistErr)
+			case "suspended-source":
+				f.a.Suspended = true
+			case "source-error":
+				f.readErr = f.persistErr
+				f.persistErr = nil
+			case "unavailable-persistence", "unknown-commit":
+				f.persistErr = value.ErrUnavailable
+			case "expired-after-persistence":
+				f.afterPersist = func() { now = a.FreshUntil }
+			case "cancelled-after-persistence":
+				f.afterPersist = cancel
+			}
+			o := TrustObserver{Settings: f, Projection: f, Now: func() time.Time { return now }}
+			err := o.Reconcile(ctx)
+			skip := mode == "unchanged-persistence" || mode == "wrapped-persistence"
+			if err == nil || !errors.Is(err, value.ErrUnavailable) || f.fenced == skip || f.observed == (mode == "source-error") {
+				t.Fatal("failed persistence changed fencing classification")
+			}
+		})
+	}
+}

@@ -1,0 +1,90 @@
+[  745.582476] Skipping core dump
+[  745.582697] fixture[3154]: segfault at 0 ip 00005955b1f10276 sp 00007ffc5fbc6be0 error 6 in fixture[5955b1f10000+1000] likely on CPU 0 (core 0, socket 0)
+[  745.582705] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  745.582713] Pid 3154(fixture) over core_pipe_limit
+[  745.582715] Skipping core dump
+[  745.582786] Pid 3164(fixture) over core_pipe_limit
+[  745.582788] Skipping core dump
+[  745.583067] Pid 3155(fixture) over core_pipe_limit
+[  745.583069] Skipping core dump
+[  745.583371] Pid 3156(fixture) over core_pipe_limit
+[  745.583373] Skipping core dump
+[  745.583502] Pid 3157(fixture) over core_pipe_limit
+[  745.583504] Skipping core dump
+[  745.583821] Pid 3158(fixture) over core_pipe_limit
+[  745.583823] Skipping core dump
+[  745.584136] Pid 3159(fixture) over core_pipe_limit
+[  745.584138] Skipping core dump
+[  745.584515] Pid 3160(fixture) over core_pipe_limit
+[  745.584518] Skipping core dump
+[  745.584623] Pid 3162(fixture) over core_pipe_limit
+[  745.584626] Skipping core dump
+[  745.584912] Pid 3161(fixture) over core_pipe_limit
+[  745.584915] Skipping core dump
+[  969.149289] show_signal_msg: 9 callbacks suppressed
+[  969.149293] fixture[3558]: segfault at 0 ip 00005c3a39f5b276 sp 00007ffc27fb4ae0 error 6 in fixture[5c3a39f5b000+1000] likely on CPU 1 (core 1, socket 0)
+[  969.149309] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.462259] fixture[3571]: segfault at 0 ip 000064fa1481a276 sp 00007ffc70461860 error 6 in fixture[64fa1481a000+1000] likely on CPU 1 (core 1, socket 0)
+[  969.462274] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.744060] fixture[3584]: segfault at 0 ip 000056e109edf276 sp 00007ffe5429bb90 error 6 in fixture[56e109edf000+1000] likely on CPU 0 (core 0, socket 0)
+[  969.744072] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.766088] fixture[3587]: segfault at 0 ip 000057cc29a6e276 sp 00007ffeaad04950 error 6 in fixture[57cc29a6e000+1000] likely on CPU 0 (core 0, socket 0)
+[  969.766099] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.807116] fixture[3590]: segfault at 0 ip 00005b8f61a19276 sp 00007ffcd7be3770 error 6 in fixture[5b8f61a19000+1000] likely on CPU 0 (core 0, socket 0)
+[  969.807130] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.838095] fixture[3597]: segfault at 0 ip 000057fc5ec07276 sp 00007ffe910da6d0 error 6 in fixture[57fc5ec07000+1000] likely on CPU 0 (core 0, socket 0)
+[  969.838109] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.879302] fixture[3604]: segfault at 0 ip 0000595efdec2276 sp 00007ffc1b3c82b0 error 6 in fixture[595efdec2000+1000] likely on CPU 1 (core 1, socket 0)
+[  969.879316] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  969.946049] fixture[3617]: segfault at 0 ip 0000559ef3479276 sp 00007fffa52c1720 error 6 in fixture[559ef3479000+1000] likely on CPU 1 (core 1, socket 0)
+[  969.946061] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  972.997045] fixture[3624]: segfault at 0 ip 00005a67e4ee2276 sp 00007ffe14bb4680 error 6 in fixture[5a67e4ee2000+1000] likely on CPU 1 (core 1, socket 0)
+[  972.997058] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  976.081041] fixture[3631]: segfault at 0 ip 00005ed66195c276 sp 00007fff9a247950 error 6 in fixture[5ed66195c000+1000] likely on CPU 1 (core 1, socket 0)
+[  976.081053] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  976.223959] fixture[3639]: segfault at 0 ip 00005aa953d09276 sp 00007fff68525160 error 6 in fixture[5aa953d09000+1000] likely on CPU 0 (core 0, socket 0)
+[  976.223973] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.309051] fixture[3646]: segfault at 0 ip 000061e36bac0276 sp 00007fff624f8650 error 6 in fixture[61e36bac0000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.309064] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.457010] fixture[3658]: segfault at 0 ip 00005682b5ab7276 sp 00007ffd608c73a0 error 6 in fixture[5682b5ab7000+1000] likely on CPU 1 (core 1, socket 0)
+[  978.457029] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.457468] fixture[3659]: segfault at 0 ip 000064ffea193276 sp 00007ffee5785910 error 6 in fixture[64ffea193000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.457481] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.457500] fixture[3660]: segfault at 0 ip 00005f4036f48276 sp 00007ffddbf8c910 error 6 in fixture[5f4036f48000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.457509] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.457516] Pid 3660(fixture) over core_pipe_limit
+[  978.457519] Skipping core dump
+[  978.457999] fixture[3661]: segfault at 0 ip 00005c3a89411276 sp 00007ffcda48f780 error 6 in fixture[5c3a89411000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.458009] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.458025] Pid 3661(fixture) over core_pipe_limit
+[  978.458027] Skipping core dump
+[  978.458710] fixture[3662]: segfault at 0 ip 000061c1e6b83276 sp 00007ffd0536ada0 error 6 in fixture[61c1e6b83000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.458720] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.458728] Pid 3662(fixture) over core_pipe_limit
+[  978.458730] Skipping core dump
+[  978.459100] fixture[3663]: segfault at 0 ip 00005c7a7c17c276 sp 00007ffc76ac86f0 error 6 in fixture[5c7a7c17c000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.459110] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.459117] Pid 3663(fixture) over core_pipe_limit
+[  978.459119] Skipping core dump
+[  978.459236] fixture[3664]: segfault at 0 ip 00005b456ca2b276 sp 00007fff75e38910 error 6 in fixture[5b456ca2b000+1000] likely on CPU 0 (core 0, socket 0)
+[  978.459245] Code: c6 05 c5 2d 00 00 01 5d c3 0f 1f 00 c3 0f 1f 80 00 00 00 00 f3 0f 1e fa e9 77 ff ff ff f3 0f 1e fa 55 48 89 e5 b8 00 00 00 00 <c7> 00 2a 00 00 00 90 5d c3 f3 0f 1e fa 55 48 89 e5 48 83 ec 20 89
+[  978.459252] Pid 3664(fixture) over core_pipe_limit
+[  978.459254] Skipping core dump
+[  978.459852] Pid 3665(fixture) over core_pipe_limit
+[  978.459855] Skipping core dump
+[  978.459955] Pid 3666(fixture) over core_pipe_limit
+[  978.459959] Skipping core dump
+[  978.460343] Pid 3667(fixture) over core_pipe_limit
+[  978.460346] Skipping core dump
+[  978.460654] Pid 3668(fixture) over core_pipe_limit
+[  978.460656] Skipping core dump
+[  978.460938] Pid 3669(fixture) over core_pipe_limit
+[  978.460940] Skipping core dump
+[  978.461522] Pid 3670(fixture) over core_pipe_limit
+[  978.461525] Skipping core dump
+[  978.461915] Pid 3671(fixture) over core_pipe_limit
+[  978.461917] Skipping core dump
+[  978.462301] Pid 3672(fixture) over core_pipe_limit
+[  978.462303] Skipping core dump
+[  978.462778] Pid 3673(fixture) over core_pipe_limit
+[  978.462780] Skipping core dump

@@ -1,0 +1,7 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/owner_bootstrap_worker_caller_test.go",
+    "caller2_sha256": "6cf467c81490757d1839c20c262850a9bf982d145f45c5986db948318dbb2beb",
+    "caller3_sha256": "e37501bbfc4d7853b2f7202d8853c310f8dd9d57feee0b360c1f4f168ca15677"
+  }
+]

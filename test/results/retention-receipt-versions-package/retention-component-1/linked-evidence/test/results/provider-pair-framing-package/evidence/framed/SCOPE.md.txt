@@ -1,0 +1,11 @@
+# Actual framed v2 observation component
+
+Thirteen new Go paths add the explicit v2 exchange path/media, outbound regional client/connection and executor, receiving stream/handler/holder, and bootstrap's concrete SQL49/profile factory and one-use operation binding. No v1 path, bytes, generic source/authenticator, rate/candidate/deadline bound, listener selector or installed profile changes.
+
+The holder spends the exact original sequence before exposing its already-installed bootstrap conversation. Claim.Observe runs once. Unknown, abandoned or failed claims stay spent; original cancellation closes and joins admitted work, then actual handler cleanup releases the slot. Old handles cannot remove replacements. The locator retains sole ownership of native proof Close; a successful stream only borrows its original handle and retained final facts. Actual pending locator creation/GET delivery bookkeeping is the next separate scope, not implemented here.
+
+The regional client holds one slot from setup through actual socket/body/native cleanup, uses original common-SNI verification plus exact finite candidate membership before Hello, and never replays an unknown POST. Both sides use the existing twelve-frame ordering/size caps, four typed v2 source values, Receipt and clean request/response EOF. Every new earlier call/proof/result end shortens following actual socket I/O. No returned correlation creates native authority.
+
+Tests include actual mutually authenticated TLS1.3/HTTP2 and the real client, executor, receiver, holder, bootstrap binding, coordinator and regional channel in one process. Native observation ports, SQL registry/provisioning and CA issuance are explicit synthetic fixtures. Component success does not qualify native shared20QPS five-second HWORK→B→A→R availability or installed routing. Selected legacy tests retain v1 behavior.
+
+The installed-facing bootstrap constructor accepts the concrete SQL49 registry; only its private test seam permits synthetic current registration. Runtime composition and authoritative input selection remain absent.

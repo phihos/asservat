@@ -1,0 +1,47 @@
+package fleet
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	value "asservat.local/asservat/internal/domain/fleet"
+)
+
+type trustObservationFixture struct {
+	a                                   value.Administration
+	readError, observeError, fenceError error
+	observed, fenced                    bool
+	fenceStarted                        time.Time
+}
+
+func (f *trustObservationFixture) FleetAdministration(context.Context) (value.Administration, error) {
+	return f.a, f.readError
+}
+func (f *trustObservationFixture) ObserveAdministration(context.Context, value.Administration) error {
+	f.observed = true
+	return f.observeError
+}
+func (f *trustObservationFixture) FenceAdministration(_ context.Context, started time.Time) error {
+	f.fenced = true
+	f.fenceStarted = started
+	return f.fenceError
+}
+func TestTrustObservationFencesUnavailableOrInvalidSource(t *testing.T) {
+	for _, mode := range []string{"unavailable", "invalid", "fence-unavailable"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+			f := &trustObservationFixture{}
+			if mode != "invalid" {
+				f.readError = value.ErrUnavailable
+			}
+			if mode == "fence-unavailable" {
+				f.fenceError = value.ErrUnavailable
+			}
+			observer := TrustObserver{Settings: f, Projection: f, Now: func() time.Time { return now }}
+			if err := observer.Reconcile(context.Background()); err == nil || !f.fenced || f.observed || !f.fenceStarted.Equal(now) {
+				t.Fatal("failed source did not fence prior trust", err)
+			}
+		})
+	}
+}

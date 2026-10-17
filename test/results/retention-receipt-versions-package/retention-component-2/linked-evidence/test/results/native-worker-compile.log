@@ -1,0 +1,4 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/custody_test.go:15:2: "net/http/httptest" imported and not used
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

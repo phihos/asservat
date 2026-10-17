@@ -1,0 +1,13 @@
+=== RUN   TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay
+    context_native_bound_worker_test.go:124: already-bound continuation replayed reserve-worker
+    context_native_bound_worker_test.go:124: already-bound continuation replayed read-worker-audit
+    context_native_bound_worker_test.go:124: already-bound continuation replayed claim-worker
+    context_native_bound_worker_test.go:124: already-bound continuation replayed find-job
+    context_native_bound_worker_test.go:124: already-bound continuation replayed record-job
+    context_native_bound_worker_test.go:124: already-bound continuation replayed bind-worker
+    context_native_bound_worker_test.go:124: already-bound continuation replayed read-worker
+    context_native_bound_worker_test.go:126: current Pod/SQL observation or joined original registration missing [reserve-worker read-worker-audit claim-worker find-job record-job observe-job bind-worker read-worker read-enrollment read-enrollment claim-owner release-owner] 2
+--- FAIL: TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.022s
+FAIL

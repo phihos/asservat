@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-overdue-original-no-history
+=== RUN   TestContextAdmissionWithRealServices/operation-audit-overdue-original-backed-history
+--- PASS: TestContextAdmissionWithRealServices (53.03s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-overdue-original-no-history (26.01s)
+    --- PASS: TestContextAdmissionWithRealServices/operation-audit-overdue-original-backed-history (26.70s)
+PASS
+ok  	asservat.local/asservat/test/integration	54.081s

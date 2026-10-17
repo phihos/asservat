@@ -1,0 +1,4 @@
+=== RUN   TestRecordOriginalOwnerProviderRecipeGolden
+--- PASS: TestRecordOriginalOwnerProviderRecipeGolden (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kms	0.012s

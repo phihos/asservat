@@ -1,0 +1,15 @@
+{
+  "files": [
+    {
+      "base_sha256": "6469ad104ad15d19a76384497c24ca7d909f141ce64807b15160d2f2f0552ce4",
+      "path": "scripts/test-context-storage.py",
+      "payload_sha256": "d5b599552e9ca0f46a12ae7b1943b700007eb2d2b5cc5f01162f3b7ed6d28311"
+    },
+    {
+      "base_sha256": null,
+      "path": "scripts/test-owner-provider-selection.py",
+      "payload_sha256": "e6646753de6a32e9166b48c82389d3d40b9481a258fd721a13a6731c75fc7723"
+    }
+  ],
+  "scope": "Exclusive native provider fixture selection only; runtime unselected"
+}

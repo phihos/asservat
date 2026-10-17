@@ -1,0 +1,5 @@
+{
+  "path": "test/integration/worker_owners_sql_test.go",
+  "payloadSHA256": "16a1097adf3667b633254df1e8d095f550c9be70b1074e3325329b0bea9133f9",
+  "scope": "Fixture-only role/state and local pool counters before authority observation; no lifecycle/connection limit changes. Native pending."
+}

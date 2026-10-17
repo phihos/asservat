@@ -1,0 +1,282 @@
+{
+  "started": 1791911241.2390883,
+  "runner": "95f4da320337af77d9f93494598d20741147a36d9f2b0ad198efa558f83974fc",
+  "manifest": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+  "dependencies": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+  "before": {
+    "metadata": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "directories": []
+  },
+  "metadata": {
+    "run.py": "95f4da320337af77d9f93494598d20741147a36d9f2b0ad198efa558f83974fc",
+    "manifest.json": "b277d178169280d3f6b2911afc2202a947c8d3b18fe65c1aa79caf7a9d042f60",
+    "dependencies.json": "8378137e6a0f5515d7e82b89bb397e0f666535edbc10cd96c213b7eb92f53157",
+    "dependency-args.json": "bed80042da89e540f545bef3b8b73172d15fe4f9b2a99a7ac952d91e1a75f279",
+    "inventory.json": "6424f0dbf4ac9968095c9aecffbf5f5d9a7631e14ab86339f463077c3ee0e585",
+    "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+    "freeze.json": "0cbe378a2f016eb25e0cfa39a3aa2b3e76b5e6becbb2d51f0a24ab540de4bc8f"
+  },
+  "phases": [
+    {
+      "mirror_file_set": [],
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./internal/domain/fleet",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./cmd/asservat",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 21.080622911453247,
+      "stop_reason": null,
+      "log_sha256": "bbe8a1462f7e21d54b8910febdb3abb40571049060a1c67b980cccb2795993dd",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "mirror_file_set": [],
+      "name": "application-before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=6m",
+        "-v",
+        "./internal/application/fleet",
+        "-run=^TestTrustObserverOnlyUnchangedPersistenceContentionSkipsFence$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "seconds": 5.073439359664917,
+      "stop_reason": null,
+      "log_sha256": "6eb47e24ac8f932635e4b493c0ca7f47573a5e0f07d109130e71570608a5841e",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 6
+    },
+    {
+      "mirror_file_set": [],
+      "name": "application-domain-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=6m",
+        "-v",
+        "./internal/application/fleet",
+        "./internal/domain/fleet"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 17.576550006866455,
+      "stop_reason": null,
+      "log_sha256": "04334ebed123bbe4024f9d6ab12351853e0328cac182d67f111f03e86e3e72b2",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 112,
+      "named_pass": 557
+    },
+    {
+      "mirror_file_set": [],
+      "name": "postgres-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=6m",
+        "-v",
+        "./internal/adapters/postgres",
+        "-run=^Test(FleetObservationContention|OwnerIdentitySQLPrerequisite)"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 16.575807571411133,
+      "stop_reason": null,
+      "log_sha256": "6b7c07b7f209b59b0fa5953bd504d849638eb6b0513164a0b6a7748750245515",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 6,
+      "named_pass": 45
+    },
+    {
+      "mirror_file_set": [],
+      "name": "bootstrap-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=6m",
+        "-v",
+        "./internal/bootstrap",
+        "-run=^TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 11.57566499710083,
+      "stop_reason": null,
+      "log_sha256": "659d28d195f1dcea49479f295dca3d726ddf46f2da70197a12356daabc84b5c3",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 1,
+      "named_pass": 3
+    },
+    {
+      "mirror_file_set": [],
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./internal/domain/fleet",
+        "./internal/application/fleet",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./cmd/asservat",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 2.574815273284912,
+      "stop_reason": null,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "mirror_file_set": [],
+      "name": "go-architecture",
+      "command": [
+        "make",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 1.079805612564087,
+      "stop_reason": null,
+      "log_sha256": "f15bc21afd9ed213b82b0123d1065df4072d9469804640ebd04fb3b5ee367c72",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "mirror_file_set": [],
+      "name": "canonical",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 8.574021339416504,
+      "stop_reason": null,
+      "log_sha256": "606de5e3e6b74042a95c55cd8adf078e9c25fe27a68fe8b8c1daca670dc44ba8",
+      "hashes": {
+        "metadata": [],
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "directories": []
+      },
+      "required_checks_present": true,
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "native": false,
+  "runtime_enablement": false,
+  "boot_id": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-fleet-contention-component-udkxj6kl",
+  "tmp_free_before": 16731344896,
+  "mirror_changed": [],
+  "mirror_file_set": [],
+  "exit": 0,
+  "ended": 1791911327.6168718,
+  "after": {
+    "metadata": [],
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "directories": []
+  },
+  "scratch_removed": true
+}

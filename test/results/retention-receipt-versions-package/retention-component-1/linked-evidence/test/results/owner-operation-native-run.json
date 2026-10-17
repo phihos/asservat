@@ -1,0 +1,11 @@
+{
+  "scope": "Owned native owner observation primitive, not installed routing",
+  "command": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-context-storage.py",
+    "--run",
+    "^TestOwnerObservationOperationWithRealKubernetes$"
+  ],
+  "exit": 0,
+  "seconds": 477.811
+}

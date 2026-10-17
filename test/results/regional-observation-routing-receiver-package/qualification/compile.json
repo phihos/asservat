@@ -1,0 +1,36 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-routing-runtime-20261013/checkpoint-v2/overlay.json",
+    "-vet=off",
+    "-run",
+    "^$",
+    "./internal/domain/fleet",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation"
+  ],
+  "cwd": "/home/phil/Projekte/asservat",
+  "exit": 0,
+  "seconds": 3.399,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "mirror": [],
+    "mirrorSet": [],
+    "freeze": []
+  }
+}

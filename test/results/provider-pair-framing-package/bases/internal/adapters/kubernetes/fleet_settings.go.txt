@@ -1,0 +1,57 @@
+package kubernetes
+
+import (
+	"context"
+	"net/url"
+	"time"
+
+	port "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// FleetSettingsClient pins one installation-owned ConfigMap. Protection and
+// observation continuity are established by runtime bootstrap, never by this
+// JSON document or a request selecting another name/issuer/installation.
+type FleetSettingsClient struct {
+	client                  *PermissionClient
+	name, uid, installation string
+}
+
+var _ port.AdministrationReader = (*FleetSettingsClient)(nil)
+
+func NewFleetSettingsClient(client *PermissionClient, name, uid, installation string) (*FleetSettingsClient, error) {
+	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(installation) {
+		return nil, value.ErrInvalid
+	}
+	return &FleetSettingsClient{client, name, uid, installation}, nil
+}
+func (c *FleetSettingsClient) FleetAdministration(ctx context.Context) (value.Administration, error) {
+	var out value.Administration
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	start := c.client.now()
+	data, ref, err := c.client.installationConfig(ctx, c.name, c.uid)
+	if err != nil || len(data) != 1 || data["fleet.json"] == "" {
+		return out, value.ErrUnavailable
+	}
+	var wire contracts.FleetSettings
+	digest, err := decodePermissionSpec([]byte(data["fleet.json"]), c.client.validator.fleetSchema, &wire)
+	if err != nil || wire.InstallationID != c.installation {
+		return out, value.ErrDenied
+	}
+	issuer, err := url.Parse(wire.Issuer)
+	if err != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || issuer.Opaque != "" {
+		return out, value.ErrInvalid
+	}
+	out = value.Administration{InstallationID: wire.InstallationID, IssuerEpoch: wire.IssuerEpoch, Issuer: wire.Issuer, Revision: identity.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, ObservedAt: start, FreshUntil: start.Add(5 * time.Second), Clients: wire.Clients, Groups: wire.Groups, DeliveryProfiles: wire.DeliveryProfiles, MaxActiveBootstraps: wire.MaxActiveBootstraps, MaxBootstrapHistory: wire.MaxBootstrapHistory, MaxClusters: wire.MaxClusters}
+	for _, s := range wire.Subjects {
+		out.Subjects = append(out.Subjects, identity.Subject{ID: s.ID, Kind: identity.Kind(s.Kind)})
+	}
+	if c.client.current(ctx, start, 5*time.Second) != nil || !out.Valid(c.client.now()) {
+		return value.Administration{}, value.ErrUnavailable
+	}
+	return out, nil
+}

@@ -1,0 +1,6 @@
+--- FAIL: TestEnrollmentKeyProofAndNoRequestedIdentity (0.01s)
+    --- FAIL: TestEnrollmentKeyProofAndNoRequestedIdentity/ignored-attribute (0.00s)
+        enrollment_test.go:99: unsafe CSR accepted ignored-attribute
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.074s
+FAIL

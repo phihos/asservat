@@ -1,0 +1,294 @@
+package providerconfig
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/pem"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+type OwnerPKIRoleRecipe struct {
+	Name string          `json:"name"`
+	Role json.RawMessage `json:"role"`
+}
+
+// OwnerSetupRecipe adds provider setup to the unchanged authentication recipe.
+// It is public automation input, not an admin write, current observation, CSR,
+// private key, installer authority or permission to use any of these roles.
+type OwnerSetupRecipe struct {
+	Authentication             OwnerProviderRecipe   `json:"authentication"`
+	AuthMount                  json.RawMessage       `json:"authMount"`
+	AuthConfiguration          json.RawMessage       `json:"authConfiguration"`
+	ReviewerCredentialRequired bool                  `json:"reviewerCredentialRequired"`
+	TransitKey                 json.RawMessage       `json:"transitKey"`
+	PKIRoles                   [2]OwnerPKIRoleRecipe `json:"pkiRoles"`
+	InspectionPolicy           json.RawMessage       `json:"inspectionPolicy"`
+}
+
+func OwnerSetupRecipeFor(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, issuerRoots [][]byte, now time.Time) (OwnerSetupRecipe, error) {
+	var out OwnerSetupRecipe
+	if ValidateOwnerProviderAuthentication(in, profile, now) != nil || !pool.Valid() || pool.InstallationID != in.InstallationID || pool.ClusterID != in.ClusterID || pool.Namespace != in.Namespace.Name || pool.NamespaceUID != in.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name || pool.AccountUID != profile.ServiceAccount.UID {
+		return out, ErrSetupUnavailable
+	}
+	if _, _, err := mtls.OwnerTrustRoots(issuerRoots, now); err != nil {
+		return out, ErrSetupUnavailable
+	}
+	var err error
+	out.Authentication, err = OwnerProviderRecipeFor(in, profile.AuthMount, profile.AuthMountAccessor, profile.ServiceAccount, profile.AuditCredentials, now)
+	if err != nil {
+		return OwnerSetupRecipe{}, ErrSetupUnavailable
+	}
+	out.AuthMount, err = ownerProviderCanonical(map[string]any{"type": "kubernetes"})
+	if err != nil {
+		return OwnerSetupRecipe{}, err
+	}
+	var ca bytes.Buffer
+	for _, root := range in.Kubernetes.Roots {
+		if pem.Encode(&ca, &pem.Block{Type: "CERTIFICATE", Bytes: root}) != nil {
+			return OwnerSetupRecipe{}, ErrSetupUnavailable
+		}
+	}
+	// The operator must add its reviewer credential to this request. Applying
+	// this incomplete body alone is not the supported setup procedure.
+	out.AuthConfiguration, err = ownerProviderCanonical(map[string]any{"kubernetes_host": in.Kubernetes.Endpoint, "kubernetes_ca_cert": ca.String(), "disable_local_ca_jwt": true, "disable_iss_validation": true, "pem_keys": []string{}})
+	if err != nil {
+		return OwnerSetupRecipe{}, err
+	}
+	out.ReviewerCredentialRequired = true
+	out.TransitKey = json.RawMessage(`{"type":"aes256-gcm96","derived":false,"exportable":false,"allow_plaintext_backup":false}`)
+	uri := "spiffe://asservat." + pool.InstallationID + "/hub/" + pool.ClusterID + "/issuer/" + pool.IssuerEpoch + "/pod/*/process/*"
+	serverPattern := "p-*.e-*.hub." + pool.ClusterID + ".asservat." + pool.InstallationID
+	common, err := mtls.OwnerBootstrapServerName(pool)
+	if err != nil && pool.NativeBootstrap == fleet.OwnerBootstrapProfile {
+		return OwnerSetupRecipe{}, ErrSetupUnavailable
+	}
+	for i, name := range []string{in.KeyService.ServerRole, in.KeyService.ClientRole} {
+		domains := []string{}
+		if i == 0 {
+			domains = append(domains, serverPattern)
+			if pool.NativeBootstrap == fleet.OwnerBootstrapProfile {
+				domains = append(domains, common)
+			}
+		}
+		// Provider globs constrain this installation/cluster/issuer, but do
+		// not attest UUIDs or a live process. The runtime CSR/leaf verifier
+		// and current native/SQL authority perform that separate check.
+		body := map[string]any{
+			"issuer_ref": "default", "require_cn": false, "use_csr_common_name": false, "use_csr_sans": false,
+			"allow_any_name": false, "allow_ip_sans": false, "allow_localhost": false, "allow_subdomains": false,
+			"allow_glob_domains": i == 0, "allow_bare_domains": i == 0, "allow_wildcard_certificates": false,
+			"enforce_hostnames": true, "allowed_domains": domains, "allowed_domains_template": false,
+			"allowed_uri_sans": []string{uri}, "allowed_uri_sans_template": false, "allowed_other_sans": []string{},
+			"allowed_user_ids": []string{}, "allowed_serial_numbers": []string{},
+			"key_type": "ec", "key_bits": 256, "server_flag": i == 0, "client_flag": i == 1,
+			"code_signing_flag": false, "email_protection_flag": false, "key_usage": []string{"DigitalSignature"},
+			"ext_key_usage": []string{}, "ext_key_usage_oids": []string{}, "policy_identifiers": []string{},
+			"organization": []string{}, "ou": []string{}, "country": []string{}, "locality": []string{},
+			"province": []string{}, "street_address": []string{}, "postal_code": []string{},
+			"basic_constraints_valid_for_non_ca": true, "not_before_duration": 30,
+			"ttl":            int64((fleet.OwnerCertificatePeriod + fleet.OwnerCertificateRenewBefore) / time.Second),
+			"max_ttl":        int64((fleet.OwnerCertificatePeriod + fleet.OwnerCertificateRenewBefore) / time.Second),
+			"generate_lease": false, "no_store": false, "not_after": "",
+			"not_before": "", "not_before_bound": "forbid", "not_after_bound": "ttl-limited",
+			"allow_globs_in_identity_templates": false, "allow_token_displayname": false, "allowed_ip_sans_cidr": []string{},
+			"signature_bits": 0, "use_pss": false, "cn_validations": []string{"email", "hostname"},
+		}
+		raw, e := ownerProviderCanonical(body)
+		if e != nil {
+			return OwnerSetupRecipe{}, e
+		}
+		out.PKIRoles[i] = OwnerPKIRoleRecipe{Name: name, Role: raw}
+	}
+	out.InspectionPolicy, err = setupInspectionPolicy(ownerSetupPaths(in, out))
+	if err != nil {
+		return OwnerSetupRecipe{}, err
+	}
+	return out, nil
+}
+
+func ownerSetupPaths(in contracts.OwnerDeployment, recipe OwnerSetupRecipe) []string {
+	p := recipe.Authentication.Profile
+	paths := setupNamedPaths(p.AuthMount, in.KeyService.AuditMount, in.KeyService.AuditKey, recipe.Authentication.Roles[:])
+	return append(paths, "sys/mounts/"+in.KeyService.PKIMount, in.KeyService.PKIMount+"/cert/ca", in.KeyService.PKIMount+"/roles/"+in.KeyService.ServerRole, in.KeyService.PKIMount+"/roles/"+in.KeyService.ClientRole)
+}
+
+// OwnerSetupCheck is a current configuration observation only. Private fields
+// prevent constructing a successful check from a digest or caller timestamp.
+type OwnerSetupCheck struct {
+	binding           [32]byte
+	observedAt, until time.Time
+}
+
+func (c OwnerSetupCheck) ObservedAt() time.Time { return c.observedAt }
+func (c OwnerSetupCheck) FreshUntil() time.Time { return c.until }
+func (c OwnerSetupCheck) Matches(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time) bool {
+	if c.binding == ([32]byte{}) || !identity.Fresh(c.observedAt, c.until, now, 5*time.Second) {
+		return false
+	}
+	recipe, err := OwnerSetupRecipeFor(in, profile, pool, roots, now)
+	if err != nil {
+		return false
+	}
+	binding, err := ownerSetupBinding(in, recipe, pool, roots)
+	return err == nil && binding == c.binding
+}
+
+func ownerSetupBinding(in contracts.OwnerDeployment, recipe OwnerSetupRecipe, pool fleet.OwnerPool, roots [][]byte) ([32]byte, error) {
+	raw, err := json.Marshal(struct {
+		Format string
+		Input  contracts.OwnerDeployment
+		Recipe OwnerSetupRecipe
+		Pool   fleet.OwnerPool
+		Roots  [][]byte
+	}{"asservat-owner-provider-setup/v1", in, recipe, pool, roots})
+	if err != nil || len(raw) > contracts.OwnerDeploymentMaxBytes+64<<10 {
+		return [32]byte{}, ErrSetupUnavailable
+	}
+	c := jsontext.Value(raw)
+	if c.Canonicalize() != nil {
+		return [32]byte{}, ErrSetupUnavailable
+	}
+	return sha256.Sum256(c), nil
+}
+
+func (r *SetupReader) VerifyOwner(ctx context.Context, in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte) (OwnerSetupCheck, error) {
+	now := time.Now()
+	recipe, err := OwnerSetupRecipeFor(in, profile, pool, roots, now)
+	if err != nil {
+		return OwnerSetupCheck{}, ErrSetupUnavailable
+	}
+	binding, err := ownerSetupBinding(in, recipe, pool, roots)
+	if err != nil {
+		return OwnerSetupCheck{}, ErrSetupUnavailable
+	}
+	o, err := r.begin(ctx, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, ownerSetupPaths(in, recipe))
+	if err != nil {
+		return OwnerSetupCheck{}, err
+	}
+	defer o.finish()
+	issuerUntil := o.until
+	checks := []setupReadCheck{
+		{"sys/mounts/auth/" + profile.AuthMount, "authentication mount", func(d map[string]json.RawMessage) error { return verifyAuthMount(d, profile.AuthMountAccessor) }},
+		{"auth/" + profile.AuthMount + "/config", "Kubernetes authentication", func(d map[string]json.RawMessage) error { return verifyKubernetesAuthConfig(d, in.Kubernetes) }},
+		{"sys/mounts/" + in.KeyService.AuditMount, "audit engine", verifyTransitMount},
+		{in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey, "audit key", func(d map[string]json.RawMessage) error { return verifyTransitKey(d, in.KeyService.AuditKey) }},
+	}
+	for _, role := range recipe.Authentication.Roles {
+		checks = append(checks,
+			setupReadCheck{"auth/" + profile.AuthMount + "/role/" + role.Name, role.Purpose + " authentication role", func(d map[string]json.RawMessage) error { return verifyKubernetesRole(d, role.Role) }},
+			setupReadCheck{"sys/policies/acl/" + role.Name, role.Purpose + " policy", func(d map[string]json.RawMessage) error { return verifyACL(d, role.Name, role.Policy) }})
+	}
+	checks = append(checks,
+		setupReadCheck{"sys/mounts/" + in.KeyService.PKIMount, "certificate engine", func(d map[string]json.RawMessage) error {
+			if !setupIs(d, "type", "pki") {
+				return ErrSetupUnavailable
+			}
+			return nil
+		}},
+		setupReadCheck{in.KeyService.PKIMount + "/cert/ca", "certificate issuer", func(d map[string]json.RawMessage) error {
+			end, e := verifySetupIssuer(d, roots, time.Now())
+			if e != nil {
+				return e
+			}
+			issuerUntil = identity.Earlier(issuerUntil, end)
+			return nil
+		}})
+	for i, role := range recipe.PKIRoles {
+		component := "server certificate role"
+		if i == 1 {
+			component = "client certificate role"
+		}
+		checks = append(checks, setupReadCheck{in.KeyService.PKIMount + "/roles/" + role.Name, component, func(d map[string]json.RawMessage) error { return verifySetupPKIRole(d, role.Role) }})
+	}
+	for _, check := range checks {
+		data, e := o.get(check.path)
+		if e != nil || check.verify(data) != nil {
+			return OwnerSetupCheck{}, setupComponentError(check.component)
+		}
+	}
+	if !o.valid() {
+		return OwnerSetupCheck{}, ErrSetupUnavailable
+	}
+	until := identity.Earlier(o.until, issuerUntil)
+	for _, anchors := range [][][]byte{in.Kubernetes.Roots, in.Postgres.Roots, in.AuditStore.Roots, in.KeyService.Roots, roots} {
+		_, end, e := mtls.OwnerTrustRoots(anchors, time.Now())
+		if e != nil {
+			return OwnerSetupCheck{}, ErrSetupUnavailable
+		}
+		until = identity.Earlier(until, end)
+	}
+	result := OwnerSetupCheck{binding: binding, observedAt: o.observedAt, until: until}
+	if !result.Matches(in, profile, pool, roots, time.Now()) {
+		return OwnerSetupCheck{}, ErrSetupUnavailable
+	}
+	return result, nil
+}
+
+func verifySetupIssuer(data map[string]json.RawMessage, roots [][]byte, now time.Time) (time.Time, error) {
+	value, ok := setupValue[string](data, "certificate")
+	if !ok {
+		return time.Time{}, ErrSetupUnavailable
+	}
+	certificates, err := setupPEMCertificates(value)
+	if err != nil || len(certificates) != 1 {
+		return time.Time{}, ErrSetupUnavailable
+	}
+	cert, err := x509.ParseCertificate(certificates[0])
+	if err != nil || !cert.IsCA || !cert.BasicConstraintsValid || cert.KeyUsage&x509.KeyUsageCertSign == 0 {
+		return time.Time{}, ErrSetupUnavailable
+	}
+	pool, _, err := mtls.OwnerTrustRoots(roots, now)
+	if err != nil {
+		return time.Time{}, ErrSetupUnavailable
+	}
+	if _, err = cert.Verify(x509.VerifyOptions{Roots: pool, CurrentTime: now, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}}); err != nil {
+		return time.Time{}, ErrSetupUnavailable
+	}
+	return cert.NotAfter.UTC(), nil
+}
+
+func verifySetupPKIRole(data map[string]json.RawMessage, expected json.RawMessage) error {
+	var want map[string]json.RawMessage
+	if json.Unmarshal(expected, &want) != nil {
+		return ErrSetupUnavailable
+	}
+	for key, value := range want {
+		if bytes.Equal(value, []byte("[]")) {
+			if !setupEmpty(data, key) {
+				return ErrSetupUnavailable
+			}
+			continue
+		}
+		if !setupJSONEqual(data[key], value) {
+			return ErrSetupUnavailable
+		}
+	}
+	for key := range data {
+		if _, ok := want[key]; ok {
+			continue
+		}
+
+		return ErrSetupUnavailable
+	}
+	return nil
+}
+
+// Component names come only from the fixed recipe, never provider output.
+type setupComponentError string
+
+func (e setupComponentError) Error() string { return ErrSetupUnavailable.Error() + ": " + string(e) }
+func (e setupComponentError) Unwrap() error { return ErrSetupUnavailable }
+
+type setupReadCheck struct {
+	path, component string
+	verify          func(map[string]json.RawMessage) error
+}

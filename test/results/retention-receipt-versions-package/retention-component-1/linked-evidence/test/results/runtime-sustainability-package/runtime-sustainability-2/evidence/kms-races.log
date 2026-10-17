@@ -1,0 +1,140 @@
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-wrap
+=== RUN   TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-unwrap
+--- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole (0.04s)
+    --- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-wrap (0.02s)
+    --- PASS: TestConfigurationControlUsesOnlyItsExactWorkerRole/audit-unwrap (0.02s)
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/policy
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/account
+=== RUN   TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/unknown-login
+--- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount (0.06s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/policy (0.02s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/account (0.02s)
+    --- PASS: TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount/unknown-login (0.02s)
+=== RUN   TestConfigurationProviderCloseRetainsBlockedControlOwnership
+--- PASS: TestConfigurationProviderCloseRetainsBlockedControlOwnership (0.06s)
+=== RUN   TestConfigurationProviderCloseAndJoinKeepsNativeOwnership
+--- PASS: TestConfigurationProviderCloseAndJoinKeepsNativeOwnership (0.10s)
+=== RUN   TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow
+--- PASS: TestConfigurationProviderCloseAndJoinDoesNotRenewRevocationWindow (0.11s)
+=== RUN   TestConfigurationProviderRefreshNeverFallsBackToLegacyProof
+--- PASS: TestConfigurationProviderRefreshNeverFallsBackToLegacyProof (5.02s)
+=== RUN   TestConfigurationProviderRefreshRejectsAnotherWorkersSlot
+--- PASS: TestConfigurationProviderRefreshRejectsAnotherWorkersSlot (0.04s)
+=== RUN   TestConfigurationProviderRecoveryComparisonKeepsOriginalAge
+--- PASS: TestConfigurationProviderRecoveryComparisonKeepsOriginalAge (0.00s)
+=== RUN   TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue
+    configuration_provider_refresh_test.go:101: healthy local hint queued behind unrelated work key service refused or unavailable
+--- FAIL: TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue (0.03s)
+=== RUN   TestConfigurationProviderQueuedRefreshKeepsCallerEndAndNeverUsesLegacyProof
+--- PASS: TestConfigurationProviderQueuedRefreshKeepsCallerEndAndNeverUsesLegacyProof (0.05s)
+=== RUN   TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor
+--- PASS: TestOwnerProviderControlUnknownLoginNeverReplaysOrLooksUpAccessor (0.01s)
+=== RUN   TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation
+--- PASS: TestOwnerProviderControlLostRenewalNeedsExactReadAndKeepsOriginalObservation (0.02s)
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/default
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/direct
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/identity
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/account
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/metadata
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/batch
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/ttl
+=== RUN   TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/parent
+--- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority (0.12s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/default (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/direct (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/identity (0.02s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/account (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/metadata (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/batch (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/ttl (0.01s)
+    --- PASS: TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority/parent (0.01s)
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/wrong-mount
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/expired
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/other-token
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/identity
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/policy
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/unbounded
+=== RUN   TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/extended-max
+--- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd (0.10s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/wrong-mount (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/expired (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/other-token (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/identity (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/policy (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/unbounded (0.01s)
+    --- PASS: TestOwnerProviderControlSelfLookupCannotReplaceOriginalScopeOrHardEnd/extended-max (0.01s)
+=== RUN   TestOwnerProviderControlCannotInheritTLSBypassHooks
+--- PASS: TestOwnerProviderControlCannotInheritTLSBypassHooks (0.01s)
+=== RUN   TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential
+--- PASS: TestOwnerProviderControlRejectsUnknownLookupAuthorityAndForeignCredential (0.02s)
+=== RUN   TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure
+2026/10/13 16:25:54 http: TLS handshake error from 127.0.0.1:45646: remote error: tls: bad certificate
+--- PASS: TestOwnerProviderControlPinsProfileRootsBeforeJWTDisclosure (0.02s)
+=== RUN   TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure
+2026/10/13 16:25:54 http: TLS handshake error from 127.0.0.1:56788: remote error: tls: bad certificate
+--- PASS: TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure (0.02s)
+=== RUN   TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath
+--- PASS: TestOwnerProviderEffectsDoNotAuthenticateOnEvidencePath (0.06s)
+=== RUN   TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow
+--- PASS: TestOwnerProviderEffectsRejectOtherPathsBeforeCredentialBorrow (0.04s)
+=== RUN   TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning
+--- PASS: TestOwnerProviderEffectsKeepPermitChecksAndDoNotReplaySigning (0.05s)
+=== RUN   TestInstalledOwnerProviderConstructorRetainsOriginalInput
+--- PASS: TestInstalledOwnerProviderConstructorRetainsOriginalInput (0.06s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsCancelledNativeRead
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsCancelledNativeRead (0.11s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsBodyAfterOriginalBound
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsBodyAfterOriginalBound (0.13s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinRetainsOriginalControlProof
+--- PASS: TestInstalledOwnerProviderCloseAndJoinRetainsOriginalControlProof (0.11s)
+=== RUN   TestInstalledOwnerProviderCloseAndJoinKeepsSuccessfulRetirement
+--- PASS: TestInstalledOwnerProviderCloseAndJoinKeepsSuccessfulRetirement (0.05s)
+=== RUN   TestInstalledOwnerProviderSupervisorPrimesExactlyFourAndDoesNotReloginOnTicks
+--- PASS: TestInstalledOwnerProviderSupervisorPrimesExactlyFourAndDoesNotReloginOnTicks (1.25s)
+=== RUN   TestInstalledOwnerProviderCloseRetainsBorrowUntilActualRelease
+--- PASS: TestInstalledOwnerProviderCloseRetainsBorrowUntilActualRelease (0.05s)
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/suspended
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/source
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/service
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/epoch
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/guard
+=== RUN   TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/roots
+--- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope (0.03s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/suspended (0.00s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/source (0.00s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/service (0.00s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/epoch (0.00s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/guard (0.00s)
+    --- PASS: TestInstalledOwnerProviderCurrentConfigurationPreservesOriginalScope/roots (0.00s)
+=== RUN   TestOwnerProviderLeaseExpiresDuringActualTLSBody
+--- PASS: TestOwnerProviderLeaseExpiresDuringActualTLSBody (0.35s)
+=== RUN   TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins
+--- PASS: TestOwnerProviderLeaseRetainsBorrowUntilBlockedCloseJoins (0.00s)
+=== RUN   TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd
+--- PASS: TestOwnerProviderLeaseRejectsExpiredBeforeEffectAndKeepsCallerEnd (0.00s)
+=== RUN   TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential
+--- PASS: TestOwnerProviderLifetimeHeldOldResponsePreventsThirdCredential (0.02s)
+=== RUN   TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline
+--- PASS: TestOwnerProviderLifetimeSingleFlightDoesNotBorrowCallerDeadline (0.01s)
+=== RUN   TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup
+--- PASS: TestOwnerProviderLifetimeUnknownLoginKeepsBoundedBackoffAndNoLookup (0.02s)
+=== RUN   TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken
+--- PASS: TestOwnerProviderLifetimeLostRenewalReconcilesOnlySameToken (0.02s)
+=== RUN   TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication
+--- PASS: TestOwnerProviderLifetimeFinalCurrentProofPrecedesPublication (0.01s)
+=== RUN   TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow
+--- PASS: TestOwnerProviderLifetimeCloseTimeoutRetainsOutstandingBorrow (0.04s)
+=== RUN   TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath
+--- PASS: TestOwnerProviderLifetimeExpiredBorrowCannotAuthenticateOnEffectPath (0.01s)
+=== RUN   TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned
+--- PASS: TestOwnerProviderLifetimeTransportCloseKeepsBlockedBodyOwned (0.04s)
+=== RUN   TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining
+--- PASS: TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kms	8.398s
+FAIL

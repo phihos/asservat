@@ -1,0 +1,88 @@
+# SQL57 retention candidate: source review
+
+Source only. No compilation, sqlc generation, schema application, test or planner
+result is claimed. Eighteen authored paths; existing bases matched the live tree
+at the last read-only comparison. Runtime schema head remains root-owned at 56.
+
+## Product changes
+
+- Strict current/new-write domain predicates reject empty and literal-null
+  versions. Structural checkpoint decoding uses the explicitly historical
+  predicate only; all prior record/digest/source checks remain in place.
+- `AcceptedRetentionSource` replaces the existing one current-checkpoint read
+  with the same query and full row, then additionally validates its actual
+  receipt. No additional database round trip or wider interval.
+- `RetentionSourceCaughtUp` retains its all-history completion branch and adds
+  two invalid-receipt branches plus already-joined root/attempt equality. It
+  uses the two partial indexes with their exact row predicates.
+- Two public-qualified pure invoker functions, explicit PUBLIC EXECUTE, fixed
+  UTF-8/C/search path, no table/time/settings dependencies, no SECURITY DEFINER.
+  Only class22 errors become false. No per-role grant inventory change.
+- Existing role verifier source review: `public_runtime_roles.go:470` checks
+  ambient security-definer functions; `:485` checks exact direct role grants.
+  PUBLIC invoker EXECUTE is neither. Initial role/history checks use the same
+  distinction. Actual catalog/read-role/denial tests remain required.
+
+The JSONB input size check serializes an already parsed value; retained table
+rows already have a 4096-byte text constraint. The bytea predicate rejects
+oversize bytes before decoding. The predicates do not impose a global caller
+query/allocation limit on arbitrary public SQL expressions.
+
+## Meaningful tests staged
+
+- Four original-code failures: checkpoint/lifecycle x empty/literal-null in
+  `TestRetentionCurrentAuditRequiresImmutableVersions`. Its new test file is
+  independent of the new historical method, so the before overlay compiles.
+- Separate historical domain test retains original empty/null parsing but
+  rejects changed purpose/digest.
+- SQL canonical Go agreement plus closed malformed input matrix, bytea duplicate
+  and numeric-spelling checks, wrong root/event, NULL, actual invoker/PUBLIC ACL,
+  read-role acknowledgement denial and cancellation propagation.
+- Four actual SQL/S3 history cases: earliest/latest checkpoint x empty/null.
+  Exact old replay and bounded historical catch-up remain possible. A valid
+  latest receipt cannot cover a bad earlier one. Full DB-rendered receipt and
+  row bytes are checked after denial and after restoring the original bytes.
+- Existing actual three-artifact lowering-before-raising case now audits its
+  checkpoints first, temporarily makes the actual shortening checkpoint's
+  version empty, and still requires exactly nine visits, three reductions,
+  three completed checkpoints. It reuses the existing audit pool; no extra
+  persistent fixture pool is added.
+- The same actual lifecycle fixture tests earlier completed decision empty/null
+  and foreign root/attempt while current observation remains within its original
+  five seconds. Each child obtains its own ordinary synthetic source observation;
+  no admitted proof is edited or renewed after the historical mutation.
+- Two final admission transaction cases retain the original already-admitted
+  retention proof, then mutate the stored checkpoint receipt. Denial must leave
+  no capture row, and exact restoration must permit the same original input.
+- The actual Kubernetes retention reconciler fixture enables versioning before
+  its first audit write; its mixed evidence Store stays generic.
+- The planner fixture creates transaction-owned synthetic histories of 1,256,
+  4096 rows in the actual tables/indexes; no application authority consumes them.
+  It compares the actual generated query with authored SQL and logs default
+  EXPLAIN ANALYZE nodes, rows, loops, buffers and timings for the preserved56
+  baseline and current query. The 4096 all-valid case requires both invalid
+  indexes in the plan. Earliest invalid, last invalid, malformed bytea, foreign
+  root/attempt and invalid other-source cases check exact Boolean behavior.
+  It rolls back every synthetic row and re-ANALYZEs actual table populations
+  because planner statistics may survive rollback.
+
+## Qualification still required
+
+Compile all affected packages/integration; controlled four before failures;
+affected domain/configuration/privacy/PostgreSQL/objectstore races and vet;
+pinned sqlc generation with only `custodydb/retention_sources.sql.go` expected;
+SQL/schema/spec/architecture/design gates. Root must supply the guarded 56->57
+schema-head hunk in the isolated combined mirror before native tests.
+
+Actual native selection: `TestRetentionReceiptPredicatesWithRealPostgres`, plus
+`TestContextAdmissionWithRealServices` child selection for
+`retention-current-history-*`, `retention-current-admitted-effect-*`, and the
+complete `retention-catchup-pages-apply-lowering-before-raising` parent (including
+its new nested lifecycle cases). The existing real Kubernetes retention
+reconciler remains affected and requires its context-harness run separately.
+
+Planner measurements do not qualify migration time on production-sized history.
+The original migration/index-build cost must be recorded separately during
+actual schema application/backfill qualification. The existing O(C+E) completion
+scan and invalid-other-source candidate count remain availability limits; no
+index, source fixture or finite Boolean erases those limits.

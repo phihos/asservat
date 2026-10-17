@@ -1,0 +1,13 @@
+{
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "go-architecture-check",
+    "design-check"
+  ],
+  "exit": 0,
+  "seconds": 10.604,
+  "scope": "Integrated consumer component and native test documentation/static gates; no native execution"
+}

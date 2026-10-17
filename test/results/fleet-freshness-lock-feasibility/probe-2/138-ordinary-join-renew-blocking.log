@@ -1,0 +1,1 @@
+[{"pid" : 980, "role" : "probe_observer", "state" : "active", "waitType" : "Lock", "waitEvent" : "transactionid", "blockers" : [959]}]

@@ -1,0 +1,24 @@
+{
+  "scope": "component integration, not S-02 release acceptance",
+  "images": {
+    "s3": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+    "kms": "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf",
+    "kubernetes": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+  },
+  "clusters": [
+    {
+      "name": "asservat-context-z02lqzxw-0",
+      "nodeImage": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+      "workloadImage": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+      "podUID": "de745701-89eb-4cbf-a7fe-c19d825ca88d"
+    },
+    {
+      "name": "asservat-context-z02lqzxw-1",
+      "nodeImage": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+      "workloadImage": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+      "podUID": "076a2b4e-dd58-47ea-9f84-d2d6fc0b451e"
+    }
+  ],
+  "testExit": 0,
+  "cleanupFailures": []
+}

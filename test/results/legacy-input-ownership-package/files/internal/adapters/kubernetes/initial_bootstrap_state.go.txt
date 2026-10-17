@@ -1,0 +1,263 @@
+package kubernetes
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"slices"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+var bootstrapSteps = [...]string{"private-state", "sql-material", "provider-material", "continuity-policy", "continuity-binding", "staging-policy", "staging-binding", "projection"}
+
+func bootstrapPasswordValid(s string) bool {
+	b, e := base64.RawURLEncoding.DecodeString(s)
+	defer clear(b)
+	return e == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == s
+}
+
+func bootstrapPreludeValid(d contracts.InitialBootstrap, p contracts.InitialBootstrapPrelude) bool {
+	n := bootstrapNames(d)
+	refs := []contracts.WorkerObjectReference{p.Namespace, p.Account, p.Role, p.Binding, p.Marker, p.ContinuityMarker, p.TokenAnchor}
+	names := []string{d.BootstrapNamespace, n.account, n.account, n.account, n.marker, n.continuityMarker, n.anchor}
+	if d.Format == contracts.InitialBootstrapCopyClosureFormat {
+		if p.CopyMarker == nil {
+			return false
+		}
+		refs = append(refs, *p.CopyMarker)
+		names = append(names, n.copyMarker)
+	} else if p.CopyMarker != nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for i, r := range refs {
+		if r.Name != names[i] || !authorization.UUID(r.UID) || seen[r.UID] {
+			return false
+		}
+		seen[r.UID] = true
+	}
+	g := p.Guard
+	return g.Name == n.guard && authorization.UUID(g.PolicyUID) && authorization.UUID(g.BindingUID) && g.PolicyUID != g.BindingUID && !seen[g.PolicyUID] && !seen[g.BindingUID] && g.PolicyGeneration > 0 && identity.Text(g.BindingResourceVersion, 128) && equalJSON(g.Administrators, d.Administrators)
+}
+
+func bootstrapMaterialValid(m contracts.InitialBootstrapMaterial) bool {
+	if m.Format != contracts.InitialBootstrapMaterialFormat || !initialProviderASCII(m.IssuerToken, contracts.InitialProviderTokenMaxBytes) || !initialProviderASCII(m.Storage.AccessKeyID, 256) || !initialProviderASCII(m.Storage.SecretAccessKey, 1024) || len(m.Storage.SessionToken) > 4096 || m.StorageUseUntil.Year() < 2020 || m.StorageUseUntil.Year() > 9998 {
+		return false
+	}
+	return m.Storage.SessionToken == "" || initialProviderASCII(m.Storage.SessionToken, 4096)
+}
+
+// Check both serialized private-material envelopes before seed/SQL/provider
+// effects. The two generated UUIDs have fixed length; no credential-derived
+// digest or body enters the public plan. Individual maxima cannot all coexist.
+func bootstrapRegistryMaterialValid(d contracts.InitialBootstrap, m contracts.InitialBootstrapMaterial) bool {
+	if !providerconfig.InitialRegistryMaterial(d.Image, d.RegistryAuthentication, m.RegistryConfig) {
+		return false
+	}
+	b, e := json.Marshal(m)
+	defer clear(b)
+	const uuid = "00000000-0000-4000-8000-000000000000"
+	provider := contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: uuid, RequestID: uuid, IssuerToken: m.IssuerToken, Storage: m.Storage, StorageUseUntil: m.StorageUseUntil, RegistryConfig: m.RegistryConfig}
+	data, err := json.Marshal(provider)
+	defer clear(data)
+	return e == nil && err == nil && len(b) <= contracts.InitialProviderMaterialMaxBytes && len(data) <= contracts.InitialProviderMaterialMaxBytes
+}
+
+func newBootstrapState(d contracts.InitialBootstrap, p contracts.InitialBootstrapPrelude, m contracts.InitialBootstrapMaterial) (contracts.InitialBootstrapState, error) {
+	var s contracts.InitialBootstrapState
+	if validateBootstrap(d) != nil || !bootstrapPreludeValid(d, p) || !bootstrapMaterialValid(m) || !bootstrapRegistryMaterialValid(d, m) {
+		return s, cfg.ErrInvalid
+	}
+	s = contracts.InitialBootstrapState{Format: contracts.InitialBootstrapStateFormat, DesiredDigest: bootstrapDigest(d), Prelude: p, Material: &m, Creates: []contracts.InitialBootstrapCreate{}}
+	for _, id := range []*string{&s.InstallationID, &s.RequestID, &s.ClusterID, &s.IssuerEpoch} {
+		v, e := prepUUID()
+		if e != nil {
+			return contracts.InitialBootstrapState{}, e
+		}
+		*id = v
+	}
+	for _, password := range []*string{&s.Passwords.Manager, &s.Passwords.Preparation, &s.Passwords.Audit, &s.Passwords.Activation, &s.Passwords.History} {
+		b := make([]byte, 32)
+		if _, e := rand.Read(b); e != nil {
+			clear(b)
+			return contracts.InitialBootstrapState{}, cfg.ErrUnavailable
+		}
+		*password = base64.RawURLEncoding.EncodeToString(b)
+		clear(b)
+	}
+	// This copy owns every mutable slice; the caller's desired/probe data can
+	// never mutate a retained bootstrap intent after validation.
+	b, e := json.Marshal(s)
+	var cloned contracts.InitialBootstrapState
+	if e != nil || json.Unmarshal(b, &cloned) != nil || !bootstrapStateValid(d, cloned) {
+		clear(b)
+		return contracts.InitialBootstrapState{}, cfg.ErrInvalid
+	}
+	clear(b)
+	return cloned, nil
+}
+
+func bootstrapStateValid(d contracts.InitialBootstrap, s contracts.InitialBootstrapState) bool {
+	if s.Format != contracts.InitialBootstrapStateFormat || s.DesiredDigest != bootstrapDigest(d) || !bootstrapPreludeValid(d, s.Prelude) || s.Creates == nil || len(s.Creates) > len(bootstrapSteps) {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, id := range []string{s.InstallationID, s.RequestID, s.ClusterID, s.IssuerEpoch} {
+		if !authorization.UUID(id) || seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	if s.SeedUID != "" && (!authorization.UUID(s.SeedUID) || seen[s.SeedUID]) {
+		return false
+	}
+	passwords := []string{s.Passwords.Manager, s.Passwords.Preparation, s.Passwords.Audit, s.Passwords.Activation, s.Passwords.History}
+	for i, p := range passwords {
+		if s.Retired && i < 4 {
+			if p != "" {
+				return false
+			}
+			continue
+		}
+		if !bootstrapPasswordValid(p) || slices.Contains(passwords[:i], p) {
+			return false
+		}
+	}
+	if s.Retired {
+		if s.Material != nil {
+			return false
+		}
+	} else if s.Material == nil || !bootstrapMaterialValid(*s.Material) || !bootstrapRegistryMaterialValid(d, *s.Material) {
+		return false
+	}
+	if m := s.Manager; m != nil {
+		if s.SeedUID == "" || !authorization.UUID(m.OperationID) || seen[m.OperationID] || m.StartedAt.Year() < 2020 || !m.StartedAt.Equal(m.StartedAt.UTC().Truncate(time.Microsecond)) || m.Until.Sub(m.StartedAt) != 30*time.Minute || m.DatabaseOID == 0 || m.PostmasterAt.Year() < 2020 || !m.PostmasterAt.Equal(m.PostmasterAt.Truncate(time.Microsecond)) {
+			return false
+		}
+		seen[m.OperationID] = true
+		if m.Receipt != nil && (m.Receipt.Name != "asservat_init_"+strings.ReplaceAll(s.InstallationID, "-", "")+"_manager" || m.Receipt.OID == 0 || m.Receipt.OID == 10) {
+			return false
+		}
+		if c := m.Closing; c != nil {
+			if m.Receipt == nil || s.Projection == nil || !authorization.UUID(c.OperationID) || seen[c.OperationID] || c.StartedAt.Before(m.StartedAt) || !c.StartedAt.Equal(c.StartedAt.UTC().Truncate(time.Microsecond)) || c.Until.Sub(c.StartedAt) != 30*time.Second {
+				return false
+			}
+			seen[c.OperationID] = true
+		}
+		if m.RetiredAt != nil && (m.Closing == nil || m.RetiredAt.Before(m.Closing.StartedAt) || !m.RetiredAt.Before(m.Closing.Until)) {
+			return false
+		}
+	} else if len(s.Creates) > 0 || s.Retired {
+		return false
+	}
+	if len(s.Creates) > 0 && s.Manager.Receipt == nil {
+		return false
+	}
+	for i, v := range s.Creates {
+		if v.Step != bootstrapSteps[i] || !authorization.UUID(v.OperationID) || seen[v.OperationID] || !validPreparerReceipt(v.Receipt) || v.Receipt == nil && i < len(s.Creates)-1 {
+			return false
+		}
+		seen[v.OperationID] = true
+	}
+	if p := s.Projection; p != nil {
+		if p.Name != bootstrapNames(d).projection || !authorization.UUID(p.UID) || len(s.Creates) != len(bootstrapSteps) || s.Creates[len(s.Creates)-1].Receipt == nil || p.UID != s.Creates[len(s.Creates)-1].Receipt.UID {
+			return false
+		}
+	}
+	if p := s.PassiveHistory; p != nil {
+		if !contracts.InitialBootstrapHasPassiveHistory(d.Format) || s.Projection == nil || p.Step != "passive-history" || !authorization.UUID(p.OperationID) || seen[p.OperationID] || !validPreparerReceipt(p.Receipt) {
+			return false
+		}
+	}
+	if contracts.InitialBootstrapHasPassiveHistory(d.Format) && s.Manager != nil && s.Manager.Closing != nil && (s.PassiveHistory == nil || s.PassiveHistory.Receipt == nil) {
+		return false
+	}
+	if s.Retired && (s.Projection == nil || s.Manager.RetiredAt == nil) {
+		return false
+	}
+	b, e := json.Marshal(s)
+	defer clear(b)
+	return e == nil && len(b) <= contracts.InitialBootstrapStateMaxBytes
+}
+
+func bootstrapStateTransition(d contracts.InitialBootstrap, old, next contracts.InitialBootstrapState) bool {
+	if !bootstrapStateValid(d, old) || !bootstrapStateValid(d, next) {
+		return false
+	}
+	if equalJSON(old, next) {
+		return true
+	}
+	// Compare against an exact copy with only one allowed transition. There
+	// is no generic patch or counter reset hidden inside the private state CAS.
+	x := old
+	if old.SeedUID == "" && next.SeedUID != "" {
+		x.SeedUID = next.SeedUID
+		return equalJSON(x, next)
+	}
+	if old.Manager == nil && next.Manager != nil && next.Manager.Receipt == nil && next.Manager.Closing == nil && next.Manager.RetiredAt == nil {
+		x.Manager = next.Manager
+		return equalJSON(x, next)
+	}
+	if old.Manager != nil && next.Manager != nil {
+		m := *old.Manager
+		x.Manager = &m
+		if m.Receipt == nil && next.Manager.Receipt != nil {
+			m.Receipt = next.Manager.Receipt
+			return equalJSON(x, next)
+		}
+		if m.Receipt != nil && m.Closing == nil && next.Manager.Closing != nil && old.Projection != nil {
+			m.Closing = next.Manager.Closing
+			return equalJSON(x, next)
+		}
+		if m.Closing != nil && m.RetiredAt == nil && next.Manager.RetiredAt != nil {
+			m.RetiredAt = next.Manager.RetiredAt
+			return equalJSON(x, next)
+		}
+	}
+	x = old
+	// Closure precedes joining the preparation pool. Nothing may resume a
+	// create or replace a receipt once this irreversible fence is retained.
+	if old.Manager != nil && old.Manager.Closing != nil && !next.Retired {
+		return false
+	}
+	if len(next.Creates) == len(old.Creates)+1 && len(next.Creates) <= len(bootstrapSteps) && next.Creates[len(next.Creates)-1].Receipt == nil && (len(old.Creates) == 0 || old.Creates[len(old.Creates)-1].Receipt != nil) {
+		x.Creates = next.Creates
+		return equalJSON(old.Creates, next.Creates[:len(old.Creates)]) && equalJSON(x, next)
+	}
+	if len(next.Creates) == len(old.Creates) && len(old.Creates) > 0 {
+		i := len(old.Creates) - 1
+		if old.Creates[i].Receipt == nil && next.Creates[i].Receipt != nil {
+			x.Creates = append([]contracts.InitialBootstrapCreate(nil), old.Creates...)
+			x.Creates[i].Receipt = next.Creates[i].Receipt
+			return equalJSON(x, next)
+		}
+	}
+	if old.Projection == nil && next.Projection != nil {
+		x.Projection = next.Projection
+		return equalJSON(x, next)
+	}
+	if old.PassiveHistory == nil && next.PassiveHistory != nil && next.PassiveHistory.Receipt == nil {
+		x.PassiveHistory = next.PassiveHistory
+		return equalJSON(x, next)
+	}
+	if old.PassiveHistory != nil && old.PassiveHistory.Receipt == nil && next.PassiveHistory != nil && next.PassiveHistory.Receipt != nil {
+		p := *old.PassiveHistory
+		p.Receipt = next.PassiveHistory.Receipt
+		x.PassiveHistory = &p
+		return equalJSON(x, next)
+	}
+	if !old.Retired && next.Retired && old.Manager != nil && old.Manager.RetiredAt != nil {
+		x.Retired = true
+		x.Material = nil
+		x.Passwords = contracts.InitialBootstrapPasswords{History: old.Passwords.History}
+		return equalJSON(x, next)
+	}
+	return false
+}

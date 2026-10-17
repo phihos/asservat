@@ -1,0 +1,18 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugCapture
+metadata:
+  name: api-context-001-shared
+  namespace: payments
+spec:
+  presetRef:
+    name: incident-context
+    version: v1
+  target:
+    workloadRef:
+      kind: Deployment
+      name: api
+  sharing:
+    recipients:
+    - kind: Group
+      issuer: https://identity.example.invalid/realms/company
+      id: group-incident-reviewers-789

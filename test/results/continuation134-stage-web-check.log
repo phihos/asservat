@@ -1,0 +1,16 @@
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+[Error: ENOENT: no such file or directory, open '/home/phil/.cache/asservat-build/planning/context-acquisition-continuation-20261012/validation/examples/mcp-pod-status-diagnostics-input.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/home/phil/.cache/asservat-build/planning/context-acquisition-continuation-20261012/validation/examples/mcp-pod-status-diagnostics-input.json'
+}
+
+Node.js v26.11.1

@@ -1,0 +1,20 @@
+{
+  "integratedAt": "2026-10-13T16:50:18.275781+00:00",
+  "scope": "Three fixture-only paths; no production verifier or deadline change. Native rerun pending.",
+  "payloadHashes": {
+    "test/integration/connector_identity_test.go": "079a4795877287a79d92137d150295074a1fb9543b01dfb280adc1de6411e52f",
+    "test/fixtures/observation-native/enrollment.go": "95556cd018b8c523832af14ff80c316679ae688d399ee73ae13d5c9b0691ba86",
+    "test/fixtures/observation-native/enrollment_test.go": "871b1c5cabbf740782ab543fc0f9a08c97bc78f1b2ac34f80f51134d034560dc"
+  },
+  "baseHashes": {
+    "test/fixtures/observation-native/enrollment.go": "8441403ca79bd42c8127b1f1d96163bd9dc5c23e2405ef9b8426f9bcd3bd0a0a",
+    "test/fixtures/observation-native/enrollment_test.go": null,
+    "test/integration/connector_identity_test.go": "78317497901f7a43896cb1d44ded67c56d9112af28bdda54640d6f244875e26f"
+  },
+  "dependencyCount": 2280,
+  "verifiedHandoffSHA256": "febaec1643b09bb5e3646f3fa1d5df0514835181c1f3b6d2de2ae74f88e6802a",
+  "componentResultSHA256": "f39f9b24c2b824dde6ef9db1b7cadef404ea88618645d68341c117775de90ad3",
+  "terminal": 0,
+  "archive": "regional-fixture-issuer-time-package",
+  "sourceAndEvidenceIndependentlyVerified": true
+}

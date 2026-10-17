@@ -1,0 +1,6 @@
+--- FAIL: TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait (0.00s)
+    --- FAIL: TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait/2s (0.00s)
+        context_download_plan_deadline_test.go:31: lookup wait moved original backing end 2026-10-12 09:42:41.800139 +0000 UTC 2026-10-12 09:41:51.800139 +0000 UTC
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.002s
+FAIL

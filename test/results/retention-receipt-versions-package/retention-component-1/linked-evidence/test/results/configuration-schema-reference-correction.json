@@ -1,0 +1,13 @@
+{
+  "scope": "normalize self references to canonical registered schema IDs; unchanged constraints",
+  "changes": {
+    "specs/contracts/configuration-runtime-role-state.schema.json": {
+      "before": "3682d584e24591f99974e28090883a037e5370262b5f9a814ac62db309f067b9",
+      "after": "63dfc03c7012fc1e667c3e248806978685f75660156e3a56b4802e8ffd1a35ce"
+    },
+    "specs/contracts/public-audit-keys.schema.json": {
+      "before": "c455c375c4548b347240c28e74454e3a4af9c11d1094a1db2213a3b3eda2e8d6",
+      "after": "e3948eab4b39b8d2cf5837a3eb2a581545051768a028e03beb0eb84493e5e49b"
+    }
+  }
+}

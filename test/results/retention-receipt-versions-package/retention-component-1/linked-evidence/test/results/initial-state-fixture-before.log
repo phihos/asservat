@@ -1,0 +1,5 @@
+--- FAIL: TestOwnerCredentialFixtureRetainsOriginalEnrollment (0.01s)
+    owner_credentials_test.go:136: fixture changed immutable enrollment when observation clock crossed a second
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.013s
+FAIL

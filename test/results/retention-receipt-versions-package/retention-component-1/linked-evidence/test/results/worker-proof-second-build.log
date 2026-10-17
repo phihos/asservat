@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.869s
+ok  	asservat.local/asservat/internal/adapters/postgres	0.003s
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/test/integration	0.084s

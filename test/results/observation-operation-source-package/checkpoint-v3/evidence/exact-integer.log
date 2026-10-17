@@ -1,0 +1,16 @@
+=== RUN   TestObservationOperationClosedWireExactIntegers
+=== RUN   TestObservationOperationClosedWireExactIntegers/unknown
+=== RUN   TestObservationOperationClosedWireExactIntegers/duplicate
+=== RUN   TestObservationOperationClosedWireExactIntegers/overflow
+=== RUN   TestObservationOperationClosedWireExactIntegers/fraction
+=== RUN   TestObservationOperationClosedWireExactIntegers/too-large
+=== RUN   TestObservationOperationClosedWireExactIntegers/trailing
+--- PASS: TestObservationOperationClosedWireExactIntegers (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/unknown (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/duplicate (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/overflow (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/fraction (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/too-large (0.00s)
+    --- PASS: TestObservationOperationClosedWireExactIntegers/trailing (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.027s

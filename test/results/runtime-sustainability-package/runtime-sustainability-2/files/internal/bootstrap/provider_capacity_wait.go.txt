@@ -1,0 +1,104 @@
+package bootstrap
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"os"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// A pending journal read is only a notification hint. It neither opens optional
+// credentials nor begins a native proof while another fixed actor owns admission.
+func (d *CapacityHubWorkerDeployment) runProviderCapacity(ctx context.Context) error {
+	if d == nil || d.admission == nil || d.activation == nil || d.mounts == nil || ctx == nil || ctx.Err() != nil {
+		return mounts.ErrUnavailable
+	}
+	var mountUntil time.Time
+	for ctx.Err() == nil {
+		ready, err := d.activation.CapacityProjectionHint(ctx)
+		if err != nil {
+			return err
+		}
+		if ready {
+			if mountUntil.IsZero() {
+				mountUntil = time.Now().Add(30 * time.Second)
+			}
+			if !time.Now().Before(mountUntil) {
+				return mounts.ErrUnavailable
+			}
+			child, files, err := d.openProviderCapacity(ctx)
+			if !errors.Is(err, errCapacityProjectionMountPending) {
+				if err != nil {
+					return err
+				}
+				// Scoped pools and files remain owned until the actual child has joined.
+				defer files.Close()
+				defer child.Close()
+				source, err := newProviderCapacitySourceInvocation(child, d.activation, childInstalledCapacityClaim(child), d.input, d.admission)
+				if err != nil {
+					return err
+				}
+				return child.run(ctx, func(call context.Context) error { return child.reconciler.RunWithSourceInvocation(call, source) })
+			}
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return ctx.Err()
+}
+
+func childInstalledCapacityClaim(d *CapacityWorkerDeployment) contracts.CapacityRuntimeProjectionClaim {
+	if d == nil || d.installedClaim == nil {
+		return contracts.CapacityRuntimeProjectionClaim{}
+	}
+	return *d.installedClaim
+}
+
+// The startup proof remains finite, but the child lifetime is the original
+// Lease context. A failed final observation closes the constructed pools; no
+// source or reconciliation loop has started at that point.
+func (d *CapacityHubWorkerDeployment) openProviderCapacity(ctx context.Context) (*CapacityWorkerDeployment, *os.Root, error) {
+	lease, err := d.admission.WaitCapacity(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer lease.Release()
+	op, claim, err := d.activation.BeginCapacityProjectionOperation(lease.Context())
+	if err != nil {
+		return nil, nil, err
+	}
+	defer op.Close()
+	files, err := d.mounts.OpenRoot(contracts.CapacityWorkerProjectionDirectory)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) && op.Context().Err() == nil {
+			return nil, nil, errCapacityProjectionMountPending
+		}
+		return nil, nil, mounts.ErrUnavailable
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			files.Close()
+		}
+	}()
+	selected := &installedCapacityWorkerInputs{files: d.mounts, worker: d.input, expected: claim, until: op.FreshUntil(), startup: op.Context()}
+	child, err := newCapacityWorkerDeployment(ctx, files, selected)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = op.Finish(op.Context()); err != nil || ctx.Err() != nil || !time.Now().Before(op.FreshUntil()) {
+		child.Close()
+		return nil, nil, mounts.ErrUnavailable
+	}
+	complete = true
+	return child, files, nil
+}

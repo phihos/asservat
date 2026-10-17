@@ -1,0 +1,95 @@
+package fleet
+
+import (
+	"time"
+
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// AcceptedOwnerAuditEpochObservation is the output of the separate concrete
+// accepted-epoch reader, never the raw Kubernetes source port. Valid checks
+// shape/time only; the reader must check actual stored receipt, selected head,
+// current non-revocation, recovery and reserve. No implementation is selected.
+type AcceptedOwnerAuditEpochObservation struct {
+	Source                 OwnerConfigurationObservation
+	Epoch                  OwnerAuditEpoch
+	ObservedAt, FreshUntil time.Time
+	CurrentRetainUntil     time.Time
+}
+
+func (o AcceptedOwnerAuditEpochObservation) Valid(now time.Time) bool {
+	return o.Source.Valid(now) && o.Epoch.WellFormed() && o.Source.Configuration.Equal(o.Epoch.Configuration) && !o.ObservedAt.Before(o.Source.ObservedAt) && !o.ObservedAt.Before(o.Epoch.ClaimedAt) && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second) && !o.FreshUntil.After(o.Source.FreshUntil) && !o.FreshUntil.After(o.Epoch.Deadlines.AdmitUntil) && ownerEpochTime(o.CurrentRetainUntil) && !o.CurrentRetainUntil.After(o.Epoch.Deadlines.RetainUntil) && !o.FreshUntil.After(o.CurrentRetainUntil)
+}
+func (o AcceptedOwnerAuditEpochObservation) Clone() AcceptedOwnerAuditEpochObservation {
+	o.Source.Configuration = o.Source.Configuration.Clone()
+	o.Epoch = o.Epoch.Clone()
+	return o
+}
+
+type OwnerAuditDependencyPurpose string
+
+const (
+	OwnerAuditCertificateDependency OwnerAuditDependencyPurpose = "owner-certificate"
+	OwnerAuditWorkerDependency      OwnerAuditDependencyPurpose = "owner-worker"
+	OwnerAuditRequestDependency     OwnerAuditDependencyPurpose = "owner-request"
+	OwnerAuditInstallerDependency   OwnerAuditDependencyPurpose = "owner-installer"
+)
+
+// A dependency is allocated before effect by its concrete SQL owner, not by a
+// configuration reader. EffectID is the exact original attempt/request of that
+// purpose owner, not the epoch attempt. EndsAt includes every possible original leaf/request/
+// cleanup end. No successor epoch rewrites this exact immutable admission.
+type OwnerAuditEpochDependency struct {
+	ID, EffectID       string
+	Purpose            OwnerAuditDependencyPurpose
+	Epoch              OwnerAuditEpoch
+	AdmittedAt, EndsAt time.Time
+}
+
+func (d OwnerAuditEpochDependency) WellFormed() bool {
+	switch d.Purpose {
+	case OwnerAuditCertificateDependency, OwnerAuditWorkerDependency, OwnerAuditRequestDependency, OwnerAuditInstallerDependency:
+	default:
+		return false
+	}
+	return authorization.UUID(d.ID) && authorization.UUID(d.EffectID) && d.Epoch.WellFormed() && ownerEpochTime(d.AdmittedAt) && ownerEpochTime(d.EndsAt) && !d.AdmittedAt.Before(d.Epoch.ClaimedAt) && d.AdmittedAt.Before(d.Epoch.Deadlines.AdmitUntil) && d.EndsAt.After(d.AdmittedAt) && !d.EndsAt.After(d.AdmittedAt.Add(d.Epoch.Reserve.Policy.MaxDependencyLifetime)) && !d.EndsAt.After(d.Epoch.Deadlines.DependenciesUntil)
+}
+
+// MatchesAdmission checks an original admission value against the exact current
+// observation and the entire retained dependency lifetime. It performs no claim,
+// reservation or lookup; concrete SQL must use database time and independently
+// verify its purpose-owned EffectID before recording the dependency/effect.
+// Current retention shortening may prevent new admission while already-admitted
+// work remains usable only until its independently checked shortened cutoff.
+func (d OwnerAuditEpochDependency) MatchesAdmission(o AcceptedOwnerAuditEpochObservation, now time.Time) bool {
+	return o.Valid(now) && d.WellFormed() && now.Before(d.EndsAt) && d.Epoch.Equal(o.Epoch) && !d.AdmittedAt.Before(o.ObservedAt) && !d.AdmittedAt.After(now) && d.AdmittedAt.Before(o.FreshUntil) && !d.EndsAt.After(o.CurrentRetainUntil)
+}
+func (d OwnerAuditEpochDependency) Clone() OwnerAuditEpochDependency {
+	d.Epoch = d.Epoch.Clone()
+	return d
+}
+func (d OwnerAuditEpochDependency) Equal(other OwnerAuditEpochDependency) bool {
+	return d.ID == other.ID && d.EffectID == other.EffectID && d.Purpose == other.Purpose && d.Epoch.Equal(other.Epoch) && d.AdmittedAt.Equal(other.AdmittedAt) && d.EndsAt.Equal(other.EndsAt)
+}
+
+// This distinct observation checks the original admitted dependency's current
+// non-revocation/retained receipt, not the selected head. A concrete SQL reader
+// must compare the entire exact stored dependency and full epoch receipt plus
+// current source/recovery/reserve. No boolean or caller-created value supplies
+// those facts. The old admission cutoff is deliberately not a completion cutoff.
+type AdmittedOwnerAuditEpochObservation struct {
+	Source                 OwnerConfigurationObservation
+	Dependency             OwnerAuditEpochDependency
+	ObservedAt, FreshUntil time.Time
+	CurrentRetainUntil     time.Time
+}
+
+func (o AdmittedOwnerAuditEpochObservation) Valid(now time.Time) bool {
+	return o.Source.Valid(now) && o.Dependency.WellFormed() && o.Source.Configuration.Equal(o.Dependency.Epoch.Configuration) && !o.ObservedAt.Before(o.Source.ObservedAt) && !o.ObservedAt.Before(o.Dependency.AdmittedAt) && identity.Fresh(o.ObservedAt, o.FreshUntil, now, 5*time.Second) && !o.FreshUntil.After(o.Source.FreshUntil) && !o.FreshUntil.After(o.Dependency.EndsAt) && !o.FreshUntil.After(o.Dependency.Epoch.Deadlines.RetainUntil) && ownerEpochTime(o.CurrentRetainUntil) && !o.CurrentRetainUntil.After(o.Dependency.Epoch.Deadlines.RetainUntil) && !o.FreshUntil.After(o.CurrentRetainUntil)
+}
+func (o AdmittedOwnerAuditEpochObservation) Clone() AdmittedOwnerAuditEpochObservation {
+	o.Source.Configuration = o.Source.Configuration.Clone()
+	o.Dependency = o.Dependency.Clone()
+	return o
+}

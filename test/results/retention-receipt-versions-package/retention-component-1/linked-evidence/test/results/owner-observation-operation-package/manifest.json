@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/owner_observation_operation.go",
+    "base": null,
+    "payload": "a892cb55d909e0f3cb74d0c27201c1022bc877078178a099d23d2e235ffbc875"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_observation_operation_routes.go",
+    "base": null,
+    "payload": "8134349bea66b65a6ce3d9502d0f23fbf87815c0363e970021ee292df7613e54"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_observation_operation_test.go",
+    "base": null,
+    "payload": "f0a51a71eb531a52aee4614e9fe6596052b8f4aa4f751532ba7125ed8d702b16"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+    "base": "9487e99d50fa68067a10dd718ad233b8a1d816dba7440c35fb4db52cb028b9a6",
+    "payload": "f43606513f8ec1b8b6fde6f28add3e8973921d1f24ac09d1f98e5b9c786762d0"
+  }
+]

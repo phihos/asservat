@@ -1,0 +1,102 @@
+{
+  "actualTerminalExit": 0,
+  "sessionID": 98621,
+  "resultExit": 0,
+  "dependencyCount": 4387,
+  "dependencyChanges": [],
+  "inventoryDifference": [],
+  "linkedDirectoryChanges": [],
+  "metadataChanges": [],
+  "payloadOrBaseChanges": [],
+  "archivedManifestMatches": true,
+  "archivedRunnerMatches": true,
+  "mirrorMatchesExactOverlay": true,
+  "bootUnchanged": true,
+  "scratchExists": false,
+  "reportedOwnedGroupJoined": true,
+  "ownedGroups": {
+    "355802": "absent",
+    "356507": "absent",
+    "356965": "absent",
+    "357119": "absent"
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "exit": 0,
+      "seconds": 17.664,
+      "topLevelPasses": 0,
+      "namedPasses": 0,
+      "failed": [],
+      "skipped": [],
+      "ownedGroupJoined": true,
+      "sourceChecksEmpty": true,
+      "mirrorUnchanged": true,
+      "logHashMatches": true,
+      "logSHA256": "ac223e2557e82feea6f2ab5f97b5154fc5d548e3fefe85beefc4888ea60edf19"
+    },
+    {
+      "name": "races",
+      "exit": 0,
+      "seconds": 13.662,
+      "topLevelPasses": 42,
+      "namedPasses": 99,
+      "failed": [],
+      "skipped": [],
+      "ownedGroupJoined": true,
+      "sourceChecksEmpty": true,
+      "mirrorUnchanged": true,
+      "logHashMatches": true,
+      "logSHA256": "edde1893919b932f1c293cec1b4941a155e223bdef0ecb9d5376e1d665ac7747"
+    },
+    {
+      "name": "vet",
+      "exit": 0,
+      "seconds": 0.658,
+      "topLevelPasses": 0,
+      "namedPasses": 0,
+      "failed": [],
+      "skipped": [],
+      "ownedGroupJoined": true,
+      "sourceChecksEmpty": true,
+      "mirrorUnchanged": true,
+      "logHashMatches": true,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "canonical",
+      "exit": 0,
+      "seconds": 9.662,
+      "topLevelPasses": 0,
+      "namedPasses": 0,
+      "failed": [],
+      "skipped": [],
+      "ownedGroupJoined": true,
+      "sourceChecksEmpty": true,
+      "mirrorUnchanged": true,
+      "logHashMatches": true,
+      "logSHA256": "c233e95d6dda82edeb9a56d2ff8fdb751130669dc9210d19da93e59feb14c276"
+    }
+  ],
+  "hashes": {
+    "result.json": "546567b09c05556eee0e4a9b15a5ea85f2a7dbfd0a5f34b521679edfe2bfa879",
+    "dependencies.json": "337051979ebcf98d2ee782a571d42450fc180292533d0528b524a159365b1a87",
+    "inventory.json": "47b261261e97030f258076b98730d6773ad0b1fad9d1d31c3495d6e0bcecae50",
+    "linked-directories.json": "a8ca6f7fe6c61a6f361766442159617b69c3b4ce6016c2eff1be0726dd77cbd3",
+    "metadata.json": "d5b53d1de99aa9dbc7bdf74d85a9ba5d7eaece6511fdfaa88e2b2cfe1ea34905",
+    "mirror.json": "b5217bb1fcea51e50040f8eeba4b788a62ca332d326b3e1d2b1fa4f4779d9cfc",
+    "manifest.json": "448730dada2bbe492ac5489f4a2e0951267833f1c45abb2762cb890820ddb8ff",
+    "run.py": "a0d1a66263f23ea92fcc0729c147f607c2dfaf95b552aac792567b33e190dadc",
+    "validation-original.json": "f9a3d88b80d00033eb4fdf655f331c3db9fb1844d4a1a33c8384faa903deb8cc",
+    "canonical-validation.json": "f9a3d88b80d00033eb4fdf655f331c3db9fb1844d4a1a33c8384faa903deb8cc"
+  },
+  "validation": {
+    "canonical": {
+      "originalSHA256": "f9a3d88b80d00033eb4fdf655f331c3db9fb1844d4a1a33c8384faa903deb8cc",
+      "generatedSHA256": "f9a3d88b80d00033eb4fdf655f331c3db9fb1844d4a1a33c8384faa903deb8cc",
+      "generatedArtifact": "canonical-validation.json",
+      "ownedGroupJoinedBeforeRestore": true,
+      "restored": true
+    }
+  }
+}

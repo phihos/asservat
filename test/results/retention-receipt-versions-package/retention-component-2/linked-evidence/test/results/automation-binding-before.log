@@ -1,0 +1,5 @@
+--- FAIL: TestAutomationBindingPreservesExplicitEnvelope (0.01s)
+    automation_binding_test.go:20: explicit bounded automation envelope rejected permission configuration unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.015s
+FAIL

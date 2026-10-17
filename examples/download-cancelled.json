@@ -1,0 +1,30 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000903",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "download_id": "00000000-0000-4000-8000-000000000902",
+    "artifact_id": "00000000-0000-4000-8000-000000000901",
+    "state": "Cancelled",
+    "filename": "artifact-901.core",
+    "native_format": "ELF core",
+    "size_bytes": 4294967296,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expires_at": "2026-10-09T12:30:00Z",
+    "managed_read_until": "2026-10-09T17:50:00Z",
+    "emitted_bytes": 0,
+    "resume_available": false,
+    "local_copy_managed": false,
+    "handling_notice": "Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.",
+    "coverage_notice": "Synthetic complete native core; matching private symbols unavailable.",
+    "etag": "\"v1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\""
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "Live rows are transient and untrusted; save before raw inspection."
+  ],
+  "provenance": []
+}

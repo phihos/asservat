@@ -1,0 +1,17 @@
+{
+  "actionIds": [
+    "core"
+  ],
+  "operations": [
+    "read_memory",
+    "download_artifact"
+  ],
+  "clientIDs": [
+    "asservat-browser",
+    "developer-agent"
+  ],
+  "maxArtifacts": 2,
+  "maxBytes": 6442450944,
+  "maxOperations": 20,
+  "notAfter": "2026-10-09T12:50:00Z"
+}

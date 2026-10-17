@@ -1,0 +1,32 @@
+[
+  {
+    "path": "pkg/libpcap-compiler/cbpf.go",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/pkg/libpcap-compiler/cbpf.go",
+    "sha256": "99a8390a6c486d644ef68865329535385bc4b9764e5e98f29f319c11514334e1"
+  },
+  {
+    "path": "pkg/operators/ebpf/ebpf.go",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/pkg/operators/ebpf/ebpf.go",
+    "sha256": "6ee8b6ea6deecd443de730329b218e99e806c1ac693d3c1f80e3969839bcc677"
+  },
+  {
+    "path": "gadgets/tcpdump/program.bpf.c",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/gadgets/tcpdump/program.bpf.c",
+    "sha256": "fb78d5d8055c271f8642f9cf95955d68e88508dce3244e0345028852b7b37c60"
+  },
+  {
+    "path": "gadgets/tcpdump/gadget.yaml",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/gadgets/tcpdump/gadget.yaml",
+    "sha256": "6379a2273c831a836cdcd0fcf362dfe1c6d90a474944d24f1e909375b4a6e84c"
+  },
+  {
+    "path": "pkg/tchandler/tracer.go",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/pkg/tchandler/tracer.go",
+    "sha256": "ee2cd557811a49b28a204375afa81a94d5056a33ec3c5d5d0d177a8ebc2e5fd3"
+  },
+  {
+    "path": "go.mod",
+    "source": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/go.mod",
+    "sha256": "fbefc8d68fa952222f4ea260fd40bc48c4533f5fd94606c11df8eb0a9e627983"
+  }
+]

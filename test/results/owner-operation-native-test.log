@@ -1,0 +1,24 @@
+=== RUN   TestOwnerObservationOperationWithRealKubernetes
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/cold
+    owner_observation_operation_native_test.go:96: native primitive elapsed=404.140004ms remaining=4.595859176s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/consecutive-1
+    owner_observation_operation_native_test.go:96: native primitive elapsed=1.399831752s remaining=3.600167458s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/consecutive-2
+    owner_observation_operation_native_test.go:96: native primitive elapsed=1.400657095s remaining=3.599342195s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/consecutive-3
+    owner_observation_operation_native_test.go:96: native primitive elapsed=1.39947291s remaining=3.60052639s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/consecutive-4
+    owner_observation_operation_native_test.go:96: native primitive elapsed=1.401780968s remaining=3.598218312s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/consecutive-5
+    owner_observation_operation_native_test.go:96: native primitive elapsed=1.400983526s remaining=3.599015794s observer=28 probe=6 expected-denials=2
+=== RUN   TestOwnerObservationOperationWithRealKubernetes/actual-pod-change-between-boundaries
+--- PASS: TestOwnerObservationOperationWithRealKubernetes (10.93s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/cold (0.41s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/consecutive-1 (1.40s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/consecutive-2 (1.40s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/consecutive-3 (1.40s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/consecutive-4 (1.40s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/consecutive-5 (1.40s)
+    --- PASS: TestOwnerObservationOperationWithRealKubernetes/actual-pod-change-between-boundaries (1.15s)
+PASS
+ok  	asservat.local/asservat/test/integration	11.995s

@@ -1,0 +1,32 @@
+{
+  "scope": "Current integrated repository Go race/vet and design gates; no native runtime qualification",
+  "sources": 2354,
+  "phases": [
+    {
+      "name": "go",
+      "command": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "go-check"
+      ],
+      "exit": 0,
+      "seconds": 926.433,
+      "changedSources": []
+    },
+    {
+      "name": "contracts",
+      "command": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check",
+        "design-check"
+      ],
+      "exit": 0,
+      "seconds": 10.41,
+      "changedSources": []
+    }
+  ],
+  "exit": 0
+}

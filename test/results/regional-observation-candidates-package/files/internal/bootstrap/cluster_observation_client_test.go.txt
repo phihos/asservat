@@ -1,0 +1,329 @@
+package bootstrap
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	wire "asservat.local/asservat/internal/transport/clusterobservation"
+)
+
+type installedObservationFixture struct {
+	base                            *runtimeFixture
+	pin                             value.OwnerObservationPin
+	binding                         value.OwnerBinding
+	cert                            value.OwnerCertificate
+	enrollment                      value.OwnerEnrollment
+	mode                            string
+	httpCalls, tokenReads           atomic.Int32
+	candidateLegacy, candidateOpted atomic.Int32
+	bound                           time.Time
+	entered, release                chan struct{}
+}
+
+func (f *installedObservationFixture) ReadContextStartOwners(context.Context) (value.APIContextOwnerCandidates, error) {
+	f.candidateLegacy.Add(1)
+	if strings.HasPrefix(f.mode, "opted-") {
+		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
+	}
+	return f.candidateValues(), nil
+}
+func (f *installedObservationFixture) candidateValues() value.APIContextOwnerCandidates {
+	now := time.Now()
+	if f.mode == "expired-before-token" {
+		f.bound = now.Add(80 * time.Millisecond)
+	}
+	owners := []value.OwnerBinding{f.binding}
+	if f.mode == "candidate-exclusion" {
+		owners[0].ProcessEpoch = "22222222-2222-4222-8222-222222222222"
+	}
+	return value.APIContextOwnerCandidates{Pool: f.pin.Pool, Owners: owners, ObservedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), f.bound)}
+}
+func (f *installedObservationFixture) ReadOwnerObservationCandidates(context.Context) (value.APIContextOwnerCandidates, error) {
+	f.candidateOpted.Add(1)
+	if f.mode == "opted-unavailable" {
+		return value.APIContextOwnerCandidates{}, value.ErrUnavailable
+	}
+	v := f.candidateValues()
+	v.Owners = nil
+	for i := 1; i <= 16; i++ {
+		b := f.binding
+		b.ProcessEpoch = fmt.Sprintf("00000000-0000-4000-8000-%012d", i)
+		v.Owners = append(v.Owners, b)
+	}
+	v.Owners = append(v.Owners, f.binding)
+	if f.mode == "opted-changed-limit" {
+		v.Pool.NativeCandidateLimit++
+	}
+	if f.mode == "opted-overflow" {
+		b := f.binding
+		b.ProcessEpoch = "22222222-2222-4222-8222-222222222222"
+		v.Owners = append(v.Owners, b)
+	}
+	return v, nil
+}
+func (f *installedObservationFixture) configuration() value.OwnerConfigurationObservation {
+	now := time.Now()
+	return value.OwnerConfigurationObservation{Configuration: f.base.configuration.Clone(), ObservedAt: now, FreshUntil: identity.Earlier(now.Add(5*time.Second), f.bound)}
+}
+func (f *installedObservationFixture) ReadOwnerRegistration(_ context.Context, c value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
+	if c != f.cert || f.mode == "registry-denial" || f.mode == "revoked-after-response" && f.httpCalls.Load() > 0 {
+		return value.OwnerRegistrationObservation{}, value.ErrUnavailable
+	}
+	o := f.configuration()
+	if f.mode == "wrong-source" {
+		o.Configuration.Revision.UID = "22222222-2222-4222-8222-222222222222"
+	}
+	if f.mode == "source-revision-during-response" && f.httpCalls.Load() > 0 {
+		o.Configuration.Revision.Generation++
+	}
+	return value.OwnerRegistrationObservation{Certificate: c, Enrollment: f.enrollment, Configuration: o, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}, nil
+}
+func (f *installedObservationFixture) CurrentOwnerRoute(_ context.Context, b value.OwnerBinding) (value.OwnerRoute, error) {
+	if b != f.binding || f.mode == "not-ready" {
+		return value.OwnerRoute{}, value.ErrUnavailable
+	}
+	o := f.configuration()
+	return value.OwnerRoute{Configuration: o, Endpoint: value.OwnerEndpoint{Pool: f.pin.Pool, Binding: b, Pod: f.enrollment.Pod, ReplicaSetUID: f.enrollment.ReplicaSetUID, Addresses: []string{"10.0.0.5"}, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}, nil
+}
+func (f *installedObservationFixture) ReadOwnerProtection(_ context.Context, p value.OwnerPool) (value.OwnerProtection, error) {
+	o := f.configuration()
+	d := f.pin.ProtectionDigest
+	if f.mode == "wrong-guard" {
+		d[0]++
+	}
+	return value.OwnerProtection{Pool: p, Digest: d, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}, nil
+}
+func (f *installedObservationFixture) ObserveOwnerWorkload(ctx context.Context, b value.OwnerBinding, pod string) (value.OwnerObservationWorkload, error) {
+	if f.mode == "expired-before-token" {
+		<-ctx.Done()
+		return value.OwnerObservationWorkload{}, value.ErrUnavailable
+	}
+	if f.entered != nil {
+		close(f.entered)
+		<-ctx.Done()
+		<-f.release
+		return value.OwnerObservationWorkload{}, value.ErrUnavailable
+	}
+	if b != f.binding || pod != f.enrollment.Pod || f.mode == "wrong-template" {
+		return value.OwnerObservationWorkload{}, value.ErrUnavailable
+	}
+	o := f.configuration()
+	return value.OwnerObservationWorkload{Pin: f.pin, Binding: b, Pod: pod, ReplicaSetUID: f.enrollment.ReplicaSetUID, WorkloadDigest: artifact.Digest{7}, ObservedAt: o.ObservedAt, FreshUntil: o.FreshUntil}, nil
+}
+func (f *installedObservationFixture) ReadClusterObservationToken(context.Context) ([]byte, error) {
+	f.tokenReads.Add(1)
+	return []byte("synthetic-projected-observation-token"), nil
+}
+
+func installedObservationClientFixture(t *testing.T, mode string) (*InstalledClusterObservationClient, *installedObservationFixture) {
+	t.Helper()
+	base, _, _ := newRuntimeFixture(t)
+	base.configuration.Pool.Port = 9443
+	base.configuration.Pool.NativePort = 9444
+	base.configuration.Pool.NativeBootstrap = value.OwnerBootstrapProfile
+	if strings.HasPrefix(mode, "opted-") {
+		base.configuration.Pool.NativeCandidateLimit = 17
+	}
+	pin := value.OwnerObservationPin{RootID: runtimeID, SourceUID: runtimeID, Pool: base.configuration.Pool, TemplateDigest: artifact.Digest{3}, ImageDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}}
+	f := &installedObservationFixture{base: base, pin: pin, binding: value.OwnerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PodUID: runtimeID, ProcessEpoch: runtimeID}, mode: mode, bound: time.Now().Add(5 * time.Second)}
+	if mode == "short-original" {
+		f.bound = time.Now().Add(time.Second)
+	}
+	if mode == "blocked-template" {
+		f.entered = make(chan struct{})
+		f.release = make(chan struct{})
+	}
+	key, e := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	uri, _ := mtls.OwnerURI(f.binding)
+	exact, _ := mtls.OwnerServerName(f.binding)
+	common, _ := mtls.OwnerBootstrapServerName(pin.Pool)
+	now := time.Now().UTC().Truncate(time.Second)
+	_, until, _ := value.OwnerCertificateWindow(now)
+	leaf := &x509.Certificate{SerialNumber: big.NewInt(193), BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, DNSNames: []string{exact, common}, URIs: []*url.URL{uri}, NotBefore: now.Add(-30 * time.Second), NotAfter: until}
+	if mode == "wrong-common-name" {
+		leaf.DNSNames = leaf.DNSNames[:1]
+	}
+	der, e := x509.CreateCertificate(rand.Reader, leaf, base.ca, &key.PublicKey, base.key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.cert = value.OwnerCertificate{Binding: f.binding, Usage: "server", Digest: artifact.Digest(sha256.Sum256(der)), NotBefore: leaf.NotBefore, NotAfter: until}
+	f.enrollment = value.OwnerEnrollment{ID: runtimeID, Binding: f.binding, Usage: "server", Pool: pin.Pool, SourceUID: runtimeID, Pod: "owner-pod", ReplicaSet: "owner-rs", ReplicaSetUID: runtimeID, PublicKeyDigest: artifact.Digest{1}, InitialTokenDigest: artifact.Digest{2}, InitialWorkloadDigest: artifact.Digest{3}, InitialProtectionDigest: pin.ProtectionDigest, ClaimedAt: now, InitialHoldUntil: until.Add(time.Minute)}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.httpCalls.Add(1)
+		if r.TLS == nil || r.TLS.ServerName != common || r.Host != common+":9444" || r.RequestURI != contracts.ClusterObservationLocalPath || r.Header.Get("Authorization") != "Bearer synthetic-projected-observation-token" || r.ProtoMajor != 2 {
+			t.Error("incorrect authenticated local transport")
+			http.Error(w, "unavailable", 404)
+			return
+		}
+		if mode == "unknown-response" {
+			http.Error(w, "unavailable", 503)
+			return
+		}
+		data, e := io.ReadAll(io.LimitReader(r.Body, contracts.ClusterObservationBytes+1))
+		if e != nil {
+			t.Error(e)
+			return
+		}
+		input, e := contracts.DecodeClusterObservationLocalRequest(data)
+		if e != nil {
+			t.Error(e)
+			return
+		}
+		request, digest, e := wire.ParseRequest(input.Observation, time.Now())
+		if e != nil {
+			t.Error(e)
+			return
+		}
+		result := value.ClusterObservationResult{RequestID: request.ID, Challenge: request.Challenge, RootID: request.RootID, ClusterID: request.ClusterID, Purpose: request.Purpose, RequestDigest: digest, Interval: value.ClusterObservationInterval{ObservedAt: time.Now(), FreshUntil: request.NotAfter}, Namespaces: &value.ClusterNamespaceCandidatePage{ResourceVersion: "10", Items: []cfg.NamespaceRef{}}}
+		if mode == "wrong-result" {
+			result.Challenge = "22222222-2222-4222-8222-222222222222"
+		}
+		body, e := contracts.EncodeClusterObservationResult(wire.ResultWire(result))
+		if e != nil {
+			t.Error(e)
+			return
+		}
+		w.Header().Set("Content-Type", contracts.ClusterObservationLocalMedia)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = w.Write(body)
+	}))
+	server.EnableHTTP2 = true
+	server.TLS = &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}, NextProtos: []string{"h2"}}
+	server.StartTLS()
+	gate := &app.OwnerAuthenticator{Registry: f, Routes: f, Protection: f, Now: time.Now}
+	client, e := newInstalledClusterObservationClient(context.Background(), pin, runtimeID, server.Listener.Addr().String(), base.roots, f, gate, f, f, 2, time.Now)
+	if e != nil {
+		server.Close()
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { client.Close(); server.Close() })
+	return client, f
+}
+func installedObservationRequest() value.ClusterObservationRequest {
+	now := time.Now()
+	return value.ClusterObservationRequest{ID: runtimeID, Challenge: runtimeID, RootID: runtimeID, ClusterID: runtimeID, Purpose: value.ObserveCapacityNamespaces, RequestedAt: now, NotAfter: now.Add(5 * time.Second)}
+}
+
+// The real TLS/h2 client must authenticate the selected owner before even
+// reading a token. SQL/native authority fakes are explicit unit-test scope.
+func TestInstalledObservationClientAuthenticatesBeforeToken(t *testing.T) {
+	for _, mode := range []string{"valid", "short-original", "candidate-exclusion", "wrong-common-name", "registry-denial", "wrong-source", "not-ready", "wrong-guard", "wrong-template", "expired-before-token", "revoked-after-response", "source-revision-during-response", "wrong-result", "unknown-response"} {
+		t.Run(mode, func(t *testing.T) {
+			c, f := installedObservationClientFixture(t, mode)
+			request := installedObservationRequest()
+			got, e := c.ObserveCluster(context.Background(), request)
+			if mode == "valid" || mode == "short-original" {
+				digest, _ := wire.RequestDigest(request)
+				if e != nil || !got.Matches(request, digest, time.Now()) || got.Interval.FreshUntil.After(f.bound) {
+					t.Fatal("valid exact owner unavailable or original deadline extended", e)
+				}
+			} else if e == nil {
+				t.Fatal("invalid current owner/result accepted")
+			}
+			after := mode == "valid" || mode == "short-original" || mode == "revoked-after-response" || mode == "source-revision-during-response" || mode == "wrong-result" || mode == "unknown-response"
+			if after {
+				if f.tokenReads.Load() != 1 || f.httpCalls.Load() != 1 {
+					t.Fatal("request retried or not delivered exactly once", f.tokenReads.Load(), f.httpCalls.Load())
+				}
+			} else if f.tokenReads.Load() != 0 || f.httpCalls.Load() != 0 {
+				t.Fatal("token read or sent before selected owner proof", f.tokenReads.Load(), f.httpCalls.Load())
+			}
+		})
+	}
+}
+
+func TestInstalledObservationClientCloseJoinsSelectedProof(t *testing.T) {
+	c, f := installedObservationClientFixture(t, "blocked-template")
+	released := false
+	defer func() {
+		if !released {
+			close(f.release)
+		}
+	}()
+	done := make(chan error, 1)
+	go func() { _, e := c.ObserveCluster(context.Background(), installedObservationRequest()); done <- e }()
+	select {
+	case <-f.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("proof not entered")
+	}
+	closed := make(chan struct{})
+	go func() { c.Close(); close(closed) }()
+	select {
+	case <-closed:
+		t.Fatal("Close returned before admitted proof joined")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(f.release)
+	released = true
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not join")
+	}
+	if e := <-done; e == nil || f.tokenReads.Load() != 0 || f.httpCalls.Load() != 0 {
+		t.Fatal("cancelled proof disclosed token", e)
+	}
+	if _, e := c.ObserveCluster(context.Background(), installedObservationRequest()); e == nil {
+		t.Fatal("closed client admitted another request")
+	}
+}
+
+// A v2 pool must use the complete selected reader before token access. The
+// legacy method deliberately fails even though the actual TLS peer is healthy.
+func TestInstalledObservationClientSelectsOriginalCandidateReader(t *testing.T) {
+	for _, mode := range []string{"valid", "opted-valid", "opted-unavailable", "opted-changed-limit", "opted-overflow"} {
+		t.Run(mode, func(t *testing.T) {
+			client, f := installedObservationClientFixture(t, mode)
+			request := installedObservationRequest()
+			result, err := client.ObserveCluster(context.Background(), request)
+			good := mode == "valid" || mode == "opted-valid"
+			if (err == nil) != good {
+				t.Fatal("original selected candidate reader", err, f.candidateLegacy.Load(), f.candidateOpted.Load())
+			}
+			if mode == "valid" {
+				if f.candidateLegacy.Load() != 1 || f.candidateOpted.Load() != 0 {
+					t.Fatal("legacy input switched population reader")
+				}
+			} else if f.candidateLegacy.Load() != 0 || f.candidateOpted.Load() != 1 {
+				t.Fatal("opted source fell back or retried", f.candidateLegacy.Load(), f.candidateOpted.Load())
+			}
+			if good {
+				digest, _ := wire.RequestDigest(request)
+				if !result.Matches(request, digest, time.Now()) || f.tokenReads.Load() != 1 || f.httpCalls.Load() != 1 {
+					t.Fatal("exact complete peer transfer", f.tokenReads.Load(), f.httpCalls.Load())
+				}
+			} else if f.tokenReads.Load() != 0 || f.httpCalls.Load() != 0 {
+				t.Fatal("unavailable selected source disclosed token")
+			}
+		})
+	}
+}

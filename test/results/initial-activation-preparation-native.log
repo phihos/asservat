@@ -1,0 +1,72 @@
+=== RUN   TestInitialPreparationActivationWithRealKubernetes
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/healthy-native-request-drain
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-target_namespace
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-root
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-account
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-cluster_role
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-collection
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/healthy/retired-role-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-target_namespace
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-root
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-account
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-cluster_role
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-collection
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-role-cannot-refill
+=== RUN   TestInitialPreparationActivationWithRealKubernetes/uncertain/late-pod-create-after-fixture-guard-transition
+--- PASS: TestInitialPreparationActivationWithRealKubernetes (84.54s)
+    --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy (42.16s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/continuation-pod-delete-denied (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/healthy-native-request-drain (0.90s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-target_namespace (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-bootstrap_namespace (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-root (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-account (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-cluster_role (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-delete-collection (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-aggregation (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-owner (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-rules (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/deny-retirement-widening-labels (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/retired-rules-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/retired-rolebinding-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/retired-clusterrolebinding-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/healthy/retired-role-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain (42.38s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/continuation-pod-delete-denied (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-target_namespace (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-bootstrap_namespace (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-root (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-account (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-cluster_role (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-delete-collection (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-aggregation (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-owner (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-rules (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/deny-retirement-widening-labels (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-rules-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-rolebinding-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-clusterrolebinding-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/retired-role-cannot-refill (0.00s)
+        --- PASS: TestInitialPreparationActivationWithRealKubernetes/uncertain/late-pod-create-after-fixture-guard-transition (0.14s)
+PASS
+ok  	asservat.local/asservat/test/integration	85.597s

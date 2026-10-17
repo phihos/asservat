@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-13T15:40:52.403198+00:00",
+  "manifest": "75f015f9b7e0258eb1829c05a83f7d3ae9c2ded9657a28db6eaaedfb35153ed1",
+  "components": {
+    "owner-component-1": "3d1f916b5388e672340331763d949f053f22255ea2072b62493bce810f525599",
+    "owner-component-2": "69d8d0b00355097cd0f45d999573fefb1da5a5444a6537b3f5768be818862a63"
+  },
+  "paths": [
+    {
+      "path": "scripts/test-context-storage.py",
+      "base_sha256": "453a4949a6c6079b2805e2acfa0e0c52efac895c9c1e0308824963ea6871351f",
+      "payload_sha256": "a0d83fe73a95a373299371280d034c323c9019bea1daaa0d38318beb689fd511",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "scripts/test-initial-bootstrap-selection.py",
+      "base_sha256": "5bed11f5f50cfbda76ae4de383d3b07c6eb424c22e0330a7b8f099dfdc19aff1",
+      "payload_sha256": "392829efaa1f9db2bb497c35341335154d1b155552c27346d8c70bdd5876fa14",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_chain_test.go",
+      "base_sha256": "8c6476fb571312894fc091d343450c90b548a0eb79f437e4f8a1fca26d35859a",
+      "payload_sha256": "82779b0d5721e858d9722e66a05e022116db760987b6bf0d557f9227a715a3fb",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_audit_native_test.go",
+      "base_sha256": null,
+      "payload_sha256": "de390b31b8ee1a50de099ac2c014dfeae71914610848fe261526b98ad0b673a5",
+      "owner": "console-original"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_continuation_native_test.go",
+      "base_sha256": null,
+      "payload_sha256": "624e6600fa5cfde174225d7cef48ee7acc6a619ece604fc2fac613e1bcfbdc75",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_identity_native_test.go",
+      "base_sha256": null,
+      "payload_sha256": "307e3cd8c6adde882f60e6a84761470f2a81158f01a320d7ef269b0e91c688ed",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "base_sha256": null,
+      "payload_sha256": "147192f7fa86aec8ff896cd1f505aea700caa34b5ffcbf35ae083f689082b191",
+      "owner": "console-original"
+    },
+    {
+      "path": "test/integration/initial_runtime_provider_pair_native_test.go",
+      "base_sha256": "42460662a40a7f1a7a09c860c4bc60bcc26bb2710945aa1ff9bcd14126bf15f6",
+      "payload_sha256": "c5dbf1532415c99338d76eed119b64041b2a2d59d2c40e2f7bd01eb1fe3eb6bb",
+      "owner": "mcp-owner-fixture"
+    },
+    {
+      "path": "test/integration/initial_runtime_worker_source_native_test.go",
+      "base_sha256": "b9a79c03bfbb49a24f6de3cbf4d895965457807fdf0edeb91d64b2c673532973",
+      "payload_sha256": "d7716ff2684613c29d78895079fcf1b13caf91d7765f558edad8fe3c9fddcb0a",
+      "owner": "mcp-owner-fixture"
+    }
+  ],
+  "nativeQualified": false,
+  "runtimeEnablement": false
+}

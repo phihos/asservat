@@ -1,0 +1,63 @@
+# Regional observation listener checkpoint-v1
+
+Frozen candidate: five owned paths, 1,884 live dependencies. Exact manifest,
+payload/base/dependency maps, overlay, runner and freeze are adjacent. Parent
+owns live integration; no live path was changed by this work.
+
+## Result
+
+The one allocated sequential job (handle 91255) is terminal exit 0:
+
+| Gate | Exit | Elapsed command time |
+| --- | --- | --- |
+| native package compile only | 0 | 1.514s |
+| selected native listener race tests | 0 | 11.483s |
+| native package vet | 0 | 0.467s |
+
+Race package reported 9.455s and exactly 24 named PASS entries: seven new tests
+plus seventeen retained observation-listener entries (including subtests).
+All before/after live, base, payload, file-set and freeze differences are empty.
+Actual commands and exits are in evidence/{compile,race,vet}.json and matching
+logs. Runner uses GOMAXPROCS=2, GOFLAGS=-p=2, this checkpoint's TMPDIR, immutable
+Go overlay, selected `^TestOwner(RegionalObservationListener|Observation)`,
+`-race -count=1 -timeout=120s`, and a 240s bound per command. Its evidence directory
+is exclusive-create; it cannot overwrite this run. No broad suite, native API,
+SQL/service lab, Go architecture or spec gate was run in this allocation.
+
+## Change
+
+One explicit receiving entry point composes the fixed own-proof, local HWORK
+and regional standby paths on the original common-SNI authority. Existing
+observation entry points/signatures and omitted-regional behavior remain.
+The existing native raw connection owner retains slots through joined closure.
+Each purpose has a positive per-process budget, total at most 64; unclassified
+connections share the original 2s prelude, and classified standby cannot consume
+proof-reserved slots. Original accept+5s proof and accept+30s standby bounds are
+only shortened by caller/leaf expiry; path selection cannot reset them.
+
+Actual loopback TLS/h2 tests qualify >5s empty standby with independent proof
+capacity, per-path certificate requirements, clean terminal EOF, original parent
+and delayed-path bounds, 2s prelude expiry, and listener shutdown joining an
+admitted coordinator held by the test. Synthetic current authority/coordinator
+facts are explicit. This is a new separately selected API, not a regression
+claim that an old entry point already supported standby. Existing-path tests
+remain selected and pass.
+
+## Remaining boundary and next work
+
+No bootstrap runtime selector, acknowledged backend projection, exact-owner
+forwarder or installed regional process is enabled. The listener entry point
+cannot substitute for accepted credential/delegation production. Native
+multi-owner/two-cluster availability within the unchanged 5s request bound,
+including per-leg timing and actual API/SQL call counts, remains unqualified.
+
+Separate source-only routing proposal is at
+../../regional-observation-routing-design-20261013. It does not mutate this
+candidate: original candidate limit, grouped common-SNI read-only locator and
+one exact-SNI claim require coordinated fresh OwnerLayout v2 plus complete
+consumer/provenance checks. Parent-approved implementation scope comes after
+review; v1 claims/bytes must remain exact.
+
+Frozen canonical documentation states checks were unrun at source freeze. This
+handoff and immutable evidence record the subsequent passing component result;
+those tested payload bytes have not been rewritten to retrofit the verdict.

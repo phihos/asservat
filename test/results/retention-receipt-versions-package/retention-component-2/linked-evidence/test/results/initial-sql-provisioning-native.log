@@ -1,0 +1,42 @@
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/continuation-pod-delete-denied
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/healthy-native-request-drain
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/original-secret-and-role-replay
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/wrong-original-password-cannot-replace-state
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/retired-roles-cannot-be-revived
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-target_namespace
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-bootstrap_namespace
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-root
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-account
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-cluster_role
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-collection
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-aggregation
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-owner
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-rules
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-labels
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/retired-rules-cannot-refill
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/retired-rolebinding-cannot-refill
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/retired-clusterrolebinding-cannot-refill
+=== RUN   TestInitialPreparationSQLWithRealKubernetesPostgres/retired-role-cannot-refill
+--- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres (73.54s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/continuation-pod-delete-denied (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/healthy-native-request-drain (0.90s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/original-secret-and-role-replay (4.05s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/wrong-original-password-cannot-replace-state (1.20s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/retired-roles-cannot-be-revived (0.10s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-target_namespace (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-bootstrap_namespace (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-root (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-account (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-cluster_role (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-delete-collection (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-aggregation (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-owner (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-rules (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/deny-retirement-widening-labels (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/retired-rules-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/retired-rolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/retired-clusterrolebinding-cannot-refill (0.00s)
+    --- PASS: TestInitialPreparationSQLWithRealKubernetesPostgres/retired-role-cannot-refill (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	74.595s

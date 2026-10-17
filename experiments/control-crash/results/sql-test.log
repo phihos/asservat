@@ -1,0 +1,42 @@
+=== RUN   TestNaiveCrossRowQuotaFails
+    admission_test.go:127: unsafe Read Committed read-sum-then-insert admitted 16 units against an 8-unit budget
+--- PASS: TestNaiveCrossRowQuotaFails (0.07s)
+=== RUN   TestLastGrantAndLastCapacity
+    admission_test.go:148: 64 contenders: one last grant, one 8-unit non-context reservation; losers leak no starts
+--- PASS: TestLastGrantAndLastCapacity (0.20s)
+=== RUN   TestProtectedCapacityAndObjects
+    admission_test.go:187: A/C used their burst; B retained protected capacity; A retained context at hard ceiling; object ceiling independent
+--- PASS: TestProtectedCapacityAndObjects (0.07s)
+=== RUN   TestDuplicateOperationAndDigest
+--- PASS: TestDuplicateOperationAndDigest (0.20s)
+=== RUN   TestExpiredWhileWaitingAndTransactionClockTrap
+    admission_test.go:251: now() remained valid after real expiry; post-lock clock_timestamp check rejected without spend
+--- PASS: TestExpiredWhileWaitingAndTransactionClockTrap (1.09s)
+=== RUN   TestRevocationWinsWaitingAdmission
+--- PASS: TestRevocationWinsWaitingAdmission (0.10s)
+=== RUN   TestPublicationExpiryAfterArtifactLockWait
+--- PASS: TestPublicationExpiryAfterArtifactLockWait (0.56s)
+=== RUN   TestResultChildrenShareOneDisclosurePool
+    admission_test.go:323: collection starts exhausted, 4 children usable under one 64-unit parent pool; only 8 of 64 eight-unit spends admitted
+--- PASS: TestResultChildrenShareOneDisclosurePool (0.27s)
+=== RUN   TestUncertainChargeAndVerifiedDeletion
+--- PASS: TestUncertainChargeAndVerifiedDeletion (0.19s)
+=== RUN   TestCommitAcknowledgementLost
+    admission_test.go:398: discarded real server COMMIT acknowledgement; original key resolved to exactly one spent reservation/work item
+--- PASS: TestCommitAcknowledgementLost (0.07s)
+=== RUN   TestBackendTerminationRollsBackAdmission
+--- PASS: TestBackendTerminationRollsBackAdmission (0.06s)
+=== RUN   TestSerializableUnprotectedPredicate
+    admission_test.go:443: unlocked predicate conflict aborted with 40001; fresh complete retry observed exhausted capacity
+--- PASS: TestSerializableUnprotectedPredicate (0.12s)
+=== RUN   TestAuditedWorkClaimsAndFences
+    admission_test.go:501: audit gate; 24 workers claimed 12 distinct items; reclaimed lease rejected fence-1 completion. No remote effect executed
+--- PASS: TestAuditedWorkClaimsAndFences (0.14s)
+=== RUN   TestPrepareDurabilityMarker
+--- PASS: TestPrepareDurabilityMarker (0.05s)
+=== RUN   TestAfterRestartDurability
+    admission_test.go:516: separate post-restart invocation
+--- SKIP: TestAfterRestartDurability (0.00s)
+PASS
+ok  	asservat.local/experiments/control-crash	4.203s
+?   	asservat.local/experiments/control-crash/cmd/receiver	[no test files]

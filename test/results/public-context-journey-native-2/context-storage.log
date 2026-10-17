@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-regional-api-journey
+    context_native_content_test.go:782: durable audit unavailable
+--- FAIL: TestContextAdmissionWithRealServices (6.28s)
+    --- FAIL: TestContextAdmissionWithRealServices/native-regional-api-journey (6.18s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.343s
+FAIL

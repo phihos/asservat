@@ -1,0 +1,252 @@
+=== RUN   TestPublicRoleRootUnknownClaimCannotRenewFirstCreation
+=== RUN   TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/normal
+=== RUN   TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/lost-root-create
+=== RUN   TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/lost-claim
+--- PASS: TestPublicRoleRootUnknownClaimCannotRenewFirstCreation (12.66s)
+    --- PASS: TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/normal (4.37s)
+    --- PASS: TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/lost-root-create (4.37s)
+    --- PASS: TestPublicRoleRootUnknownClaimCannotRenewFirstCreation/lost-claim (3.92s)
+=== RUN   TestPublicRoleRootRevokedAdministratorAndCancelledCallerCannotClaim
+--- PASS: TestPublicRoleRootRevokedAdministratorAndCancelledCallerCannotClaim (1.42s)
+=== RUN   TestPublicRoleRootRejectsUnsupportedRetainedProcessCount
+--- PASS: TestPublicRoleRootRejectsUnsupportedRetainedProcessCount (2.92s)
+=== RUN   TestPublicRoleProjectionExcludesReconcilerCredentials
+--- PASS: TestPublicRoleProjectionExcludesReconcilerCredentials (3.51s)
+=== RUN   TestPublicRuntimeAllPurposeClaimCompletionKeepsOriginalWorkerProof
+--- PASS: TestPublicRuntimeAllPurposeClaimCompletionKeepsOriginalWorkerProof (139.93s)
+=== RUN   TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact
+=== RUN   TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact/false
+    public_runtime_roles_test.go:410: exact projection readback permission source identity changed
+    public_runtime_roles_test.go:255: role-root diagnostic: writes=2 root=true api="v1" kind="Secret" namespace=true name=true type=true fields=1 decode=true valid=true
+=== RUN   TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact/true
+    public_runtime_roles_test.go:410: exact projection readback permission source identity changed
+    public_runtime_roles_test.go:255: role-root diagnostic: writes=2 root=true api="v1" kind="Secret" namespace=true name=true type=true fields=1 decode=true valid=true
+--- FAIL: TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact (14.41s)
+    --- FAIL: TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact/false (7.22s)
+    --- FAIL: TestPublicRuntimeProjectionUnknownWriteAndRestartRemainExact/true (7.18s)
+=== RUN   TestPublicRuntimeProjectionUnknownClaimCannotCreate
+panic: test timed out after 3m0s
+	running tests:
+		TestPublicRuntimeProjectionUnknownClaimCannotCreate (5s)
+
+goroutine 13927 [running]:
+testing.(*M).startAlarm.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2961 +0x605
+created by time.goFunc
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/time/sleep.go:182 +0x45
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc0002b9448, {0x2442329, 0x33}, 0x3681ae0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2268 +0xb3e
+testing.runTests.func1(0xc0002b9448)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2744 +0x85
+testing.tRunner(0xc0002b9448, 0xc00053fa40)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+testing.runTests({0x240c482, 0x17}, {0x2444ed5, 0x34}, 0xc000016d20, {0x3726270, 0x11b, 0x11b}, {0xc2ab7e50914ccbdb, 0x29eb1654df, ...})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2742 +0x9ea
+testing.(*M).Run(0xc0003106e0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2602 +0xf45
+main.main()
+	_testmain.go:612 +0x165
+
+goroutine 13492 [select]:
+golang.org/x/time/rate.(*Limiter).wait(0xc00023aa50, {0x367b7e0, 0xc00018bae0}, 0x1, {0x4d04c9?, 0x0?, 0x372fde0?}, 0x3683ea8)
+	/home/phil/go/pkg/mod/golang.org/x/time@v0.15.0/rate/rate.go:286 +0x50f
+golang.org/x/time/rate.(*Limiter).WaitN(0xc00023aa50, {0x367b7e0, 0xc00018bae0}, 0x1)
+	/home/phil/go/pkg/mod/golang.org/x/time@v0.15.0/rate/rate.go:249 +0x5a
+golang.org/x/time/rate.(*Limiter).Wait(...)
+	/home/phil/go/pkg/mod/golang.org/x/time@v0.15.0/rate/rate.go:234
+k8s.io/client-go/util/flowcontrol.(*tokenBucketRateLimiter).Wait(0xc0003be030, {0x367b7e0, 0xc00018bae0})
+	/home/phil/go/pkg/mod/k8s.io/client-go@v0.37.0/util/flowcontrol/throttle.go:131 +0x4f
+k8s.io/client-go/rest.(*Request).tryThrottleWithInfo(0xc0003f0480, {0x367b7e0, 0xc00018bae0}, {0x0, 0x0})
+	/home/phil/go/pkg/mod/k8s.io/client-go@v0.37.0/rest/request.go:674 +0xd9
+k8s.io/client-go/rest.(*Request).tryThrottle(...)
+	/home/phil/go/pkg/mod/k8s.io/client-go@v0.37.0/rest/request.go:699
+k8s.io/client-go/rest.(*Request).request(0xc0003f0480, {0x367b7e0, 0xc00018bae0}, 0xc00098bc60)
+	/home/phil/go/pkg/mod/k8s.io/client-go@v0.37.0/rest/request.go:1056 +0x3eb
+k8s.io/client-go/rest.(*Request).DoRaw(0xc0003f0480, {0x367b7e0, 0xc00018bae0})
+	/home/phil/go/pkg/mod/k8s.io/client-go@v0.37.0/rest/request.go:1158 +0x1d9
+asservat.local/asservat/internal/adapters/kubernetes.(*PermissionClient).raw(0xc000268050, {0x367b7e0, 0xc00018bae0}, {0xc00069c060, 0x56}, 0x0)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/permissions.go:124 +0x3f8
+asservat.local/asservat/internal/adapters/kubernetes.checkAdmissionGuard({0x367b7e0, _}, {_, _}, {_, _}, {{0xc00030fe90, 0x24}, {0xc00030fef0, 0x24}, ...}, ...)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/permission_guard.go:118 +0x785
+asservat.local/asservat/internal/adapters/kubernetes.(*OwnerWorkloadProtection).Current(0xc00043e1e0, {0x367b850, 0xc0000a01c0})
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/owner_workload_guard.go:289 +0x6cc
+asservat.local/asservat/internal/adapters/kubernetes.(*PublicRuntimeRoleRoot).current(0xc0000d4e08, {0x367b850, 0xc0001cfe30})
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_roles.go:111 +0x853
+asservat.local/asservat/internal/adapters/kubernetes.(*PublicRuntimeRoleRoot).read(_, {_, _})
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_roles.go:245 +0x134
+asservat.local/asservat/internal/adapters/kubernetes.(*PublicRuntimeRoleRoot).ReadPublicRuntimeRoles(_, {_, _})
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_roles.go:279 +0x14a
+asservat.local/asservat/internal/adapters/kubernetes.TestPublicRuntimeProjectionUnknownClaimCannotCreate(0xc0003d86c8)
+	/home/phil/Projekte/asservat/internal/adapters/kubernetes/public_runtime_roles_test.go:458 +0x38f
+testing.tRunner(0xc0003d86c8, 0x3681ae0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2195 +0x21d
+created by testing.(*T).Run in goroutine 1
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/testing/testing.go:2260 +0xb13
+
+goroutine 13479 [IO wait]:
+internal/poll.runtime_pollWait(0x7f199afcc800, 0x72)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/netpoll.go:351 +0x85
+internal/poll.(*pollDesc).wait(0xc000699ea0, 0x72, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:84 +0xb1
+internal/poll.(*pollDesc).waitRead(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc000699e80, {0xc0005e6000, 0x6000, 0x6000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_unix.go:170 +0x499
+net.(*netFD).Read(0xc000699e80, {0xc0005e6000, 0x6000, 0x6000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/fd_posix.go:68 +0x4b
+net.(*conn).Read(0xc00033cdd0, {0xc0005e6000, 0x6000, 0x6000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/net.go:196 +0xad
+crypto/tls.(*Conn).readFromUntil(0xc0003ba008, {0x3670718, 0xc00033cdd0}, 0x5)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:820 +0x299
+crypto/tls.(*Conn).readRecordOrCCS(0xc0003ba008, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:626 +0x337
+crypto/tls.(*Conn).readRecord(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:588
+crypto/tls.(*Conn).Read(0xc0003ba008, {0xc0003b9000, 0x1000, 0xc00027a348?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:1392 +0x2d0
+net/http.(*persistConn).Read(0xc0000b9540, {0xc0003b9000, 0x1000, 0x1000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2300 +0x233
+bufio.(*Reader).fill(0xc0003eeae0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:113 +0x2a4
+bufio.(*Reader).Peek(0xc0003eeae0, 0x1)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:152 +0xaf
+net/http.(*persistConn).readLoop(0xc0000b9540)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2493 +0x325
+created by net/http.(*Transport).dialConn in goroutine 13477
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2123 +0x38f2
+
+goroutine 13494 [IO wait]:
+internal/poll.runtime_pollWait(0x7f199afcca00, 0x72)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/netpoll.go:351 +0x85
+internal/poll.(*pollDesc).wait(0xc0000de420, 0x72, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:84 +0xb1
+internal/poll.(*pollDesc).waitRead(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc0000de400, {0xc0007f1500, 0x5500, 0x5500})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_unix.go:170 +0x499
+net.(*netFD).Read(0xc0000de400, {0xc0007f1500, 0x5500, 0x5500})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/fd_posix.go:68 +0x4b
+net.(*conn).Read(0xc000106050, {0xc0007f1500, 0x5500, 0x5500})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/net.go:196 +0xad
+crypto/tls.(*Conn).readFromUntil(0xc00019d408, {0x3670718, 0xc000106050}, 0x5)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:820 +0x299
+crypto/tls.(*Conn).readRecordOrCCS(0xc00019d408, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:626 +0x337
+crypto/tls.(*Conn).readRecord(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:588
+crypto/tls.(*Conn).Read(0xc00019d408, {0xc00042c000, 0x1000, 0x0?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:1392 +0x2d0
+net/http.(*connReader).Read(0xc000568740, {0xc00042c000, 0x1000, 0x1000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:856 +0x288
+bufio.(*Reader).fill(0xc00012bc80)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:113 +0x2a4
+bufio.(*Reader).Peek(0xc00012bc80, 0x4)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:152 +0xaf
+net/http.(*conn).serve(0xc00071a000, {0x367b7a8, 0xc0006160c0})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2193 +0x112e
+created by net/http.(*Server).Serve in goroutine 13493
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3604 +0x92a
+
+goroutine 13484 [IO wait]:
+internal/poll.runtime_pollWait(0x7f199afcd000, 0x72)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/netpoll.go:351 +0x85
+internal/poll.(*pollDesc).wait(0xc0000dea20, 0x72, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:84 +0xb1
+internal/poll.(*pollDesc).waitRead(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc0000dea00, {0xc0004b7500, 0xa80, 0xa80})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_unix.go:170 +0x499
+net.(*netFD).Read(0xc0000dea00, {0xc0004b7500, 0xa80, 0xa80})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/fd_posix.go:68 +0x4b
+net.(*conn).Read(0xc0001065c0, {0xc0004b7500, 0xa80, 0xa80})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/net.go:196 +0xad
+crypto/tls.(*Conn).readFromUntil(0xc000576008, {0x3670718, 0xc0001065c0}, 0x5)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:820 +0x299
+crypto/tls.(*Conn).readRecordOrCCS(0xc000576008, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:626 +0x337
+crypto/tls.(*Conn).readRecord(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:588
+crypto/tls.(*Conn).Read(0xc000576008, {0xc0003f9000, 0x1000, 0xc0003147f8?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:1392 +0x2d0
+net/http.(*persistConn).Read(0xc00022f7c0, {0xc0003f9000, 0x1000, 0x1000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2300 +0x233
+bufio.(*Reader).fill(0xc000618f00)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:113 +0x2a4
+bufio.(*Reader).Peek(0xc000618f00, 0x1)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:152 +0xaf
+net/http.(*persistConn).readLoop(0xc00022f7c0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2493 +0x325
+created by net/http.(*Transport).dialConn in goroutine 13502
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2123 +0x38f2
+
+goroutine 13485 [select]:
+net/http.(*persistConn).writeLoop(0xc00022f7c0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2833 +0x1b5
+created by net/http.(*Transport).dialConn in goroutine 13502
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2124 +0x397d
+
+goroutine 13493 [IO wait]:
+internal/poll.runtime_pollWait(0x7f199afccc00, 0x72)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/netpoll.go:351 +0x85
+internal/poll.(*pollDesc).wait(0xc0002e4320, 0x72, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:84 +0xb1
+internal/poll.(*pollDesc).waitRead(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0xc0002e4300)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_unix.go:618 +0x4ea
+net.(*netFD).accept(0xc0002e4300)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/fd_unix.go:149 +0x45
+net.(*TCPListener).accept(0xc000741340)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/tcpsock_posix.go:159 +0x4e
+net.(*TCPListener).Accept(0xc000741340)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/tcpsock.go:387 +0x65
+crypto/tls.(*listener).Accept(0xc000422780)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/tls.go:78 +0x43
+net/http.(*Server).Serve(0xc0000b9400, {0x3679fb8, 0xc000422780})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3574 +0x6ad
+net/http/httptest.(*Server).goServe.func1()
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/httptest/server.go:586 +0xad
+created by net/http/httptest.(*Server).goServe in goroutine 13492
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/httptest/server.go:584 +0xeb
+
+goroutine 13483 [IO wait]:
+internal/poll.runtime_pollWait(0x7f199afcce00, 0x72)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/runtime/netpoll.go:351 +0x85
+internal/poll.(*pollDesc).wait(0xc000160220, 0x72, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:84 +0xb1
+internal/poll.(*pollDesc).waitRead(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc000160200, {0xc00048d000, 0x800, 0x800})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/internal/poll/fd_unix.go:170 +0x499
+net.(*netFD).Read(0xc000160200, {0xc00048d000, 0x800, 0x800})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/fd_posix.go:68 +0x4b
+net.(*conn).Read(0xc00033ce08, {0xc00048d000, 0x800, 0x800})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/net.go:196 +0xad
+crypto/tls.(*Conn).readFromUntil(0xc0003ba408, {0x3670718, 0xc00033ce08}, 0x5)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:820 +0x299
+crypto/tls.(*Conn).readRecordOrCCS(0xc0003ba408, 0x0)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:626 +0x337
+crypto/tls.(*Conn).readRecord(...)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:588
+crypto/tls.(*Conn).Read(0xc0003ba408, {0xc00051d000, 0x1000, 0x0?})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/crypto/tls/conn.go:1392 +0x2d0
+net/http.(*connReader).Read(0xc000568f80, {0xc00051d000, 0x1000, 0x1000})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:856 +0x288
+bufio.(*Reader).fill(0xc00055ac60)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:113 +0x2a4
+bufio.(*Reader).Peek(0xc00055ac60, 0x4)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/bufio/bufio.go:152 +0xaf
+net/http.(*conn).serve(0xc0001af3b0, {0x367b7a8, 0xc0006160c0})
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:2193 +0x112e
+created by net/http.(*Server).Serve in goroutine 13493
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/server.go:3604 +0x92a
+
+goroutine 13480 [select]:
+net/http.(*persistConn).writeLoop(0xc0000b9540)
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2833 +0x1b5
+created by net/http.(*Transport).dialConn in goroutine 13477
+	/home/phil/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.2.linux-amd64/src/net/http/transport.go:2124 +0x397d
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	180.058s
+FAIL

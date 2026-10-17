@@ -1,0 +1,404 @@
+{
+  "name": "get_artifact_download",
+  "description": "Read current authorized download status and verified native metadata. Never starts, repairs or decrypts evidence. Native file bytes use the authenticated content path, not MCP.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "download_id": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "required": [
+      "download_id"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d0"
+                  },
+                  {
+                    "not": {
+                      "required": [
+                        "continue_preparation"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "download_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "Preparing",
+              "Ready",
+              "Streaming",
+              "Completed",
+              "Interrupted",
+              "Cancelled",
+              "Expired",
+              "Denied",
+              "Failed"
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+          },
+          "native_format": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "content_path": {
+            "type": "string",
+            "pattern": "^/api/v1/downloads/[0-9a-f-]{36}/content$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Effective transfer deadline, no later than the original session deadline or current managed evidence access expiry. A past deadline is valid for terminal status and never renews preparation, transfer or resume authority."
+          },
+          "managed_read_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emitted_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "resume_available": {
+            "type": "boolean"
+          },
+          "local_copy_managed": {
+            "const": false
+          },
+          "handling_notice": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "coverage_notice": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "etag": {
+            "type": "string",
+            "pattern": "^\"[A-Za-z0-9_-]{1,120}\"$",
+            "description": "Strong opaque native-representation version; use with If-Match when resuming."
+          },
+          "continue_preparation": {
+            "const": true,
+            "description": "Only an acknowledged Preparing response to the explicit preparation operation permits bounded automatic continuation with the original key and deadline. Passive status never supplies this instruction."
+          }
+        },
+        "required": [
+          "download_id",
+          "artifact_id",
+          "state",
+          "expires_at",
+          "managed_read_until",
+          "emitted_bytes",
+          "resume_available",
+          "local_copy_managed",
+          "handling_notice"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "Ready",
+                    "Streaming",
+                    "Interrupted"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "content_path"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "content_path"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "Ready",
+                    "Streaming",
+                    "Interrupted"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "filename",
+                "native_format",
+                "size_bytes",
+                "sha256",
+                "etag",
+                "coverage_notice"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "Preparing",
+                    "Completed",
+                    "Cancelled",
+                    "Expired",
+                    "Denied",
+                    "Failed"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "resume_available": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "continue_preparation"
+              ]
+            },
+            "then": {
+              "properties": {
+                "state": {
+                  "const": "Preparing"
+                }
+              }
+            }
+          }
+        ],
+        "dependentRequired": {
+          "filename": [
+            "native_format",
+            "size_bytes",
+            "sha256",
+            "etag",
+            "coverage_notice"
+          ],
+          "native_format": [
+            "filename",
+            "size_bytes",
+            "sha256",
+            "etag",
+            "coverage_notice"
+          ],
+          "size_bytes": [
+            "filename",
+            "native_format",
+            "sha256",
+            "etag",
+            "coverage_notice"
+          ],
+          "sha256": [
+            "filename",
+            "native_format",
+            "size_bytes",
+            "etag",
+            "coverage_notice"
+          ],
+          "etag": [
+            "filename",
+            "native_format",
+            "size_bytes",
+            "sha256",
+            "coverage_notice"
+          ],
+          "coverage_notice": [
+            "filename",
+            "native_format",
+            "size_bytes",
+            "sha256",
+            "etag"
+          ]
+        },
+        "description": "Current authorized transfer status. Completed records the server transfer outcome, not local file persistence. Terminal status may omit native file metadata and remains readable after the transfer deadline while current evidence metadata authority permits it. Any included native metadata is the complete verified group; status reads never prepare or decrypt a file."
+      }
+    }
+  }
+}

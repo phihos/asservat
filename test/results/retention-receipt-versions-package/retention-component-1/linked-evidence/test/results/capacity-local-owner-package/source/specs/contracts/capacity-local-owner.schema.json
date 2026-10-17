@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capacity-local-owner.schema.json",
+  "title": "Original public owner inputs for installed capacity observation",
+  "description": "Private generated member of capacity-deployment.json. The complete capacity deployment remains at most 256 KiB. These original typed public inputs prove installation provenance only; current accepted same-pool revisions, SQL owner registration, Ready route, exact template/image, native guard and pinned issuer trust are independently checked before any local projected token is disclosed. No endpoint override, remote Kubernetes credential, private key or runtime role journal is carried.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source",
+    "pool",
+    "deployment"
+  ],
+  "properties": {
+    "source": {
+      "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/namespace"
+    },
+    "pool": {
+      "allOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json"
+        },
+        {
+          "properties": {
+            "revision": {
+              "const": 1
+            },
+            "suspended": {
+              "const": false
+            },
+            "port": {
+              "const": 9443
+            },
+            "nativePort": {
+              "const": 9444
+            },
+            "nativeBootstrap": {
+              "const": "owner-bootstrap/v1"
+            }
+          },
+          "required": [
+            "nativePort",
+            "nativeBootstrap"
+          ]
+        }
+      ]
+    },
+    "deployment": {
+      "allOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json"
+        },
+        {
+          "required": [
+            "observation",
+            "capacityProbe"
+          ],
+          "not": {
+            "required": [
+              "native"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

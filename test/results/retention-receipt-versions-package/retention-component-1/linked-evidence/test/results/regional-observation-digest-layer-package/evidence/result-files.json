@@ -1,0 +1,14 @@
+{
+  "../regional-observation-digest-layer-20261013/evidence/after-architecture.json": "fad3580fd1b9f69a82801c0ca3238f60a698338a34ddd275124d9b978f4c9681",
+  "../regional-observation-digest-layer-20261013/evidence/after-architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "../regional-observation-digest-layer-20261013/evidence/before-architecture.json": "180b0bd9df26e8cdf80ba63fb502ca8e46316d7354e336d5d19dac2043538542",
+  "../regional-observation-digest-layer-20261013/evidence/before-architecture.log": "ccdbf3b37f72bc24f92656e0813b85d05cf90b3fe85483b406aba2a83701269c",
+  "../regional-observation-digest-layer-20261013/evidence/race.json": "c108a0a7a7efaec3cba8e28edf19047c8acbf3bebb251e346892645083706b81",
+  "../regional-observation-digest-layer-20261013/evidence/race.log": "b0278bbac9acaa4b5772a2224ddc3474056e199ec6515017132834c5fe42817a",
+  "evidence/after-architecture.json": "637b2e8da59b1d5979020e34f7bdf812cd08e3ae0d414cd0efbb4d81b2296e61",
+  "evidence/after-architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "evidence/race.json": "edce314bb0472e3669bd6104f463a094ec7faf9bc33e8ed98230bc8d09ad3a44",
+  "evidence/race.log": "8ca31289ed53e1b7be18077b2defc81ff1b267e1f77e5c55047d32e19f9e5dfc",
+  "evidence/vet.json": "a23baaf1ad33835720532c0f80490d4329dc17e03b6b4370fc235f3eb9188e4a",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

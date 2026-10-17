@@ -1,0 +1,13 @@
+# Private leased owner effects
+
+Handle 83073 completed exit 0. Two new source files; all payloads/new-file bases and 1,984 dependencies stayed unchanged before/after each command. No live edits or native lab.
+
+- KMS package compile: exit 0, 2.453 seconds.
+- `go test -race -count=1 -timeout=180s -v -run '^TestOwnerProvider' ./internal/adapters/kms` through the exact overlay: exit 0, 4.809 seconds; 28 top-level tests pass and the native test correctly skips without opt-in.
+- KMS vet: exit 0, 0.499 seconds.
+
+The private factory creates its four lifetime owners and four purpose-specific clients from the same validated recipe. It uses the existing maintained Bao codecs, Transit binding verification, owner permit checks and certificate-result verification. Each leased client additionally rejects another method/origin/path before credential borrowing. Existing constructors, token paths and input selectors are unchanged.
+
+Three new tests prove no authentication on the evidence path, an actual TLS synthetic-provider Transit roundtrip and binding rejection, exact four-purpose control/effect counts, fixed-path denial before disclosure, both existing signing permits and no retry of an unknown provider signing response. The existing nine lifetime tests and control/lease/recipe regressions remain passing. This is component qualification; synthetic current-proof callbacks, SQL-free fixtures and synthetic provider replies are not installed authority. Actual provider response qualification from the earlier native suite does not establish an installed effect supervisor.
+
+The next shared change is one complete fresh installed-owner v2 branch: provider profile plus nativeCandidateLimit, generated projection/activation/identity-reader handling, concrete native/accepted-SQL proof and runtime supervision. Legacy v1 bytes/replay must remain exact. No recognized-but-ignored profile field may be introduced. Root coordinates source-only implementation while full Go is running; no subsequent build allocated.

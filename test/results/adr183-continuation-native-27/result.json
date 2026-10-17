@@ -1,0 +1,13 @@
+{
+  "name": "adr183-continuation-native-27",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [],
+  "result": "Fixture setup failure before any Go test ran: 'kubectl rollout status deployment/fixture --timeout=90s' timed out in the synthetic namespace while the harness created its owned cluster. No product code ran. The copied context-storage.log was a stale copy from run 26 and is kept only as stale-context-storage-from-run-26.log. Cleanup report: no failures, build scratch removed. Rerun as run 28.",
+  "scope": "Infrastructure only.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "environment": "environment.json"
+}

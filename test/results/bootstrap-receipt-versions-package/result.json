@@ -1,0 +1,184 @@
+{
+  "native": false,
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/home/phil/.cache/asservat-build/asservat-bootstrap-receipts-covzxh5q",
+  "manifest": "903654ebcff9fdfba5376528e18561b43996946bf65145d7678a4661dbfc53de",
+  "dependencies": "79137c0b7008d13989d54675cf338d75153af8ddbded645f7163feb14f113ed1",
+  "runner": "2bf7b672bfa08eb12201edb0ce80d5ae2b03614e845e2aa8df8960358adbdcfe",
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/objectstore",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 20.845,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "919d19fde98af9f6103900eb88d197b2a27c777276f38b806442ec4e18d69f1a",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "before-bootstrap",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/bootstrap-receipt-versions-20261013/checks/component-1/before-overlay.json",
+        "-run=^TestBootstrapCurrentAuditRequiresImmutableVersion$",
+        "-count=1",
+        "-timeout=120s",
+        "-v",
+        "./internal/domain/audit"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 1.065,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "8e238cbebc3fc67e2ed8606547395e82b6070452b9011be70fcd663ac04e2b52",
+      "passes": 4,
+      "topPasses": 0
+    },
+    {
+      "name": "affected-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=300s",
+        "-v",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/objectstore"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 36.777,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "5131d1b6d43917b123a7a6c3eb15975783f9e6068e38c408af47700f91630063",
+      "passes": 1204,
+      "topPasses": 249
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./internal/domain/audit",
+        "./internal/adapters/postgres",
+        "./internal/application/audit",
+        "./internal/application/fleet",
+        "./internal/adapters/objectstore",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 2.367,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "sql-check",
+      "command": [
+        "make",
+        "sql-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "ASSERVAT_BUILD_TMP=/home/phil/.cache/asservat-build/asservat-bootstrap-receipts-covzxh5q/build",
+        "SQLC=/home/phil/.cache/asservat-build/bin/sqlc"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 0.314,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "dfe5547742a13c882b72d293672e3f1489e46c52c6508517f35672d79d8d32db",
+      "passes": 0,
+      "topPasses": 0
+    },
+    {
+      "name": "canonical",
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 9.176,
+      "hashes": {
+        "deps": [],
+        "inventory": [],
+        "payload": [],
+        "bases": [],
+        "directories": []
+      },
+      "logSHA256": "89c81d7e42673a513e3c32c91065e4bd5b134ec59669c2851df63f27cb9eecd8",
+      "passes": 0,
+      "topPasses": 0
+    }
+  ],
+  "sqlcSHA256": "fae55f275d1a5d8722eb5b52b97a2cc2d2f39e3d9135dd0449291be21df26b44",
+  "mirrorDrift": [],
+  "finalHashes": {
+    "deps": [],
+    "inventory": [],
+    "payload": [],
+    "bases": [],
+    "directories": []
+  },
+  "scratchRemoved": true,
+  "exit": 0
+}

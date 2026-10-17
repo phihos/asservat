@@ -1,0 +1,4 @@
+# asservat.local/asservat/internal/adapters/mtls [asservat.local/asservat/internal/adapters/mtls.test]
+internal/adapters/mtls/worker_trust_test.go:23:18: undefined: NewWorkerTrustCatalog
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL

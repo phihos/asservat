@@ -1,0 +1,26 @@
+=== RUN   TestHubWorkerExternalCloseJoinsRunBeforeClosingResources
+I1013 09:31:32.344852 2109262 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+E1013 09:31:32.445364 2109262 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+--- PASS: TestHubWorkerExternalCloseJoinsRunBeforeClosingResources (0.13s)
+=== RUN   TestHubWorkerCloseBeforeRunPreventsAnyLeaderRead
+--- PASS: TestHubWorkerCloseBeforeRunPreventsAnyLeaderRead (0.03s)
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/valid
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-source
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/http-provider
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document
+--- PASS: TestHubWorkerProjectionPinsAndProviderIsolation (0.03s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/valid (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-source (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/http-provider (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.244s

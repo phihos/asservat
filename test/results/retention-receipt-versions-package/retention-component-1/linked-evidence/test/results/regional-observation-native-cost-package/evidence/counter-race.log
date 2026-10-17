@@ -1,0 +1,8 @@
+=== RUN   TestOwnerObservationCostCounterClosedLabels
+--- PASS: TestOwnerObservationCostCounterClosedLabels (0.00s)
+=== RUN   TestOwnerObservationCostCounterTransparent
+--- PASS: TestOwnerObservationCostCounterTransparent (0.00s)
+=== RUN   TestOwnerObservationCostCounterConcurrent
+--- PASS: TestOwnerObservationCostCounterConcurrent (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.052s

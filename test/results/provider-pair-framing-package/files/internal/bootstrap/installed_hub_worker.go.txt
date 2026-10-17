@@ -1,0 +1,140 @@
+package bootstrap
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"os"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/contracts"
+)
+
+// InstalledHubWorkerDeployment owns the three fixed A-HWORK children. Only
+// configuration starts with the initial projection. Capacity and cleanup wait
+// independently for their original journal's positively completed receipts.
+// This constructor is not selected by the command until the complete protected
+// provider/projection handoff has been qualified.
+type InstalledHubWorkerDeployment struct{ capacity *CapacityHubWorkerDeployment }
+
+func NewInstalledHubWorkerDeployment(ctx context.Context, files *os.Root) (*InstalledHubWorkerDeployment, error) {
+	d, err := NewProvisionedCapacityHubWorkerDeployment(ctx, files)
+	if err != nil {
+		return nil, err
+	}
+	return &InstalledHubWorkerDeployment{capacity: d}, nil
+}
+
+func (d *InstalledHubWorkerDeployment) Run() error {
+	if d == nil || d.capacity == nil {
+		return mounts.ErrUnavailable
+	}
+	b := d.capacity
+	if b.configuration == nil || b.activation == nil || b.configuration.leader == nil || b.configuration.reconciler == nil {
+		return mounts.ErrUnavailable
+	}
+	b.mu.Lock()
+	if b.closed || b.running || b.root == nil || b.root.Err() != nil {
+		b.mu.Unlock()
+		return mounts.ErrUnavailable
+	}
+	b.running = true
+	b.owners.Add(1)
+	b.mu.Unlock()
+	defer func() { b.owners.Done(); b.Close() }()
+	return b.configuration.leader.Run(b.root, func(lease context.Context) error {
+		return runInstalledWorkerChildren(lease, b.configuration.runConfiguration, b.runCapacity, d.runCleanup)
+	})
+}
+
+// Every child receives the same original Lease deadline/cancellation. The
+// first return closes all three; this callback cannot report joined until all
+// children have actually returned, including failed or still-closing work.
+func runInstalledWorkerChildren(ctx context.Context, configuration, capacity, cleanup func(context.Context) error) error {
+	if ctx == nil || ctx.Err() != nil || configuration == nil || capacity == nil || cleanup == nil {
+		return mounts.ErrUnavailable
+	}
+	call, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 3)
+	go func() { done <- configuration(call) }()
+	go func() { done <- capacity(call) }()
+	go func() { done <- cleanup(call) }()
+	err := <-done
+	cancel()
+	<-done
+	<-done
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err == nil {
+		return mounts.ErrUnavailable
+	}
+	return err
+}
+
+var errCleanupProjectionMountPending = errors.New("cleanup projection mount pending")
+
+func (d *InstalledHubWorkerDeployment) runCleanup(ctx context.Context) error {
+	b := d.capacity
+	var mountUntil time.Time
+	for {
+		claim, ready, until, err := b.activation.ReadCleanup(ctx)
+		if err != nil {
+			return err
+		}
+		if ready {
+			if mountUntil.IsZero() {
+				mountUntil = time.Now().Add(30 * time.Second)
+			}
+			if !time.Now().Before(mountUntil) {
+				return mounts.ErrUnavailable
+			}
+			err = d.openCleanup(ctx, claim, until)
+			if !errors.Is(err, errCleanupProjectionMountPending) {
+				return err
+			}
+		}
+		if ctx.Err() != nil || !time.Now().Before(until) {
+			return mounts.ErrUnavailable
+		}
+		timer := time.NewTimer(time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (d *InstalledHubWorkerDeployment) openCleanup(ctx context.Context, claim contracts.CaptureCleanupProjectionClaim, until time.Time) error {
+	if d == nil || d.capacity == nil || d.capacity.mounts == nil || d.capacity.activation == nil || ctx == nil || ctx.Err() != nil || claim.Receipt == nil || !time.Now().Before(until) {
+		return mounts.ErrUnavailable
+	}
+	b := d.capacity
+	files, err := b.mounts.OpenRoot(contracts.HubWorkerCleanupProjectionDirectory)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) && ctx.Err() == nil && time.Now().Before(until) {
+			return errCleanupProjectionMountPending
+		}
+		return mounts.ErrUnavailable
+	}
+	defer files.Close()
+	// The constructor freshly rechecks this exact receipt and workload before
+	// any credential opens, then bounds all startup work by that observation.
+	// The earlier read only selects the fixed mount; it confers no SQL effect.
+	child, err := NewCaptureCleanupWorkerDeployment(ctx, files, b.input, b.activation, claim)
+	if err != nil {
+		return err
+	}
+	defer child.Close()
+	return child.Run(ctx)
+}
+
+func (d *InstalledHubWorkerDeployment) Close() {
+	if d != nil && d.capacity != nil {
+		d.capacity.Close()
+	}
+}

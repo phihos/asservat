@@ -1,0 +1,6 @@
+=== RUN   TestHubConfigurationWorkerInRestrictedPod
+    hub_worker_test.go:254: Operation cannot be fulfilled on deployments.apps "worker": the object has been modified; please apply your changes to the latest version and try again
+--- FAIL: TestHubConfigurationWorkerInRestrictedPod (0.26s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.319s
+FAIL

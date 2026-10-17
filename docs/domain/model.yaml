@@ -1,0 +1,1196 @@
+version: 1
+status: conceptual-design; not a physical migration or generated CRD schema
+entities:
+- name: BrowserLogin
+  boundary: identity
+  authority: verified-OIDC-challenge
+  storage: encrypted-SQL
+  fields:
+  - name: stateAndBrowserHashes
+    type: DigestPair
+  - name: encryptedChallenge
+    type: CredentialEnvelope
+  - name: expiresAt
+    type: Instant
+- name: BrowserSession
+  boundary: identity
+  authority: current-OIDC-and-protected-policy
+  storage: encrypted-SQL
+  fields:
+  - name: cookieHash
+    type: Digest
+  - name: epoch
+    type: InstallationEpoch
+  - name: principal
+    type: Principal
+  - name: providerSession
+    type: IssuerScopedSessionId
+  - name: encryptedCredentials
+    type: CredentialEnvelope
+  - name: version
+    type: Revision
+  - name: refreshClaim
+    type: FiniteNonReusableClaim?
+  - name: expiresAt
+    type: Instant
+- name: Principal
+  boundary: identity
+  authority: identity-provider
+  storage: none
+  fields:
+  - name: subject
+    type: SubjectId
+  - name: groups
+    type: SubjectId[]
+  - name: authenticatedAt
+    type: Instant
+  - name: assurance
+    type: Assurance
+- name: ClusterRegistration
+  boundary: fleet
+  authority: hub
+  storage: cluster
+  fields:
+  - name: id
+    type: ClusterId
+  - name: revision
+    type: Revision
+  - name: region
+    type: RegionId
+  - name: connectorIdentity
+    type: KeyRef
+  - name: state
+    type: EnrollmentState
+  - name: lastSeenAt
+    type: Instant?
+- name: InstallationProfile
+  boundary: configuration
+  authority: Kubernetes-and-operator-values
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: identityRef
+    type: SecretRef
+  - name: storageRefs
+    type: ConfigRef[]
+  - name: supportedVersions
+    type: Version[]
+- name: PermissionSource
+  boundary: authorization
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: derivation
+    type: PermissionRule
+  - name: protectedKeys
+    type: String[]
+  - name: freshnessLimit
+    type: Duration
+  - name: guardQualification
+    type: EvidenceRef
+- name: AccessBinding
+  boundary: authorization
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: subjects
+    type: SubjectId[]
+  - name: roles
+    type: Role[]
+  - name: scope
+    type: WorkloadScope
+  - name: expiresAt
+    type: Instant?
+  - name: automation
+    type: AutomationEnvelope?
+- name: CollectionCeiling
+  boundary: authorization
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: allowedActions
+    type: ActionKind[]
+  - name: scope
+    type: WorkloadScope
+  - name: limits
+    type: ResourceVector
+- name: AccessDecision
+  boundary: authorization
+  authority: derived-current
+  storage: none
+  fields:
+  - name: decisionId
+    type: DecisionId
+  - name: principal
+    type: SubjectId
+  - name: operation
+    type: OperationKind
+  - name: scopeDigest
+    type: Digest
+  - name: outcome
+    type: Decision
+  - name: sourceRevisions
+    type: ConfigRef[]
+  - name: evaluatedAt
+    type: Instant
+  - name: validUntil
+    type: Instant
+  - name: reasons
+    type: ReasonCode[]
+- name: AccessGrant
+  boundary: authorization
+  authority: hub
+  storage: access_grant
+  fields:
+  - name: id
+    type: GrantId
+  - name: revision
+    type: Revision
+  - name: requester
+    type: SubjectId
+  - name: reviewer
+    type: SubjectId?
+  - name: scopeDigest
+    type: Digest
+  - name: planRef
+    type: ProtectedRef
+  - name: operation
+    type: GrantKind
+  - name: limits
+    type: ResourceVector
+  - name: state
+    type: GrantState
+  - name: expiresAt
+    type: Instant
+  - name: consumed
+    type: ResourceVector
+  - name: resultAccess
+    type: ResultAccessScope?
+  - name: resultOrigin
+    type: ResultGrantOrigin?
+  - name: resultAccessCounters
+    type: ResultAccessCounters?
+- name: GrantReservation
+  boundary: authorization
+  authority: hub
+  storage: grant_reservation
+  fields:
+  - name: id
+    type: ReservationId
+  - name: grantId
+    type: GrantId
+  - name: operationId
+    type: OperationId
+  - name: slice
+    type: ResourceVector
+  - name: fence
+    type: Fence
+  - name: state
+    type: ReservationState
+  - name: deadline
+    type: Instant
+- name: WorkloadProjection
+  boundary: targeting
+  authority: Kubernetes-derived
+  storage: config_projection
+  fields:
+  - name: key
+    type: WorkloadKey
+  - name: namespaceUid
+    type: KubeUid
+  - name: kind
+    type: WorkloadKind
+  - name: selector
+    type: SelectorRef
+  - name: generation
+    type: Generation
+  - name: pods
+    type: PodIdentity[]
+  - name: freshness
+    type: Freshness
+- name: ResolvedTarget
+  boundary: targeting
+  authority: accepted-scope
+  storage: protected-object
+  fields:
+  - name: pod
+    type: PodIdentity
+  - name: node
+    type: NodeIdentity
+  - name: processes
+    type: ProcessIdentity[]
+  - name: resolutionRule
+    type: ProtectedRef
+  - name: resolvedAt
+    type: Instant
+- name: CapabilityReport
+  boundary: fleet
+  authority: qualified-observation
+  storage: config_projection-or-protected-object
+  fields:
+  - name: id
+    type: ReportId
+  - name: clusterId
+    type: ClusterId
+  - name: environmentDigest
+    type: Digest
+  - name: mechanism
+    type: Mechanism
+  - name: configured
+    type: Bool
+  - name: inspected
+    type: Bool
+  - name: qualified
+    type: Bool
+  - name: evidenceRef
+    type: EvidenceRef?
+  - name: validUntil
+    type: Instant
+  - name: limitations
+    type: ReasonCode[]
+- name: CaptureProfile
+  boundary: authoring
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: catalog
+    type: CatalogScope
+  - name: version
+    type: Version
+  - name: definitionDigest
+    type: Digest
+  - name: definitionRef
+    type: ProtectedRef
+  - name: editableFields
+    type: FieldConstraint[]
+  - name: availability
+    type: Availability
+- name: RecipeDefinition
+  boundary: authoring
+  authority: Kubernetes-or-protected-request
+  storage: config_projection-or-protected-object
+  fields:
+  - name: identity
+    type: DefinitionId
+  - name: version
+    type: Version
+  - name: actions
+    type: ActionDefinition[]
+  - name: edges
+    type: ActionEdge[]
+  - name: limits
+    type: ResourceVector
+  - name: composition
+    type: CompositionRef[]
+- name: DebugPolicy
+  boundary: authoring
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: target
+    type: WorkloadScope
+  - name: trigger
+    type: TriggerExpression
+  - name: recipeRef
+    type: DefinitionRef
+  - name: observationLimit
+    type: Count
+  - name: incidentPodLimit
+    type: Count
+  - name: recordingSavesEnabled
+    type: Bool
+  - name: sharingRef
+    type: ProtectedRef?
+- name: PolicyActivation
+  boundary: execution
+  authority: hub-with-local-projections
+  storage: operation-and-config_projection
+  fields:
+  - name: id
+    type: ActivationId
+  - name: policy
+    type: ConfigRef
+  - name: executor
+    type: SubjectId
+  - name: collectionDigest
+    type: Digest
+  - name: grantIds
+    type: GrantId[]
+  - name: fence
+    type: Fence
+  - name: state
+    type: ActivationState
+  - name: observedCoverage
+    type: Coverage
+  - name: sourceIds
+    type: SourceSessionId[]
+  - name: createdBy
+    type: SubjectId
+  - name: automationAuthority
+    type: PolicyAuthority
+  - name: sponsoringAssignments
+    type: AssignmentId[]
+- name: AcceptedScope
+  boundary: execution
+  authority: immutable-acceptance
+  storage: protected-object
+  fields:
+  - name: captureId
+    type: CaptureId
+  - name: requester
+    type: SubjectId
+  - name: executor
+    type: SubjectId
+  - name: operation
+    type: CaptureKind
+  - name: planDigest
+    type: Digest
+  - name: sharingDigest
+    type: Digest?
+  - name: targets
+    type: ResolvedTarget[]
+  - name: limits
+    type: ResourceVector
+  - name: expiresAt
+    type: Instant
+  - name: configPins
+    type: ConfigRef[]
+  - name: assessment
+    type: AssessmentRef
+  - name: policyAuthority
+    type: PolicyAuthority?
+- name: Operation
+  boundary: execution
+  authority: hub
+  storage: operation
+  fields:
+  - name: id
+    type: OperationId
+  - name: revision
+    type: Revision
+  - name: principal
+    type: SubjectId
+  - name: client
+    type: ClientId
+  - name: kind
+    type: OperationKind
+  - name: idempotencyDigest
+    type: Digest
+  - name: requestDigest
+    type: Digest
+  - name: state
+    type: OperationState
+  - name: deadline
+    type: Instant
+  - name: outcomeRef
+    type: ProtectedRef?
+- name: Capture
+  boundary: execution
+  authority: hub
+  storage: capture
+  fields:
+  - name: id
+    type: CaptureId
+  - name: operationId
+    type: OperationId
+  - name: kind
+    type: CaptureKind
+  - name: origin
+    type: CaptureOrigin
+  - name: scopeRef
+    type: ProtectedRef
+  - name: scopeDigest
+    type: Digest
+  - name: acceptedAt
+    type: Instant
+  - name: finalizeBy
+    type: Instant
+  - name: state
+    type: CaptureState
+  - name: repeatedFrom
+    type: CaptureId?
+  - name: occurrenceId
+    type: OccurrenceId?
+- name: ActionAttempt
+  boundary: execution
+  authority: hub-with-fenced-local-work
+  storage: action_attempt
+  fields:
+  - name: id
+    type: AttemptId
+  - name: captureId
+    type: CaptureId
+  - name: actionId
+    type: ActionId
+  - name: attempt
+    type: Count
+  - name: permitId
+    type: PermitId
+  - name: fence
+    type: Fence
+  - name: state
+    type: AttemptState
+  - name: startDisposition
+    type: StartDisposition
+  - name: outputIds
+    type: ArtifactId[]
+  - name: deadline
+    type: Instant
+- name: SourceSession
+  boundary: recording
+  authority: node-with-signed-hub-projection
+  storage: local-runtime-and-protected-checkpoint
+  fields:
+  - name: id
+    type: SourceSessionId
+  - name: activationId
+    type: ActivationId
+  - name: pod
+    type: PodIdentity
+  - name: node
+    type: NodeIdentity
+  - name: actionId
+    type: ActionId
+  - name: definitionDigest
+    type: Digest
+  - name: filterGeneration
+    type: Generation
+  - name: state
+    type: SourceState
+  - name: leaseUntil
+    type: Instant
+  - name: retentionEnd
+    type: Instant
+  - name: coverage
+    type: Coverage
+  - name: reserved
+    type: ResourceVector
+- name: SourceSnapshot
+  boundary: recording
+  authority: accepted-capture-and-fenced-node
+  storage: action_attempt-and-protected-object
+  fields:
+  - name: id
+    type: SnapshotId
+  - name: captureId
+    type: CaptureId
+  - name: sourceId
+    type: SourceSessionId
+  - name: acceptedEnd
+    type: Instant
+  - name: uncertainty
+    type: Duration
+  - name: before
+    type: Duration
+  - name: after
+    type: Duration
+  - name: actualCoverage
+    type: Coverage
+  - name: state
+    type: SnapshotState
+  - name: expiresAt
+    type: Instant
+- name: CaptureHistory
+  boundary: history
+  authority: derived-hub-index
+  storage: capture_history-and-capture_settings_reference
+  fields:
+  - name: captureId
+    type: CaptureId
+  - name: selectorKey
+    type: Digest
+  - name: settingsRef
+    type: ProtectedRef
+  - name: settingsKind
+    type: CaptureKind
+  - name: audienceId
+    type: AudienceId
+  - name: repeatedFrom
+    type: CaptureId?
+  - name: expiresAt
+    type: Instant
+- name: Case
+  boundary: catalog
+  authority: hub
+  storage: case_record
+  fields:
+  - name: id
+    type: CaseId
+  - name: revision
+    type: Revision
+  - name: groupingKey
+    type: Digest
+  - name: labelRef
+    type: ProtectedRef?
+  - name: createdAt
+    type: Instant
+  - name: lastActivityAt
+    type: Instant
+- name: Occurrence
+  boundary: catalog
+  authority: hub
+  storage: occurrence
+  fields:
+  - name: id
+    type: OccurrenceId
+  - name: caseId
+    type: CaseId
+  - name: captureId
+    type: CaptureId
+  - name: triggerKind
+    type: TriggerKind
+  - name: signatureDigest
+    type: Digest
+  - name: acceptedAt
+    type: Instant
+  - name: outcome
+    type: OccurrenceOutcome
+- name: Artifact
+  boundary: evidence
+  authority: committed-manifest-with-hub-index
+  storage: artifact-and-protected-manifest
+  fields:
+  - name: id
+    type: ArtifactId
+  - name: captureId
+    type: CaptureId
+  - name: kind
+    type: ArtifactKind
+  - name: manifestRef
+    type: ProtectedRef
+  - name: digest
+    type: Digest
+  - name: dataClass
+    type: DataClass
+  - name: privacy
+    type: PrivacyClass[]
+  - name: audienceId
+    type: AudienceId
+  - name: state
+    type: ArtifactState
+  - name: acquisitionStart
+    type: Instant
+  - name: readUntil
+    type: Instant
+  - name: deleteBy
+    type: Instant
+- name: ArtifactParent
+  boundary: evidence
+  authority: hub-and-manifest
+  storage: artifact_parent
+  fields:
+  - name: childId
+    type: ArtifactId
+  - name: parentId
+    type: ArtifactId
+  - name: relation
+    type: LineageKind
+  - name: inheritedDeadline
+    type: Instant
+- name: ArtifactCopy
+  boundary: evidence
+  authority: hub-ledger-with-region-verification
+  storage: artifact_copy
+  fields:
+  - name: id
+    type: CopyId
+  - name: artifactId
+    type: ArtifactId
+  - name: storageRef
+    type: ProtectedRef
+  - name: region
+    type: RegionId
+  - name: kind
+    type: CopyKind
+  - name: bytes
+    type: Bytes
+  - name: state
+    type: CopyState
+  - name: deleteBy
+    type: Instant
+  - name: verifiedAt
+    type: Instant?
+- name: AudienceAssignment
+  boundary: authorization
+  authority: acquisition-and-accepted-sharing
+  storage: audience_assignment
+  fields:
+  - name: id
+    type: AudienceId
+  - name: evidenceId
+    type: EvidenceId
+  - name: principalsOrRules
+    type: AudienceRule[]
+  - name: retainedAt
+    type: Instant
+  - name: expiresAt
+    type: Instant
+- name: AnalysisRun
+  boundary: analysis
+  authority: hub-with-fenced-local-work
+  storage: operation-and-protected-outcome
+  fields:
+  - name: id
+    type: QueryId
+  - name: operationId
+    type: OperationId
+  - name: inputs
+    type: ArtifactId[]
+  - name: queryRef
+    type: ProtectedRef
+  - name: authorization
+    type: DecisionRef
+  - name: limits
+    type: ResourceVector
+  - name: state
+    type: AnalysisState
+  - name: resultRef
+    type: ProtectedRef?
+  - name: deadline
+    type: Instant
+- name: EvidenceShare
+  boundary: sharing
+  authority: hub
+  storage: evidence_share-and-share_artifact-and-share_recipient
+  fields:
+  - name: id
+    type: ShareId
+  - name: revision
+    type: Revision
+  - name: originIntent
+    type: IntentId?
+  - name: artifacts
+    type: ArtifactId[]
+  - name: recipients
+    type: SubjectId[]
+  - name: state
+    type: ShareState
+  - name: expiresAt
+    type: Instant
+  - name: createdBy
+    type: SubjectId
+- name: SharingIntent
+  boundary: sharing
+  authority: hub-from-authenticated-instruction
+  storage: sharing_intent
+  fields:
+  - name: id
+    type: IntentId
+  - name: revision
+    type: Revision
+  - name: origin
+    type: InstructionOrigin
+  - name: selectionRef
+    type: ProtectedRef
+  - name: recipientSetDigest
+    type: Digest
+  - name: publicationLimit
+    type: Count
+  - name: expiresAt
+    type: Instant
+  - name: state
+    type: IntentState
+  - name: createdBy
+    type: SubjectId
+- name: ManagerAssignment
+  boundary: sharing
+  authority: hub-from-current-owner-authority
+  storage: manager_assignment
+  fields:
+  - name: id
+    type: AssignmentId
+  - name: resourceId
+    type: SharingResourceId
+  - name: subject
+    type: SubjectId
+  - name: role
+    type: ManagerRole
+  - name: revision
+    type: Revision
+  - name: validUntil
+    type: Instant?
+- name: SharingRegistration
+  boundary: sharing
+  authority: hub
+  storage: sharing_registration-and-publication_slot
+  fields:
+  - name: id
+    type: RegistrationId
+  - name: intentId
+    type: IntentId
+  - name: captureId
+    type: CaptureId
+  - name: slot
+    type: Count
+  - name: state
+    type: RegistrationState
+  - name: concreteShareId
+    type: ShareId?
+  - name: deadline
+    type: Instant
+- name: SelectionApproval
+  boundary: sharing
+  authority: hub
+  storage: selection_approval
+  fields:
+  - name: id
+    type: ApprovalId
+  - name: intentId
+    type: IntentId?
+  - name: scopeDigest
+    type: Digest
+  - name: reviewer
+    type: SubjectId
+  - name: requester
+    type: SubjectId
+  - name: expiresAt
+    type: Instant
+  - name: state
+    type: ApprovalState
+- name: CapacityAccount
+  boundary: capacity
+  authority: hub-or-fenced-local-slice
+  storage: capacity_account
+  fields:
+  - name: id
+    type: AccountId
+  - name: parentId
+    type: AccountId?
+  - name: scopeKey
+    type: Digest
+  - name: vectorLimit
+    type: ResourceVector
+  - name: committed
+    type: ResourceVector
+  - name: reserved
+    type: ResourceVector
+  - name: uncertain
+    type: ResourceVector
+  - name: fence
+    type: Fence
+  - name: revision
+    type: Revision
+- name: CapacityReservation
+  boundary: capacity
+  authority: hub-or-fenced-local-slice
+  storage: capacity_reservation-and-allocation_slice
+  fields:
+  - name: id
+    type: ReservationId
+  - name: accountId
+    type: AccountId
+  - name: operationId
+    type: OperationId
+  - name: slice
+    type: ResourceVector
+  - name: state
+    type: ReservationState
+  - name: fence
+    type: Fence
+  - name: deadline
+    type: Instant
+- name: EvidenceRetentionPolicy
+  boundary: privacy
+  authority: Kubernetes
+  storage: config_projection
+  fields:
+  - name: source
+    type: ConfigRef
+  - name: scope
+    type: WorkloadScope
+  - name: rules
+    type: RetentionRule[]
+  - name: deletionBudget
+    type: Duration
+  - name: exceptionMode
+    type: ExceptionMode
+- name: PrivacyDecision
+  boundary: privacy
+  authority: authorized-hub-decision
+  storage: revocation-and-lifecycle_work-and-protected-outcome
+  fields:
+  - name: id
+    type: DecisionId
+  - name: evidenceIds
+    type: ArtifactId[]
+  - name: expectedRevision
+    type: Revision
+  - name: action
+    type: PrivacyAction
+  - name: reasonRef
+    type: ProtectedRef
+  - name: actor
+    type: SubjectId
+  - name: acceptedAt
+    type: Instant
+- name: DeletionWork
+  boundary: privacy
+  authority: hub-ledger
+  storage: lifecycle_work-and-deletion_tombstone
+  fields:
+  - name: id
+    type: WorkId
+  - name: copyId
+    type: CopyId
+  - name: state
+    type: DeletionState
+  - name: dueAt
+    type: Instant
+  - name: attempts
+    type: Count
+  - name: nextAttemptAt
+    type: Instant?
+  - name: fence
+    type: Fence
+  - name: verificationRef
+    type: EvidenceRef?
+- name: AuditReference
+  boundary: audit
+  authority: append-only-audit
+  storage: audit_reference
+  fields:
+  - name: id
+    type: AuditId
+  - name: actor
+    type: SubjectId
+  - name: action
+    type: OperationKind
+  - name: scopeDigest
+    type: Digest
+  - name: decision
+    type: Decision
+  - name: protectedRecordRef
+    type: ProtectedRef
+  - name: committedAt
+    type: Instant
+- name: DeliveryWork
+  boundary: delivery
+  authority: hub-or-local-authorized-queue
+  storage: outbox-and-work_lease
+  fields:
+  - name: id
+    type: WorkId
+  - name: aggregateId
+    type: AggregateId
+  - name: eventId
+    type: EventId
+  - name: kind
+    type: EventKind
+  - name: leaseOwner
+    type: WorkerId?
+  - name: fence
+    type: Fence
+  - name: nextAttemptAt
+    type: Instant
+  - name: deadline
+    type: Instant
+  - name: state
+    type: DeliveryState
+- name: Overview
+  boundary: read-model
+  authority: derived-authorized
+  storage: none
+  fields:
+  - name: counts
+    type: AuthorizedCounts
+  - name: attention
+    type: AuthorizedLink[]
+  - name: refreshedAt
+    type: Instant
+- name: InterfaceHelp
+  boundary: read-model
+  authority: versioned-product-documentation
+  storage: static-assets
+  fields:
+  - name: release
+    type: Version
+  - name: routes
+    type: SurfaceId[]
+  - name: shortcuts
+    type: Shortcut[]
+- name: LiveWatch
+  boundary: live-observation
+  authority: hub-session-with-fenced-source-projection
+  storage: live_watch-and-protected-scope
+  fields:
+  - name: id
+    type: WatchId
+  - name: revision
+    type: Revision
+  - name: viewer
+    type: SubjectId
+  - name: client
+    type: ClientId
+  - name: sourceBindings
+    type: ProtectedRef
+  - name: projection
+    type: ProjectionKind
+  - name: displayFilterRef
+    type: ProtectedRef
+  - name: state
+    type: WatchState
+  - name: acceptedAt
+    type: Instant
+  - name: expiresAt
+    type: Instant
+  - name: idleExpiresAt
+    type: Instant
+  - name: outputSpent
+    type: Bytes
+  - name: reservations
+    type: ReservationId[]
+  - name: fence
+    type: Fence
+  - name: workerLease
+    type: LeaseRef
+- name: LiveBatch
+  boundary: live-observation
+  authority: hub-session-with-fenced-source-projection
+  storage: transient-bounded-memory-only
+  fields:
+  - name: id
+    type: BatchId
+  - name: watchId
+    type: WatchId
+  - name: viewRevision
+    type: Revision
+  - name: sourcePositions
+    type: SourcePosition[]
+  - name: rows
+    type: ApprovedLiveRow[]
+  - name: gaps
+    type: CoverageGap[]
+  - name: nextCursor
+    type: OpaqueCursor?
+  - name: expiresAt
+    type: Instant
+- name: ArtifactDownload
+  boundary: evidence
+  authority: hub-with-fenced-regional-transfer
+  storage: download-session-and-capacity-reservations
+  fields:
+  - name: id
+    type: DownloadId
+  - name: artifactId
+    type: ArtifactId
+  - name: version
+    type: ImmutableArtifactVersion
+  - name: actor
+    type: PrincipalRef
+  - name: authority
+    type: DecisionRef
+  - name: state
+    type: DownloadState
+  - name: generation
+    type: Revision
+  - name: limits
+    type: ResourceVector
+  - name: emittedBytes
+    type: ByteCount
+  - name: uncertainBytes
+    type: ByteCount
+  - name: deadline
+    type: Instant
+relations:
+- source: ClusterRegistration
+  target: WorkloadProjection
+  cardinality: 1:N
+  invariant: cluster identity; not ownership
+- source: DebugPolicy
+  target: PolicyActivation
+  cardinality: 1:N
+  invariant: successive immutable execution scopes
+- source: PolicyActivation
+  target: SourceSession
+  cardinality: 1:N
+  invariant: independently leased observed pod/action epochs
+- source: Capture
+  target: ActionAttempt
+  cardinality: 1:N
+  invariant: bounded action attempts
+- source: Capture
+  target: AcceptedScope
+  cardinality: '1:1'
+  invariant: protected immutable plan
+- source: SourceSession
+  target: SourceSnapshot
+  cardinality: 1:N
+  invariant: snapshot does not own recorder lifetime
+- source: Capture
+  target: SourceSnapshot
+  cardinality: 1:N
+  invariant: only ongoing actions or recording-save
+- source: Case
+  target: Occurrence
+  cardinality: 1:N
+  invariant: grouping does not grant access
+- source: Occurrence
+  target: Capture
+  cardinality: '1:1'
+  invariant: accepted event/manual operation
+- source: Capture
+  target: Artifact
+  cardinality: 1:N
+  invariant: zero artifacts permitted for failed capture
+- source: Artifact
+  target: ArtifactParent
+  cardinality: 1:N
+  invariant: acyclic lineage
+- source: Artifact
+  target: ArtifactCopy
+  cardinality: 1:N
+  invariant: every managed copy charged
+- source: AnalysisRun
+  target: Artifact
+  cardinality: N:M
+  invariant: authorize all input and output lineage
+- source: SharingIntent
+  target: SharingRegistration
+  cardinality: 1:N
+  invariant: bounded publication slots
+- source: SharingRegistration
+  target: EvidenceShare
+  cardinality: 1:0..1
+  invariant: concrete immutable selection
+- source: EvidenceShare
+  target: Artifact
+  cardinality: N:M
+  invariant: each artifact independently authorized
+- source: EvidenceShare
+  target: ManagerAssignment
+  cardinality: 1:N
+  invariant: multiple immutable subject IDs
+- source: SharingIntent
+  target: ManagerAssignment
+  cardinality: 1:N
+  invariant: owner teams are not creators
+- source: AccessGrant
+  target: GrantReservation
+  cardinality: 1:N
+  invariant: spend before side effect
+- source: CapacityAccount
+  target: CapacityReservation
+  cardinality: 1:N
+  invariant: reserve before acquisition
+- source: ArtifactCopy
+  target: DeletionWork
+  cardinality: 1:N
+  invariant: retries preserve liability
+- source: LiveWatch
+  target: SourceSession
+  cardinality: N:M
+  invariant: exact authorized epochs; no source lifetime ownership
+- source: LiveWatch
+  target: LiveBatch
+  cardinality: 1:N
+  invariant: bounded transient projection, no artifact or durable replay
+- source: LiveWatch
+  target: CapacityReservation
+  cardinality: 1:N
+  invariant: independent view resources; incident priority
+- source: ArtifactDownload
+  target: Artifact
+  kind: downloads-exact-existing-version
+conceptual_enums:
+  CaptureKind:
+  - collect
+  - recordingSave
+  CaptureOrigin:
+  - manual
+  - policy
+  - discovery
+  CaptureState:
+  - Pending
+  - Validating
+  - AwaitingApproval
+  - Armed
+  - Queued
+  - Running
+  - Finalizing
+  - Succeeded
+  - Partial
+  - Failed
+  - Cancelled
+  - Indeterminate
+  SourceState:
+  - Pending
+  - Warming
+  - Ready
+  - Degraded
+  - Stopped
+  - Expired
+  GrantState:
+  - Pending
+  - Approved
+  - Denied
+  - Revoked
+  - Expired
+  - Exhausted
+  ShareState:
+  - PendingApproval
+  - Active
+  - Revoked
+  - Expired
+  IntentState:
+  - PendingApproval
+  - Active
+  - PublishingStopped
+  - Blocked
+  - Revoked
+  - Expired
+  - Exhausted
+  CopyState:
+  - Reserved
+  - Writing
+  - Committed
+  - DeletePending
+  - DeleteOverdue
+  - VerifiedAbsent
+  - Indeterminate
+  DataClass:
+  - metadata
+  - extract
+  - raw
+  StartDisposition:
+  - NotStarted
+  - ConfirmedStarted
+  - Unknown
+  DeletionState:
+  - Pending
+  - Running
+  - Overdue
+  - VerifiedAbsent
+  - Indeterminate
+  WatchState:
+  - Active
+  - Paused
+  - Closed
+  - Expired
+  - Exhausted
+  - SourceEnded
+  - AccessLost
+  - Disconnected
+contract_mappings:
+  Capture: specs/contracts/mcp-tools.json#get_capture
+  AcceptedScope: specs/contracts/collection-scope.schema.json
+  SourceSnapshot: specs/contracts/action-lifecycle.schema.json
+  recordingSave: specs/contracts/recording-save.schema.json
+  AccessGrant: specs/contracts/grant.schema.json
+  EvidenceShare: specs/contracts/share.schema.json
+  SharingIntent: specs/contracts/sharing-intent.schema.json
+  RecipeDefinition: specs/contracts/recipe.schema.json
+  CaptureProfile: specs/contracts/capture-profile.schema.json
+  PrivacyClassification: specs/contracts/privacy-common.schema.json
+  LiveWatch: specs/contracts/live-watch.schema.json
+  ArtifactDownload: specs/contracts/artifact-download.schema.json

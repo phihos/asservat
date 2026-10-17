@@ -1,0 +1,56 @@
+# ADR153 typed carrier and effect ownership review
+
+Source-only candidate. No production selector, SQL change, runtime composition or test execution is included. The original PROPOSAL.md and source-evidence.json remain unchanged.
+
+## Exact first source scope
+
+- `changes/internal/domain/fleet/connector_lifecycle_operation.go`: closed enrollment/client-sign/server-sign binding, four explicit phases, original/current/final observation value and exact continuity/clone rules. Values grant no authority and cannot reconstruct a retained operation.
+- `changes/internal/application/fleet/connector_lifecycle_operation.go`: purpose-only factory and lifetime port; no implementation of existing full source/proof interfaces.
+- `before/internal/adapters/kubernetes/connector_lifecycle_nested_regression_test.go`: actual concrete HTTPS source/attester composition, retained original 20-QPS/burst-20 clients, real application Enroll, synthetic current SQL/audit/recovery ports. One exact standalone count check and an intentionally failing success-within-original-bound test. It logs only fixed ordinal, numeric elapsed/remaining/request counts and effect counters.
+
+No current source is replaced by these three files. Their first build must prove that the fixture reaches real initial native proof and a retained process/audit admission before reporting the expected repeated-proof bound failure. If the fixture fails sooner, that is an invalid reproducer, not the intended before evidence.
+
+## Carrier and private owner
+
+`ConnectorLifecycleRequest` holds `Binding{ID,Purpose,Process,RequestedAt,NotAfter}` and the exact two CSR buffers. Binding contains no new native observation or renewal capability. The application fixes the original <=5s end before calling Begin, intersecting the original parent (including Reconcile <=30s). The concrete Begin rejects missing/expired/overlong context bounds, deep-clones both CSR buffers and all nested plans, and ties cleanup to the original root.
+
+`ConnectorLifecycleOperation` has only Read(ctx,phase) and Close(). The concrete object spends the next phase before I/O and rejects concurrent/duplicate/reordered reads permanently. Failed or cancelled I/O cancels the object. Close joins all admitted native reads; it never refunds SQL/provider attempts or proves a remote join. Only that concrete factory can own private native state. No caller-provided callback, result UUID or returned proof reconstructs it.
+
+The initial complete proof retains its original dates forever in `Original`. `Source` is the separately dated actual full current value read. `FinalProof` exists only at Final and contains the second independent native observation, exact same source/security facts and its actual later start. `Until` is the monotonic intersection of original caller/native/source/token/root/backing caps and later observed shortenings. A current value cannot extend Original, and a later Final cannot refresh it. Continuity compares exact Original dates as well as all identity/security facts; the consumer additionally retains the same operation instance.
+
+The native owner retains the complete initial backing and roles and compares every freshly decoded full value, including same-revision mutations. The public value carries the existing exact backing revision/digests; it does not replace the private complete-body equality. Source protection and workload protection remain distinct. Allowed status/resource-version-only startup changes retain the legacy process attester semantics; they must not be rejected merely by importing observation-purpose workload equality.
+
+Allowed phase sequences are Initial -> BeforeEffect -> BeforeActivation -> Final, or Initial -> BeforeActivation -> Final only when the coordinator has verified an exact previously stored outcome/certificate. This branch never reopens audit or signing. The native owner allows the monotonic skip but does not decide journal replay authority. The coordinator owns that decision from the existing exact journal receipt checks.
+
+## Smallest coordinator integration (next, after carrier review)
+
+Keep public `ConnectorProcessEnrollment.Enroll`, `ConnectorRenewal.Issue`, `ConnectorRenewal.IssueProcess`, general source/attester/registry and retirement behavior unchanged. Add explicitly named `ConnectorLifecycleEnrollment` and `ConnectorLifecycleRenewal` services. They implement the existing consumer-owned Enroll/IssueProcess interfaces used by process credentials, so no new mTLS constructor or runtime selector is needed for this checkpoint.
+
+To avoid forking the irreversible audit/SQL/provider effect implementation, extract each existing coordinator body into one private effect runner with a private purpose-specific current-check interface. Its old entry points supply the unchanged full-proof implementation; the new explicit entry points supply one retained lifecycle operation. This is local static composition, not an exported authority callback and not a cache placed behind `ConnectorProcessProofReader` or `ConnectorIdentitySourceReader`. Legacy parity tests must prove the same four full proof calls and source calls/order/unknown handling. If the extraction obscures that guarantee, keep it separate from the initial native component checkpoint.
+
+The new current-check implementation validates exact binding, phase, unchanged Original, Source and prior result; immediately narrows context to every newly returned earlier cap; then reads the existing independent RecoveryReader under that narrowed context. Recovery is read at every current phase, and its earlier cap is carried into subsequent SQL/audit/provider work. A recovery error/change/expiry or mismatch permanently closes the operation. No effect uses the result until all those checks pass after blocking I/O.
+
+Private conversion for enrollment returns the existing `ConnectorProcessCurrent{Proof: Original.Clone(), Recovery: actualRecovery, ObservedAt: originalRequestStart, Until: min(original/prior/value/recovery/caller)}`. It does **not** overwrite Proof.ObservedAt, Proof.FreshUntil or its Configuration dates with the intermediate value dates. The conversion requires the current value to match the retained complete native proof/source, including roles/backing, and therefore cannot be invoked on an arbitrary structurally valid carrier alone: it belongs to the check object that owns the original operation.
+
+Signing uses existing `ConnectorCredentialCurrent{ProcessProof: &Original, Source: actualCurrentSource, Recovery: actualRecovery, ObservedAt: originalRequestStart, Until: sameMinimum}`. The independent Peer field stays zero. The actual Source may have a later read start, but still ends no later than the original native/request cap. Existing permit historical-overlap and current validation rules continue to apply. No returned `ConnectorLifecycleObservation` is passed directly to SQL or serialized into the old proof slot.
+
+The SQL49 functions already check original Proof/Configuration/Recovery intervals against database current time after current trust/root/profile locks, plus exact accepted source/backing and process/attempt binding. They do not demand a newly acquired native guard timestamp on every effect. `lock_connector_process_current` (migration49 lines791-808), credential candidate locking, and acceptance/claim/activation remain unchanged. The new application conversion supplies the original still-valid proof, rather than extending SQL semantics. No migration, new JSON field ignored by SQL, new grant or pool is planned.
+
+## Closed effect schedule
+
+| Phase | Enrollment effect | Signing effect |
+| --- | --- | --- |
+| Initial complete native + current recovery | Existing Prepare and exact admission validation, then existing audit Begin | Existing Prepare and exact attempt validation, then existing audit Begin |
+| Actual BeforeEffect value/token/chain/policy + recovery | Existing outcome construction and Store | Existing irreversible Claim, provider Sign, strict verification and Store under the same shortened bound |
+| Actual BeforeActivation value/token/chain/policy + recovery | After audit Finish, exact current Accept | After audit Finish, exact current Activate |
+| Independent complete Final native + actual final value + recovery | Suppress acknowledged process result unless still current | Strict current final certificate verification; suppress delivery unless still current |
+
+Every existing post-lock/time/cancellation check remains. A known failure before an effect denies it; a failure after a committed/unknown effect suppresses success but retains original admission, stored outcome, provider attempt and activation spend. Unknown signing is never repeated. The operation cannot restart after Final or failure, even with identical request IDs. Durable exact-outcome reconciliation remains a separate new bounded request that can finish its already-stored operation only through existing original journal rules; it never invents another signing attempt or clears uncertain state.
+
+## Native validation work and remaining proof
+
+The first/final implementation will share only pure object validators and the actual responses within a single complete boundary, not an ADR150 observation handle. Original token/CSR/key, current account/Pod/ReplicaSet/Deployment chain, full exact source/backing, both guards and native denied probes remain genuine. Intermediate twelve actual observer reads retain the original denied enforcement interval, check both current policy/binding pairs and online token/live object/value facts, and never claim to perform a new denied probe.
+
+Projected 22/6 + 12/0 + 12/0 + 22/6 remains an unqualified target. The concrete count regression must verify it and native qualification must measure the whole initial and renewing Reconcile with the original <=30s, each original <=5s, real SQL/audit/provider latency and actual shared client contention. Existing source/registry reads outside the three operations remain in that count. No isolated fast boundary or source arithmetic can qualify the full H/A/R observation path or installed sustained availability.
+
+The before test uses an original fixed recovery observation and the true caller deadline, and never resets the bucket between calls. It retains the admission if later proof fails. It is not a test of PostgreSQL locking or encrypted audit; those must be exercised later by the native H/A/R fixture after component review.

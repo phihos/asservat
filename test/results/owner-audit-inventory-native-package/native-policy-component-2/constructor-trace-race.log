@@ -1,0 +1,8 @@
+{"Time":"2026-10-13T19:05:21.369358789+02:00","Action":"start","Package":"asservat.local/asservat/test/integration"}
+{"Time":"2026-10-13T19:05:21.419652074+02:00","Action":"run","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryTraceUsesActualConstructor"}
+{"Time":"2026-10-13T19:05:21.419690454+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryTraceUsesActualConstructor","Output":"=== RUN   TestOwnerAuditInventoryTraceUsesActualConstructor\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:21.432339165+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryTraceUsesActualConstructor","Output":"--- PASS: TestOwnerAuditInventoryTraceUsesActualConstructor (0.01s)\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:21.432353855+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Test":"TestOwnerAuditInventoryTraceUsesActualConstructor","Elapsed":0.01}
+{"Time":"2026-10-13T19:05:21.432412576+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-13T19:05:22.435196155+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"ok  \tasservat.local/asservat/test/integration\t1.066s\n"}
+{"Time":"2026-10-13T19:05:22.435225396+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Elapsed":1.066}

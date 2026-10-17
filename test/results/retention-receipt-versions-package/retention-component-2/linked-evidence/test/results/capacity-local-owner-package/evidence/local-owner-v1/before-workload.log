@@ -1,0 +1,6 @@
+=== RUN   TestInstalledWorkerOriginalRoleReceiptsCoverCapacityGraph
+    hub_worker_capacity_reads_test.go:56: installed builder omitted capacity observer/probe grant
+--- FAIL: TestInstalledWorkerOriginalRoleReceiptsCoverCapacityGraph (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.078s
+FAIL

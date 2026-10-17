@@ -1,0 +1,87 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-13 15:50:16.514 UTC [122] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 15:50:16.514 UTC [122] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 15:50:16.533 UTC [134] LOG:  database system was shut down at 2026-10-13 15:50:14 UTC
+2026-10-13 15:50:16.543 UTC [122] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-13 15:50:16.683 UTC [122] LOG:  received fast shutdown request
+.2026-10-13 15:50:16.685 UTC [122] LOG:  aborting any active transactions
+2026-10-13 15:50:16.687 UTC [122] LOG:  background worker "logical replication launcher" (PID 137) exited with exit code 1
+2026-10-13 15:50:16.687 UTC [132] LOG:  shutting down
+2026-10-13 15:50:16.690 UTC [132] LOG:  checkpoint starting: shutdown immediate
+2026-10-13 15:50:17.582 UTC [132] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.022 s, sync=0.857 s, total=0.896 s; sync files=303, longest=0.007 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-13 15:50:17.597 UTC [122] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-13 15:50:17.704 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-13 15:50:17.704 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-13 15:50:17.704 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-13 15:50:17.707 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-13 15:50:17.714 UTC [186] LOG:  database system was shut down at 2026-10-13 15:50:17 UTC
+2026-10-13 15:50:17.719 UTC [1] LOG:  database system is ready to accept connections
+2026-10-13 15:54:30.264 UTC [344] FATAL:  password authentication failed for user "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager"
+2026-10-13 15:54:30.264 UTC [344] DETAIL:  User "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 15:54:30.819 UTC [345] FATAL:  password authentication failed for user "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager"
+2026-10-13 15:54:30.819 UTC [345] DETAIL:  User "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 15:55:04.546 UTC [347] FATAL:  password authentication failed for user "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager"
+2026-10-13 15:55:04.546 UTC [347] DETAIL:  User "asservat_init_09fb66ad28434ef8a7d43ff7b5f4113e_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-13 15:55:17.814 UTC [184] LOG:  checkpoint starting: time
+2026-10-13 15:56:48.103 UTC [184] LOG:  checkpoint complete: wrote 902 buffers (5.5%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=90.138 s, sync=0.136 s, total=90.290 s; sync files=588, longest=0.010 s, average=0.001 s; distance=9687 kB, estimate=9687 kB; lsn=0/250D350, redo lsn=0/250AE78
+2026-10-13 15:56:54.511 UTC [359] WARNING:  role "postgres" has not been granted membership in role "as_09fb66ad28434ef8a7d43ff7b5f4113e_cfg_00" by role "postgres"
+2026-10-13 15:56:59.063 UTC [359] WARNING:  role "postgres" has not been granted membership in role "as_09fb66ad28434ef8a7d43ff7b5f4113e_cfg_01" by role "postgres"
+2026-10-13 15:57:03.610 UTC [359] WARNING:  role "postgres" has not been granted membership in role "as_09fb66ad28434ef8a7d43ff7b5f4113e_cfg_02" by role "postgres"
+2026-10-13 15:57:24.969 UTC [366] ERROR:  canceling statement due to lock timeout
+2026-10-13 15:57:24.969 UTC [366] CONTEXT:  while locking tuple (0,3) in relation "fleet_trust"
+2026-10-13 15:57:24.969 UTC [366] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	
+2026-10-13 15:57:25.970 UTC [366] ERROR:  canceling statement due to lock timeout
+2026-10-13 15:57:25.970 UTC [366] CONTEXT:  while updating tuple (0,3) in relation "fleet_trust"
+2026-10-13 15:57:25.970 UTC [366] STATEMENT:  -- name: FenceFleetObservation :execrows
+	UPDATE fleet_trust SET suspended=true,observed_at=clock_timestamp(),fresh_until=clock_timestamp()+interval '1 microsecond'
+	WHERE installation_id=$1 AND observed_at<=$2::timestamptz
+	
+2026-10-13 15:57:35.896 UTC [366] ERROR:  canceling statement due to lock timeout
+2026-10-13 15:57:35.896 UTC [366] CONTEXT:  while locking tuple (0,10) in relation "fleet_trust"
+2026-10-13 15:57:35.896 UTC [366] STATEMENT:  -- name: LockFleetTrust :one
+	SELECT installation_id, issuer_epoch, source_uid, source_generation, source_digest, suspended, recovery_blocked, observed_at, fresh_until FROM fleet_current_trust WHERE installation_id=$1 FOR UPDATE
+	

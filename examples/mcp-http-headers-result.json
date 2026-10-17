@@ -1,0 +1,45 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000050",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "protocol": "http1",
+    "projection_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+    "records": [
+      {
+        "timestamp": "2026-10-09T12:00:01Z",
+        "method": "GET",
+        "status": 503,
+        "headers": [
+          {
+            "name": "content-type",
+            "value": "application/json"
+          },
+          {
+            "name": "content-length",
+            "value": "64"
+          }
+        ],
+        "partial": false
+      }
+    ],
+    "dropped_flows": 0,
+    "incomplete_flows": 1,
+    "coverage_gaps": [
+      "One midstream flow omitted; no raw fallback."
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000051",
+      "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "manifest": "936dc7150d1b5e45d78f94fbd2a93095686516968c9d0232a3b3f35c502b6a5e",
+  "dependencies": "0714e20cc747a9241cbfd37a3b1071caa999a2cdc784afb36f2d1c8f41648d38",
+  "runner": "0d8c1ab7e0bb471d2f57f643231e6336a9d0c399a4bf7d845d87620e7387e0e6",
+  "started": 1791876976.1518667,
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": []
+  },
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-2/overlay.json",
+        "-run=^$",
+        "-count=1",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 13.183775663375854,
+      "log_sha256": "c5f795d01b25851c694ba83fbe65597b5137227b0eca1ce07533f9fc51e5bccb",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0
+    },
+    {
+      "name": "before-copy",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-2/before-copy-overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerLaunchRejectsCopiedOpaqueWrapper$"
+      ],
+      "exit": 1,
+      "expected_exit": 1,
+      "timed_out": false,
+      "seconds": 11.280571699142456,
+      "log_sha256": "d07423d5f127837514aca402a7dab6e51e3a179fc181144d87407415354824a2",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0,
+      "intended_assertion": true
+    },
+    {
+      "name": "corrected-copy",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-2/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/adapters/kubernetes",
+        "-run=^TestConfigurationWorkerLaunch(RejectsCopiedOpaqueWrapper|OpaqueZeroAndForeignPhaseDeny)$"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 11.58029055595398,
+      "log_sha256": "74b90529db9eeffdd609c75c7a136538036258004863bbb777920c707cd1a7c8",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 2,
+      "named_pass": 7
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-provider-predecessor-20261013/checks/worker-launch-2/overlay.json",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "timed_out": false,
+      "seconds": 1.56601881980896,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "payloads": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": [],
+        "auxiliary": []
+      },
+      "top_level_pass": 0,
+      "named_pass": 0
+    }
+  ],
+  "native": false,
+  "exit": 0,
+  "ended": 1791877014.3020818,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": [],
+    "auxiliary": []
+  },
+  "scratch": "/tmp/asservat-worker-launch-2-46d60dd11b8341d49c9f6017824e7a0c",
+  "scratch_removed": true
+}

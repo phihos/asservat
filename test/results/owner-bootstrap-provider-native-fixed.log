@@ -1,0 +1,10 @@
+=== RUN   TestEnrollmentOwnerPKIWithRealServices
+    owner_pki_test.go:27: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:27: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerPKIWithRealServices (11.93s)
+=== RUN   TestEnrollmentOwnerBootstrapPKIWithRealServices
+    owner_pki_test.go:31: owner lifecycle: independent audit/activation, real provider result reuse, uncertain spend, post-lock expiry, retirement, source/recovery denial, roles, bounded 32 registrations and expired cleanup passed
+    owner_pki_test.go:31: OpenBao server/client CSR signing, exact URI/DNS/usage/deadline, real mutual TLS, distinct provider roles and revoked credential denial; direct issuer permits are synthetic; separate composed registration lifecycle exercised above; no protected bootstrap or forwarding
+--- PASS: TestEnrollmentOwnerBootstrapPKIWithRealServices (11.89s)
+PASS
+ok  	asservat.local/asservat/test/integration	24.877s

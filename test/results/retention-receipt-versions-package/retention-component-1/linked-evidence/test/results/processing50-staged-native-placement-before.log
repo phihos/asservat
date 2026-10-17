@@ -1,0 +1,6 @@
+--- FAIL: TestNativeHubPlacementRequiresActualCurrentServingIdentity (0.01s)
+    --- FAIL: TestNativeHubPlacementRequiresActualCurrentServingIdentity/valid (0.00s)
+        native_placement_test.go:74: actual accepted serving path rejected <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/mtls	0.018s
+FAIL

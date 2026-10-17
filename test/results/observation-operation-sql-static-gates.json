@@ -1,0 +1,24 @@
+[
+  {
+    "name": "vet",
+    "command": [
+      "go",
+      "vet",
+      "./test/integration"
+    ],
+    "exit": 0,
+    "seconds": 1.827
+  },
+  {
+    "name": "contracts",
+    "command": [
+      "make",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+    ],
+    "exit": 0,
+    "seconds": 9.063
+  }
+]

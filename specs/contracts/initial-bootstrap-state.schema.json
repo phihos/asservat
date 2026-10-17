@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-bootstrap-state.schema.json",
+  "title": "Private original bootstrap seed v1",
+  "description": "At most 32 KiB. Fixed inventory, original random material and independent create receipts; no user-defined effect queue. Relational Go checks require ordered unique creates, exact role/manager 30-minute interval and original 30-second retirement. Retired means seed material cleared only; managed SQL/provider copy deletion requires separate qualified closure and must not be inferred. The optional copyMarker exists only for original v3 desired input. V3 final closure replaces this entire private payload with immutable retired:true; original public closure metadata/history remain separately verified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "desiredDigest",
+    "installationID",
+    "requestID",
+    "clusterID",
+    "issuerEpoch",
+    "prelude",
+    "passwords",
+    "creates"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-bootstrap-state/v1"
+    },
+    "desiredDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "requestID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "issuerEpoch": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "seedUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "prelude": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "account",
+        "role",
+        "binding",
+        "marker",
+        "continuityMarker",
+        "tokenAnchor",
+        "guard"
+      ],
+      "properties": {
+        "namespace": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "account": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "role": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "binding": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "marker": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "continuityMarker": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "tokenAnchor": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        },
+        "guard": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard"
+        },
+        "copyMarker": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+        }
+      }
+    },
+    "passwords": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manager",
+        "preparation",
+        "audit",
+        "activation",
+        "history"
+      ],
+      "properties": {
+        "manager": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{43})?$",
+          "maxLength": 43
+        },
+        "preparation": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{43})?$",
+          "maxLength": 43
+        },
+        "audit": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{43})?$",
+          "maxLength": 43
+        },
+        "activation": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{43})?$",
+          "maxLength": 43
+        },
+        "history": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_-]{43})?$",
+          "maxLength": 43
+        }
+      }
+    },
+    "material": {
+      "$ref": "https://asservat.io/spec/v1/initial-bootstrap-material.schema.json"
+    },
+    "manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "startedAt",
+        "until",
+        "databaseOID",
+        "postmasterAt"
+      ],
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "databaseOID": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "postmasterAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "oid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])",
+              "description": "At most 63 UTF-8 bytes at runtime; exact PostgreSQL role name, never inferred from the passive connection."
+            },
+            "oid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295,
+              "not": {
+                "const": 10
+              }
+            }
+          },
+          "description": "Independently pinned original trusted SQL setup manager; part of the immutable preparation plan, no credential or activation authority."
+        },
+        "closing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationID",
+            "startedAt",
+            "until"
+          ],
+          "properties": {
+            "operationID": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "retiredAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "creates": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "operationID"
+        ],
+        "properties": {
+          "step": {
+            "enum": [
+              "private-state",
+              "sql-material",
+              "provider-material",
+              "continuity-policy",
+              "continuity-binding",
+              "staging-policy",
+              "staging-binding",
+              "projection"
+            ]
+          },
+          "operationID": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "resourceVersion"
+            ],
+            "properties": {
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "resourceVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    "projection": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "retired": {
+      "const": true
+    },
+    "passiveHistory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "operationID"
+      ],
+      "properties": {
+        "step": {
+          "const": "passive-history"
+        },
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "uid",
+            "resourceVersion"
+          ],
+          "properties": {
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            },
+            "resourceVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    }
+  }
+}

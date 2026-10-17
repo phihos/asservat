@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-identity-roles.schema.json",
+  "title": "Original owner identity SQL role input",
+  "description": "Installation-only public provenance derived from the original resource bridge and accepted owner source. Four fixed purpose roles; no general DDL input, recovery activation or public investigation authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "initialClaimID",
+    "clusterID",
+    "namespace",
+    "ownerConfigurationUID",
+    "resources",
+    "resourceSetupID",
+    "resourceBinding",
+    "ownerLayout",
+    "deployment",
+    "serviceAccount",
+    "layoutDigest"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-owner-identity-roles/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "initialClaimID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/namespace"
+    },
+    "ownerConfigurationUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "resources": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+    },
+    "resourceSetupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "resourceBinding": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "ownerLayout": {
+      "enum": [
+        "asservat-owner-installed/v1",
+        "asservat-owner-installed/v2"
+      ]
+    },
+    "deployment": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+    },
+    "serviceAccount": {
+      "$ref": "https://asservat.io/spec/v1/configuration-runtime-roles.schema.json#/properties/deployment"
+    },
+    "layoutDigest": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    }
+  }
+}

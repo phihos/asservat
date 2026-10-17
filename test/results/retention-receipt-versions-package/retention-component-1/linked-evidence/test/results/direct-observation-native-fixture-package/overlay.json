@@ -1,0 +1,17 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/scripts/test-context-storage.py": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/scripts/test-context-storage.py",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/data.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/data.go",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/enrollment.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/enrollment.go",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/inputs.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/inputs.go",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/main.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/main.go",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/metrics.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/metrics.go",
+    "/home/phil/Projekte/asservat/test/fixtures/observation-native/runtime.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/fixtures/observation-native/runtime.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_access_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_access_test.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_data_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_data_test.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_fixture_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_fixture_test.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_source_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_source_test.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_sql_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_sql_test.go",
+    "/home/phil/Projekte/asservat/test/integration/direct_observation_native_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/native-fixture/checkpoint-v1/files/test/integration/direct_observation_native_test.go"
+  }
+}

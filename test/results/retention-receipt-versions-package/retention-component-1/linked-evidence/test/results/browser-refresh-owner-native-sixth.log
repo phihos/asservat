@@ -1,0 +1,7 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity
+    browser_refresh_owners_test.go:390: actual SQL publication-backed owner replay, exact pending/settled response pause, one-use claims, delayed admission closure, logout/retained capacity and joined close; process authority is explicitly synthetic; no external provider or byte transfer in this case
+--- PASS: TestContextAdmissionWithRealServices (2.44s)
+    --- PASS: TestContextAdmissionWithRealServices/browser-refresh-owner-durable-consent-and-joined-capacity (2.09s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.497s

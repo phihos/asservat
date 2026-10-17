@@ -1,0 +1,18 @@
+{
+  "format": "asservat-staged-payload/v1",
+  "scope": "ADR133 exact original managed-copy metadata compatibility correction",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_close.go",
+      "base_sha256": "340033dcbaf3c2f0d18dfbb68fdf52912a6bee62be662538359e81166457318c",
+      "payload_sha256": "548b6f5b3931f0b5eabdcceff5b04d4e3a35433a1962a820994762e78802fd05",
+      "bytes": 17654
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_metadata_test.go",
+      "base_sha256": null,
+      "payload_sha256": "7f2fb782d062967146fdfa302c934ccd541ba29dd2e2894ad1f4fa4482183d4a",
+      "bytes": 6640
+    }
+  ]
+}

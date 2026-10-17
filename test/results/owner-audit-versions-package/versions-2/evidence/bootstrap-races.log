@@ -1,0 +1,186 @@
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/historical-positive
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/unknown-receipt
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/no-activation
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-worker
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-account
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-lease
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-resource-journal
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-owner-source
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-setup
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/changed-store-without-receipt
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/expanded-pool
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/wrong-key-size
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/canceled
+=== RUN   TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/expired
+--- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt (0.10s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/historical-positive (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/unknown-receipt (0.00s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/no-activation (0.00s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-worker (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-account (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-lease (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-resource-journal (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-owner-source (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/other-setup (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/changed-store-without-receipt (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/expanded-pool (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/wrong-key-size (0.01s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/canceled (0.00s)
+    --- PASS: TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt/expired (0.00s)
+=== RUN   TestCaptureCleanupStorageCredentialsRemainSeparateAndDoNotFallback
+--- PASS: TestCaptureCleanupStorageCredentialsRemainSeparateAndDoNotFallback (0.00s)
+=== RUN   TestProviderConfigurationAuditStorageRequiresImmutableVersion
+=== RUN   TestProviderConfigurationAuditStorageRequiresImmutableVersion/version=
+=== RUN   TestProviderConfigurationAuditStorageRequiresImmutableVersion/version=null
+=== RUN   TestProviderConfigurationAuditStorageRequiresImmutableVersion/version=original-version
+--- PASS: TestProviderConfigurationAuditStorageRequiresImmutableVersion (0.02s)
+    --- PASS: TestProviderConfigurationAuditStorageRequiresImmutableVersion/version= (0.01s)
+    --- PASS: TestProviderConfigurationAuditStorageRequiresImmutableVersion/version=null (0.01s)
+    --- PASS: TestProviderConfigurationAuditStorageRequiresImmutableVersion/version=original-version (0.01s)
+=== RUN   TestHubWorkerExternalCloseJoinsRunBeforeClosingResources
+I1013 13:44:32.342625  403204 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+E1013 13:44:32.443145  403204 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+--- PASS: TestHubWorkerExternalCloseJoinsRunBeforeClosingResources (0.13s)
+=== RUN   TestHubWorkerCloseBeforeRunPreventsAnyLeaderRead
+--- PASS: TestHubWorkerCloseBeforeRunPreventsAnyLeaderRead (0.03s)
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/valid
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-source
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/http-provider
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool
+=== RUN   TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document
+--- PASS: TestHubWorkerProjectionPinsAndProviderIsolation (0.03s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/valid (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-source (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/shared-guard (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/bad-lease (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/nil-roots (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/http-provider (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/unbounded-pool (0.00s)
+    --- PASS: TestHubWorkerProjectionPinsAndProviderIsolation/role-in-document (0.00s)
+=== RUN   TestCaptureCleanupCloseRetainsPoolsUntilActualOwnerCompletion
+--- PASS: TestCaptureCleanupCloseRetainsPoolsUntilActualOwnerCompletion (0.00s)
+=== RUN   TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies
+--- PASS: TestOwnerDeploymentExternalCloseJoinsRuntimeBeforeDependencies (0.11s)
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/parent-cancel
+=== RUN   TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/catalog-unavailable
+--- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait (1.21s)
+    --- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/parent-cancel (0.11s)
+    --- PASS: TestOwnerDeploymentDeferredCloseJoinsWithoutSelfWait/catalog-unavailable (1.11s)
+=== RUN   TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission
+--- PASS: TestOwnerDeploymentCloseBeforeRunRejectsAnyRuntimeAdmission (0.00s)
+=== RUN   TestOwnerMountedInputsAndSQLRotation
+--- PASS: TestOwnerMountedInputsAndSQLRotation (0.00s)
+=== RUN   TestOwnerInputRejections
+=== RUN   TestOwnerInputRejections/unknown
+=== RUN   TestOwnerInputRejections/alias
+=== RUN   TestOwnerInputRejections/provider-http
+=== RUN   TestOwnerInputRejections/provider-query
+=== RUN   TestOwnerInputRejections/postgres-socket
+=== RUN   TestOwnerInputRejections/shared-sign-role
+=== RUN   TestOwnerInputRejections/unknown-format
+=== RUN   TestOwnerInputRejections/duplicate-administrator
+=== RUN   TestOwnerInputRejections/nil-roots
+=== RUN   TestOwnerInputRejections/bad-root
+=== RUN   TestOwnerInputRejections/excess-concurrency
+=== RUN   TestOwnerInputRejections/foreign-file
+=== RUN   TestOwnerInputRejections/null-probes
+=== RUN   TestOwnerInputRejections/duplicate-probe
+=== RUN   TestOwnerInputRejections/wildcard-probe
+=== RUN   TestOwnerInputRejections/foreign-probe
+=== RUN   TestOwnerInputRejections/too-many-probes
+=== RUN   TestOwnerInputRejections/null-leases
+=== RUN   TestOwnerInputRejections/duplicate-lease
+=== RUN   TestOwnerInputRejections/wildcard-lease
+=== RUN   TestOwnerInputRejections/foreign-lease-account
+=== RUN   TestOwnerInputRejections/too-many-leases
+--- PASS: TestOwnerInputRejections (0.09s)
+    --- PASS: TestOwnerInputRejections/unknown (0.00s)
+    --- PASS: TestOwnerInputRejections/alias (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-http (0.00s)
+    --- PASS: TestOwnerInputRejections/provider-query (0.00s)
+    --- PASS: TestOwnerInputRejections/postgres-socket (0.00s)
+    --- PASS: TestOwnerInputRejections/shared-sign-role (0.00s)
+    --- PASS: TestOwnerInputRejections/unknown-format (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-administrator (0.00s)
+    --- PASS: TestOwnerInputRejections/nil-roots (0.00s)
+    --- PASS: TestOwnerInputRejections/bad-root (0.00s)
+    --- PASS: TestOwnerInputRejections/excess-concurrency (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-file (0.00s)
+    --- PASS: TestOwnerInputRejections/null-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-probe (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-probes (0.00s)
+    --- PASS: TestOwnerInputRejections/null-leases (0.00s)
+    --- PASS: TestOwnerInputRejections/duplicate-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/wildcard-lease (0.00s)
+    --- PASS: TestOwnerInputRejections/foreign-lease-account (0.00s)
+    --- PASS: TestOwnerInputRejections/too-many-leases (0.00s)
+=== RUN   TestOwnerStorageProjectionRotationAndLoss
+--- PASS: TestOwnerStorageProjectionRotationAndLoss (0.00s)
+=== RUN   TestOwnerProjectedKubernetesTokenAndCatalog
+--- PASS: TestOwnerProjectedKubernetesTokenAndCatalog (0.01s)
+=== RUN   TestOwnerObservationDeploymentExternalCloseJoinsReadinessBeforeDependencies
+--- PASS: TestOwnerObservationDeploymentExternalCloseJoinsReadinessBeforeDependencies (0.11s)
+=== RUN   TestOwnerObservationDeploymentRunCancellationJoinsBeforeDeferredClose
+--- PASS: TestOwnerObservationDeploymentRunCancellationJoinsBeforeDeferredClose (0.11s)
+=== RUN   TestOwnerObservationDeploymentCloseBeforeRunPreventsEnrollment
+--- PASS: TestOwnerObservationDeploymentCloseBeforeRunPreventsEnrollment (0.00s)
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/valid
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/legacy
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/mixed
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/format
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/empty-peers
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/duplicate-peer
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/excess-peers
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/missing-root
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/zero-template
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/upper-image
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/guessed-process
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/missing-activation
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-namespace
+=== RUN   TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-root
+--- PASS: TestOwnerObservationInputIsExplicitAndFinite (0.07s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/valid (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/legacy (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/mixed (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/format (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/empty-peers (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/duplicate-peer (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/excess-peers (0.01s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/missing-root (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/zero-template (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/upper-image (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/guessed-process (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/missing-activation (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-namespace (0.00s)
+    --- PASS: TestOwnerObservationInputIsExplicitAndFinite/wrong-activation-root (0.01s)
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/unopted
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/namespace
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/installation
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/cluster
+=== RUN   TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/peer-epoch
+--- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool (0.00s)
+    --- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/unopted (0.00s)
+    --- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/namespace (0.00s)
+    --- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/installation (0.00s)
+    --- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/cluster (0.00s)
+    --- PASS: TestOwnerObservationPinsNeverAdoptAnotherAcceptedPool/peer-epoch (0.00s)
+=== RUN   TestProviderOwnerAuditStorageRequiresImmutableVersion
+=== RUN   TestProviderOwnerAuditStorageRequiresImmutableVersion/version=
+=== RUN   TestProviderOwnerAuditStorageRequiresImmutableVersion/version=null
+=== RUN   TestProviderOwnerAuditStorageRequiresImmutableVersion/version=original-version
+--- PASS: TestProviderOwnerAuditStorageRequiresImmutableVersion (0.02s)
+    --- PASS: TestProviderOwnerAuditStorageRequiresImmutableVersion/version= (0.01s)
+    --- PASS: TestProviderOwnerAuditStorageRequiresImmutableVersion/version=null (0.01s)
+    --- PASS: TestProviderOwnerAuditStorageRequiresImmutableVersion/version=original-version (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	3.114s

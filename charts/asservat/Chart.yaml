@@ -1,0 +1,8 @@
+apiVersion: v2
+name: asservat
+description: Asservat Kubernetes debugging platform — configuration foundation and optional initial bootstrap
+type: application
+version: 0.1.0-dev.1
+kubeVersion: ">=1.35.0-0"
+annotations:
+  asservat.io/installation-stage: configuration-foundation

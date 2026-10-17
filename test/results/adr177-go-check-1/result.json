@@ -1,0 +1,10 @@
+{
+  "name": "adr177-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "scope": "Full Go gate after ADR-176 (migration 62, wrap authority, key peers, key-service command, per-attempt regional sealer) and ADR-177's 22 hub extension roles",
+  "results": "55 full packages and 543 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip",
+  "sourceHashBefore": "009dd57d08a14fa24e1cf80c1e358710ad011d9ee9f6a0887be1213964737e32",
+  "sourceHashAfter": "009dd57d08a14fa24e1cf80c1e358710ad011d9ee9f6a0887be1213964737e32",
+  "log": "go-check.log"
+}

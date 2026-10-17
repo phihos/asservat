@@ -1,0 +1,53 @@
+# asservat.local/asservat/internal/application/fleet
+../../.cache/asservat-build/planning/regional-observation-digest-layer-20261013/files/internal/application/fleet/cluster_observation_digest.go:52:35: value.ErrInvalid undefined (type struct{Format string "json:\"format\""; RequestID string "json:\"requestId\""; Challenge string "json:\"challenge\""; RootID string "json:\"rootId\""; ClusterID string "json:\"clusterId\""; Purpose string "json:\"purpose\""; RequestedAt string "json:\"requestedAt\""; NotAfter string "json:\"notAfter\""; Namespace *namespace "json:\"namespace,omitempty\""; Workload *workload "json:\"workload,omitempty\""; Kind string "json:\"kind,omitempty\""; Keys []string "json:\"keys,omitempty\""; Continue string "json:\"continue,omitempty\""} has no field or method ErrInvalid)
+../../.cache/asservat-build/planning/regional-observation-digest-layer-20261013/files/internal/application/fleet/cluster_observation_digest.go:56:35: value.ErrInvalid undefined (type struct{Format string "json:\"format\""; RequestID string "json:\"requestId\""; Challenge string "json:\"challenge\""; RootID string "json:\"rootId\""; ClusterID string "json:\"clusterId\""; Purpose string "json:\"purpose\""; RequestedAt string "json:\"requestedAt\""; NotAfter string "json:\"notAfter\""; Namespace *namespace "json:\"namespace,omitempty\""; Workload *workload "json:\"workload,omitempty\""; Kind string "json:\"kind,omitempty\""; Keys []string "json:\"keys,omitempty\""; Continue string "json:\"continue,omitempty\""} has no field or method ErrInvalid)
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/union
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/future
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/request
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest
+=== RUN   TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set
+--- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/short-child (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/challenge (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/cluster (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/namespace-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/workload-replaced (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/unrequested-label (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/union (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/future (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/renew-on-receipt (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/request (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/purpose (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/digest (0.00s)
+    --- PASS: TestClusterObservationPreservesExactSelectionAndOriginalInterval/missing-label-set (0.00s)
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret
+=== RUN   TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose
+--- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/empty-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/duplicate-keys (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-cursor (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/extra-kind (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/renewed-bound (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/secret (0.00s)
+    --- PASS: TestClusterObservationRequestCannotSelectAnotherPurposeOrUnboundedRead/arbitrary-purpose (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/fleet	1.012s
+FAIL	asservat.local/asservat/internal/application/fleet [build failed]
+FAIL	asservat.local/asservat/internal/adapters/mtls [build failed]
+FAIL	asservat.local/asservat/internal/transport/clusterobservation [build failed]
+FAIL

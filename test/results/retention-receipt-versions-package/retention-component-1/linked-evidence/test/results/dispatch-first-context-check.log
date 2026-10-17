@@ -1,0 +1,5 @@
+/tmp/asservat-openapi-validation/bin/python scripts/test-context-storage.py
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Component test exit: 1
+make: *** [Makefile:45: context-integration] Error 1

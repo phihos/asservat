@@ -1,0 +1,81 @@
+{
+  "manifest": "ddced6cf51b11317008798f871b1cab0324a7fc0102e463ee7d2ffe6616f5755",
+  "dependencies": "1ccefb62b900c1763ddb087af14ec01e386fbe95253a99074113a181f40264cf",
+  "runner": "7d39ebb10a212e92667229fa8044da09e2fd5bbd987bf52fe101a60f5091db31",
+  "started": 1791860111.1466923,
+  "before": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "phases": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/before-overlay.json",
+        "-count=1",
+        "-timeout=90s",
+        "-v",
+        "./internal/application/fleet",
+        "./internal/bootstrap",
+        "-run=^(TestConfigurationReconcilerRetainsBlockedChildPastFormerJoinTimer|TestHubWorkerExternalCloseJoinsRunBeforeClosingResources)$"
+      ],
+      "exit": 1,
+      "timed_out": false,
+      "expected_failure": true,
+      "seconds": 7.476067781448364,
+      "log_sha256": "bfefadfc507ff3ff188c4ed9d1979fde53e5db5d396691114e337e468ca5f0da"
+    },
+    {
+      "name": "corrected-races",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/overlay.json",
+        "-count=1",
+        "-timeout=3m",
+        "-v",
+        "./internal/application/fleet",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "expected_failure": false,
+      "seconds": 27.201915740966797,
+      "log_sha256": "420009c09163616b1fd2d7bcdb564d6f1d09a286ccc25002f43ce0e906903438"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/overlay.json",
+        "./internal/application/fleet",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "timed_out": false,
+      "expected_failure": false,
+      "seconds": 6.6752612590789795,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "exit": 0,
+  "ended": 1791860152.636089,
+  "after": {
+    "payload": [],
+    "base": [],
+    "dependencies": [],
+    "inventory": []
+  }
+}

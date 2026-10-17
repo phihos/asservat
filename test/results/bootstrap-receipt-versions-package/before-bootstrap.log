@@ -1,0 +1,19 @@
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/original
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/empty
+    bootstrap_versions_test.go:25: unexpected immutable-version decision
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/literal-null
+    bootstrap_versions_test.go:25: unexpected immutable-version decision
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/maximum
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/oversized
+=== RUN   TestBootstrapCurrentAuditRequiresImmutableVersion/control
+--- FAIL: TestBootstrapCurrentAuditRequiresImmutableVersion (0.00s)
+    --- PASS: TestBootstrapCurrentAuditRequiresImmutableVersion/original (0.00s)
+    --- FAIL: TestBootstrapCurrentAuditRequiresImmutableVersion/empty (0.00s)
+    --- FAIL: TestBootstrapCurrentAuditRequiresImmutableVersion/literal-null (0.00s)
+    --- PASS: TestBootstrapCurrentAuditRequiresImmutableVersion/maximum (0.00s)
+    --- PASS: TestBootstrapCurrentAuditRequiresImmutableVersion/oversized (0.00s)
+    --- PASS: TestBootstrapCurrentAuditRequiresImmutableVersion/control (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/domain/audit	0.006s
+FAIL

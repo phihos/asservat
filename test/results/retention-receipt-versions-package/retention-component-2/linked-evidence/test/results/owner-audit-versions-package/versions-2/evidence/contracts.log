@@ -1,0 +1,5 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-architecture.py
+Go architecture OK: 53 packages, 302 internal import edges; catalog ownership and layer/dependency rules checked
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+FAIL: Broken local link in README.md: docs/implementation-progress.md
+make: *** [Makefile:5: spec-check] Error 1

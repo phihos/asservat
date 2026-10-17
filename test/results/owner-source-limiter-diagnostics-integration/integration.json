@@ -1,0 +1,115 @@
+{
+  "integratedAt": "2026-10-13T23:17:46.084789+00:00",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/configmap_protection.go",
+      "baseSHA256": "47e7d4a539cab99113cfc597452846326e5b9a8bc3fb5a76acd6012551bce834",
+      "payloadSHA256": "04fea57c2e7a8e3c82a8988fd4db7f22548236f845c9967b34f496854bd22f4c",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_role_recheck.go",
+      "baseSHA256": "e9de8c125f4b65c451cb919449d6aa40b658df7d5aef84fa649ec12a5034cde8",
+      "payloadSHA256": "f5427f11e1f28287f078aa8046245618e987c2c7def73732ba5bedc005220859",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_diagnostic.go",
+      "baseSHA256": null,
+      "payloadSHA256": "0951e9afdc2a1eb9c42db02ca0976db5f98b4818a856802b560a6a2bd8320f9e",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_diagnostic_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "eb28817ea89f65bcb929c88251eac12af680f13a08817bef9039ff28e6b2af47",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/configuration_worker_native.go",
+      "baseSHA256": "1b3240c715d3b5cb708d3b1c4a5c8dc55db20a1285865695cf9ab183304e4819",
+      "payloadSHA256": "254c23d7be5254d9aee49f2a17d3da33a443c92fcb066e3d85c92ee3b9ce80a3",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_identity_operation_root.go",
+      "baseSHA256": "212031d5c21590d997dbb8079a5609d55f5495f33310a360853920d2848a11ba",
+      "payloadSHA256": "4d17246d59b126f78e4f7bb089454797783286218c20659b3f37fb8169849c88",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_projection_diagnostic.go",
+      "baseSHA256": "70a332331855a645f57831d7f841037b36fd1915666dfc1a2714ea268473fe0e",
+      "payloadSHA256": "3018bc41f6d8063cb34d6fca9a482ce88b9743ead539b9aa41fac22bdc49a4ce",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_workload_guard.go",
+      "baseSHA256": "56998ec98bf56c08b54208487655e81fd09e04112ba6cc90cf7f4f4cff109680",
+      "payloadSHA256": "6c2f1a0d89c199d9b52adb5d2be6860f57c12ceb86d516ee1e77f5b652eed3ba",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "internal/adapters/kubernetes/permission_guard.go",
+      "baseSHA256": "8afff41964a6b2fe1e13df5e64274f32ca50b03b1c65fd73f8d29401972814ed",
+      "payloadSHA256": "3d7ef8276a10c6daa7f53e86028ba853582529dc1f4aeee8f14c5bdc5eb06e8b",
+      "stage": "owner-source-diagnostics-20261014"
+    },
+    {
+      "path": "test/integration/initial_runtime_limiter_trace_test.go",
+      "baseSHA256": null,
+      "payloadSHA256": "a63c5f5a8c716d9c66ac6a4240240f7d8ceb6b6ccf8483b75802bfbf1a7a21c3",
+      "stage": "owner-limiter-diagnostics-20261014"
+    },
+    {
+      "path": "test/integration/initial_runtime_owner_pair_native_test.go",
+      "baseSHA256": "552990d8c4040f778cb5f0871a10c3149473df9b8599a550d884982ac6e9b105",
+      "payloadSHA256": "e44e59d8e58e608f12fe623db0bd20c43def0ee0a6e6fd924529fa1e5a2d3104",
+      "stage": "owner-limiter-diagnostics-20261014"
+    },
+    {
+      "path": "test/integration/initial_runtime_provider_pair_native_test.go",
+      "baseSHA256": "c5dbf1532415c99338d76eed119b64041b2a2d59d2c40e2f7bd01eb1fe3eb6bb",
+      "payloadSHA256": "0c25116e0cf58129cbf7616fea9089c412acf091957a3c29b0418b6de36e7325",
+      "stage": "owner-limiter-diagnostics-20261014"
+    }
+  ],
+  "stages": [
+    [
+      "owner-source-diagnostics-20261014",
+      "34cb4a48218b6cf1b3b23eeb5e373727d9391e5b9be1577d83197f3937f44060",
+      "b09fad60448a713fec92cc446a8bec2c800e81d6d95ea42003ab1cfdec2b195f"
+    ],
+    [
+      "owner-limiter-diagnostics-20261014",
+      "935c66750c0ad72fe3691058d7902e3f8d1247e5bbb8c746ba82e199db41ac3c",
+      "23727a067d458583484f59a4dad375a22b0fd22dc51aea9a4f8a0e6a1f4e8ae7"
+    ]
+  ],
+  "qualification": "component-passed-native-pending",
+  "scope": "Closed native source check codes and fixture-only observation of the original limiter. No production call, deadline, attempt or authority changes.",
+  "archiveHashes": {
+    "payload/test/integration/initial_runtime_limiter_trace_test.go.txt": "a63c5f5a8c716d9c66ac6a4240240f7d8ceb6b6ccf8483b75802bfbf1a7a21c3",
+    "payload/test/integration/initial_runtime_owner_pair_native_test.go.txt": "e44e59d8e58e608f12fe623db0bd20c43def0ee0a6e6fd924529fa1e5a2d3104",
+    "payload/test/integration/initial_runtime_provider_pair_native_test.go.txt": "0c25116e0cf58129cbf7616fea9089c412acf091957a3c29b0418b6de36e7325",
+    "payload/internal/adapters/kubernetes/configmap_protection.go.txt": "04fea57c2e7a8e3c82a8988fd4db7f22548236f845c9967b34f496854bd22f4c",
+    "payload/internal/adapters/kubernetes/configuration_role_recheck.go.txt": "f5427f11e1f28287f078aa8046245618e987c2c7def73732ba5bedc005220859",
+    "payload/internal/adapters/kubernetes/configuration_worker_diagnostic.go.txt": "0951e9afdc2a1eb9c42db02ca0976db5f98b4818a856802b560a6a2bd8320f9e",
+    "payload/internal/adapters/kubernetes/configuration_worker_diagnostic_test.go.txt": "eb28817ea89f65bcb929c88251eac12af680f13a08817bef9039ff28e6b2af47",
+    "payload/internal/adapters/kubernetes/configuration_worker_native.go.txt": "254c23d7be5254d9aee49f2a17d3da33a443c92fcb066e3d85c92ee3b9ce80a3",
+    "payload/internal/adapters/kubernetes/owner_identity_operation_root.go.txt": "4d17246d59b126f78e4f7bb089454797783286218c20659b3f37fb8169849c88",
+    "payload/internal/adapters/kubernetes/owner_projection_diagnostic.go.txt": "3018bc41f6d8063cb34d6fca9a482ce88b9743ead539b9aa41fac22bdc49a4ce",
+    "payload/internal/adapters/kubernetes/owner_workload_guard.go.txt": "6c2f1a0d89c199d9b52adb5d2be6860f57c12ceb86d516ee1e77f5b652eed3ba",
+    "payload/internal/adapters/kubernetes/permission_guard.go.txt": "3d7ef8276a10c6daa7f53e86028ba853582529dc1f4aeee8f14c5bdc5eb06e8b",
+    "before/test/integration/initial_runtime_owner_pair_native_test.go.txt": "552990d8c4040f778cb5f0871a10c3149473df9b8599a550d884982ac6e9b105",
+    "before/test/integration/initial_runtime_provider_pair_native_test.go.txt": "c5dbf1532415c99338d76eed119b64041b2a2d59d2c40e2f7bd01eb1fe3eb6bb",
+    "before/internal/adapters/kubernetes/configmap_protection.go.txt": "47e7d4a539cab99113cfc597452846326e5b9a8bc3fb5a76acd6012551bce834",
+    "before/internal/adapters/kubernetes/configuration_role_recheck.go.txt": "e9de8c125f4b65c451cb919449d6aa40b658df7d5aef84fa649ec12a5034cde8",
+    "before/internal/adapters/kubernetes/configuration_worker_native.go.txt": "1b3240c715d3b5cb708d3b1c4a5c8dc55db20a1285865695cf9ab183304e4819",
+    "before/internal/adapters/kubernetes/owner_identity_operation_root.go.txt": "212031d5c21590d997dbb8079a5609d55f5495f33310a360853920d2848a11ba",
+    "before/internal/adapters/kubernetes/owner_projection_diagnostic.go.txt": "70a332331855a645f57831d7f841037b36fd1915666dfc1a2714ea268473fe0e",
+    "before/internal/adapters/kubernetes/owner_workload_guard.go.txt": "56998ec98bf56c08b54208487655e81fd09e04112ba6cc90cf7f4f4cff109680",
+    "before/internal/adapters/kubernetes/permission_guard.go.txt": "8afff41964a6b2fe1e13df5e64274f32ca50b03b1c65fd73f8d29401972814ed"
+  },
+  "componentResultSHA256": "69c4ebce558785bebfe270a8be765fa02cd882e0d32acb1e7a66387de3bf81f3"
+}

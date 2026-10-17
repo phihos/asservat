@@ -1,0 +1,17 @@
+node scripts/check-ui.cjs
+{
+  "date": "2026-10-09",
+  "scope": "Synthetic prototype only; not runtime security or accessibility certification",
+  "screens": 63,
+  "states": 7,
+  "checks": 662,
+  "browser": "Chromium headless",
+  "viewports": [
+    1440,
+    390,
+    320
+  ],
+  "errors": [],
+  "externalRequests": [],
+  "accessibilityViolations": []
+}

@@ -1,0 +1,1461 @@
+{
+  "scope": "SQL view lock feasibility only",
+  "native": true,
+  "productionSelected": false,
+  "containerName": "asservat-fleet-lock-f3896909557748f9-postgres",
+  "runID": "asservat-fleet-lock-f3896909557748f9",
+  "manifestSHA256": "0064ec51671ea0690bdaa2d4188ba82b02b884708311421e61573fee87ef35a5",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "commands": [
+    {
+      "label": "docker-context",
+      "pid": 1003971,
+      "argv": [
+        "docker",
+        "context",
+        "show"
+      ],
+      "log": "001-docker-context.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "01666ec060466c14b9fa06c613fbac449163f2a2017558fe16526209ab78c6b0"
+    },
+    {
+      "label": "docker-context-inspect",
+      "pid": 1003981,
+      "argv": [
+        "docker",
+        "context",
+        "inspect",
+        "default"
+      ],
+      "log": "002-docker-context-inspect.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "ee957e0747d2328a52b4c9210052a1fddf721cdeaebbaddc288f438c65c54057"
+    },
+    {
+      "label": "image-inspect",
+      "pid": 1003991,
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
+      ],
+      "log": "003-image-inspect.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "ff3e58994525a3a2f2f422f99f65ce3ea0ccaaf0511df8aeadf460986e1b930c"
+    },
+    {
+      "label": "create",
+      "pid": 1004001,
+      "argv": [
+        "docker",
+        "create",
+        "--pull=never",
+        "--name",
+        "asservat-fleet-lock-f3896909557748f9-postgres",
+        "--label",
+        "asservat.test=asservat-fleet-lock-f3896909557748f9",
+        "--label",
+        "asservat.probe=fleet-lock",
+        "--network",
+        "none",
+        "--memory",
+        "768m",
+        "--cpus",
+        "2",
+        "--pids-limit",
+        "256",
+        "--cap-drop",
+        "ALL",
+        "--user",
+        "postgres",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,size=32m",
+        "--tmpfs",
+        "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777",
+        "-v",
+        "/var/lib/postgresql",
+        "-e",
+        "POSTGRES_PASSWORD=synthetic-probe-only",
+        "-e",
+        "POSTGRES_DB=fleet_lock_probe",
+        "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+        "-c",
+        "max_connections=48",
+        "-c",
+        "shared_buffers=128MB",
+        "-c",
+        "fsync=on",
+        "-c",
+        "synchronous_commit=on"
+      ],
+      "log": "004-create.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc"
+    },
+    {
+      "label": "start",
+      "pid": 1004013,
+      "argv": [
+        "docker",
+        "start",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b"
+      ],
+      "log": "005-start.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc"
+    },
+    {
+      "label": "ready",
+      "pid": 1004083,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "006-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004124,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "007-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004179,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "008-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004209,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "009-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004239,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "010-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004293,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "011-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004330,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "012-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004367,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "013-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004397,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "014-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004428,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "015-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004461,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "016-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004546,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "017-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004595,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "018-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004643,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "019-ready.log",
+      "exit": 2,
+      "ownedGroupJoined": true,
+      "logSHA256": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a"
+    },
+    {
+      "label": "ready",
+      "pid": 1004683,
+      "argv": [
+        "docker",
+        "exec",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "pg_isready",
+        "-h127.0.0.1",
+        "-Upostgres",
+        "-dfleet_lock_probe"
+      ],
+      "log": "020-ready.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "f65a06d12c78be4ce11dc662c4ebf525a1da13786331065f0fe973c6df5ddd29"
+    },
+    {
+      "label": "server",
+      "pid": 1004715,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:server",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "021-server.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:server",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e76405548a4b1e6c02cf0ab9f383fe2b62695e80f15ecea629cc80264a72ef76"
+    },
+    {
+      "label": "schema",
+      "pid": 1004744,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:schema",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "022-schema.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:schema",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "view-contract",
+      "pid": 1004782,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:view-contract",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "023-view-contract.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:view-contract",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "747585078b6485a18ca1292049eca4b91c7f0ac98177878431e7a49bab01d620"
+    },
+    {
+      "label": "view-definition",
+      "pid": 1004811,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:view-definition",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "024-view-definition.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:view-definition",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "3a586442b516ffbe6f1fbfdf54d9ea4d23eb25c37b6000cbb2802ae62f0b29eb"
+    },
+    {
+      "label": "consumer-acl",
+      "pid": 1004840,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:consumer-acl",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "025-consumer-acl.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:consumer-acl",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "9c441eef52d8edecbaf7f2a8bcb8340250880f3966148b8248bed6d4c535c857"
+    },
+    {
+      "label": "select-only-cannot-lock",
+      "pid": 1004871,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:select-only-cannot-lock",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_select_only",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "026-select-only-cannot-lock.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:select-only-cannot-lock",
+      "exit": 3,
+      "ownedGroupJoined": true,
+      "logSHA256": "7ea13b786de1df39f35fb9eecf245c8ce23463a894170c9de94dbb38b13f6ea3"
+    },
+    {
+      "label": "consumer-cannot-read-base",
+      "pid": 1004902,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:consumer-cannot-read-base",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "027-consumer-cannot-read-base.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:consumer-cannot-read-base",
+      "exit": 3,
+      "ownedGroupJoined": true,
+      "logSHA256": "9d3ab954ac44b3407697d2c25a2be17a2c90462159edb90002bc564fae181f53"
+    },
+    {
+      "label": "consumer-cannot-write-observation",
+      "pid": 1004936,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:consumer-cannot-write-observation",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "028-consumer-cannot-write-observation.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:consumer-cannot-write-observation",
+      "exit": 3,
+      "ownedGroupJoined": true,
+      "logSHA256": "0463990f98185a2e16261a62cbc52d3fb5eac9dc511a34171b58a46a759efb9b"
+    },
+    {
+      "label": "consumer-view-remains-read-only",
+      "pid": 1004968,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:consumer-view-remains-read-only",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "029-consumer-view-remains-read-only.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:consumer-view-remains-read-only",
+      "exit": 3,
+      "ownedGroupJoined": true,
+      "logSHA256": "3bedda74ccdc50529ccd79defeb948f4bd4b9264133995888bd27a4f8fbfe7f8"
+    },
+    {
+      "label": "share-all-reset",
+      "pid": 1004998,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-reset",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "030-share-all-reset.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-reset",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "share-all-active",
+      "pid": 1005029,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-active",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "031-share-all-active.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-active",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "fe8edeeb98cc6d3b93cf2d57000254b84bd9eba34b4df7ce4b87db8b937b7703"
+    },
+    {
+      "label": "share-all",
+      "pid": 1005058,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_consumer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "032-share-all.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all",
+      "backendPID": 237,
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "b3d04cefb11c94b8fe8655ade899f65855966235e14bd5c8c58ebc011220046e"
+    },
+    {
+      "label": "share-all-held",
+      "pid": 1005088,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-held",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "033-share-all-held.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-held",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "label": "share-all-old-dates",
+      "pid": 1005118,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-old-dates",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "034-share-all-old-dates.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-old-dates",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "85a74d97fd231e46b7f1fcdc3d5cdef61e6d819520272711afe35431c4ef0b75"
+    },
+    {
+      "label": "share-all-renew",
+      "pid": 1005147,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-renew",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_observer",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "035-share-all-renew.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-renew",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "cab35d30eee0daac4a2fa08368e9e6c6d2e6ea431a03ce3a9ccd562da18699b8"
+    },
+    {
+      "label": "share-all-new-dates",
+      "pid": 1005178,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-new-dates",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "036-share-all-new-dates.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-new-dates",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "3ca96f154b27a452d58f3e0f011180ddd0ee9e519dd774f29e38b432c09d98c5"
+    },
+    {
+      "label": "share-all-semantic",
+      "pid": 1005207,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-semantic",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "probe_semantic",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "037-share-all-semantic.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-semantic",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "share-all-semantic-blocking",
+      "pid": 1005208,
+      "argv": [
+        "docker",
+        "exec",
+        "-i",
+        "--env",
+        "PGPASSWORD=synthetic-probe-only",
+        "--env",
+        "PGAPPNAME=asservat-fleet-lock-f3896909557748f9:share-all-semantic-blocking",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+        "psql",
+        "-X",
+        "-qAt",
+        "--no-password",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        "postgres",
+        "-d",
+        "fleet_lock_probe",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose"
+      ],
+      "log": "038-share-all-semantic-blocking.log",
+      "applicationName": "asservat-fleet-lock-f3896909557748f9:share-all-semantic-blocking",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "5c5635d47ff8dc16dbac17c6bf436d7fd7843430b23baa66ad56500a5186c0a8"
+    },
+    {
+      "label": "cleanup-inspect",
+      "pid": 1005268,
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "asservat-fleet-lock-f3896909557748f9-postgres"
+      ],
+      "log": "039-cleanup-inspect.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e94caff4648c01079e377b13f7cca7424840c3d5c0c8f699125d4825987a278a"
+    },
+    {
+      "label": "postgres-log",
+      "pid": 1005281,
+      "argv": [
+        "docker",
+        "logs",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b"
+      ],
+      "log": "040-postgres-log.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "7dbc0e6159d03f2b4648ef663aa310858179a409a734af9b672341527b7cc41c"
+    },
+    {
+      "label": "remove-owned-container",
+      "pid": 1005294,
+      "argv": [
+        "docker",
+        "rm",
+        "-f",
+        "-v",
+        "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b"
+      ],
+      "log": "041-remove-owned-container.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc"
+    },
+    {
+      "label": "remaining-owned-containers",
+      "pid": 1005333,
+      "argv": [
+        "docker",
+        "ps",
+        "-aq",
+        "--no-trunc",
+        "--filter",
+        "label=asservat.test=asservat-fleet-lock-f3896909557748f9"
+      ],
+      "log": "042-remaining-owned-containers.log",
+      "exit": 0,
+      "ownedGroupJoined": true,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "remaining-volume",
+      "pid": 1005344,
+      "argv": [
+        "docker",
+        "volume",
+        "inspect",
+        "13c5f01e83dbd533a9fa505bf44c3fca23353ee304f95afe2ab8eeacc43d1aab"
+      ],
+      "log": "043-remaining-volume.log",
+      "exit": 1,
+      "ownedGroupJoined": true,
+      "logSHA256": "a7c4fa9ce9ab412d00b23384526b07544285203a8ea397e5252d98ab0968e0f3"
+    }
+  ],
+  "cases": [
+    {
+      "name": "select-only-cannot-lock",
+      "SQLSTATE": "42501",
+      "passed": true
+    },
+    {
+      "name": "consumer-cannot-read-base",
+      "SQLSTATE": "42501",
+      "passed": true
+    },
+    {
+      "name": "consumer-cannot-write-observation",
+      "SQLSTATE": "42501",
+      "passed": true
+    },
+    {
+      "name": "consumer-view-remains-read-only",
+      "SQLSTATE": "55000",
+      "passed": true
+    }
+  ],
+  "imageID": "sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
+  "imageRepoDigests": [
+    "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
+  ],
+  "containerID": "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+  "server": {
+    "version": "PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit",
+    "versionNum": "180006",
+    "startedAt": "2026-10-14T01:09:04.137662+00:00",
+    "databaseOID": "16384",
+    "inRecovery": false
+  },
+  "viewColumns": {
+    "fleet_current_trust": [
+      {
+        "name": "installation_id",
+        "type": "uuid"
+      },
+      {
+        "name": "issuer_epoch",
+        "type": "uuid"
+      },
+      {
+        "name": "source_uid",
+        "type": "text"
+      },
+      {
+        "name": "source_generation",
+        "type": "bigint"
+      },
+      {
+        "name": "source_digest",
+        "type": "bytea"
+      },
+      {
+        "name": "suspended",
+        "type": "boolean"
+      },
+      {
+        "name": "recovery_blocked",
+        "type": "boolean"
+      },
+      {
+        "name": "observed_at",
+        "type": "timestamp with time zone"
+      },
+      {
+        "name": "fresh_until",
+        "type": "timestamp with time zone"
+      }
+    ],
+    "fleet_legacy_contract": [
+      {
+        "name": "installation_id",
+        "type": "uuid"
+      },
+      {
+        "name": "issuer_epoch",
+        "type": "uuid"
+      },
+      {
+        "name": "source_uid",
+        "type": "text"
+      },
+      {
+        "name": "source_generation",
+        "type": "bigint"
+      },
+      {
+        "name": "source_digest",
+        "type": "bytea"
+      },
+      {
+        "name": "suspended",
+        "type": "boolean"
+      },
+      {
+        "name": "recovery_blocked",
+        "type": "boolean"
+      },
+      {
+        "name": "observed_at",
+        "type": "timestamp with time zone"
+      },
+      {
+        "name": "fresh_until",
+        "type": "timestamp with time zone"
+      }
+    ]
+  },
+  "error": "AssertionError(('share-all-semantic-blocking', ['NOTICE:  identifier \"asservat-fleet-lock-f3896909557748f9:share-all-semantic-blocking\" will be truncated to \"asservat-fleet-lock-f3896909557748f9:share-all-semantic-blockin\"', '[{\"pid\" : 279, \"role\" : \"probe_semantic\", \"state\" : \"active\", \"waitType\" : \"Lock\", \"waitEvent\" : \"transactionid\", \"blockers\" : [237]}]']))",
+  "cleanup": {
+    "containerRemoved": true,
+    "ownedGroupsJoined": true,
+    "containerID": "391c5adb7581ea0e7be0e35b5c7a1716d15ae89e342d97baed4463f4cc9bb15b",
+    "volumes": [
+      "13c5f01e83dbd533a9fa505bf44c3fca23353ee304f95afe2ab8eeacc43d1aab"
+    ],
+    "processGroups": [
+      {
+        "pid": 1003971,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1003981,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1003991,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004001,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004013,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004083,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004124,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004179,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004209,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004239,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004293,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004330,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004367,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004397,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004428,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004461,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004546,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004595,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004643,
+        "exit": 2,
+        "absent": true
+      },
+      {
+        "pid": 1004683,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004715,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004744,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004782,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004811,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004840,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1004871,
+        "exit": 3,
+        "absent": true
+      },
+      {
+        "pid": 1004902,
+        "exit": 3,
+        "absent": true
+      },
+      {
+        "pid": 1004936,
+        "exit": 3,
+        "absent": true
+      },
+      {
+        "pid": 1004968,
+        "exit": 3,
+        "absent": true
+      },
+      {
+        "pid": 1004998,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005029,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005058,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005088,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005118,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005147,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005178,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005207,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005208,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005268,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005281,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005294,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005333,
+        "exit": 0,
+        "absent": true
+      },
+      {
+        "pid": 1005344,
+        "exit": 1,
+        "absent": true
+      }
+    ]
+  },
+  "sourceChanges": [],
+  "signalReceived": null,
+  "exit": 2,
+  "seconds": 7.039,
+  "artifacts": {
+    "001-docker-context.log": "01666ec060466c14b9fa06c613fbac449163f2a2017558fe16526209ab78c6b0",
+    "002-docker-context-inspect.log": "ee957e0747d2328a52b4c9210052a1fddf721cdeaebbaddc288f438c65c54057",
+    "003-image-inspect.log": "ff3e58994525a3a2f2f422f99f65ce3ea0ccaaf0511df8aeadf460986e1b930c",
+    "004-create.log": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc",
+    "005-start.log": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc",
+    "006-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "007-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "008-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "009-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "010-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "011-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "012-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "013-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "014-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "015-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "016-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "017-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "018-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "019-ready.log": "16ee3d174b642b39bda2af4b9be5ba53306922e073f3f9750a7f4b458cdfde1a",
+    "020-ready.log": "f65a06d12c78be4ce11dc662c4ebf525a1da13786331065f0fe973c6df5ddd29",
+    "021-server.log": "e76405548a4b1e6c02cf0ab9f383fe2b62695e80f15ecea629cc80264a72ef76",
+    "021-server.sql": "a746fd19b867a9b5aa9a8ed035cc18cae4e70e1ce6e80fac47ebccc98d839e55",
+    "022-schema.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "022-schema.sql": "bedb98ac247ad6005905186dd0d7d187beb220afc958445b117b9cb170bf3836",
+    "023-view-contract.log": "747585078b6485a18ca1292049eca4b91c7f0ac98177878431e7a49bab01d620",
+    "023-view-contract.sql": "87593a4c553e5c28f14085d35ac6365279960bac9d9995c019f5d187a5935f3a",
+    "024-view-definition.log": "3a586442b516ffbe6f1fbfdf54d9ea4d23eb25c37b6000cbb2802ae62f0b29eb",
+    "024-view-definition.sql": "27bcc9fb0a357d7327aefc53e05372f8f25d537a70352db00f2a44183f21472b",
+    "025-consumer-acl.log": "9c441eef52d8edecbaf7f2a8bcb8340250880f3966148b8248bed6d4c535c857",
+    "025-consumer-acl.sql": "651e79c877d10a925676264d4344aaa7ef1479eb9aa0f7c33a1af99c7f94b8bc",
+    "026-select-only-cannot-lock.log": "7ea13b786de1df39f35fb9eecf245c8ce23463a894170c9de94dbb38b13f6ea3",
+    "026-select-only-cannot-lock.sql": "2c9938c0c04dabc45dcddb27041849aab73276f04e495748adafe381518efe96",
+    "027-consumer-cannot-read-base.log": "9d3ab954ac44b3407697d2c25a2be17a2c90462159edb90002bc564fae181f53",
+    "027-consumer-cannot-read-base.sql": "6a5e9083f7391613fc7233024aa2c3513b81614f5efd5ede46077512230c41be",
+    "028-consumer-cannot-write-observation.log": "0463990f98185a2e16261a62cbc52d3fb5eac9dc511a34171b58a46a759efb9b",
+    "028-consumer-cannot-write-observation.sql": "fc5e18d3297cbcaeefea02831d28bf90a861dd622df2d172c59456365f4c3ab0",
+    "029-consumer-view-remains-read-only.log": "3bedda74ccdc50529ccd79defeb948f4bd4b9264133995888bd27a4f8fbfe7f8",
+    "029-consumer-view-remains-read-only.sql": "6b31363069f89421131d5191a14989422411f3995cd169173b7f15ea4e1ce27a",
+    "030-share-all-reset.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "030-share-all-reset.sql": "d1c72f5132f860b528083031bd637d67f532b13de38e81a92da0bc9e473b0139",
+    "031-share-all-active.log": "fe8edeeb98cc6d3b93cf2d57000254b84bd9eba34b4df7ce4b87db8b937b7703",
+    "031-share-all-active.sql": "8dc2b6020b043e4099cc79dd4d0046e2882f2ad0f4488939886d27fb8fd0ed37",
+    "032-share-all.log": "b3d04cefb11c94b8fe8655ade899f65855966235e14bd5c8c58ebc011220046e",
+    "032-share-all.sql": "40baef99263eb4a50087e315b9cd217354dec0af2f68155f678d1315ea632316",
+    "033-share-all-held.log": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "033-share-all-held.sql": "13ff6f9aa1fbb5c06f2acef58d9ad794a06f9389612da58ac5e50e530dd6b93f",
+    "034-share-all-old-dates.log": "85a74d97fd231e46b7f1fcdc3d5cdef61e6d819520272711afe35431c4ef0b75",
+    "034-share-all-old-dates.sql": "3bb067635ddd7f56b5fe7cd8eebf5461f8fb20b4524ea0a30577f583029905d5",
+    "035-share-all-renew.log": "cab35d30eee0daac4a2fa08368e9e6c6d2e6ea431a03ce3a9ccd562da18699b8",
+    "035-share-all-renew.sql": "f564ac3dd7d780f763608aa8cdc6d0214fc36857a8a17c8fb29dbc7225cd405f",
+    "036-share-all-new-dates.log": "3ca96f154b27a452d58f3e0f011180ddd0ee9e519dd774f29e38b432c09d98c5",
+    "036-share-all-new-dates.sql": "3bb067635ddd7f56b5fe7cd8eebf5461f8fb20b4524ea0a30577f583029905d5",
+    "037-share-all-semantic.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "037-share-all-semantic.sql": "dd27662524219e9773baeb7ec94bfefd6eab77906721f9183a5881a0f2e58a71",
+    "038-share-all-semantic-blocking.log": "5c5635d47ff8dc16dbac17c6bf436d7fd7843430b23baa66ad56500a5186c0a8",
+    "038-share-all-semantic-blocking.sql": "4b3de7dde840540cc7f5422b54e3336e7a451fad70000f86d7e2a48c0dfee2fc",
+    "039-cleanup-inspect.log": "e94caff4648c01079e377b13f7cca7424840c3d5c0c8f699125d4825987a278a",
+    "040-postgres-log.log": "7dbc0e6159d03f2b4648ef663aa310858179a409a734af9b672341527b7cc41c",
+    "041-remove-owned-container.log": "5ff8be416468c786e67f875478faf895e92d68d9d69ca630901b6b4f839de1bc",
+    "042-remaining-owned-containers.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "043-remaining-volume.log": "a7c4fa9ce9ab412d00b23384526b07544285203a8ea397e5252d98ab0968e0f3",
+    "README.md": "fbfe3da0a456c035ed8ea7b586912a5501034e4f63ee8d99a4a6d85de5281e7a",
+    "manifest.json": "0064ec51671ea0690bdaa2d4188ba82b02b884708311421e61573fee87ef35a5",
+    "probe.py": "71d623a0b4d0fb56a9c2f621240478981263f16da50702729a2bae0e543fa64a",
+    "producer-review.md": "e7714c45a272c23216a232955f10d8dc96b41cf14f61ef23b714faafcff219e0",
+    "schema.sql": "4f2f424cb29d407e8b5ec5d2e68ebbe6572e3423877fab66c45a1f03bec80f2c",
+    "sources/internal/adapters/postgres/configuration_runtime_role_plan.go.txt": "2603b431e7ecd1863cba6288727c91ca74ac40a1fecec9ccd7ba7c2f49e9a938",
+    "sources/internal/adapters/postgres/fleet_observation.go.txt": "2d1d8d3327191f637b0dd68576a9bb2cc0609a321d7f93efcd99788b81bf4653",
+    "sources/internal/adapters/postgres/fleet_observation_contention.go.txt": "2b5c2215199002ff72635e43e86e76e92aae2c00ae400a1557d80814fba28e36",
+    "sources/internal/adapters/postgres/initial_installation.go.txt": "9a3969c6b47609ad2c408ddeb1620caea3b24c81c0655860fb735252cfa02334",
+    "sources/internal/adapters/postgres/initial_roles.go.txt": "f2e8d8ff296ab7ac8f15e2f3706b6817cfd26c26e7bab1e5afe854c220a59ad6",
+    "sources/migrations/00006_peer_identity.sql.txt": "e4ac24e80ecf7332d3be31197d256f0931ca466776caa838d5dcfdb0b0ed0455",
+    "sources/migrations/00031_database_activation.sql.txt": "0053d5a4f1f10936c17512286207b9fcec70a2dd557ca82a8a15a091c7700887",
+    "sources/migrations/00051_connector_retirement.sql.txt": "e35a4d4c2d60dc148b3fe6d4781c78eea26799e3e5f2ff18aec443a1e1639527",
+    "sources/migrations/00052_capture_intent_lifecycle.sql.txt": "bfd9e13c113a852f5a1858865eccd5e86272a2573e85d36e531fb22d31debea3",
+    "sources/migrations/00054_protected_capacity.sql.txt": "2431fb290d2613cbc6d96877c047813c54d9af85496c89c86b184d8ea7bd1b11",
+    "sources/migrations/queries/fleet.sql.txt": "494ec19ef4e939ed4af9149e5d9c723bac5bf05997cdcb1019761f4e0cf38752",
+    "sources/scripts/test-context-storage.py.txt": "2d24adc21f84e950e531d09c1325d6442823fbe9800b96e7a215b60c3e0275f5",
+    "sources/scripts/test-custody.py.txt": "a4cad1993b7059e3fd75b0517a445e57e4abb0b80b1bfc7e609413710c40c462"
+  }
+}

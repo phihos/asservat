@@ -1,0 +1,301 @@
+{
+  "manifest": {
+    "scope": "ADR140 cleanup/receipt-gated three-child component; not installed enablement",
+    "qualification_source_manifest_sha256": "638b1dd082d9bde1d5b2e914be7f7244a0a77896bfe43c13ec9e5e1edb25696a",
+    "dependency_manifest_sha256": "cba7efe29e15404f0d46c38c0d2f3fec4c74950f407c860c751d613344faa1ee",
+    "files": [
+      {
+        "path": "internal/adapters/jose/remote_operation_retirement.go",
+        "base_sha256": null,
+        "payload_sha256": "ea3f12514e84aab874caa54be109011ee319ee31ba7d453a8b88bab0ca42174a",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/jose/remote_operation_retirement.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/jose/remote_operation_retirement_test.go",
+        "base_sha256": null,
+        "payload_sha256": "b6933c85c77120e63bda0625ce5c2c2c78364623762faee420cd3c78bf1b14f2",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/jose/remote_operation_retirement_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kms/signing_source.go",
+        "base_sha256": null,
+        "payload_sha256": "e2c1dbe42006b6a30e28319c199878fbf25cadade0a199f46825447573ae0947",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/kms/signing_source.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kms/signing_source_test.go",
+        "base_sha256": null,
+        "payload_sha256": "31e191a9c89178f034054bc6dffb0978256ad545f6c01492fe5c0905504d05b3",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/kms/signing_source_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_projection_digest.go",
+        "base_sha256": null,
+        "payload_sha256": "07e003314943a67d359d6aa43d0f2316816bf7af069c648275a178d8b4df64c3",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/adapters/kubernetes/capacity_projection_digest.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_projection_reader.go",
+        "base_sha256": null,
+        "payload_sha256": "b5da345f4e7b358501e38ffcd5c36ff00524b51d806c7edd2e8e9ce507319893",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/adapters/kubernetes/capacity_projection_reader.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_projection_state.go",
+        "base_sha256": null,
+        "payload_sha256": "17d2001a2c987fe3a9de464f0ff9094dcc2f17c5f3b49b792f9ac5c181c1ea33",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/adapters/kubernetes/capacity_projection_state.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capacity_projection_workload.go",
+        "base_sha256": null,
+        "payload_sha256": "30fe4fcccd5a4aa3362bb5f34e6f2d4cadd72fcd9a7ca124b826c6351ca19d71",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/adapters/kubernetes/capacity_projection_workload.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capture_cleanup_projection.go",
+        "base_sha256": null,
+        "payload_sha256": "76ce5065c0ba9810549554c9763e538e0fe5a89bce395030a52c0b8f6393c4e1",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/kubernetes/capture_cleanup_projection.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capture_cleanup_projection_reader.go",
+        "base_sha256": null,
+        "payload_sha256": "6ef595eb64d8c82abaf0ce9c2afe9c7e5e38c7d30b8e9306fe0e709952db56c1",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/kubernetes/capture_cleanup_projection_reader.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/capture_cleanup_projection_test.go",
+        "base_sha256": null,
+        "payload_sha256": "47f0e86d05c24d6ea2f30fe77bc5938ae5541d64fd6ed7a88d2ca279ae7e5392",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/kubernetes/capture_cleanup_projection_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/hub_worker_installed.go",
+        "base_sha256": "7e0efbc98e8b1895de3f7b343ae688e7d087572ae05486ae452c576ab18c5300",
+        "payload_sha256": "d39e26c0204b35a3d87c6a53a1dcbe395120f083c02c07380cd6d7ffc40dbbf7",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/hub_worker_installed.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/initial_runtime_resources.go",
+        "base_sha256": "34afd60b63226c23800fe1e155f45c9c53a106e340b319fa4955d46de80512e1",
+        "payload_sha256": "c1df1cb082669a179bfc94329751497b2475b9c6bc6e9dd8ad239f713b6ee7a5",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/initial_runtime_resources.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/worker_projection_annotations.go",
+        "base_sha256": null,
+        "payload_sha256": "df08d797ea2dd0561a90118eef3d95bc1f222a362d2418c4a824784a7cc72add",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/adapters/kubernetes/worker_projection_annotations.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/adapters/kubernetes/worker_projection_resources.go",
+        "base_sha256": null,
+        "payload_sha256": "52e8ee3ee6731154a48c9b8279fb02196ae844c61a5ba334bc5c914b78bdd4e2",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/worker_projection_resources.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/worker_projection_resources_test.go",
+        "base_sha256": null,
+        "payload_sha256": "335e31756c6bab3fb04aac64a2c36d3bb57b0d9082085e5f91e2ad175612f601",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/worker_projection_resources_test.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/worker_projection_state.go",
+        "base_sha256": null,
+        "payload_sha256": "0d321610882405d6e5b3c13b9fa0611aa72fb9a0e2adaa5a6ffff2a3f3f9ce82",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/worker_projection_state.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/kubernetes/worker_projection_state_test.go",
+        "base_sha256": null,
+        "payload_sha256": "4690037ac11d2b1dad29113dd70d94f9b8c7d1aedcb87308a4726e01ca9fc71d",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/internal/adapters/kubernetes/worker_projection_state_test.go",
+        "owner": "worker-projection-startup-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/capture_cleanup_credential.go",
+        "base_sha256": null,
+        "payload_sha256": "3b7d0052a7837ee5dbf34cce042a348c03722a14e662f2ad92f798aab20974ea",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/capture_cleanup_credential.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/capture_cleanup_credential_test.go",
+        "base_sha256": null,
+        "payload_sha256": "a11d71169a79a20d2d1f3ac6d7c36f10a56b83fb4846603ace66a890e1540a44",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/capture_cleanup_credential_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/capture_cleanup_due.go",
+        "base_sha256": null,
+        "payload_sha256": "bc5eda467c7fccfee43d58d0b27cf5f9cd1d5ad062946791ee89710f220e8c40",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/capture_cleanup_due.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/capture_lifecycle.go",
+        "base_sha256": "4b0bb9658b3d26b8e702bdd2b6d30fc7a678afd793731632f0f8c6606897e9ea",
+        "payload_sha256": "096edbc7fe80e9d290bc5af0ed79eb20c910cba3da1b482c41867df5a6b5deed",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/capture_lifecycle.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/capture_lifecycle_scope_test.go",
+        "base_sha256": null,
+        "payload_sha256": "785e84a15c6b42e6dd15809392cdfac274ec1108f32b01847a784792be3f9259",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/capture_lifecycle_scope_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/adapters/postgres/custodydb/capture_lifecycle.sql.go",
+        "base_sha256": "3e2065069f69bea605474123f9254ada4a4c26625ec6c2b1afe197840d38368a",
+        "payload_sha256": "a231c4ebaacbac5ab152b52284c3069a00109ee76243e3f0e9bae9fa260dafac",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/checks/cleanup-graph-3/generation/internal/adapters/postgres/custodydb/capture_lifecycle.sql.go",
+        "owner": "generated from exact schema54 + additive due-page SELECT"
+      },
+      {
+        "path": "internal/adapters/postgres/operation_lifecycle.go",
+        "base_sha256": "ba65b4243e6f5f10fd6db310d46c2831abc468f261028a190373cae8292f3df3",
+        "payload_sha256": "320ae67f17bee5c5c7a48e955c836a803c14d5d9a69e68603c6b7c25392fb1b3",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/adapters/postgres/operation_lifecycle.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/bootstrap/capacity_hub_worker.go",
+        "base_sha256": "099e10c3b349d66d5a7bd93801e9d5c9b339746c8f86e31041938f6a721c99e8",
+        "payload_sha256": "84b0a240e56000c722ad8b62262ccdce62d9a577ddad227f4b641fcd047b5a20",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/bootstrap/capacity_hub_worker.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/bootstrap/capacity_projection_protection.go",
+        "base_sha256": null,
+        "payload_sha256": "f79d2e1b57bbb95cdd88f6c599ccc94b603a8a7788c9666a144e3c7b7f334b1f",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/bootstrap/capacity_projection_protection.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/bootstrap/capacity_projection_wait.go",
+        "base_sha256": null,
+        "payload_sha256": "28810cf351bb634db26481b8c61814bad72d3505e5966a6e60846c17350e9798",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/dependency-runtime-wait-v1/files/internal/bootstrap/capacity_projection_wait.go",
+        "owner": "dependency-runtime-wait-v1, source-only"
+      },
+      {
+        "path": "internal/bootstrap/capture_cleanup_inputs.go",
+        "base_sha256": null,
+        "payload_sha256": "a6279d5609190ad95b82acad6c6f5082ee7e13a78ad1d371a97e7812cd6296e6",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/bootstrap/capture_cleanup_inputs.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/bootstrap/capture_cleanup_inputs_test.go",
+        "base_sha256": null,
+        "payload_sha256": "ab6956a3b1d6134a1f254ff69adbe84bb251e8bf59a90170df59b0672c74e3b7",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/bootstrap/capture_cleanup_inputs_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/bootstrap/capture_cleanup_worker.go",
+        "base_sha256": null,
+        "payload_sha256": "6cea2605414b8f9a03d6d7befeda331bb12606d7c47a006f6f30dec91c3c72a1",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/bootstrap/capture_cleanup_worker.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/bootstrap/installed_hub_worker.go",
+        "base_sha256": null,
+        "payload_sha256": "8761de997a121c225e134d2ff2c7e889406dfd5ecf33424b1f39d5c4f7076ed7",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/bootstrap/installed_hub_worker.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/bootstrap/installed_hub_worker_test.go",
+        "base_sha256": null,
+        "payload_sha256": "738f66ccac060b3827e6b29ed705f2f18ca0e062ccd800f27c8bd7fddd6bbbfd",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/bootstrap/installed_hub_worker_test.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "internal/contracts/capture_cleanup_digest.go",
+        "base_sha256": null,
+        "payload_sha256": "9bbaa1a1b4901d2bc4022a75dd797a58b0958793f28855ccbe141e477d666b83",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/internal/contracts/capture_cleanup_digest.go",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "migrations/queries/capture_lifecycle.sql",
+        "base_sha256": "e2766437c887485935c6ee891d75d50532a2bd8e2dbb669e2198e6f1a9d4da2d",
+        "payload_sha256": "ae782d0897f9c090e5427c2f44eda07add86eca6ca9c9f455a5ee5dc79e71fb7",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/migrations/queries/capture_lifecycle.sql",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "specs/contracts/capacity-runtime-projection-claim.schema.json",
+        "base_sha256": null,
+        "payload_sha256": "c833d8dee332325b7e58402e3593e8947c154505a9c540a2658e21c819e9a17b",
+        "source": "/home/phil/.cache/asservat-build/planning/capacity-projection-20261012/changes/specs/contracts/capacity-runtime-projection-claim.schema.json",
+        "owner": "MCP canonical schema, source-only"
+      },
+      {
+        "path": "specs/contracts/capture-cleanup-credentials.schema.json",
+        "base_sha256": null,
+        "payload_sha256": "7100cdf355ab3c016432fd483fb0032e8c0a5a15703139878e4fef4f77e8aaa3",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/specs/contracts/capture-cleanup-credentials.schema.json",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "specs/contracts/capture-cleanup-deployment.schema.json",
+        "base_sha256": null,
+        "payload_sha256": "b1f53a53c09eadd401e64f45c90279d3fe27ab477851afdf42372de1361d16f6",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/specs/contracts/capture-cleanup-deployment.schema.json",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "specs/contracts/capture-cleanup-projection-claim.schema.json",
+        "base_sha256": null,
+        "payload_sha256": "b699445c5f0d0624eec4b2728db3db9360ca91f185dff148362729d73c0aa840",
+        "source": "/home/phil/.cache/asservat-build/planning/capture-cleanup-runtime-20261012/changes/specs/contracts/capture-cleanup-projection-claim.schema.json",
+        "owner": "capture-cleanup-runtime-20261012/changes"
+      },
+      {
+        "path": "specs/contracts/initial-runtime-resources.schema.json",
+        "base_sha256": "512dfbdc1a7f820920d0ef93f0f50f606f9ad0e2fcb1655de4069914e8141fe4",
+        "payload_sha256": "12d5e59a9b1717601008dcfc50e82d6989816848c344d0e7f13e9d86f558bebf",
+        "source": "/home/phil/.cache/asservat-build/planning/worker-projection-startup-20261012/changes/specs/contracts/initial-runtime-resources.schema.json",
+        "owner": "worker-projection-startup-20261012/changes"
+      }
+    ]
+  },
+  "dependencies": 1780,
+  "reviewedPriorVerifierCorrection": {
+    "internal/adapters/postgres/public_runtime_roles.go": {
+      "before": "097ec59e77398298cb097ae47f09dcb2b4038e7222c3df64d4749615f63ec3a3",
+      "after": "cf9a3c91ea5417bf0cabc3f40fd7d8b0b1a260eec664a908c5060f8018f7fc0f"
+    },
+    "test/integration/capacity_sql_fixture_test.go": {
+      "before": "468db31625e30e67d5576f19b38cf541fcc85c0c165be776c2ff10a892fc270e",
+      "after": "42b3a6b8bf8ac6e4170cab3de208ddec37998a56fcb471a30ed9520e8dce2eb8"
+    }
+  },
+  "scope": "Source integration only; combined gates and native qualification follow"
+}

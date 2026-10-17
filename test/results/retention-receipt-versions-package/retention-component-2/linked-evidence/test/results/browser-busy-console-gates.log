@@ -1,0 +1,17 @@
+cd web && npm run check
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+Native ESM auth and all five capture operation validators passed positive and negative checks.
+Native ESM case and download validators passed positive and negative checks.
+Native ESM download terminal-only status and complete native metadata guards passed for all three operations.
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat/web
+
+
+ Test Files  8 passed (8)
+      Tests  110 passed (110)
+   Start at  23:26:59
+   Duration  2.05s (environment 44%, tests 25%, transform 16%, import 14%)
+

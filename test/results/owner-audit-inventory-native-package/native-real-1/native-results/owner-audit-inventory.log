@@ -1,0 +1,10 @@
+=== RUN   TestOwnerAuditInventoryWithRealServices
+=== RUN   TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies
+=== RUN   TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory
+    owner_audit_inventory_test.go:168: actual bounded historical inventory unavailable object storage refused or unavailable
+--- FAIL: TestOwnerAuditInventoryWithRealServices (0.26s)
+    --- PASS: TestOwnerAuditInventoryWithRealServices/inspection-credential-cannot-mutate-or-read-bodies (0.01s)
+    --- FAIL: TestOwnerAuditInventoryWithRealServices/expired-original-source-exact-physical-inventory (0.01s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.321s
+FAIL

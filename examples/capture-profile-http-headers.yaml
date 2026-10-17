@@ -1,0 +1,82 @@
+apiVersion: asservat.io/v1alpha1
+kind: CaptureProfile
+metadata:
+  name: http-headers-v1
+  namespace: asservat-builtin-profiles
+spec:
+  name: http-headers
+  version: v1
+  definition:
+    displayName: HTTP/1 headers, both directions
+    description: Plain HTTP/1 request and response header projection; no TLS plaintext
+      or HTTP/2 support.
+    recipe:
+      description: Plain HTTP/1 request and response header projection; no TLS plaintext
+        or HTTP/2 support.
+      actions:
+      - id: http
+        kind: packetCapture
+        parameters:
+          profile:
+            kind: httpHeaders
+            protocol: http1
+            projectionRef:
+              name: http-response-headers
+              version: v1
+            maxFlows: 1024
+            maxHeaderBytes: 32768
+            maxReassemblyBytesPerFlow: 262144
+            maxReassemblyBytes: 16777216
+            idleTimeout: 30s
+          before: 30s
+          after: 30s
+          ring:
+            maxAge: 30s
+            maxBytes: 16777216
+            segmentBytes: 4194304
+            maxSegments: 4
+            medium: memory
+          peers:
+            entries:
+            - cidrs:
+              - 0.0.0.0/0
+              - ::/0
+            protocol: tcp
+            resolution: frozen
+            maxEndpoints: 1
+            maxStaleness: 5s
+          maxFrozenBytes: 67108864
+          maxConcurrentSnapshots: 1
+        required: true
+        impact: sensitiveRead
+        limits:
+          maxBytes: 67108864
+          timeout: 90s
+        executionMode: ongoing
+      maxTotalBytes: 67108864
+      maxDuration: 120s
+    editableFields:
+    - actionID: http
+      field: packetPeers
+      label: Peers and ports
+    - actionID: http
+      field: packetFilter
+      label: Pcap filter
+    - actionID: http
+      field: packetBefore
+      label: History window
+    - actionID: http
+      field: packetAfter
+      label: Next interval
+    - actionID: http
+      field: packetRing
+      label: Ring allocation
+    - actionID: http
+      field: actionTimeout
+      label: Completion deadline
+    - actionID: http
+      field: actionExecutionMode
+      label: When recording starts
+  availability:
+    enabled: true
+    deprecated: false

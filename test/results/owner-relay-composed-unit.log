@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.288s
+ok  	asservat.local/asservat/internal/adapters/mtls	(cached)
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/application/fleet	(cached)
+ok  	asservat.local/asservat/test/integration	2.064s

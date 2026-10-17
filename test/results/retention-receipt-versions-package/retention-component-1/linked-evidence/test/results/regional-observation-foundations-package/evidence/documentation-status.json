@@ -1,0 +1,7 @@
+{
+  "path": "docs/architecture/cluster-observations.md",
+  "baseSHA256": "ad0755d8b40909e795bf41658342f38148cb8286120ac800da19ab64008ac4ea",
+  "afterSHA256": "707357a30145266f5bc0c07215501c67cd74d6a2f5cd3ed29e955292ec9df2c5",
+  "patchSHA256": "02bf061ac465926271552bb42c8ba47fc49c7cc037f41209627548648843310b",
+  "scope": "documentation status only; parent applies after exact payload integration; no code changed"
+}

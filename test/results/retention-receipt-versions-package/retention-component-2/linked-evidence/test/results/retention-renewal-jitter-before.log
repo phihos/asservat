@@ -1,0 +1,5 @@
+--- FAIL: TestRetentionRenewalDoesNotSkipCycleAfterGuardTimingShift (2.01s)
+    retention_reconciler_test.go:315: observation renewal skipped a cycle or exceeded its rate 1.879944082s
+FAIL
+FAIL	asservat.local/asservat/internal/application/configuration	2.013s
+FAIL

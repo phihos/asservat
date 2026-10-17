@@ -1,0 +1,28 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/owner-deployment-join-20261013/checks/legacy-1/overlay.json",
+    "-run",
+    "^$",
+    "./internal/application/evidence",
+    "./internal/bootstrap"
+  ],
+  "exit": 0,
+  "expected_exit": 0,
+  "intended_before": true,
+  "seconds": 9.7,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "auxiliary": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "auxiliary": []
+  }
+}

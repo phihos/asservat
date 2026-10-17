@@ -1,0 +1,21 @@
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/11 20:16:01 http: TLS handshake error from 127.0.0.1:52268: remote error: tls: unknown certificate
+2026/10/11 20:16:01 http: TLS handshake error from 127.0.0.1:52294: remote error: tls: unknown certificate
+    console_test.go:130: console browser test failed: exit status 1
+        node:internal/modules/run_main:111
+            triggerUncaughtException(
+            ^
+        
+        response.json: Protocol error (Network.getResponseBody): No data found for resource with given identifier
+        Response body is not available for a response that was navigated away from. Read response.body() before triggering any navigation.
+            at evidenceJourney (/home/phil/Projekte/asservat/web/tests/evidence-journey.mjs:33:33)
+            at async file:///home/phil/Projekte/asservat/web/scripts/browser-test.mjs:129:3 {
+          log: [],
+          name: 'Error'
+        }
+        
+        Node.js v26.11.1
+--- FAIL: TestConsoleBrowserWithBuiltPackage (7.55s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	7.567s
+FAIL

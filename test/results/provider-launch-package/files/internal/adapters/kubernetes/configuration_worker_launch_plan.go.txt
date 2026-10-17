@@ -1,0 +1,133 @@
+package kubernetes
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+	apps "k8s.io/api/apps/v1"
+)
+
+// Pure derivation from the actual initial operation responses. This value is
+// not authority: only a positively acknowledged original launch claim followed
+// by actual post-lock SQL/native checks may admit its one Deployment UPDATE.
+type configurationWorkerLaunchPlan struct {
+	claim   contracts.ConfigurationRuntimeLaunch
+	running apps.Deployment
+}
+
+func configurationWorkerLaunchPlanFor(input contracts.HubWorkerDeployment, resources contracts.InitialRuntimeResourceSnapshot, roles contracts.ConfigurationRuntimeRoleSnapshot, inert apps.Deployment, operation string, now, operationUntil time.Time) (configurationWorkerLaunchPlan, error) {
+	var zero configurationWorkerLaunchPlan
+	child := resources.State.WorkerInputs
+	if !configurationWorkerLaunchIDAvailable(resources.State, operation) || child == nil || child.Receipt == nil || input.ProviderInputs == nil || input.ProviderAuthentication == nil ||
+		!equalJSON(configurationWorkerInputProvenance(child), input.ProviderInputs) || child.AuditCredentials != input.ProviderAuthentication.AuditCredentials ||
+		roles.State.Launch != nil || roles.State.Projection == nil || roles.State.Projection.SecretUID != child.SQLProjection.UID ||
+		roles.UID != child.ConfigurationRoot.UID || roles.State.OperationID != child.ConfigurationSetupID ||
+		!configurationRoleStateValid(roles.State.Input, roles.State, now) || !configurationRoleSourceMatches(roles.State.Input, roles.Sources, now) ||
+		inert.APIVersion != "apps/v1" || inert.Kind != "Deployment" || !configurationRoleDeploymentBound(inert, roles.State.Input) ||
+		*inert.Spec.Replicas != 0 || inert.Annotations[configurationLaunchAnnotation] != "" {
+		return zero, cfg.ErrChanged
+	}
+	digest, err := configurationWorkerInputDigest(input)
+	if err != nil || digest != child.PublicDigest || configurationWorkerDeploymentDigest(inert) != roles.Sources.WorkloadDigest {
+		return zero, cfg.ErrChanged
+	}
+	until := identity.Earlier(operationUntil, identity.Earlier(roles.ValidUntil, identity.Earlier(roles.State.Until, resources.State.Until))).UTC().Truncate(time.Microsecond)
+	claimedAt := now.UTC().Truncate(time.Microsecond)
+	if !claimedAt.Before(until) || until.Sub(claimedAt) > 5*time.Second {
+		return zero, cfg.ErrUnavailable
+	}
+	running := inert.DeepCopy()
+	*running.Spec.Replicas = 1
+	claim := contracts.ConfigurationRuntimeLaunch{OperationID: operation, ClaimedAt: claimedAt, Until: until,
+		Sources: roles.Sources, InertResourceVersion: inert.ResourceVersion, RunningDigest: configurationWorkerDeploymentDigest(*running),
+		ProjectionUID: roles.State.Projection.SecretUID, Configuration: child.Receipt.Configuration, Providers: child.AuditCredentials}
+	candidate := roles.State
+	candidate.Launch = &claim
+	if !configurationRoleStateValid(roles.State.Input, candidate, now) || !configurationProviderLaunchMounts(*running, input, &claim) {
+		return zero, cfg.ErrChanged
+	}
+	if running.Annotations == nil {
+		running.Annotations = map[string]string{}
+	}
+	running.Annotations[configurationLaunchAnnotation] = operation
+	return configurationWorkerLaunchPlan{claim: claim, running: *running}, nil
+}
+
+func configurationWorkerDeploymentDigest(deployment apps.Deployment) string {
+	raw, err := json.Marshal(deployment.Spec)
+	if err != nil {
+		return ""
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+// A later actual native response may normalize precisely the pre-recorded
+// zero-to-one specification change for original-role verification. It must
+// first match that complete current running body and original launch marker;
+// merely reading the new digest from a journal cannot qualify a workload.
+func configurationWorkerOriginalLaunchSources(current contracts.ConfigurationRoleObservation, deployment apps.Deployment, roles contracts.ConfigurationRuntimeRoleSnapshot) (contracts.ConfigurationRoleObservation, bool) {
+	launch := roles.State.Launch
+	if !configurationLaunchSpec(deployment, roles.State.Input, launch) || !configurationLaunchSources(current, launch) || configurationWorkerDeploymentDigest(deployment) != current.WorkloadDigest {
+		return contracts.ConfigurationRoleObservation{}, false
+	}
+	current.WorkloadDigest = launch.Sources.WorkloadDigest
+	return current, true
+}
+
+// Status, generation and RV may change after the guarded zero-to-one write;
+// no other original metadata edit is part of this configuration effect.
+func configurationWorkerLaunchMetadataMatches(current, original apps.Deployment, launch *contracts.ConfigurationRuntimeLaunch) bool {
+	if launch == nil {
+		return false
+	}
+	expected := original.DeepCopy()
+	if expected.Annotations == nil {
+		expected.Annotations = map[string]string{}
+	}
+	expected.Annotations[configurationLaunchAnnotation] = launch.OperationID
+	return equalJSON(current.Labels, expected.Labels) && equalJSON(current.Annotations, expected.Annotations) &&
+		equalJSON(current.OwnerReferences, expected.OwnerReferences) && equalJSON(current.Finalizers, expected.Finalizers)
+}
+
+// The original role validator separately reserves its own setup/claim IDs.
+// This fixed check reserves the original public sibling identities as well.
+func configurationWorkerLaunchIDAvailable(state contracts.InitialRuntimeResourceState, operation string) bool {
+	if !authorization.UUID(operation) || operation == state.SetupID {
+		return false
+	}
+	for _, object := range state.Objects {
+		if object.OperationID == operation {
+			return false
+		}
+	}
+	if p := state.WorkerInputs; p != nil && (p.OperationID == operation || p.ConfigurationSetupID == operation) {
+		return false
+	}
+	if p := state.OwnerIdentity; p != nil {
+		if p.OperationID == operation || p.RoleSetupID == operation {
+			return false
+		}
+		for _, child := range []*contracts.OwnerIdentityObjectAttempt{p.Configuration, p.Credentials} {
+			if child != nil && child.OperationID == operation {
+				return false
+			}
+		}
+	}
+	if p := state.OwnerLaunch; p != nil && p.OperationID == operation {
+		return false
+	}
+	if p := state.CapacityProjection; p != nil && (p.OperationID == operation || p.Setup.OperationID == operation || p.Setup.RoleSetupID == operation) {
+		return false
+	}
+	if p := state.CleanupProjection; p != nil && (p.OperationID == operation || p.Setup.OperationID == operation || p.Setup.RoleSetupID == operation) {
+		return false
+	}
+	return true
+}

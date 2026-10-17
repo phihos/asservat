@@ -1,0 +1,29 @@
+# Direct HWORK → holder A → regional R: component handoff
+
+Final payload is `../checkpoint-v3/manifest.json`: 20 paths (17 Go, three canonical docs), six existing bases and 14 additions. Do not integrate checkpoint-v1/v2 payloads. V3 differs from v2 only in the new Kubernetes cancellation test fixture. The product source is byte-identical between v2 and v3. No live source was edited by this agent.
+
+## Scope and contract
+
+This implements the purpose-fixed direct HWORK token route through independently verified holder A, removing the intermediate owner forwarding hop from the selected design. Complete candidate/Ready discovery, actual common/exact TLS and current SQL/native identity checks precede token disclosure. A retains one exact original native proof/standby reservation across GET delivery, spends the exact claim once before effect work, preserves all four regional source ordinals and two SQL49 pairs, and performs independent final native checks. Lost output never refunds or replays the original operation. Existing v1 formats, ordinary public authenticators, rates, grants, pools and deadlines are unchanged.
+
+The first-error discovery fix allows another already-running independent candidate to return an authenticated positive after one candidate fails. Failure remains an error and ends that worker; only authenticated explicit absence advances it. No POST retry or broader candidate fallback is added.
+
+Runtime selection, installed producers/backend receipt and native whole-path availability remain pending. Counts in `../checkpoint-v3/CALL-GRAPH.md` are structural/component evidence, not a five-second availability verdict.
+
+## Actual checks and evidence boundaries
+
+Checkpoint-v2 handle 41057 was terminal 1: all-five-package compile passed (11.135s), intended first-error BEFORE failed exactly at the meaningful assertion (3.074s), and four packages passed selected races: contracts 1.049s, mtls 9.041s, clusterobservation 1.921s, bootstrap 3.989s (100 top-level/339 named, no skips). Their exact source/log hashes are retained in `../checkpoint-v3/reused-evidence.json`; these unchanged package results are reused, not rerun. The BEFORE assertion is `unavailable first candidate cancelled independent pending positive`; its corrected real-h2 AFTER passes in the same v2 race log.
+
+V2 Kubernetes races failed at the original 180-second aggregate timeout, waiting on a synthetic HTTP/1 server handler notification after client cancellation. Its unread request body made that independent server notification unreliable. The original log/stack and failure remain intact. The test-only correction consumes the TokenReview first, positively joins actual client read/Close while the fake API still holds its response, then explicitly releases/joins the independent handler with failure-safe cleanup. No product predicate or operation/test deadline changed.
+
+Checkpoint-v3 handle 44423 is terminal 0: focused Kubernetes compile 10.904s; selected races 41.584s wall / 20.747s Go (16 top-level/109 named, no skips); all five affected packages vet 7.432s; Go architecture 1.068s, 53 packages/302 edges. The corrected Close test passes in 0.29s. Commands and actual exits are in each `../checkpoint-v3/evidence/*.json`; all children joined. Owned tmpfs scratch was removed.
+
+The v3 dependency snapshot contains 2,162 paths. Exactly five root historical-version Go changes since v2 are recorded in `dependency-delta.json`; this does not relabel old v2 results as testing the new global source tree. All v3 dependencies, 20 payloads, bases, exact file sets, frozen metadata and referenced v2 evidence matched before/after every phase. Progress documentation is excluded. Full spec/design gates are parent-owned after integration.
+
+## Canonical documents
+
+The three doc payloads and bases are unchanged from the reviewed v2 source: `docs/architecture/cluster-observations.md` base c31a58dd526b92d01fca2ba6b38d7c66fa8101da2582e93d0aa82219a7d66aaf; `docs/decisions/144-cluster-local-observations.md` base a86b100358146d4433608b55a8c7c22eba5396a0dd2127d85ad89bf53082093d; ADR150 is new/absent. Payload hashes are in the final manifest. Their frozen wording says staged/source-only; parent should separately record the actual component verdict, keeping native availability pending, and add ADR150 to the canonical decision index.
+
+## Remaining qualification and next work
+
+A full native HWORK → A → R fixture must exercise real two-cluster API guards/tokens, actual SQL49/owner registry, process-owned keys and actual HTTP/2 stream; use the same existing clients/limiters across consecutive requests and source-owner background work. Measure original source/recovery/leaf ages, per-leg monotonic elapsed time and actual API/SQL acquisitions, including losing candidates, all four purposes and original socket bounds. The installed caller-pin producer is now live, but no backend receipt or runtime selector is enabled here. The next source task is the concrete native fixture map; root owns lab allocation and integration.

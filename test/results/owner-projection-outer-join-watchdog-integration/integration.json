@@ -1,0 +1,9 @@
+{
+  "status": "integrated; unqualified",
+  "paths": {
+    "internal/adapters/kubernetes/owner_installation_driver_test.go": {
+      "beforeSHA256": "da7c43fa05bc126332e9754eeba1ac289335976f009aeb4df4e2ef46c04ee06f",
+      "afterSHA256": "d39337a4f7bb9c547bb85131ac095fb3c64a25834c5258aa8d37c1cdbefce285"
+    }
+  }
+}

@@ -1,0 +1,241 @@
+package execution
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	access "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/configuration"
+	value "asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
+)
+
+type apiRunnerFixture struct {
+	*contextExecutionFixture
+	work      APIContextWork
+	target    targets.PodResolution
+	cap       planning.ContextCapability
+	retention privacy.Resolution
+	recovery  artifact.RecoveryProof
+	process   value.APIProcessBinding
+	actor     identity.Identity
+	mu        sync.Mutex
+	record    value.APIExecution
+}
+
+func (f *apiRunnerFixture) Resolve(ctx context.Context, _ string) (identity.Identity, error) {
+	i := f.actor
+	if f.prepares.Load() > 0 {
+		if f.mode == "revoked-after-keys" {
+			i.Groups = nil
+		}
+		if f.mode == "expired-after-keys" {
+			return i, identity.ErrDenied
+		}
+	}
+	if ctx.Err() != nil {
+		return i, ctx.Err()
+	}
+	return i, nil
+}
+func (f *apiRunnerFixture) Permissions(ctx context.Context, t authorization.Target) (authorization.Projection, error) {
+	return authorization.Projection{Target: t, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: [32]byte{1}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), DeniesObservedAt: f.now, DeniesFreshUntil: f.now.Add(5 * time.Second), DeniesComplete: true, Allows: []authorization.CurrentAssignment{{Audience: f.work.Accepted.Expectation.Audience[0], ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}}}, nil
+}
+func (f *apiRunnerFixture) ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error) {
+	return f.work, nil
+}
+func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets.PodResolution, error) {
+	if f.mode == "replacement-pod" && f.prepares.Load() > 0 {
+		return targets.PodResolution{}, targets.ErrChanged
+	}
+	return f.target, nil
+}
+func (f *apiRunnerFixture) ContextCapability(context.Context, authorization.Target) (planning.ContextCapability, error) {
+	return f.cap, nil
+}
+func (f *apiRunnerFixture) ResolveRetention(context.Context, privacy.Input) (privacy.Resolution, error) {
+	return f.retention, nil
+}
+
+type apiFixtureRetention struct{ f *apiRunnerFixture }
+
+func (r apiFixtureRetention) Resolve(ctx context.Context, i privacy.Input) (privacy.Resolution, error) {
+	return r.f.ResolveRetention(ctx, i)
+}
+func (f *apiRunnerFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
+	return f.recovery, nil
+}
+func (f *apiRunnerFixture) ReadAPIProcess(context.Context) (value.APIProcessObservation, error) {
+	p := f.process
+	if f.mode == "restarted-process" && f.prepares.Load() > 0 {
+		p.ProcessEpoch = contextID(80)
+	}
+	return value.APIProcessObservation{Binding: p, CheckedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}, nil
+}
+func (f *apiRunnerFixture) PrepareAPIExecution(_ context.Context, c APIExecutionCheck) (value.APIExecution, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !c.Valid(f.now) {
+		return value.APIExecution{}, false, value.ErrDenied
+	}
+	first := f.record.Phase == ""
+	if first {
+		b := f.resolved.Start.Binding
+		b.ExecutionClass = artifact.ContextAPIExecution
+		b.NodeUID = ""
+		b.NodeBootID = ""
+		b.ExecutorPodUID = f.process.PodUID
+		b.ExecutorAccountUID = f.process.AccountUID
+		b.CollectorEpoch = f.process.ProcessEpoch
+		b.ScopeDigest = f.work.Accepted.ScopeDigest
+		b.NotBefore = c.CheckedAt
+		b.NotAfter = c.ValidUntil
+		f.record = value.APIExecution{WriterProtocol: artifact.ContextWriterProtocol, RootID: contextID(41), Binding: b, Process: f.process, ExpectationDigest: evidence.ContextExpectationDigest(f.work.Accepted.Expectation), Phase: "prepared"}
+	}
+	if f.mode == "legacy-writer-protocol" {
+		f.record.WriterProtocol = ""
+	}
+	if f.mode == "lost-preparation-reply" && first {
+		return value.APIExecution{}, false, value.ErrUnavailable
+	}
+	return f.record, first, nil
+}
+func (f *apiRunnerFixture) BindAPIStart(_ context.Context, _ APIExecutionCheck, _ value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.record.ObjectUID != "" && f.record.ObjectUID != p.ObjectUID {
+		return value.APIExecution{}, value.ErrConflict
+	}
+	f.record.ObjectUID = p.ObjectUID
+	return f.record, nil
+}
+func (f *apiRunnerFixture) PrepareStart(_ context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
+	if f.mode == "lost-create-reply" && c.MayCreate {
+		return value.PreparedStart{}, value.ErrUnavailable
+	}
+	return value.PreparedStart{ObjectUID: f.resolved.Start.ObjectUID, ResourceVersion: "1"}, nil
+}
+func (f *apiRunnerFixture) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
+	return f.LookupStart(ctx, r)
+}
+func (f *apiRunnerFixture) RecordAPIStart(_ context.Context, _ APIExecutionCheck, _ value.APIExecution, d value.Disposition) (value.APIExecution, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.mode == "lost-start-record-reply" {
+		return value.APIExecution{}, value.ErrUnavailable
+	}
+	if f.record.Phase != "prepared" {
+		return value.APIExecution{}, value.ErrConflict
+	}
+	f.record.Phase = "started"
+	f.record.StartedAt = d.CommittedAt
+	if f.mode == "expired-start-record-reply" {
+		f.now = f.now.Add(6 * time.Second)
+	}
+	return f.record, nil
+}
+func (f *apiRunnerFixture) RecordAPIOutcome(_ context.Context, r value.APIExecution, p value.APIProcessObservation) (value.APIExecution, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !r.Valid() || p.Binding != r.Process {
+		return value.APIExecution{}, value.ErrDenied
+	}
+	f.record = r
+	return r, nil
+}
+func (f *apiRunnerFixture) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, p value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
+	if f.closes.Load() < 1 || c.Copies != r.Copies || !c.Valid(f.work.Accepted.Expectation.Registration) || !recovery.Valid(f.now) {
+		return value.APIExecution{}, value.ErrDenied
+	}
+	return f.RecordAPIOutcome(ctx, r, p)
+}
+func apiRunner(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.CurrentIdentity) {
+	t.Helper()
+	base, _ := executionFixture()
+	f := &apiRunnerFixture{contextExecutionFixture: base}
+	e := base.resolved.Expectation
+	e.ExecutionClass = artifact.ContextAPIExecution
+	e.NodeUID = ""
+	e.NodeBootID = ""
+	pin := base.resolved.Pin
+	pin.NodeName = ""
+	pin.ControllerUID = e.WorkloadUID
+	rev := identity.Revision{UID: contextID(40), Generation: 1, Digest: [32]byte{40}}
+	f.target = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: targets.Request{ClusterID: e.Registration.Location.ClusterID, Namespace: configuration.NamespaceRef{Name: e.Namespace, UID: e.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: "StatefulSet", Name: "api", UID: e.WorkloadUID}, PodName: pin.Name, PodUID: e.PodUID}, Pin: pin, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
+	f.actor = identity.Identity{Principal: identity.Principal{Issuer: e.Audience[0].Issuer, Subject: "dev", ClientID: "console", Kind: identity.Human}, Policy: rev, Scopes: []string{"evidence:capture", "evidence:read"}, Groups: []string{"team"}, VerifiedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}
+	f.cap = planning.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Enabled: true, Revision: rev, CollectorVersion: e.CollectorVersion, CollectorImageDigest: e.CollectorImageDigest, ProjectionDigest: compiler.ProjectionDigest(), ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
+	proof := artifact.RetentionProof{RootID: contextID(41), ClusterID: f.target.Target().ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second), Sources: [2]artifact.RetentionSourceVersion{{ClusterID: f.target.Target().ClusterID, ControlNamespaceUID: contextID(42), Epoch: contextID(43), Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}}}
+	f.retention = privacy.Resolution{Target: f.target.Target(), PolicyRevision: rev, PurposeRef: e.PurposeRef, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, MaximumSeconds: e.MaximumAgeSeconds, DeletionBudgetSeconds: e.DeletionBudgetSeconds, Policies: e.RetentionRules, Deadlines: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}, ValidUntil: f.now.Add(5 * time.Second), Proof: proof}
+	f.recovery = artifact.RecoveryProof{InstallationID: contextID(44), IssuerEpoch: base.receiver.IssuerEpoch, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
+	f.process = value.APIProcessBinding{InstallationID: f.recovery.InstallationID, ClusterID: f.target.Target().ClusterID, IssuerEpoch: f.recovery.IssuerEpoch, NamespaceUID: contextID(45), AccountUID: contextID(46), PodUID: contextID(47), ProcessEpoch: contextID(48), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
+	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: e.CaseID, Executor: f.actor.Principal, Deadline: e.Registration.WriteUntil, Target: f.target, Retention: f.retention, Capability: f.cap}, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.PlanDigest = plan.ScopeDigest
+	e.RecipeDigest = plan.RecipeDigest
+	f.work = APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, ScopeDigest: e.PlanDigest, Expectation: e, Pin: pin, CreatedAt: f.now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.actor.Principal, IntentDigest: artifact.Digest{1}}
+	svc := APIContextRunner{Read: f, Prepare: f, Record: f, Process: f, Local: f, Starts: f, Targets: f, Eligibility: access.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Capabilities: f, Retention: apiFixtureRetention{f}, Recovery: f, Output: f, Collector: f, Now: func() time.Time { return f.now }}
+	source, _, err := identities.NewBearerRequest(context.Background(), f, "synthetic-token", svc.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f, svc, source
+}
+func TestAPIContextRunnerOneEffectAndClosedKeys(t *testing.T) {
+	f, s, current := apiRunner(t)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			out, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
+			if !(errors.Is(err, value.ErrPreparationUncertain) && out.State == "Indeterminate") && (err != nil || out.State != "StoredPendingVerification" && out.State != "AlreadyStarted") {
+				t.Errorf("%s %v", out.State, err)
+			}
+		})
+	}
+	wg.Wait()
+	if f.captures.Load() != 1 || f.stores.Load() != 1 || f.prepares.Load() != 1 || f.prepares.Load() != f.closes.Load() || f.record.Phase != "stored" {
+		t.Fatal("repeated effect or keys retained", f.captures.Load(), f.stores.Load(), f.record.Phase)
+	}
+}
+func TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire(t *testing.T) {
+	for _, mode := range []string{"legacy-writer-protocol", "revoked-after-keys", "expired-after-keys", "replacement-pod", "restarted-process", "lost-preparation-reply", "lost-create-reply", "lost-start-reply", "lost-start-record-reply", "expired-start-record-reply"} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			f.mode = mode
+			_, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
+			if err == nil || f.captures.Load() != 0 || f.stores.Load() != 0 || f.prepares.Load() != f.closes.Load() {
+				t.Fatal("uncertain/stale authority acquired", err)
+			}
+		})
+	}
+}
+func TestAPIContextRunnerFailureIsImmutableSpentOutcome(t *testing.T) {
+	for _, mode := range []string{"capture", "oversize", "write"} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			f.mode = mode
+			_, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
+			if err == nil || !f.spent.Load() {
+				t.Fatal("failure was not spent", err)
+			}
+			before := f.captures.Load()
+			out, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
+			if err != nil || out.State != "AlreadyStarted" || f.captures.Load() != before {
+				t.Fatal("repeated failed acquisition", err)
+			}
+		})
+	}
+}

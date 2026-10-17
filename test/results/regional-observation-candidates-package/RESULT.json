@@ -1,0 +1,334 @@
+{
+  "session": 93068,
+  "terminal": 0,
+  "scope": "isolated candidate read and original-pool consumer component; no external service tests executed",
+  "phases": [
+    {
+      "phase": "sqlc-version",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "version"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 0.19,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "generate",
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate",
+        "-f",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/generation/sqlc.json"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 0.5,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "before-value",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/before-value.json",
+        "-vet=off",
+        "-count=1",
+        "-timeout=60s",
+        "-run",
+        "^TestOwnerObservationCandidateValueKeepsExplicitPopulationAndEveryProcess$/^opted17$",
+        "-v",
+        "./internal/domain/fleet"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "seconds": 0.713,
+      "expectedFailure": true,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "before-consumer",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/before-consumer.json",
+        "-vet=off",
+        "-count=1",
+        "-timeout=60s",
+        "-run",
+        "^TestInstalledObservationClientSelectsOriginalCandidateReader$/^opted-valid$",
+        "-v",
+        "./internal/bootstrap"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 1,
+      "seconds": 7.112,
+      "expectedFailure": true,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/domain/fleet",
+        "./internal/application/fleet",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 23.751,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(OwnerObservationCandidate|OwnerObservationReadyGroups|OwnerObservationBootstrapUsesComplete|ConnectorObservationChannel|ConnectorObservationStream|InstalledObservationClient|OwnerEndpointBoundedDiscovery|OwnerPoolNativeCandidateLimit)",
+        "-v",
+        "./internal/domain/fleet",
+        "./internal/application/fleet",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/bootstrap"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 28.851,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/build-overlay.json",
+        "./internal/domain/fleet",
+        "./internal/application/fleet",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/adapters/postgres",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "cwd": "/home/phil/Projekte/asservat",
+      "exit": 0,
+      "seconds": 4.209,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    },
+    {
+      "phase": "architecture",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-candidates-20261013/checkpoint-v1/mirror",
+      "exit": 0,
+      "seconds": 1.251,
+      "expectedFailure": false,
+      "before": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      },
+      "after": {
+        "live": [],
+        "bases": [],
+        "payload": [],
+        "fileSet": [],
+        "mirror": [],
+        "mirrorSet": [],
+        "freeze": [],
+        "derived": [],
+        "tool": []
+      }
+    }
+  ],
+  "racePassEntries": 185,
+  "raceSkipEntries": 0,
+  "dependencyCount": 1927,
+  "payloadCount": 26,
+  "generated": {
+    "internal/adapters/postgres/custodydb/owner_observation_candidates.sql.go": "15e3cc81cc707917ce1c0b15c596ae46a7370b757c6319ae992caebe9cf644fe"
+  },
+  "hashesUnchanged": true
+}

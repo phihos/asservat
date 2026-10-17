@@ -1,0 +1,11 @@
+# Source-ready required-input ordering
+
+Two integration payloads only. No helper, DTO, production, grant, rate, schema, provider or harness edits. Current captured bases still match. Full dependency freeze and compilation are held until parent native98578 terminates.
+
+The fixture now retains an exact Pending Pod through its original ReplicaSet and defaulted Deployment while the required input Secret prevents any container startup. Unexpected prior startup, wrong/deleted controller, namespace change and replacement deny. The immutable input create remains single-attempt, with its deadline fixed before encoding/API create and retained for the later original-Pod Running wait. The original60s control wait begins only afterward. The full8m fixture, helper2m file loader, product5s checks/30s credential bounds, pool/grant/rate limits are unchanged.
+
+Cleanup semantics are unchanged: attempted/unknown creation requires the positive joined original-helper marker; Pending/404/deletion cannot certify Joined. No automatic retry or synthetic success is introduced.
+
+Two focused regressions are staged: 17 Pending-chain mutation/start negatives plus positive exact chain; an actual client-go request path over a local in-memory HTTP transport asserting both Secret CREATE and subsequent Pod GET receive the same original shorter context deadline even when the later caller supplies a longer context. Existing14 named closed-diagnostic/DTO tests remain. Expected selected output33 named PASS,0skip. No source predicate is weakened for setup or tests.
+
+Next bounded job after allocation: integration compile with race instrumentation, these four test functions, integration vet and Go architecture; preserve exact frozen before/after hashes and owned scratch cleanup. This is component qualification only. Actual required projection, Pod-bound token ordering and complete H/A/R remain an external two-cluster gate.

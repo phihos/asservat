@@ -1,0 +1,758 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/owner-deployment.schema.json",
+  "title": "Private protected owner startup v1",
+  "description": "Installation-owned deployment.json, at most 256 KiB. Public endpoints and DER CA roots only. Runtime additionally checks root validity and aggregate sizes, UTF-8 byte lengths, IP/DNS parsing, distinct signing roles and mounts, concurrency <= connections, independently accepted configuration and workload authority. Source updates require process restart. No user-facing administration API.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "installationID",
+    "clusterID",
+    "permissionRootID",
+    "namespace",
+    "configurationUID",
+    "kubernetes",
+    "workloadGuard",
+    "postgres",
+    "auditStore",
+    "keyService",
+    "connections",
+    "concurrency",
+    "configurationProbes",
+    "schedulingLeases"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-owner-deployment/v1"
+    },
+    "installationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "clusterID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "permissionRootID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "configurationUID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "kubernetes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "roots"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://[^/@?#\\s]+/?(?![\\s\\S])"
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 21848,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "workloadGuard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "policyUID",
+        "policyGeneration",
+        "bindingUID",
+        "bindingResourceVersion",
+        "administrators"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "policyUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "policyGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "bindingUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "bindingResourceVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "administrators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "User",
+                  "Group"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+              }
+            }
+          }
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "database",
+        "roots",
+        "maxConnections"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-zA-Z0-9:.%-]+(?![\\s\\S])"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 21848,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+          }
+        },
+        "maxConnections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      }
+    },
+    "auditStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "roots",
+        "region",
+        "bucket"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://[^/@?#\\s]+/?(?![\\s\\S])"
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 21848,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+          }
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+        }
+      }
+    },
+    "keyService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "roots",
+        "auditMount",
+        "auditKey",
+        "pkiMount",
+        "serverRole",
+        "clientRole"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://[^/@?#\\s]+/?(?![\\s\\S])"
+        },
+        "roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 21848,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+          }
+        },
+        "auditMount": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        },
+        "auditKey": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        },
+        "pkiMount": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        },
+        "serverRole": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        },
+        "clientRole": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,128}(?![\\s\\S])"
+        }
+      }
+    },
+    "connections": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "configurationProbes": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "description": "Installation-owned same-namespace source probes. Only dry-run ConfigMap UPDATE may pass the workload guard; the source guard must independently deny. Runtime additionally checks DNS subdomain names.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "configMap",
+          "serviceAccount"
+        ],
+        "properties": {
+          "configMap": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+          },
+          "serviceAccount": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "schedulingLeases": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "description": "Installation-owned same-namespace accounts allowed to UPDATE exact precreated scheduling Leases. No create/delete or other resource permission. Runtime separately pins Lease UID and bounded records.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lease",
+          "serviceAccount"
+        ],
+        "properties": {
+          "serviceAccount": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+          },
+          "lease": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+          }
+        }
+      }
+    },
+    "native": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connectorRoots",
+        "workerAPIs",
+        "retentionTopologies",
+        "connections",
+        "concurrency"
+      ],
+      "properties": {
+        "connectorRoots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 21848,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+          }
+        },
+        "workerAPIs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "clusterID",
+              "namespace",
+              "kubernetes"
+            ],
+            "properties": {
+              "clusterID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "namespace": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "uid"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*(?![\\s\\S])"
+                  },
+                  "uid": {
+                    "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+                  }
+                }
+              },
+              "kubernetes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "endpoint",
+                  "roots"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "pattern": "^https://[^/@?#\\s]+/?(?![\\s\\S])"
+                  },
+                  "roots": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 21848,
+                      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![\\s\\S])"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "retentionTopologies": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "targetClusterID",
+              "name",
+              "uid",
+              "sha256"
+            ],
+            "properties": {
+              "targetClusterID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253
+              },
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "connections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      },
+      "description": "Optional private h2 listener inputs; requires an independently accepted nonzero owner nativePort. Fixed separate sql-native-read.json and native-kube-<cluster UUID>-<namespace UUID>.token projections; no effect, issuer or user credentials. Runtime checks unique exact API/topology pins and concurrency <= connections. Absence preserves historical encoding and enrollment-only runtime."
+    },
+    "initialHistoryProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "serviceAccount",
+        "configuration"
+      ],
+      "description": "Exact retained original installation history probe. Only explicitly true dry-run UPDATE of original configuration passes the owner guard; the original initial guard must independently deny. Derived from acknowledged initial plan, never caller-selected.",
+      "properties": {
+        "namespace": {
+          "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/namespace"
+        },
+        "serviceAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "templateDigest",
+        "imageDigest",
+        "protectionDigest",
+        "peers",
+        "activation"
+      ],
+      "description": "Fresh installer-selected own-owner observation phase only; incompatible with native backend. Exactly four owner identity SQL facets plus independently checked owner-roles.json. No process/Pod identity guessed for connectors and no worker/context/public route. Original aggregate deployment size remains 256 KiB.",
+      "properties": {
+        "format": {
+          "const": "owner-observation/v1"
+        },
+        "templateDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "not": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "imageDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "not": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "protectionDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "not": {
+            "const": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "peers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "installationID",
+              "clusterID",
+              "issuerEpoch",
+              "peerID",
+              "roots"
+            ],
+            "properties": {
+              "installationID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "clusterID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "issuerEpoch": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "peerID": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "roots": {
+                "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/kubernetes/properties/roots"
+              }
+            }
+          }
+        },
+        "activation": {
+          "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json"
+        }
+      }
+    },
+    "apiContextStarts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacityAccount",
+        "executionAccount"
+      ],
+      "properties": {
+        "capacityAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        },
+        "executionAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "uid"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?![\\s\\S])"
+            },
+            "uid": {
+              "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+            }
+          }
+        }
+      },
+      "description": "Optional exact original namespace-guard facet; runtime requires distinct account names and UIDs. No RBAC or start authority is supplied by this input."
+    },
+    "capacityProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceAccount"
+      ],
+      "properties": {
+        "serviceAccount": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/reference"
+        }
+      },
+      "description": "Original same-namespace worker account and UID. Only explicit dry-run main-resource CREATE for the two v1alpha1 capacity configuration resources; independent capacity policy must deny. This is not permission to persist capacity configuration."
+    },
+    "providerAuthentication": {
+      "$ref": "https://asservat.io/spec/v1/owner-provider-auth.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "not": {
+        "required": [
+          "native",
+          "observation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "providerAuthentication"
+        ]
+      },
+      "then": {
+        "required": [
+          "observation"
+        ],
+        "not": {
+          "required": [
+            "native"
+          ]
+        },
+        "properties": {
+          "observation": {
+            "required": [
+              "activation"
+            ],
+            "properties": {
+              "activation": {
+                "properties": {
+                  "input": {
+                    "properties": {
+                      "ownerLayout": {
+                        "const": "asservat-owner-installed/v2"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "observation"
+        ],
+        "properties": {
+          "observation": {
+            "required": [
+              "activation"
+            ],
+            "properties": {
+              "activation": {
+                "required": [
+                  "input"
+                ],
+                "properties": {
+                  "input": {
+                    "required": [
+                      "ownerLayout"
+                    ],
+                    "properties": {
+                      "ownerLayout": {
+                        "const": "asservat-owner-installed/v2"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "providerAuthentication"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+from pathlib import Path
+import hashlib,json,os,subprocess,time
+root=Path('/home/phil/Projekte/asservat'); stage=Path('/home/phil/.cache/asservat-build/planning/owner-effects-native-20261013'); effects=Path('/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/effects-1')
+read=lambda p:json.loads(p.read_text());sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+assert sha(effects/'manifest.json')=='73f5dd55e76858baba452538e68bfa01ed8dc4a47be251b0d40e1b4ec330bf57'
+owned=[]
+for p in sorted((stage/'changes').rglob('*.go')):
+ rel=str(p.relative_to(stage/'changes')); owned.append(dict(path=rel,base_sha256=sha(root/rel),payload_sha256=sha(p)))
+assert len(owned)==2
+for name,obj in [('manifest.json',owned)]:
+ with (stage/name).open('x') as f:json.dump(obj,f,indent=2);f.write('\n')
+deps={str(p.relative_to(root)):sha(p) for folder in ['internal','api','cmd','test/integration'] for p in sorted((root/folder).rglob('*.go'))}
+for p in ['go.mod','go.sum','Makefile','scripts/test-context-storage.py']:deps[p]=sha(root/p)
+with (stage/'dependencies.json').open('x') as f:json.dump(deps,f,indent=2);f.write('\n')
+rows=owned+read(effects/'manifest.json')
+overlay={str(root/row['path']):str((stage/'changes' if row in owned else effects/'files')/row['path']) for row in rows}
+with (stage/'overlay.json').open('x') as f:json.dump({'Replace':overlay},f,indent=2)
+def check():
+ return dict(dependencies=[p for p,v in deps.items() if sha(root/p)!=v],bases=[r['path'] for r in rows if sha(root/r['path'])!=r['base_sha256']],payloads=[r['path'] for r in rows if sha(Path(overlay[str(root/r['path'])]))!=r['payload_sha256']])
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR='/home/phil/.cache/asservat-build/tmp')
+for key in list(env):
+ if key.startswith('ASSERVAT_'):env.pop(key)
+result=dict(manifest=sha(stage/'manifest.json'),dependencies=sha(stage/'dependencies.json'),runner=sha(Path(__file__)),scope='Compile/vet only of explicitly selected native child; real provider execution pending. The two unintegrated private effects files are frozen overlay dependencies.',before=check(),phases=[])
+assert all(not x for x in result['before'].values())
+for name,args in [('compile',['go','test','-run','^$']),('vet',['go','vet'])]:
+ command=args+['-overlay='+str(stage/'overlay.json'),'./internal/adapters/kms'];start=time.time()
+ with (stage/(name+'.log')).open('x') as f:r=subprocess.run(command,cwd=root,env=env,stdout=f,stderr=subprocess.STDOUT)
+ result['phases'].append(dict(phase=name,command=command,exit=r.returncode,seconds=round(time.time()-start,3),log_sha256=sha(stage/(name+'.log'))))
+ if r.returncode:break
+result['after']=check();result['exit']=r.returncode or (2 if any(result['after'].values()) else 0)
+with (stage/'result.json').open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+print(json.dumps(result),flush=True);raise SystemExit(result['exit'])

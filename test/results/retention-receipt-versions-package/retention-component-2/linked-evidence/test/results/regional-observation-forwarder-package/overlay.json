@@ -1,0 +1,10 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/fleet/owner_authentication.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/application/fleet/owner_authentication.go",
+    "/home/phil/Projekte/asservat/internal/application/fleet/owner_authentication_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/application/fleet/owner_authentication_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_observation_forwarder.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/bootstrap/owner_observation_forwarder.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/owner_observation_forwarder_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/bootstrap/owner_observation_forwarder_test.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/routing_wire.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/routing_wire.go",
+    "/home/phil/Projekte/asservat/internal/transport/clusterobservation/routing_wire_mapping_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/files/internal/transport/clusterobservation/routing_wire_mapping_test.go"
+  }
+}

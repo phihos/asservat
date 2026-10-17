@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_operation_channel.go": "/home/phil/.cache/asservat-build/planning/regional-observation-channel-bounds-20261013/checkpoint-v2/originals/internal/adapters/mtls/connector_operation_channel.go",
+    "/home/phil/Projekte/asservat/internal/adapters/mtls/connector_operation_channel_bounds_test.go": "/home/phil/.cache/asservat-build/planning/regional-observation-channel-bounds-20261013/checkpoint-v2/files/internal/adapters/mtls/connector_operation_channel_bounds_test.go"
+  }
+}

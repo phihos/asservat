@@ -1,0 +1,425 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/packet-capture.schema.json",
+  "title": "Bounded packet action parameters",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "networkHeaders"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "httpHeaders"
+            },
+            "protocol": {
+              "const": "http1"
+            },
+            "projectionRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                },
+                "version": {
+                  "type": "string",
+                  "pattern": "^v[1-9][0-9]*$"
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ]
+            },
+            "maxFlows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "maxHeaderBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32768
+            },
+            "maxReassemblyBytesPerFlow": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 262144
+            },
+            "maxReassemblyBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16777216
+            },
+            "idleTimeout": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            }
+          },
+          "required": [
+            "kind",
+            "protocol",
+            "projectionRef",
+            "maxFlows",
+            "maxHeaderBytes",
+            "maxReassemblyBytesPerFlow",
+            "maxReassemblyBytes",
+            "idleTimeout"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "rawPackets"
+            },
+            "snaplen": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "protocolSnaplen": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp",
+                      "icmp"
+                    ]
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "bytes"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 3,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "kind",
+            "snaplen"
+          ]
+        }
+      ]
+    },
+    "before": {
+      "type": "string",
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+      "maxLength": 16
+    },
+    "after": {
+      "type": "string",
+      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+      "maxLength": 16
+    },
+    "filter": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "\\S"
+    },
+    "ring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAge": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "segmentBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "maxSegments": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 64
+        },
+        "medium": {
+          "enum": [
+            "memory",
+            "encryptedDisk"
+          ]
+        },
+        "storageProfileRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        }
+      },
+      "required": [
+        "maxAge",
+        "maxBytes",
+        "segmentBytes",
+        "maxSegments",
+        "medium"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "medium": {
+                "const": "encryptedDisk"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "storageProfileRef"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "storageProfileRef"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "peers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "cidrs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "cidrs"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "podSelector": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "matchLabels": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "maxProperties": 16,
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 63
+                        }
+                      }
+                    },
+                    "required": [
+                      "namespace",
+                      "matchLabels"
+                    ]
+                  }
+                },
+                "required": [
+                  "podSelector"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "resourceRef": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "Pod",
+                          "Deployment",
+                          "StatefulSet",
+                          "Service"
+                        ]
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253
+                      },
+                      "serviceMode": {
+                        "enum": [
+                          "backends",
+                          "virtualIP",
+                          "both"
+                        ]
+                      },
+                      "readyOnly": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "namespace",
+                      "name"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "kind": {
+                              "const": "Service"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "serviceMode",
+                            "readyOnly"
+                          ]
+                        },
+                        "else": {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "serviceMode"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "readyOnly"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "resourceRef"
+                ]
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp",
+            "icmp",
+            "any"
+          ]
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "resolution": {
+          "enum": [
+            "frozen",
+            "follow"
+          ]
+        },
+        "maxEndpoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "maxStaleness": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+        }
+      },
+      "required": [
+        "entries",
+        "protocol",
+        "resolution",
+        "maxEndpoints",
+        "maxStaleness"
+      ]
+    },
+    "maxFrozenBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 268435456
+    },
+    "maxConcurrentSnapshots": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    }
+  },
+  "required": [
+    "profile",
+    "before",
+    "after",
+    "ring",
+    "peers",
+    "maxFrozenBytes",
+    "maxConcurrentSnapshots"
+  ]
+}

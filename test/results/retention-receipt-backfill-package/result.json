@@ -1,0 +1,69 @@
+{
+  "pins": {
+    "manifest.json": "f510ebcfe24a6f27d47946992b31e348f9442f31534f6dfc457b23c96fc85478",
+    "dependencies.json": "7a0ab95a79ca260cf3cb391467b34b3401b28b109714509f815cb1262a66468e",
+    "args.json": "e523d142d84fd83560910207d8a14985ceaef7218fb782d507c10eb9698c49c3",
+    "run.py": "775a963daa89727fedd6b0531791b1a51b5a2d479523d40578095538cb078735"
+  },
+  "native": false,
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-vet=off",
+        "-run=^$",
+        "-count=1",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 17.037787322999975,
+      "logSHA256": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      }
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "seconds": 2.216894569000033,
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hashes": {
+        "pins": [],
+        "payload": [],
+        "bases": [],
+        "dependencies": [],
+        "inventory": []
+      }
+    }
+  ],
+  "before": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "bootID": "e4eccc3d-ac8c-45d4-9a41-397b2ce9e81c",
+  "scratch": "/tmp/asservat-retention-backfill-l9x4k6nm",
+  "mirrorChanges": [],
+  "after": {
+    "pins": [],
+    "payload": [],
+    "bases": [],
+    "dependencies": [],
+    "inventory": []
+  },
+  "exit": 0,
+  "scratchRemoved": true
+}

@@ -1,0 +1,40 @@
+{
+  "phase": "focused",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/overlay.json",
+    "-race",
+    "./test/integration",
+    "-run",
+    "^TestNativeFixtureSourceOwner",
+    "-count=1",
+    "-timeout=60s",
+    "-v"
+  ],
+  "exit": 0,
+  "seconds": 14.565,
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "payload": []
+  },
+  "payload": {
+    "test/integration/capture_admission_test.go": "3e4ef751e343048982ae5b9c911ff4dcb2eb4b32282bca68ea7ac549f876ccd3",
+    "test/integration/context_publication_test.go": "06aa8f615af0528864276203d3500e0b63527059ae4d8ddc61cef4bdbae3e698",
+    "test/integration/download_sessions_test.go": "5cbb4608f7fd90f5fbb40c9cc2e03be68e9bbd22b65054f07d317a2b92e67418",
+    "test/integration/native_retention_observer_test.go": "976e770c3610039f3fb00fe67de7ad6687573436b1b999de0b931b55b34bb90b"
+  },
+  "dependencies_count": 1507,
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/planning/native-retention-observer-20261012/tmp"
+  }
+}

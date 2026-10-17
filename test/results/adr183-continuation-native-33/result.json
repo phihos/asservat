@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-33",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass of ADR-190 steps 1-4. The shipped capacity CRDs and the operator pool and policy objects were accepted. After the ADR-189 permission step, the continuation created the capacity, selector and processing guards, the dedicated probe namespace and account and the processing source. It proved all three guards live and built the qualification from the operator profile. It ran InitializeCapacity inside one public role operation once the hub-worker's permission stream was fresh. The capacity_source row exists for the permission root e15b259b-..., and the stream was fresh with 2 acknowledged authority audits. The owner launch, the bootstrap hook replay and the second continuation then passed. Subtest 566.0 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; synthetic operator capacity profile and objects. No capacity projection, ReadyAt or audit profiles yet (ADR-190 steps 6-8); no public workflow.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

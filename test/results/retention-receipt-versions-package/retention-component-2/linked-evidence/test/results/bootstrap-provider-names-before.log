@@ -1,0 +1,74 @@
+--- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects (0.25s)
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-1 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-2 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-3 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-0-4 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-root (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-default (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role/name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-role_name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-2 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-3 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-1-4 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-root (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-default (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role/name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-role_name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-3 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-2-4 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-root (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-default (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role/name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-role_name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-2-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/duplicate-3-4 (0.01s)
+        initial_bootstrap_provider_names_test.go:55: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-root (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-default (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role/name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-role_name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-3-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-root (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-default (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role/name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-role_name (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+    --- FAIL: TestInitialBootstrapRejectsInvalidProviderNamesBeforeEffects/invalid-4-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (0.01s)
+        initial_bootstrap_provider_names_test.go:62: invalid provider names accepted before bootstrap effects
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.258s
+FAIL

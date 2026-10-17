@@ -1,0 +1,9 @@
+{
+  "name": "adr179-go-check-1",
+  "exit": 2,
+  "status": "failed",
+  "cause": "go vet: test/integration/context_start_exchange_test.go:344 runner.Targets lacks ResolveWorkload for contextstart.QueryTargets",
+  "sourceHashBefore": "45f5f7b1ab2b8e5fe3054c109f51de87638db3caf6d0d144204c6e2d761c05d4",
+  "sourceHashAfter": "45f5f7b1ab2b8e5fe3054c109f51de87638db3caf6d0d144204c6e2d761c05d4",
+  "log": "go-check.log"
+}

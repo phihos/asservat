@@ -1,0 +1,6 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:66: native original Pending chain changed
+--- FAIL: TestFederationRegionalProductWithRealKubernetes (1.65s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.702s
+FAIL

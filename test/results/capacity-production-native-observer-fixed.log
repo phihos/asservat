@@ -1,0 +1,6 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: actual fixed role production permission source identity changed
+--- FAIL: TestCapacityProducerWithRealPostgres (1.07s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1.124s
+FAIL

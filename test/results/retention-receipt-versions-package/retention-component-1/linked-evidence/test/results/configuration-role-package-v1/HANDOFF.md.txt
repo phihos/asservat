@@ -1,0 +1,134 @@
+# ADR140 configuration-role checkpoint
+
+This is a reviewed-source integration candidate, not an installed public
+runtime or a completed ADR140 handoff. All external qualification remains
+parent-owned. No live repository file, SQL schema, listener or chart was changed.
+
+## Included scope
+
+The three fixed configuration roles now have an actual protected Kubernetes
+source/Secret/projection producer, actual PostgreSQL provisioning and current
+acknowledgement, a callable private installer and a verifying runtime
+constructor. The native SQL/S3/OpenBao matrix is ready for execution. The source
+is selected from immutable `checks/configuration-path-5`, with one explicit
+integration refinement: `RunHubWorker` retains its existing constructor until
+the new projection is produced and qualified. `pending/hub-worker-command.patch`
+records the required later switch. No silent legacy fallback is added to the
+new verifying constructor.
+
+The package includes the partial public-role implementation because its exact
+receipt DTOs, immutable-projection mechanics, SQL grant/ACL checks and test
+helpers are shared dependencies. It is an 18-purpose identity/read subset, not
+the final public inventory or aggregate connection-budget proof. No public
+installer command, public HTTP server or incomplete public handler graph is
+included. The configuration CLI implementation is callable but is not yet
+registered in `cmd/asservat/main.go`.
+
+## Contracts and authority
+
+- Separate closed `configuration-runtime-roles/v1`, private original state,
+  immutable credential manifest and 96 KiB configuration-installer DTO. Fixed
+  roles `_cfg_00..02`; each pool one connection; each role limit three for two
+  retained reconciler processes plus a verifier. No caller-selected grants.
+- Original 30-minute private root and one-use five-second claims. SQL receives
+  exact provenance and public role identities, never passwords or HMAC seeds.
+  Unknown claims/results allow exact lookup only; no repair/adoption/new grant.
+- Original positive initial activation, actual process/database incarnation,
+  current issuer/recovery/suspension and independently current guarded
+  fleet/owner/workload source checks. Only this fixed configuration bootstrap
+  can replace stale stored observation freshness; public-role gates stay
+  stronger. The producer neither observes nor accepts configuration itself.
+- Same-operation proof retention is private to the concrete source. Repeat
+  actual negative RBAC/admission checks, exact canonical sources/workload and
+  guard versions. Preserve original starts/earliest ends and cancellation.
+  First role and final inventory reads occur after SQL locks. UTC normalization
+  changes time representation only.
+- Current configuration acknowledgement locks recovery before configuration
+  and preserves the original current snapshot/deadline through COMMIT.
+  Historical acknowledgement behavior is not changed; neither one activates.
+
+## Evidence
+
+Evidence is copied with original manifests, run scripts, logs and result files
+under `evidence/configuration-path-{1,2,3,4,5}`. Those scripts point to the
+original immutable check directories; they are provenance, not new commands
+run by this package. `checked-dependencies.json` is the exact dependency set
+for path5. `current-dependencies.json` records current source for integration
+review; `dependency-drift.json` distinguishes changed dependency bytes.
+
+| Original handle | Actual outcome |
+| --- | --- |
+| 68810 | Compile pass; initial root path failed at 4.951955789s, 149 HTTP requests/10 negative probes. |
+| 51414 | Compile/vet and source-negative races pass; first root 2.102470371s/71/3; Claim exposed monotonic-time versus JSON readback. |
+| 71145 | Compile/vet and other selected races pass; normalized Claim/post-lock read pass; complete role exceeded 5s at 4.999557525s/127/9. |
+| 91157 | Six-package compile and five-package vet pass; source/guard/deadline/Close races pass; first role 4.552265366s; full-path test failed an asserted deadline it had not supplied. |
+| 40949 | Test-only exact caller-deadline correction. All three role operations pass at 4.551993804s, 4.550681374s, 4.551830073s (118 HTTP/9 probes each). Final original inventory/projection passes at 4.650914493s (120/9). Race package 22.019s, job 30.254988624s, exit 0. |
+
+These are loopback synthetic Kubernetes enforcement responses with real clients,
+clock, source proof/Secret CAS/cancellation code and unchanged 20 QPS/burst-20.
+The SQL role receipt in that timing test is synthetic. No native SQL role,
+Kubernetes protection, deployed reconciler, full public graph or sustained
+availability is claimed. Headroom within five seconds is narrow.
+
+The package extraction, nine canonical schemas, two documentation files and
+command-switch deferral have not received a new integrated compile/spec gate.
+No test was started during the parent's native source freeze.
+
+## Integration and native selectors
+
+Verify every `base_sha256` and payload digest in `manifest.json`. New paths
+require absence. `source.patch` is a review aid; use the manifest rather than
+blindly applying the whole directory. The only existing source replacements
+are `internal/bootstrap/hub_worker.go` and
+`test/integration/initial_installation_test.go`. The latter adds purpose-fixed
+subtests; existing initial-installation scenarios remain intact.
+
+There is no migration, table inventory, schema-version, sqlc or embedded SQL
+bundle change. The closed grants are source-owned in
+`configuration_runtime_role_plan.go` and `public_runtime_role_plan.go`; native
+roles are created by the actual producer in its tests, not by fixture SQL.
+
+After source integration, run affected Go compile/races/vet and ordinary
+repository contract/import/architecture gates. For a small first actual SQL
+case, the exact selected child is:
+
+```text
+TestInitialInstallationWithRealServices/configuration-runtime-roles-matrix
+```
+
+The existing owned runner can select it with `ASSERVAT_INITIAL_INSTALLATION=1`
+and `scripts/test-custody.py --run
+'^TestInitialInstallationWithRealServices$/^configuration-runtime-roles-matrix$'`.
+Keep the existing original source-hash/cleanup report and empty-selection
+rejection. This is a proposed command, not an executed qualification.
+
+Then select `configuration-runtime-roles-` to run: matrix, expired-observation,
+unknown-claim, changed-source, held-lock, recovery-after-lock, source-after-lock,
+source-rollback, source-mutation, reconcile, ack-source-expired, ack-lock-expired,
+ack-recovery and ack-current-generation. The reconciliation helper uses actual
+separate SQL logins, encrypted S3/OpenBao configuration audit and current
+acknowledgement/accepted read. Protected source/Secret facts remain synthetic.
+The sibling `public-runtime-roles-` children separately cover the shared
+stronger public boundary. Actual Kubernetes/Secret and installed command tests
+must follow; a passing SQL matrix cannot replace them.
+
+## Shared documentation merge and remaining work
+
+Manually add ADR140 and the new architecture page to the existing decision and
+architecture indexes. Append the reviewed normative paragraph in
+`shared-spec-addition.md` to `specs/deployment-profiles.md`; retain existing
+decisions and current parent qualification records. Record this component's
+actual verdict in `docs/implementation-progress.md` only after integrated gates.
+Update `docs/validation.md` with executed native results, not proposed passes.
+Canonical schemas are included and require normal `make spec-check` reference
+and format validation; they are not embedded in a new runtime bundle.
+
+ADR140 ownership continues after this checkpoint: generated guarded installer
+inputs/Pod and CLI registration; complete runtime role/credential/projection
+inventory and aggregate database connection budget; actual owner/context-start
+runtime, provider and audit/effect services; shared normal-lane backing;
+current C03-selected multi-profile download registry; HTTPS/session/browser/MCP
+and content shutdown; native installed acceptance. Capacity70/71 remain a
+separate ADR141 producer; 71 alone owns the capture source pin. The retired
+initial manager is not reused. Public/chart enablement stays off until the
+complete graph and installed journey qualify.

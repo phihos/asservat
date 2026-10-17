@@ -1,0 +1,25 @@
+{
+  "phase": "compile",
+  "command": [
+    "go",
+    "test",
+    "-overlay=/home/phil/.cache/asservat-build/planning/legacy-input-ownership-20261013/check-1/overlay.json",
+    "-run",
+    "^$",
+    "./internal/adapters/kubernetes"
+  ],
+  "exit": 0,
+  "seconds": 7.112,
+  "before": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  },
+  "after": {
+    "dependencies": [],
+    "bases": [],
+    "payloads": [],
+    "before_payloads": []
+  }
+}

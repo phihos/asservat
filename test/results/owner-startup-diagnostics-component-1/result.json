@@ -1,0 +1,172 @@
+{
+  "runnerSHA256": "dbd316b90780496fc9ba2cb202c61569635d371b9a64f3f36355d280293cf20c",
+  "manifestSHA256": "d3dc3eead084b71c5241a1a0e264ca669c74fb43b54cf252e3318b64af0e64ea",
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "sourceCount": 3089,
+  "reviewedPayloads": {
+    "cmd/asservat/main.go": "1c2cadef8a827b01b5bbb91777961cb8853eb398175ba8a4fa2dd9d25ab4345b",
+    "docs/architecture/owner-startup.md": "3a4a698d2e9b3c25af55610d8ccec2cae1b7f09bae0f4d9d519258614909e73b",
+    "internal/adapters/kubernetes/owner_identity_objects.go": "7c1371e5ce3a84941b22aa3841d35f13f121462494443d1a02aa5a02b5ed07a0",
+    "internal/adapters/kubernetes/owner_identity_objects_test.go": "91645bd6cf375e83ac4973f296cac34b9d11e96dee0e2bb35c4d52eb08b9493e",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic.go": "c164db93b17f6e9cf3e620cb22229f66c7988b1a15489a8ed09e6db53c884ca5",
+    "internal/adapters/kubernetes/owner_identity_read_diagnostic_test.go": "880f506ec2656785b3e7ec4a8f4d4815dff4b5c9a62f42b137b8d359df16fadf",
+    "internal/adapters/kubernetes/owner_identity_reader.go": "2c96b96f6b05979d04b945eb25d6ebda54db6b03d887bff472eefb5c8086cebd",
+    "internal/adapters/kubernetes/owner_identity_reader_test.go": "cd7ba96820a9b14a00099505a208f43559c329aa90efd46a974d7f9c30ca108b",
+    "internal/bootstrap/hub_api.go": "37eb68b5d361633d8f4a6998f525256aa6f34a2e1659a332c343d323e9cfe2d9",
+    "internal/bootstrap/owner_observation_deployment.go": "95086a93c5e851110dad1ef4b6cbe40059813be9489302e9925b3ef291ac9f9d",
+    "internal/bootstrap/owner_observation_runtime.go": "49e9defbc1e0816842163a367b2e1ac0f707a752ad401895b063b5da490b6e77",
+    "internal/bootstrap/owner_startup_diagnostic.go": "309461132f456b78817c4271be9b8b78b4ee33aa7a62f0938beacd12191ca280",
+    "internal/bootstrap/owner_startup_diagnostic_test.go": "d32b2683c45938701a94f4a040687a23d56842b29742c5c6e111dc74a1cc50cf",
+    "test/integration/initial_runtime_owner_identity_native_test.go": "88cdf756c1bf468ddcc365ab8fc8ca2bce39df17155a9ff8b249188395caa425",
+    "test/integration/initial_runtime_owner_startup_diagnostic_test.go": "67f4f4942d92ea302c0a6f915a9699a8c00d6b92824d014fc02900441499ef17"
+  },
+  "steps": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-timeout=15m",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "pid": 1719127,
+      "processGroup": 1719127,
+      "exit": 0,
+      "seconds": 30.125,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null
+    },
+    {
+      "name": "race-kubernetes",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestOwnerIdentityNativeReadersRequireOriginalMountedBundle|TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard|TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 1720680,
+      "processGroup": 1720680,
+      "exit": 1,
+      "seconds": 16.913,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityNativeReadersRequireOriginalMountedBundle"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": false,
+      "allRunChildrenPassed": false,
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/account-replacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/config-substitution",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/different-mounted-credential",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/extra-mounted-credential",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/journal-replacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/late",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/launch-substitution",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-child-marker",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-launch-receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/missing-projection-receipt",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/mutable-provider",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/new-image",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/provider-replacement",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/role-root-substitution",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/scaled",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/swapped-child-marker",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityNativeReadersRequireOriginalMountedBundle/valid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/allowing-probe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/cancelled",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-lost",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/guard-missing",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-owner-changed",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/pod-unassigned",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/token-read-error",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/token-revoked",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/valid",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/wrong-token-pod"
+      ],
+      "missingPackagePasses": [
+        "asservat.local/asservat/internal/adapters/kubernetes"
+      ],
+      "failuresOrSkips": [
+        {
+          "Time": "2026-10-14T06:18:39.407664338+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Test": "TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard/late-guard",
+          "Elapsed": 0.47
+        },
+        {
+          "Time": "2026-10-14T06:18:39.482032452+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Test": "TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard",
+          "Elapsed": 3.14
+        },
+        {
+          "Time": "2026-10-14T06:18:39.484900055+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Elapsed": 4.63
+        }
+      ]
+    }
+  ],
+  "status": "failed",
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": true,
+  "payloadsUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "71d2b88d0cee66245e900b0ba8323a817c58693c9e6602ba98e4fb21371ad058",
+    "runner.py": "dbd316b90780496fc9ba2cb202c61569635d371b9a64f3f36355d280293cf20c",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "manifest.json": "d3dc3eead084b71c5241a1a0e264ca669c74fb43b54cf252e3318b64af0e64ea",
+    "review.patch": "fee3df27979cf1bf61fc3dc2e5b2fc15fd9beb617213661185894094e3815e2d",
+    "compile.log": "a7f97a6b9f1c471718cd527b491049ce0b46604c367cfc560d4d682f6f4f9378",
+    "race-kubernetes.log": "19904fb0a53843e82221d441d611053037365659673ac5abccdc4a815012bb3b",
+    "payloads/test/integration/initial_runtime_owner_identity_native_test.go.txt": "88cdf756c1bf468ddcc365ab8fc8ca2bce39df17155a9ff8b249188395caa425",
+    "payloads/test/integration/initial_runtime_owner_startup_diagnostic_test.go.txt": "67f4f4942d92ea302c0a6f915a9699a8c00d6b92824d014fc02900441499ef17",
+    "payloads/internal/bootstrap/hub_api.go.txt": "37eb68b5d361633d8f4a6998f525256aa6f34a2e1659a332c343d323e9cfe2d9",
+    "payloads/internal/bootstrap/owner_observation_deployment.go.txt": "95086a93c5e851110dad1ef4b6cbe40059813be9489302e9925b3ef291ac9f9d",
+    "payloads/internal/bootstrap/owner_observation_runtime.go.txt": "49e9defbc1e0816842163a367b2e1ac0f707a752ad401895b063b5da490b6e77",
+    "payloads/internal/bootstrap/owner_startup_diagnostic.go.txt": "309461132f456b78817c4271be9b8b78b4ee33aa7a62f0938beacd12191ca280",
+    "payloads/internal/bootstrap/owner_startup_diagnostic_test.go.txt": "d32b2683c45938701a94f4a040687a23d56842b29742c5c6e111dc74a1cc50cf",
+    "payloads/internal/adapters/kubernetes/owner_identity_objects.go.txt": "7c1371e5ce3a84941b22aa3841d35f13f121462494443d1a02aa5a02b5ed07a0",
+    "payloads/internal/adapters/kubernetes/owner_identity_objects_test.go.txt": "91645bd6cf375e83ac4973f296cac34b9d11e96dee0e2bb35c4d52eb08b9493e",
+    "payloads/internal/adapters/kubernetes/owner_identity_read_diagnostic.go.txt": "c164db93b17f6e9cf3e620cb22229f66c7988b1a15489a8ed09e6db53c884ca5",
+    "payloads/internal/adapters/kubernetes/owner_identity_read_diagnostic_test.go.txt": "880f506ec2656785b3e7ec4a8f4d4815dff4b5c9a62f42b137b8d359df16fadf",
+    "payloads/internal/adapters/kubernetes/owner_identity_reader.go.txt": "2c96b96f6b05979d04b945eb25d6ebda54db6b03d887bff472eefb5c8086cebd",
+    "payloads/internal/adapters/kubernetes/owner_identity_reader_test.go.txt": "cd7ba96820a9b14a00099505a208f43559c329aa90efd46a974d7f9c30ca108b",
+    "payloads/docs/architecture/owner-startup.md.txt": "3a4a698d2e9b3c25af55610d8ccec2cae1b7f09bae0f4d9d519258614909e73b",
+    "payloads/cmd/asservat/main.go.txt": "1c2cadef8a827b01b5bbb91777961cb8853eb398175ba8a4fa2dd9d25ab4345b"
+  }
+}

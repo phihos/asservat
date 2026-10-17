@@ -1,0 +1,33 @@
+from pathlib import Path
+import hashlib,json,os,signal,subprocess,time
+C=Path(__file__).resolve().parent;L=Path('/home/phil/Projekte/asservat')
+h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+manifest=json.loads((C/'manifest.json').read_text());deps=json.loads((C/'dependencies.json').read_text())
+def check():
+ return {'dependencies':[p for p,v in deps.items() if h(L/p)!=v], 'bases':[v['path'] for v in manifest if h(L/v['path'])!=v['base_sha256']], 'payloads':[v['path'] for v in manifest if h(C/'files'/v['path'])!=v['payload_sha256']]}
+with (C/'evidence/started').open('x'):pass
+env=os.environ.copy();env.update(GOMAXPROCS='2',GOFLAGS='-p=2',TMPDIR=str(C/'tmp'));env.pop('ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE',None);env.pop('ASSERVAT_CONTEXT_FIXTURES',None)
+overlay='-overlay='+str(C/'overlay.json');pkg='./internal/adapters/kms'
+steps=[('compile',['go','test',overlay,'-run','^$',pkg]),('vet',['go','vet',overlay,pkg])]
+result={'manifest_sha256':h(C/'manifest.json'),'dependencies_sha256':h(C/'dependencies.json'),'runner_sha256':h(C/'run.py'),'paths':len(manifest),'dependencies':len(deps),'native_executed':False,'commands':[]};terminal=0
+for name,command in steps:
+ before=check()
+ if any(before.values()):terminal=1;result['before_failure']=before;break
+ start=time.monotonic()
+ with (C/'evidence'/f'{name}.log').open('x') as log:
+  p=subprocess.Popen(command,cwd=L,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+  print(json.dumps({'phase':name,'pid':p.pid}),flush=True)
+  try:code=p.wait(timeout=240)
+  except subprocess.TimeoutExpired:
+   os.killpg(p.pid,signal.SIGTERM)
+   try:p.wait(timeout=5)
+   except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+   code=124
+ after=check();report={'phase':name,'command':command,'exit':code,'seconds':round(time.monotonic()-start,3),'before':before,'after':after};result['commands'].append(report)
+ with (C/'evidence'/f'{name}.json').open('x') as out:json.dump(report,out,indent=2);out.write('\n')
+ print(json.dumps(report),flush=True)
+ if code or any(after.values()):terminal=1;break
+result.update(terminal_exit=terminal,final_hash_check=check())
+if any(result['final_hash_check'].values()):result['terminal_exit']=terminal=1
+with (C/'result.json').open('x') as out:json.dump(result,out,indent=2);out.write('\n')
+print(json.dumps(result),flush=True);raise SystemExit(terminal)

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "test/integration/initial_handover_admission_test.go",
+    "base_sha256": "3486fad923c81f00dc0667685fb55fdd506dbeb544160c727a03388e0aebbb9f",
+    "sha256": "73ace9c89601e17cb5718357ec328c4bc840becc6d430e1151133981df49fc58"
+  },
+  {
+    "path": "test/integration/initial_preparer_handover_test.go",
+    "base_sha256": "4a131fae90e50d52302887ea0947c1539f35fc47240ec2ecf1bd7c06169fb7ce",
+    "sha256": "4259316c4fb2a4fd427926c72b8a479790e218920b45f43f28856ccbe6d25ccf"
+  }
+]

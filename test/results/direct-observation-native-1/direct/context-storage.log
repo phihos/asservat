@@ -1,0 +1,7 @@
+=== RUN   TestDirectHolderObservationWithRealKubernetes
+    direct_observation_native_test.go:117: native original helper not ready
+    direct_observation_native_test.go:90: native original helper did not positively join regional
+--- FAIL: TestDirectHolderObservationWithRealKubernetes (75.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	75.096s
+FAIL

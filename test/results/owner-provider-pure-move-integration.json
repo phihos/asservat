@@ -1,0 +1,270 @@
+{
+  "integratedAt": 1791856544.9869218,
+  "manifestSHA256": "2cf33685f35b219aac28a69bff527895c4cc2715bfc27286cbecfadb3e4842ad",
+  "dependenciesSHA256": "b1486f19d41136be072f47cf2a7d1193f2e50fe9c34958db8ab27113349c2263",
+  "dependencyCount": 1991,
+  "files": [
+    {
+      "path": "internal/adapters/providerconfig/owner_provider_recipe.go",
+      "base_sha256": null,
+      "payload_sha256": "b0a4852552ecfbfd9826310000417c99c7ef92ad8d9111cf3803ce49e49c765f",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/files/internal/adapters/providerconfig/owner_provider_recipe.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_recipe.go",
+      "base_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+      "payload_sha256": "f43e76d9a624b4db66c2165a70ff84f840a4593d6203498aa486062fbc2eaf0d",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/files/internal/adapters/kms/owner_provider_recipe.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_recipe_compatibility_test.go",
+      "base_sha256": null,
+      "payload_sha256": "2047b8a3300b8024ee94eb30186acc37e7f47bedea4f47fef319524b97bbdca7",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/files/internal/adapters/kms/owner_provider_recipe_compatibility_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json",
+      "base_sha256": null,
+      "payload_sha256": "df0c6caf6c69521f2c3fd6de9e6dc2dd80b1fd3e403b86ea1996619a11cf63f7",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/files/internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/original.json",
+      "base_sha256": null,
+      "payload_sha256": "76f010cf3d52023b2b5a80f104ee076e62177566fb1bc68620048f4c3538b051",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/evidence/golden/original.json"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/namespace-uid.json",
+      "base_sha256": null,
+      "payload_sha256": "7b090166738beee6638e1da8f36f6d62b9b2fa25b35929a23147aa07d9216938",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/evidence/golden/namespace-uid.json"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/account-uid.json",
+      "base_sha256": null,
+      "payload_sha256": "f4eb0a5f558b782d0ae28959e670f0b6d924d714b264ebca2cbfd3668a89417b",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/evidence/golden/account-uid.json"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/server-role.json",
+      "base_sha256": null,
+      "payload_sha256": "c8232fb0f796d1550c358b6e5db9effa660051501db3f2e583568e12a4802af4",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/evidence/golden/server-role.json"
+    },
+    {
+      "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/audit-key.json",
+      "base_sha256": null,
+      "payload_sha256": "167d3932f4ba571d17261731d9c56da926068d0a4a295ede407c788a977d7fae",
+      "evidence_source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/evidence/golden/audit-key.json"
+    }
+  ],
+  "qualification": {
+    "manifest_sha256": "cba3a766c04853ad1bc0572db3dac8fdb9b7a5f975c030b557d412449e679595",
+    "dependencies_sha256": "b1486f19d41136be072f47cf2a7d1193f2e50fe9c34958db8ab27113349c2263",
+    "runner_sha256": "d9ec24878ee77a73a954d8f9d9f300517901216d2ea0ca39226871a9a151a6bf",
+    "paths": 4,
+    "dependencies": 1991,
+    "native_executed": false,
+    "original_recipe_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+    "commands": [
+      {
+        "phase": "record-original",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/recorder-overlay.json",
+          "-count=1",
+          "-timeout=120s",
+          "-v",
+          "-run",
+          "^TestRecordOriginalOwnerProviderRecipeGolden$",
+          "./internal/adapters/kms"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 3.657,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      },
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 2.002,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      },
+      {
+        "phase": "compile-race-binary",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+          "-race",
+          "-c",
+          "-o",
+          "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/tmp/kms.test",
+          "./internal/adapters/kms"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 3.655,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      },
+      {
+        "phase": "race-kms",
+        "command": [
+          "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/tmp/kms.test",
+          "-test.count=1",
+          "-test.timeout=180s",
+          "-test.v",
+          "-test.run=^TestOwnerProvider"
+        ],
+        "cwd": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/tmp/package",
+        "exit": 0,
+        "seconds": 2.206,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      },
+      {
+        "phase": "race-providerconfig",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=180s",
+          "-v",
+          "./internal/adapters/providerconfig"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 1.702,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/checks/pure-move-1/overlay.json",
+          "./internal/adapters/providerconfig",
+          "./internal/adapters/kms"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 0.65,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "recorder": [],
+          "goldens": []
+        }
+      }
+    ],
+    "terminal_exit": 0,
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": [],
+      "recorder": [],
+      "goldens": []
+    },
+    "golden_sha256": {
+      "evidence/golden/inputs.json": "df0c6caf6c69521f2c3fd6de9e6dc2dd80b1fd3e403b86ea1996619a11cf63f7",
+      "tmp/package/testdata/owner-provider-recipe-v1/inputs.json": "df0c6caf6c69521f2c3fd6de9e6dc2dd80b1fd3e403b86ea1996619a11cf63f7",
+      "evidence/golden/original.json": "76f010cf3d52023b2b5a80f104ee076e62177566fb1bc68620048f4c3538b051",
+      "tmp/package/testdata/owner-provider-recipe-v1/original.json": "76f010cf3d52023b2b5a80f104ee076e62177566fb1bc68620048f4c3538b051",
+      "evidence/golden/namespace-uid.json": "7b090166738beee6638e1da8f36f6d62b9b2fa25b35929a23147aa07d9216938",
+      "tmp/package/testdata/owner-provider-recipe-v1/namespace-uid.json": "7b090166738beee6638e1da8f36f6d62b9b2fa25b35929a23147aa07d9216938",
+      "evidence/golden/account-uid.json": "f4eb0a5f558b782d0ae28959e670f0b6d924d714b264ebca2cbfd3668a89417b",
+      "tmp/package/testdata/owner-provider-recipe-v1/account-uid.json": "f4eb0a5f558b782d0ae28959e670f0b6d924d714b264ebca2cbfd3668a89417b",
+      "evidence/golden/server-role.json": "c8232fb0f796d1550c358b6e5db9effa660051501db3f2e583568e12a4802af4",
+      "tmp/package/testdata/owner-provider-recipe-v1/server-role.json": "c8232fb0f796d1550c358b6e5db9effa660051501db3f2e583568e12a4802af4",
+      "evidence/golden/audit-key.json": "167d3932f4ba571d17261731d9c56da926068d0a4a295ede407c788a977d7fae",
+      "tmp/package/testdata/owner-provider-recipe-v1/audit-key.json": "167d3932f4ba571d17261731d9c56da926068d0a4a295ede407c788a977d7fae"
+    }
+  },
+  "scope": "Pure provider recipe move with original-byte compatibility goldens. No runtime selector, provider effects or installed authority."
+}

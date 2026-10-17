@@ -1,0 +1,38 @@
+{
+  "expected": 0,
+  "meaningfulBefore": true,
+  "phase": "race",
+  "command": [
+    "go",
+    "test",
+    "-overlay",
+    "/home/phil/.cache/asservat-build/planning/regional-observation-digest-layer-v2-20261013/overlay.json",
+    "-race",
+    "-vet=off",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^Test(ConnectorObservationChannel|ClusterObservation)",
+    "-v",
+    "./internal/domain/fleet",
+    "./internal/application/fleet",
+    "./internal/adapters/mtls",
+    "./internal/transport/clusterobservation"
+  ],
+  "exit": 0,
+  "seconds": 8.856,
+  "before": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  },
+  "after": {
+    "live": [],
+    "bases": [],
+    "payload": [],
+    "fileSet": [],
+    "freeze": []
+  }
+}

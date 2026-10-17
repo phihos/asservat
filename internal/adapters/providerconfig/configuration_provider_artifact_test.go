@@ -1,0 +1,63 @@
+package providerconfig
+
+import (
+	"bytes"
+	"encoding/json"
+	"slices"
+	"strings"
+	"testing"
+)
+
+func TestConfigurationProviderArtifactUsesOnlyActualSourceAndNamedSetup(t *testing.T) {
+	in, selection, account, now := configurationProviderRecipeFixture(t)
+	b, err := ConfigurationProviderSetupArtifact(in, selection, account, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		Format       string                               `json:"format"`
+		Recipe       json.RawMessage                      `json:"recipe"`
+		Apply        [4]configurationProviderSetupRequest `json:"apply"`
+		Inspect      []string                             `json:"inspect"`
+		AuditStorage struct {
+			Prefixes   []string `json:"prefixes"`
+			Operations []string `json:"operations"`
+		} `json:"auditStorage"`
+	}
+	if json.Unmarshal(b, &v) != nil || len(b) > 64<<10 || len(v.Inspect) != 8 ||
+		v.Format != "asservat-configuration-provider-setup/v1" || !slices.Equal(v.AuditStorage.Prefixes, []string{"hub-owner-configuration/v1/" + in.InstallationID + "/" + in.ClusterID + "/" + in.OwnerSource.UID + "/", "authority/v1/"}) ||
+		strings.Join(v.AuditStorage.Operations, ",") != "PutObject,GetObject" {
+		t.Fatal("artifact lost exact source/backend scope")
+	}
+	if v.Inspect[0] != "sys/mounts/auth/"+selection.AuthMount {
+		t.Fatal("auth mount inspection must use the named read-only mount route")
+	}
+	for _, path := range v.Inspect {
+		if strings.HasPrefix(path, "sys/auth/") {
+			t.Fatal("inspection requires an elevated auth administration route")
+		}
+	}
+	r, err := ConfigurationProviderRecipeFor(in, selection, account, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, role := range r.Roles {
+		p, auth := v.Apply[2*i], v.Apply[2*i+1]
+		var policy struct {
+			Policy string `json:"policy"`
+		}
+		if p.Method != "POST" || p.Path != "sys/policies/acl/"+role.Name || json.Unmarshal(p.Body, &policy) != nil || policy.Policy != string(role.Policy) ||
+			auth.Method != "POST" || auth.Path != "auth/"+selection.AuthMount+"/role/"+role.Name || !bytes.Equal(auth.Body, role.Role) {
+			t.Fatal("artifact allows arbitrary request or loses exact body")
+		}
+	}
+	for _, forbidden := range []string{`"client_token"`, `"reviewer_jwt"`, `"secretAccessKey"`, `"server-sign"`, `"client-sign"`} {
+		if bytes.Contains(b, []byte(forbidden)) {
+			t.Fatal("artifact acquired credential or owner effect", forbidden)
+		}
+	}
+	in.OwnerSource.UID = ""
+	if _, err := ConfigurationProviderSetupArtifact(in, selection, account, now); err == nil {
+		t.Fatal("future source UID guessed before original receipt")
+	}
+}

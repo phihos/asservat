@@ -1,0 +1,5 @@
+SET statement_timeout='10s'; SET idle_in_transaction_session_timeout='20s';
+BEGIN;
+SELECT t.* FROM public.fleet_current_trust t JOIN public.permission_stream p ON p.installation_id=t.installation_id WHERE t.installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR SHARE OF t;
+SELECT 'probe-backend:' || pg_backend_pid();
+\echo probe-holder-ready

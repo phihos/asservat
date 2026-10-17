@@ -1,0 +1,25 @@
+# Native receiver cost counterexample handoff
+
+Three new integration test files only; production, limits, protocol and listener selection are unchanged. The existing owned context harness selects the new test without a harness patch. Read IMPLEMENTATION.md for the exact synthetic/native boundary and bounded diagnostic fields; PAIR-PROOF-DESIGN.md is an unimplemented follow-up proposal.
+
+Checkpoint-v1 was never run. The parent added the versioned audit native fixture before launch, so checkpoint-v2 retained all three identical payloads and captured the new current source dependencies. It is not a reconstructed failure report.
+
+## Actual local qualification
+
+Runner handle 71857 terminated exit 0. Integration compile-only passed in 29.263 seconds, the three pure counter tests under race passed in 13.846 seconds, and integration vet passed in 2.273 seconds. Every phase verified all 1,901 live dependency hashes, absent original paths, three payload hashes, frozen runner/metadata hashes and complete Go file set before and afterward. All sets matched. See RESULT.json and evidence/{compile,counter-race,vet}.{json,log}.
+
+The race tests establish closed diagnostic categories, unchanged transport objects/errors, no body reads/closes and concurrent count integrity. They do not exercise native services. The native counterexample has only compiled.
+
+## Next exact native selection
+
+Parent-owned exclusive fixture:
+
+```
+python scripts/test-context-storage.py --run '^TestOwnerObservationReceiverOriginalBudgetWithRealServices$'
+```
+
+Use the qualified repository Python environment, frozen live sources and the normal original image/source/cleanup checks. A passing named test means first concrete receiver proof succeeded and the repeated proof was denied under the original bound. It establishes the availability counterexample, not a usable route. If the first proof fails, retain its exact phase/count/SQL result as the earlier boundary; do not extend the deadline or turn that unrelated outcome into success.
+
+The fixture uses real API objects/admission/Ready endpoints, scoped SQL activation, encrypted S3 audit, process-owned keys and actual mutual TLS1.3/h2. Its initial roots/source/registration proof are synthetic; no product binary, native Pod-IP routing, complete regional four-proof flow, installation or sustained availability is qualified. SQL pool acquisition metrics are not statement/lock counts; the configuration pool is explicitly shared with the independent joined fixture source owner.
+
+After the native counterexample, review the explicit request-owned complete-pair contract. Preserve the original five seconds, 20-QPS/burst20 clients, exact fresh TLS/SQL/private-key effect checks, two independent native brackets, four regional ordinals, unknown spend, non-replay and joined closure. No hidden cached callback or runtime selection is included here.

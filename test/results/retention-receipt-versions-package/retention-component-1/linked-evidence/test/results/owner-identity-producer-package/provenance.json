@@ -1,0 +1,9 @@
+{
+  "parent_integration_sha256": "3400edc1e917e26b64a718599af9665f8ddbcf8514576cfc5cfdfd0cad5fd5ca",
+  "manifest_sha256": "8b048c87adb7d8866480cab2359ad3602691ec4a44f71ee86e847f81b6925aa9",
+  "dependencies_sha256": "a02d44636afc341113345328a3b0434c8e3599e016333a807c3b35f0efc39293",
+  "paths": 13,
+  "dependencies": 1864,
+  "predecessor": "producer-1 retained compile exit1",
+  "change": "Explicit ValidateOwner audit-field mapping plus fixed PKI names/separation; original producer1 payloads otherwise unchanged."
+}

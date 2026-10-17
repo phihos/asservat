@@ -1,0 +1,15 @@
+{
+  "reason": "First native failure reported only t.Run caller. Retain two orchestration frames for precise failure location; no request, authority, fixture, or product behavior changes.",
+  "files": [
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "before": "b3756deeddbc642ca22ca8e3647ee993414f3cd242689640f4b4c1451c0f312f",
+      "after": "0320e0ee88fe9af3e2cc7d3e16a5afa36f4f980de468f303641bb41a12eba7db"
+    },
+    {
+      "path": "test/integration/public_context_journey_test.go",
+      "before": "047e024915c028373a6eb7c40ad14b4b9ed2add5bb4279485ba7b1434902318a",
+      "after": "1ded4db47f6418579296f7f201b155dfbb8a3fa4a0aeb8de863017ae906b4680"
+    }
+  ]
+}

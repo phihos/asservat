@@ -1,0 +1,11 @@
+{
+  "v2OnlyChangedPaths": [
+    "internal/contracts/observation_operation.go",
+    "internal/contracts/observation_operation_test.go"
+  ],
+  "originalCompileFailureReport": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v1/evidence/compile.json",
+  "originalCompileFailureSHA256": "5dfcefc9747784bef9ba0052dad494e8082dd761d3b5b58e4a31d6a192555e53",
+  "exactIntegerBeforeFailureReport": "/home/phil/.cache/asservat-build/planning/regional-observation-v2-channel-20261013/checkpoint-v2/evidence/race.json",
+  "exactIntegerBeforeFailureSHA256": "27a67ed3e08a50bcd2e104458f9ffd77a88c754c2b504ea0b20a18983585bf30",
+  "exactIntegerBeforeFailureLogSHA256": "e2bbec83a9d687197815c1ed4029bdbe7aab230e4f33bca7297399a55c45eda1"
+}

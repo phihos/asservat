@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-12T18:55:31.929526+00:00",
+  "restoredOriginals": 3,
+  "removedOwnedFile": 1,
+  "allMatched": true,
+  "diagnosticLimitation": "Fixed worker.attachment label fell back to other; no raw values emitted. Package retained unchanged."
+}

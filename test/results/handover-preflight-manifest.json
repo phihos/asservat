@@ -1,0 +1,17 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/initial_sql_material.go",
+    "base_sha256": "c3205e058c7374684cdc8052770a7e261cca2467a4025603adc41a436870b1ee",
+    "sha256": "ce22efba1385d72827c544605a4e18dd716edfbac7ecf9109f82ec9a9388abfb"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_sql_material_preflight_test.go",
+    "base_sha256": "c79ca0d722297f0a55e8c2ae6343426b85eeab38eeaee7bc978143bac1827fa5",
+    "sha256": "01c13df04e192aa2003e0aaa06e87f75300763816d58b7b73532814670499e4e"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "0874c6c865fd454d3e5179c8ea3b143a9c8427cbb855fafce95dae6e6a5ae011",
+    "sha256": "3ed08eb694378a02dcbaf947a587e50d4595b141865fc5666d9f6172943dbf11"
+  }
+]

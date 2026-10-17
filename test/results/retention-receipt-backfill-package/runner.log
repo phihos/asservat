@@ -1,0 +1,3 @@
+{"name": "compile", "command": ["go", "test", "-vet=off", "-run=^$", "-count=1", "./test/integration"], "exit": 0, "seconds": 17.037787322999975, "logSHA256": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0", "hashes": {"pins": [], "payload": [], "bases": [], "dependencies": [], "inventory": []}}
+{"name": "vet", "command": ["go", "vet", "./test/integration"], "exit": 0, "seconds": 2.216894569000033, "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "hashes": {"pins": [], "payload": [], "bases": [], "dependencies": [], "inventory": []}}
+{"exit": 0, "scratchRemoved": true}

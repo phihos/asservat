@@ -1,0 +1,11 @@
+ok  	asservat.local/asservat/internal/domain/audit	1.011s
+ok  	asservat.local/asservat/internal/application/audit	1.130s
+ok  	asservat.local/asservat/internal/adapters/objectstore	2.468s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.972s
+--- FAIL: TestInitialSchemaExpectationRejectsIncompatibleCompiledProvenance (0.00s)
+    initial_schema_expectation_test.go:16: invalid permission observation request
+--- FAIL: TestInitialSchemaEmbeddedBundleAndClosedAnnotations (0.00s)
+    initial_schema_test.go:17: embedded pinned bundle { 0} invalid permission observation request
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.240s
+FAIL

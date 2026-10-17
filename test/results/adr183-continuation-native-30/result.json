@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-30",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "The owned kind network fixed the fixture setup: the fixture rolled out and the bootstrap chain passed. The real API server then rejected the generated EvidenceStoragePool CRD: 'properties[capacityAssurance].type: Required value'. The contract's enum had no type, which a structural schema needs. The generator now infers the type of enum-only nodes and refuses any untyped structural property.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; the continuation subtest stopped at CRD installation.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

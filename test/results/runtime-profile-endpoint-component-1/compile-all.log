@@ -1,0 +1,256 @@
+{"Time":"2026-10-14T07:37:28.160105914+02:00","Action":"start","Package":"asservat.local/asservat/api/v1alpha1"}
+{"Time":"2026-10-14T07:37:28.160167935+02:00","Action":"output","Package":"asservat.local/asservat/api/v1alpha1","Output":"?   \tasservat.local/asservat/api/v1alpha1\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:28.160180745+02:00","Action":"skip","Package":"asservat.local/asservat/api/v1alpha1","Elapsed":0}
+{"Time":"2026-10-14T07:37:28.409746144+02:00","Action":"start","Package":"asservat.local/asservat/cmd/asservat"}
+{"Time":"2026-10-14T07:37:28.409811255+02:00","Action":"output","Package":"asservat.local/asservat/cmd/asservat","Output":"?   \tasservat.local/asservat/cmd/asservat\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:28.409820475+02:00","Action":"skip","Package":"asservat.local/asservat/cmd/asservat","Elapsed":0}
+{"Time":"2026-10-14T07:37:28.752152431+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/diagnostics"}
+{"Time":"2026-10-14T07:37:28.754698894+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/diagnostics","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:28.754740935+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/diagnostics","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:28.755048676+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/diagnostics","Output":"ok  \tasservat.local/asservat/internal/adapters/diagnostics\t0.003s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:28.755067466+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/diagnostics","Elapsed":0.003}
+{"Time":"2026-10-14T07:37:28.818537659+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/jose"}
+{"Time":"2026-10-14T07:37:28.823343925+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/jose","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:28.823374345+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/jose","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:28.823656436+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/jose","Output":"ok  \tasservat.local/asservat/internal/adapters/jose\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:28.823671276+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/jose","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:30.922620387+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/kms"}
+{"Time":"2026-10-14T07:37:30.932893181+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kms","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:30.932922411+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kms","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:30.933511704+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kms","Output":"ok  \tasservat.local/asservat/internal/adapters/kms\t0.011s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:30.933551534+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/kms","Elapsed":0.011}
+{"Time":"2026-10-14T07:37:36.97995409+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/kubernetes"}
+{"Time":"2026-10-14T07:37:36.989481101+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kubernetes","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:36.989505991+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kubernetes","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:36.989990933+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/kubernetes","Output":"ok  \tasservat.local/asservat/internal/adapters/kubernetes\t0.010s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:36.990005723+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/kubernetes","Elapsed":0.01}
+{"Time":"2026-10-14T07:37:36.992395806+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/mounts"}
+{"Time":"2026-10-14T07:37:36.993779473+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mounts","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:36.993801483+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mounts","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:36.993965584+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mounts","Output":"ok  \tasservat.local/asservat/internal/adapters/mounts\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:36.993977984+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/mounts","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:36.994415986+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/mtls"}
+{"Time":"2026-10-14T07:37:36.999438423+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mtls","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:36.999461863+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mtls","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:36.999928115+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/mtls","Output":"ok  \tasservat.local/asservat/internal/adapters/mtls\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:36.999942195+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/mtls","Elapsed":0.006}
+{"Time":"2026-10-14T07:37:37.001520473+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/objectstore"}
+{"Time":"2026-10-14T07:37:37.01230933+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:37.01233077+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:37.013168235+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore","Output":"ok  \tasservat.local/asservat/internal/adapters/objectstore\t0.012s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:37.013180355+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/objectstore","Elapsed":0.012}
+{"Time":"2026-10-14T07:37:37.014826553+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/objectstore/framed"}
+{"Time":"2026-10-14T07:37:37.020111541+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/framed","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:37.020130351+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/framed","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:37.020432753+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/framed","Output":"ok  \tasservat.local/asservat/internal/adapters/objectstore/framed\t0.006s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:37.020445513+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/objectstore/framed","Elapsed":0.006}
+{"Time":"2026-10-14T07:37:37.021407338+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/objectstore/manifest"}
+{"Time":"2026-10-14T07:37:37.026363224+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/manifest","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:37.026382944+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/manifest","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:37.026721055+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/objectstore/manifest","Output":"ok  \tasservat.local/asservat/internal/adapters/objectstore/manifest\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:37.026739595+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/objectstore/manifest","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:37.027769421+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/oidc"}
+{"Time":"2026-10-14T07:37:37.029959812+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/oidc","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:37.029976492+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/oidc","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:37.030220574+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/oidc","Output":"ok  \tasservat.local/asservat/internal/adapters/oidc\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:37.030232414+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/oidc","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:39.614795954+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/postgres"}
+{"Time":"2026-10-14T07:37:39.624739596+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/postgres","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.624768907+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/postgres","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.624790417+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/postgres","Output":"ok  \tasservat.local/asservat/internal/adapters/postgres\t0.010s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.624800197+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/postgres","Elapsed":0.01}
+{"Time":"2026-10-14T07:37:39.627033328+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/postgres/custodydb"}
+{"Time":"2026-10-14T07:37:39.627041898+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/postgres/custodydb","Output":"?   \tasservat.local/asservat/internal/adapters/postgres/custodydb\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:39.627047879+02:00","Action":"skip","Package":"asservat.local/asservat/internal/adapters/postgres/custodydb","Elapsed":0}
+{"Time":"2026-10-14T07:37:39.627055679+02:00","Action":"start","Package":"asservat.local/asservat/internal/adapters/providerconfig"}
+{"Time":"2026-10-14T07:37:39.632382406+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/providerconfig","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.632406116+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/providerconfig","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.632715388+02:00","Action":"output","Package":"asservat.local/asservat/internal/adapters/providerconfig","Output":"ok  \tasservat.local/asservat/internal/adapters/providerconfig\t0.006s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.632727178+02:00","Action":"pass","Package":"asservat.local/asservat/internal/adapters/providerconfig","Elapsed":0.006}
+{"Time":"2026-10-14T07:37:39.633689383+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/audit"}
+{"Time":"2026-10-14T07:37:39.635523683+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/audit","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.635544163+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/audit","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.635753224+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/audit","Output":"ok  \tasservat.local/asservat/internal/application/audit\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.635765194+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/audit","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:39.636458338+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/authorization"}
+{"Time":"2026-10-14T07:37:39.637781275+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/authorization","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.637798735+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/authorization","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.637973836+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/authorization","Output":"ok  \tasservat.local/asservat/internal/application/authorization\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.637985896+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/authorization","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:39.638614039+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/capacity"}
+{"Time":"2026-10-14T07:37:39.640249717+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capacity","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.640268118+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capacity","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.640474039+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capacity","Output":"ok  \tasservat.local/asservat/internal/application/capacity\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.640486119+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/capacity","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:39.641092462+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/capture"}
+{"Time":"2026-10-14T07:37:39.642835311+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capture","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.642850921+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capture","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.643062412+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/capture","Output":"ok  \tasservat.local/asservat/internal/application/capture\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.643073692+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/capture","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:39.643831566+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/catalog"}
+{"Time":"2026-10-14T07:37:39.645050443+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/catalog","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.645068473+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/catalog","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.645195463+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/catalog","Output":"ok  \tasservat.local/asservat/internal/application/catalog\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.645210294+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/catalog","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:39.645794887+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/configuration"}
+{"Time":"2026-10-14T07:37:39.647446595+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/configuration","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:39.647468995+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/configuration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:39.647679386+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/configuration","Output":"ok  \tasservat.local/asservat/internal/application/configuration\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:39.647699816+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/configuration","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:40.850841873+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/evidence"}
+{"Time":"2026-10-14T07:37:40.852660002+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/evidence","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:40.852688112+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/evidence","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:40.852899673+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/evidence","Output":"ok  \tasservat.local/asservat/internal/application/evidence\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:40.852913653+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/evidence","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:40.853800488+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/execution"}
+{"Time":"2026-10-14T07:37:40.855478047+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/execution","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:40.855499057+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/execution","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:40.855712318+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/execution","Output":"ok  \tasservat.local/asservat/internal/application/execution\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:40.855724498+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/execution","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:40.856323561+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/fleet"}
+{"Time":"2026-10-14T07:37:40.85795894+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/fleet","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:40.8579763+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/fleet","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:40.858194751+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/fleet","Output":"ok  \tasservat.local/asservat/internal/application/fleet\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:40.858209491+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/fleet","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:40.89236183+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/identity"}
+{"Time":"2026-10-14T07:37:40.893623046+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/identity","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:40.893643976+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/identity","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:40.893776557+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/identity","Output":"ok  \tasservat.local/asservat/internal/application/identity\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:40.893792257+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/identity","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:41.13328134+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/planning"}
+{"Time":"2026-10-14T07:37:41.13507605+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/planning","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:41.13510663+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/planning","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:41.135287371+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/planning","Output":"ok  \tasservat.local/asservat/internal/application/planning\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:41.135306471+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/planning","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:41.181583183+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/privacy"}
+{"Time":"2026-10-14T07:37:41.183363182+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/privacy","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:41.183390922+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/privacy","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:41.183640364+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/privacy","Output":"ok  \tasservat.local/asservat/internal/application/privacy\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:41.183654934+02:00","Action":"pass","Package":"asservat.local/asservat/internal/application/privacy","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:41.184464828+02:00","Action":"start","Package":"asservat.local/asservat/internal/application/targets"}
+{"Time":"2026-10-14T07:37:41.184473368+02:00","Action":"output","Package":"asservat.local/asservat/internal/application/targets","Output":"?   \tasservat.local/asservat/internal/application/targets\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:41.184478858+02:00","Action":"skip","Package":"asservat.local/asservat/internal/application/targets","Elapsed":0}
+{"Time":"2026-10-14T07:37:44.089112359+02:00","Action":"start","Package":"asservat.local/asservat/internal/bootstrap"}
+{"Time":"2026-10-14T07:37:44.100506498+02:00","Action":"output","Package":"asservat.local/asservat/internal/bootstrap","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.100532368+02:00","Action":"output","Package":"asservat.local/asservat/internal/bootstrap","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.101112202+02:00","Action":"output","Package":"asservat.local/asservat/internal/bootstrap","Output":"ok  \tasservat.local/asservat/internal/bootstrap\t0.012s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.101125592+02:00","Action":"pass","Package":"asservat.local/asservat/internal/bootstrap","Elapsed":0.012}
+{"Time":"2026-10-14T07:37:44.103278243+02:00","Action":"start","Package":"asservat.local/asservat/internal/console"}
+{"Time":"2026-10-14T07:37:44.105574475+02:00","Action":"output","Package":"asservat.local/asservat/internal/console","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.105591635+02:00","Action":"output","Package":"asservat.local/asservat/internal/console","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.105872877+02:00","Action":"output","Package":"asservat.local/asservat/internal/console","Output":"ok  \tasservat.local/asservat/internal/console\t0.003s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.105885357+02:00","Action":"pass","Package":"asservat.local/asservat/internal/console","Elapsed":0.003}
+{"Time":"2026-10-14T07:37:44.10661961+02:00","Action":"start","Package":"asservat.local/asservat/internal/contracts"}
+{"Time":"2026-10-14T07:37:44.110453531+02:00","Action":"output","Package":"asservat.local/asservat/internal/contracts","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.110472451+02:00","Action":"output","Package":"asservat.local/asservat/internal/contracts","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.110635111+02:00","Action":"output","Package":"asservat.local/asservat/internal/contracts","Output":"ok  \tasservat.local/asservat/internal/contracts\t0.004s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.110647661+02:00","Action":"pass","Package":"asservat.local/asservat/internal/contracts","Elapsed":0.004}
+{"Time":"2026-10-14T07:37:44.111270725+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/artifact"}
+{"Time":"2026-10-14T07:37:44.112518801+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/artifact","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.112544681+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/artifact","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.112682052+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/artifact","Output":"ok  \tasservat.local/asservat/internal/domain/artifact\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.112699272+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/artifact","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.113302765+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/audit"}
+{"Time":"2026-10-14T07:37:44.114935984+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/audit","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.114957714+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/audit","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.115134635+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/audit","Output":"ok  \tasservat.local/asservat/internal/domain/audit\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.115146225+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/audit","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:44.115819748+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/authorization"}
+{"Time":"2026-10-14T07:37:44.116920894+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/authorization","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.116938694+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/authorization","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.117092895+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/authorization","Output":"ok  \tasservat.local/asservat/internal/domain/authorization\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.117104655+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/authorization","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.117635998+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/capture"}
+{"Time":"2026-10-14T07:37:44.119576308+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/capture","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.119594778+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/capture","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.119611459+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/capture","Output":"ok  \tasservat.local/asservat/internal/domain/capture\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.119617758+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/capture","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:44.120144051+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/catalog"}
+{"Time":"2026-10-14T07:37:44.121500968+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/catalog","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.121516038+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/catalog","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.121530629+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/catalog","Output":"ok  \tasservat.local/asservat/internal/domain/catalog\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.121537338+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/catalog","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.121957671+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/configuration"}
+{"Time":"2026-10-14T07:37:44.123198237+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/configuration","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.123213527+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/configuration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.123227537+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/configuration","Output":"ok  \tasservat.local/asservat/internal/domain/configuration\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.123233857+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/configuration","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.1237427+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/execution"}
+{"Time":"2026-10-14T07:37:44.125007037+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/execution","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.125021487+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/execution","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.125036327+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/execution","Output":"ok  \tasservat.local/asservat/internal/domain/execution\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.125041997+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/execution","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.125473279+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/fleet"}
+{"Time":"2026-10-14T07:37:44.12576507+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/identity"}
+{"Time":"2026-10-14T07:37:44.127000457+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/fleet","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.127014577+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/fleet","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.127028307+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/fleet","Output":"ok  \tasservat.local/asservat/internal/domain/fleet\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.127034007+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/fleet","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:44.127194208+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/identity","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.127210408+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/identity","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.127226428+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/identity","Output":"ok  \tasservat.local/asservat/internal/domain/identity\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.127233258+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/identity","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.12756538+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/planning"}
+{"Time":"2026-10-14T07:37:44.12764776+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/privacy"}
+{"Time":"2026-10-14T07:37:44.129120568+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/privacy","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.129136078+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/privacy","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.129150748+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/privacy","Output":"ok  \tasservat.local/asservat/internal/domain/privacy\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.129160438+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/privacy","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:44.12951461+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/planning","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.12953211+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/planning","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.12954816+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/planning","Output":"ok  \tasservat.local/asservat/internal/domain/planning\t0.002s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.12955433+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/planning","Elapsed":0.002}
+{"Time":"2026-10-14T07:37:44.1295822+02:00","Action":"start","Package":"asservat.local/asservat/internal/domain/targets"}
+{"Time":"2026-10-14T07:37:44.130094823+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/browser"}
+{"Time":"2026-10-14T07:37:44.130796077+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/targets","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.130810187+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/targets","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.130823537+02:00","Action":"output","Package":"asservat.local/asservat/internal/domain/targets","Output":"ok  \tasservat.local/asservat/internal/domain/targets\t0.001s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.130829077+02:00","Action":"pass","Package":"asservat.local/asservat/internal/domain/targets","Elapsed":0.001}
+{"Time":"2026-10-14T07:37:44.13517778+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/browser","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.13519762+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/browser","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.1352155+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/browser","Output":"ok  \tasservat.local/asservat/internal/transport/browser\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.13522269+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/browser","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:44.327579866+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/clusterobservation"}
+{"Time":"2026-10-14T07:37:44.332534532+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/clusterobservation","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.332588792+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/clusterobservation","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.332834173+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/clusterobservation","Output":"ok  \tasservat.local/asservat/internal/transport/clusterobservation\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.332849793+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/clusterobservation","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:44.664945449+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/contextstart"}
+{"Time":"2026-10-14T07:37:44.665603562+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/keyservice"}
+{"Time":"2026-10-14T07:37:44.665615362+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/keyservice","Output":"?   \tasservat.local/asservat/internal/transport/keyservice\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:44.665623503+02:00","Action":"skip","Package":"asservat.local/asservat/internal/transport/keyservice","Elapsed":0}
+{"Time":"2026-10-14T07:37:44.669952065+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/contextstart","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.669983905+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/contextstart","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.670010306+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/contextstart","Output":"ok  \tasservat.local/asservat/internal/transport/contextstart\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.670019666+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/contextstart","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:44.903598607+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/mcp"}
+{"Time":"2026-10-14T07:37:44.908429682+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/mcp","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:44.908458672+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/mcp","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:44.908791624+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/mcp","Output":"ok  \tasservat.local/asservat/internal/transport/mcp\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:44.908807944+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/mcp","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:45.450527345+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/native"}
+{"Time":"2026-10-14T07:37:45.455496871+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/native","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:45.455521251+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/native","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:45.455833743+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/native","Output":"ok  \tasservat.local/asservat/internal/transport/native\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:45.455849113+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/native","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:45.45718119+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/ownerrelay"}
+{"Time":"2026-10-14T07:37:45.462135736+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/ownerrelay","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:45.462158296+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/ownerrelay","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:45.462468918+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/ownerrelay","Output":"ok  \tasservat.local/asservat/internal/transport/ownerrelay\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:45.462484478+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/ownerrelay","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:45.776469109+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/presentation"}
+{"Time":"2026-10-14T07:37:45.781222884+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/presentation","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:45.781248034+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/presentation","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:45.781552235+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/presentation","Output":"ok  \tasservat.local/asservat/internal/transport/presentation\t0.005s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:45.781566655+02:00","Action":"pass","Package":"asservat.local/asservat/internal/transport/presentation","Elapsed":0.005}
+{"Time":"2026-10-14T07:37:45.78241539+02:00","Action":"start","Package":"asservat.local/asservat/internal/transport/worker"}
+{"Time":"2026-10-14T07:37:45.78242712+02:00","Action":"output","Package":"asservat.local/asservat/internal/transport/worker","Output":"?   \tasservat.local/asservat/internal/transport/worker\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:45.78243773+02:00","Action":"skip","Package":"asservat.local/asservat/internal/transport/worker","Elapsed":0}
+{"Time":"2026-10-14T07:37:45.78244503+02:00","Action":"start","Package":"asservat.local/asservat/migrations"}
+{"Time":"2026-10-14T07:37:45.78244936+02:00","Action":"output","Package":"asservat.local/asservat/migrations","Output":"?   \tasservat.local/asservat/migrations\t[no test files]\n"}
+{"Time":"2026-10-14T07:37:45.78245375+02:00","Action":"skip","Package":"asservat.local/asservat/migrations","Elapsed":0}
+{"Time":"2026-10-14T07:37:46.719110875+02:00","Action":"start","Package":"asservat.local/asservat/test/integration"}
+{"Time":"2026-10-14T07:37:46.731154168+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-10-14T07:37:46.731180638+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-10-14T07:37:46.731842591+02:00","Action":"output","Package":"asservat.local/asservat/test/integration","Output":"ok  \tasservat.local/asservat/test/integration\t0.013s [no tests to run]\n"}
+{"Time":"2026-10-14T07:37:46.731857891+02:00","Action":"pass","Package":"asservat.local/asservat/test/integration","Elapsed":0.013}

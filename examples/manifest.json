@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "artifact/v1",
+  "artifactID": "00000000-0000-4000-8000-000000000003",
+  "caseID": "00000000-0000-4000-8000-000000000002",
+  "occurrenceID": "00000000-0000-4000-8000-000000000005",
+  "target": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "nodeUID": "node-uid",
+    "nodeBootID": "00000000-0000-4000-8000-000000000006",
+    "podUID": "pod-uid",
+    "namespace": "payments",
+    "workloadUID": "workload-ledger-uid",
+    "containerID": "containerd://synthetic-container-id",
+    "restartCount": 0,
+    "hostPID": 420,
+    "processStartTimeTicks": 123456,
+    "scope": "process"
+  },
+  "kind": "runtimeDiagnostic",
+  "mediaType": "application/json",
+  "format": "backtrace/v1",
+  "dataClass": "extract",
+  "image": {
+    "requested": "registry.example.invalid/ledger:test",
+    "resolvedDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "identityConfidence": "exact",
+    "revision": "synthetic-revision"
+  },
+  "collector": {
+    "version": "0.0.0-spec-example",
+    "imageDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "recipeDigest": "5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43"
+  },
+  "startedAt": "2026-10-09T12:00:00Z",
+  "completedAt": "2026-10-09T12:00:02Z",
+  "expiresAt": "2026-10-09T17:55:00Z",
+  "completeness": {
+    "source": "complete",
+    "ciphertext": "complete",
+    "analyzable": "true",
+    "gaps": []
+  },
+  "sizes": {
+    "plaintextBytes": 512,
+    "ciphertextBytes": 768
+  },
+  "hashes": {
+    "plaintextSHA256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "ciphertextSHA256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "encryption": {
+    "format": "tink-streaming-aead/v1",
+    "keyRef": "transit/asservat/metadata",
+    "wrappedKeyset": "SYNTHETIC-NOT-A-REAL-WRAPPED-KEY",
+    "aadSHA256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "provenance": {
+    "parentArtifacts": [
+      {
+        "artifactID": "00000000-0000-4000-8000-000000000004",
+        "digest": "4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    ],
+    "transform": "backtrace-allowlist/v1",
+    "toolDigests": [
+      "6666666666666666666666666666666666666666666666666666666666666666"
+    ],
+    "buildIDs": [
+      "synthetic-build-id"
+    ],
+    "projectionDigest": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "accessProvenance": {
+    "namespaceUID": "namespace-payments-uid",
+    "assignments": [
+      {
+        "subject": {
+          "kind": "Group",
+          "issuer": "https://identity.example.invalid/realms/company",
+          "id": "group-payments-123"
+        },
+        "role": "workload-maintainer",
+        "basisKind": "AccessBinding",
+        "basisUID": "binding-payments-uid",
+        "basisDigest": "9c6a14ad8b32e40e97146127fcb3ec9948825236775f59090d79f5283feff78d",
+        "assignmentID": "00000000-0000-4000-8000-000000000020"
+      }
+    ]
+  },
+  "privacy": {
+    "classification": "potentialPersonalData",
+    "evidenceType": "coreDump",
+    "purposeRef": "production-incident-investigation",
+    "classificationSource": "inherited"
+  },
+  "retention": {
+    "anchorAt": "2026-10-09T12:00:00Z",
+    "anchorBasis": "parent",
+    "requestedAgeSeconds": 259200,
+    "resolvedMaxAgeSeconds": 21600,
+    "deletionBudgetSeconds": 300,
+    "deleteBy": "2026-10-09T18:00:00Z",
+    "policyRefs": [
+      {
+        "uid": "retention-user-evidence-uid",
+        "generation": 1,
+        "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+      }
+    ],
+    "parentExpiresAt": "2026-10-09T17:55:00Z",
+    "parentDeleteBy": "2026-10-09T18:00:00Z"
+  },
+  "collectionProvenance": {
+    "captureUID": "00000000-0000-4000-8000-000000000031",
+    "actionID": "core",
+    "planDigest": "981455ead3e88e0aff88067e6cf95d5ee95109549a48c5c983e0713b992c4fc1"
+  }
+}

@@ -1,0 +1,6 @@
+ok  	asservat.local/asservat/internal/application/evidence	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore	(cached)
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.317s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	(cached)
+ok  	asservat.local/asservat/internal/adapters/postgres	(cached)
+ok  	asservat.local/asservat/test/integration	1.053s

@@ -1,0 +1,289 @@
+package kubernetes
+
+import (
+	"context"
+	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// NewProviderOwnerIdentityRoleRoot is the explicit fresh pair constructor. The
+// legacy constructor and readers retain their existing behavior. Both native
+// brackets are real independent operations inside this original call; no role,
+// credential projection or workload is created by construction.
+func NewProviderOwnerIdentityRoleRoot(ctx context.Context, bridge *InitialRuntimeBridge, resources *InitialRuntimeResources, accepted fleetapp.OwnerConfigurationReader, layout string) (*OwnerIdentityRoleRoot, error) {
+	if ctx == nil || ctx.Err() != nil || bridge == nil || resources == nil || accepted == nil || !ownerIdentityDigestValid(layout) || resources.preparer != bridge.preparer || resources.rootUID != bridge.rootUID || !equalJSON(resources.initial, bridge.initial) || resources.workerLayout != contracts.HubWorkerProviderInstalledLayout || resources.ownerLayout != contracts.OwnerProviderInstalledLayout || !initialRuntimeProviderSelectionValid(resources.initial.InstallationID, resources.workerLayout, resources.ownerLayout, resources.workerProvider, resources.ownerProvider) {
+		return nil, cfg.ErrInvalid
+	}
+	life, cancel := context.WithCancel(ctx)
+	out := &OwnerIdentityRoleRoot{bridge: bridge, resources: resources, accepted: accepted, ctx: life, cancel: cancel}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	err := out.providerOperation(call, false, func(bounded context.Context) (ownerIdentityOperationNative, error) {
+		first, err := out.readOwnerIdentityOperationNative(bounded, layout, false)
+		if err != nil {
+			return ownerIdentityOperationNative{}, err
+		}
+		// These private originals come only from the first full native bracket.
+		// A failed locked check closes this unpublished constructor result.
+		out.input = first.input
+		out.resourceCreatedAt = first.retained.resources.State.CreatedAt
+		out.resourceUntil = first.retained.resources.State.Until
+		return first, nil
+	}, func(bounded context.Context, first ownerIdentityOperationNative) error {
+		current, narrow := context.WithDeadline(bounded, first.until)
+		defer narrow()
+		last, err := out.readOwnerIdentityOperationNative(current, layout, false)
+		until := identity.Earlier(first.until, last.until)
+		if err != nil {
+			return ownerOperationUnavailable(ownerRootFinalNative, err)
+		}
+		if check := ownerIdentityOperationOriginalDifference(first, last); check != ownerOperationNoFailure {
+			return ownerOperationError(check, cfg.ErrUnavailable)
+		}
+		if initialHandoverDeadline(current, resources.now, until) != nil {
+			return ownerOperationError(ownerRootFinalDeadline, cfg.ErrUnavailable)
+		}
+		return nil
+	})
+	if err != nil {
+		out.Close()
+		return nil, err
+	}
+	return out, nil
+}
+
+// Dates of independent observations are intentionally not equated or renewed.
+// Every original identity, protected value and exact retained journal is.
+func ownerIdentityOperationOriginalsEqual(a, b ownerIdentityOperationNative) bool {
+	return ownerIdentityOperationOriginalDifference(a, b) == ownerOperationNoFailure
+}
+
+// Pure, ordered groups of the exact former conjunction. No extra API or clock
+// read and no relaxed field/date equality; stop at the same first false term.
+func ownerIdentityOperationOriginalDifference(a, b ownerIdentityOperationNative) ownerOperationCheck {
+	if a.input != b.input {
+		return ownerOriginalInput
+	}
+	if a.retained.bridge.UID != b.retained.bridge.UID || a.retained.bridge.ResourceVersion != b.retained.bridge.ResourceVersion || !equalJSON(a.retained.bridge.State, b.retained.bridge.State) {
+		return ownerOriginalBridge
+	}
+	if a.retained.resources.UID != b.retained.resources.UID || a.retained.resources.ResourceVersion != b.retained.resources.ResourceVersion || !equalJSON(a.retained.resources.State, b.retained.resources.State) {
+		return ownerOriginalResources
+	}
+	if !configurationRoleSameSources(a.source.proof.observation, b.source.proof.observation) || a.source.proof.guards != b.source.proof.guards {
+		return ownerOriginalSourceProof
+	}
+	if a.source.fleetRef != b.source.fleetRef || a.source.ownerRef != b.source.ownerRef || !a.source.owner.Equal(b.source.owner) {
+		return ownerOriginalSourceConfiguration
+	}
+	if a.source.deployment.ResourceVersion != b.source.deployment.ResourceVersion || !equalJSON(a.source.deployment.Spec, b.source.deployment.Spec) {
+		return ownerOriginalDeployment
+	}
+	if !equalJSON(a.source.account, b.source.account) || !equalJSON(a.source.administrator, b.source.administrator) {
+		return ownerOriginalSourceAccounts
+	}
+	if !equalJSON(a.account, b.account) || !equalJSON(a.service, b.service) {
+		return ownerOriginalOwnerObjects
+	}
+	if !a.accepted.Configuration.Equal(b.accepted.Configuration) {
+		return ownerOriginalAcceptedConfiguration
+	}
+	return ownerOperationNoFailure
+}
+
+// These private diagnostics contain only fixed check names. Causes retain the
+// existing errors.Is contract but their text is never rendered. No driver error,
+// protected identity/value or native response can become diagnostic output.
+type ownerOperationCheck uint8
+
+const (
+	ownerOperationNoFailure ownerOperationCheck = iota
+	ownerSelectionFirstPhase
+	ownerSelectionSecondPhase
+	ownerSelectionThirdPhase
+	ownerSelectionEnter
+	ownerSelectionInitialNative
+	ownerSelectionApply
+	ownerSelectionChildRead
+	ownerSelectionFinalNative
+	ownerSelectionFinalDeadline
+	ownerSelectionSnapshotEncode
+	ownerSelectionSnapshotDecode
+	ownerSelectionDeployment
+	ownerSelectionDeploymentDeadline
+	ownerSelectionOuterBefore
+	ownerSelectionOuterAfter
+	ownerSelectionParentCAS
+	ownerSelectionChildCAS
+	ownerSelectionChildCreate
+	ownerSelectionReceiptRead
+	ownerSelectionReceiptCAS
+	ownerNativeRetained
+	ownerNativeSource
+	ownerNativeInitialDeadline
+	ownerNativeInput
+	ownerNativeReceipt
+	ownerNativeOriginalInput
+	ownerNativeOriginalConfiguration
+	ownerNativeDeployment
+	ownerNativeAccountRead
+	ownerNativeAccountOriginal
+	ownerNativeServiceRead
+	ownerNativeServiceOriginal
+	ownerNativeProbes
+	ownerNativeAcceptedRead
+	ownerNativeAcceptedValid
+	ownerNativeAcceptedEqual
+	ownerNativeAcceptedOriginal
+	ownerNativeAcceptedDeadline
+	ownerNativeFinalDeadline
+	ownerRootFinalNative
+	ownerRootFinalDeadline
+	ownerOriginalInput
+	ownerOriginalBridge
+	ownerOriginalResources
+	ownerOriginalSourceProof
+	ownerOriginalSourceConfiguration
+	ownerOriginalDeployment
+	ownerOriginalSourceAccounts
+	ownerOriginalOwnerObjects
+	ownerOriginalAcceptedConfiguration
+)
+
+func (c ownerOperationCheck) String() string {
+	switch c {
+	case ownerSelectionFirstPhase:
+		return "selection.phase-one"
+	case ownerSelectionSecondPhase:
+		return "selection.phase-two"
+	case ownerSelectionThirdPhase:
+		return "selection.phase-three"
+	case ownerSelectionEnter:
+		return "selection.enter"
+	case ownerSelectionInitialNative:
+		return "selection.initial-native"
+	case ownerSelectionApply:
+		return "selection.apply"
+	case ownerSelectionChildRead:
+		return "selection.post-effect-child"
+	case ownerSelectionFinalNative:
+		return "selection.final-native"
+	case ownerSelectionFinalDeadline:
+		return "selection.final-deadline"
+	case ownerSelectionSnapshotEncode:
+		return "selection.snapshot-encode"
+	case ownerSelectionSnapshotDecode:
+		return "selection.snapshot-decode"
+	case ownerSelectionDeployment:
+		return "selection.deployment"
+	case ownerSelectionDeploymentDeadline:
+		return "selection.deployment-deadline"
+	case ownerSelectionOuterBefore:
+		return "selection.outer-before-callback"
+	case ownerSelectionOuterAfter:
+		return "selection.outer-after-callback"
+	case ownerSelectionParentCAS:
+		return "selection.parent-cas"
+	case ownerSelectionChildCAS:
+		return "selection.child-cas"
+	case ownerSelectionChildCreate:
+		return "selection.child-create"
+	case ownerSelectionReceiptRead:
+		return "selection.receipt-read"
+	case ownerSelectionReceiptCAS:
+		return "selection.receipt-cas"
+	case ownerNativeRetained:
+		return "native.retained-branch"
+	case ownerNativeSource:
+		return "native.source-branch"
+	case ownerNativeInitialDeadline:
+		return "native.initial-deadline"
+	case ownerNativeInput:
+		return "native.input"
+	case ownerNativeReceipt:
+		return "native.original-receipt"
+	case ownerNativeOriginalInput:
+		return "native.original-input"
+	case ownerNativeOriginalConfiguration:
+		return "native.original-configuration"
+	case ownerNativeDeployment:
+		return "native.deployment"
+	case ownerNativeAccountRead:
+		return "native.account-read"
+	case ownerNativeAccountOriginal:
+		return "native.account-original"
+	case ownerNativeServiceRead:
+		return "native.service-read"
+	case ownerNativeServiceOriginal:
+		return "native.service-original"
+	case ownerNativeProbes:
+		return "native.probes"
+	case ownerNativeAcceptedRead:
+		return "native.accepted-read"
+	case ownerNativeAcceptedValid:
+		return "native.accepted-valid"
+	case ownerNativeAcceptedEqual:
+		return "native.accepted-equal"
+	case ownerNativeAcceptedOriginal:
+		return "native.accepted-original"
+	case ownerNativeAcceptedDeadline:
+		return "native.accepted-deadline"
+	case ownerNativeFinalDeadline:
+		return "native.final-deadline"
+	case ownerRootFinalNative:
+		return "root.final-native"
+	case ownerRootFinalDeadline:
+		return "root.final-deadline"
+	case ownerOriginalInput:
+		return "original.input"
+	case ownerOriginalBridge:
+		return "original.bridge"
+	case ownerOriginalResources:
+		return "original.resources"
+	case ownerOriginalSourceProof:
+		return "original.source-proof"
+	case ownerOriginalSourceConfiguration:
+		return "original.source-configuration"
+	case ownerOriginalDeployment:
+		return "original.deployment"
+	case ownerOriginalSourceAccounts:
+		return "original.source-accounts"
+	case ownerOriginalOwnerObjects:
+		return "original.owner-objects"
+	case ownerOriginalAcceptedConfiguration:
+		return "original.accepted-configuration"
+	default:
+		return "unknown"
+	}
+}
+
+type ownerOperationDiagnostic struct {
+	check  ownerOperationCheck
+	cause  error
+	detail *ownerOperationDiagnostic
+}
+
+func (e *ownerOperationDiagnostic) Error() string {
+	text := "owner operation: " + e.check.String()
+	for detail := e.detail; detail != nil; detail = detail.detail {
+		text += ": " + detail.check.String()
+	}
+	return text
+}
+func (e *ownerOperationDiagnostic) Unwrap() error { return e.cause }
+
+func ownerOperationError(check ownerOperationCheck, cause error) error {
+	detail, _ := cause.(*ownerOperationDiagnostic)
+	return &ownerOperationDiagnostic{check: check, cause: cause, detail: detail}
+}
+
+// The original final-native condition normalized any read failure to
+// unavailable. Retain a nested fixed check without widening error identity.
+func ownerOperationUnavailable(check ownerOperationCheck, cause error) error {
+	detail, _ := cause.(*ownerOperationDiagnostic)
+	return &ownerOperationDiagnostic{check: check, cause: cfg.ErrUnavailable, detail: detail}
+}

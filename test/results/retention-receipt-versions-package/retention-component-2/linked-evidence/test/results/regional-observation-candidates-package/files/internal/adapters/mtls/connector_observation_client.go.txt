@@ -1,0 +1,265 @@
+package mtls
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"sync/atomic"
+	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// ConnectorObservationClient opens one purpose-fixed outbound standby at a
+// time per admitted slot. Its address is an installed dial hint; the actual
+// TLS server must belong to the independently read finite original-pool set.
+// Open neither enrolls a process nor grants metadata authority. The attached
+// channel performs fresh owner/source checks before each numbered proof.
+type ConnectorObservationClient struct {
+	base     *OwnerObservationClient
+	producer *ConnectorObservationProducer
+	metadata app.ClusterObservationExchange
+}
+
+func NewConnectorObservationClient(ctx context.Context, pin value.OwnerObservationPin, address string, roots *x509.CertPool, producer *ConnectorObservationProducer, candidates app.OwnerObservationCandidateSource, registry app.OwnerCertificateRegistry, metadata app.ClusterObservationExchange, maximum int, now func() time.Time) (*ConnectorObservationClient, error) {
+	if producer == nil || metadata == nil || producer.pin.Profile.RootID != pin.RootID || producer.pin.Profile.Binding.InstallationID != pin.Pool.InstallationID || producer.pin.Profile.Binding.IssuerEpoch != pin.Pool.IssuerEpoch {
+		return nil, value.ErrInvalid
+	}
+	base, err := NewOwnerObservationClient(ctx, pin, address, roots, producer.credentials, candidates, registry, maximum, now)
+	if err != nil {
+		return nil, err
+	}
+	return &ConnectorObservationClient{base: base, producer: producer, metadata: metadata}, nil
+}
+
+func (c *ConnectorObservationClient) Close() {
+	if c != nil && c.base != nil {
+		c.base.Close()
+	}
+}
+
+// Open has one original five-second handshake/header/Hello bound and one
+// original at-most-thirty-second socket end. Passing the first bound does not
+// renew a candidate, source, leaf or later request. There is no automatic POST
+// replay, address fallback, response redirect or idle keepalive.
+func (c *ConnectorObservationClient) Open(ctx context.Context, exchangeID string) (*ConnectorObservationConnection, error) {
+	if c == nil || c.base == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(exchangeID) || !c.base.enter() {
+		return nil, value.ErrUnavailable
+	}
+	b := c.base
+	transferred := false
+	defer func() {
+		if !transferred {
+			b.leave()
+		}
+	}()
+	started := b.now()
+	until := started.Add(30 * time.Second)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	work, cancel := context.WithDeadline(ctx, until)
+	joinRoot := linkObservationCancellation(b.root, cancel)
+	joinKeys := linkObservationCancellation(b.connector.root, cancel)
+	var raw net.Conn
+	var reader *io.PipeReader
+	var writer *io.PipeWriter
+	var response *http.Response
+	var transport *http.Transport
+	var channel *ConnectorObservationChannel
+	defer func() {
+		if transferred {
+			return
+		}
+		cancel()
+		if raw != nil {
+			_ = raw.Close()
+		}
+		if writer != nil {
+			_ = writer.CloseWithError(contracts.ErrClusterObservationProtocol)
+			_ = reader.CloseWithError(contracts.ErrClusterObservationProtocol)
+		}
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		if channel != nil {
+			channel.Close()
+		}
+		if transport != nil {
+			transport.CloseIdleConnections()
+		}
+		joinRoot()
+		joinKeys()
+	}()
+	setup, stopSetup := context.WithDeadline(work, identity.Earlier(until, started.Add(5*time.Second)))
+	defer stopSetup()
+	setupDone := make(chan struct{})
+	stopSetupCancel := context.AfterFunc(setup, func() { cancel(); close(setupDone) })
+	setupDetached := false
+	defer func() {
+		if !setupDetached && !stopSetupCancel() {
+			<-setupDone
+		}
+	}()
+	b.connector.mu.Lock()
+	var leaf value.ConnectorCredentialCertificate
+	if p := b.connector.active; p != nil {
+		leaf = p.installed[0]
+	}
+	b.connector.mu.Unlock()
+	keys, err := b.connector.observationKeys(setup, leaf)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	until = identity.Earlier(until, identity.Earlier(leaf.NotAfter, keys.runUntil))
+	before, err := b.candidates.ReadOwnerObservationCandidates(setup)
+	if err != nil || before.Pool != b.pin.Pool || !before.Valid(b.now()) || len(before.Owners) == 0 {
+		return nil, value.ErrUnavailable
+	}
+	before.Owners = append([]value.OwnerBinding(nil), before.Owners...)
+	handshake, stopHandshake := context.WithDeadline(setup, identity.Earlier(until, before.ValidUntil))
+	defer stopHandshake()
+	raw, err = (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext(handshake, "tcp", b.address)
+	if err != nil || raw == nil || raw.SetDeadline(identity.Earlier(until, before.ValidUntil)) != nil {
+		return nil, value.ErrUnavailable
+	}
+	// Cancellation also owns the actual pre-HTTP socket. After setup the
+	// retained connection takes this responsibility without a cancellation gap.
+	ioDone := make(chan struct{})
+	stopIO := context.AfterFunc(work, func() { _ = raw.Close(); close(ioDone) })
+	defer func() {
+		if !stopIO() {
+			<-ioDone
+		}
+	}()
+	config := &tls.Config{RootCAs: b.roots.Clone(), MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, ServerName: b.name, Time: b.now, SessionTicketsDisabled: true}
+	var clientPresented atomic.Bool
+	config.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		if b.connector.observationKeysCurrent(handshake, keys) != nil {
+			return nil, value.ErrUnavailable
+		}
+		certificate, e := b.connector.GetClientCertificate(info)
+		if e != nil || certificate == nil || len(certificate.Certificate) == 0 || artifact.Digest(sha256.Sum256(certificate.Certificate[0])) != leaf.Digest {
+			return nil, value.ErrDenied
+		}
+		clientPresented.Store(true)
+		return certificate, nil
+	}
+	socket := tls.Client(raw, config)
+	if socket.HandshakeContext(handshake) != nil || !clientPresented.Load() {
+		return nil, value.ErrDenied
+	}
+	state := socket.ConnectionState()
+	remote, err := b.verifier.VerifyBootstrapServer(&state, before)
+	if err != nil || b.connector.observationKeysCurrent(handshake, keys) != nil {
+		return nil, value.ErrDenied
+	}
+	until = identity.Earlier(until, remote.NotAfter)
+	// Empty residency holds only this handshake identity. Do not label its
+	// candidate dates current after attachment; Channel independently rereads.
+	channelRoot, stopChannel := context.WithDeadline(work, until)
+	defer func() {
+		if !transferred {
+			stopChannel()
+		}
+	}()
+	channel, err = NewConnectorObservationChannel(channelRoot, exchangeID, b.pin, b.roots, before, &state, leaf, c.producer, b.candidates, b.registry, c.metadata, b.now)
+	if err != nil {
+		return nil, err
+	}
+	var dialed atomic.Bool
+	transport = &http.Transport{ForceAttemptHTTP2: true, DisableKeepAlives: true, DisableCompression: true, MaxConnsPerHost: 1, MaxIdleConns: 0, MaxResponseHeaderBytes: 4096, TLSClientConfig: config, ResponseHeaderTimeout: 5 * time.Second, DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
+		if !dialed.CompareAndSwap(false, true) {
+			return nil, value.ErrUnavailable
+		}
+		return socket, nil
+	}}
+	reader, writer = io.Pipe()
+	authority := net.JoinHostPort(b.name, strconv.Itoa(b.pin.Pool.NativePort))
+	req, err := http.NewRequestWithContext(channelRoot, http.MethodPost, "https://"+authority+contracts.ClusterObservationExchangePath, reader)
+	if err != nil {
+		return nil, value.ErrInvalid
+	}
+	req.ContentLength = -1
+	req.Header.Set("Content-Type", contracts.ClusterObservationExchangeMedia)
+	req.Header.Set("Accept", contracts.ClusterObservationExchangeMedia)
+	hello := contracts.ClusterObservationHello{Format: contracts.ClusterObservationExchangeFormat, ExchangeID: exchangeID, RootID: b.pin.RootID, ClusterID: leaf.Binding.ClusterID}
+	helloBytes, err := contracts.EncodeClusterObservationHello(hello)
+	if err != nil {
+		return nil, value.ErrInvalid
+	}
+	wrote := startConnectorObservationHello(writer, helloBytes)
+	response, err = transport.RoundTrip(req)
+	if err != nil || response == nil || response.Body == nil || response.TLS == nil || response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.ContentLength != -1 || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.ClusterObservationExchangeMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
+		cancel()
+		_ = raw.Close()
+		_ = writer.CloseWithError(contracts.ErrClusterObservationProtocol)
+		_ = reader.CloseWithError(contracts.ErrClusterObservationProtocol)
+		<-wrote
+		return nil, value.ErrUnavailable
+	}
+	err = joinConnectorObservationHello(setup, reader, writer, wrote)
+	if err != nil || setup.Err() != nil || channelRoot.Err() != nil || b.connector.observationKeysCurrent(setup, keys) != nil {
+		return nil, value.ErrUnavailable
+	}
+	// Detach only the completed setup cancellation. This restores the original
+	// socket residency, never an attached request or candidate authority interval.
+	setupDetached = stopSetupCancel()
+	if !setupDetached || setup.Err() != nil || socket.SetDeadline(until) != nil {
+		return nil, value.ErrUnavailable
+	}
+	connection := newConnectorObservationConnection(channelRoot, cancel, stopChannel, raw, reader, writer, response.Body, transport, channel, hello, len(helloBytes), b.now, func() { joinRoot(); joinKeys(); b.leave() })
+	transferred = true
+	if channelRoot.Err() != nil {
+		_ = connection.Close()
+		return nil, value.ErrUnavailable
+	}
+	return connection, nil
+}
+
+// The callback only cancels; its join never waits for network work. The owning
+// connection closes and joins actual I/O separately before releasing its slot.
+func linkObservationCancellation(root context.Context, cancel context.CancelFunc) func() {
+	done := make(chan struct{})
+	stop := context.AfterFunc(root, func() { cancel(); close(done) })
+	return func() {
+		if !stop() {
+			<-done
+		}
+	}
+}
+
+func startConnectorObservationHello(writer *io.PipeWriter, body []byte) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		err := contracts.WriteClusterObservationFrame(writer, contracts.ClusterObservationFrame{Kind: contracts.ClusterObservationHelloFrame, Payload: body})
+		clear(body)
+		done <- err
+	}()
+	return done
+}
+
+func joinConnectorObservationHello(ctx context.Context, reader *io.PipeReader, writer *io.PipeWriter, done <-chan error) error {
+	select {
+	case err := <-done:
+		if err != nil || ctx.Err() != nil {
+			return value.ErrUnavailable
+		}
+		return nil
+	case <-ctx.Done():
+		_ = writer.CloseWithError(contracts.ErrClusterObservationProtocol)
+		_ = reader.CloseWithError(contracts.ErrClusterObservationProtocol)
+		<-done
+		return value.ErrUnavailable
+	}
+}

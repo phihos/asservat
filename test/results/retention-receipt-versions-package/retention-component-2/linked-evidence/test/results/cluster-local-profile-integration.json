@@ -1,0 +1,288 @@
+{
+  "integrated_at": "2026-10-12T21:03:34.063559+00:00",
+  "checkpoints": [
+    {
+      "checkpoint": "/home/phil/.cache/asservat-build/planning/regional-observations-20261012/checkpoint-v3",
+      "manifest_sha256": "3c99cf226218103b75adb34f0ac50d5c59c3bdf19d9867ef3c96376b757a8349",
+      "dependency_count": 1377,
+      "files": [
+        {
+          "path": "internal/adapters/kubernetes/cluster_observation_caller.go",
+          "base": null,
+          "sha256": "84bdcbc4e046380f404ed91d5138113d51a18ad2d22da5b5468a736de091bb82"
+        },
+        {
+          "path": "internal/adapters/kubernetes/cluster_observation_caller_test.go",
+          "base": null,
+          "sha256": "5998f1677dfa0105d6e1f4e91bbae3f8d293bf849f066609aa5694a62ca589ba"
+        },
+        {
+          "path": "internal/application/fleet/cluster_observation.go",
+          "base": null,
+          "sha256": "011ab3d0623bd98f2590c32b0e3c15ec69680c149ca00bea34c0e718befb0d5d"
+        },
+        {
+          "path": "internal/contracts/cluster_observation.go",
+          "base": null,
+          "sha256": "1f0d288f7eb9ee321b55ca9863c49ca18b130d54a561fe40263a77538916ca3c"
+        },
+        {
+          "path": "internal/contracts/cluster_observation_local.go",
+          "base": null,
+          "sha256": "bdbf96d4628ec950f0d023a3e0ed42c56b41059563c08f98017d08d23b80e931"
+        },
+        {
+          "path": "internal/contracts/cluster_observation_test.go",
+          "base": null,
+          "sha256": "ecfff1c42a5ed170bea925ed821bdd4018f872de68cc05d7bae2accc19bab23b"
+        },
+        {
+          "path": "internal/domain/fleet/cluster_observation.go",
+          "base": null,
+          "sha256": "0531d8e734db40736aec9473e43a2d51bd167acb73136c245ea62977f9200d90"
+        },
+        {
+          "path": "internal/domain/fleet/cluster_observation_caller.go",
+          "base": null,
+          "sha256": "dba4b2a7514f7c1f6fdce7081b76580390c47c5eb7e592ee06e248703ec646ef"
+        },
+        {
+          "path": "internal/domain/fleet/cluster_observation_test.go",
+          "base": null,
+          "sha256": "a722f3a155089ed3f52e7b20a77bbacf555758ad200decf4c600aadbc29b73b8"
+        },
+        {
+          "path": "internal/transport/clusterobservation/local_client.go",
+          "base": null,
+          "sha256": "7e3bd34b867833b537f5d591cf737456cfe663000ef2da5717925e128c17a01d"
+        },
+        {
+          "path": "internal/transport/clusterobservation/local_handler.go",
+          "base": null,
+          "sha256": "22768d4b20769352105faa59b7a99adf4aada61c8957dbad8e010c1e8e992a56"
+        },
+        {
+          "path": "internal/transport/clusterobservation/local_test.go",
+          "base": null,
+          "sha256": "9a6af6ef3d0c3db2deba8ec079a708710118fa2c062a8c4f165bc2d4e99ce5b5"
+        },
+        {
+          "path": "internal/transport/clusterobservation/wire.go",
+          "base": null,
+          "sha256": "723b93f70901b96d9279bb4dfab8639b87f5abe4a26ee627d0c683969740b401"
+        }
+      ]
+    },
+    {
+      "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-bootstrap-profile-20261012/checkpoint-v2",
+      "manifest_sha256": "fe3d893a75293e8ac3c8ff0bc9abd6548817f4bd3fa28c27aa447455d1e5d2d3",
+      "dependency_count": 1377,
+      "files": [
+        {
+          "base_sha256": "c8290561ff9db18532593533d22346dbc5fdf6c096b343b1d1ab90f3dbd257b2",
+          "path": "docs/architecture/hub-owner-discovery.md",
+          "sha256": "e4c1199ebba9e3d9001a715f71187cb3e9438cc4ae9928e2fef92edcbc9ce164"
+        },
+        {
+          "base_sha256": "e3429568cc8dc7ceab099039aa4b185fad2f64b33cf1ccc746ae97cca9342647",
+          "path": "docs/architecture/owner-issuance.md",
+          "sha256": "eafc8fa2e2b519218963e883d19d598a2e315621f792001f90aca7f291aa15e3"
+        },
+        {
+          "base_sha256": null,
+          "path": "docs/decisions/144-cluster-local-observations.md",
+          "sha256": "c3a460ba52be4f792916fa6b984453aba278fd1761f731c495a706457c61f788"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/kms/owner_bootstrap_pki.go",
+          "sha256": "2f6f9c5bf59c7a63d1c035ffa185bfd7510d14e44b7da0eff38054ad90397855"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/kms/owner_bootstrap_pki_test.go",
+          "sha256": "b4a826f685529e5ab44a843ae0292a8e842400ddacb0d39b3fcf6b3fec439042"
+        },
+        {
+          "base_sha256": "9a9d4e0e7b2b6dbb002eb7664e7ba2b18aa0a96732298ac6aedf8eda054c108f",
+          "path": "internal/adapters/kms/owner_pki.go",
+          "sha256": "8ac378041837cc4b7098c6fd16daaee070496538cc7a35b1575c1546027820f9"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/kubernetes/owner_bootstrap_configuration_test.go",
+          "sha256": "a87894f203ac956707008d72e84dfded8e96bbd77fdb953f41707c7d8ffa4bdc"
+        },
+        {
+          "base_sha256": "1ff2383627b2fc18a5362ab787d079c95258e5a1a8f2c897a2942aa8bafc2a56",
+          "path": "internal/adapters/kubernetes/owner_configuration.go",
+          "sha256": "d9378ba29d6332697311fc73e749a037848e2b169ac108b36d4f9324469b4611"
+        },
+        {
+          "base_sha256": "afd060df47f730cc6efac386ca911a8e49dfc6413422c657c0dadf188e505d17",
+          "path": "internal/adapters/mtls/context_start_client.go",
+          "sha256": "e44f0ae8937a8729272cea2c3a4ab5beb84ba05a0287f4875cbb721020125716"
+        },
+        {
+          "base_sha256": "904134ebb54d824931ad3476b6caab201159ce3217eb1f65c279341798a98cda",
+          "path": "internal/adapters/mtls/native_forwarder.go",
+          "sha256": "2ae0da68a4bd0644500660130ce36436f052ce6e113ac324f3833293324fe062"
+        },
+        {
+          "base_sha256": "e69237100719a7ad8f65ab314beeddaf0f6203659afdaa60d02490ff721198c4",
+          "path": "internal/adapters/mtls/owner.go",
+          "sha256": "e8b22747d6534bbb26f8b6d0931575ff0d78d939305533b4b84c35f0c3187b5d"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/mtls/owner_bootstrap.go",
+          "sha256": "86679e9f8fa28eb3829c06da14e6cf3027b333c947849f92305bbc3fc43224ef"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/mtls/owner_bootstrap_credentials_test.go",
+          "sha256": "02c859533947ce42c2a36d9f6f4e903a0aea32e4c3a6030e4568e580a191fe13"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/adapters/mtls/owner_bootstrap_test.go",
+          "sha256": "142af3c8692b400d1b29aee7d846cd405d7735993168bf4ab5d10520b000ebda"
+        },
+        {
+          "base_sha256": "7ca2eaae9bca02b06433f82cf45e81daa58deec69b7450d959f66984b9750699",
+          "path": "internal/adapters/mtls/owner_connection.go",
+          "sha256": "4b44424dd0a4c86a8bdc4c1cfc82531cee2a417d2d534bc6fcfc8253807aa1da"
+        },
+        {
+          "base_sha256": "d94346430ccfa1e60d69818af4887af086f0d72633cb0b9d2aa08e5dfe8d66e0",
+          "path": "internal/adapters/mtls/owner_credentials.go",
+          "sha256": "d2c2511f33b9f496930765b665b35a6ee62f80a7451818c88cb8d6999e2bdb06"
+        },
+        {
+          "base_sha256": "16f66270b72c1e639c1e589d11560241afbaf811126ed0c135bdb483866fdb06",
+          "path": "internal/adapters/mtls/owner_forwarder.go",
+          "sha256": "a7a1bb68203ed296690a5924ad3b980b98c3714664580d67389181a6be80787c"
+        },
+        {
+          "base_sha256": "49e3a1c62f1cc9866789e8c9cbbcc806368e10d2f87677506ffd011c8e98bc88",
+          "path": "internal/adapters/mtls/owner_issuance.go",
+          "sha256": "a1902468a678df5e72f3b3f45e7eb9f5e4aa613e988341a95c09bf11837d6470"
+        },
+        {
+          "base_sha256": "69b0cd629d7a990625749e7b7914a9fbac1e0d8bcb1ce2dd18f4e84f68d5d646",
+          "path": "internal/adapters/mtls/owner_serving.go",
+          "sha256": "d403514de6eda3af1bc83d1a742d4c0f51552a4def3c4abdcdf3dfbec19a057b"
+        },
+        {
+          "base_sha256": "c7fc65e58ea1700b434891e6be7def3da56f33e31eba4f0635d7ff33615538b2",
+          "path": "internal/bootstrap/owner_deployment.go",
+          "sha256": "fd97ff4cf3ef99b759861b156547109c1d8743100903f50d4eaef4ae90080142"
+        },
+        {
+          "base_sha256": "4981f15280d247ea6660de1c490bfb3cfbbfd4b8a7b80e1930e0154021f2d4d2",
+          "path": "internal/bootstrap/owner_runtime.go",
+          "sha256": "1bb8fcc4bd004dc02418fe16f135d5dea62c16d6230e044ddc45d49bf0e07d31"
+        },
+        {
+          "base_sha256": "c49eec4f773877f1f7d6924f9f17ce7e39dad51c1a21de8f895e016f57fcbe38",
+          "path": "internal/contracts/owner_configuration.go",
+          "sha256": "6bdb5beb28d8f9b6a52c0f071511e973ea072d98481b3c51580bc605a4ff9307"
+        },
+        {
+          "base_sha256": "fef596e5c98408021f75c8e8637bbb7a948e13755d48445bf218c7702fa3bfac",
+          "path": "internal/domain/fleet/owner.go",
+          "sha256": "5a9cffec76cb05a53dfbae1a612c58854e8239feffead2479a92fd180d8f16ea"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/domain/fleet/owner_bootstrap_test.go",
+          "sha256": "6f886ee89f4ad1bd899a66d8682f2a554ee31897f5ce1c80f133be136778ffc9"
+        },
+        {
+          "base_sha256": "6a3f99c70a92d3d048ddb5747c336d01b9009c6e951467588b821e675cd4af54",
+          "path": "internal/transport/native/server.go",
+          "sha256": "31789a0030a388d11b13b3117a9d8c0b66adc62a4e6534954512ca19b2649b45"
+        },
+        {
+          "base_sha256": null,
+          "path": "internal/transport/native/server_bootstrap_test.go",
+          "sha256": "5a269289382eb31264c29b26efb425ad65a4642c6fe33621debfbdf6fc444afb"
+        },
+        {
+          "base_sha256": "946b52befa9cf9bba46950e17c61622bb4666216013091a474a50a515df500e0",
+          "path": "specs/contracts/owner-configuration.schema.json",
+          "sha256": "54f2c88ea5145fa0aef1d075254a00b0ff75952110b2facb64534eea973dcf0c"
+        },
+        {
+          "base_sha256": "7cbb29cf2349f5d57e4352fe2e23a9c6a14b42bade2c9c6134cb09dafe217e59",
+          "path": "specs/federation.md",
+          "sha256": "885a79348101622be23500dd060ad58d513d678d4fdf93d8fd3aa3a0b3c8e75c"
+        }
+      ]
+    },
+    {
+      "checkpoint": "/home/phil/.cache/asservat-build/planning/regional-observation-local-sni-20261012/checkpoint-v1",
+      "manifest_sha256": "973facbc6dc4849cf311e5db5e25caa3f0188aba9496674ce33073063889375a",
+      "dependency_count": 1377,
+      "files": [
+        {
+          "live_base_sha256": null,
+          "logical_v3_base_sha256": "22768d4b20769352105faa59b7a99adf4aada61c8957dbad8e010c1e8e992a56",
+          "path": "internal/transport/clusterobservation/local_handler.go",
+          "sha256": "c1a0d5013e1bc5e32765fbb660812f73ce1c3b8e8598b01447d3fbdf543cd92c"
+        },
+        {
+          "live_base_sha256": null,
+          "logical_v3_base_sha256": null,
+          "path": "internal/transport/clusterobservation/local_sni_test.go",
+          "sha256": "ab0190bbe35189335b6f3bf941e64d3499a7756a0993b8fc718d6d8aea385aa6"
+        }
+      ]
+    }
+  ],
+  "final_payloads": {
+    "internal/adapters/kubernetes/cluster_observation_caller.go": "84bdcbc4e046380f404ed91d5138113d51a18ad2d22da5b5468a736de091bb82",
+    "internal/adapters/kubernetes/cluster_observation_caller_test.go": "5998f1677dfa0105d6e1f4e91bbae3f8d293bf849f066609aa5694a62ca589ba",
+    "internal/application/fleet/cluster_observation.go": "011ab3d0623bd98f2590c32b0e3c15ec69680c149ca00bea34c0e718befb0d5d",
+    "internal/contracts/cluster_observation.go": "1f0d288f7eb9ee321b55ca9863c49ca18b130d54a561fe40263a77538916ca3c",
+    "internal/contracts/cluster_observation_local.go": "bdbf96d4628ec950f0d023a3e0ed42c56b41059563c08f98017d08d23b80e931",
+    "internal/contracts/cluster_observation_test.go": "ecfff1c42a5ed170bea925ed821bdd4018f872de68cc05d7bae2accc19bab23b",
+    "internal/domain/fleet/cluster_observation.go": "0531d8e734db40736aec9473e43a2d51bd167acb73136c245ea62977f9200d90",
+    "internal/domain/fleet/cluster_observation_caller.go": "dba4b2a7514f7c1f6fdce7081b76580390c47c5eb7e592ee06e248703ec646ef",
+    "internal/domain/fleet/cluster_observation_test.go": "a722f3a155089ed3f52e7b20a77bbacf555758ad200decf4c600aadbc29b73b8",
+    "internal/transport/clusterobservation/local_client.go": "7e3bd34b867833b537f5d591cf737456cfe663000ef2da5717925e128c17a01d",
+    "internal/transport/clusterobservation/local_handler.go": "c1a0d5013e1bc5e32765fbb660812f73ce1c3b8e8598b01447d3fbdf543cd92c",
+    "internal/transport/clusterobservation/local_test.go": "9a6af6ef3d0c3db2deba8ec079a708710118fa2c062a8c4f165bc2d4e99ce5b5",
+    "internal/transport/clusterobservation/wire.go": "723b93f70901b96d9279bb4dfab8639b87f5abe4a26ee627d0c683969740b401",
+    "docs/architecture/hub-owner-discovery.md": "e4c1199ebba9e3d9001a715f71187cb3e9438cc4ae9928e2fef92edcbc9ce164",
+    "docs/architecture/owner-issuance.md": "eafc8fa2e2b519218963e883d19d598a2e315621f792001f90aca7f291aa15e3",
+    "docs/decisions/144-cluster-local-observations.md": "c3a460ba52be4f792916fa6b984453aba278fd1761f731c495a706457c61f788",
+    "internal/adapters/kms/owner_bootstrap_pki.go": "2f6f9c5bf59c7a63d1c035ffa185bfd7510d14e44b7da0eff38054ad90397855",
+    "internal/adapters/kms/owner_bootstrap_pki_test.go": "b4a826f685529e5ab44a843ae0292a8e842400ddacb0d39b3fcf6b3fec439042",
+    "internal/adapters/kms/owner_pki.go": "8ac378041837cc4b7098c6fd16daaee070496538cc7a35b1575c1546027820f9",
+    "internal/adapters/kubernetes/owner_bootstrap_configuration_test.go": "a87894f203ac956707008d72e84dfded8e96bbd77fdb953f41707c7d8ffa4bdc",
+    "internal/adapters/kubernetes/owner_configuration.go": "d9378ba29d6332697311fc73e749a037848e2b169ac108b36d4f9324469b4611",
+    "internal/adapters/mtls/context_start_client.go": "e44f0ae8937a8729272cea2c3a4ab5beb84ba05a0287f4875cbb721020125716",
+    "internal/adapters/mtls/native_forwarder.go": "2ae0da68a4bd0644500660130ce36436f052ce6e113ac324f3833293324fe062",
+    "internal/adapters/mtls/owner.go": "e8b22747d6534bbb26f8b6d0931575ff0d78d939305533b4b84c35f0c3187b5d",
+    "internal/adapters/mtls/owner_bootstrap.go": "86679e9f8fa28eb3829c06da14e6cf3027b333c947849f92305bbc3fc43224ef",
+    "internal/adapters/mtls/owner_bootstrap_credentials_test.go": "02c859533947ce42c2a36d9f6f4e903a0aea32e4c3a6030e4568e580a191fe13",
+    "internal/adapters/mtls/owner_bootstrap_test.go": "142af3c8692b400d1b29aee7d846cd405d7735993168bf4ab5d10520b000ebda",
+    "internal/adapters/mtls/owner_connection.go": "4b44424dd0a4c86a8bdc4c1cfc82531cee2a417d2d534bc6fcfc8253807aa1da",
+    "internal/adapters/mtls/owner_credentials.go": "d2c2511f33b9f496930765b665b35a6ee62f80a7451818c88cb8d6999e2bdb06",
+    "internal/adapters/mtls/owner_forwarder.go": "a7a1bb68203ed296690a5924ad3b980b98c3714664580d67389181a6be80787c",
+    "internal/adapters/mtls/owner_issuance.go": "a1902468a678df5e72f3b3f45e7eb9f5e4aa613e988341a95c09bf11837d6470",
+    "internal/adapters/mtls/owner_serving.go": "d403514de6eda3af1bc83d1a742d4c0f51552a4def3c4abdcdf3dfbec19a057b",
+    "internal/bootstrap/owner_deployment.go": "fd97ff4cf3ef99b759861b156547109c1d8743100903f50d4eaef4ae90080142",
+    "internal/bootstrap/owner_runtime.go": "1bb8fcc4bd004dc02418fe16f135d5dea62c16d6230e044ddc45d49bf0e07d31",
+    "internal/contracts/owner_configuration.go": "6bdb5beb28d8f9b6a52c0f071511e973ea072d98481b3c51580bc605a4ff9307",
+    "internal/domain/fleet/owner.go": "5a9cffec76cb05a53dfbae1a612c58854e8239feffead2479a92fd180d8f16ea",
+    "internal/domain/fleet/owner_bootstrap_test.go": "6f886ee89f4ad1bd899a66d8682f2a554ee31897f5ce1c80f133be136778ffc9",
+    "internal/transport/native/server.go": "31789a0030a388d11b13b3117a9d8c0b66adc62a4e6534954512ca19b2649b45",
+    "internal/transport/native/server_bootstrap_test.go": "5a269289382eb31264c29b26efb425ad65a4642c6fe33621debfbdf6fc444afb",
+    "specs/contracts/owner-configuration.schema.json": "54f2c88ea5145fa0aef1d075254a00b0ff75952110b2facb64534eea973dcf0c",
+    "specs/federation.md": "885a79348101622be23500dd060ad58d513d678d4fdf93d8fd3aa3a0b3c8e75c",
+    "internal/transport/clusterobservation/local_sni_test.go": "ab0190bbe35189335b6f3bf941e64d3499a7756a0993b8fc718d6d8aea385aa6"
+  },
+  "scope": "Checked components only; no installed or remote qualification"
+}

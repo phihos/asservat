@@ -1,0 +1,74 @@
+[
+  {
+    "Dataset": "compressible",
+    "NativeMiB": 64,
+    "FrameMiB": 8,
+    "CipherBytes": 16896,
+    "IndexBytes": 2300,
+    "RangeReadBytes": 2112,
+    "EncodeMS": 294.089,
+    "FirstRangeMS": 9.849,
+    "FullReadMS": 97.601,
+    "HeapInUse": 133701632
+  },
+  {
+    "Dataset": "compressible",
+    "NativeMiB": 64,
+    "FrameMiB": 16,
+    "CipherBytes": 15616,
+    "IndexBytes": 1324,
+    "RangeReadBytes": 3904,
+    "EncodeMS": 98.377,
+    "FirstRangeMS": 12.985,
+    "FullReadMS": 87.568,
+    "HeapInUse": 102924288
+  },
+  {
+    "Dataset": "compressible",
+    "NativeMiB": 64,
+    "FrameMiB": 32,
+    "CipherBytes": 14976,
+    "IndexBytes": 831,
+    "RangeReadBytes": 7488,
+    "EncodeMS": 91.548,
+    "FirstRangeMS": 34.853,
+    "FullReadMS": 90.381,
+    "HeapInUse": 137707520
+  },
+  {
+    "Dataset": "incompressible",
+    "NativeMiB": 64,
+    "FrameMiB": 8,
+    "CipherBytes": 67113520,
+    "IndexBytes": 2353,
+    "RangeReadBytes": 8389190,
+    "EncodeMS": 593.62,
+    "FirstRangeMS": 27.613,
+    "FullReadMS": 194.455,
+    "HeapInUse": 166649856
+  },
+  {
+    "Dataset": "incompressible",
+    "NativeMiB": 64,
+    "FrameMiB": 16,
+    "CipherBytes": 67113240,
+    "IndexBytes": 1356,
+    "RangeReadBytes": 16778310,
+    "EncodeMS": 646.034,
+    "FirstRangeMS": 43.587,
+    "FullReadMS": 214.278,
+    "HeapInUse": 119291904
+  },
+  {
+    "Dataset": "incompressible",
+    "NativeMiB": 64,
+    "FrameMiB": 32,
+    "CipherBytes": 67113100,
+    "IndexBytes": 848,
+    "RangeReadBytes": 33556550,
+    "EncodeMS": 707.186,
+    "FirstRangeMS": 86.234,
+    "FullReadMS": 219.507,
+    "HeapInUse": 249159680
+  }
+]

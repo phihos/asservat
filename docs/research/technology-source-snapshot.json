@@ -1,0 +1,287 @@
+{
+  "observed_date": "2026-10-09",
+  "meaning": "Research candidates and source metadata; not production-qualified dependency locks. Superseded candidates remain visible as observations.",
+  "github_releases": [
+    {
+      "repository": "jackc/pgx",
+      "tag": "v5.11.0",
+      "published_at": "2026-09-07T23:46:37Z",
+      "url": "https://github.com/jackc/pgx/releases/tag/v5.11.0"
+    },
+    {
+      "repository": "sqlc-dev/sqlc",
+      "tag": "v1.31.1",
+      "published_at": "2026-04-22T14:55:41Z",
+      "url": "https://github.com/sqlc-dev/sqlc/releases/tag/v1.31.1"
+    },
+    {
+      "repository": "pressly/goose",
+      "tag": "v3.28.0",
+      "published_at": "2026-09-02T08:34:11Z",
+      "url": "https://github.com/pressly/goose/releases/tag/v3.28.0"
+    },
+    {
+      "repository": "lestrrat-go/jwx",
+      "tag": "v4.5.0",
+      "published_at": "2026-09-08T03:39:21Z",
+      "url": "https://github.com/lestrrat-go/jwx/releases/tag/v4.5.0"
+    },
+    {
+      "repository": "coreos/go-oidc",
+      "tag": "v3.21.0",
+      "published_at": "2026-09-01T23:04:59Z",
+      "url": "https://github.com/coreos/go-oidc/releases/tag/v3.21.0"
+    },
+    {
+      "repository": "modelcontextprotocol/go-sdk",
+      "tag": "v1.8.0",
+      "published_at": "2026-09-14T08:05:46Z",
+      "url": "https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.8.0"
+    },
+    {
+      "repository": "inspektor-gadget/inspektor-gadget",
+      "tag": "v0.57.0",
+      "published_at": "2026-10-05T18:06:17Z",
+      "url": "https://github.com/inspektor-gadget/inspektor-gadget/releases/tag/v0.57.0"
+    },
+    {
+      "repository": "tink-crypto/tink-go",
+      "tag": "v2.8.0",
+      "published_at": "2026-08-11T12:57:09Z",
+      "url": "https://github.com/tink-crypto/tink-go/releases/tag/v2.8.0"
+    },
+    {
+      "repository": "google/cel-go",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repository": "blevesearch/bleve",
+      "tag": "v2.6.1",
+      "published_at": "2026-08-24T16:18:28Z",
+      "url": "https://github.com/blevesearch/bleve/releases/tag/v2.6.1"
+    },
+    {
+      "repository": "klauspost/compress",
+      "tag": "v1.20.1",
+      "published_at": "2026-09-25T08:03:31Z",
+      "url": "https://github.com/klauspost/compress/releases/tag/v1.20.1"
+    },
+    {
+      "repository": "getkin/kin-openapi",
+      "tag": "v0.149.0",
+      "published_at": "2026-08-28T09:15:18Z",
+      "url": "https://github.com/getkin/kin-openapi/releases/tag/v0.149.0"
+    },
+    {
+      "repository": "oapi-codegen/oapi-codegen",
+      "tag": "v2.8.0",
+      "published_at": "2026-07-17T14:11:21Z",
+      "url": "https://github.com/oapi-codegen/oapi-codegen/releases/tag/v2.8.0"
+    },
+    {
+      "repository": "google/gopacket",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "repository": "gopacket/gopacket",
+      "tag": "v1.7.4",
+      "published_at": "2026-10-02T22:21:49Z",
+      "url": "https://github.com/gopacket/gopacket/releases/tag/v1.7.4"
+    }
+  ],
+  "go_modules": [
+    {
+      "module": "github.com/google/cel-go",
+      "version": "v0.30.0",
+      "time": "2026-07-25T00:08:13Z",
+      "url": "https://proxy.golang.org/github.com/google/cel-go/@latest"
+    },
+    {
+      "module": "github.com/santhosh-tekuri/jsonschema/v6",
+      "version": "v6.0.3",
+      "time": "2026-06-28T17:38:00Z",
+      "url": "https://proxy.golang.org/github.com/santhosh-tekuri/jsonschema/v6/@latest"
+    },
+    {
+      "module": "github.com/cyberphone/json-canonicalization",
+      "version": "v0.0.0-20241213102144-19d51d7fe467",
+      "time": "2024-12-13T10:21:44Z",
+      "url": "https://proxy.golang.org/github.com/cyberphone/json-canonicalization/@latest"
+    },
+    {
+      "module": "golang.org/x/oauth2",
+      "version": "v0.37.0",
+      "time": "2026-08-25T21:41:43Z",
+      "url": "https://proxy.golang.org/golang.org/x/oauth2/@latest"
+    },
+    {
+      "module": "sigs.k8s.io/controller-runtime",
+      "version": "v0.25.2",
+      "time": "2026-09-30T23:29:52Z",
+      "url": "https://proxy.golang.org/sigs.k8s.io/controller-runtime/@latest"
+    },
+    {
+      "module": "k8s.io/client-go",
+      "version": "v0.37.1",
+      "time": "2026-09-23T21:10:43Z",
+      "url": "https://proxy.golang.org/k8s.io/client-go/@latest"
+    }
+  ],
+  "npm_latest_observed": [
+    {
+      "package": "react",
+      "version": "19.3.0",
+      "license": "MIT",
+      "engines": {
+        "node": ">=0.10.0"
+      },
+      "integrity": "sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==",
+      "url": "https://registry.npmjs.org/react/latest"
+    },
+    {
+      "package": "react-dom",
+      "version": "19.3.0",
+      "license": "MIT",
+      "engines": {},
+      "integrity": "sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==",
+      "url": "https://registry.npmjs.org/react-dom/latest"
+    },
+    {
+      "package": "typescript",
+      "version": "7.0.2",
+      "license": "Apache-2.0",
+      "engines": {
+        "node": ">=16.20.0"
+      },
+      "integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==",
+      "url": "https://registry.npmjs.org/typescript/latest"
+    },
+    {
+      "package": "vite",
+      "version": "8.3.4",
+      "license": "MIT",
+      "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+      },
+      "integrity": "sha512-IftLE8phJhdNRIGNEV4JCCvfNScoZQVfcXaN8TQropWGJtOHcu+iAB9pHcuGvmEb/kddw0LBe/jS8ztdC6xdiQ==",
+      "url": "https://registry.npmjs.org/vite/latest"
+    },
+    {
+      "package": "react-aria-components",
+      "version": "1.22.0",
+      "license": "Apache-2.0",
+      "engines": {},
+      "integrity": "sha512-iTrOa3QYzlEZLSICcaZBS3yqFnxu41x/PQqzA9bqcKahlcheMeEMF6aMVOiB+rtAwpX2MqNDPBxIbnhwa4KBFQ==",
+      "url": "https://registry.npmjs.org/react-aria-components/latest"
+    },
+    {
+      "package": "@tanstack/react-query",
+      "version": "5.104.1",
+      "license": "MIT",
+      "engines": {},
+      "integrity": "sha512-Zz70EgjahNI7aCz8BZxM3vUGU44ycxEAzMuCUjLeA7SVhhOkg3ZgPjPJPvHjs6Rmky/dtmnu1WzjGHNHmhCoZQ==",
+      "url": "https://registry.npmjs.org/@tanstack/react-query/latest"
+    },
+    {
+      "package": "@tanstack/react-table",
+      "version": "9.2.8",
+      "license": "MIT",
+      "engines": {
+        "node": ">=20"
+      },
+      "integrity": "sha512-cJxgratJm3uMm2sXnmY3PCTvcvIEFleCJ2uSOM2nxCmIY8RWA1KjXt5fsWGlYisL7DODr2w9YpLRQ3i/7MdIsQ==",
+      "url": "https://registry.npmjs.org/@tanstack/react-table/latest"
+    },
+    {
+      "package": "react-router",
+      "version": "8.4.0",
+      "license": "MIT",
+      "engines": {
+        "node": ">=22.22.0"
+      },
+      "integrity": "sha512-JtydAkBvU9UTEe5qNC+POhu+ZBNM7rlKY2IegwXc7Idj7xfRG16x5RZrw3mju+XlqBxfvb2ky9P3jUp9WyWC1g==",
+      "url": "https://registry.npmjs.org/react-router/latest"
+    },
+    {
+      "package": "openapi-typescript",
+      "version": "7.13.0",
+      "license": "MIT",
+      "engines": {},
+      "integrity": "sha512-EFP392gcqXS7ntPvbhBzbF8TyBA+baIYEm791Hy5YkjDYKTnk/Tn5OQeKm5BIZvJihpp8Zzr4hzx0Irde1LNGQ==",
+      "url": "https://registry.npmjs.org/openapi-typescript/latest"
+    },
+    {
+      "package": "ajv",
+      "version": "8.20.0",
+      "license": "MIT",
+      "engines": {},
+      "integrity": "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==",
+      "url": "https://registry.npmjs.org/ajv/latest"
+    },
+    {
+      "package": "vitest",
+      "version": "5.0.3",
+      "license": "MIT",
+      "engines": {
+        "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+      },
+      "integrity": "sha512-xMw97S3rjdtj5dkVat7jCsqWBpvchs3RlpQctUqwJD0KkERk40vz2fJ77lDwW/Vzh/pk18eItYAzkodhSes3jQ==",
+      "url": "https://registry.npmjs.org/vitest/latest"
+    }
+  ],
+  "tagged_source_documents": [
+    {
+      "id": "jwx-alg",
+      "url": "https://raw.githubusercontent.com/lestrrat-go/jwx/v4.5.0/jwa/signature_gen.go",
+      "sha256": "4a8eac75395a226dae333ed9c2e7c48a4b944975b5b8c57d049eb7ea78dcc2bc",
+      "bytes": 8263
+    },
+    {
+      "id": "oapi-readme",
+      "url": "https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/v2.8.0/README.md",
+      "sha256": "cc074e2818015966cf5f7c976746897ba2d8a72a8ec6c4d24659763094f129d0",
+      "bytes": 90096
+    },
+    {
+      "id": "kin-readme",
+      "url": "https://raw.githubusercontent.com/getkin/kin-openapi/v0.149.0/README.md",
+      "sha256": "b275221ff8c8f8a989ac5f9b739077528a8401869cb91503dff974213e5bdcd3",
+      "bytes": 23146
+    },
+    {
+      "id": "gadget-go",
+      "url": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/go.mod",
+      "sha256": "fbefc8d68fa952222f4ea260fd40bc48c4533f5fd94606c11df8eb0a9e627983",
+      "bytes": 11758
+    },
+    {
+      "id": "gadget-api",
+      "url": "https://raw.githubusercontent.com/inspektor-gadget/inspektor-gadget/v0.57.0/docs/api/golang.md",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "id": "gopacket-readme",
+      "url": "https://raw.githubusercontent.com/gopacket/gopacket/v1.7.4/README.md",
+      "sha256": "8b930cfcc235abdea76c92130437b8f88adf370f324bc85debcea0f9f9673ee6",
+      "bytes": 1077
+    },
+    {
+      "id": "sqlc-readme",
+      "url": "https://raw.githubusercontent.com/sqlc-dev/sqlc/v1.31.1/README.md",
+      "sha256": "0f55d9c3fef0a34c4b3daf1c7c6d11c3cdd1bacb8b7e9b1684b0f918f28e5f21",
+      "bytes": 3016
+    },
+    {
+      "id": "tink-stream",
+      "url": "https://raw.githubusercontent.com/tink-crypto/tink-go/v2.8.0/streamingaead/streamingaead.go",
+      "sha256": "6e6f822b97a79ec0b15c96a4ca7110caab1f0ee4bff456ff76503840a0a3cdef",
+      "bytes": 1011
+    },
+    {
+      "id": "jwx-readme",
+      "url": "https://raw.githubusercontent.com/lestrrat-go/jwx/v4.5.0/README.md",
+      "sha256": "e1cb3062cab4398a39a47595683e180e56b60ab42f9a37911fbbd5f6ab1b4fcf",
+      "bytes": 13129
+    }
+  ]
+}

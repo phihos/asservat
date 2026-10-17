@@ -1,0 +1,5 @@
+--- FAIL: TestInitialBootstrapAdmissionHasNoReservedCELVariable (0.01s)
+    initial_bootstrap_variables_test.go:7: namespace is a reserved CEL identifier
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.017s
+FAIL

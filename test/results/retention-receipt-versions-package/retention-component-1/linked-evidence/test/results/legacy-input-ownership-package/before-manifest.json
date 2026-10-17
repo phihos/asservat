@@ -1,0 +1,7 @@
+{
+  "internal/adapters/kubernetes/capture_cleanup_projection.go": "76ce5065c0ba9810549554c9763e538e0fe5a89bce395030a52c0b8f6393c4e1",
+  "internal/adapters/kubernetes/initial_bootstrap.go": "50f3e6afb4ef8e4a47e095a80db82f38d12004106a35e61e7b40d49ee2d2c03f",
+  "internal/adapters/kubernetes/initial_bootstrap_observation.go": "df1a2675603567cdd17e8b197dce51790f4a392907d953da8ee0e1cf0ad90460",
+  "internal/adapters/kubernetes/initial_bootstrap_state.go": "45a3615fad55602b4742094fabea3c7547f934f443dce33bc95362fd25593a76",
+  "internal/adapters/kubernetes/initial_runtime_bridge.go": "70a3f0412fec66c5ff7670b74ae648c25eebcf23586c6ca5f6b6568d04eeded5"
+}

@@ -1,0 +1,225 @@
+{
+  "integratedAt": 1791861344.8632967,
+  "jointPreflight": true,
+  "manifestSHA256": "7050fe5d5ba824fdbeb6a2fcb5803d79e8f292226861aaeefdbdcba4c9c4d709",
+  "dependenciesSHA256": "803554b4d54ab6622e5d2abf3bbe576debc03bff26456e3ca13a0d1b58ce18c3",
+  "dependencyCount": 1943,
+  "files": [
+    {
+      "path": "docs/architecture/cluster-observations.md",
+      "action": "modify",
+      "base": "3c5061a2bcdf1f5836ea6fa80b2828c89bf71f3c0c7323b446fb147f3030424b",
+      "sha256": "db8558118c4984d60f0daa93c63ab75e411f86384c7f5e1be12c8eeb2cb46f17"
+    },
+    {
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "action": "modify",
+      "base": "5250e4358491e42b502156486ce2d54c602af27e4030d8432cce8eb9582e9a35",
+      "sha256": "a86b100358146d4433608b55a8c7c22eba5396a0dd2127d85ad89bf53082093d"
+    },
+    {
+      "path": "internal/application/fleet/owner_authentication.go",
+      "action": "modify",
+      "base": "41997470333637524bdad46ad5a4e6045bd972146d8d3ad8ca52f1abe3158864",
+      "sha256": "902679123534ce2599118a5f4459690a11f9bf7f3585c91430c53ed045bd6c5e"
+    },
+    {
+      "path": "internal/application/fleet/owner_authentication_test.go",
+      "action": "modify",
+      "base": "0afa157323a2b80b346021652591501ee855ca4c0efe9f62e9fe20a2d14e9d13",
+      "sha256": "706423700cfcf8fd6080e3b591e89a70f2ed3c6689141932dfd112a6c839e9d5"
+    },
+    {
+      "path": "internal/bootstrap/owner_observation_forwarder.go",
+      "action": "add",
+      "base": null,
+      "sha256": "dc28f8f232f7dafe0989a3ac0d800744a0f97d8d99b00542d048ffff9d6e0f9c"
+    },
+    {
+      "path": "internal/bootstrap/owner_observation_forwarder_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "4d24997070ee2e2779b873221f06142bf4a69001a4901e70c6aafc9c9e62224f"
+    },
+    {
+      "path": "internal/transport/clusterobservation/routing_wire.go",
+      "action": "modify",
+      "base": "e1d6271a0ed1db22eb70e735742aa585691afd0ba20ebc22f0516eabc99c1e90",
+      "sha256": "cc541fdbd27aa5223cfb9ae9553466946c6218ff6ff49ac19436f57a79023c87"
+    },
+    {
+      "path": "internal/transport/clusterobservation/routing_wire_mapping_test.go",
+      "action": "add",
+      "base": null,
+      "sha256": "ef27de31016896b30f6f930b122f90161859e871b30b7dcaf3443c42ae0955e3"
+    }
+  ],
+  "qualification": {
+    "terminal": 0,
+    "handle": 68081,
+    "scope": "Component qualification: actual mutual TLS/HTTP2, synthetic current authority and regional results; no installed/native regional route qualification.",
+    "passes": 152,
+    "skips": 0,
+    "failures": 0,
+    "topLevelPasses": [
+      "TestOwnerAuthenticationRequiresAllCurrentBoundaries",
+      "TestOwnerServingRequiresAllCurrentBoundaries",
+      "TestOwnerClientRequiresAllCurrentBoundaries",
+      "TestOwnerClientObservationRequiresAllCurrentBoundaries",
+      "TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads",
+      "TestOwnerObservationRoutingPeersRejectCurrentChanges",
+      "TestOwnerObservationForwarderActualH2SelectionAndNoReplay",
+      "TestOwnerObservationForwarderOriginalDeadlineAndJoinedClose",
+      "TestObservationRoutingActualH2LookupClaimAndJoinedTerminal",
+      "TestObservationRoutingActualTLSRejectsWrongPurposeBeforeProof",
+      "TestObservationRoutingCurrentProofAndOriginalDeadline",
+      "TestObservationRoutingCloseJoinsBlockedAuthorityAndRetainsSlot",
+      "TestObservationRoutingPublicMappingsPreserveOriginalBytes"
+    ],
+    "liveDependencies": 1943,
+    "payloadPaths": 8,
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/overlay.json",
+          "-vet=off",
+          "-run",
+          "^$",
+          "./internal/application/fleet",
+          "./internal/adapters/mtls",
+          "./internal/bootstrap",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 9.686,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "race",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=120s",
+          "-run",
+          "^Test(OwnerObservationForwarder|OwnerClientObservationRequiresAllCurrentBoundaries|OwnerAuthenticationRequiresAllCurrentBoundaries|OwnerServingRequiresAllCurrentBoundaries|OwnerClientRequiresAllCurrentBoundaries|ObservationRouting|OwnerObservationRouting)",
+          "-v",
+          "./internal/application/fleet",
+          "./internal/adapters/mtls",
+          "./internal/bootstrap",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 18.672,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/overlay.json",
+          "./internal/application/fleet",
+          "./internal/adapters/mtls",
+          "./internal/bootstrap",
+          "./internal/transport/clusterobservation"
+        ],
+        "cwd": "/home/phil/Projekte/asservat",
+        "exit": 0,
+        "seconds": 1.95,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      },
+      {
+        "phase": "architecture",
+        "command": [
+          "make",
+          "go-architecture-check"
+        ],
+        "cwd": "/home/phil/.cache/asservat-build/planning/regional-observation-forwarder-20261013/checkpoint-v1/mirror",
+        "exit": 0,
+        "seconds": 1.65,
+        "before": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        },
+        "after": {
+          "live": [],
+          "bases": [],
+          "payload": [],
+          "fileSet": [],
+          "mirror": [],
+          "mirrorSet": [],
+          "freeze": []
+        }
+      }
+    ]
+  },
+  "scope": "Forwarding component only; production native availability fails structural request-count feasibility and needs separate correction before selection"
+}

@@ -1,0 +1,24 @@
+=== RUN   TestCapacityRootConfigurationDigestState
+=== RUN   TestCapacityRootConfigurationDigestState/initial-zero-phase-sentinels
+=== RUN   TestCapacityRootConfigurationDigestState/capture-backed-still-unreconciled
+=== RUN   TestCapacityRootConfigurationDigestState/ready-still-unreconciled
+=== RUN   TestCapacityRootConfigurationDigestState/positive-original-disposition
+=== RUN   TestCapacityRootConfigurationDigestState/renewed-positive-predecessor-zero-disposition
+=== RUN   TestCapacityRootConfigurationDigestState/maximum-valid-predecessor-bytes
+=== RUN   TestCapacityRootConfigurationDigestState/initial-cannot-have-predecessor
+=== RUN   TestCapacityRootConfigurationDigestState/renewal-requires-predecessor
+=== RUN   TestCapacityRootConfigurationDigestState/time-cannot-manufacture-disposition
+=== RUN   TestCapacityRootConfigurationDigestState/digest-cannot-manufacture-reconciled-time
+--- PASS: TestCapacityRootConfigurationDigestState (0.01s)
+    --- PASS: TestCapacityRootConfigurationDigestState/initial-zero-phase-sentinels (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/capture-backed-still-unreconciled (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/ready-still-unreconciled (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/positive-original-disposition (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/renewed-positive-predecessor-zero-disposition (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/maximum-valid-predecessor-bytes (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/initial-cannot-have-predecessor (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/renewal-requires-predecessor (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/time-cannot-manufacture-disposition (0.00s)
+    --- PASS: TestCapacityRootConfigurationDigestState/digest-cannot-manufacture-reconciled-time (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.065s

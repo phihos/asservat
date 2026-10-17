@@ -1,0 +1,14 @@
+package native_test
+
+import (
+	"asservat.local/asservat/internal/application/evidence"
+	value "asservat.local/asservat/internal/domain/authorization"
+	native "asservat.local/asservat/internal/transport/native"
+	"context"
+)
+
+// Compatibility helper only: the original API has no completion callback.
+// The common test retains the actual original post-Commit cleanup ordering.
+func registerHandoffOperation(ctx context.Context, r *native.HubRouter, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error), _ func(context.Context, value.NativeLease) error) (evidence.NativePendingExchange, error) {
+	return r.RegisterNativeExchange(ctx, in, before, check)
+}

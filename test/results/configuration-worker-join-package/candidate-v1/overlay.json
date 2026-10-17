@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/fleet/reconciliation.go": "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/files/internal/application/fleet/reconciliation.go",
+    "/home/phil/Projekte/asservat/internal/application/fleet/reconciliation_join_test.go": "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/files/internal/application/fleet/reconciliation_join_test.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/hub_worker.go": "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/files/internal/bootstrap/hub_worker.go",
+    "/home/phil/Projekte/asservat/internal/bootstrap/hub_worker_join_test.go": "/home/phil/.cache/asservat-build/planning/configuration-worker-join-20261013/candidate-v1/files/internal/bootstrap/hub_worker_join_test.go"
+  }
+}

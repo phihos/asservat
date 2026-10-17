@@ -1,0 +1,8 @@
+--- FAIL: TestCSRFConcurrentCommittedRefreshIsBusyOnlyForSameOriginalSession (0.00s)
+    --- FAIL: TestCSRFConcurrentCommittedRefreshIsBusyOnlyForSameOriginalSession/same (0.00s)
+        browser_csrf_rotation_test.go:72: committed rotation forced sign-in identity not eligible
+    --- FAIL: TestCSRFConcurrentCommittedRefreshIsBusyOnlyForSameOriginalSession/same-version-identity-change (0.00s)
+        browser_csrf_rotation_test.go:69: stale CSRF escaped
+FAIL
+FAIL	asservat.local/asservat/internal/application/identity	0.002s
+FAIL

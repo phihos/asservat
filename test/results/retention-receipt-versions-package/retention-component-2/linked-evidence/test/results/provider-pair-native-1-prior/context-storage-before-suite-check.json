@@ -1,0 +1,48 @@
+{
+  "scope": "component integration, not S-02 release acceptance",
+  "images": {
+    "s3": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+    "kms": "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf",
+    "kubernetes": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+  },
+  "clusters": [
+    {
+      "name": "asservat-context-7ryn8uv8-0",
+      "nodeImage": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+      "workloadImage": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+      "podUID": "f265b1f0-f9bb-41f7-8ec0-64b89b7751ed"
+    },
+    {
+      "name": "asservat-context-7ryn8uv8-1",
+      "nodeImage": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+      "workloadImage": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+      "podUID": "37500881-1a60-494d-98fb-32e58b6698aa"
+    }
+  ],
+  "goVersion": "go version go1.27.2 linux/amd64",
+  "sourceHashes": {
+    "go.mod": "2cb369b05bd9cccbec854a62bb8f30ba9f19331787dce93b0edd91bc8400c441",
+    "go.sum": "b3a796828a853484e148dd6ebf5e9c2660a8dec5a6c3879221ce11227d0cfa84",
+    "internal/adapters/kms/transit.go": "c08b72aabfd70393c3a532a3c1fe629e1aa56d8562c8301a7178a375d61e278b",
+    "internal/adapters/kms/transit_test.go": "366ab04572aa640fbe763b2366b53ffd810c1caf206dfab7e5058f8a9c50d7cc",
+    "internal/adapters/kubernetes/context.go": "995c2cd2afc253719cf1989868cbcefe69fcd5a57bc927b26bcaaed804e8adb9",
+    "internal/adapters/kubernetes/context_test.go": "95fb1ba6e6e6c0825d1af95e662aba0e67772b1608ae24b38655d637df2fe6bc",
+    "internal/adapters/objectstore/framed/crypto.go": "fb8d51648bc5e4e832b99a16103297afc08514b59fffeb81fbad5b6ba478ccfd",
+    "internal/adapters/objectstore/framed/decode.go": "195dcfbfd84fe26ba39c33e8c592001c1ec7ae30f446f18fdabef6162d98dd2f",
+    "internal/adapters/objectstore/framed/encode.go": "d56e46c8c8733777eddbea412c8cd3885f07b5e40f74eda8a1c8624449f270cd",
+    "internal/adapters/objectstore/framed/framed_test.go": "7b76d5e01cf03cc09b0d5ebf3d19b5fb96c44e699166a644460ea9d171af263d",
+    "internal/adapters/objectstore/framed/json.go": "214c2ecbdcc4933955d6644b7bd839516b1db307559865cff8f3c8dc4400ce35",
+    "internal/adapters/objectstore/framed/layout.go": "236986d52f3db7705f7f8f136d1219bb729213eda3fbd64010c3965d1e8d02aa",
+    "internal/adapters/objectstore/framed/manifest.go": "1525aade8de349c91224f77910441fd5d7bd4fb35bb8c9340dadb41eb14d65e0",
+    "internal/adapters/objectstore/s3.go": "33f576d2bf194c91c30d654eae17036dfb85b6e3838e0b413904c2fad837f07c",
+    "internal/adapters/objectstore/s3_test.go": "66238119228529697661c66ef0d973e0bcac815a0252b6a7cb36eb3bd8697626",
+    "internal/application/evidence/storage.go": "0099878cfbe43650a2d3d5901670731a2abe84766cfbc11a15727b1dba5441ef",
+    "internal/domain/artifact/context.go": "07910dbb85a3a9ac356ca5bf44b6749797422da1f975f5e93afd67c6967a7438",
+    "internal/domain/artifact/storage.go": "29d5dc9b574b77373bc0256be42f717a176303ee75f8407ca8285c792afc0f39",
+    "scripts/test-context-storage.py": "a279cd7ffb599b54756e2feb83cf6563fa5bc902529f6d224a6eefeeed507ea9",
+    "test/integration/context_storage_test.go": "7e88b943470d9b5b56658ff10c76d7623ad94c4d683b0131d95b9eebd4af3698"
+  },
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "cleanupFailures": []
+}

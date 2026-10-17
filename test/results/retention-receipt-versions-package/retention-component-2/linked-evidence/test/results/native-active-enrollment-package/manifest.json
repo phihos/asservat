@@ -1,0 +1,17 @@
+[
+  {
+    "path": "docs/architecture/context-native-content.md",
+    "base_sha256": "f13b5c6b6cc67c79bc95da5b3ca4b0ec98251ebd6b338edc9c22b2afed866ee6",
+    "payload_sha256": "c9ce1777d8c58d7cc5b21324e618f52d7b88d8347969aa3236da0a3ec8cd9f6d"
+  },
+  {
+    "path": "internal/application/evidence/context_native_active_enrollment_test.go",
+    "base_sha256": null,
+    "payload_sha256": "a5475b4321b51897ccb2b11e3cc3f27cc35499f92e3eac9dba0e413da635c01d"
+  },
+  {
+    "path": "internal/application/evidence/context_native_runtime.go",
+    "base_sha256": "9fc3c38bb7bea8cdd3b4165c686a147dc9382fdd6271915d9ffd2e758008a187",
+    "payload_sha256": "ac39f90ec35237acd5f3efc7bee4b4acc1ba8c08f541ed412581d656806e2f59"
+  }
+]

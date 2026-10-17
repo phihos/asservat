@@ -1,0 +1,31 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change
+    connector_observation_operation_sql_test.go:97: post-SQL source change disclosed registration current signing trust unavailable [1]
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source
+    connector_observation_operation_sql_test.go:110: first real SQL pair must remain incomplete current signing trust unavailable
+=== RUN   TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait
+    connector_observation_operation_sql_test.go:90: scoped reader failed a separate request after cancelled wait current signing trust unavailable
+--- FAIL: TestContextAdmissionWithRealServices (8.68s)
+    --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation (8.34s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/both-pairs (1.48s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/first-post-sql-source-change (0.79s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/final-post-sql-source-change (0.97s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/source-fence-between-pairs (0.92s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/recovery-between-pairs (0.85s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/database-incarnation-between-pairs (0.82s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/sql-shortens-final-source (0.86s)
+        --- FAIL: TestContextAdmissionWithRealServices/connector-observation-operation/original-deadline-during-sql-wait (1.65s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	8.738s
+FAIL

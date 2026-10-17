@@ -1,0 +1,5 @@
+ok  	asservat.local/asservat/internal/bootstrap	3.200s
+ok  	asservat.local/asservat/internal/adapters/kms	1.082s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.012s
+ok  	asservat.local/asservat/internal/adapters/mtls	8.351s
+ok  	asservat.local/asservat/internal/contracts	1.012s

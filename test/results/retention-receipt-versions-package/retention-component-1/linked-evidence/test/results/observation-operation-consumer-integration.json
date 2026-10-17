@@ -1,0 +1,115 @@
+{
+  "scope": "Native-operation values, closed ports and separate fixed SQL49 consumer; runtime selection and complete native conversation remain pending",
+  "dependenciesVerifiedBeforeMutation": 1921,
+  "manifestSHA256": "f1604c18602884b697284a44ad9112ca74f28708f3347cbe01034ce67019d63e",
+  "paths": [
+    {
+      "path": "internal/adapters/kubernetes/connector_observation_operation.go",
+      "base": "602d7427c7f457ca8b3cafcb2c423d5d3aa37867db39ca8ede1dccd9df09c9ba",
+      "payload": "d4b66656768369e9e55d72027b8a9b029af645789c9efe1836210ab27e3cd59e"
+    },
+    {
+      "path": "internal/adapters/kubernetes/observation_operation_ports.go",
+      "base": null,
+      "payload": "398849b457833f5c8b5bf5e98f2d13b7836c0d2f1a9dda2affc851ddc2601f8b"
+    },
+    {
+      "path": "internal/adapters/kubernetes/observation_operation_ports_test.go",
+      "base": null,
+      "payload": "be954bddd9b505a66ff960acafb651967342fa48ef2c0f1d6b43d1fcc7814938"
+    },
+    {
+      "path": "internal/adapters/kubernetes/owner_observation_operation.go",
+      "base": "a892cb55d909e0f3cb74d0c27201c1022bc877078178a099d23d2e235ffbc875",
+      "payload": "1127c7d83749ca77dab8be1d7e8795d5c031baa9e885cab3eaf53b0e37ce2eb5"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_operation.go",
+      "base": null,
+      "payload": "6fa72e7c23604c235744f7bc66d525c1372abefeaaf3158af9c6e5fb3babfa95"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_observation_operation_test.go",
+      "base": null,
+      "payload": "32c59b0741d10e07fae7572ee8c62d2d500e6e29a5a180289d53fd98aba2d71d"
+    },
+    {
+      "path": "internal/adapters/postgres/connector_registry.go",
+      "base": "5b3e743d3ba7bf94b362e537c6feb271a8b2faa3244b6b2fe9427d80677ca119",
+      "payload": "570dc43845b8b32821c1094998f8837d0048a333663f611ae89dbe56676b4785"
+    },
+    {
+      "path": "internal/application/fleet/observation_operation.go",
+      "base": null,
+      "payload": "9ac6dea1662dbdb7f63ef33518683301953a0093ed53dc10c556d431cd721bbe"
+    },
+    {
+      "path": "internal/domain/fleet/observation_operation.go",
+      "base": null,
+      "payload": "ea520188b89f3d263eb0f6202fb4df90c71267e622f30ca5f3222690969a4480"
+    },
+    {
+      "path": "internal/domain/fleet/observation_operation_test.go",
+      "base": null,
+      "payload": "70b77fbbd8909073c1fc1248729ee1b59fea78a4cefe01a13495aa206cbf306c"
+    }
+  ],
+  "qualification": {
+    "status": "component-checks-passed",
+    "payloadUnchangedSinceCheckpointV1": true,
+    "nativeQualification": false,
+    "activeBuilds": false,
+    "dependencies": 1921,
+    "payloadPaths": 10,
+    "mirrorPaths": 1928,
+    "topLevelPassedTests": 33,
+    "namedPassedTests": 245,
+    "gates": [
+      {
+        "phase": "compile",
+        "checkpoint": "checkpoint-v1",
+        "exit": 0,
+        "seconds": 22.057
+      },
+      {
+        "phase": "race",
+        "checkpoint": "checkpoint-v1",
+        "exit": 0,
+        "seconds": 60.059
+      },
+      {
+        "phase": "vet",
+        "checkpoint": "checkpoint-v1",
+        "exit": 0,
+        "seconds": 5.426
+      },
+      {
+        "phase": "go-architecture",
+        "checkpoint": "checkpoint-v3",
+        "exit": 0,
+        "seconds": 2.651
+      }
+    ],
+    "preservedHarnessFailures": [
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/go-architecture.json",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v2/evidence/go-architecture.json"
+    ],
+    "evidence": {
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/compile.json": "f3fb243781e39a3e298eee050ba53358717d2d8b9f0ee10ff09cd88f2d1d2321",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/compile.log": "b812324f267ded2ac4c93b128e9156ff27a3ab90d60e887cc98b07f2e84d8fcf",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/race.json": "145e5d24183513c8ba6ce9472ffa6a6ea48d29d290954ecb726dfd350f231e99",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/race.log": "b460e9121f938fefefb377c770bee4fef0170fe16aaa396add6efce42505f0e4",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/vet.json": "ad0ccf27745d24df97772c2d0a3943c4743ff344eac88ea0f0703a230ded3a8b",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/go-architecture.json": "061cfd5afbb7164dbc254ddbc3f227bb2ff1ab735b42fd56c76d148085077c84",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v1/evidence/go-architecture.log": "8bf1bcfcd03fff28c8440ffd0f36e274f393d6291b5da1ebca79254905d73bba",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v2/evidence/go-architecture.json": "61c72e8ac4a0646818675f4c946381cb744aef7f6c77b28b99e6450c54358786",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v2/evidence/go-architecture.log": "ba95f0c870f18a0ed3cf363477aceab4c617863284f8aace9b0ad2712456cc1b",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v3/evidence/go-architecture.json": "f42162983e86e0ab63019e0529435dff7ea5b0bdec7ea7261d5a2db1c46b1833",
+      "/home/phil/.cache/asservat-build/planning/regional-observation-v2-consumers-20261013/checkpoint-v3/evidence/go-architecture.log": "0655fbab9cc2ad429d5a30c894ace88bb7e767e276ae4600ab5214396d0810dc"
+    },
+    "manifestSHA256": "f1604c18602884b697284a44ad9112ca74f28708f3347cbe01034ce67019d63e",
+    "freezeSHA256": "22e709476b1274337cf108418b6373f178b25f74733dec63f43675bfef27c22d"
+  },
+  "archive": "test/results/observation-operation-consumer-package"
+}

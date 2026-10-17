@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "recording-save/v1",
+  "operation": "recordingSave",
+  "captureID": "00000000-0000-4000-8000-000000000190",
+  "requester": {
+    "issuer": "https://identity.example.invalid/realms/company",
+    "subject": "maintainer-456",
+    "clientID": "asservat-browser",
+    "identityType": "human"
+  },
+  "executor": {
+    "issuer": "urn:asservat:installation:00000000-0000-4000-8000-000000000098",
+    "subject": "policy:policy-trigger-lifecycles-uid",
+    "clientID": "policy-executor",
+    "identityType": "workload"
+  },
+  "policy": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "policyUID": "policy-trigger-lifecycles-uid",
+    "executionDigest": "4920c87bc4d15f2d7adbdde931973b7047c24a9bd0a086065f541a547bc41cb3"
+  },
+  "workloadUID": "workload-api-uid",
+  "sources": [
+    {
+      "sourceSessionID": "00000000-0000-4000-8000-000000000191",
+      "podUID": "pod-uid",
+      "nodeUID": "node-uid",
+      "nodeBootID": "00000000-0000-4000-8000-000000000006",
+      "actionID": "traffic",
+      "kind": "packetCapture",
+      "sourceDefinitionDigest": "64cf8228cf2c57d404d4e3e1240695358e19677aba820414387fd4ea4c296583",
+      "retainedAudienceDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "before": "20s",
+      "after": "0s",
+      "maxBytes": 4194304
+    },
+    {
+      "sourceSessionID": "00000000-0000-4000-8000-000000000192",
+      "podUID": "pod-uid",
+      "nodeUID": "node-uid",
+      "nodeBootID": "00000000-0000-4000-8000-000000000006",
+      "actionID": "syscalls",
+      "kind": "syscallTrace",
+      "sourceDefinitionDigest": "a39dff608a04f90072034822ea44d46521bdd896e1d0045e19555989d11959f6",
+      "retainedAudienceDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "before": "20s",
+      "after": "0s",
+      "maxBytes": 16777216
+    }
+  ],
+  "incidentPodLimit": 1,
+  "finalizeTimeout": "30s",
+  "dependencies": [
+    {
+      "role": "collectionCeiling",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "role": "retention",
+      "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+    }
+  ]
+}

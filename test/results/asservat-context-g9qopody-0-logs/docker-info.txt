@@ -1,0 +1,61 @@
+Client:
+ Version:    29.9.0
+ Context:    default
+ Debug Mode: false
+ Plugins:
+  buildx: Docker Buildx (Docker Inc.)
+    Version:  0.38.0
+    Path:     /usr/lib/docker/cli-plugins/docker-buildx
+  compose: Docker Compose (Docker Inc.)
+    Version:  5.6.0
+    Path:     /usr/lib/docker/cli-plugins/docker-compose
+
+Server:
+ Containers: 22
+  Running: 6
+  Paused: 0
+  Stopped: 16
+ Images: 1319
+ Server Version: 29.9.0
+ Storage Driver: overlayfs
+  driver-type: io.containerd.snapshotter.v1
+ Logging Driver: json-file
+ Cgroup Driver: systemd
+ Cgroup Version: 2
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local splunk syslog
+ CDI spec directories:
+  /etc/cdi
+  /var/run/cdi
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 runc
+ Default Runtime: runc
+ Init Binary: docker-init
+ containerd version: f2551031d7276a770f65f98c9b52e57e7dad07e8.m
+ runc version: 1.5.2-1-0-g17cc947-dirty
+ init version: de40ad0
+ Security Options:
+  seccomp
+   Profile: builtin
+  cgroupns
+ Kernel Version: 7.2.9-2-cachyos
+ Operating System: CachyOS
+ OSType: linux
+ Architecture: x86_64
+ CPUs: 16
+ Total Memory: 31.26GiB
+ Name: zockstation
+ ID: 487b6296-789e-432c-9645-d1850b641a7f
+ Docker Root Dir: /var/lib/docker
+ Debug Mode: false
+ Experimental: false
+ Insecure Registries:
+  127.0.0.0/8
+  ::1/128
+ Live Restore Enabled: false
+ Firewall Backend: iptables
+  EnableUserlandProxy: true
+  UserlandProxyPath: /usr/bin/docker-proxy
+

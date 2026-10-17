@@ -1,0 +1,9 @@
+--- FAIL: TestBindingAcceptancePreservesAutomationEnvelope (0.00s)
+    binding_journal_test.go:27: accepted configuration discarded the bounded automation envelope <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/configuration	0.009s
+--- FAIL: TestCurrentDelegationCanUseAnUnchangedHistoricalAssignment (0.00s)
+    automation_test.go:44: current delegation rejected a continuing owner assignment {false PolicyAuthorityExpiredOrInvalid {   } 0001-01-01 00:00:00 +0000 UTC { 0 [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]} { 0 [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]}}
+FAIL
+FAIL	asservat.local/asservat/internal/domain/authorization	0.008s
+FAIL

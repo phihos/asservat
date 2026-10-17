@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/initial-runtime-resources.schema.json",
+  "title": "Original fixed inert runtime resource creation",
+  "description": "Private installation journal for the compiled original inventory and optional fixed owner/worker continuations. Relational validation enforces original order, unique claims and objects, positive predecessor receipts, generated public digests and original time bounds. No credentials or arbitrary bodies; historical state grants no source acceptance, launch or recovery authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "bindingDigest",
+    "setupID",
+    "createdAt",
+    "until",
+    "objects"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-initial-runtime-resources/v1"
+    },
+    "bindingDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "setupID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "objects": {
+      "type": "array",
+      "maxItems": 19,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item",
+          "operationID",
+          "templateDigest",
+          "claimedAt",
+          "until"
+        ],
+        "properties": {
+          "item": {
+            "enum": [
+              "owner-account",
+              "worker-account",
+              "owner-role",
+              "owner-binding",
+              "owner-cluster-role",
+              "owner-cluster-binding",
+              "worker-role",
+              "worker-binding",
+              "worker-cluster-role",
+              "worker-cluster-binding",
+              "owner-deployment",
+              "worker-deployment",
+              "owner-service",
+              "worker-lease",
+              "owner-source",
+              "owner-source-policy",
+              "owner-source-binding",
+              "owner-workload-policy",
+              "owner-workload-binding"
+            ]
+          },
+          "operationID": {
+            "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+          },
+          "templateDigest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "resourceVersion",
+              "generation"
+            ],
+            "properties": {
+              "uid": {
+                "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+              },
+              "resourceVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      }
+    },
+    "workerLayout": {
+      "enum": [
+        "asservat-hub-worker-installed/v1",
+        "asservat-hub-worker-installed/v2"
+      ]
+    },
+    "cleanupProjection": {
+      "$ref": "https://asservat.io/spec/v1/capture-cleanup-projection-claim.schema.json"
+    },
+    "capacityProjection": {
+      "$ref": "https://asservat.io/spec/v1/capacity-runtime-projection-claim.schema.json"
+    },
+    "ownerLayout": {
+      "enum": [
+        "asservat-owner-installed/v1",
+        "asservat-owner-installed/v2"
+      ]
+    },
+    "ownerIdentity": {
+      "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/projectionClaim"
+    },
+    "ownerLaunch": {
+      "$ref": "https://asservat.io/spec/v1/owner-identity-activation.schema.json#/$defs/launchClaim"
+    },
+    "ownerProvider": {
+      "$ref": "https://asservat.io/spec/v1/owner-provider-selection.schema.json"
+    },
+    "workerProvider": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json"
+    },
+    "workerInputs": {
+      "$ref": "https://asservat.io/spec/v1/configuration-worker-input-claim.schema.json"
+    },
+    "ownerBootstrap": {
+      "$ref": "https://asservat.io/spec/v1/owner-bootstrap-selection.schema.json#/$defs/claim"
+    }
+  },
+  "dependentRequired": {
+    "ownerLayout": [
+      "workerLayout"
+    ],
+    "ownerIdentity": [
+      "ownerLayout",
+      "workerLayout"
+    ],
+    "ownerLaunch": [
+      "ownerIdentity",
+      "ownerLayout",
+      "workerLayout"
+    ],
+    "ownerBootstrap": [
+      "workerLayout",
+      "ownerLayout",
+      "workerProvider",
+      "ownerProvider"
+    ]
+  },
+  "oneOf": [
+    {
+      "allOf": [
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "workerLayout"
+                ]
+              },
+              {
+                "required": [
+                  "ownerLayout"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "ownerProvider"
+                ]
+              },
+              {
+                "required": [
+                  "workerProvider"
+                ]
+              },
+              {
+                "required": [
+                  "workerInputs"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "required": [
+        "workerLayout"
+      ],
+      "properties": {
+        "workerLayout": {
+          "const": "asservat-hub-worker-installed/v1"
+        }
+      },
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "ownerLayout"
+            ]
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "ownerProvider"
+                ]
+              },
+              {
+                "required": [
+                  "workerProvider"
+                ]
+              },
+              {
+                "required": [
+                  "workerInputs"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "required": [
+        "workerLayout",
+        "ownerLayout"
+      ],
+      "properties": {
+        "workerLayout": {
+          "const": "asservat-hub-worker-installed/v1"
+        },
+        "ownerLayout": {
+          "const": "asservat-owner-installed/v1"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "ownerProvider"
+            ]
+          },
+          {
+            "required": [
+              "workerProvider"
+            ]
+          },
+          {
+            "required": [
+              "workerInputs"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "workerLayout",
+        "ownerLayout",
+        "ownerProvider",
+        "workerProvider"
+      ],
+      "properties": {
+        "workerLayout": {
+          "const": "asservat-hub-worker-installed/v2"
+        },
+        "ownerLayout": {
+          "const": "asservat-owner-installed/v2"
+        }
+      }
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "ownerBootstrap"
+        ]
+      },
+      "then": {
+        "properties": {
+          "workerLayout": {
+            "const": "asservat-hub-worker-installed/v2"
+          },
+          "ownerLayout": {
+            "const": "asservat-owner-installed/v2"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1271 @@
+--- a/internal/transport/contextstart/conversation.go
++++ b/internal/transport/contextstart/conversation.go
+@@ -38,7 +38,9 @@
+ 
+ // ServeHub dispatches once and answers only new identity questions from this
+ // exact exchange. Its result is not catalog visibility or new admission proof.
+-func ServeHub(ctx context.Context, stream Stream, w fleet.APIContextWork, signed []byte, current identities.CurrentIdentity, now func() time.Time) (string, error) {
++func ServeHub(ctx context.Context, stream Stream, w fleet.APIContextWork, signed []byte, current identities.CurrentIdentity, now func() time.Time) (state string, err error) {
++	stage := streamHubSetup
++	defer func() { recordStreamDiagnostic(ctx, stream, err, stage) }()
+ 	if ctx == nil || ctx.Err() != nil || stream == nil || now == nil || !w.Valid(now()) || len(signed) == 0 || len(signed) > contracts.APIContextSignedWorkBytes {
+ 		return "", fleet.ErrInvalid
+ 	}
+@@ -56,25 +58,30 @@
+ 		return "", e
+ 	}
+ 	defer source.Close()
++	stage = streamHubSend
+ 	if e = stream.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: signed}); e != nil {
+ 		return "", e
+ 	}
+ 	for count := 0; count <= contracts.APIContextIdentityChecks; count++ {
++		stage = streamHubReceive
+ 		frame, e := stream.Receive(call)
+ 		if e != nil {
+ 			return "", e
+ 		}
+ 		switch frame.Kind {
+ 		case contracts.APIContextIdentityRequestFrame:
++			stage = streamHubIdentityDecode
+ 			q, e := contracts.DecodeAPIContextIdentityRequest(frame.Payload)
+ 			clear(frame.Payload)
+ 			if e != nil {
+ 				return "", e
+ 			}
++			stage = streamHubIdentity
+ 			response, e := source.Answer(call, q)
+ 			if e != nil {
+ 				return "", e
+ 			}
++			stage = streamHubIdentityEncode
+ 			encoded, e := contracts.EncodeAPIContextIdentity(response)
+ 			if e != nil {
+ 				return "", e
+@@ -86,6 +93,7 @@
+ 				return "", fleet.ErrDenied
+ 			}
+ 			send, stop := context.WithDeadline(call, until)
++			stage = streamHubSend
+ 			e = stream.Send(send, contracts.APIContextFrame{Kind: contracts.APIContextIdentityResponseFrame, Payload: encoded})
+ 			clear(encoded)
+ 			stop()
+@@ -93,6 +101,7 @@
+ 				return "", e
+ 			}
+ 		case contracts.APIContextResultFrame:
++			stage = streamHubResult
+ 			result, e := contracts.DecodeAPIContextResult(frame.Payload)
+ 			clear(frame.Payload)
+ 			if e != nil || result.Format != contracts.APIContextExchangeFormat || result.ExchangeID != w.Channel.ExchangeID || result.CaptureID != w.CaptureID || !knownResult(result.State) {
+@@ -104,6 +113,7 @@
+ 			until := source.state.until
+ 			source.state.mu.Unlock()
+ 			final, stop := context.WithDeadline(call, until)
++			stage = streamHubFinalIdentity
+ 			observed, e := current.ResolveIdentity(final)
+ 			if e == nil {
+ 				observed, e = source.state.accept(final, observed)
+@@ -112,6 +122,7 @@
+ 				stop()
+ 				return "", e
+ 			}
++			stage = streamHubReceipt
+ 			receipt, e := contracts.EncodeAPIContextReceipt(contracts.APIContextReceipt{Format: contracts.APIContextExchangeFormat, ExchangeID: w.Channel.ExchangeID, CaptureID: w.CaptureID, State: "received"})
+ 			if e != nil {
+ 				stop()
+@@ -157,10 +168,13 @@
+ // ServeRegional accepts exactly one signed API capture. The receiver was built
+ // from this actual TLS exchange plus current local process/registry checks.
+ // The executor's positive first-preparation and local CAS are unchanged.
+-func ServeRegional(ctx context.Context, stream Stream, receiver fleet.APIContextReceiver, check ReceiverCheck, verifier fleetapp.APIContextWorkVerifier, runner RegionalExecutor, now func() time.Time) error {
++func ServeRegional(ctx context.Context, stream Stream, receiver fleet.APIContextReceiver, check ReceiverCheck, verifier fleetapp.APIContextWorkVerifier, runner RegionalExecutor, now func() time.Time) (err error) {
++	stage := streamRegionalSetup
++	defer func() { recordStreamDiagnostic(ctx, stream, err, stage) }()
+ 	if ctx == nil || ctx.Err() != nil || stream == nil || check == nil || verifier == nil || runner == nil || now == nil || !receiver.Valid(now()) {
+ 		return fleet.ErrInvalid
+ 	}
++	stage = streamRegionalWork
+ 	f, currentReceiver, e := stream.AwaitWork(ctx)
+ 	if e != nil || f.Kind != contracts.APIContextWorkFrame {
+ 		clear(f.Payload)
+@@ -170,6 +184,7 @@
+ 		clear(f.Payload)
+ 		return fleet.ErrDenied
+ 	}
++	stage = streamRegionalVerify
+ 	authenticated, e := verifier.VerifyAPIContextWork(ctx, f.Payload, currentReceiver)
+ 	clear(f.Payload)
+ 	if e != nil || !authenticated.Valid(now()) {
+@@ -184,6 +199,7 @@
+ 		}
+ 		cancel()
+ 	}()
++	stage = streamRegionalIdentity
+ 	current, e := NewRemoteIdentity(call, authenticated, regionalIdentityExchange{stream}, now)
+ 	if e != nil {
+ 		return e
+@@ -203,6 +219,7 @@
+ 	current.state.mu.Unlock()
+ 	resultCtx, stop := context.WithDeadline(call, identity.Earlier(until, authenticated.ValidUntil))
+ 	defer stop()
++	stage = streamRegionalResult
+ 	encoded, e := contracts.EncodeAPIContextResult(contracts.APIContextResult{Format: contracts.APIContextExchangeFormat, ExchangeID: authenticated.Work.Channel.ExchangeID, CaptureID: authenticated.Work.CaptureID, State: state})
+ 	if e != nil {
+ 		return e
+@@ -212,6 +229,7 @@
+ 	if e != nil {
+ 		return e
+ 	}
++	stage = streamRegionalReceipt
+ 	f, e = stream.Receive(resultCtx)
+ 	defer clear(f.Payload)
+ 	if e != nil || f.Kind != contracts.APIContextReceiptFrame {
+--- /dev/null
++++ b/internal/transport/contextstart/diagnostic.go
+@@ -0,0 +1,220 @@
++package contextstart
++
++import (
++	"context"
++	"io"
++	"net"
++	"os"
++	"sync/atomic"
++
++	"asservat.local/asservat/internal/contracts"
++	execution "asservat.local/asservat/internal/domain/execution"
++	"asservat.local/asservat/internal/domain/fleet"
++	"asservat.local/asservat/internal/domain/identity"
++)
++
++// StreamInterruption contains only closed diagnostic codes. It cannot carry a
++// peer, payload, source value, arbitrary error text or authority. The first
++// deciding interruption wins before cancellation can recursively close peers.
++type StreamInterruption struct {
++	stage  streamStage
++	reason streamReason
++}
++
++type streamStage uint8
++
++const (
++	streamNoStage streamStage = iota
++	streamOwner
++	streamClose
++	streamSendAdmission
++	streamReceiveAdmission
++	streamSendCall
++	streamReceiveCall
++	streamSendPeer
++	streamReceivePeer
++	streamSendBound
++	streamReceiveBound
++	streamSendDeadline
++	streamReceiveDeadline
++	streamWrite
++	streamFlush
++	streamRead
++	streamSendResult
++	streamReceiveResult
++	streamPassiveCall
++	streamPassiveDeadline
++	streamPassiveFrame
++	streamPassivePeer
++	streamHubSetup
++	streamHubSend
++	streamHubReceive
++	streamHubIdentityDecode
++	streamHubIdentity
++	streamHubIdentityEncode
++	streamHubResult
++	streamHubFinalIdentity
++	streamHubReceipt
++	streamRegionalSetup
++	streamRegionalWork
++	streamRegionalVerify
++	streamRegionalIdentity
++	streamRegionalResult
++	streamRegionalReceipt
++)
++
++func (v StreamInterruption) Stage() string {
++	names := [...]string{"none", "owner", "close", "send-admission", "receive-admission", "send-call", "receive-call", "send-peer", "receive-peer", "send-bound", "receive-bound", "send-deadline", "receive-deadline", "write", "flush", "read", "send-result", "receive-result", "passive-call", "passive-deadline", "passive-frame", "passive-peer", "hub-setup", "hub-send", "hub-receive", "hub-identity-decode", "hub-identity", "hub-identity-encode", "hub-result", "hub-final-identity", "hub-receipt", "regional-setup", "regional-work", "regional-verify", "regional-identity", "regional-result", "regional-receipt"}
++	if int(v.stage) >= len(names) {
++		return "unknown"
++	}
++	return names[v.stage]
++}
++
++type streamReason uint8
++
++const (
++	streamNoReason streamReason = iota
++	streamOther
++	streamCanceled
++	streamExpired
++	streamEOF
++	streamShortRead
++	streamClosedIO
++	streamTimeout
++	streamInvalid
++	streamDenied
++	streamUnavailable
++	streamProtocol
++	streamClosed
++	streamBusy
++	streamBudget
++	streamPeerInvalid
++	streamPeerChanged
++)
++
++func (v StreamInterruption) Reason() string {
++	names := [...]string{"none", "other", "canceled", "deadline", "eof", "short-read", "closed-io", "io-timeout", "invalid", "denied", "unavailable", "protocol", "closed", "concurrent-call", "frame-or-byte-budget", "peer-invalid", "peer-changed"}
++	if int(v.reason) >= len(names) {
++		return "unknown"
++	}
++	return names[v.reason]
++}
++func (v StreamInterruption) Present() bool { return v.stage != streamNoStage }
++
++// StreamDiagnostics is one invocation-owned fixed snapshot. It accepts no
++// callback, error, source value or caller-supplied diagnostic. A fixture can
++// carry separate instances on its original hub and regional contexts; absence
++// of a recorder changes neither work nor error normalization.
++type StreamDiagnostics struct {
++	first atomic.Pointer[StreamInterruption]
++}
++type streamDiagnosticKey struct{}
++
++func NewStreamDiagnosticContext(ctx context.Context) (context.Context, *StreamDiagnostics) {
++	if ctx == nil {
++		return nil, nil
++	}
++	d := &StreamDiagnostics{}
++	return context.WithValue(ctx, streamDiagnosticKey{}, d), d
++}
++func (d *StreamDiagnostics) Interruption() StreamInterruption {
++	if d != nil {
++		if v := d.first.Load(); v != nil {
++			return *v
++		}
++	}
++	return StreamInterruption{}
++}
++
++// Only known sentinel errors and net.Error's non-text timeout classification
++// are observed. No Error, Is or Unwrap method is invoked on a foreign error.
++func streamErrorReason(err error) streamReason {
++	switch err {
++	case nil:
++		return streamNoReason
++	case context.Canceled:
++		return streamCanceled
++	case context.DeadlineExceeded, os.ErrDeadlineExceeded:
++		return streamExpired
++	case io.EOF:
++		return streamEOF
++	case io.ErrUnexpectedEOF:
++		return streamShortRead
++	case io.ErrClosedPipe, net.ErrClosed:
++		return streamClosedIO
++	case fleet.ErrInvalid, identity.ErrInvalid, execution.ErrInvalid:
++		return streamInvalid
++	case fleet.ErrDenied, identity.ErrDenied, execution.ErrDenied:
++		return streamDenied
++	case fleet.ErrUnavailable, identity.ErrUnavailable, execution.ErrUnavailable:
++		return streamUnavailable
++	case contracts.ErrAPIContextProtocol:
++		return streamProtocol
++	}
++	if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
++		return streamTimeout
++	}
++	return streamOther
++}
++
++func (s *frameStream) record(stage streamStage, reason streamReason) {
++	if s != nil {
++		s.first.CompareAndSwap(nil, &StreamInterruption{stage, reason})
++	}
++}
++func (s *frameStream) interruption() StreamInterruption {
++	if s != nil {
++		if v := s.first.Load(); v != nil {
++			return *v
++		}
++	}
++	return StreamInterruption{}
++}
++func recordStreamDiagnostic(ctx context.Context, stream Stream, err error, stage streamStage) {
++	if err == nil {
++		return
++	}
++	var v StreamInterruption
++	if s, ok := stream.(*frameStream); ok {
++		s.record(stage, streamErrorReason(err))
++		v = s.interruption()
++	} else {
++		v = StreamInterruption{stage, streamErrorReason(err)}
++	}
++	if ctx != nil {
++		if d, ok := ctx.Value(streamDiagnosticKey{}).(*StreamDiagnostics); ok && d != nil {
++			d.first.CompareAndSwap(nil, &v)
++		}
++	}
++}
++
++// The frame decoder deliberately normalizes I/O errors. This original-reader
++// delegate retains only the error class for that one decode, without another
++// read, changed n/error, clock sample or retained payload. A read with n>0 and
++// EOF that satisfies ReadFull must not be mistaken for a failed frame.
++type streamReadDiagnostic struct {
++	reader io.Reader
++	reason streamReason
++}
++
++func (r *streamReadDiagnostic) Read(p []byte) (int, error) {
++	n, err := r.reader.Read(p)
++	if err != nil {
++		r.reason = streamErrorReason(err)
++	}
++	return n, err
++}
++
++type streamWriteDiagnostic struct {
++	writer io.Writer
++	reason streamReason
++}
++
++func (w *streamWriteDiagnostic) Write(p []byte) (int, error) {
++	n, err := w.writer.Write(p)
++	if err != nil {
++		w.reason = streamErrorReason(err)
++	}
++	return n, err
++}
+--- /dev/null
++++ b/internal/transport/contextstart/diagnostic_test.go
+@@ -0,0 +1,604 @@
++package contextstart
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"io"
++	"net"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	executionapp "asservat.local/asservat/internal/application/execution"
++	identities "asservat.local/asservat/internal/application/identity"
++	"asservat.local/asservat/internal/contracts"
++	"asservat.local/asservat/internal/domain/fleet"
++	identity "asservat.local/asservat/internal/domain/identity"
++)
++
++type streamPrivateError struct{}
++
++func (*streamPrivateError) Error() string { panic("private error rendered") }
++func (*streamPrivateError) Unwrap() error { panic("private error unwrapped") }
++func (*streamPrivateError) Is(error) bool { panic("private error compared") }
++
++type streamReaderFunc func([]byte) (int, error)
++
++func (f streamReaderFunc) Read(p []byte) (int, error) { return f(p) }
++
++type streamWriterFunc func([]byte) (int, error)
++
++func (f streamWriterFunc) Write(p []byte) (int, error) { return f(p) }
++
++func diagnosticStream(t *testing.T, ctx context.Context, check ReceiverCheck, reader io.Reader, writer io.Writer, rd, wd func(time.Time) error, flush func() error, interrupt func()) *frameStream {
++	t.Helper()
++	w, _ := identityFixture()
++	if ctx == nil {
++		ctx = context.Background()
++	}
++	if check == nil {
++		check = func(context.Context) (fleet.APIContextReceiver, error) {
++			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
++		}
++	}
++	if reader == nil {
++		reader = bytes.NewReader(nil)
++	}
++	if writer == nil {
++		writer = io.Discard
++	}
++	if rd == nil {
++		rd = func(time.Time) error { return nil }
++	}
++	if wd == nil {
++		wd = func(time.Time) error { return nil }
++	}
++	if flush == nil {
++		flush = func() error { return nil }
++	}
++	if interrupt == nil {
++		interrupt = func() {}
++	}
++	s, e := newFrameStream(ctx, w.Work.Channel, check, reader, writer, rd, wd, flush, interrupt)
++	if e != nil {
++		t.Fatal(e)
++	}
++	t.Cleanup(func() { _ = s.Close() })
++	return s
++}
++func requireStreamReason(t *testing.T, s *frameStream, stage streamStage, reason streamReason) {
++	t.Helper()
++	got := s.interruption()
++	if got.stage != stage || got.reason != reason {
++		t.Fatalf("closed diagnostic %s/%s, want %s/%s", got.Stage(), got.Reason(), (StreamInterruption{stage: stage}).Stage(), (StreamInterruption{reason: reason}).Reason())
++	}
++	s.Close()
++	if s.interruption() != got {
++		t.Fatal("joined close overwrote original deciding failure")
++	}
++}
++
++func TestContextStreamDiagnosticPeerAndDeadlineBranches(t *testing.T) {
++	for _, read := range []bool{false, true} {
++		for _, name := range []string{"private-error", "unavailable", "denied", "invalid-peer", "changed-peer", "deadline-hook"} {
++			t.Run(map[bool]string{false: "send", true: "receive"}[read]+"/"+name, func(t *testing.T) {
++				w, _ := identityFixture()
++				checks, deadlines := 0, 0
++				check := func(context.Context) (fleet.APIContextReceiver, error) {
++					checks++
++					r := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
++					switch name {
++					case "private-error":
++						return r, &streamPrivateError{}
++					case "unavailable":
++						return r, fleet.ErrUnavailable
++					case "denied":
++						return r, fleet.ErrDenied
++					case "invalid-peer":
++						r.ValidUntil = r.ObservedAt
++					case "changed-peer":
++						r.Channel.ExchangeID = "00000000-0000-4000-8000-000000000099"
++					}
++					return r, nil
++				}
++				d := func(time.Time) error { deadlines++; return &streamPrivateError{} }
++				s := diagnosticStream(t, nil, check, nil, nil, d, d, nil, nil)
++				_, _, end, e := s.begin(context.Background(), read)
++				if end != nil {
++					end()
++				}
++				if !errors.Is(e, fleet.ErrUnavailable) {
++					t.Fatal("original normalization changed")
++				}
++				stage := streamSendPeer
++				if read {
++					stage = streamReceivePeer
++				}
++				reason := streamOther
++				switch name {
++				case "unavailable":
++					reason = streamUnavailable
++				case "denied":
++					reason = streamDenied
++				case "invalid-peer":
++					reason = streamPeerInvalid
++				case "changed-peer":
++					reason = streamPeerChanged
++				case "deadline-hook":
++					stage = streamSendDeadline
++					if read {
++						stage = streamReceiveDeadline
++					}
++				}
++				requireStreamReason(t, s, stage, reason)
++				wantDeadline := 0
++				if name == "deadline-hook" {
++					wantDeadline = 1
++				}
++				if checks != 1 || deadlines != wantDeadline {
++					t.Fatal("original peer/deadline call ordering changed", checks, deadlines)
++				}
++			})
++		}
++	}
++}
++
++func TestContextStreamDiagnosticReadAndWriteFailures(t *testing.T) {
++	for _, name := range []string{"read-eof", "read-private", "read-malformed", "read-byte-budget", "write-private", "write-invalid-frame", "write-byte-budget", "flush-private"} {
++		t.Run(name, func(t *testing.T) {
++			reads, writes, flushes := 0, 0, 0
++			r := streamReaderFunc(func(p []byte) (int, error) {
++				reads++
++				if name == "read-private" {
++					return 0, &streamPrivateError{}
++				}
++				return 0, io.EOF
++			})
++			var reader io.Reader = r
++			if name == "read-malformed" {
++				reader = bytes.NewReader([]byte{0, 0, 0, 0, 1})
++			}
++			if name == "read-byte-budget" {
++				var b bytes.Buffer
++				_ = contracts.WriteAPIContextFrame(&b, contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: []byte("{}")})
++				reader = &b
++			}
++			writer := streamWriterFunc(func(p []byte) (int, error) {
++				writes++
++				if name == "write-private" {
++					return 0, &streamPrivateError{}
++				}
++				return len(p), nil
++			})
++			flush := func() error {
++				flushes++
++				if name == "flush-private" {
++					return &streamPrivateError{}
++				}
++				return nil
++			}
++			s := diagnosticStream(t, nil, nil, reader, writer, nil, nil, flush, nil)
++			frame := contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("{}")}
++			stage, reason := streamRead, streamEOF
++			var e error
++			switch name {
++			case "read-eof", "read-private", "read-malformed", "read-byte-budget":
++				if name == "read-private" {
++					reason = streamOther
++				}
++				if name == "read-malformed" {
++					reason = streamProtocol
++				}
++				if name == "read-byte-budget" {
++					reason = streamBudget
++					s.bytes = contracts.APIContextMaximumExchangeBytes
++				}
++				_, e = s.Receive(context.Background())
++			default:
++				stage, reason = streamWrite, streamOther
++				if name == "write-invalid-frame" {
++					frame.Kind = 0
++					reason = streamProtocol
++				}
++				if name == "write-byte-budget" {
++					s.bytes = contracts.APIContextMaximumExchangeBytes
++					stage, reason = streamSendAdmission, streamBudget
++				}
++				if name == "flush-private" {
++					stage = streamFlush
++				}
++				e = s.Send(context.Background(), frame)
++			}
++			want := fleet.ErrUnavailable
++			if name == "write-byte-budget" {
++				want = contracts.ErrAPIContextProtocol
++			}
++			if !errors.Is(e, want) {
++				t.Fatal("original result changed")
++			}
++			requireStreamReason(t, s, stage, reason)
++			if name == "read-eof" || name == "read-private" {
++				if reads != 1 || writes != 0 || flushes != 0 {
++					t.Fatal("read error repeated or crossed effects")
++				}
++			}
++			if name == "write-private" && (writes != 1 || flushes != 0) {
++				t.Fatal("write error repeated or flushed")
++			}
++			if name == "write-invalid-frame" || name == "write-byte-budget" {
++				if writes != 0 || flushes != 0 {
++					t.Fatal("invalid write reached I/O")
++				}
++			}
++			if name == "flush-private" && (writes != 2 || flushes != 1) {
++				t.Fatal("flush error changed original frame writes")
++			}
++		})
++	}
++}
++
++func TestContextStreamDiagnosticRetainedReadDeadline(t *testing.T) {
++	// A real net.Conn deadline remains installed after Receive has completed.
++	// The background EOF reader then encounters that exact bound while there is
++	// no Receive call/timer running. This reproduces the suspected mechanism,
++	// without asserting it caused the separate native failure or relaxing it.
++	local, remote := net.Pipe()
++	defer remote.Close()
++	w, _ := identityFixture()
++	start := time.Now()
++	until := start.Add(120 * time.Millisecond)
++	var checks, interrupts atomic.Int32
++	check := func(context.Context) (fleet.APIContextReceiver, error) {
++		checks.Add(1)
++		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: start, ValidUntil: until}, nil
++	}
++	s := diagnosticStream(t, nil, check, local, io.Discard, local.SetReadDeadline, local.SetWriteDeadline, nil, func() { interrupts.Add(1); _ = local.Close() })
++	written := make(chan error, 1)
++	go func() {
++		written <- contracts.WriteAPIContextFrame(remote, contracts.APIContextFrame{Kind: contracts.APIContextIdentityResponseFrame, Payload: []byte("{}")})
++	}()
++	f, e := s.Receive(context.Background())
++	if e != nil || f.Kind != contracts.APIContextIdentityResponseFrame {
++		t.Fatal("first finite frame failed")
++	}
++	clear(f.Payload)
++	if e = <-written; e != nil {
++		t.Fatal(e)
++	}
++	select {
++	case <-s.Context().Done():
++	case <-time.After(time.Second):
++		t.Fatal("retained original socket deadline did not interrupt pump")
++	}
++	s.Close()
++	requireStreamReason(t, s, streamRead, streamTimeout)
++	if checks.Load() != 1 || interrupts.Load() != 1 {
++		t.Fatal("background read refreshed authority or repeated close")
++	}
++	if _, e = s.Receive(context.Background()); !errors.Is(e, fleet.ErrUnavailable) || checks.Load() != 1 {
++		t.Fatal("expired original stream resumed")
++	}
++}
++
++func TestContextStreamDiagnosticOriginalOwnerAndCallCancellation(t *testing.T) {
++	t.Run("owner", func(t *testing.T) {
++		ctx, cancel := context.WithCancel(context.Background())
++		s := diagnosticStream(t, ctx, nil, nil, nil, nil, nil, nil, nil)
++		cancel()
++		<-s.interrupted
++		requireStreamReason(t, s, streamOwner, streamCanceled)
++	})
++	t.Run("blocked-peer-call", func(t *testing.T) {
++		ctx, cancel := context.WithCancel(context.Background())
++		defer cancel()
++		entered := make(chan struct{})
++		s := diagnosticStream(t, nil, func(c context.Context) (fleet.APIContextReceiver, error) {
++			close(entered)
++			<-c.Done()
++			return fleet.APIContextReceiver{}, c.Err()
++		}, nil, nil, nil, nil, nil, nil)
++		done := make(chan error, 1)
++		go func() {
++			done <- s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("{}")})
++		}()
++		<-entered
++		cancel()
++		if e := <-done; !errors.Is(e, fleet.ErrUnavailable) {
++			t.Fatal("caller cancellation normalized differently")
++		}
++		s.Close()
++		v := s.interruption()
++		if v.reason != streamCanceled || (v.stage != streamSendCall && v.stage != streamSendPeer) {
++			t.Fatal("original canceled caller not retained", v.Stage(), v.Reason())
++		}
++	})
++	t.Run("short-peer-bound", func(t *testing.T) {
++		w, _ := identityFixture()
++		n := time.Now()
++		until := n.Add(80 * time.Millisecond)
++		reader, writer := io.Pipe()
++		defer reader.Close()
++		defer writer.Close()
++		s := diagnosticStream(t, nil, func(context.Context) (fleet.APIContextReceiver, error) {
++			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: n, ValidUntil: until}, nil
++		}, nil, writer, nil, nil, nil, func() { _ = writer.CloseWithError(context.DeadlineExceeded) })
++		if e := s.Send(context.Background(), contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("{}")}); !errors.Is(e, fleet.ErrUnavailable) {
++			t.Fatal("short bound allowed write")
++		}
++		requireStreamReason(t, s, streamSendBound, streamExpired)
++	})
++}
++
++func TestContextStreamDiagnosticPrivateErrorAndDecoderSemantics(t *testing.T) {
++	err := &streamPrivateError{}
++	if streamErrorReason(err) != streamOther {
++		t.Fatal("unknown private error classified")
++	}
++	for _, cause := range []error{fleet.ErrUnavailable, fleet.ErrDenied, contracts.ErrAPIContextProtocol, context.Canceled} {
++		ctx, record := NewStreamDiagnosticContext(context.Background())
++		s := diagnosticStream(t, nil, nil, nil, nil, nil, nil, nil, nil)
++		s.record(streamReceivePeer, streamOther)
++		recordStreamDiagnostic(ctx, s, cause, streamHubReceive)
++		got := record.Interruption()
++		if got.Stage() != "receive-peer" || got.Reason() != "other" {
++			t.Fatal("closed recording changed")
++		}
++		s.Close()
++		recordStreamDiagnostic(ctx, s, fleet.ErrDenied, streamRegionalReceipt)
++		if record.Interruption() != got {
++			t.Fatal("later close replaced first cause")
++		}
++	}
++	// ReadFull accepts n==len(p),EOF. Do not promote a discarded Reader error
++	// into a stream failure when the original complete frame is valid.
++	wire := []byte{byte(contracts.APIContextReceiptFrame), 0, 0, 0, 2, '{', '}'}
++	reads := 0
++	r := &streamReadDiagnostic{reader: streamReaderFunc(func(p []byte) (int, error) {
++		reads++
++		n := copy(p, wire)
++		wire = wire[n:]
++		if len(wire) == 0 {
++			return n, io.EOF
++		}
++		return n, nil
++	})}
++	f, e := contracts.ReadAPIContextFrame(r)
++	if e != nil || string(f.Payload) != "{}" || reads != 2 {
++		t.Fatal("diagnostic delegate changed ReadFull semantics")
++	}
++}
++
++func TestContextStreamDiagnosticOriginalHubIdentityAndJoinedAttachment(t *testing.T) {
++	w, _ := identityFixture()
++	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{ClusterID: w.Work.Target.ClusterID, Standby: 1, Captures: 1}}})
++	if e != nil {
++		t.Fatal(e)
++	}
++	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
++	defer cancel()
++	ctx, record := NewStreamDiagnosticContext(ctx)
++	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
++	check := func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil }
++	standby, e := router.RegisterStandby(ctx, receiver, check)
++	if e != nil {
++		t.Fatal(e)
++	}
++	attachment, e := router.Attach(ctx, w.Work.Target.ClusterID, w.Work.CaptureID)
++	if e != nil {
++		t.Fatal(e)
++	}
++	reader, writer := io.Pipe()
++	defer writer.Close()
++	s := diagnosticStream(t, standby.Context(), check, reader, io.Discard, nil, nil, nil, func() { _ = reader.Close() })
++	served := make(chan error, 1)
++	finish := make(chan struct{})
++	go func() { err := standby.Serve(s, time.Now); served <- err; <-finish; s.Close(); standby.Finish() }()
++	q, e := contracts.EncodeAPIContextIdentityRequest(contracts.APIContextIdentityRequest{Format: contracts.APIContextExchangeFormat, ExchangeID: w.Work.Channel.ExchangeID, CaptureID: w.Work.CaptureID, Sequence: 1, Challenge: "33000000-0000-4000-8000-000000000001"})
++	if e != nil {
++		t.Fatal(e)
++	}
++	written := make(chan error, 1)
++	go func() {
++		written <- contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: contracts.APIContextIdentityRequestFrame, Payload: q})
++	}()
++	calls := 0
++	private := &streamPrivateError{}
++	_, e = attachment.Dispatch(w.Work, []byte("signed"), currentFunc(func(context.Context) (identity.Identity, error) {
++		calls++
++		return identity.Identity{}, private
++	}))
++	close(finish)
++	attachment.Close()
++	router.Close()
++	if err := <-written; err != nil {
++		t.Fatal(err)
++	}
++	if err := <-served; err != private {
++		t.Fatal("original hub error was replaced")
++	}
++	if e != private || calls != 1 {
++		t.Fatal("original identity normalization/call count changed")
++	}
++	got := record.Interruption()
++	if got.stage != streamHubIdentity || got.reason != streamOther {
++		t.Fatal("joined hub deciding failure lost", got.Stage(), got.Reason())
++	}
++}
++
++type streamDiagnosticVerifier func(context.Context, []byte, fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error)
++
++func (f streamDiagnosticVerifier) VerifyAPIContextWork(c context.Context, b []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
++	return f(c, b, r)
++}
++
++type streamDiagnosticExecutor func(context.Context, fleet.AuthenticatedAPIContextWork, identities.CurrentIdentity) (executionapp.ContextResult, error)
++
++func (f streamDiagnosticExecutor) ExecuteAPIContext(c context.Context, w fleet.AuthenticatedAPIContextWork, i identities.CurrentIdentity) (executionapp.ContextResult, error) {
++	return f(c, w, i)
++}
++
++func TestContextStreamDiagnosticRegionalVerificationAndIsolation(t *testing.T) {
++	w, _ := identityFixture()
++	parent, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++	defer cancel()
++	ctx, regional := NewStreamDiagnosticContext(parent)
++	_, hub := NewStreamDiagnosticContext(parent)
++	if d, _ := ctx.Deadline(); d != func() time.Time { d, _ := parent.Deadline(); return d }() {
++		t.Fatal("recorder changed original deadline")
++	}
++	reader, writer := io.Pipe()
++	defer writer.Close()
++	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
++	checks := 0
++	check := func(context.Context) (fleet.APIContextReceiver, error) { checks++; return receiver, nil }
++	s := diagnosticStream(t, ctx, check, reader, io.Discard, nil, nil, nil, func() { _ = reader.Close() })
++	written := make(chan error, 1)
++	go func() {
++		written <- contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")})
++	}()
++	verifications, executions := 0, 0
++	e := ServeRegional(ctx, s, receiver, check, streamDiagnosticVerifier(func(c context.Context, b []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
++		verifications++
++		if c != ctx || r != receiver || string(b) != "signed" {
++			t.Fatal("original verifier input changed")
++		}
++		return fleet.AuthenticatedAPIContextWork{}, &streamPrivateError{}
++	}), streamDiagnosticExecutor(func(context.Context, fleet.AuthenticatedAPIContextWork, identities.CurrentIdentity) (executionapp.ContextResult, error) {
++		executions++
++		return executionapp.ContextResult{}, nil
++	}), time.Now)
++	if e != fleet.ErrDenied || verifications != 1 || checks != 1 || executions != 0 {
++		t.Fatal("original verification normalization or call count changed")
++	}
++	if e = <-written; e != nil {
++		t.Fatal(e)
++	}
++	s.Close()
++	v := regional.Interruption()
++	if v.stage != streamRegionalVerify || v.reason != streamDenied || hub.Interruption().Present() {
++		t.Fatal("independent endpoint recorder lost cause or cross-populated")
++	}
++	if parent.Err() != nil {
++		t.Fatal("diagnostic canceled original parent")
++	}
++}
++
++func TestContextStreamDiagnosticAdmissionAndPassiveBranches(t *testing.T) {
++	for _, name := range []string{"nil-caller", "canceled-caller", "closed", "frame-limit", "busy-read", "busy-write"} {
++		t.Run(name, func(t *testing.T) {
++			checks := 0
++			s := diagnosticStream(t, nil, func(context.Context) (fleet.APIContextReceiver, error) {
++				checks++
++				return fleet.APIContextReceiver{}, nil
++			}, nil, nil, nil, nil, nil, nil)
++			ctx := context.Background()
++			read := false
++			want := streamInvalid
++			switch name {
++			case "nil-caller":
++				ctx = nil
++			case "canceled-caller":
++				c, cancel := context.WithCancel(ctx)
++				cancel()
++				ctx = c
++				want = streamCanceled
++			case "closed":
++				s.closed = true
++				want = streamClosed
++			case "frame-limit":
++				s.frames = contracts.APIContextMaximumFrames
++				want = streamBudget
++			case "busy-read":
++				read = true
++				s.reads = 1
++				want = streamBusy
++			case "busy-write":
++				s.writes = 1
++				want = streamBusy
++			}
++			_, _, end, e := s.begin(ctx, read)
++			if end != nil {
++				end()
++			}
++			if e != fleet.ErrUnavailable || checks != 0 {
++				t.Fatal("refused admission reached peer or changed category")
++			}
++			stage := streamSendAdmission
++			if read {
++				stage = streamReceiveAdmission
++			}
++			requireStreamReason(t, s, stage, want)
++		})
++	}
++	for _, name := range []string{"deadline-hook", "wrong-kind", "peer-private", "peer-changed", "peer-invalid"} {
++		t.Run("passive/"+name, func(t *testing.T) {
++			w, _ := identityFixture()
++			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
++			defer cancel()
++			reader, writer := io.Pipe()
++			defer writer.Close()
++			checks := 0
++			check := func(context.Context) (fleet.APIContextReceiver, error) {
++				checks++
++				r := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
++				switch name {
++				case "peer-private":
++					return r, &streamPrivateError{}
++				case "peer-changed":
++					r.Channel.ExchangeID = "00000000-0000-4000-8000-000000000099"
++				case "peer-invalid":
++					r.ValidUntil = r.ObservedAt
++				}
++				return r, nil
++			}
++			rd := func(time.Time) error {
++				if name == "deadline-hook" {
++					return &streamPrivateError{}
++				}
++				return nil
++			}
++			s := diagnosticStream(t, nil, check, reader, io.Discard, rd, nil, nil, func() { _ = reader.Close() })
++			written := make(chan error, 1)
++			if name != "deadline-hook" {
++				go func() {
++					kind := contracts.APIContextWorkFrame
++					if name == "wrong-kind" {
++						kind = contracts.APIContextReceiptFrame
++					}
++					written <- contracts.WriteAPIContextFrame(writer, contracts.APIContextFrame{Kind: kind, Payload: []byte("{}")})
++				}()
++			}
++			_, _, e := s.AwaitWork(ctx)
++			wantError := fleet.ErrDenied
++			stage, reason := streamPassivePeer, streamOther
++			switch name {
++			case "deadline-hook":
++				wantError = fleet.ErrUnavailable
++				stage = streamPassiveDeadline
++			case "wrong-kind":
++				stage, reason = streamPassiveFrame, streamProtocol
++			case "peer-changed":
++				reason = streamPeerChanged
++			case "peer-invalid":
++				reason = streamPeerInvalid
++			}
++			if e != wantError {
++				t.Fatal("original passive branch normalization changed")
++			}
++			if name != "deadline-hook" {
++				if e = <-written; e != nil {
++					t.Fatal(e)
++				}
++			}
++			requireStreamReason(t, s, stage, reason)
++			wantChecks := 1
++			if name == "deadline-hook" || name == "wrong-kind" {
++				wantChecks = 0
++			}
++			if checks != wantChecks {
++				t.Fatal("passive refusal changed peer call count")
++			}
++		})
++	}
++}
+--- a/internal/transport/contextstart/stream.go
++++ b/internal/transport/contextstart/stream.go
+@@ -4,6 +4,7 @@
+ 	"context"
+ 	"io"
+ 	"sync"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"asservat.local/asservat/internal/contracts"
+@@ -26,6 +27,7 @@
+ 	mu                           sync.Mutex
+ 	reads, writes, frames, bytes int
+ 	closed                       bool
++	first                        atomic.Pointer[StreamInterruption]
+ 	work                         sync.WaitGroup
+ 	once                         sync.Once
+ 	interrupted                  chan struct{}
+@@ -43,10 +45,12 @@
+ 	owner, cancel := context.WithCancel(ctx)
+ 	s := &frameStream{ctx: owner, cancel: cancel, channel: channel, check: check, read: read, write: write, readDeadline: rd, writeDeadline: wd, flush: flush, interruptIO: interrupt, interrupted: make(chan struct{})}
+ 	s.ownerDone = make(chan struct{})
+-	s.stopOwner = context.AfterFunc(owner, func() { s.interrupt(); close(s.ownerDone) })
++	s.stopOwner = context.AfterFunc(owner, func() { s.interruptAt(streamOwner, streamErrorReason(owner.Err())); close(s.ownerDone) })
+ 	return s, nil
+ }
+-func (s *frameStream) interrupt() {
++func (s *frameStream) interrupt() { s.interruptAt(streamClose, streamClosed) }
++func (s *frameStream) interruptAt(stage streamStage, reason streamReason) {
++	s.record(stage, reason)
+ 	s.once.Do(func() {
+ 		s.mu.Lock()
+ 		s.closed = true
+@@ -79,11 +83,31 @@
+ 	return nil
+ }
+ func (s *frameStream) begin(ctx context.Context, read bool) (context.Context, time.Time, func(), error) {
+-	if s == nil || ctx == nil || ctx.Err() != nil {
++	admissionStage, callStage, peerStage, boundStage, deadlineStage := streamSendAdmission, streamSendCall, streamSendPeer, streamSendBound, streamSendDeadline
++	if read {
++		admissionStage, callStage, peerStage, boundStage, deadlineStage = streamReceiveAdmission, streamReceiveCall, streamReceivePeer, streamReceiveBound, streamReceiveDeadline
++	}
++	if s == nil || ctx == nil {
++		s.record(admissionStage, streamInvalid)
+ 		return nil, time.Time{}, nil, fleet.ErrUnavailable
+ 	}
++	if err := ctx.Err(); err != nil {
++		s.record(admissionStage, streamErrorReason(err))
++		return nil, time.Time{}, nil, fleet.ErrUnavailable
++	}
+ 	s.mu.Lock()
+-	if s.closed || s.ctx.Err() != nil || (!read && s.frames >= contracts.APIContextMaximumFrames) || read && s.reads != 0 || !read && s.writes != 0 {
++	reason := streamNoReason
++	if s.closed {
++		reason = streamClosed
++	} else if err := s.ctx.Err(); err != nil {
++		reason = streamErrorReason(err)
++	} else if !read && s.frames >= contracts.APIContextMaximumFrames {
++		reason = streamBudget
++	} else if read && s.reads != 0 || !read && s.writes != 0 {
++		reason = streamBusy
++	}
++	if reason != streamNoReason {
++		s.record(admissionStage, reason)
+ 		s.mu.Unlock()
+ 		return nil, time.Time{}, nil, fleet.ErrUnavailable
+ 	}
+@@ -103,7 +127,7 @@
+ 	// After any timeout, this stream is terminal. An uncertain I/O never gets a
+ 	// longer next deadline or a replacement connection carrying the same work.
+ 	interruptDone := make(chan struct{})
+-	stopCall := context.AfterFunc(call, func() { s.interrupt(); close(interruptDone) })
++	stopCall := context.AfterFunc(call, func() { s.interruptAt(callStage, streamErrorReason(call.Err())); close(interruptDone) })
+ 	finish := func() {
+ 		if !stopCall() {
+ 			<-interruptDone
+@@ -120,8 +144,18 @@
+ 		s.work.Done()
+ 	}
+ 	observed, e := s.check(call)
+-	if e != nil || !observed.Valid(time.Now()) || observed.Channel != s.channel || call.Err() != nil {
+-		s.interrupt()
++	reason = streamNoReason
++	if e != nil {
++		reason = streamErrorReason(e)
++	} else if !observed.Valid(time.Now()) {
++		reason = streamPeerInvalid
++	} else if observed.Channel != s.channel {
++		reason = streamPeerChanged
++	} else if err := call.Err(); err != nil {
++		reason = streamErrorReason(err)
++	}
++	if reason != streamNoReason {
++		s.interruptAt(peerStage, reason)
+ 		finish()
+ 		return nil, time.Time{}, nil, fleet.ErrUnavailable
+ 	}
+@@ -131,7 +165,7 @@
+ 	// request-body pipe. Join an explicit callback at the shorter original peer
+ 	// deadline before returning or reusing any stream resources.
+ 	boundedDone := make(chan struct{})
+-	stopBounded := context.AfterFunc(bounded, func() { s.interrupt(); close(boundedDone) })
++	stopBounded := context.AfterFunc(bounded, func() { s.interruptAt(boundStage, streamErrorReason(bounded.Err())); close(boundedDone) })
+ 	end := func() {
+ 		if !stopBounded() {
+ 			<-boundedDone
+@@ -143,8 +177,16 @@
+ 	if read {
+ 		deadline = s.readDeadline
+ 	}
+-	if e = deadline(until); e != nil || !time.Now().Before(until) || bounded.Err() != nil {
+-		s.interrupt()
++	reason = streamNoReason
++	if e = deadline(until); e != nil {
++		reason = streamErrorReason(e)
++	} else if !time.Now().Before(until) {
++		reason = streamExpired
++	} else if err := bounded.Err(); err != nil {
++		reason = streamErrorReason(err)
++	}
++	if reason != streamNoReason {
++		s.interruptAt(deadlineStage, reason)
+ 		end()
+ 		return nil, time.Time{}, nil, fleet.ErrUnavailable
+ 	}
+@@ -167,15 +209,28 @@
+ 	}
+ 	defer end()
+ 	if !s.count(len(f.Payload) + 5) {
+-		s.interrupt()
++		s.interruptAt(streamSendAdmission, streamBudget)
+ 		return contracts.ErrAPIContextProtocol
+ 	}
+-	e = contracts.WriteAPIContextFrame(s.write, f)
++	writer := &streamWriteDiagnostic{writer: s.write}
++	e = contracts.WriteAPIContextFrame(writer, f)
++	stage, reason := streamWrite, writer.reason
+ 	if e == nil {
++		stage = streamFlush
+ 		e = s.flush()
+-	}
+-	if e != nil || call.Err() != nil || !time.Now().Before(until) {
+-		s.interrupt()
++		reason = streamErrorReason(e)
++	}
++	if e != nil {
++		if reason == streamNoReason {
++			reason = streamErrorReason(e)
++		}
++	} else if err := call.Err(); err != nil {
++		stage, reason = streamSendResult, streamErrorReason(err)
++	} else if !time.Now().Before(until) {
++		stage, reason = streamSendResult, streamExpired
++	}
++	if reason != streamNoReason {
++		s.interruptAt(stage, reason)
+ 		return fleet.ErrUnavailable
+ 	}
+ 	return nil
+@@ -200,10 +255,20 @@
+ 		defer close(s.pumpDone)
+ 		defer close(s.incoming)
+ 		for {
+-			f, e := contracts.ReadAPIContextFrame(s.read)
+-			if e != nil || !s.count(len(f.Payload)+5) {
++			reader := &streamReadDiagnostic{reader: s.read}
++			f, e := contracts.ReadAPIContextFrame(reader)
++			reason := streamNoReason
++			if e != nil {
++				reason = reader.reason
++				if reason == streamNoReason {
++					reason = streamErrorReason(e)
++				}
++			} else if !s.count(len(f.Payload) + 5) {
++				reason = streamBudget
++			}
++			if reason != streamNoReason {
+ 				clear(f.Payload)
+-				s.interrupt()
++				s.interruptAt(streamRead, reason)
+ 				return
+ 			}
+ 			select {
+@@ -240,14 +305,22 @@
+ 		}
+ 		f = received
+ 	case <-call.Done():
+-		s.interrupt()
++		s.interruptAt(streamReceiveCall, streamErrorReason(call.Err()))
+ 		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+ 	case <-s.ctx.Done():
+ 		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+ 	}
+-	if call.Err() != nil || s.ctx.Err() != nil || !time.Now().Before(until) {
++	reason := streamNoReason
++	if err := call.Err(); err != nil {
++		reason = streamErrorReason(err)
++	} else if err := s.ctx.Err(); err != nil {
++		reason = streamErrorReason(err)
++	} else if !time.Now().Before(until) {
++		reason = streamExpired
++	}
++	if reason != streamNoReason {
+ 		clear(f.Payload)
+-		s.interrupt()
++		s.interruptAt(streamReceiveResult, reason)
+ 		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+ 	}
+ 	return f, nil
+@@ -281,7 +354,7 @@
+ 	s.mu.Unlock()
+ 	call, cancel := context.WithDeadline(ctx, until)
+ 	done := make(chan struct{})
+-	stop := context.AfterFunc(call, func() { s.interrupt(); close(done) })
++	stop := context.AfterFunc(call, func() { s.interruptAt(streamPassiveCall, streamErrorReason(call.Err())); close(done) })
+ 	defer func() {
+ 		if !stop() {
+ 			<-done
+@@ -292,8 +365,8 @@
+ 		s.mu.Unlock()
+ 		s.work.Done()
+ 	}()
+-	if s.readDeadline(until) != nil {
+-		s.interrupt()
++	if err := s.readDeadline(until); err != nil {
++		s.interruptAt(streamPassiveDeadline, streamErrorReason(err))
+ 		return empty, zero, fleet.ErrUnavailable
+ 	}
+ 	incoming, e := s.startReader()
+@@ -312,17 +385,35 @@
+ 	case <-s.ctx.Done():
+ 		return empty, zero, fleet.ErrUnavailable
+ 	}
+-	if f.Kind != contracts.APIContextWorkFrame || call.Err() != nil || s.ctx.Err() != nil {
++	reason := streamNoReason
++	if f.Kind != contracts.APIContextWorkFrame {
++		reason = streamProtocol
++	} else if err := call.Err(); err != nil {
++		reason = streamErrorReason(err)
++	} else if err := s.ctx.Err(); err != nil {
++		reason = streamErrorReason(err)
++	}
++	if reason != streamNoReason {
+ 		clear(f.Payload)
+-		s.interrupt()
++		s.interruptAt(streamPassiveFrame, reason)
+ 		return empty, zero, fleet.ErrDenied
+ 	}
+ 	checkCtx, end := context.WithTimeout(call, 5*time.Second)
+ 	defer end()
+ 	receiver, e := s.check(checkCtx)
+-	if e != nil || checkCtx.Err() != nil || receiver.Channel != s.channel || !receiver.Valid(time.Now()) {
++	reason = streamNoReason
++	if e != nil {
++		reason = streamErrorReason(e)
++	} else if err := checkCtx.Err(); err != nil {
++		reason = streamErrorReason(err)
++	} else if receiver.Channel != s.channel {
++		reason = streamPeerChanged
++	} else if !receiver.Valid(time.Now()) {
++		reason = streamPeerInvalid
++	}
++	if reason != streamNoReason {
+ 		clear(f.Payload)
+-		s.interrupt()
++		s.interruptAt(streamPassivePeer, reason)
+ 		return empty, zero, fleet.ErrDenied
+ 	}
+ 	return f, receiver, nil
+--- a/test/integration/context_start_exchange_test.go
++++ b/test/integration/context_start_exchange_test.go
+@@ -109,6 +109,10 @@
+ 	if e != nil || len(candidates.Owners) != 1 || candidates.Owners[0] != s.owner {
+ 		t.Fatal("actual SQL exact owner discovery", e)
+ 	}
++	var streamDiagnostic *contextstart.StreamDiagnostics
++	if s.diagnostic != nil {
++		ctx, streamDiagnostic = contextstart.NewStreamDiagnosticContext(ctx)
++	}
+ 	standby, stop := context.WithTimeout(ctx, 30*time.Second)
+ 	exchange, e := s.client.OpenDiscovered(standby, s.owner, candidates)
+ 	if e != nil {
+@@ -122,7 +126,8 @@
+ 		if s.diagnostic != nil {
+ 			// Log this original joined completion separately: the public result may
+ 			// already have stopped its recorder. Never render the private error.
+-			t.Logf("journey original regional exchange completed reason=%s", journeyRegionalReason(err))
++			interruption := streamDiagnostic.Interruption()
++			t.Logf("journey original regional exchange completed reason=%s stream-stage=%s stream-reason=%s", journeyRegionalReason(err), interruption.Stage(), interruption.Reason())
+ 		}
+ 		s.regional <- err
+ 	}()
+--- a/test/integration/public_context_journey_test.go
++++ b/test/integration/public_context_journey_test.go
+@@ -27,6 +27,7 @@
+ 	"asservat.local/asservat/internal/domain/artifact"
+ 	"asservat.local/asservat/internal/domain/identity"
+ 	"asservat.local/asservat/internal/transport/browser"
++	"asservat.local/asservat/internal/transport/contextstart"
+ 	"asservat.local/asservat/internal/transport/presentation"
+ 	"github.com/jackc/pgx/v5/pgxpool"
+ )
+@@ -178,9 +179,13 @@
+ 	if !diagnostic.BeginRequest() {
+ 		t.Fatal("first-request diagnostic window unavailable")
+ 	}
+-	reply, e = call("request_capture", request, true)
++	requestContext, hubStream := contextstart.NewStreamDiagnosticContext(ctx)
++	requestStarted := time.Now()
++	reply, e = shared.Call(requestContext, current(requestContext, true), "request_capture", publicJourneyInput(t, request))
++	requestDuration := time.Since(requestStarted)
+ 	diagnostic.Report(t)
+-	t.Logf("journey first-request original collector calls=%d", collector.calls.Load())
++	hubInterruption := hubStream.Interruption()
++	t.Logf("journey first-request original collector calls=%d whole-request-duration=%s hub-stream-stage=%s hub-stream-reason=%s", collector.calls.Load(), requestDuration, hubInterruption.Stage(), hubInterruption.Reason())
+ 	accepted := publicJourneyData[presentation.ContextAcceptedData](t, "browser first request", reply, e)
+ 	regional.joined(t, ctx)
+ 	if collector.calls.Load() != 1 || accepted.CaptureID == "" {

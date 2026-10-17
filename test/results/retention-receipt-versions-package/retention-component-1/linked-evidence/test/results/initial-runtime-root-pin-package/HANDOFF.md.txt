@@ -1,0 +1,14 @@
+# Original initial root pin correction
+
+Five exact paths against live integrated bridge-native-1. Apply only manifest-listed source payloads after checking their bases; generated files, schemas, grants and outward contracts do not change. Both bindings retain existing serialization for explicitly pinned inputs.
+
+The original creation configuration legitimately has empty RootUID. The completed handover decoder independently checks the acknowledged nonempty UID. Resource and bridge constructors incorrectly compared these lifecycle values. The corrected components retain that actual UID privately and include it in their existing binding. Subsequent resource/current bridge/passive-history checks and first bridge journal CREATE require that same UID. The shared original preparer is never mutated, and an explicit contrary caller pin still fails the original decoder.
+
+The regression uses existing synthetic TLS API/current-handover mechanics and a synthetic SQL receipt. It verifies original empty input, exact pinned reopen with identical binding, contrary explicit pin, self-consistent replacement after construction, and denial before first bridge journal CREATE. It creates no actual runtime resources and grants no current authority.
+
+Handle90174 is terminal0. The exact failing-before race returned1 with `completed original creation input rejected permission source identity changed` (test2.16s). Corrected focused bridge/resource races returned0, then bootstrap/integration compile and affected vet returned0. result.json records every command and wall time. All five bases/payloads and1702 dependencies matched before/after; no live edits or external labs were performed.
+
+Manifest SHA256: c0b66d656f5fb97ec82e316d170bf570640d9a5dcca74fb7607f8f391a23108c
+Dependency SHA256: 2f3127b0dced709001ec74e929878fc934f7e3efccf0aae1b764cf85291e10c2
+
+Next: parent requalifies the actual original bootstrap chain with ASSERVAT_INITIAL_RUNTIME_BRIDGE=1 and its existing --initial-bootstrap-chain mode. Native55319 remains preserved as failed; no claim that this fixes all later bridge transitions. Complete generated inputs, worker activation receipts and public composition remain ADR140 work.

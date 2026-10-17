@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "artifact/v1",
+  "artifactID": "00000000-0000-4000-8000-000000000200",
+  "caseID": "00000000-0000-4000-8000-000000000002",
+  "occurrenceID": "00000000-0000-4000-8000-000000000005",
+  "target": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "nodeUID": "node-uid",
+    "nodeBootID": "00000000-0000-4000-8000-000000000006",
+    "podUID": "pod-uid",
+    "namespace": "payments",
+    "workloadUID": "workload-api-uid",
+    "scope": "pod"
+  },
+  "kind": "packetCapture",
+  "mediaType": "application/vnd.tcpdump.pcap",
+  "format": "pcap/networkHeaders/v1",
+  "dataClass": "raw",
+  "collector": {
+    "version": "0.0.0-spec-example",
+    "imageDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "recipeDigest": "8c1632a5cbda6ea3e7d67b8630d4a7538fcf0e0fea67e12ff5b861742488ea73"
+  },
+  "startedAt": "2026-10-09T11:59:45Z",
+  "completedAt": "2026-10-09T12:00:05Z",
+  "expiresAt": "2026-10-10T11:54:45Z",
+  "completeness": {
+    "source": "complete",
+    "ciphertext": "complete",
+    "analyzable": "true",
+    "gaps": []
+  },
+  "sizes": {
+    "plaintextBytes": 4096,
+    "ciphertextBytes": 4352
+  },
+  "hashes": {
+    "plaintextSHA256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "ciphertextSHA256": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "encryption": {
+    "format": "tink-streaming-aead/v1",
+    "keyRef": "transit/asservat/metadata",
+    "wrappedKeyset": "SYNTHETIC-NOT-A-REAL-WRAPPED-KEY",
+    "aadSHA256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "provenance": {
+    "parentArtifacts": [],
+    "toolDigests": [
+      "6666666666666666666666666666666666666666666666666666666666666666"
+    ],
+    "buildIDs": []
+  },
+  "accessProvenance": {
+    "namespaceUID": "namespace-payments-uid",
+    "assignments": [
+      {
+        "subject": {
+          "kind": "Group",
+          "issuer": "https://identity.example.invalid/realms/company",
+          "id": "group-payments-123"
+        },
+        "role": "workload-maintainer",
+        "basisKind": "AccessBinding",
+        "basisUID": "binding-payments-uid",
+        "basisDigest": "9c6a14ad8b32e40e97146127fcb3ec9948825236775f59090d79f5283feff78d",
+        "assignmentID": "00000000-0000-4000-8000-000000000020"
+      }
+    ]
+  },
+  "privacy": {
+    "classification": "potentialPersonalData",
+    "evidenceType": "packetCapture",
+    "purposeRef": "production-incident-investigation",
+    "classificationSource": "default"
+  },
+  "retention": {
+    "anchorAt": "2026-10-09T11:59:45Z",
+    "anchorBasis": "oldestRingSegment",
+    "requestedAgeSeconds": 259200,
+    "resolvedMaxAgeSeconds": 86400,
+    "deletionBudgetSeconds": 300,
+    "deleteBy": "2026-10-10T11:59:45Z",
+    "policyRefs": [
+      {
+        "uid": "retention-user-evidence-uid",
+        "generation": 1,
+        "digest": "386340546d83b24bbfc3e7a823c0eb42b79554c7b20438e7e3ce237de62ca36b"
+      }
+    ]
+  },
+  "collectionProvenance": {
+    "captureUID": "00000000-0000-4000-8000-000000000190",
+    "actionID": "traffic",
+    "planDigest": "33dc70161e239f66d41de88282ce27c1a2426797fb743c9f688e0261e39822d8"
+  },
+  "actionLifecycle": {
+    "executionMode": "ongoing",
+    "triggerKind": "recordingSave",
+    "triggeredAt": "2026-10-09T12:00:05Z",
+    "sourceSessionID": "00000000-0000-4000-8000-000000000191",
+    "sourceStartedAt": "2026-10-09T11:59:30Z",
+    "snapshotID": "00000000-0000-4000-8000-000000000198",
+    "requestedBefore": "20s",
+    "after": "0s",
+    "historyCoverage": "full",
+    "gapReasons": [],
+    "windowCoverage": "full",
+    "recordingSaveOrigin": {
+      "policyUID": "policy-trigger-lifecycles-uid",
+      "policyExecutionDigest": "4920c87bc4d15f2d7adbdde931973b7047c24a9bd0a086065f541a547bc41cb3"
+    }
+  }
+}

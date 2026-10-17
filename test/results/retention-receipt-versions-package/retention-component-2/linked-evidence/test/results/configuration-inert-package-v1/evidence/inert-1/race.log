@@ -1,0 +1,78 @@
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/no-overlap
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/one-overlap
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/default-quarter
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/one-full-overlap
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/too-many
+=== RUN   TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/hidden-at-zero
+--- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/no-overlap (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/one-overlap (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/default-quarter (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/one-full-overlap (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/too-many (0.00s)
+    --- PASS: TestConfigurationRoleInertDeploymentPreservesFutureRolloutBound/hidden-at-zero (0.00s)
+=== RUN   TestConfigurationRoleInertClaimCanCompleteWithoutLaunchingPod
+--- PASS: TestConfigurationRoleInertClaimCanCompleteWithoutLaunchingPod (4.12s)
+=== RUN   TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation
+--- PASS: TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation (3.62s)
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/rbac
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/admission
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/fleet
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/owner
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/workload
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/guard
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/account
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/administrator
+=== RUN   TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/probe-became-administrator
+--- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources (29.01s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/rbac (3.03s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/admission (3.08s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/fleet (3.34s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/owner (3.47s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/workload (3.52s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/guard (2.97s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/account (3.57s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/administrator (3.02s)
+    --- PASS: TestConfigurationRoleOperationRechecksChangedEnforcementAndSources/probe-became-administrator (3.02s)
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=true
+=== RUN   TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=false
+--- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes (2.73s)
+    --- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=true (0.72s)
+    --- PASS: TestConfigurationRoleOperationChecksGuardAroundNegativeProbes/initial=false (2.02s)
+=== RUN   TestConfigurationRoleOperationDoesNotEscapeOrRenew
+--- PASS: TestConfigurationRoleOperationDoesNotEscapeOrRenew (2.47s)
+=== RUN   TestConfigurationRoleOperationCloseCancelsAndJoins
+--- PASS: TestConfigurationRoleOperationCloseCancelsAndJoins (0.07s)
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/installation
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/namespace
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/expired
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/missing-guard
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/cluster
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/deployment
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/account
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/fleet-source
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/owner-source
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/future
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-fleet
+=== RUN   TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-owner
+--- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/installation (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/namespace (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/expired (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/missing-guard (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/cluster (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/deployment (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/account (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/fleet-source (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/owner-source (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/future (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-fleet (0.00s)
+    --- PASS: TestConfigurationRoleSourceKeepsOriginalIdentityAndBounds/shortened-owner (0.00s)
+=== RUN   TestConfigurationRoleDeploymentUsesItsOwnTwoProcessBound
+--- PASS: TestConfigurationRoleDeploymentUsesItsOwnTwoProcessBound (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	43.075s

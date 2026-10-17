@@ -1,0 +1,165 @@
+{
+  "scope": "ADR-134 explicit acquisition continuation; no native qualification or runtime enablement",
+  "files": [
+    {
+      "path": "docs/architecture/context-capability.md",
+      "base_sha256": "2d7f3296bdaea327b7d194a72494175a335f6b4be870a9ec8aa1d6529c14a484",
+      "new_sha256": "5130aacde4b0f4b09a46826f86ae1141c2553baf6faa46569cabc8b417dacdbd"
+    },
+    {
+      "path": "docs/decisions/134-explicit-capture-continuation.md",
+      "base_sha256": null,
+      "new_sha256": "45be9650528b36042e05c0f31f7c92a4e3d52205aa3f9f1a6d77a0aeef57ba30"
+    },
+    {
+      "path": "docs/interfaces/browser-openapi.yaml",
+      "base_sha256": "4867c19eb058152efe4ba9a4525451959ab5c5773cd78761e07e9be2d111acad",
+      "new_sha256": "b75a29903b5f96d803a950f53f1d23443fb1c4f2449d5f32cd05b3875ea88feb"
+    },
+    {
+      "path": "internal/application/capture/context_continuation_test.go",
+      "base_sha256": null,
+      "new_sha256": "862890ae86916d930b99bdcc747c51ae6e85b80f62690229ee2593dfe43c212d"
+    },
+    {
+      "path": "internal/application/capture/context_submission.go",
+      "base_sha256": "57c41694d161c597c6c20fe52f916cb819d55ac062913b6801a988c5e38e0a6f",
+      "new_sha256": "0c3300e2553eb0e65a9e9708f6ca7d562e9e688db9061ff6f38d284d32445bb5"
+    },
+    {
+      "path": "internal/application/execution/api_context.go",
+      "base_sha256": "305814e80ff0a8aa116e8435168c2ce57d9837727fbabf85432fa5e8c355d13e",
+      "new_sha256": "4d1fd30f550451198ead6e17fdb40f62b86f35d963cb6996b74ac190b7a0b256"
+    },
+    {
+      "path": "internal/application/execution/api_context_test.go",
+      "base_sha256": "bbb9d072e3cd60ae8db5936a7a08dc6d56c331abbc9b2925ce4a5788676d145f",
+      "new_sha256": "f810e5dacfbbe6c3f8d67418545d95cbf55d544f76ae8846f90f13863b7dc42e"
+    },
+    {
+      "path": "internal/application/execution/api_preparation_once_test.go",
+      "base_sha256": null,
+      "new_sha256": "1913e28715a3ae3e7407a24c73453b0c3c8753b0c260ee7e7cebda686125734e"
+    },
+    {
+      "path": "internal/bootstrap/context_submission.go",
+      "base_sha256": "d8970b8bb3b7d4bbd17dccd3cc4a55766b0383159552c2a4e72bac76df64b43e",
+      "new_sha256": "e578e584bbd61d71c08cdbbcad3aa189b05922de22d6b4e1f0236f6e4d44595d"
+    },
+    {
+      "path": "internal/contracts/investigation-schemas/request_capture.json",
+      "base_sha256": "fe40644ba595ec878ccb84de595458fdc5df6d208935bacf89a9005128a82b5b",
+      "new_sha256": "0245c216e6ad7301f9536c974c9595ab0d204acca2bfbf85b4cb0c758a090855"
+    },
+    {
+      "path": "internal/contracts/investigation_schema_test.go",
+      "base_sha256": "91cafa1bb5d6f24307fd1459bd32399d685cc230641403f236f0247ec2cd60d8",
+      "new_sha256": "52e452401eaf9f02081b45e58fc0c7eb65903e7b0a4bf4c31119595c39666493"
+    },
+    {
+      "path": "internal/domain/capture/admission.go",
+      "base_sha256": "c55981058aa22006ead8c0914e3175bcaaa7cd62bede45c008cc95a077b554ad",
+      "new_sha256": "bd5c073a39668af34d5959a18800926797b48c1203d96eac28f36fabe0d3c835"
+    },
+    {
+      "path": "internal/domain/execution/start.go",
+      "base_sha256": "b7588897b29aceb2fd7a9a5e40f566c047a2b814c83f1445d496854d85b8a2d4",
+      "new_sha256": "015c8231e74411e30eabb1013d9af79562f9d085ef6c592053e263fa6bf98c53"
+    },
+    {
+      "path": "internal/transport/browser/investigation_test.go",
+      "base_sha256": "43c7d9b12c5d5ddb56228a1459aa831f429ce8ee630e951b97e071911fc19b05",
+      "new_sha256": "8f0da1a3a617ca7b7df17d9f25ae0535651df04bbdbf6ab78e0cf5b5be3e0d14"
+    },
+    {
+      "path": "internal/transport/mcp/context_test.go",
+      "base_sha256": "0efd22a8ef38ada92f7149362ab09cd391ed22f6d09f5e6d3135f47d5059692c",
+      "new_sha256": "9f71fff3b496519449949afc8d3df19d39e00c5680107990b7aca9f1c6002172"
+    },
+    {
+      "path": "internal/transport/presentation/context_operations.go",
+      "base_sha256": "6af41585b54fb73345613fdce127f4aeb18c1e202136aa788bf09bc16f37ec6a",
+      "new_sha256": "ace989876e80dd266f3ec6304baa4374972a94489e946243ea14d0b8483ea6c7"
+    },
+    {
+      "path": "internal/transport/presentation/context_operations_test.go",
+      "base_sha256": "613870f2aa76a6c52be653690cf9d07d77359264d274d3272370ce24a3a92568",
+      "new_sha256": "97effb1bf5b7467ff5c6de425a57e056781a44218daf7af11a02b6f926e6f781"
+    },
+    {
+      "path": "internal/transport/presentation/operation_audit_test.go",
+      "base_sha256": "5e021bad0b2f9cf95ea134b642093b5eecd60850d673318e955e9fedd2bd8481",
+      "new_sha256": "d9953627ea9d0350beb4c2f348be7857f08fa429ab2b6e946251ed8c21805b61"
+    },
+    {
+      "path": "scripts/investigation-schemas.py",
+      "base_sha256": "43b391f8f105bcba4a7d0daa3ab8cd68340851bcae26ada8590e3df2e85e1d06",
+      "new_sha256": "47580199f2d40d47b9123195595e5a14a87fb4c3773a35fe44ae24fca2304bdb"
+    },
+    {
+      "path": "specs/contracts/mcp-tools.json",
+      "base_sha256": "f4eb55f091d2f1181d201f675aa076f42c259f453f0f696a2bee05ecc6ed6b83",
+      "new_sha256": "268eace0e3c49e0fd373882f3ea9b0e6f61a9bc7fc7cdc5ff595a7c6fc13cee9"
+    },
+    {
+      "path": "specs/mcp.md",
+      "base_sha256": "fcaf123c19a49d846096075b3ac9ad72135c1e34889a795bb6aa3d15a90ed94a",
+      "new_sha256": "b65bd8ebaf54018930fbe263d3532cf27236ceb058220f739fffb9d6f7a15d2e"
+    },
+    {
+      "path": "test/integration/api_execution_native_test.go",
+      "base_sha256": "71535cd7e511dcc6142ad62c65de40f665b73759800981df2530501512b97ae7",
+      "new_sha256": "70125639dccfaf7561e6417fa1f1e6a4d5c24aaa35a020f9c2119c7f623b16d3"
+    },
+    {
+      "path": "test/integration/console_test.go",
+      "base_sha256": "dc8766cf145ad91490bb479f1d23a7149c2d2fcc4036d41bddd655aab9cc0436",
+      "new_sha256": "7584b15f72898116ab35c11962ffbb9d6982a0d600ce3090633131ce9d3c95b8"
+    },
+    {
+      "path": "test/integration/context_continuation_native_test.go",
+      "base_sha256": null,
+      "new_sha256": "d82c5fa2a08fce297021a678849d91f7aad22cbfc3d4736c5d5c785ec15fcb91"
+    },
+    {
+      "path": "web/scripts/browser-test.mjs",
+      "base_sha256": "bb30f6e93ad57833ef0340c645ca12b15385932cb3b6ff9b83abacf19542967e",
+      "new_sha256": "fb6e56c9940610d2be4f7f8a78c4da76cb9d80defd0cad4946a2cdd7deda7c2a"
+    },
+    {
+      "path": "web/src/capture/CaptureWorkspace.test.tsx",
+      "base_sha256": "4ac7249c6e14fc6f91b939d344da5bf21808d88fe358ec32fbb4f3a2651ec9b3",
+      "new_sha256": "10053194f36b8da75a72ede9f9fe1afa126e95f735659d36b8519292d275800a"
+    },
+    {
+      "path": "web/src/capture/CaptureWorkspace.tsx",
+      "base_sha256": "cf6656c8d092d40e4608d3ae5d9728aa40c10b7c5088dfb4962a0631ec768669",
+      "new_sha256": "f74603ff2ec9afd4a65d1c35923274042654e2b791063e5cedb8bd24131d60f6"
+    },
+    {
+      "path": "web/src/capture/http.test.ts",
+      "base_sha256": "f6ee2bf9872cf2c343ffcc682a903898c0faf544f8a9cd9efac9df409137e43e",
+      "new_sha256": "694c7fbae20b125c1f5118b61f9ab4492ef6254c85fbf6436e21ade0bbba574e"
+    },
+    {
+      "path": "web/src/capture/investigation.test.ts",
+      "base_sha256": "5fe320b7904767c0b4d9e8c41f636e7dc1d555e5b205556297ed29381eaaa569",
+      "new_sha256": "58293beda6486da43b3994d5585b1c84277ec2dda1760b41117afd2f8da8fb6a"
+    },
+    {
+      "path": "web/src/capture/investigation.ts",
+      "base_sha256": "b6b08514d5dad4a6332c7d2acc2eb0de27c54e0c9d545bcb192d937a193a7688",
+      "new_sha256": "276f6250b04fd83c45e6d9d951b3b95c2f6924c3a7617508effedaf9a3799b21"
+    },
+    {
+      "path": "web/src/generated/capture.d.ts",
+      "base_sha256": "5226b61413234c334fbd12a3183c2917d90a0ebab161b8ccc4314ae3be61ab69",
+      "new_sha256": "b6d3f9bd0fe26cb5ed37a7dc76775d111aeffe7f3609f69a5817fa30bd21c8c8"
+    },
+    {
+      "path": "web/src/generated/validate-capture.js",
+      "base_sha256": "92ede51fe1b986af1151bf0fd2f273eb6553f7df380594542e9f7dc91a87a63d",
+      "new_sha256": "2f1be4376e17480bc458f4e7fcce49a40f919040f8e1aa55ffd64a8f5e8509d6"
+    }
+  ]
+}

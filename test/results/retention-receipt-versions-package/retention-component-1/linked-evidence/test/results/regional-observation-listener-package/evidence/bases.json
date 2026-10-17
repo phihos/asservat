@@ -1,0 +1,7 @@
+{
+  "docs/architecture/cluster-observations.md": "82b4d25ff2769d6f72d59ed0ddd30a5fa5b84c4994e02a6a61b87861ac733364",
+  "docs/decisions/144-cluster-local-observations.md": "4eb168a4e30ac182e33df022cda85211de81c7ca05cab9f6aa3235b032dae835",
+  "internal/transport/native/owner_observation_server.go": "e10e492c1716dfdd217aecdd5b8b488d15fe46182542f3f89d46d93816cea65c",
+  "internal/transport/native/owner_regional_observation_server.go": null,
+  "internal/transport/native/owner_regional_observation_server_test.go": null
+}

@@ -1,0 +1,15 @@
+{
+  "before-selection": [
+    "TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim"
+  ],
+  "bootstrap-race": [
+    "TestOwnerBootstrapOriginalAllocationAndGeneratedInput",
+    "TestOwnerBootstrapSameClusterAllocatesDistinctLogicalPeers",
+    "TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim"
+  ],
+  "affected-race": [
+    "TestProviderOwnerProjectionOperationCompleteAndLaunch",
+    "TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout",
+    "TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial"
+  ]
+}

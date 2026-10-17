@@ -1,0 +1,83 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "kind": "discoveryPage",
+    "capture_id": "00000000-0000-4000-8000-000000000090",
+    "source_artifact_ids": [
+      "00000000-0000-4000-8000-000000000091"
+    ],
+    "expires_at": "2026-10-09T12:15:00Z",
+    "section": "flows",
+    "summary": {
+      "started_at": "2026-10-09T12:00:00Z",
+      "ended_at": "2026-10-09T12:00:10Z",
+      "observed_wire_bytes": 20971520,
+      "retained_bytes": 7340032,
+      "coverage": {
+        "requested_pods": 1,
+        "covered_pods": 1,
+        "process_inventory_complete": true,
+        "traffic_complete": true,
+        "dropped_packets": 0,
+        "stop_reason": "duration"
+      },
+      "classifier_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capture_mode": "rawPackets"
+    },
+    "gaps": [
+      "Only one pod was sampled; other replicas may differ."
+    ],
+    "flows": [
+      {
+        "flow_ref": "flow-7",
+        "pod_uid": "checkout-pod-uid",
+        "transport": "tcp",
+        "peer_address": "10.42.1.9",
+        "peer_port": 8080,
+        "direction": "egress",
+        "protocol": "tls",
+        "protocol_basis": {
+          "confidence": "observed",
+          "reason": "Visible TLS handshake; inner application protocol remains unknown."
+        },
+        "peer_candidates": [
+          {
+            "kind": "Service",
+            "namespace": "payments",
+            "name": "ledger-api",
+            "uid": "ledger-service-uid"
+          },
+          {
+            "kind": "Service",
+            "namespace": "payments",
+            "name": "ledger-read",
+            "uid": "ledger-read-uid"
+          }
+        ],
+        "peer_basis": {
+          "confidence": "ambiguous",
+          "reason": "Observed backend is selected by two Services; original Service is unknown."
+        },
+        "process_refs": [
+          "process-worker-7",
+          "process-worker-8"
+        ],
+        "process_basis": {
+          "confidence": "ambiguous",
+          "reason": "The socket was shared by two qualified worker identities."
+        },
+        "observation_point": "qualified pod network interface"
+      }
+    ]
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": []
+}

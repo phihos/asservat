@@ -1,0 +1,73 @@
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-14 01:12:37.087 UTC [103] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 01:12:37.088 UTC [103] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 01:12:37.103 UTC [109] LOG:  database system was shut down at 2026-10-14 01:12:34 UTC
+2026-10-14 01:12:37.114 UTC [103] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-14 01:12:37.272 UTC [103] LOG:  received fast shutdown request
+.2026-10-14 01:12:37.275 UTC [103] LOG:  aborting any active transactions
+2026-10-14 01:12:37.276 UTC [103] LOG:  background worker "logical replication launcher" (PID 112) exited with exit code 1
+2026-10-14 01:12:37.276 UTC [107] LOG:  shutting down
+2026-10-14 01:12:37.279 UTC [107] LOG:  checkpoint starting: shutdown immediate
+2026-10-14 01:12:38.194 UTC [107] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.022 s, sync=0.879 s, total=0.918 s; sync files=303, longest=0.010 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FB0, redo lsn=0/1B94FB0
+2026-10-14 01:12:38.208 UTC [103] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-10-14 01:12:38.306 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-14 01:12:38.306 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-14 01:12:38.306 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-14 01:12:38.309 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-14 01:12:38.317 UTC [143] LOG:  database system was shut down at 2026-10-14 01:12:38 UTC
+2026-10-14 01:12:38.322 UTC [1] LOG:  database system is ready to accept connections
+2026-10-14 01:12:38.952 UTC [195] ERROR:  permission denied for view fleet_current_trust
+2026-10-14 01:12:38.952 UTC [195] STATEMENT:  SELECT * FROM public.fleet_current_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR SHARE;
+2026-10-14 01:12:39.029 UTC [202] ERROR:  permission denied for table fleet_trust
+2026-10-14 01:12:39.029 UTC [202] STATEMENT:  SELECT * FROM public.fleet_trust;
+2026-10-14 01:12:39.104 UTC [209] ERROR:  permission denied for table fleet_observation
+2026-10-14 01:12:39.104 UTC [209] STATEMENT:  UPDATE public.fleet_observation SET fresh_until=fresh_until;
+2026-10-14 01:12:39.178 UTC [216] ERROR:  cannot update view "fleet_current_trust"
+2026-10-14 01:12:39.178 UTC [216] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-14 01:12:39.178 UTC [216] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-14 01:12:39.178 UTC [216] STATEMENT:  UPDATE public.fleet_current_trust SET installation_id=installation_id;
+2026-10-14 01:12:47.388 UTC [1022] ERROR:  could not obtain lock on row in relation "fleet_trust"
+2026-10-14 01:12:47.388 UTC [1022] STATEMENT:  SELECT * FROM public.fleet_current_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR SHARE NOWAIT;
+2026-10-14 01:12:47.464 UTC [1029] ERROR:  could not obtain lock on row in relation "fleet_trust"
+2026-10-14 01:12:47.464 UTC [1029] STATEMENT:  SELECT * FROM public.fleet_current_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR UPDATE NOWAIT;
+2026-10-14 01:12:47.537 UTC [1036] ERROR:  could not obtain lock on row in relation "fleet_trust"
+2026-10-14 01:12:47.537 UTC [1036] STATEMENT:  SELECT 1 FROM public.fleet_trust WHERE installation_id='11111111-1111-4111-8111-111111111111'::uuid FOR SHARE NOWAIT;

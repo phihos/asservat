@@ -1,0 +1,8 @@
+{
+  "basis": "/home/phil/.cache/asservat-build/planning/audit-version-authority-inventory-20261013/checks/retention-component-source-1",
+  "basis_manifest": "91a4bae592280030451b4e4ef800e5920b8337e6cfc07fca26d8760124c1a217",
+  "changes": [
+    "internal/adapters/postgres/custody.go"
+  ],
+  "status": "source only; no dependencies captured or build started"
+}

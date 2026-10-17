@@ -1,0 +1,8 @@
+{
+  "recording_handles": [
+    "recording-synthetic-traffic",
+    "recording-synthetic-syscalls"
+  ],
+  "before": "20s",
+  "reason": "Preserve the current latency incident."
+}

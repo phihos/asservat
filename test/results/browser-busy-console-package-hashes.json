@@ -1,0 +1,13 @@
+{
+  "internal/transport/browser/session.go": "c627bf47d3e627f88f96a703480a28faae11ceb18df8fb9da96531a7e1e8430f",
+  "internal/transport/browser/session_busy_test.go": "9fdee7b85d805caab799ebe18ec72c16f1f37473ced89e4700fc93a4ea8b5f49",
+  "test/integration/console_test.go": "dc8766cf145ad91490bb479f1d23a7149c2d2fcc4036d41bddd655aab9cc0436",
+  "web/dist/assets/EvidenceWorkspace-D5ugr1tH.js": "2d032601c44886a562f4b2fde52a6b6211c7011d410454cb6b369476eaa484b7",
+  "web/dist/assets/index-8wPE5Nwz.css": "e32c68c63f48700b90875e08ea7c6d6e613e236d6da62317d54c667a8e677115",
+  "web/dist/assets/index-B5YUY7p-.js": "69cea02217e57cbdc6008fe3df5de0a24b11c29df88150490488362088ba5a98",
+  "web/dist/index.html": "365c2ba394a5a08de77f359d10d43133d49d85d69cc7aece4588671a3a6c05ff",
+  "web/scripts/browser-test.mjs": "bb30f6e93ad57833ef0340c645ca12b15385932cb3b6ff9b83abacf19542967e",
+  "web/src/auth/http.ts": "d99a8cbba2233daed61bbfb56f886889936c5d7095fe20bd156a855951631a77",
+  "web/src/auth/session.test.ts": "bc83a84c5d0f11b1b125495bd154d925e2689569ccb21a7de5e2994d18e9a066",
+  "web/src/auth/session.ts": "62181d5f217a757ca44bf19c7c056c19abc1c550ab4411987f91ee96acade814"
+}

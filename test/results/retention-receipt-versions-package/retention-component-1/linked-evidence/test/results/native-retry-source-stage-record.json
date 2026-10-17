@@ -1,0 +1,5 @@
+{
+  "before": "cfd618f223e025562dcbf5619132d2457dbf24989b8fd4b6aac6f499856da60d",
+  "diagnostic": "2eb91248e7ac4b7859109ed33bc9f8a9986ebde55ad09a36b6cdebc1d287065c",
+  "scope": "temporary test-only stage labels, revert after diagnostic"
+}

@@ -1,0 +1,37 @@
+{
+  "component-and-setup-failure": {
+    "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-sql-prerequisite-20261013/checks/prerequisite-1",
+    "exit": 1,
+    "artifacts": {
+      "manifest.json": "ad86f1ff0754ca0c768415517c8115dfd96b79427916b476138e3539b1ac2408",
+      "dependencies.json": "363d320c4f0fe2edb96383ce175492d01f4c93f9e9c3a990bce2de02f65106a1",
+      "native-dependencies.json": "61e57e97e9f13ec5f1dfa419277d6fef7a1338948607fac247bd018a62456393",
+      "run.py": "402f1974d661f12fb2d78709b05dbbb2d98a748cd58b1947b8958e35c555a3a2",
+      "result.json": "43fd1350b49c854f89a6d242c970a3721b1dca07a47b6be87083d367bdc449e6",
+      "runner.log": "042324d6ba2959b750ecdf020c3fdc02305bc355bfdaca54896cedfa7c65e907",
+      "evidence/actual-sql.log": "101a69dc57362988434067fdc5eb76ab12807d21922f9f6dc683d2360437661c",
+      "evidence/compile.log": "f46a0d34e135de072168ca6479956dcedebbfafb0da3f243a67324358c2ed811",
+      "evidence/diagnostic-before.log": "d1b676eb8f10faee7f22adbfb16262502392a2a25af1d73de4af5cafa9a3c283",
+      "evidence/native/custody-environment.json": "743b7fcb7da3f95d1cf675771f5db705d4664d6a56c9a034fed778fce4fa657a",
+      "evidence/native/custody-postgres.log": "bee6dec07bd7f401d50efe0791de40ec3b25c160662f0ece7777c405400fd886",
+      "evidence/native/custody.log": "debf3d08bb815320a62d4b5701a8d3b61a162265c77d1ffb5297063efac1b9d7",
+      "evidence/postgres-race.log": "c8aab626bb413bf1233e08748bb116e87e69da24a8c53e9a1695639cfe204afa",
+      "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "corrected-native-only": {
+    "checkpoint": "/home/phil/.cache/asservat-build/planning/owner-sql-prerequisite-20261013/checks/prerequisite-2",
+    "exit": 0,
+    "artifacts": {
+      "manifest.json": "ad86f1ff0754ca0c768415517c8115dfd96b79427916b476138e3539b1ac2408",
+      "dependencies.json": "363d320c4f0fe2edb96383ce175492d01f4c93f9e9c3a990bce2de02f65106a1",
+      "native-dependencies.json": "61e57e97e9f13ec5f1dfa419277d6fef7a1338948607fac247bd018a62456393",
+      "run.py": "1e532435476ba346a059ed72ec3c52423889a3aa0edfee0399588e710fee28e1",
+      "result.json": "191c22ce67dea518ff1591cbca8146986cc0d8f8ccc52241ec23df631c795986",
+      "runner.log": "51161f8732cd7e4afdcff5591c5ce3433d29eb35000520fb4d691758af488c32",
+      "evidence/actual-sql.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+      "evidence/native/fleet-environment.json": "f760392a99751d09587e2e4119e2c4a772346b96703ff2515ba04aae2eda62f6",
+      "evidence/native/fleet.log": "066d037e240c6b75c509ff2a75455c9850b87d1f907c801a60ab43ac84c65892"
+    }
+  }
+}

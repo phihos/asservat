@@ -1,0 +1,14 @@
+{
+  "state": "source-only; compile/race/vet/architecture/spec/native not run",
+  "payloadPaths": 20,
+  "goPaths": 17,
+  "newPaths": 14,
+  "dependencyPaths": 2161,
+  "topLevelTestsStaged": 23,
+  "formatParser": "gofmt exited 0; no compile inference",
+  "basePreflight": "all original six existing bases match live; fourteen additions absent",
+  "candidateFailureBefore": "preserved original first-error selection; not yet executed",
+  "runtimeSelection": false,
+  "nativeQualified": false,
+  "dependencyTransitionPaths": 20
+}

@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-exchange
+    download_sessions_test.go:648: regional preparation native exchange unavailable
+--- FAIL: TestContextAdmissionWithRealServices (5.63s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-exchange (5.29s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.688s
+FAIL

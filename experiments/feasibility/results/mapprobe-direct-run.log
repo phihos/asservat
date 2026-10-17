@@ -1,0 +1,11 @@
+deployment.apps/sink restarted
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "sink" rollout to finish: 1 old replicas are pending termination...
+deployment "sink" successfully rolled out
+panic: write udp 10.42.0.1:34934->10.42.0.7:58888: write: connection refused
+
+goroutine 1 [running]:
+main.must(...)
+	/home/phil/Projekte/asservat/experiments/feasibility/go/cmd/mapprobe/main.go:19
+main.main()
+	/home/phil/Projekte/asservat/experiments/feasibility/go/cmd/mapprobe/main.go:103 +0xd25

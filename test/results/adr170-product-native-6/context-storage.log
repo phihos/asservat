@@ -1,0 +1,20 @@
+=== RUN   TestFederationRegionalProductWithRealKubernetes
+    federation_regional_native_test.go:104: regional condition PodReadyToStartContainers=True reason=
+    federation_regional_native_test.go:104: regional condition Initialized=True reason=
+    federation_regional_native_test.go:104: regional condition Ready=False reason=ContainersNotReady
+    federation_regional_native_test.go:104: regional condition ContainersReady=False reason=ContainersNotReady
+    federation_regional_native_test.go:104: regional condition PodScheduled=True reason=
+    federation_regional_native_test.go:104: regional waiting reason=ImagePullBackOff message=Back-off pulling image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47": ErrImagePull: failed to pull and unpack image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47
+    federation_regional_native_test.go:104: regional event Scheduled count=1: Successfully assigned direct-observation-0000000004/regional-5f78567dfd-wdvh4 to asservat-context-etcqp9it-1-control-plane
+    federation_regional_native_test.go:104: regional event FailedMount count=3: MountVolume.SetUp failed for volume "inputs" : configmap "regional-inputs" not found
+    federation_regional_native_test.go:104: regional event Pulling count=5: Pulling image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47"
+    federation_regional_native_test.go:104: regional event Failed count=5: Failed to pull image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47": failed to pull and unpack image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47": failed to res
+    federation_regional_native_test.go:104: regional event Failed count=5: Error: ErrImagePull
+    federation_regional_native_test.go:104: regional event BackOff count=14: Back-off pulling image "docker.io/library/asservat-context-worker@sha256:a6827a140313912cd0be2938cd45214d31b3f5bad5db64731257d25099757d47"
+    federation_regional_native_test.go:104: regional event Failed count=12: Error: ImagePullBackOff
+    federation_regional_native_test.go:104: regional product Pod never ran
+    direct_observation_native_fixture_test.go:191: native original helper Pod mode=regional original=true phase=Pending status-count=1
+--- FAIL: TestFederationRegionalProductWithRealKubernetes (243.57s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	243.626s
+FAIL

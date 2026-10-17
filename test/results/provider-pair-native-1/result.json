@@ -1,0 +1,20 @@
+{
+  "handle": 69849,
+  "exit": 1,
+  "scope": "Fixture startup failure before cluster creation or Go tests; not a product failure or passing native result",
+  "cause": "Owned PostgreSQL initdb still bootstrapping after100 readiness attempts separated by100ms",
+  "sourceCount": 2074,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "productBinary": {
+    "binarySHA256": "e0be82daeb10321bb109e9e45f298cb42ae6a50df41dc6a7f9c9fb1070ad6e34",
+    "dockerImageID": "sha256:bc4c53533b2159c9ba187097b5f5e6f41b0743f9d3fcacbd04f4e31c95f468dd",
+    "tag": "asservat-context-worker:context-83dyapwo"
+  },
+  "archivedFiles": {
+    "provider-pair-native-1-harness.log": "68c65eaaf96e9596bda16f79137d23275e4aa0a77793400bf52be2957ffbd76d",
+    "context-storage-environment.json": "bfd662747d7e365498031f051ed121ac18cae244a2a09ea2cedf22dbc6916252",
+    "context-storage-postgres.log": "c04ab7daa644670f7f9e5c7e1a00b6b6f3d6206296b0256d857892d3b503d4ca"
+  }
+}

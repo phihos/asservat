@@ -1,0 +1,24 @@
+--- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan (0.01s)
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-binding (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-capability (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-capability (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-bundle (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/changed-head (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/zero-oid (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/sub-microsecond (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+    --- FAIL: TestInitialInstallerSchemaBindingIsClosedAndChangesProtectedPlan/missing-handover (0.00s)
+        initial_preparer_schema_test.go:114: incomplete or incompatible schema binding accepted
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.023s
+--- FAIL: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding (0.28s)
+    initial_preparer_schema_inputs_test.go:33: original completed schema omitted or changed <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.295s
+FAIL

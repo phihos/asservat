@@ -1,0 +1,52 @@
+{
+  "phases": [
+    {
+      "name": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/overlay.json",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 0,
+      "seconds": 33.091
+    },
+    {
+      "name": "races",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/overlay.json",
+        "-race",
+        "-count=1",
+        "-timeout=120s",
+        "-run",
+        "^Test(CapacitySession|SessionCapacity|FirstContext)",
+        "-v",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "seconds": 9.529
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/session-capacity-reads-20261013/overlay.json",
+        "./internal/adapters/postgres"
+      ],
+      "exit": 0,
+      "seconds": 0.715
+    }
+  ],
+  "changedDependencies": [],
+  "changedPayload": [],
+  "scratchRemoved": true,
+  "exit": 0
+}

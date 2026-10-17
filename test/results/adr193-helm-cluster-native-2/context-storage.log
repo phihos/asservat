@@ -1,0 +1,11 @@
+=== RUN   TestHelmClusterInstallWithRealServices
+    helm_cluster_test.go:119: installer pod asservat-cluster-installer-6x8dx: protected mounted file unavailable
+    helm_cluster_test.go:119: installer pod asservat-cluster-installer-bntzd: protected mounted file unavailable
+    helm_cluster_test.go:119: installer pod asservat-cluster-installer-hj556: protected mounted file unavailable
+    helm_cluster_test.go:120: helm install mode=cluster: Helm command: exit status 1: Release "asservat" does not exist. Installing it now.
+        Error: failed post-install: resource Job/asservat-region/asservat-cluster-installer not ready. status: Failed, message: Job Failed. failed: 3/1
+        
+--- FAIL: TestHelmClusterInstallWithRealServices (38.63s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	38.744s
+FAIL

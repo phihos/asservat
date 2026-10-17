@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-23",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass with ADR-187 and ADR-188. After the guard bridge the continuation waited for the released Deployment controllers' status writes, then provisioned the three configuration roles, the worker inputs and launch, the public sources, all 66 public runtime roles and the public projection, the owner identity roles, selection, projection and launch. After completion, the bootstrap hook replayed passively and a second continuation Pod exited as already complete, with the guard generation and the resource journal unchanged. Subtest 466.0 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; synthetic public settings. The launched owner is observation-only (ADR-184 steps 5/7/8 pending). No public workflow, partial-rerun or helm upgrade claim beyond the hook replay.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

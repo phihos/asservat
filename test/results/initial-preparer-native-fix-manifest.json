@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+      "baseSha256": "00a716af9a8be81746b27ff86a025755b16003530d5c7d4e1379f31a659cfe75",
+      "newSha256": "025479a965fc8a29c001caceaa88d09ade5db64d0a7682f7621c45e84ab134d1"
+    },
+    {
+      "path": "test/integration/initial_preparer_test.go",
+      "baseSha256": "5a0c3e5bdf771fa388f9b745eda939f35c10008f453c51bfbce7078abc97e16d",
+      "newSha256": "2e8a0331a61f360839e5044ec77d4bfaa643a44559b5d53f7cd39e4d430a6f0b"
+    }
+  ]
+}

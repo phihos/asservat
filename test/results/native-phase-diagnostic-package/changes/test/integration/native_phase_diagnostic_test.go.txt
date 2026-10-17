@@ -1,0 +1,833 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
+	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/application/evidence"
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/transport/browser"
+)
+
+// Temporary fixture-only timings. No query text, argument, identity, evidence,
+// credential, raw error or wall-clock timestamp is retained. Timings include
+// scheduling and all work inside a port; they do not establish SQL lock time.
+// Each fixed stage has its own last sixteen completions and first error so the
+// forty unchanged warm polls cannot hide ingress. Calls keep their exact
+// original context, inputs, results and marker facets. No background work.
+type nativeDiagnosticStage uint8
+
+const (
+	nativeDiagnosticOff nativeDiagnosticStage = iota
+	nativeDiagnosticPreparation
+	nativeDiagnosticMetadata
+	nativeDiagnosticHTTP
+	nativeDiagnosticPublication
+)
+
+func (s nativeDiagnosticStage) name() string {
+	switch s {
+	case nativeDiagnosticPreparation:
+		return "preparation"
+	case nativeDiagnosticMetadata:
+		return "metadata"
+	case nativeDiagnosticHTTP:
+		return "http"
+	case nativeDiagnosticPublication:
+		return "publication"
+	default:
+		return "off"
+	}
+}
+
+type nativeDiagnosticEvent struct {
+	phase                                                                         string
+	start, elapsed, remainingStart, remainingEnd, inputRemaining, resultRemaining time.Duration
+	result, contextResult                                                         string
+}
+type nativeDiagnosticTotal struct {
+	calls   uint64
+	elapsed time.Duration
+}
+type nativeDiagnosticBuffer struct {
+	events     [16]nativeDiagnosticEvent
+	next, used int
+	firstError *nativeDiagnosticEvent
+	totals     map[string]nativeDiagnosticTotal
+}
+type nativePhaseDiagnostic struct {
+	mu     sync.Mutex
+	start  time.Time
+	active nativeDiagnosticStage
+	stages [5]nativeDiagnosticBuffer
+}
+
+func newNativePhaseDiagnostic(t *testing.T) *nativePhaseDiagnostic {
+	s := &nativePhaseDiagnostic{start: time.Now()}
+	t.Cleanup(func() { s.log(t) })
+	return s
+}
+func (s *nativePhaseDiagnostic) stage(v nativeDiagnosticStage) {
+	if s == nil {
+		return
+	}
+	if v > nativeDiagnosticPublication {
+		v = nativeDiagnosticOff
+	}
+	s.mu.Lock()
+	s.active = v
+	s.mu.Unlock()
+}
+func nativeDiagnosticResult(err error) string {
+	switch {
+	case err == nil:
+		return "ok"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "context-deadline"
+	case errors.Is(err, context.Canceled):
+		return "context-canceled"
+	case errors.Is(err, artifact.ErrDownloadExpired):
+		return "download-expired"
+	case errors.Is(err, artifact.ErrDownloadUnavailable):
+		return "download-unavailable"
+	case errors.Is(err, artifact.ErrDownloadConflict):
+		return "download-conflict"
+	case errors.Is(err, artifact.ErrDownloadCapacity):
+		return "download-capacity"
+	case errors.Is(err, artifact.ErrInvalid):
+		return "invalid"
+	case errors.Is(err, artifact.ErrIntegrity):
+		return "integrity"
+	case errors.Is(err, identity.ErrDenied):
+		return "identity-denied"
+	case errors.Is(err, identity.ErrUnavailable):
+		return "identity-unavailable"
+	default:
+		return "other-error"
+	}
+}
+func nativeDiagnosticRemaining(until, now time.Time) time.Duration {
+	if until.IsZero() {
+		return 0
+	}
+	return until.Sub(now)
+}
+func (s *nativePhaseDiagnostic) begin(ctx context.Context, phase string, inputUntil time.Time) func(error, time.Time) {
+	if s == nil {
+		return func(error, time.Time) {}
+	}
+	s.mu.Lock()
+	stage := s.active
+	s.mu.Unlock()
+	if stage == nativeDiagnosticOff {
+		return func(error, time.Time) {}
+	}
+	phase = nativeDiagnosticLabel(phase)
+	start := time.Now()
+	var deadline time.Time
+	if ctx != nil {
+		deadline, _ = ctx.Deadline()
+	}
+	return func(err error, until time.Time) {
+		end := time.Now()
+		e := nativeDiagnosticEvent{phase: phase, start: start.Sub(s.start), elapsed: end.Sub(start), remainingStart: nativeDiagnosticRemaining(deadline, start), remainingEnd: nativeDiagnosticRemaining(deadline, end), inputRemaining: nativeDiagnosticRemaining(inputUntil, end), resultRemaining: nativeDiagnosticRemaining(until, end), result: nativeDiagnosticResult(err), contextResult: "none"}
+		if ctx != nil {
+			e.contextResult = nativeDiagnosticResult(ctx.Err())
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		b := &s.stages[stage]
+		b.events[b.next] = e
+		b.next = (b.next + 1) % len(b.events)
+		b.used = min(b.used+1, len(b.events))
+		if err != nil && b.firstError == nil {
+			first := e
+			b.firstError = &first
+		}
+		if b.totals == nil {
+			b.totals = make(map[string]nativeDiagnosticTotal)
+		}
+		total := b.totals[phase]
+		total.calls++
+		total.elapsed += e.elapsed
+		b.totals[phase] = total
+	}
+}
+func (s *nativePhaseDiagnostic) log(t *testing.T) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for stage := nativeDiagnosticPreparation; stage <= nativeDiagnosticPublication; stage++ {
+		b := &s.stages[stage]
+		logEvent := func(kind string, e nativeDiagnosticEvent) {
+			t.Logf("native bounded phase=%s kind=%s port=%s start=%s elapsed=%s remaining-start=%s remaining-end=%s input-remaining=%s result-remaining=%s result=%s context=%s", stage.name(), kind, e.phase, e.start, e.elapsed, e.remainingStart, e.remainingEnd, e.inputRemaining, e.resultRemaining, e.result, e.contextResult)
+		}
+		for i := 0; i < b.used; i++ {
+			logEvent("recent", b.events[(b.next-b.used+i+len(b.events))%len(b.events)])
+		}
+		if b.firstError != nil {
+			logEvent("first-error", *b.firstError)
+		}
+		for _, label := range nativeDiagnosticLabels {
+			if v, ok := b.totals[label]; ok {
+				t.Logf("native bounded phase=%s kind=total port=%s calls=%d elapsed=%s", stage.name(), label, v.calls, v.elapsed)
+			}
+		}
+	}
+}
+
+func (s *nativePhaseDiagnostic) authority(a authapp.ContextDownloadAuthority) evidence.CurrentDownloadAuthority {
+	a.Permissions = nativePhasePermissions{a.Permissions, s}
+	a.Catalog = nativePhaseCatalog{a.Catalog, s}
+	a.Retention = nativePhaseRetention{a.Retention, s}
+	a.Environment = nativePhaseEnvironment{a.Environment, s}
+	return nativePhaseAuthority{a, s}
+}
+func (s *nativePhaseDiagnostic) runtime(t *testing.T, c evidence.ContextNativeRuntimeConfig) evidence.ContextNativeRuntimeConfig {
+	t.Helper()
+	a, ok := c.Authority.(authapp.ContextDownloadAuthority)
+	if !ok {
+		t.Fatal("diagnostic requires original composed authority")
+	}
+	c.Authority = s.authority(a)
+	c.Workers = nativePhaseAttachments{c.Workers, s}
+	c.Preparation = nativePhasePreparation{c.Preparation, s}
+	c.Audit = nativePhaseAudit{c.Audit, s}
+	c.Acknowledgements = nativePhaseAcknowledgements{c.Acknowledgements, s}
+	c.Native.Fences = nativePhaseFences{c.Native.Fences, s}
+	owners, ok := c.Native.Owners.(nativePhaseFirstOperations)
+	if !ok {
+		t.Fatal("diagnostic requires original first-context operations")
+	}
+	c.Native.Owners = nativePhaseOperations{owners, s}
+	c.Native.Origins.Operations = nativePhaseOperationReader{c.Native.Origins.Operations, s}
+	c.Native.PreparationKeys = nativePhasePreparationKeys{c.Native.PreparationKeys, s}
+	c.Native.Registrar = nativePhaseRegistrar{c.Native.Registrar, s}
+	return c
+}
+func (s *nativePhaseDiagnostic) transfer(t *testing.T, in evidence.DownloadResponseTransfer) evidence.DownloadResponseTransfer {
+	t.Helper()
+	a, ok := in.Authority.(authapp.ContextDownloadAuthority)
+	if !ok {
+		t.Fatal("diagnostic requires original transfer authority")
+	}
+	r, ok := in.Responses.(nativePhaseHTTPFirstResponses)
+	if !ok {
+		t.Fatal("diagnostic requires original first-context responses")
+	}
+	in.Authority = s.authority(a)
+	in.Sessions = nativePhaseHTTPSessions{in.Sessions, s}
+	in.Responses = nativePhaseHTTPResponses{r, s}
+	in.Objects = nativeDiagnosticWindowObjects{in.Objects, s}
+	in.Audit = nativeDiagnosticWindowAck{in.Audit, s}
+	return in
+}
+
+type nativeDiagnosticWindowObjects struct {
+	auditapp.DownloadWindowObjects
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativeDiagnosticWindowObjects) CreateDownloadWindowIntent(ctx context.Context, in audit.DownloadWindowIntent) (audit.DownloadWindowWriteResult, error) {
+	done := s.trace.begin(ctx, "http.window-intent-create", in.Window.WriteUntil)
+	v, e := s.DownloadWindowObjects.CreateDownloadWindowIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativeDiagnosticWindowAck struct {
+	evidence.DownloadWindowAcknowledgements
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativeDiagnosticWindowAck) AcknowledgeDownloadWindowIntent(ctx context.Context, in audit.DownloadWindowIntent, result audit.DownloadWindowWriteResult) error {
+	done := s.trace.begin(ctx, "http.window-intent-ack", in.Window.WriteUntil)
+	e := s.DownloadWindowAcknowledgements.AcknowledgeDownloadWindowIntent(ctx, in, result)
+	done(e, time.Time{})
+	return e
+}
+
+type nativeDiagnosticSessions struct {
+	browser.SessionService
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativeDiagnosticSessions) Resolve(ctx context.Context, cookie string, refresh bool) (identities.SessionView, error) {
+	done := s.trace.begin(ctx, "http.identity", time.Time{})
+	v, e := s.SessionService.Resolve(ctx, cookie, refresh)
+	done(e, v.Identity.ValidUntil)
+	return v, e
+}
+
+type nativePhaseAuthority struct {
+	evidence.CurrentDownloadAuthority
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseAuthority) CheckDownloadCurrent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	done := s.trace.begin(ctx, "authority.current", time.Time{})
+	v, e := s.CurrentDownloadAuthority.CheckDownloadCurrent(ctx, current, scope)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativePhasePermissions struct {
+	authapp.ProjectionReader
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhasePermissions) Permissions(ctx context.Context, target value.Target) (value.Projection, error) {
+	done := s.trace.begin(ctx, "authority.permissions", time.Time{})
+	v, e := s.ProjectionReader.Permissions(ctx, target)
+	done(e, identity.Earlier(v.FreshUntil, v.DeniesFreshUntil))
+	return v, e
+}
+
+type nativePhaseCatalog struct {
+	authapp.ContextDownloadCatalog
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseCatalog) ContextDownloadEvidence(ctx context.Context, id string) (authapp.ContextDownloadEvidence, error) {
+	done := s.trace.begin(ctx, "authority.catalog", time.Time{})
+	v, e := s.ContextDownloadCatalog.ContextDownloadEvidence(ctx, id)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativePhaseRetention struct {
+	authapp.DownloadRetentionResolver
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseRetention) ResolveRetained(ctx context.Context, in privacy.Input, dates privacy.Deadlines, rules []artifact.RetentionRule) (privacy.RetainedResolution, error) {
+	done := s.trace.begin(ctx, "authority.retention", dates.ExpiresAt)
+	v, e := s.DownloadRetentionResolver.ResolveRetained(ctx, in, dates, rules)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativePhaseEnvironment struct {
+	authapp.DownloadEnvironmentReader
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseEnvironment) DownloadEnvironment(ctx context.Context, in authapp.ContextDownloadEvidence, principal identity.Principal) (artifact.DownloadEnvironment, error) {
+	done := s.trace.begin(ctx, "authority.environment", in.ValidUntil)
+	v, e := s.DownloadEnvironmentReader.DownloadEnvironment(ctx, in, principal)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativePhaseAttachments struct {
+	evidence.ContextDownloadAttachments
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseAttachments) ReadContextDownloadAttachment(ctx context.Context, id string, a artifact.DownloadAuthority) (evidence.ContextDownloadAttachment, error) {
+	done := s.trace.begin(ctx, "worker.attachment", a.ValidUntil)
+	v, e := s.ContextDownloadAttachments.ReadContextDownloadAttachment(ctx, id, a)
+	done(e, v.ValidUntil)
+	return v, e
+}
+
+type nativePhasePreparation struct {
+	evidence.FirstContextPreparationSessions
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhasePreparation) BeginDownloadBatch(ctx context.Context, id string, a artifact.DownloadAuthority, batch artifact.DownloadBatch) (audit.DownloadIntent, error) {
+	done := s.trace.begin(ctx, "preparation.begin-batch", a.ValidUntil)
+	v, e := s.FirstContextPreparationSessions.BeginDownloadBatch(ctx, id, a, batch)
+	done(e, v.Batch.LeaseUntil)
+	return v, e
+}
+func (s nativePhasePreparation) PermitDownloadBatch(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64) error {
+	done := s.trace.begin(ctx, "preparation.permit-batch", a.ValidUntil)
+	e := s.FirstContextPreparationSessions.PermitDownloadBatch(ctx, id, a, batch, generation)
+	done(e, time.Time{})
+	return e
+}
+func (s nativePhasePreparation) PermitDownloadMetadata(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64) error {
+	done := s.trace.begin(ctx, "preparation.permit-metadata", a.ValidUntil)
+	e := s.FirstContextPreparationSessions.PermitDownloadMetadata(ctx, id, a, batch, generation)
+	done(e, time.Time{})
+	return e
+}
+func (s nativePhasePreparation) FinishDownloadBatch(ctx context.Context, id, batch string, generation, emitted int64, complete, interrupted bool) (audit.DownloadOutcome, error) {
+	done := s.trace.begin(ctx, "preparation.finish-batch", time.Time{})
+	v, e := s.FirstContextPreparationSessions.FinishDownloadBatch(ctx, id, batch, generation, emitted, complete, interrupted)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativePhaseAudit struct {
+	auditapp.DownloadWriter
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseAudit) WriteDownloadIntent(ctx context.Context, in audit.DownloadIntent) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "preparation.intent-write", in.Batch.LeaseUntil)
+	v, e := s.DownloadWriter.WriteDownloadIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativePhaseAudit) WriteDownloadOutcome(ctx context.Context, in audit.DownloadOutcome) (audit.Receipt, error) {
+	done := s.trace.begin(ctx, "preparation.outcome-write", time.Time{})
+	v, e := s.DownloadWriter.WriteDownloadOutcome(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativePhaseAcknowledgements struct {
+	evidence.DownloadAuditAcknowledger
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseAcknowledgements) AcknowledgeDownloadIntent(ctx context.Context, in audit.DownloadIntent, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, "preparation.intent-ack", in.Batch.LeaseUntil)
+	e := s.DownloadAuditAcknowledger.AcknowledgeDownloadIntent(ctx, in, receipt)
+	done(e, time.Time{})
+	return e
+}
+func (s nativePhaseAcknowledgements) AcknowledgeDownloadOutcome(ctx context.Context, in audit.DownloadOutcome, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, "preparation.outcome-ack", time.Time{})
+	e := s.DownloadAuditAcknowledger.AcknowledgeDownloadOutcome(ctx, in, receipt)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseFences struct {
+	evidence.NativeFenceReader
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseFences) NextNativeFence(ctx context.Context, id string) (int64, error) {
+	done := s.trace.begin(ctx, "native.next-fence", time.Time{})
+	v, e := s.NativeFenceReader.NextNativeFence(ctx, id)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativePhaseFirstOperations interface {
+	evidence.NativeOperations
+	FirstContextObservationsOnly()
+}
+type nativePhaseOperations struct {
+	nativePhaseFirstOperations
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseOperations) ClaimNativeOperation(ctx context.Context, en value.WorkerEnrollment, a artifact.DownloadAuthority, op value.NativeOperation) (value.NativeOperation, error) {
+	done := s.trace.begin(ctx, "native.claim", identity.Earlier(a.ValidUntil, op.Until))
+	v, e := s.nativePhaseFirstOperations.ClaimNativeOperation(ctx, en, a, op)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativePhaseOperations) ReleaseNativeOperation(ctx context.Context, op value.NativeOperation) error {
+	done := s.trace.begin(ctx, "native.release", op.Until)
+	e := s.nativePhaseFirstOperations.ReleaseNativeOperation(ctx, op)
+	done(e, time.Time{})
+	return e
+}
+func (s nativePhaseOperations) CompleteNativeOperation(ctx context.Context, lease value.NativeLease) error {
+	done := s.trace.begin(ctx, "native.complete", lease.Until)
+	e := s.nativePhaseFirstOperations.CompleteNativeOperation(ctx, lease)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseOperationReader struct {
+	evidence.NativeOperationReader
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseOperationReader) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, peer value.KeyPeer) (value.NativeLease, error) {
+	done := s.trace.begin(ctx, "native.origin-sql", time.Time{})
+	v, e := s.NativeOperationReader.ObserveNativeOperation(ctx, ref, peer)
+	done(e, v.Until)
+	return v, e
+}
+
+type nativePhasePreparationKeys struct {
+	evidence.DownloadKeyBindingLedger
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhasePreparationKeys) BindAttestedDownloadKeys(ctx context.Context, id string, a artifact.DownloadAuthority, batch string, generation int64, scope value.KeyScope, peer value.KeyPeer, proof value.KeyWorkerProof) error {
+	done := s.trace.begin(ctx, "native.bind-keys", identity.Earlier(a.ValidUntil, proof.FreshUntil))
+	e := s.DownloadKeyBindingLedger.BindAttestedDownloadKeys(ctx, id, a, batch, generation, scope, peer, proof)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseRegistrar struct {
+	evidence.NativeExchangeRegistrar
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseRegistrar) RegisterNativeExchange(ctx context.Context, in evidence.NativeExchangeRegistration, before func(context.Context, evidence.NativeOrigin) error, check func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativePendingExchange, error) {
+	done := s.trace.begin(ctx, "native.register", in.Operation.Until)
+	v, e := s.NativeExchangeRegistrar.RegisterNativeExchange(ctx, in, func(call context.Context, origin evidence.NativeOrigin) error {
+		finished := s.trace.begin(call, "native.before-command", origin.Lease.Until)
+		err := before(call, origin)
+		finished(err, time.Time{})
+		return err
+	}, func(call context.Context, origin evidence.NativeOrigin) (value.NativeLease, error) {
+		finished := s.trace.begin(call, "native.current-frame", origin.Lease.Until)
+		lease, err := check(call, origin)
+		finished(err, lease.Until)
+		return lease, err
+	})
+	done(e, time.Time{})
+	if v != nil {
+		v = nativePhasePending{v, s.trace}
+	}
+	return v, e
+}
+
+type nativePhasePending struct {
+	evidence.NativePendingExchange
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhasePending) Wait(ctx context.Context) (evidence.NativeExchange, error) {
+	done := s.trace.begin(ctx, "native.wait", time.Time{})
+	v, e := s.NativePendingExchange.Wait(ctx)
+	done(e, time.Time{})
+	if v != nil {
+		v = nativePhaseExchange{v, s.trace}
+	}
+	return v, e
+}
+func (s nativePhasePending) Close() {
+	done := s.trace.begin(nil, "native.close-pending", time.Time{})
+	s.NativePendingExchange.Close()
+	done(nil, time.Time{})
+}
+
+type nativePhaseExchange struct {
+	evidence.NativeExchange
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseExchange) Prepared(ctx context.Context) (artifact.NativeDownloadMetadata, error) {
+	done := s.trace.begin(ctx, "native.prepared", time.Time{})
+	v, e := s.NativeExchange.Prepared(ctx)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativePhaseExchange) Commit(ctx context.Context) error {
+	done := s.trace.begin(ctx, "native.commit", time.Time{})
+	e := s.NativeExchange.Commit(ctx)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseHTTPFirstResponses interface {
+	evidence.DownloadResponses
+	FirstContextResponsesOnly()
+}
+
+type nativePhaseHTTPSessions struct {
+	evidence.DownloadSessions
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPSessions) LookupDownload(ctx context.Context, id string, principal identity.Principal) (artifact.DownloadSession, error) {
+	done := s.trace.begin(ctx, "http.session-lookup", time.Time{})
+	v, e := s.DownloadSessions.LookupDownload(ctx, id, principal)
+	done(e, v.Deadline)
+	return v, e
+}
+
+type nativePhaseHTTPResponses struct {
+	nativePhaseHTTPFirstResponses
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPResponses) BeginDownloadResponse(ctx context.Context, store string, authority artifact.DownloadAuthority, response artifact.DownloadResponse) (artifact.DownloadResponse, error) {
+	done := s.trace.begin(ctx, "http.response-begin", authority.ValidUntil)
+	v, e := s.nativePhaseHTTPFirstResponses.BeginDownloadResponse(ctx, store, authority, response)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativePhaseHTTPResponses) BeginDownloadWindow(ctx context.Context, session, response, owner, window string, authority artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
+	done := s.trace.begin(ctx, "http.window-begin", authority.ValidUntil)
+	v, e := s.nativePhaseHTTPFirstResponses.BeginDownloadWindow(ctx, session, response, owner, window, authority)
+	done(e, v.Window.WriteUntil)
+	return v, e
+}
+func (s nativePhaseHTTPResponses) LeaseDownloadResponse(ctx context.Context, session, response, owner, window string, authority artifact.DownloadAuthority) (artifact.DownloadDeliveryLease, error) {
+	done := s.trace.begin(ctx, "http.response-lease", authority.ValidUntil)
+	v, e := s.nativePhaseHTTPFirstResponses.LeaseDownloadResponse(ctx, session, response, owner, window, authority)
+	done(e, v.Until)
+	return v, e
+}
+func (s nativePhaseHTTPResponses) FinishDownloadWindow(ctx context.Context, in audit.DownloadWindowIntent, outcome artifact.DownloadWindowOutcome) (audit.DownloadWindowAuditOutcome, error) {
+	done := s.trace.begin(ctx, "http.window-finish", in.Window.WriteUntil)
+	v, e := s.nativePhaseHTTPFirstResponses.FinishDownloadWindow(ctx, in, outcome)
+	done(e, v.Intent.Window.WriteUntil)
+	return v, e
+}
+func (s nativePhaseHTTPResponses) CloseDownloadResponse(ctx context.Context, session, response, owner string) error {
+	done := s.trace.begin(ctx, "http.response-close", time.Time{})
+	e := s.nativePhaseHTTPFirstResponses.CloseDownloadResponse(ctx, session, response, owner)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseHTTPJournal struct {
+	auditapp.OperationJournal
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPJournal) ReserveOperation(ctx context.Context, in audit.OperationIntent) (audit.OperationSnapshot, error) {
+	done := s.trace.begin(ctx, "http.audit-reserve", in.RequestUntil)
+	v, e := s.OperationJournal.ReserveOperation(ctx, in)
+	done(e, v.Intent.RequestUntil)
+	return v, e
+}
+func (s nativePhaseHTTPJournal) ClaimOperationWrite(ctx context.Context, in audit.OperationIntent, phase string) (bool, error) {
+	done := s.trace.begin(ctx, nativePhaseHTTPAuditPhase(phase, "claim"), in.WriteUntil)
+	v, e := s.OperationJournal.ClaimOperationWrite(ctx, in, phase)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativePhaseHTTPJournal) FreezeOperationOutcome(ctx context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
+	done := s.trace.begin(ctx, "http.audit-freeze", out.Intent.WriteUntil)
+	v, e := s.OperationJournal.FreezeOperationOutcome(ctx, out)
+	done(e, v.Intent.RequestUntil)
+	return v, e
+}
+
+type nativePhaseHTTPOperationAck struct {
+	auditapp.OperationAcknowledgements
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPOperationAck) AcknowledgeOperation(ctx context.Context, in audit.OperationIntent, phase string, receipt audit.Receipt) error {
+	done := s.trace.begin(ctx, nativePhaseHTTPAuditPhase(phase, "ack"), in.WriteUntil)
+	e := s.OperationAcknowledgements.AcknowledgeOperation(ctx, in, phase, receipt)
+	done(e, time.Time{})
+	return e
+}
+
+type nativePhaseHTTPClosedObjects struct {
+	auditapp.ClosedOperationObjects
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPClosedObjects) CreateClosedOperationIntent(ctx context.Context, in audit.OperationIntent) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, "http.audit-intent-create", in.WriteUntil)
+	v, e := s.ClosedOperationObjects.CreateClosedOperationIntent(ctx, in)
+	done(e, time.Time{})
+	return v, e
+}
+func (s nativePhaseHTTPClosedObjects) CreateClosedOperationOutcome(ctx context.Context, out audit.OperationOutcome) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, "http.audit-outcome-create", out.Intent.WriteUntil)
+	v, e := s.ClosedOperationObjects.CreateClosedOperationOutcome(ctx, out)
+	done(e, time.Time{})
+	return v, e
+}
+
+type nativePhaseHTTPCompletions struct {
+	auditapp.OperationCompletions
+	trace *nativePhaseDiagnostic
+}
+
+func (s nativePhaseHTTPCompletions) RecordOperationCompletion(ctx context.Context, in audit.OperationIntent, phase string, completion audit.OperationWriteCompletion) error {
+	done := s.trace.begin(ctx, nativePhaseHTTPAuditPhase(phase, "record"), in.WriteUntil)
+	e := s.OperationCompletions.RecordOperationCompletion(ctx, in, phase, completion)
+	done(e, time.Time{})
+	return e
+}
+func (s nativePhaseHTTPCompletions) ReadOperationCompletion(ctx context.Context, in audit.OperationIntent, phase string) (audit.OperationWriteCompletion, error) {
+	done := s.trace.begin(ctx, nativePhaseHTTPAuditPhase(phase, "read"), in.WriteUntil)
+	v, e := s.OperationCompletions.ReadOperationCompletion(ctx, in, phase)
+	done(e, time.Time{})
+	return v, e
+}
+
+// Labels remain closed even if a failing implementation supplies an unexpected
+// phase. That original value still reaches the underlying port unchanged.
+func nativePhaseHTTPAuditPhase(phase, action string) string {
+	switch phase {
+	case "intent":
+		switch action {
+		case "claim":
+			return "http.audit-intent-claim"
+		case "ack":
+			return "http.audit-intent-ack"
+		case "record":
+			return "http.audit-intent-record"
+		case "read":
+			return "http.audit-intent-read"
+		}
+	case "outcome":
+		switch action {
+		case "claim":
+			return "http.audit-outcome-claim"
+		case "ack":
+			return "http.audit-outcome-ack"
+		case "record":
+			return "http.audit-outcome-record"
+		case "read":
+			return "http.audit-outcome-read"
+		}
+	}
+	return "http.audit-invalid-phase"
+}
+
+// Closed labels only; an unexpected caller cannot turn the recorder into a log sink.
+var nativeDiagnosticLabels = [...]string{
+	"authority.catalog",
+	"authority.current",
+	"authority.environment",
+	"authority.permissions",
+	"authority.retention",
+	"http.audit-freeze",
+	"http.audit-intent-ack",
+	"http.audit-intent-claim",
+	"http.audit-intent-create",
+	"http.audit-intent-read",
+	"http.audit-intent-record",
+	"http.audit-invalid-phase",
+	"http.audit-outcome-ack",
+	"http.audit-outcome-claim",
+	"http.audit-outcome-create",
+	"http.audit-outcome-read",
+	"http.audit-outcome-record",
+	"http.audit-reserve",
+	"http.client-request",
+	"http.identity",
+	"http.response-begin",
+	"http.response-close",
+	"http.response-lease",
+	"http.session-lookup",
+	"http.window-begin",
+	"http.window-finish",
+	"http.window-intent-ack",
+	"http.window-intent-create",
+	"metadata.read",
+	"native.before-command",
+	"native.bind-keys",
+	"native.claim",
+	"native.close-pending",
+	"native.commit",
+	"native.complete",
+	"native.current-frame",
+	"native.next-fence",
+	"native.origin-sql",
+	"native.prepared",
+	"native.register",
+	"native.release",
+	"native.wait",
+	"other",
+	"preparation.begin-batch",
+	"preparation.continue",
+	"preparation.finish-batch",
+	"preparation.intent-ack",
+	"preparation.intent-write",
+	"preparation.outcome-ack",
+	"preparation.outcome-write",
+	"preparation.permit-batch",
+	"preparation.permit-metadata",
+	"publication.create-fixture",
+	"publication.permissions",
+	"publication.recovery",
+	"publication.retention",
+}
+
+func nativeDiagnosticLabel(value string) string {
+	for _, label := range nativeDiagnosticLabels {
+		if value == label {
+			return label
+		}
+	}
+	return "other"
+}
+
+type nativeDiagnosticAuthorityTest struct {
+	ctx     context.Context
+	current identities.CurrentIdentity
+	scope   artifact.DownloadScope
+	value   artifact.DownloadAuthority
+	err     error
+	calls   int
+}
+
+func (s *nativeDiagnosticAuthorityTest) CheckDownloadCurrent(ctx context.Context, c identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	s.ctx, s.current, s.scope = ctx, c, scope
+	s.calls++
+	return s.value, s.err
+}
+func TestNativePhaseDiagnosticPreservesOriginalCallAndDeadline(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+	defer cancel()
+	unavailable := errors.New("private diagnostic sentinel never logged")
+	in := &nativeDiagnosticAuthorityTest{value: artifact.DownloadAuthority{CheckedAt: time.Now(), ValidUntil: time.Now().Add(time.Millisecond)}, err: unavailable}
+	s := &nativePhaseDiagnostic{start: time.Now()}
+	s.stage(nativeDiagnosticPreparation)
+	a := nativePhaseAuthority{in, s}
+	scope := artifact.DownloadScope{ArtifactID: "original-not-logged"}
+	v, err := a.CheckDownloadCurrent(ctx, nil, scope)
+	if in.calls != 1 || in.ctx != ctx || in.current != nil || in.scope != scope || v != in.value || err != unavailable {
+		t.Fatal("trace changed original authority call")
+	}
+	cancel()
+	_, err = a.CheckDownloadCurrent(ctx, nil, scope)
+	if err != unavailable || in.calls != 2 || in.ctx != ctx {
+		t.Fatal("trace replaced canceled original call")
+	}
+	b := s.stages[nativeDiagnosticPreparation]
+	if b.firstError == nil || b.firstError.result != "other-error" || b.firstError.remainingStart <= 0 || b.firstError.elapsed < 0 || b.events[1].contextResult != "context-canceled" {
+		t.Fatal("incorrect bounded timing classification")
+	}
+}
+func TestNativePhaseDiagnosticKeepsIndependentBoundedStages(t *testing.T) {
+	s := &nativePhaseDiagnostic{start: time.Now()}
+	s.stage(nativeDiagnosticPreparation)
+	s.begin(context.Background(), "native.claim", time.Time{})(artifact.ErrDownloadConflict, time.Time{})
+	var joined sync.WaitGroup
+	for range 4 {
+		joined.Add(1)
+		go func() {
+			defer joined.Done()
+			for range 40 {
+				s.begin(context.Background(), "authority.current", time.Time{})(nil, time.Time{})
+			}
+		}()
+	}
+	joined.Wait()
+	s.stage(nativeDiagnosticOff)
+	for range 40 {
+		s.begin(context.Background(), "authority.current", time.Time{})(nil, time.Time{})
+	}
+	s.stage(nativeDiagnosticHTTP)
+	s.begin(context.Background(), "http.audit-reserve", time.Time{})(artifact.ErrDownloadCapacity, time.Time{})
+	prep, http := s.stages[nativeDiagnosticPreparation], s.stages[nativeDiagnosticHTTP]
+	if prep.used != 16 || prep.firstError == nil || prep.firstError.phase != "native.claim" || prep.totals["authority.current"].calls != 160 || http.used != 1 || http.firstError.phase != "http.audit-reserve" {
+		t.Fatal("trace lost independent first error or exceeded bound")
+	}
+	// Dynamic input can reach neither the totals key nor retained event/error.
+	s.begin(context.Background(), "private-id-or-token", time.Time{})(errors.New("private body"), time.Time{})
+	if s.stages[nativeDiagnosticHTTP].events[1].phase != "other" || s.stages[nativeDiagnosticHTTP].events[1].result != "other-error" || len(s.stages[nativeDiagnosticHTTP].totals) != 2 {
+		t.Fatal("dynamic diagnostic label/error escaped classification")
+	}
+}
+
+var _ interface{ FirstContextObservationsOnly() } = nativePhaseOperations{}
+var _ interface{ FirstContextResponsesOnly() } = nativePhaseHTTPResponses{}

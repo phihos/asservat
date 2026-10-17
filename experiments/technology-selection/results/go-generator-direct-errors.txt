@@ -1,0 +1,2 @@
+error generating code: error collecting component types: error generating Go types for component schemas: error converting Schema Contract_capture_composition_schema to Go type: error generating Go schema for property 'components': error resolving primitive type: error generating type for array: error turning reference (#/components/schemas/Contract_capture_composition_schema/$defs/component) into a Go type: unexpected reference depth: 6 for ref: #/components/schemas/Contract_capture_composition_schema/$defs/component local: true
+exit status 1

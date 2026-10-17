@@ -1,0 +1,258 @@
+{
+  "integratedAt": "2026-10-13T10:34:41.666254+00:00",
+  "source": "/home/phil/.cache/asservat-build/planning/initial-versioned-audit-20261013/checkpoint-v4",
+  "manifestSHA256": "b9654aa55acd161e91ce5779fed0633d5fc07c000b790ebc668a431a272c7ce2",
+  "resultSHA256": "1357cd64bbed2557b393925f8cd181c058900dedf84f3d8195a73e26a6b43212",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_close.go",
+      "base": "548b6f5b3931f0b5eabdcceff5b04d4e3a35433a1962a820994762e78802fd05",
+      "payload": "cb9033ac6e69fc3ce88a87cc94477945871012e7d42bce78e8bc927b103f147f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_copy_state.go",
+      "base": "cf48fbe24ac39f798082837237a8c50f38e12708dc2847505cd0442042b5b8c0",
+      "payload": "f4bc640d2f5a923e16877bfd84d67f664bc9f9d930b629bc0b141bd42b9409d6"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_observation_test.go",
+      "base": "f9dca01e330d2e5f42d93a55bb4f1dc64a913d247f0a561bec4f4469e9c8596f",
+      "payload": "39ff24ba46daa907b36c2ab4254d9b7bd1f11a674f7ea6f5404a69ae7acb5e18"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_open.go",
+      "base": "ae4118b5b9256c1566d7bd75c69efc999536c50ed27ca3dd5cb1aa6a4628b09a",
+      "payload": "dd9f6ded216d89f009d9647e121fcdad9fdb4e5cbab896fb89dd16df4a3a9066"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_passive.go",
+      "base": "64c4ea78aaa57a4eeb30779726e06a9dbdae02578872390d145c58cce923dde3",
+      "payload": "21d80a55c6325a8afff7a1289b6f00baed9c79deacc561cc5ca54a60a4303122"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+      "base": "3f4d165b87c3bb000ded07f8862a5e4f09f40f217d9fb11ab88203aa20781921",
+      "payload": "4744049a0951aaee0d5955a939e24e012485235647a2c67e9b17fdb1f4f2ee44"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_projection.go",
+      "base": "292c1c4ac593fc9e57fc700509fdafbe9e5f4bc7c5d59ebf9f0e2a4393383d6f",
+      "payload": "b3227a2834fb7de8b86d12ff541820acea9b372175a98a8009ccc4fa5cc69dea"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_route.go",
+      "base": "220c76fe2693b70aac9bca4149ede58838e4a84921ac4564b7f611831c3ae78f",
+      "payload": "7a76a63430d013fefd339c9572fa120b5dcdb718a10ced62e2f661dadc2424db"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_route_test.go",
+      "base": "0f5b4096e49b368e1d3926153209cfa5bace71fe6f94dacd29c09d9fcf24bfec",
+      "payload": "dd6ca658d30e321d2e03e88d39f5b755389088302a24976ff1b6a1f936666b24"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_state.go",
+      "base": "06bbb5b16ce8a60206ef6bab0e260bca890ddefc1c3962fe23c92bb5bb843d23",
+      "payload": "69dda9f63a29c654f9c6419bcc84b62ee583e165a2f7607170615be823e84c52"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_credentials.go",
+      "base": "f87430f2f883a6713362a99f8def47a852233c00a00477cd84682f30e77e47ff",
+      "payload": "02f7a9f620acaab4dedb02b110c3a92862788539dc1008659d221fcf93f2b139"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_installation_read.go",
+      "base": "0395b8a01b651d1a7dfb1f71a744addbb70c181bd0479c9c49ffa9f51efcdeaa",
+      "payload": "c10b78d5b357463a160e66096ad66f97b915eb4a5640167934312ef479e4de0a"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_credentials.go",
+      "base": "1ecb8317d89890bec0e87f10828e5a276b76a6dc3858ce12809e06a604aabe3c",
+      "payload": "a7f42ab1c430461a72d6e607674b8a4b2573363c703300c8c806c49e4bcf978f"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_preparer_inputs.go",
+      "base": "be2c7d38f23eea61cf5ede0518b24fd6b081933b41eedf8105f20a86f4e298f6",
+      "payload": "7d631aacf472785cec8e1b66b6ea971e1dabb6d6c13a18e988ac6b6e8ff6ae8c"
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_versioned_audit_test.go",
+      "base": null,
+      "payload": "519f4ede48d16fac83d5a982c8c8ddff506fd33f319fb54d75943c520ae3d99c"
+    },
+    {
+      "path": "internal/adapters/providerconfig/initial_bootstrap_input.go",
+      "base": "1acf702fd91ce55ee2a8f9b00186290fcd5bb3ac5c0b0981b329682b5c60b2c9",
+      "payload": "5628eec39b92b33d86f2ea6861fb215bd1733fc54feedd4c3d7b90cada77ca7c"
+    },
+    {
+      "path": "internal/adapters/providerconfig/initial_bootstrap_input_test.go",
+      "base": "2f1c7677ff86f0645d598571d71c40d8530e52aa2948fadb9602d4ee575a35e5",
+      "payload": "905d5383c4d0c015b8f8730b08593ffd6475a0f9aab668993344c7b3bdf5ed36"
+    },
+    {
+      "path": "internal/bootstrap/initial_bootstrap_retire.go",
+      "base": "511ed47918a4ffbde516bbc963fe737a8bacdaea803ba8d5e3dec24826cd51d9",
+      "payload": "71178a2616e0193ad4f0e0b242203b27201bf160c22062ac53856153e3723ff9"
+    },
+    {
+      "path": "internal/bootstrap/initial_installer.go",
+      "base": "bfe0d3e276f3301788bc61b6f7c78d1b3b0713eb01e47542a9f6b0ccdcbea831",
+      "payload": "b4e9deb4cfc64586eaadc5b0ed23d9c489828561fe8f2c92cbaa6b73bff24825"
+    },
+    {
+      "path": "internal/bootstrap/initial_installer_audit.go",
+      "base": null,
+      "payload": "56139c79a297c8554c353e5ee81e83d632b94e0a69e2df152a424db11c984fee"
+    },
+    {
+      "path": "internal/bootstrap/initial_installer_audit_test.go",
+      "base": null,
+      "payload": "42a22dc325f38b7bbfceb14282e343ebfad83e24439883244c2e10f53d137ca8"
+    },
+    {
+      "path": "internal/bootstrap/initial_runtime_configuration.go",
+      "base": "b5f9c5732a9dc3f95e20f5be2dc5cc0816f2d09b6282e777e6d4571cc9352bde",
+      "payload": "07ca2e6cbda5a3b45d20b9ad3362721866cce6988ba9d2f3c9a8fe9e324a6b3f"
+    },
+    {
+      "path": "internal/contracts/initial_bootstrap_copy_closure.go",
+      "base": "8f94c6a0bcfdb42618254f92c197d5c25a098ad2ec4433540fbc3cc221fd083b",
+      "payload": "9baaa511a24ac5c4cf0c171d21248012ce52ec9408fc826daa4aac575cb80c84"
+    },
+    {
+      "path": "internal/contracts/initial_versioned_audit.go",
+      "base": null,
+      "payload": "e56528e58153e1cbdb3f232ac20d709780d16c30dc17a6aedc4f8322fb3c25cf"
+    },
+    {
+      "path": "scripts/check-specs.py",
+      "base": "18203ef3306b69254d3ca7143a24080adb82afb93e562dd48c6b8ffe07dc261f",
+      "payload": "c972b5e036c1e4629a4609005c1d688243e18f4110182bea7f0053f8b6e7b200"
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap-observation.schema.json",
+      "base": "6eff68d83df6f3d9e409546b4270dd7e9b401c5872395744f237040cb0070e6f",
+      "payload": "253931a31b7518e8e747f6fd64a4879769ba5ea72abad292529f2b673ff99093"
+    },
+    {
+      "path": "specs/contracts/initial-bootstrap.schema.json",
+      "base": "6ba37703db268494e08e0d6ea51d8c49a89f8de7e2f53c8e595d616a9cf6f7b6",
+      "payload": "cfc67b8285d3d3b1e757f49040f83e5528e89889e4586fa62d6873a063c0d793"
+    },
+    {
+      "path": "specs/contracts/initial-installer.schema.json",
+      "base": "2338e8447d2f531a2c3d6b55c0ed7e98cfbf056c861d8bf8175612d56c0e1f2a",
+      "payload": "90530286f784e53d8e50c1a45ebf80501971f5d8e9497e1d6cf28196e50936f6"
+    },
+    {
+      "path": "specs/contracts/initial-preparation-services.schema.json",
+      "base": "081d8da365bf0b22bed76afeb3806199b26fcee738dc6d700ecd9589e5b18f0d",
+      "payload": "a4ebd7a59f98d0d1a7e24b3ab32c15dce2ed5a03f22dec3c8686e0bfaffd869e"
+    },
+    {
+      "path": "test/integration/helm_bootstrap_test.go",
+      "base": "473dfdada9222b0002c8bf6ddeb133ddfb2d82c652971756c6a252badf073fa0",
+      "payload": "97ffe9ac0c3d301239a95eda378d70bb1197fc59ffd6fe59b9d237a7cfbd51e9"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_chain_test.go",
+      "base": "88c2c2796e015e9b5f37535e79170ced3d99baeb1a79731e4ff4b558d89f1421",
+      "payload": "18b61b669291f74201ccfb8630010c32dcc1fa1a3bfb35b5a9e697cc3f9c4975"
+    },
+    {
+      "path": "test/integration/initial_bootstrap_copy_test.go",
+      "base": "53a37d82d7ac5989eb71f46068e648c0a9b5be8b98677022939518e36fe1b39d",
+      "payload": "2091f2db8c676ea3477546215a190673804ea762532d9b09db7b5f1c49b9234d"
+    },
+    {
+      "path": "test/integration/initial_installation_test.go",
+      "base": "a6b3160bf6dac3bd7665a471610ef76bb1eb2873a1d49dace747152297c7a18b",
+      "payload": "8ea1f7175ebc4739ecb0104e3b464b4fc41100711cadeba94714d3b88756981a"
+    }
+  ],
+  "nativeQualification": false,
+  "scope": "Exact component payloads; native composition and installed runtime remain pending",
+  "archives": {
+    "test/results/initial-audit-version-package/checks/checkpoint-v1/manifest.json": "f61487b611b9e94f9e10228727727745873496a916bdf29a3bc30d7190f29e9e",
+    "test/results/initial-audit-version-package/checks/checkpoint-v1/dependencies.json": "04013ddb24c53694106791e146bba5f54d3f113f7bef7f1414451294fc318d06",
+    "test/results/initial-audit-version-package/checks/checkpoint-v1/overlay.json": "1af1ba8216d1280a3195751af8e9021a7786917ee17c307bc9333a7cbde054d0",
+    "test/results/initial-audit-version-package/checks/checkpoint-v1/before-overlay.json": "4dc28fec1097a05d9453f5d381ec4d5f949e2b8069d3d43d66431d5fa1dcbb4d",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/reboot.json": "8b68d2bf3bf162ee53a97579d1ebfe48400f2c3ad571c69067e97b7920f50747",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/manifest.json": "f61487b611b9e94f9e10228727727745873496a916bdf29a3bc30d7190f29e9e",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/dependencies.json": "04013ddb24c53694106791e146bba5f54d3f113f7bef7f1414451294fc318d06",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/overlay.json": "71143797b6579b87eb3d2643d39c4e9d18fcf7ba5750834ae786f7c0fc99e16c",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/before-overlay.json": "309f2eca32eb502b7ce57d3b03106b23bc2f28e684b71e429b8ddb876e4442f3",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/runner.py": "2d93511534fb77d21cd0cbf5cc8cb0bdd559bcf5ebdcac0edd6cf1f2ab2fc09c",
+    "test/results/initial-audit-version-package/checks/checkpoint-v2/result.json": "2424a8dff1333a3f0b37886ab218fa514386b69815a5a6a32a97dbc66223d3e8",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/reboot.json": "b5a92880ef5dab3972bbd42a772b3243661a6f747e75a00c697d96943186c597",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/manifest.json": "f61487b611b9e94f9e10228727727745873496a916bdf29a3bc30d7190f29e9e",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/dependencies.json": "04013ddb24c53694106791e146bba5f54d3f113f7bef7f1414451294fc318d06",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/overlay.json": "9bdc9f90453649718595037d51d996dc12c2fb5a7f0f5bdb75f3284b351092e2",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/before-overlay.json": "21c4c3fe2c20cb80e3a91a4a0a9689e36db24adaeccf459156c8899626b4d424",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/runner.py": "9359d7347ef6183d516ff822ee2d454ef9032f58c0fdff3c6c87762ff9dd1051",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/compile.log": "4c4a68fe5604782b9f9750d9c620baa039718e36dfaf7c2aa1d5ef4bfb80bae2",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/compile.json": "2a5fef535983b667334114278083f6b911735620a49af880d0cf1ec26994e54a",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/before-version-optional.log": "df0b5b1ca63061ecd993e2012c03ffd1dead73eb883946db3084d1d2763bd585",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/before-version-optional.json": "7c8e3ee6ae991928a3a88f8e6b16c7903b37fc498731529168c6a2250182a25f",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/race.log": "b1cecb5f78f250ad717e8b05645633fd9ea04fda9345e0ad204e20b12d9ddea6",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/race.json": "9f5d3d034bbcab4ea2052132d490c8c54f610ac32a8cf83123e3015141660e26",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/vet.json": "9e4ee393e11ed9ddc5ebe537c0a94d03ea1a82dba9f18f08fdf3cebd18ae6bf7",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/go-architecture.log": "061b7f200962f92aaff7e9955284c5e7214834a477fa034d088615c8356553ef",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/go-architecture.json": "1ababc609e689407a09d03cfe066fab2ee546f99188572c90cd9088c7d2b62ac",
+    "test/results/initial-audit-version-package/checks/checkpoint-v3/result.json": "8e209ef046295f0e5d41c3c5c41050ca0d3488289f6a9278aaf5bfa9b615fbf2",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/reboot.json": "a124997ca7f9ac5b75d91072ca1c10f7e7404cfeeca39ccf0a56514cdae15770",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/dependencies.json": "04013ddb24c53694106791e146bba5f54d3f113f7bef7f1414451294fc318d06",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/manifest.json": "b9654aa55acd161e91ce5779fed0633d5fc07c000b790ebc668a431a272c7ce2",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/runner.py": "d31f6080c436d984b41cf622c09762d9a83091d20e54cd579c4c022e21cdc54c",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/overlay.json": "b8544b2c0aea63c4bc02a2e8d117c16ed5bb506a376f7af694bc6f4a19c2d954",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/before-overlay.json": "362cbc55f6c1f11254d590be89c1c3deccce8b6b424ad41ed7b99b7296260c75",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/compile.log": "c364e3550637419be2dcc0c172f6a9f694434af5c6f170d5fc17fae02ffcb59a",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/compile.json": "76c3c26101207896b053c6bea59173642fa3fecb12c2c77409ea96194dc36e76",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/before-version-optional.log": "f4e718e8e776c579363a204e702cbf1dfe48858415ddab729e6a893979c14578",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/before-version-optional.json": "b1aa071aa3e9eb4d6a9f7d38536d1fdff491f585088aea7b0fe304345dc24e2d",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/race.log": "02610b17ba1a75ac885d263744c70afa67fdb7a0e0668e655f3860d458ca6faa",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/race.json": "e95a43d10213a4e80bca4112bef2e477cce75ea24b1da5851dffdd5df4243052",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/vet.json": "eadd027676c6df38f9fbe410240cbdc4a700fe91d4a5d889b9a940ff590ba595",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/go-architecture.log": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/go-architecture.json": "07138f85f85aa417a7ff9a1816d147756763cf47b2773d62cfe91dcb75843670",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/spec.log": "bfdce9f57fa8a014277d8ad40f36b9b7c5c496ba284383f6eb1efe7eaf589ddb",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/spec.json": "a6ef6df727e6337abb62d324ef3a6ec0f4f470d318e6ddd6f75187e3a203293b",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/result.json": "1357cd64bbed2557b393925f8cd181c058900dedf84f3d8195a73e26a6b43212",
+    "test/results/initial-audit-version-package/checks/checkpoint-v4/HANDOFF.md": "e9b56add1bef4d29eac3d085ecc2208201edb4cf0b7103e707314b5d312bffcb",
+    "test/results/initial-audit-version-package/payloads/scripts/check-specs.py.txt": "c972b5e036c1e4629a4609005c1d688243e18f4110182bea7f0053f8b6e7b200",
+    "test/results/initial-audit-version-package/payloads/test/integration/helm_bootstrap_test.go.txt": "97ffe9ac0c3d301239a95eda378d70bb1197fc59ffd6fe59b9d237a7cfbd51e9",
+    "test/results/initial-audit-version-package/payloads/test/integration/initial_bootstrap_chain_test.go.txt": "18b61b669291f74201ccfb8630010c32dcc1fa1a3bfb35b5a9e697cc3f9c4975",
+    "test/results/initial-audit-version-package/payloads/test/integration/initial_bootstrap_copy_test.go.txt": "2091f2db8c676ea3477546215a190673804ea762532d9b09db7b5f1c49b9234d",
+    "test/results/initial-audit-version-package/payloads/test/integration/initial_installation_test.go.txt": "8ea1f7175ebc4739ecb0104e3b464b4fc41100711cadeba94714d3b88756981a",
+    "test/results/initial-audit-version-package/payloads/specs/contracts/initial-bootstrap-observation.schema.json.txt": "253931a31b7518e8e747f6fd64a4879769ba5ea72abad292529f2b673ff99093",
+    "test/results/initial-audit-version-package/payloads/specs/contracts/initial-bootstrap.schema.json.txt": "cfc67b8285d3d3b1e757f49040f83e5528e89889e4586fa62d6873a063c0d793",
+    "test/results/initial-audit-version-package/payloads/specs/contracts/initial-installer.schema.json.txt": "90530286f784e53d8e50c1a45ebf80501971f5d8e9497e1d6cf28196e50936f6",
+    "test/results/initial-audit-version-package/payloads/specs/contracts/initial-preparation-services.schema.json.txt": "a4ebd7a59f98d0d1a7e24b3ab32c15dce2ed5a03f22dec3c8686e0bfaffd869e",
+    "test/results/initial-audit-version-package/payloads/internal/bootstrap/initial_bootstrap_retire.go.txt": "71178a2616e0193ad4f0e0b242203b27201bf160c22062ac53856153e3723ff9",
+    "test/results/initial-audit-version-package/payloads/internal/bootstrap/initial_installer.go.txt": "b4e9deb4cfc64586eaadc5b0ed23d9c489828561fe8f2c92cbaa6b73bff24825",
+    "test/results/initial-audit-version-package/payloads/internal/bootstrap/initial_installer_audit.go.txt": "56139c79a297c8554c353e5ee81e83d632b94e0a69e2df152a424db11c984fee",
+    "test/results/initial-audit-version-package/payloads/internal/bootstrap/initial_installer_audit_test.go.txt": "42a22dc325f38b7bbfceb14282e343ebfad83e24439883244c2e10f53d137ca8",
+    "test/results/initial-audit-version-package/payloads/internal/bootstrap/initial_runtime_configuration.go.txt": "07ca2e6cbda5a3b45d20b9ad3362721866cce6988ba9d2f3c9a8fe9e324a6b3f",
+    "test/results/initial-audit-version-package/payloads/internal/contracts/initial_bootstrap_copy_closure.go.txt": "9baaa511a24ac5c4cf0c171d21248012ce52ec9408fc826daa4aac575cb80c84",
+    "test/results/initial-audit-version-package/payloads/internal/contracts/initial_versioned_audit.go.txt": "e56528e58153e1cbdb3f232ac20d709780d16c30dc17a6aedc4f8322fb3c25cf",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_copy_close.go.txt": "cb9033ac6e69fc3ce88a87cc94477945871012e7d42bce78e8bc927b103f147f",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_copy_state.go.txt": "f4bc640d2f5a923e16877bfd84d67f664bc9f9d930b629bc0b141bd42b9409d6",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_observation_test.go.txt": "39ff24ba46daa907b36c2ab4254d9b7bd1f11a674f7ea6f5404a69ae7acb5e18",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_open.go.txt": "dd9f6ded216d89f009d9647e121fcdad9fdb4e5cbab896fb89dd16df4a3a9066",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_passive.go.txt": "21d80a55c6325a8afff7a1289b6f00baed9c79deacc561cc5ca54a60a4303122",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_plan.go.txt": "4744049a0951aaee0d5955a939e24e012485235647a2c67e9b17fdb1f4f2ee44",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_projection.go.txt": "b3227a2834fb7de8b86d12ff541820acea9b372175a98a8009ccc4fa5cc69dea",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_route.go.txt": "7a76a63430d013fefd339c9572fa120b5dcdb718a10ced62e2f661dadc2424db",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_route_test.go.txt": "dd6ca658d30e321d2e03e88d39f5b755389088302a24976ff1b6a1f936666b24",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_bootstrap_state.go.txt": "69dda9f63a29c654f9c6419bcc84b62ee583e165a2f7607170615be823e84c52",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_credentials.go.txt": "02f7a9f620acaab4dedb02b110c3a92862788539dc1008659d221fcf93f2b139",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_installation_read.go.txt": "c10b78d5b357463a160e66096ad66f97b915eb4a5640167934312ef479e4de0a",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_preparer_credentials.go.txt": "a7f42ab1c430461a72d6e607674b8a4b2573363c703300c8c806c49e4bcf978f",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_preparer_inputs.go.txt": "7d631aacf472785cec8e1b66b6ea971e1dabb6d6c13a18e988ac6b6e8ff6ae8c",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/kubernetes/initial_versioned_audit_test.go.txt": "519f4ede48d16fac83d5a982c8c8ddff506fd33f319fb54d75943c520ae3d99c",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/providerconfig/initial_bootstrap_input.go.txt": "5628eec39b92b33d86f2ea6861fb215bd1733fc54feedd4c3d7b90cada77ca7c",
+    "test/results/initial-audit-version-package/payloads/internal/adapters/providerconfig/initial_bootstrap_input_test.go.txt": "905d5383c4d0c015b8f8730b08593ffd6475a0f9aab668993344c7b3bdf5ed36"
+  }
+}

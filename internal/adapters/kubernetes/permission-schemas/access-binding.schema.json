@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/access-binding.schema.json",
+  "title": "Asservat AccessBinding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "AccessBinding"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": [
+            "Allow",
+            "Deny"
+          ]
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/subject"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/role"
+          },
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "scope": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/scope"
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "automation": {
+          "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/envelope"
+        }
+      },
+      "required": [
+        "effect",
+        "subjects",
+        "roles",
+        "scope",
+        "reason"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "automation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effect": {
+                "const": "Allow"
+              },
+              "subjects": {
+                "items": {
+                  "properties": {
+                    "kind": {
+                      "const": "Group"
+                    }
+                  }
+                }
+              },
+              "roles": {
+                "contains": {
+                  "const": "workload-maintainer"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/status"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

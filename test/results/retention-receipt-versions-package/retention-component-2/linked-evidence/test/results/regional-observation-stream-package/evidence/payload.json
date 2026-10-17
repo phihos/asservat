@@ -1,0 +1,9 @@
+{
+  "docs/architecture/cluster-observations.md": "d47faf271f4591d75f4c528a23b9aa7b9a8ef0b8e5fac618a501f5cea6c7d716",
+  "docs/decisions/144-cluster-local-observations.md": "1bd33735443e513340d4fb4753171ba75cffcf6c3f9fb5c1b0d75c4f97879790",
+  "internal/adapters/mtls/connector_observation_client.go": "949e99ac45d1106d0bbb281d5f9c08cad4219d93286af22089cd3bd6d2104816",
+  "internal/adapters/mtls/connector_observation_connection.go": "628738eac95fddfff8d85f37f05206b30580d39c3039fec3e550aa86960be098",
+  "internal/adapters/mtls/connector_observation_connection_test.go": "c99a9ea5166b40cac7f4035ec3687eb106520179411d91a90e2f198116968c09",
+  "internal/transport/clusterobservation/regional_exchange.go": "eb085bc6676ba1f678329184aae2943d6eba59af2021eeb226ae53b34ecb2b05",
+  "internal/transport/clusterobservation/regional_exchange_test.go": "92b2b76d5302bad009dc997a296db48d3f1186420d08eb08ee081546ba1a0c61"
+}

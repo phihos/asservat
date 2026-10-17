@@ -1,0 +1,4 @@
+=== RUN   TestVersionedAuditStorageWithRealServices
+--- PASS: TestVersionedAuditStorageWithRealServices (0.32s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.371s

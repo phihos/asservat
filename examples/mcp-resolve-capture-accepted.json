@@ -1,0 +1,18 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000500",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "state": "accepted",
+    "capture_id": "00000000-0000-4000-8000-000000000008",
+    "phase": "Accepted",
+    "navigation_uri": "https://asservat.example.invalid/captures/00000000-0000-4000-8000-000000000008",
+    "operation": "collect"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

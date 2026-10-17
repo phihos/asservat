@@ -1,0 +1,7 @@
+{
+  "path": "test/integration/native_retention_observer_test.go",
+  "before": "ed1ead4eca91b10dca850b62c10a0a05ea48383b4f6474ad68f93fa547cf0808",
+  "after": "976e770c3610039f3fb00fe67de7ad6687573436b1b999de0b931b55b34bb90b",
+  "beforeExit": 1,
+  "beforeAssertion": "current native retention read <nil>; combined error/proof/deadline check"
+}

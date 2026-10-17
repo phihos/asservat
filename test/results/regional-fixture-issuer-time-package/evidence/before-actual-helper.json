@@ -1,0 +1,45 @@
+{
+  "CGO_ENABLED": "1",
+  "after": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "before": {
+    "bases": [],
+    "dependencies": [],
+    "frozen": [],
+    "liveFileSet": [],
+    "mirror": [],
+    "mirrorFileSet": [],
+    "payloadFileSet": [],
+    "sourceFileSet": []
+  },
+  "beforeMarkers": 2,
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=60s",
+    "-vet=off",
+    "-v",
+    "-run=^TestNativeFixtureConnectorIssuerOriginalSigningInstant$",
+    "test/fixtures/observation-native/data.go",
+    "test/fixtures/observation-native/enrollment.go",
+    "test/fixtures/observation-native/inputs.go",
+    "test/fixtures/observation-native/main.go",
+    "test/fixtures/observation-native/metrics.go",
+    "test/fixtures/observation-native/runtime.go",
+    "test/fixtures/observation-native/enrollment_test.go"
+  ],
+  "exit": 1,
+  "expectedExit": 1,
+  "phase": "before-actual-helper",
+  "seconds": 21.106
+}

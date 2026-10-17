@@ -1,0 +1,78 @@
+{
+  "manifest": "d2213693e8f0a45d2106b001bd9c3ff10f3c8dafdee88971e8e864f427daee09",
+  "dependencies": "9570f303ffea48686424d2f874f288ec1e6c8f0ea1b3eef481922c82de020c56",
+  "runner": "dde90995b3b7c086576ebf102f39186762569e5331b980423d296cb2b509478b",
+  "before": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": []
+  },
+  "phases": [
+    {
+      "name": "before",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-configuration-probe-20261013/candidate-v1/before-overlay.json",
+        "./internal/bootstrap",
+        "-run",
+        "^TestInitialConfigurationDocuments",
+        "-count=1",
+        "-timeout=3m",
+        "-v"
+      ],
+      "exit": 1,
+      "expected": 1,
+      "seconds": 2.2095375061035156,
+      "log_sha256": "c4a00bada7b6c65c16a96f542ae5d6ea08f2ef028ba72438a860430747835841"
+    },
+    {
+      "name": "after-race",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-vet=off",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-configuration-probe-20261013/candidate-v1/overlay.json",
+        "./internal/bootstrap",
+        "-run",
+        "^Test(InitialConfigurationDocuments|ConfigurationRoleInstaller|OwnerCapacityProbe)",
+        "-count=1",
+        "-timeout=3m",
+        "-v"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 4.745809316635132,
+      "log_sha256": "3881d034c0804b11e19c62c344402da8f46044c4f3af21744f2a8665ea9cbfd3"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/capacity-configuration-probe-20261013/candidate-v1/overlay.json",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expected": 0,
+      "seconds": 1.1883225440979004,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "started_at": 1791852826.3663168,
+  "terminal_exit": 0,
+  "after": {
+    "payloads": [],
+    "bases": [],
+    "retained_bases": [],
+    "dependencies": []
+  },
+  "ended_at": 1791852834.5602822
+}

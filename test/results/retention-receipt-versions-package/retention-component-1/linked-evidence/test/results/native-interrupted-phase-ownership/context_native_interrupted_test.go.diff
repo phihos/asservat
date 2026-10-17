@@ -1,0 +1,68 @@
+--- before
++++ after
+@@ -25,7 +25,9 @@
+ // The second phase has a new explicitly prepared session, not a replacement of
+ // the uncertain first worker. These values are client/test state, not authority.
+ type nativeInterruptedState struct {
++	owner      *testing.T
+ 	second     bool
++	nextWorker *value.DownloadWorker
+ 	original   artifact.DownloadSession
+ 	worker     value.DownloadWorker
+ 	metadata   artifact.NativeDownloadMetadata
+@@ -65,12 +67,15 @@
+ 	t.Helper()
+ 	state := f.content.retry
+ 	nativeFixtureSQLUsage(t, ctx, f.admin, "enter-interrupted-phase")
+-	if state == nil {
+-		state = &nativeInterruptedState{original: session, worker: f.worker, metadata: m, completed: make(chan struct{}, 1)}
+-		f.content.retry = state
++	if state == nil || state.owner == nil {
++		t.Fatal("missing outer interruption fixture owner")
++	}
++	if state.server == nil {
++		state.original, state.worker, state.metadata = session, f.worker, m
++		state.completed = make(chan struct{}, 1)
+ 		state.server = httptest.NewUnstartedServer(nil)
+ 		state.server.EnableHTTP2 = true
+-		t.Cleanup(state.server.Close)
++		state.owner.Cleanup(state.server.Close)
+ 		origin := "https://" + state.server.Listener.Addr().String()
+ 		operations, e := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: custodyID}, coordinator)
+ 		if e != nil {
+@@ -80,7 +85,7 @@
+ 		if e != nil {
+ 			t.Fatal("interruption investigation constructor", e)
+ 		}
+-		state.shared = nativeContentAuditFixture(t, ctx, f, inner)
++		state.shared = nativeContentAuditFixtureOwned(t, state.owner, ctx, f, inner)
+ 		initial, e := f.gate.Identities.Resolve(ctx, "synthetic-reference")
+ 		if e != nil {
+ 			t.Fatal("interruption initial identity", e)
+@@ -184,7 +189,7 @@
+ 		t.Fatal("actual interruption never began native h2 output", response.StatusCode)
+ 	}
+ 	state.prefix = make([]byte, m.Size/2)
+-	t.Cleanup(func() { clear(state.prefix) })
++	state.owner.Cleanup(func() { clear(state.prefix) })
+ 	_, e = io.ReadFull(response.Body, state.prefix)
+ 	cancel()
+ 	response.Body.Close()
+@@ -259,11 +264,10 @@
+ 		t.Fatal("fresh preparation did not produce its own audited worker", e)
+ 	}
+ 	state.second = true
+-	next := f
+-	next.worker = *attachment.Worker
++	next := *attachment.Worker
++	state.nextWorker = &next
+ 	nativeFixtureSQLUsage(t, ctx, f.admin, "before-fresh-worker")
+-	next.enrollment = newWorkerEnrollmentFixture(t, ctx, f.poolFor, f.allocation.RootID, next.worker, f.guards, f.store, f.keys, f.gate)
+-	// Same original outer context and previously installed backing. Only issuer/
+-	// Pod proof is synthetic as already declared by this native fixture.
+-	qualifyNativeExchange(t, ctx, next)
+-}
++	// Return through this phase's joined worker/result/listener/pool cleanup.
++	// The outer owner then starts the separately admitted worker under the same
++	// original fixture deadline and previously installed backing.
++}

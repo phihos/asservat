@@ -1,0 +1,22 @@
+[
+  {
+    "path": "test/integration/context_native_content_test.go",
+    "base_sha256": "4001e9b4ddfc507ea8118c159799144fc231f6f7cb320f6a07f5db1406888d92",
+    "payload_sha256": "f2c128c36fb0225c1677d1cd3eaecb8def58318fcbb21aa85a7028d3d3e5b4ff"
+  },
+  {
+    "path": "test/integration/context_native_interrupted_test.go",
+    "base_sha256": "4ead0cac80f138c7e2faa0bcd1a263970ea47b5b32e1a909bc6900dc5a7a57e0",
+    "payload_sha256": "a302ecb540d5eed2c6676532b301d879f46b2e3cab71051e80ba0e8626159377"
+  },
+  {
+    "path": "test/integration/context_publication_test.go",
+    "base_sha256": "b77053e8183ee1ab9ec4c02f7d5bf6d7fdc2a6f3450b7a0a62c88772f3429da8",
+    "payload_sha256": "0d70078a3df8d918bfd1cebce5d031ecb254ba6207c553c964d5629ba43d7a27"
+  },
+  {
+    "path": "test/integration/native_phase_diagnostic_test.go",
+    "base_sha256": null,
+    "payload_sha256": "e118dc4af316d546f53445c13c2e7e917c09e122e3496a28a1a86fd543996a7e"
+  }
+]

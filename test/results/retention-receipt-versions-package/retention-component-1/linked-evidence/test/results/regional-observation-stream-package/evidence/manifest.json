@@ -1,0 +1,21 @@
+{
+  "basesSHA256": "f69cb75478d9ec93af0d06cbb58e2e4ca5191bd367be0433d9c455692a06b0b8",
+  "dependenciesSHA256": "a43f229d0368835af090dd768772c9e915001f665ce93b06e3c4ec10833bcf20",
+  "liveDependencies": 1684,
+  "next": "Compile, selected race tests, vet and Go architecture gate only after parent build slot release. Hub holder/forwarding remains separate.",
+  "overlaySHA256": "bb750f8b210b84fd1ce9ff3935b77df39a83055b363111b51119106c4124811e",
+  "ownedPaths": 7,
+  "paths": [
+    "docs/architecture/cluster-observations.md",
+    "docs/decisions/144-cluster-local-observations.md",
+    "internal/adapters/mtls/connector_observation_client.go",
+    "internal/adapters/mtls/connector_observation_connection.go",
+    "internal/adapters/mtls/connector_observation_connection_test.go",
+    "internal/transport/clusterobservation/regional_exchange.go",
+    "internal/transport/clusterobservation/regional_exchange_test.go"
+  ],
+  "payloadSHA256": "eb228d61ad57adfd7f8081325fc85dcfe32591cb908a6f13caaed2dcb3093337",
+  "scope": "Concrete regional same-channel HTTP/2 standby, closed twelve-frame runner and terminal EOF/join; no listener/holder/router activation",
+  "status": "source frozen; checks unrun",
+  "syntheticScope": "Actual loopback HTTP/2 and mutual TLS tests retain synthetic native workload/source/registry fixtures. No installed/two-cluster or sustained availability verdict."
+}

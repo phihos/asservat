@@ -1,0 +1,408 @@
+{
+  "runnerSHA256": "0fed993c0afecc64abd973412fff02c1a8f097e2bac7f62f98bf6440aade78b7",
+  "steps": [
+    {
+      "name": "race-kubernetes",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-timeout=15m",
+        "-json",
+        "-run",
+        "^(?:TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts|TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches|TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate|TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge|TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay|TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait|TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection|TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect|TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared|TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete|TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe|TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects)$",
+        "./internal/adapters/kubernetes"
+      ],
+      "pid": 1586566,
+      "processGroup": 1586566,
+      "exit": 1,
+      "seconds": 195.352,
+      "processJoined": true,
+      "processGroupAbsent": true,
+      "stopReason": null,
+      "requiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe"
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects"
+        ]
+      ],
+      "requiredTopLevelTests": 12,
+      "missingPackagePasses": [
+        "asservat.local/asservat/internal/adapters/kubernetes"
+      ],
+      "missingRequiredTests": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection"
+        ]
+      ],
+      "exactTopLevelRuns": true,
+      "exactTopLevelPasses": false,
+      "observedTopLevelRuns": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects",
+          1
+        ]
+      ],
+      "observedTopLevelPasses": [
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe",
+          1
+        ],
+        [
+          "asservat.local/asservat/internal/adapters/kubernetes",
+          "TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects",
+          1
+        ]
+      ],
+      "passedNamedTests": [
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/caller",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/driver",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/root",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate/native-denial",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate/accepted-unavailable",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate/accepted-expired",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate/bridge-recovery",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection/private-replaced",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection/private-missing",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection/unpinned",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect/credentials",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect/launch",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect/private-version",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait/short-positive",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait/caller-cancelled",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait/source-expired",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/prefix/root",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/prefix/bridge",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/prefix/resources",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/suffix/root",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/suffix/bridge",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches/suffix/resources",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/omission",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/accessor",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/account",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/selected-secret",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects/recipe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/client",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/storage",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/wrap",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/unwrap",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe/server",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts/legacy-true",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts/legacy-false",
+        "asservat.local/asservat/internal/adapters/kubernetes/TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts"
+      ],
+      "failuresOrSkips": [
+        {
+          "Time": "2026-10-14T05:35:57.242202184+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Test": "TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection/private-version",
+          "Elapsed": 6.51
+        },
+        {
+          "Time": "2026-10-14T05:36:14.872752127+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Test": "TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection",
+          "Elapsed": 24.14
+        },
+        {
+          "Time": "2026-10-14T05:37:46.303941401+02:00",
+          "Action": "fail",
+          "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+          "Elapsed": 183.137
+        }
+      ],
+      "exactFailedParentAndChildren": false
+    }
+  ],
+  "sourceCount": 3082,
+  "bootID": "233cf8c2-50ef-47f6-9aab-b020248e75a9",
+  "status": "failed",
+  "reviewedPayloads": {
+    "internal/adapters/kubernetes/initial_runtime_resources.go": "7e2ab93567fafc8222c01d516716a7a5d953fdca9ac7c06c1f6fdaf16d47b103",
+    "internal/adapters/kubernetes/owner_identity_launch.go": "a4c2efdee260cf2a931f932b64197c63fccf84f2fc8317d905c919dc6b7a2c5d",
+    "internal/adapters/kubernetes/owner_identity_projection.go": "b5fa1356fceb2cb69a8fce9885d38bb00ef867f87eb7a79c492ea3b1c4f03ee2",
+    "internal/adapters/kubernetes/owner_identity_projection_objects.go": "f5881f71a77fbec90eece0adc3ef12d1dbdedc77e8b5eaae5a422018d0de91d9",
+    "internal/adapters/kubernetes/owner_identity_roles.go": "2a6b8a6be3a605554c8d52af494bbd3cc92bb7f3e68ea634f2bc29c9f8806fc0",
+    "internal/adapters/kubernetes/owner_installation_driver.go": "2038d2b72dfdb666d075b0d7e294b7a2cbe1c5accf4f1c9a5c23fefdbf1cb2ea",
+    "internal/adapters/kubernetes/owner_installation_driver_test.go": "d39337a4f7bb9c547bb85131ac095fb3c64a25834c5258aa8d37c1cdbefce285",
+    "internal/adapters/kubernetes/owner_projection_diagnostic_test.go": "12d1ce86bff806ed29cc8ff7cf9592655c576bd00ae1367e8f43d6874a3e6f0f",
+    "internal/adapters/kubernetes/owner_projection_finalization.go": "e6453270b029a84e15e0cc3533bbdfe55f77555aa9ab41bd86d52c9891f795b7",
+    "internal/adapters/kubernetes/owner_projection_finalization_handle_test.go": "25ce3c8865fde18706689b06347598a0829cf9983c042b97d3e4e18da99ff5ba",
+    "internal/adapters/kubernetes/owner_projection_finalization_test.go": "6c58d99e423cad6083d5d392a619f45b9c901eeda5a6aca7187675e6d9b0f11f",
+    "internal/adapters/kubernetes/owner_projection_operation.go": "0d0ce22340609f8e9f7c6ac01550844a2cbc5d606eed4867e25c03968b851ac6",
+    "internal/adapters/kubernetes/owner_projection_operation_composed_test.go": "03c320ee99e79f8c2fe8d3adf0dd4b6eca0fd0dc1a7290cd9b8def1d92726437",
+    "internal/adapters/kubernetes/owner_projection_operation_effects.go": "919d93e2ddc5fa43c908d2c60f5a5d80372d4b00ca060e296e2a44b486e46448",
+    "internal/adapters/kubernetes/owner_projection_operation_fixture_test.go": "88cfe0e9b9f24c72a20db54b93a26cc24e7c094343de144893e7beb6747e8a0e",
+    "internal/adapters/kubernetes/owner_projection_operation_native.go": "25961943a534dff8ece10aeb1212b98622bf867ba8c181ff0e67c9bf6fc2a962",
+    "internal/adapters/kubernetes/owner_projection_operation_plan.go": "cb90f19a1e9963df5ab3960f1b9090fee9162c8d45e21346211eb294a2196dc2",
+    "internal/adapters/kubernetes/owner_projection_pending.go": "26bb2ad94978797c2340544e2e1dbdd0254c96d171d6a502085399ad9db53efa",
+    "internal/adapters/kubernetes/owner_projection_preflight.go": "e631a6f696945ac5042ec24bc11d503ddac3b969c9b098ae49e51f695d1c01d2",
+    "internal/adapters/kubernetes/owner_projection_preflight_test.go": "5dd91497bd32a8526a22de5655c2b16b77de2123dc77090091cc9c8f9d78591e",
+    "internal/adapters/postgres/owner_identity_operation_test.go": "dcf0a61c658a0d65a2189c9b0a58988c1dfe09064e6d7be08af2ab5e9bc3821c",
+    "internal/adapters/postgres/owner_projection_finalization.go": "dd61ce8af4662b973596ef4efb006e15c67adc0ff0761a6807653d628740f208",
+    "internal/adapters/postgres/owner_projection_operation.go": "46600cd95f2a6e1f290848bd0e8badaba15ca39195e73a9113c1646bd3adc18b",
+    "test/integration/initial_runtime_owner_pair_native_test.go": "aec921a90073d5520d59a2c2f4e96748d6991f00908244e217b6f9ab2444e236"
+  },
+  "selections": {
+    "race-kubernetes": [
+      "./internal/adapters/kubernetes",
+      "^(?:TestOwnerIdentityProjectionClonesNestedCallerInputForBothLayouts|TestOwnerProjectionSplitCloseCancelsAndJoinsOriginalBranches|TestOwnerProjectionSplitCompletedNativeAndAcceptedPrecedePrivate|TestOwnerProjectionSplitInvalidOriginalOwnerDeploymentPrecedesBridge|TestOwnerProjectionSplitOpaquePrefixRejectsCopiesAndReplay|TestOwnerProjectionSplitOriginalDeadlineCannotBeRenewedAfterBridgeWait|TestOwnerProjectionSplitPinsRootAndDefinesFirstPrivateSelection|TestOwnerProjectionSplitPostClaimMutationStillSpendsWithoutEffect|TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared|TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete|TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe|TestProviderOwnerProjectionRejectsLegacyAndUnverifiedSelectionBeforeEffects)$"
+    ],
+    "race-postgres": [
+      "./internal/adapters/postgres",
+      "^"
+    ]
+  },
+  "helperSHA256": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+  "priorComponent1": {
+    "path": "/home/phil/Projekte/asservat/test/results/owner-projection-finalization-component-1",
+    "hashes": {
+      "result.json": "43cb7698129fc49899412710858a12f993b152baec250b8241a9b419be47c770",
+      "sources.json": "9f2b64f863f32a38020fb2e26b597cfde49de862a618daf009ac9b901b7f2439",
+      "compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+      "race-kubernetes.log": "9cb79a6715dadad54419d108a6c0c93991a353fd415541eb6b17b3ace697132f",
+      "runner.py": "741172e02cdf831dea42567a7164f7bf91174f26921fb306f54508863b150ded"
+    },
+    "retainedPassingKubernetesParents": 101,
+    "originalFailures": [
+      {
+        "Time": "2026-10-14T05:21:21.499076817+02:00",
+        "Action": "fail",
+        "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+        "Test": "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/caller",
+        "Elapsed": 8.46
+      },
+      {
+        "Time": "2026-10-14T05:21:29.974376212+02:00",
+        "Action": "fail",
+        "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+        "Test": "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/driver",
+        "Elapsed": 8.48
+      },
+      {
+        "Time": "2026-10-14T05:21:38.464563802+02:00",
+        "Action": "fail",
+        "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+        "Test": "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete/root",
+        "Elapsed": 8.49
+      },
+      {
+        "Time": "2026-10-14T05:21:38.464581242+02:00",
+        "Action": "fail",
+        "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+        "Test": "TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplete",
+        "Elapsed": 25.43
+      },
+      {
+        "Time": "2026-10-14T05:31:10.804414749+02:00",
+        "Action": "fail",
+        "Package": "asservat.local/asservat/internal/adapters/kubernetes",
+        "Elapsed": 900.084
+      }
+    ],
+    "testOnlyChangedPath": "internal/adapters/kubernetes/owner_installation_driver_test.go",
+    "compileExit": 0
+  },
+  "signalReceived": null,
+  "finalProcessGroupAbsent": true,
+  "sourceUnchanged": true,
+  "runnerUnchanged": false,
+  "priorEvidenceUnchanged": true,
+  "scratchRemoved": true,
+  "exit": 1,
+  "archiveHashes": {
+    "sources.json": "ff55ff36bd45b195a74d3381fedd90bcdb7afc59dd4485ac474c1ac12cacd784",
+    "runner.py": "0fed993c0afecc64abd973412fff02c1a8f097e2bac7f62f98bf6440aade78b7",
+    "freeze-helper.py": "70b900ee945711b7829c9054bf89a72bba1085904b1f94fade0006747c015d07",
+    "race-kubernetes.log": "1d0976e0bd32e7ec528dd6d633d6b1c24a72e23bad1dd9f03eaf50ebe325d45d",
+    "prior-component1/result.json": "43cb7698129fc49899412710858a12f993b152baec250b8241a9b419be47c770",
+    "prior-component1/sources.json": "9f2b64f863f32a38020fb2e26b597cfde49de862a618daf009ac9b901b7f2439",
+    "prior-component1/compile.log": "5ce6eeff3464956a4e03b24fbd16dc41a90aa91dbaee8c552c2d9a99de9b7dd0",
+    "prior-component1/race-kubernetes.log": "9cb79a6715dadad54419d108a6c0c93991a353fd415541eb6b17b3ace697132f",
+    "prior-component1/runner.py": "741172e02cdf831dea42567a7164f7bf91174f26921fb306f54508863b150ded",
+    "payloads/test/integration/initial_runtime_owner_pair_native_test.go.txt": "aec921a90073d5520d59a2c2f4e96748d6991f00908244e217b6f9ab2444e236",
+    "payloads/internal/adapters/kubernetes/initial_runtime_resources.go.txt": "7e2ab93567fafc8222c01d516716a7a5d953fdca9ac7c06c1f6fdaf16d47b103",
+    "payloads/internal/adapters/kubernetes/owner_identity_launch.go.txt": "a4c2efdee260cf2a931f932b64197c63fccf84f2fc8317d905c919dc6b7a2c5d",
+    "payloads/internal/adapters/kubernetes/owner_identity_projection.go.txt": "b5fa1356fceb2cb69a8fce9885d38bb00ef867f87eb7a79c492ea3b1c4f03ee2",
+    "payloads/internal/adapters/kubernetes/owner_identity_projection_objects.go.txt": "f5881f71a77fbec90eece0adc3ef12d1dbdedc77e8b5eaae5a422018d0de91d9",
+    "payloads/internal/adapters/kubernetes/owner_identity_roles.go.txt": "2a6b8a6be3a605554c8d52af494bbd3cc92bb7f3e68ea634f2bc29c9f8806fc0",
+    "payloads/internal/adapters/kubernetes/owner_installation_driver.go.txt": "2038d2b72dfdb666d075b0d7e294b7a2cbe1c5accf4f1c9a5c23fefdbf1cb2ea",
+    "payloads/internal/adapters/kubernetes/owner_installation_driver_test.go.txt": "d39337a4f7bb9c547bb85131ac095fb3c64a25834c5258aa8d37c1cdbefce285",
+    "payloads/internal/adapters/kubernetes/owner_projection_diagnostic_test.go.txt": "12d1ce86bff806ed29cc8ff7cf9592655c576bd00ae1367e8f43d6874a3e6f0f",
+    "payloads/internal/adapters/kubernetes/owner_projection_finalization.go.txt": "e6453270b029a84e15e0cc3533bbdfe55f77555aa9ab41bd86d52c9891f795b7",
+    "payloads/internal/adapters/kubernetes/owner_projection_finalization_handle_test.go.txt": "25ce3c8865fde18706689b06347598a0829cf9983c042b97d3e4e18da99ff5ba",
+    "payloads/internal/adapters/kubernetes/owner_projection_finalization_test.go.txt": "6c58d99e423cad6083d5d392a619f45b9c901eeda5a6aca7187675e6d9b0f11f",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation.go.txt": "0d0ce22340609f8e9f7c6ac01550844a2cbc5d606eed4867e25c03968b851ac6",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation_composed_test.go.txt": "03c320ee99e79f8c2fe8d3adf0dd4b6eca0fd0dc1a7290cd9b8def1d92726437",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation_effects.go.txt": "919d93e2ddc5fa43c908d2c60f5a5d80372d4b00ca060e296e2a44b486e46448",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation_fixture_test.go.txt": "88cfe0e9b9f24c72a20db54b93a26cc24e7c094343de144893e7beb6747e8a0e",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation_native.go.txt": "25961943a534dff8ece10aeb1212b98622bf867ba8c181ff0e67c9bf6fc2a962",
+    "payloads/internal/adapters/kubernetes/owner_projection_operation_plan.go.txt": "cb90f19a1e9963df5ab3960f1b9090fee9162c8d45e21346211eb294a2196dc2",
+    "payloads/internal/adapters/kubernetes/owner_projection_pending.go.txt": "26bb2ad94978797c2340544e2e1dbdd0254c96d171d6a502085399ad9db53efa",
+    "payloads/internal/adapters/kubernetes/owner_projection_preflight.go.txt": "e631a6f696945ac5042ec24bc11d503ddac3b969c9b098ae49e51f695d1c01d2",
+    "payloads/internal/adapters/kubernetes/owner_projection_preflight_test.go.txt": "5dd91497bd32a8526a22de5655c2b16b77de2123dc77090091cc9c8f9d78591e",
+    "payloads/internal/adapters/postgres/owner_identity_operation_test.go.txt": "dcf0a61c658a0d65a2189c9b0a58988c1dfe09064e6d7be08af2ab5e9bc3821c",
+    "payloads/internal/adapters/postgres/owner_projection_finalization.go.txt": "dd61ce8af4662b973596ef4efb006e15c67adc0ff0761a6807653d628740f208",
+    "payloads/internal/adapters/postgres/owner_projection_operation.go.txt": "46600cd95f2a6e1f290848bd0e8badaba15ca39195e73a9113c1646bd3adc18b"
+  }
+}

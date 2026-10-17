@@ -1,0 +1,19 @@
+{
+  "name": "adr183-continuation-native-46",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Retained failure after ADR-193 step 2b passed natively: the real applier created the federation's four auth roles and policies, the connector PKI roles and the federation audit transit key in one phase-3 apply, the continuation filled the federation audit Secret from the inbox and verified every federation path through the inspection token (federation/verify). The owner launch then stopped before any effect at projection.current-native (unavailable), the third launch-phase native-check failure (runs 35, 41, 46); the code now carries its class, elapsed time and remaining budget.",
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

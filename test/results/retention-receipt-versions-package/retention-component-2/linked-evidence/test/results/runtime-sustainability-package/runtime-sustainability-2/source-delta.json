@@ -1,0 +1,72 @@
+[
+  {
+    "path": "internal/adapters/kms/configuration_provider_audit_operation.go",
+    "baseline_payload_sha256": "574dccd871d6f80456efa8d5a9b540e3a9007bdcb02c75ff8938a589c10638ca",
+    "payload_sha256": "14420ea3199639981c607a575e89902cfff0c4c966b93bacfa8f00d356ef5547"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_lifetime.go",
+    "baseline_payload_sha256": "0f55efab5fe43629a7da0fe0830e2f44e5b01fa42b48344199481388e26830ca",
+    "payload_sha256": "248ac35c03dfa452f1304b720fba08fb1908bc1d203b176acff560cc38cb2c34"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_contention_test.go",
+    "baseline_payload_sha256": "1349a3db6f3096f6c99d24ad9d5d46f6df2fc64e4194c232fda8d78459d05388",
+    "payload_sha256": "8b3bb764c26463248fc5889ca8138f072246e536234ec7801be43e7d5ffd5855"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_provider_fixture_test.go",
+    "baseline_payload_sha256": "3bf5e5f0afa3b518b770af71d2829dddf1a0505a07e341d1f77c8d3b2f646bbf",
+    "payload_sha256": "547f44cac28a0f95e9229633e61a3c407ccd85b9532805fd40a5cb0a36506841"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_tokens.go",
+    "baseline_payload_sha256": "e32b626ac008ea8c64d870f070820a60f33d3cb4cb02526f7d213708703a60bd",
+    "payload_sha256": "3736d0ca4442409ab47aa5d725fd7bd93e13dc1c812011794b1eeb4073f0f23f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_tokens_test.go",
+    "baseline_payload_sha256": "1915945d6e915ee88f605588b1a779a1141e9719cb4eaf22ca380d99556e5cb6",
+    "payload_sha256": "a54cbf9d88349533cdf30be2c863536d7c460c6295d571b3ee00502fcfdab797"
+  },
+  {
+    "path": "internal/application/fleet/worker_owner_audit.go",
+    "baseline_payload_sha256": "61c621faa5e70ea4d36a25d32ba88f540001fd790f23f96c7dc52f54ef362a54",
+    "payload_sha256": "d00b647a5971d980a741d310a22916cb6ae889d8bcaa5233683bd1d5c4a87c7e"
+  },
+  {
+    "path": "internal/application/fleet/worker_owner_audit_test.go",
+    "baseline_payload_sha256": "4d621aafd169bbca2ec03292131a4b2a7417d2de30392bf6338413f6227c1b25",
+    "payload_sha256": "79918d5e30873c3487c0fbac0a00db4fc8381ee59567663a28a2e27ed87b52ea"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_admission.go",
+    "baseline_payload_sha256": "981921119d5a58b782127d9ee3e32f825f843777d1d5f33a6cd23e8345e98a86",
+    "payload_sha256": "fa5ec92df2da44caeacceeb4761ae4f43248bd934a5070b80fb3ab9b9d542838"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_source_notice.go",
+    "baseline_payload_sha256": null,
+    "payload_sha256": "642bf29b029fc70cee4573b060d581e76fd86346115362ecb79497bf20b76292"
+  },
+  {
+    "path": "internal/application/fleet/worker_runtime_source_notice_test.go",
+    "baseline_payload_sha256": null,
+    "payload_sha256": "7b7f4ffdabe40a599eaa4453e1a455ba7d766bab7caa1971f7484048b522d196"
+  },
+  {
+    "path": "internal/bootstrap/configuration_provider_runtime.go",
+    "baseline_payload_sha256": "bbda47ce513846965ca319bbf45cec8294b45b124e187e6d62afa45b374036ff",
+    "payload_sha256": "8244ebb3b9e9b45846306210905acb08537838d738f54479f4d0c1b4d8292d24"
+  },
+  {
+    "path": "internal/bootstrap/configuration_runtime_source_notice.go",
+    "baseline_payload_sha256": null,
+    "payload_sha256": "81ca8ec4a2c8aff988fde6e40ff8d509c6df63cc84b890f0d77755257b3880ca"
+  },
+  {
+    "path": "internal/bootstrap/hub_worker.go",
+    "baseline_payload_sha256": "df74af57f9708a2d1049c2b5b501b58d548400993dcddfa69f5983ec56070409",
+    "payload_sha256": "03b0919c719b067a8cf8275cb528055f350e846a63c0a443d1db49029a29059e"
+  }
+]

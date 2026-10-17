@@ -1,0 +1,292 @@
+{
+  "integratedAt": "2026-10-13T12:20:34.720972+00:00",
+  "source": "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1",
+  "manifestSHA256": "3990e7b5486674d6e21cc9ef6e9bfbd10682861c4b22843a95d67177471d582b",
+  "dependenciesVerified": 2179,
+  "paths": [
+    {
+      "base": null,
+      "path": "internal/adapters/kubernetes/cluster_observation_metadata.go",
+      "payload": "660a90b476f65290fec0d2d9fc818a44ca386dcb76728f353cfc1f8bd8ff272c"
+    },
+    {
+      "base": null,
+      "path": "internal/adapters/kubernetes/cluster_observation_metadata_test.go",
+      "payload": "e4bc8397358a9d3ecc3e5b0b72b7836c2a12d625ac169bcdc6128f66ae6f6803"
+    },
+    {
+      "base": null,
+      "path": "internal/transport/native/owner_observation_operation_lifetime_test.go",
+      "payload": "d10b6325c4939d206fa4a8e4e722b29327f411bb91b367e1a3d7be54072b4c8b"
+    },
+    {
+      "base": null,
+      "path": "internal/transport/native/owner_observation_operation_server.go",
+      "payload": "58587153dd84dbfc16c1e1ad4a83916c7b63307d2f0bd27f8588664fa00877b6"
+    },
+    {
+      "base": null,
+      "path": "internal/transport/native/owner_observation_operation_server_test.go",
+      "payload": "4d65d04c4c4bd08207a1e4164671ca7e6d49275293f80ff624a678aa8966173a"
+    }
+  ],
+  "qualification": {
+    "terminal": 0,
+    "phases": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+          "-vet=off",
+          "-run",
+          "^$",
+          "./internal/transport/native",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "expectedExit": 0,
+        "seconds": 7.197,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "topLevelPass": 0,
+        "namedPass": 0,
+        "skips": 0,
+        "failureMarker": null,
+        "markerOccurrences": null
+      },
+      {
+        "phase": "race-native",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=180s",
+          "-run",
+          "^Test(OwnerObservationOperationListener|OwnerObservationOperationFirstRequestCloseRace|OwnerObservationOnlyListenerActualTLS|OwnerObservationListenerCloseJoinsOriginalCall|NativePurpose)",
+          "-v",
+          "./internal/transport/native"
+        ],
+        "exit": 0,
+        "expectedExit": 0,
+        "seconds": 10.185,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "topLevelPass": 11,
+        "namedPass": 40,
+        "skips": 0,
+        "failureMarker": null,
+        "markerOccurrences": null
+      },
+      {
+        "phase": "race-metadata",
+        "command": [
+          "go",
+          "test",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+          "-race",
+          "-vet=off",
+          "-count=1",
+          "-timeout=180s",
+          "-run",
+          "^TestClusterObservationMetadata",
+          "-v",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "expectedExit": 0,
+        "seconds": 14.692,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "topLevelPass": 5,
+        "namedPass": 32,
+        "skips": 0,
+        "failureMarker": null,
+        "markerOccurrences": null
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay",
+          "/home/phil/.cache/asservat-build/planning/regional-observation-direct-native-20261013/checkpoint-v1/overlay.json",
+          "./internal/transport/native",
+          "./internal/adapters/kubernetes"
+        ],
+        "exit": 0,
+        "expectedExit": 0,
+        "seconds": 1.272,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "topLevelPass": 0,
+        "namedPass": 0,
+        "skips": 0,
+        "failureMarker": null,
+        "markerOccurrences": null
+      },
+      {
+        "phase": "go-architecture",
+        "command": [
+          "python3",
+          "/tmp/asservat-direct-native-3lri4vcg/mirror/scripts/check-go-architecture.py"
+        ],
+        "exit": 0,
+        "expectedExit": 0,
+        "seconds": 1.019,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payload": [],
+          "liveFileSet": [],
+          "payloadFileSet": [],
+          "freeze": [],
+          "mirror": [],
+          "mirrorFileSet": []
+        },
+        "topLevelPass": 0,
+        "namedPass": 0,
+        "skips": 0,
+        "failureMarker": null,
+        "markerOccurrences": null
+      }
+    ],
+    "finalHashes": {
+      "dependencies": [],
+      "bases": [],
+      "payload": [],
+      "liveFileSet": [],
+      "payloadFileSet": [],
+      "freeze": [],
+      "mirror": [],
+      "mirrorFileSet": []
+    },
+    "cleanup": {
+      "removed": true,
+      "freeAfter": 16771493888
+    },
+    "nativeQualification": false,
+    "installedSelection": false
+  },
+  "archive": {
+    "payload.json": "5b1b305d6e9e76041b7f8b7b1750187c464783fc9e3730778d30d139885ce3e0",
+    "bases.json": "2b26c5279c89fea2b611b968323722790d603cccb174a404ec651e4017d99f6c",
+    "dependencies.json": "6d5b0925b263fb69d85c56f6b6862c5cc87c27e0c9bb93a45349462ad5688895",
+    "manifest.json": "3990e7b5486674d6e21cc9ef6e9bfbd10682861c4b22843a95d67177471d582b",
+    "overlay.json": "9db9f9f84bfe87572131f15e1bd141a95a8e69d237b2e3857e613fa7c9d556e9",
+    "run.py": "51180a48b81b72199e29f1430f494a0921cf542f2f7991f274c3450a2702a4b5",
+    "SCOPE.md.txt": "31e2f249a5250af0c9113fb8f55b7ad25cefadf1f99fe1bbc3fcb1bbd594a6f1",
+    "freeze.json": "db368cd8df73f942cfb3e2b81bd7356462442569721248ad9220fcbd01e17cc3",
+    "evidence/preflight.json": "4cc4c0efe30a708807465cf7f0120a64e2656289977e826504419b30c6ec6534",
+    "evidence/scratch.json": "1455a7ac6debe361f943378a4135f498b52c52cd2caa3de6645445b70c9d00e0",
+    "evidence/mirror-manifest.json": "66601498f31c4160a2269ffdf82dd1422f042dfbc3a2c65275ef7c8468643e82",
+    "evidence/compile.log": "a8614d071371afc20acedf8f92af1320908ee4e062828099a8bba958d886796e",
+    "evidence/compile.json": "d5b86c33c29a6ad1e86a76d23c39c6ca4ba1eb75155adf323bb01e302c2ebe55",
+    "evidence/race-native.log": "afee9ae8e1cc8b7f3fa9392866277754bc99d7de3a311f76cf579eade6e2cd18",
+    "evidence/race-native.json": "c8128210c3ebdfddade59372cd4cb66a6c463cc8615983913598357b469de2d4",
+    "evidence/race-metadata.log": "c6b9f71ae289e3e4b4c837018d6c83c379ab5be9cdd07e294aeb70f377dd5c65",
+    "evidence/race-metadata.json": "1c084d5a72560da0398f9ac28d0b88d64f4d9d9e0c24f3d4af335a9f2db533cb",
+    "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evidence/vet.json": "13c60551c5539a3fcc51abc8bab33e2a6463864726c4485c7736be264ac6f561",
+    "evidence/go-architecture.log": "9cf4ebc46b87b4a3bb62c36b1404dcfa1803374d988e0df20142500b93c4e56d",
+    "evidence/go-architecture.json": "7be48c1196d4c27ed77cafa836dcae2b6feaaae56c23f704ea59513bbcfb762d",
+    "evidence/scratch-cleanup.json": "1eb8be93c43ea92675a18e81930d30eb2b0264308e404e317f73a7fc20b9461f",
+    "evidence/RESULT.json": "4823911c28e47f1a41b70abdce9f1a8c112cae01f6d3ca163e39f180b93f57fc",
+    "files/internal/adapters/kubernetes/cluster_observation_metadata.go.txt": "660a90b476f65290fec0d2d9fc818a44ca386dcb76728f353cfc1f8bd8ff272c",
+    "files/internal/adapters/kubernetes/cluster_observation_metadata_test.go.txt": "e4bc8397358a9d3ecc3e5b0b72b7836c2a12d625ac169bcdc6128f66ae6f6803",
+    "files/internal/transport/native/owner_observation_operation_server.go.txt": "58587153dd84dbfc16c1e1ad4a83916c7b63307d2f0bd27f8588664fa00877b6",
+    "files/internal/transport/native/owner_observation_operation_server_test.go.txt": "4d65d04c4c4bd08207a1e4164671ca7e6d49275293f80ff624a678aa8966173a",
+    "files/internal/transport/native/owner_observation_operation_lifetime_test.go.txt": "d10b6325c4939d206fa4a8e4e722b29327f411bb91b367e1a3d7be54072b4c8b"
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

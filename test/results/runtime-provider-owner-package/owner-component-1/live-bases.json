@@ -1,0 +1,22 @@
+[
+  {
+    "path": "scripts/test-context-storage.py",
+    "base_sha256": "453a4949a6c6079b2805e2acfa0e0c52efac895c9c1e0308824963ea6871351f"
+  },
+  {
+    "path": "scripts/test-initial-bootstrap-selection.py",
+    "base_sha256": "5bed11f5f50cfbda76ae4de383d3b07c6eb424c22e0330a7b8f099dfdc19aff1"
+  },
+  {
+    "path": "test/integration/initial_bootstrap_chain_test.go",
+    "base_sha256": "8c6476fb571312894fc091d343450c90b548a0eb79f437e4f8a1fca26d35859a"
+  },
+  {
+    "path": "test/integration/initial_runtime_provider_pair_native_test.go",
+    "base_sha256": "42460662a40a7f1a7a09c860c4bc60bcc26bb2710945aa1ff9bcd14126bf15f6"
+  },
+  {
+    "path": "test/integration/initial_runtime_worker_source_native_test.go",
+    "base_sha256": "b9a79c03bfbb49a24f6de3cbf4d895965457807fdf0edeb91d64b2c673532973"
+  }
+]

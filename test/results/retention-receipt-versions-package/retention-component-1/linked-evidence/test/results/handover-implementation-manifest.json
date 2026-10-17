@@ -1,0 +1,212 @@
+[
+  {
+    "path": "docs/architecture/initial-activation-handover.md",
+    "base_sha256": null,
+    "sha256": "e012c9e3b6da3fa676532e1fd6e6af7971bbf8baeaa478f38c89c534283751d1"
+  },
+  {
+    "path": "docs/decisions/129-initial-activation-handover.md",
+    "base_sha256": null,
+    "sha256": "dcc6999ae57c2833df81f7bfa5d1d04941b7b39e6e20df1f57857b775896cf51"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_credentials.go",
+    "base_sha256": "63cd2d18cf7fffe9f3556e8a8f20ad15c25a20c41648da3a1b74b6a46eeadf78",
+    "sha256": "f87430f2f883a6713362a99f8def47a852233c00a00477cd84682f30e77e47ff"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer.go",
+    "base_sha256": "d7d7cf49cbfd17cb7e5a649bed3c41790c1d8be8af6841b66f117d7ad1e91a39",
+    "sha256": "ebb8de9a5b8134f363f81743172a89d3e1b909cf45ed57c0d6027b44fda955f1"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_activation.go",
+    "base_sha256": "3e1348df784257f851fb18f8d9457327d393c851d2a56d69bf3f5eb8ab4d933f",
+    "sha256": "46495f65d7f24c0874bb511815469eae6e28be115f27073d21524d7daf11fddb"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_cleanup.go",
+    "base_sha256": null,
+    "sha256": "aa7e38a4fa8147eacdfb838315e71c7a1081a5e5bca7c303656d8aac3742db3b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_cleanup_objects.go",
+    "base_sha256": null,
+    "sha256": "c1c7859ae1541cae0162ea583722e5fadf8c36c58668ae21d33a84785ce10b02"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_credentials.go",
+    "base_sha256": "a59289da2b07babb7d5a2c16a335ad979f96cae82ab6f1082580c3a1d6a495fa",
+    "sha256": "1ecb8317d89890bec0e87f10828e5a276b76a6dc3858ce12809e06a604aabe3c"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover.go",
+    "base_sha256": null,
+    "sha256": "51c41576e9d07b0ca71e35a1d901feca48cccb728ea30dfc3687f8a70cf0d5b0"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_contract.go",
+    "base_sha256": null,
+    "sha256": "5af23537d98cf61e27411f2f64f780d7aa5ad2b498e4d00bef1a2fab99c3a3d8"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_current.go",
+    "base_sha256": null,
+    "sha256": "1133d4db29ba22358b6d4b058a2d75d7e10779956fb02320c141b26f352cfccd"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_test.go",
+    "base_sha256": null,
+    "sha256": "343636df7c9c335d5f19ded5d815e64afeebf30102d1ccdf60a69431eed79a4b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_handover_time_test.go",
+    "base_sha256": null,
+    "sha256": "77370ca3312b3c2f55242b9d2a1f28062e742642070851a954b04e0e176b3508"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_history.go",
+    "base_sha256": null,
+    "sha256": "05f1cfc1c2969aad00126b870e2e9ccdf10c83d778fa12b8bc3e36d22dfc8069"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_inputs.go",
+    "base_sha256": "e7d480b24bb1985fc58bf0741e810c567ae8da3fd9062ec5a1074f29f6126325",
+    "sha256": "88c49b649e57d0d983e57e7d3b800cdf37d18ac5b6b779d3342a7294c99ec054"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_launch.go",
+    "base_sha256": null,
+    "sha256": "322dd6a38d9797a3b1fba6c82f9b92c7fc749750c765ce02e075818bf9679f3f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_policy.go",
+    "base_sha256": "757ee630fd2705fb901d62143541027a7a0501d1caee43c6e66984e0680e1e50",
+    "sha256": "35efd444c0fd40e3addddf5a8663e61e7bcb20923dd9406d9cba19a8befde46e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_private.go",
+    "base_sha256": "57a201d52522f518932e3f50f68fef2dfa24e2522b5a232f314182a014233419",
+    "sha256": "2f33861b605ced468399489ddc6b47229227b7fc510c8ded8bef815f6a9d524d"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_probe.go",
+    "base_sha256": "4afde319532a00cac7334b9aaf0971b86d8e7edfcf0d69fa16f8408f17c1bbd6",
+    "sha256": "ff7133f8812b453b681f19caa3205f8f06c4afe82c183364d197a4f245b2da7a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider_projection.go",
+    "base_sha256": "a283565efe45ca0187d24388a720b9503236b73f3a8fc93c8e71c410aab9aad7",
+    "sha256": "4c9863fa5e96979b469912dac4c26d1f8fa289d894b1ce6dadf355abb292be8a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_provider_state.go",
+    "base_sha256": "4c6212aa9b3bd8b609e39784f9315495a75833e2f017f18eafcf5c4be4502d3c",
+    "sha256": "f58d9b58eb2fb0e737dd1649d807ee018696852e9239ea74e9934a3868e43c46"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_requests.go",
+    "base_sha256": "755cfc825ed11c5c4acb00ef6f2b6dbca487212ac3371c833663a97173d09890",
+    "sha256": "cea6dbfe3d4fe0ff6cc73d81ba1c8bc7cb46cacb4467bf88ef5223042560db1f"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_secret_completions.go",
+    "base_sha256": null,
+    "sha256": "b89878c72c2b2f87ce0bf80d9916730b4a29378a0bf1cff517444fb22d17712a"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_sql.go",
+    "base_sha256": "03c59c2dc24e02ca8151832c15b94b65c2b03da7e965dbd5a7ab420e47a0e010",
+    "sha256": "4a69ebb249b7d78b871aca60cb680ce818d8e3e33810be8230f8916cc3fa8738"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_preparer_staging_retirement.go",
+    "base_sha256": null,
+    "sha256": "4be6478b28d23d4cfa7dffa47bc2e9a7fe1ad015fd115b903981cabf4e3b71c9"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_workload.go",
+    "base_sha256": "cba2cb9e1683f5f28ebe847e1d72a9882b8e728252d5b6cdad1f127a9ab432ea",
+    "sha256": "425a062de234b78828b5ea6dd80147f9750e570499368612997a3d3ee2b751d9"
+  },
+  {
+    "path": "internal/adapters/kubernetes/initial_workload_template.go",
+    "base_sha256": "f619690ecde499321f5120d824a0abdadacb167d452654af048b5e16359571b2",
+    "sha256": "5cfe7fa31e64d0723b72d25ab0b5e39836c1e6f9d944f5ad3a0e72d61b7027ee"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_roles.go",
+    "base_sha256": null,
+    "sha256": "8fca743a3823f21fc91462ceeef86ee8836575a6f9fc762fa8344a5b37b02ad8"
+  },
+  {
+    "path": "internal/adapters/postgres/initial_history_roles_test.go",
+    "base_sha256": null,
+    "sha256": "14bb91c2e6e51f4942f7e17bf57954b937958ec0809130775c65399a53245a85"
+  },
+  {
+    "path": "internal/bootstrap/initial_installer.go",
+    "base_sha256": "e847e23183e0823d9b4dfe6a2a72391e1d1d83099c0136bcf4213aa38f6a703d",
+    "sha256": "29016ac2f5e5b458c048532ac82e1e4df7eb17393f96c835948a3b27524a95e0"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer.go",
+    "base_sha256": "63dc1b37dec7f90dabe6f2781399486673c33d22bd17f7639105fb3ea9c196b5",
+    "sha256": "0874c6c865fd454d3e5179c8ea3b143a9c8427cbb855fafce95dae6e6a5ae011"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_cleanup.go",
+    "base_sha256": null,
+    "sha256": "5bf7b7069bee44c45f5e9173ebcd0f51b8ee64006f797a603af199f30facad3f"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_handover.go",
+    "base_sha256": null,
+    "sha256": "169a3233caac6016c0cd2e0f39ace3eb575f1b6131884f9fa1ec73f7af54b812"
+  },
+  {
+    "path": "internal/bootstrap/initial_preparer_sql.go",
+    "base_sha256": "55674c99a96b393df481072cb7b1ce715586f58153cddf77176dd8a353864cea",
+    "sha256": "eac2bffc81f05ffde7f7f87d30a3d795b622518305c5b73105a1f3a79c62b9ac"
+  },
+  {
+    "path": "internal/contracts/initial_installer.go",
+    "base_sha256": "e1769b22f9abecdc73ab1793db8492cae73d3112074927289a54616bf5237a8b",
+    "sha256": "d5bf07d8418231eb39a5d63a124d1897f85346f308a4f8205e33bf16a52297a3"
+  },
+  {
+    "path": "internal/contracts/initial_preparation_private.go",
+    "base_sha256": "67b773d60fb6b03fb0af132c7da1b323046ea92427c8e63e9ab33e21997df52f",
+    "sha256": "8b9d10846b322417b34396b2b54b956cc665e9cd6f7c50da6c5aa6d68116a14a"
+  },
+  {
+    "path": "internal/contracts/initial_preparer.go",
+    "base_sha256": "053750f7986ead63b5b8a1f8eac181c3b2974362269912a2a5d8d0992a9df294",
+    "sha256": "111e1d0d8c4dbfb17a7c0ac4a8a851c36df645d2d0f7867a0ec8becb7b8be1cb"
+  },
+  {
+    "path": "internal/domain/configuration/initial_workload.go",
+    "base_sha256": "248a5da0f1aa28eac143bfe3159916f867657b22ee007fabcd91e4a17688142c",
+    "sha256": "e64f220268d5f968c7fa95a94f8de4df72f6d22cadf2691bdf7b2527a89bc51b"
+  },
+  {
+    "path": "specs/contracts/initial-installer.schema.json",
+    "base_sha256": "3ce42f647a4889a524dd58223c5841c7b76d74ab2314061aa807c2b017244fc1",
+    "sha256": "c4805600d8b9cb5dbf20f861ad9800b3f8e562d90570773c99dd9cbcf119b8bb"
+  },
+  {
+    "path": "specs/contracts/initial-preparation-private.schema.json",
+    "base_sha256": "a95cdd057c48678b287c8f7798edb0eec6073cf27ffac9ebcc7f8f161f6ada4f",
+    "sha256": "8f2095ff6b168d0d90ce1bc0f37376165c0b97062d263b5766052588654aac97"
+  },
+  {
+    "path": "specs/contracts/initial-preparation-root.schema.json",
+    "base_sha256": "ca2746dbf73e10402dbdc15f6f6dd47c49c30400e7e5e4be8870af08a9bc3f72",
+    "sha256": "e606ebfefaa7044480619b835ca18f368a64cfda8fb1161e48888b3bf8a62d15"
+  },
+  {
+    "path": "specs/contracts/initial-preparer.schema.json",
+    "base_sha256": "0b004c563194795a895e866507aa763c0914d14d746297e4a2009585fc754bf1",
+    "sha256": "31dc939a5b73bd85a03b9a5031dc228259a051ad9788796f08b6da0733a13627"
+  }
+]

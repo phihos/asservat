@@ -1,0 +1,9 @@
+--- FAIL: TestProcessingDecisionAuditsPreparedUnknownBeforeCAS (0.00s)
+    processing_test.go:119: prepared decision/CAS {      0 0 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC} complete current retention policy unavailable 0 0 0
+--- FAIL: TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend (0.00s)
+    processing_test.go:131: replay allocated new work {      0 0 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC} complete current retention policy unavailable 0 0 0
+--- FAIL: TestProcessingReleaseUsesReservedLaneAndActualHuman (0.00s)
+    processing_test.go:192: prepaid release changed actor or used normal capacity {      0 0 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC} complete current retention policy unavailable 0
+FAIL
+FAIL	asservat.local/asservat/internal/application/privacy	0.002s
+FAIL

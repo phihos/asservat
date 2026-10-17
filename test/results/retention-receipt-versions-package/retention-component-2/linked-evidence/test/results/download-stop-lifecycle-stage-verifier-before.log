@@ -1,0 +1,5 @@
+--- FAIL: TestStopCertificateVerificationRequiresPrepaidAttemptBeforeOpen (0.00s)
+    download_stop_lifecycle_test.go:164: verification was not prepaid download unavailable 0 1
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.001s
+FAIL

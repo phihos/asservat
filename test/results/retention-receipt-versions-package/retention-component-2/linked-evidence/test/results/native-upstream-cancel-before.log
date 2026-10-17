@@ -1,0 +1,12 @@
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement
+=== RUN   TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/upstream-cancellation
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    flow_test.go:61: hub serve terminal <nil>
+    flow_test.go:61: connector serve terminal <nil>
+    closure_test.go:174: invalid final marker or lost gate claimed Joined upstream-cancellation
+--- FAIL: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement (0.01s)
+    --- FAIL: TestNativeContentFinalMarkerSurvivesOwnPositiveRetirement/upstream-cancellation (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/transport/native	0.017s
+FAIL

@@ -1,0 +1,10 @@
+{
+  "evidence/architecture.json": "c6ec397cda2d8e98cd21e8f9b25fcc503446659e399ff8eb8373e7e91b1334ac",
+  "evidence/architecture.log": "14aaa8f635daf44eae90af5b20cada2c6527b8b1670aef6c91e0e37a5a6f139b",
+  "evidence/compile.json": "506faf2e1e53bf86982e5e9137091c6c20a1ade5ce7de0822054bde55f5c7d30",
+  "evidence/compile.log": "8ab717888a04618578da3571a36d19f62590150fa459247ad0156c9a81467a5d",
+  "evidence/race.json": "1965ed3e53e3f117e66d9c74c16c24e2d425f05d41aab7072e288a2e5230d155",
+  "evidence/race.log": "2babd029b995c30bd924cab5e8529fae8a80dc2ec91591f3124f027346e7c62b",
+  "evidence/vet.json": "4363092f2ede89b8f16b9c8558fd60e62919c1116abab08662f336719192bbb2",
+  "evidence/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

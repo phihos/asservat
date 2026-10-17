@@ -1,0 +1,17 @@
+{
+  "command": [
+    "make",
+    "spec-check",
+    "architecture-check",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  ],
+  "exit": 0,
+  "execSession": 22276,
+  "sourceHashes": {
+    "docs/implementation-progress.md": "1e2e80c7665375cab0b359e7f0f11f10dc9ed13dcf14df9ab68450e0cdb49555",
+    "docs/architecture/public-context-composition.md": "86f8c2c80f5341c55d2a5a6736697c4daa187d61873af26b064f1e40c6714196",
+    "docs/decisions/160-public-context-service-assembly.md": "e74204967aa12917b8a54ecd982f32d010172920ff510dd034c235c4555d57fa",
+    "docs/decisions/README.md": "e15059b65fb1e866eeec3405ededb586c7f798c7a9f7cf39baf7b330bef59edb"
+  },
+  "scope": "Documentation-only update after completed native verification; runtime sources unchanged"
+}

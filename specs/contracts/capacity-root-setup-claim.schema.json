@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/capacity-root-setup-claim.schema.json",
+  "title": "Private original capacity root setup claim",
+  "description": "Optional original private role-root claim. Original database/role/setup identity, at most five-second claim inside the original thirty-minute role setup, exact receipt matching and protected current proof are additionally checked by the producer. No receipt grants capacity readiness or recovery. No credential fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationID",
+    "permissionRootID",
+    "inputDigest",
+    "databaseOID",
+    "postmasterAt",
+    "claimedAt",
+    "until"
+  ],
+  "properties": {
+    "operationID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "permissionRootID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "inputDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "databaseOID": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "postmasterAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "claimedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt": {
+      "$ref": "https://asservat.io/spec/v1/capacity-root-setup-claim.schema.json#/$defs/receipt"
+    }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "operationID",
+        "installationID",
+        "initialClaimID",
+        "permissionRootID",
+        "roleRootUID",
+        "roleSetupID",
+        "inputDigest",
+        "databaseOID",
+        "postmasterAt",
+        "claimedAt",
+        "until"
+      ],
+      "properties": {
+        "format": {
+          "const": "asservat-capacity-root-setup/v1"
+        },
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "installationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "initialClaimID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "permissionRootID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "roleRootUID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "roleSetupID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "inputDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "databaseOID": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "postmasterAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

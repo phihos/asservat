@@ -1,0 +1,7 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/configuration_worker_operation_test.go",
+    "before": "1582ccdf407a92c9a0afc34c521b2a13e0ea08aec6e7b01c4d1fb75bf5621887",
+    "after": "71d40acd355d259883507d68a299e1f72cf64511c89ddee338e54f93b7c99cbc"
+  }
+]

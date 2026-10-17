@@ -1,0 +1,193 @@
+{
+  "terminal": 0,
+  "phases": [
+    {
+      "phase": "compile",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/overlay.json",
+        "-vet=off",
+        "-run",
+        "^$",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 10.904,
+      "before": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "race",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/overlay.json",
+        "-race",
+        "-vet=off",
+        "-count=1",
+        "-timeout=180s",
+        "-run",
+        "^Test(OwnerLocalObservation|OwnerObservation(DialCandidate|Candidate|Operation)|ClusterObservationCaller)",
+        "-v",
+        "./internal/adapters/kubernetes"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 41.584,
+      "before": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 16,
+      "namedPass": 109,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "vet",
+      "command": [
+        "go",
+        "vet",
+        "-overlay",
+        "/home/phil/.cache/asservat-build/planning/regional-observation-direct-holder-20261013/checkpoint-v3/overlay.json",
+        "./internal/contracts",
+        "./internal/adapters/kubernetes",
+        "./internal/adapters/mtls",
+        "./internal/transport/clusterobservation",
+        "./internal/bootstrap"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 7.432,
+      "before": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    },
+    {
+      "phase": "go-architecture",
+      "command": [
+        "python3",
+        "/tmp/asservat-direct-holder-9gcjgjjd/mirror/scripts/check-go-architecture.py"
+      ],
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.068,
+      "before": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "after": {
+        "reusedEvidence": [],
+        "dependencies": [],
+        "bases": [],
+        "payload": [],
+        "liveFileSet": [],
+        "payloadFileSet": [],
+        "freeze": [],
+        "mirror": [],
+        "mirrorFileSet": []
+      },
+      "topLevelPass": 0,
+      "namedPass": 0,
+      "skips": 0,
+      "failureMarker": null,
+      "markerOccurrences": null
+    }
+  ],
+  "finalHashes": {
+    "reusedEvidence": [],
+    "dependencies": [],
+    "bases": [],
+    "payload": [],
+    "liveFileSet": [],
+    "payloadFileSet": [],
+    "freeze": [],
+    "mirror": [],
+    "mirrorFileSet": []
+  },
+  "cleanup": {
+    "removed": true,
+    "freeAfter": 16780025856
+  },
+  "nativeQualification": false,
+  "installedSelection": false
+}

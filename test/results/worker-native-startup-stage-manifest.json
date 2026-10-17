@@ -1,0 +1,122 @@
+[
+  {
+    "path": "docs/architecture/worker-startup.md",
+    "base": "f4115ecf8edba030493573c6187b4bd4b7c0ff7192084838c60be39934e507c7",
+    "sha256": "76e5c4c9d20cd9c1e46e5bff06b84c1cddb7a6bd2f5cba6014db52f6712aeb86"
+  },
+  {
+    "path": "docs/decisions/121-native-worker-startup.md",
+    "base": null,
+    "sha256": "9b9e97547601b256d2454f09641f47b95c72f3161ef7c0e003ca08e5c7f392c9"
+  },
+  {
+    "path": "internal/adapters/kubernetes/download_jobs.go",
+    "base": "fdd5aff574553abea4fc0773bbf38ef3dc9089cbd25eba84ac82dc798137648d",
+    "sha256": "0343bbc14ba149f5976e6aec40c09f5080a72aa371109a264f63d55aeb97d33b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_configuration.go",
+    "base": "1ebc43341499d5143621384ce8a2c9e5fe71231e14dec520a0dc9f2b143a6ead",
+    "sha256": "a47bb4d6fc54f46b266a6fef58f44a2906cf59c857b16a63daf33ca78bcb0998"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_store_credentials.go",
+    "base": null,
+    "sha256": "bd07f1a96392e5cb0d64c12c224920edd185a0ffb891506ffd6cd390eecd191c"
+  },
+  {
+    "path": "internal/adapters/kubernetes/worker_store_credentials_test.go",
+    "base": null,
+    "sha256": "86bc1ab08d0ca6fda0a190c36bb1f981029507408ead46ffc97d9510fc9efd14"
+  },
+  {
+    "path": "internal/adapters/mtls/worker_control.go",
+    "base": "014d2eead1b12730fd144954b373eb2dd983c0d28ce73de260f92751d7e78e31",
+    "sha256": "3e350c10cd5ea49bc65954a9a4af0732bad5858d7522e18db5f34e28c3868e47"
+  },
+  {
+    "path": "internal/adapters/mtls/worker_credentials.go",
+    "base": "b97d20ad39e341b8bc1791984d64b14d81498311355621e0f40b26ee60ebc2dd",
+    "sha256": "593552e4ea4a49077e1aad930490f690ba13e3a2c7a95ca85add65b308ceffd1"
+  },
+  {
+    "path": "internal/adapters/mtls/worker_native_control.go",
+    "base": null,
+    "sha256": "6263e80df414fa610cfbb03673b00c13ddcb47fa64a19268500a0f5a1cc4cedd"
+  },
+  {
+    "path": "internal/adapters/mtls/worker_native_control_test.go",
+    "base": null,
+    "sha256": "a500df6593260bfb04ed1961511476a114e8b6f1da436aeaea5ed861acd2a516"
+  },
+  {
+    "path": "internal/adapters/mtls/worker_public_key_test.go",
+    "base": null,
+    "sha256": "1a2d7aa633aa099b71926ee78085ed5ae0e501f1678db4d1cfccbde9ba7d8201"
+  },
+  {
+    "path": "internal/bootstrap/download_worker.go",
+    "base": "a0f686c2ab26e552f208aa07ce6106302bbc0cc066282968981f5c472c19775d",
+    "sha256": "28da6bcdfc19cfd3862d383765605b9ce7b0a3dbd8782d372cf276a0ece97078"
+  },
+  {
+    "path": "internal/bootstrap/download_worker_native.go",
+    "base": null,
+    "sha256": "a931823717a3e9ba39bbbff13eef1d53c54f5a24c60ccc55d7558639607b527f"
+  },
+  {
+    "path": "internal/bootstrap/download_worker_native_inputs.go",
+    "base": null,
+    "sha256": "eeb7b0e1b868b4c8b7391d03c4f4d41be646b96f935ceccb6f99efc263fe0331"
+  },
+  {
+    "path": "internal/bootstrap/download_worker_native_inputs_test.go",
+    "base": null,
+    "sha256": "6a6b8d101550dac61f4f69284c905f93cb2867cbc5497ed8d2385f3cd8dd9985"
+  },
+  {
+    "path": "internal/bootstrap/download_worker_native_test.go",
+    "base": null,
+    "sha256": "0e61e429ac14b1c7636dab7ec6550ce884c83dd2567d184006e75d252c20e849"
+  },
+  {
+    "path": "internal/contracts/worker_configuration.go",
+    "base": "e8039d5bbcc48a8afc07e845129126b27626bbdd86234fa688efd591b6566110",
+    "sha256": "15b055cd854fcbe84ad1cb72146450d9ebc5917e2b98668996e1ea24a35b992a"
+  },
+  {
+    "path": "internal/contracts/worker_control.go",
+    "base": "7d333c77337b6ce0af246139cea2ea4e829a61c760b1a9e2778e5e8e27fdd2d9",
+    "sha256": "7c816840e627805b2dae57aaf42bb5028de4ba37a11d87f67f1cbf1f316cc605"
+  },
+  {
+    "path": "internal/contracts/worker_native_control.go",
+    "base": null,
+    "sha256": "b8c8847996b19864d1ade737f03819fa39b99f1268b553f6f4521629275f1e27"
+  },
+  {
+    "path": "internal/domain/authorization/download_worker.go",
+    "base": "376f97168d6a52dd8639e9bbc4510841c9e2b2330123fef9e0b12fa45c5a0402",
+    "sha256": "88c3758504db0aa8f62de06299dd418462ed76872f202cf7c4266e4296067c3f"
+  },
+  {
+    "path": "internal/domain/authorization/native_worker_profile_test.go",
+    "base": null,
+    "sha256": "24b162bcc0e9e410aa4590f96d2012554d357e65af53c02888ca57aa9350d1b8"
+  },
+  {
+    "path": "specs/contracts/worker-configuration.schema.json",
+    "base": "1432588bff9893f73ae1ee7325885ef8caf3acca3b955b53052e9a116f0eeda3",
+    "sha256": "1b3d8846974051e4b70fce26b12f1b5bdc784a8a96c1498cd98588a5966b94b1"
+  },
+  {
+    "path": "specs/contracts/worker-control.schema.json",
+    "base": "6d3ea69e1a262b287e297978eee00692bace70dea51aa08a1169b6d722d25e92",
+    "sha256": "eda6441906c881093f5bc4981a0b51de65219eaaf8a901dfa0b8a4e29eb1b2ba"
+  },
+  {
+    "path": "specs/contracts/worker-store-credentials.schema.json",
+    "base": null,
+    "sha256": "e2452472e9c2a33d57bebb80cd553875972373d62ff9b992c5020ae9bb24339e"
+  }
+]

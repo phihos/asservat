@@ -1,0 +1,5 @@
+{
+  "scope": "Unrun native counterfactual: same setup/source owner and regression; only former write-on-read retained-policy composition restored",
+  "path": "test/integration/native_retention_observer_test.go",
+  "sha256": "ed1ead4eca91b10dca850b62c10a0a05ea48383b4f6474ad68f93fa547cf0808"
+}

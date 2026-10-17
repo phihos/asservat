@@ -1,0 +1,60 @@
+# Public context endpoint composition
+
+C-20 bootstrap joins the existing browser session service, built console,
+audited investigation operations, MCP and authenticated native content under
+one installed HTTPS origin. `NewPublicContextHandler` constructs the actual
+handlers rather than taking arbitrary HTTP callbacks in public configuration.
+It opens no listener and does not enable collection in Helm.
+
+One concrete healthy operation-audit owner wraps the shared investigation
+service. Browser mutations, MCP calls and native HTTP preflight use that same
+owner, preserving its independent normal/resolution/Stop limits and protected
+MAC. The browser operation handler requires its existing POST-admitted refresh
+owner. Downloads receive the same browser session service and the separately
+accepted refresh-pause reader. MCP and native content receive separately pinned
+bearer resource resolvers; the router never guesses token audiences or treats a
+browser cookie as MCP authorization.
+
+The installed origin and issuer are shared across all constructor inputs.
+Console assets use the existing bounded trusted-package reader. The operation
+set must contain context preview/progress/recovery, case metadata and download
+preparation/status/cancellation. Disabling new collection preserves retained
+evidence access; it cannot qualify the complete first capture journey.
+
+The private router uses the original literal request path. It has no automatic
+path cleaning, slash redirect, generic app-shell fallback, body buffering,
+compression, provider request, shared ingress semaphore or credential logging.
+It passes the original request and response writer to the correct owner, so
+native Range/conditional inputs, response-controller deadlines, flushing and
+stream cancellation remain available. API and private-path errors cannot turn
+into successful HTML responses. Authentication callbacks keep their original
+query parameters and their existing protocol checks. Only actual request TLS
+and the exact installed host satisfy the routing boundary; forwarded headers
+grant no transport authority.
+
+Existing routes are composed without additions:
+
+| Route | Owning handler |
+| --- | --- |
+| Explicit `/auth/*` routes and `/api/v1/session` | Browser session handler |
+| `/api/v1/operations/{operation}` | Audited browser operations |
+| `/mcp` and its protected-resource metadata | Audited MCP handler |
+| `/api/v1/downloads/{id}/content` and downloads resource metadata | Authenticated native-content handler |
+| Existing console paths and packaged assets | Console handler |
+
+Construction does not qualify the service inputs. Protected provider, client,
+permission, retention, storage, capability and audit provisioning; source and
+cleanup supervision; regional acquisition/publication; the native runtime; and
+bounded public listener/ingress configuration remain deployment prerequisites.
+The installed browser/MCP/native-byte journey must pass before chart runtime
+enablement. A routing fixture with synthetic services supplies no evidence or
+collection authority.
+
+Current checkpoint: staged source. The routing regression checks include actual
+loopback TLS response-controller use, distinct protocol ownership, original
+callback/range fields, rejected encoded/absolute/cross-host paths and absence of
+redirects/API fallback. The complete constructor also compiles against ADR136's
+frozen 22-file HTTP dependency snapshot after exact payload/base checks. The five
+routing races pass in that combined overlay. This is not a positive configured-
+provider or installed-service test. Actual exits are retained in the staged
+handoff; this document makes no native-service qualification claim.

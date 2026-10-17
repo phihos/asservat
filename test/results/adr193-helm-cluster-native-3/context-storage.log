@@ -1,0 +1,6 @@
+=== RUN   TestHelmClusterInstallWithRealServices
+    helm_cluster_test.go:145: serviceaccounts "connector" is forbidden: ValidatingAdmissionPolicy 'asservat-connector' with binding 'asservat-connector' denied request: Asservat private hub namespace requires an installation administrator or a qualified Kubernetes controller operation.
+--- FAIL: TestHelmClusterInstallWithRealServices (14.09s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	14.171s
+FAIL

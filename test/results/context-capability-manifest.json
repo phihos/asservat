@@ -1,0 +1,72 @@
+[
+  {
+    "path": "docs/architecture/context-capability.md",
+    "base_sha256": null,
+    "sha256": "589b0a15ed6c08e03f2473a6713f3e92394710d57dd516d28470af70dbe07d5e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/context_capability.go",
+    "base_sha256": null,
+    "sha256": "50612c516341630ba6e7dceff84c797215c1aeed699c97ed83281b3731a94f97"
+  },
+  {
+    "path": "internal/adapters/kubernetes/context_capability_test.go",
+    "base_sha256": null,
+    "sha256": "e80f14014f573204887a8d745f4e1e75e17ee642926242ad4c05cf63ba6da3ee"
+  },
+  {
+    "path": "internal/adapters/postgres/capture_intent.go",
+    "base_sha256": "ac0c41766e9f969db9d853f93c894b9f4512957ff8c15b37ef4e688d49df3d4b",
+    "sha256": "d196885837cda48b2a8f97d8be04d477c985d23e2e5fa806f7c1e2b2f7d47316"
+  },
+  {
+    "path": "internal/adapters/postgres/capture_intent_exact_test.go",
+    "base_sha256": null,
+    "sha256": "8b6a39a26092bc1243b33d74c4e78a2ec5db0f6333d34ab6dd159ed937994601"
+  },
+  {
+    "path": "internal/adapters/postgres/custodydb/capture.sql.go",
+    "base_sha256": "11e0332c28f522322067e3bc65a0aaad3eedb37f84838f2501a2393a1aeafc82",
+    "sha256": "94a92d165b1e60ab2fe0207d4795d63e4a8cd8170a03c83a734ce5a25f6a1c46"
+  },
+  {
+    "path": "internal/application/audit/capture_exact.go",
+    "base_sha256": null,
+    "sha256": "6b23fdea9b540ccf1a84d72fe5b98d03fdc5be1f661996ebb384c766592d139a"
+  },
+  {
+    "path": "internal/application/audit/capture_exact_test.go",
+    "base_sha256": null,
+    "sha256": "406636684ff5cbbfc409a1eed91535160c86cc524f83606139f2b16e65c9aa41"
+  },
+  {
+    "path": "internal/application/capture/context_submission.go",
+    "base_sha256": null,
+    "sha256": "57c41694d161c597c6c20fe52f916cb819d55ac062913b6801a988c5e38e0a6f"
+  },
+  {
+    "path": "internal/application/capture/context_submission_test.go",
+    "base_sha256": null,
+    "sha256": "6dd5b6f23950afc41d53fbcb792e3edf992132ea78dd8e91bb6f046892cb32df"
+  },
+  {
+    "path": "internal/bootstrap/context_submission.go",
+    "base_sha256": null,
+    "sha256": "d8970b8bb3b7d4bbd17dccd3cc4a55766b0383159552c2a4e72bac76df64b43e"
+  },
+  {
+    "path": "internal/contracts/context_capability.go",
+    "base_sha256": null,
+    "sha256": "df303fb285b03bf7efb5432e3f4ef366b540f53dd96a82beb21d38ff42f4da48"
+  },
+  {
+    "path": "migrations/queries/capture.sql",
+    "base_sha256": "8a67a5fbfd86efd876fe0e42a239bf14937985ab865f52d3965cc090ab0f1a4e",
+    "sha256": "50de1164fdf09e7d30a03b4d9cdc4c619c890f63ea4c3dba86a09670fc3a94d9"
+  },
+  {
+    "path": "specs/contracts/context-capability.schema.json",
+    "base_sha256": null,
+    "sha256": "6508f757852adc561626cd6ccc46ebde1ff65d103fb448fde1220ee10d2625f7"
+  }
+]

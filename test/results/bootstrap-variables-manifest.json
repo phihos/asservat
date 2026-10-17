@@ -1,0 +1,17 @@
+{
+  "scope": "ADR131 reserved CEL variable correction",
+  "files": [
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_plan.go",
+      "base_sha256": "b0646e86dd7b48db68e1dc44c416ce8ddadc7e400bde48a0353d2a23ca5aa1dc",
+      "sha256": "334c6f25e897ce04bc4cd76e099e5366eb01376971e05174fe9bd583c4f1fb02",
+      "bytes": 12249
+    },
+    {
+      "path": "internal/adapters/kubernetes/initial_bootstrap_variables_test.go",
+      "base_sha256": null,
+      "sha256": "01fd4642e2ac9d40cac0f7ba22c4a65b9d79c43533985f2947ae1f4a441ba387",
+      "bytes": 627
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "owner-projection-race": [
+    "TestHandoverProviderFixtureBindsEndpointBeforeOriginalInput",
+    "TestOwnerIdentityOperationCancellationWhileWaitingForPhaseMutex",
+    "TestOwnerIdentityOperationCloseJoinsAdmittedRead",
+    "TestOwnerIdentityOperationFinalCannotSkipActualCurrentPhase",
+    "TestOwnerIdentityOperationRejectsDetachedAndRepeatedCalls",
+    "TestOwnerIdentityOperationRetainsShorterAdmittedPhaseDeadline",
+    "TestOwnerIdentityOperationRoleAttemptIsSingleUse",
+    "TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs",
+    "TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement",
+    "TestOwnerProjectionOperationChildEndSurvivesLaterOriginalContext",
+    "TestOwnerProjectionOperationRejectsSkippedPhasesBeforeNativeOrEffect",
+    "TestOwnerProjectionOperationResultCopiesStateAndCanBeReturnedOnlyOnce",
+    "TestProviderOwnerAcceptedObservationDoesNotRefreshOnRead",
+    "TestProviderOwnerInstallationCloseJoinsAdmittedNativeWork",
+    "TestProviderOwnerInstallationRunsFiniteOriginalSequence",
+    "TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling",
+    "TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection",
+    "TestProviderOwnerOperationClaimBeforePostLockDenialStaysSpent",
+    "TestProviderOwnerOperationFinalRepeatsRBACAndAdmissionChecks",
+    "TestProviderOwnerOperationOpenAndFourOriginalRolePhases",
+    "TestProviderOwnerOperationUnknownEffectOnlyReconcilesOriginalResult",
+    "TestProviderOwnerOperationUnknownRootCreatePinsExactAttemptAcrossCalls",
+    "TestProviderOwnerProjectionOperationCompleteAndLaunch",
+    "TestProviderOwnerProjectionOperationLostCreateIsInspectOnly",
+    "TestProviderOwnerProjectionOperationProviderDenialPrecedesIntent",
+    "TestProviderOwnerProjectionOperationRequiresPostLockAndFinalCurrentProof",
+    "TestProviderOwnerProjectionOperationUnknownReceiptCannotRepeatCAS"
+  ],
+  "owner-operation-sql-race": [
+    "TestOwnerIdentityOperationSQLRejectsZeroHandleBeforePoolUse"
+  ]
+}

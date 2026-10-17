@@ -1,0 +1,11 @@
+=== RUN   TestCapacityProducerWithRealPostgres
+=== RUN   TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:129: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestCapacityProducerWithRealPostgres
+    capacity_producer_test.go:149: fixed_role_production_ms=2078
+    capacity_producer_test.go:149: synthetic exact source plan invalid invalid protected capacity budget
+--- FAIL: TestCapacityProducerWithRealPostgres (2.73s)
+    --- PASS: TestCapacityProducerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.782s
+FAIL

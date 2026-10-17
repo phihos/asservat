@@ -1,0 +1,103 @@
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRecipe
+metadata:
+  name: composed-ledger
+  namespace: payments
+spec:
+  description: Expanded capture profile composition fixture.
+  actions:
+  - id: a005bdfce57635c5dabddbdd6
+    kind: packetCapture
+    parameters:
+      profile:
+        kind: httpHeaders
+        protocol: http1
+        projectionRef:
+          name: http-response-headers
+          version: v1
+        maxFlows: 1024
+        maxHeaderBytes: 32768
+        maxReassemblyBytesPerFlow: 262144
+        maxReassemblyBytes: 16777216
+        idleTimeout: 30s
+      before: 30s
+      after: 30s
+      ring:
+        maxAge: 30s
+        maxBytes: 16777216
+        segmentBytes: 4194304
+        maxSegments: 4
+        medium: memory
+      peers:
+        entries:
+        - cidrs:
+          - 0.0.0.0/0
+          - ::/0
+        protocol: tcp
+        resolution: frozen
+        maxEndpoints: 1
+        maxStaleness: 5s
+      maxFrozenBytes: 67108864
+      maxConcurrentSnapshots: 1
+      filter: tcp port 8080
+    required: true
+    impact: sensitiveRead
+    limits:
+      maxBytes: 67108864
+      timeout: 90s
+    executionMode: ongoing
+  - id: a5b186fa2f944fc675c96fcc2
+    kind: syscallTrace
+    parameters:
+      processes: allPodProcesses
+      mode: metadata
+      before: 30s
+      after: 10s
+      syscalls:
+        mode: all
+      result: all
+      ring:
+        maxAge: 30s
+        maxBytes: 8388608
+        segmentBytes: 2097152
+        maxSegments: 4
+        medium: memory
+      maxFrozenBytes: 16777216
+      maxConcurrentSnapshots: 1
+      maxEvents: 100000
+      maxEventsPerSecond: 10000
+      maxTrackedThreads: 4096
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 16777216
+      timeout: 20s
+    executionMode: ongoing
+  - id: adf187502ec3e8884310b85cf
+    kind: processSnapshot
+    parameters:
+      include:
+      - identity
+      - status
+      - cgroups
+    required: true
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+    executionMode: onTrigger
+  - id: a7e5c90417a8841bef4f7993c
+    kind: networkSnapshot
+    parameters:
+      include:
+      - sockets
+      - counters
+      - socketOwners
+    required: false
+    impact: observe
+    limits:
+      maxBytes: 1048576
+      timeout: 5s
+    executionMode: onTrigger
+  maxTotalBytes: 100663296
+  maxDuration: 120s

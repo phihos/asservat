@@ -1,0 +1,18 @@
+{
+  "scope": "Fixture-only pre-authority readiness correction after native1 setup failure; native rerun pending",
+  "sources": {
+    "scripts/test-context-storage.py": "29888c6bbf1b9dea95cd0e5e118e343b053777ce039bdacffe408cb821a362d9",
+    "scripts/test-initial-bootstrap-selection.py": "f79d5c20e6d74831f8cba3520cb050f39195a656f49f266e17ff3e820ac15722",
+    "test/integration/initial_runtime_provider_pair_native_test.go": "a5dd7c26901d8257bdc8e7453fea0ebf228f4b67e5861be1d8b93d402f0ccb46",
+    "test/integration/initial_runtime_bridge_native_test.go": "e52e552178b4776d9004751161e909cf5c83a25e6c5d634aa262dbcee66d244a"
+  },
+  "selectorTests": {
+    "exit": 0,
+    "tests": 4
+  },
+  "unchangedProductBounds": true,
+  "fixtureCorrections": [
+    "Use declared configuration-audit-storage.json key via existing constant",
+    "Pass actual original completed19-resource snapshot across handover; do not reuse pre-handover Read as current proof"
+  ]
+}

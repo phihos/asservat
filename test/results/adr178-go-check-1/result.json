@@ -1,0 +1,10 @@
+{
+  "name": "adr178-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "scope": "Full Go gate after the ADR-177 SQL connection governor, the ADR-175 capacity TokenRequest and the ADR-178 context-start source frames",
+  "results": "55 full packages and 543 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (TestInitialRuntimeObjectRoundTripWithRealKubernetes, group 4)",
+  "sourceHashBefore": "1fd6da9999698365b49448123f6c36a6cead06efc57d0755c9bdf6a872226003",
+  "sourceHashAfter": "1fd6da9999698365b49448123f6c36a6cead06efc57d0755c9bdf6a872226003",
+  "log": "go-check.log"
+}

@@ -1,0 +1,8 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/fleet/initial_runtime_bridge.go": "/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/before/source/internal/application/fleet/initial_runtime_bridge.go",
+    "/home/phil/Projekte/asservat/internal/adapters/postgres/initial_runtime_bridge.go": "/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/before/source/internal/adapters/postgres/initial_runtime_bridge.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_runtime_bridge_sql_test.go": "/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/before/source/test/integration/initial_runtime_bridge_sql_test.go",
+    "/home/phil/Projekte/asservat/test/integration/initial_installation_test.go": "/home/phil/.cache/asservat-build/planning/installed-resource-handoff-20261012/checks/bridge-sql-constructor-1/before/source/test/integration/initial_installation_test.go"
+  }
+}

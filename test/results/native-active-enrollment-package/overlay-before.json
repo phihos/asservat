@@ -1,0 +1,6 @@
+{
+  "Replace": {
+    "/home/phil/Projekte/asservat/internal/application/evidence/context_native_runtime.go": "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/before/internal/application/evidence/context_native_runtime.go",
+    "/home/phil/Projekte/asservat/internal/application/evidence/context_native_active_enrollment_test.go": "/home/phil/.cache/asservat-build/planning/native-active-enrollment-20261012/before-tests/internal/application/evidence/context_native_active_enrollment_test.go"
+  }
+}

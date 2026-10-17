@@ -1,0 +1,50 @@
+[
+  {
+    "path": "docs/decisions/147-standard-owner-provider-authentication.md",
+    "base_sha256": null,
+    "payload_sha256": "9252d0ce3ded4f811ef5286d28cbeb36ef2281805d59851b8a718b518ede5479",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/docs/decisions/147-standard-owner-provider-authentication.md"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_recipe.go",
+    "base_sha256": null,
+    "payload_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/internal/adapters/kms/owner_provider_recipe.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_recipe_test.go",
+    "base_sha256": null,
+    "payload_sha256": "4a3bbfe467788f9f0d50b18b84981f46a8b93329157bf69f033ca65e65c68de7",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/internal/adapters/kms/owner_provider_recipe_test.go"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_composed_fixture_test.go",
+    "base_sha256": null,
+    "payload_sha256": "6985d0e3ede8a8a4112f9f1035d0e9dda851130b77d61c757712f7d6ade8eea0",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/composed-projection/changes/internal/adapters/kubernetes/owner_identity_composed_fixture_test.go"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_identity_composed_test.go",
+    "base_sha256": null,
+    "payload_sha256": "46d8df287e0d927c4619636368b8883e7960305627e842514cd1602a19fd7df6",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-identity-producer-20261012/composed-projection/changes/internal/adapters/kubernetes/owner_identity_composed_test.go"
+  },
+  {
+    "path": "internal/contracts/owner_provider_auth.go",
+    "base_sha256": null,
+    "payload_sha256": "bcdde2e51bdda6bd90d09ee0709612b1f29e4c6440c57e18569d384e287f9725",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/internal/contracts/owner_provider_auth.go"
+  },
+  {
+    "path": "internal/contracts/owner_provider_auth_test.go",
+    "base_sha256": null,
+    "payload_sha256": "a612c43b9eb48dbcda341ac1a91c41ea9f38d4183a16ea2a2cdd237ba20b6ea3",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/internal/contracts/owner_provider_auth_test.go"
+  },
+  {
+    "path": "specs/contracts/owner-provider-auth.schema.json",
+    "base_sha256": null,
+    "payload_sha256": "e8a2902233d08ac0b049e2615bde8b5831c162216596306765d5addcf5ff2ca1",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/changes/specs/contracts/owner-provider-auth.schema.json"
+  }
+]

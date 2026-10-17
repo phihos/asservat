@@ -1,0 +1,8 @@
+=== RUN   TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices
+=== RUN   TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices/pending-notice
+=== RUN   TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices/active-notice
+--- PASS: TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices (0.04s)
+    --- PASS: TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices/pending-notice (0.02s)
+    --- PASS: TestConfigurationRuntimeContentionInvalidatesPendingAndActiveNotices/active-notice (0.02s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.095s

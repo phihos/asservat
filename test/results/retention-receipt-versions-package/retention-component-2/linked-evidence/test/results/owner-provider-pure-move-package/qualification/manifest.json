@@ -1,0 +1,26 @@
+[
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_recipe.go",
+    "base_sha256": null,
+    "payload_sha256": "b0a4852552ecfbfd9826310000417c99c7ef92ad8d9111cf3803ce49e49c765f",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/changes/internal/adapters/providerconfig/owner_provider_recipe.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_recipe.go",
+    "base_sha256": "063f62c5bcb695b50fe22baa1e1bf53f563693d2f44c649715d218805a1bb0af",
+    "payload_sha256": "f43e76d9a624b4db66c2165a70ff84f840a4593d6203498aa486062fbc2eaf0d",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/changes/internal/adapters/kms/owner_provider_recipe.go"
+  },
+  {
+    "path": "internal/adapters/kms/owner_provider_recipe_compatibility_test.go",
+    "base_sha256": null,
+    "payload_sha256": "2047b8a3300b8024ee94eb30186acc37e7f47bedea4f47fef319524b97bbdca7",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/changes/internal/adapters/kms/owner_provider_recipe_compatibility_test.go"
+  },
+  {
+    "path": "internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json",
+    "base_sha256": null,
+    "payload_sha256": "df0c6caf6c69521f2c3fd6de9e6dc2dd80b1fd3e403b86ea1996619a11cf63f7",
+    "source": "/home/phil/.cache/asservat-build/planning/owner-provider-installed-v2-20261013/changes/internal/adapters/kms/testdata/owner-provider-recipe-v1/inputs.json"
+  }
+]

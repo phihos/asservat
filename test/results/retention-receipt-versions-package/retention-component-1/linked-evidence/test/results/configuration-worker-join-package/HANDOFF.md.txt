@@ -1,0 +1,15 @@
+# Joined configuration shutdown correction
+
+Frozen candidate: `candidate-v1/manifest.json` (`ddced6cf51b11317008798f871b1cab0324a7fc0102e463ee7d2ffe6616f5755`), five exact payloads; original bases included. All 1,920 dependency hashes and the complete inventory matched before/after. No live source was changed.
+
+`ConfigurationReconciler.Run` now cancels and joins both actual observer loops, with no six-second success/return shortcut. `HubWorkerDeployment.Run` acquires owned work under its closed-state mutex; externally initiated Close cancels, waits for Run, then closes providers. Run drops its own ownership before invoking Close, avoiding a self-join deadlock. Starting after Close and duplicate Run remain denied. The existing capacity/installed wrappers retain their independent joined child ownership.
+
+No observation, Lease, provider, request or external orchestration deadline is extended. A process supervisor can terminate stuck work; successful local shutdown never pretends it joined it. The architecture paragraph's old seven/six-second claim is corrected.
+
+## Actual evidence
+
+Handle12790 terminal0, `checks/join-v1/result.json`. GOMAXPROCS2, GOFLAGS-p2, dedicated TMPDIR; all ASSERVAT fixture variables removed. Live production plus only the two new test files reproduced both intended defects (exit1,7.476s): reconciler returned while its cancelled observer retained work; external Close released provider ownership before its real leader read joined. The before phase compiled and exercised the actual implementations; it was not a build failure.
+
+Corrected full application/fleet and bootstrap race suites passed exit0 in27.202s. Affected package vet passed exit0 in6.675s. Exact commands/log hashes and count inventory are retained in result.json/counts.json. No native Kubernetes/SQL/provider test or repository-wide gates were run for this correction. Parent should apply all five exact paths, then include ordinary static gates; the concrete runtime/native lifecycle remains part of upcoming provider2 qualification.
+
+This package is independent of the uncompiled provider2 input/launch/runtime follow-up. It does not change commands, credentials, layouts, or enable the new provider profile. The existing staged bootstrap provider2 rejection hunk must later rebase additively over this file.

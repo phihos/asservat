@@ -1,0 +1,170 @@
+{
+  "manifestSHA256": "04427332265c841a129ffcf9d3e3e8253ae26937d88b68597838602d5b544f5f",
+  "dependencySHA256": "bc166350ae0c538c08a5448a8bdf6dcd926d58ae424d110d1b46b31cfbc04d36",
+  "dependencyCount": 1956,
+  "files": [
+    {
+      "path": "internal/adapters/kms/owner_provider_control.go",
+      "base_sha256": null,
+      "payload_sha256": "ba947130f6bcc39b4b3896f130b8e002fc33edbb5da052a5e536fc4ed66ad30f",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_control_test.go",
+      "base_sha256": null,
+      "payload_sha256": "3502062c7228a82c4a844b695a002e839af5825249b430acc4794828968e04b0",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control_test.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_control_validation.go",
+      "base_sha256": null,
+      "payload_sha256": "11cecdd7bfc72aa59eaf67178ee8f72673890dbc908bae9c12137e2737f1f1ac",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_control_validation.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lease.go",
+      "base_sha256": null,
+      "payload_sha256": "a320c8c9df1f1a3fb5dfd861063a378ad718b6058586618c4cc739bd199d817d",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_lease.go"
+    },
+    {
+      "path": "internal/adapters/kms/owner_provider_lease_test.go",
+      "base_sha256": null,
+      "payload_sha256": "8a9fb7cf4920e9fc314c11e7a06a9497e702ba598178ceb21534e6e9044ab8ee",
+      "source": "/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/control/changes/internal/adapters/kms/owner_provider_lease_test.go"
+    }
+  ],
+  "qualification": {
+    "manifest_sha256": "04427332265c841a129ffcf9d3e3e8253ae26937d88b68597838602d5b544f5f",
+    "dependencies_sha256": "bc166350ae0c538c08a5448a8bdf6dcd926d58ae424d110d1b46b31cfbc04d36",
+    "runner_sha256": "82f7eb5790ae5572e56aa92480f90644a9c108cdbc268cfe2cccc3e959afe1d5",
+    "before_manifest_sha256": "95df0250e66d3c48cb44cacfcf0f7495ecb12b6ca3ede1ba5a8028f5b9d3a93c",
+    "paths": 5,
+    "dependencies": 1956,
+    "commands": [
+      {
+        "phase": "compile",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/control-lease-1/overlay.json",
+          "-run",
+          "^$",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "matched_expectation": true,
+        "seconds": 1.312,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        }
+      },
+      {
+        "phase": "before-tls-race",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/control-lease-1/before-overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=60s",
+          "-run",
+          "^TestOwnerProviderControlRejectsCustomTLSDialBypassBeforeJWTDisclosure$",
+          "-v",
+          "./internal/adapters/kms"
+        ],
+        "exit": 1,
+        "expected_exit": 1,
+        "matched_expectation": true,
+        "seconds": 1.651,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        }
+      },
+      {
+        "phase": "control-lease-race",
+        "command": [
+          "go",
+          "test",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/control-lease-1/overlay.json",
+          "-race",
+          "-count=1",
+          "-timeout=90s",
+          "-run",
+          "^TestOwnerProvider",
+          "-v",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "matched_expectation": true,
+        "seconds": 3.704,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        }
+      },
+      {
+        "phase": "vet",
+        "command": [
+          "go",
+          "vet",
+          "-overlay=/home/phil/.cache/asservat-build/planning/owner-provider-auth-20261013/checks/control-lease-1/overlay.json",
+          "./internal/adapters/kms"
+        ],
+        "exit": 0,
+        "expected_exit": 0,
+        "matched_expectation": true,
+        "seconds": 0.349,
+        "before": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        },
+        "after": {
+          "dependencies": [],
+          "bases": [],
+          "payloads": [],
+          "before": []
+        }
+      }
+    ],
+    "terminal_exit": 0,
+    "final_hash_check": {
+      "dependencies": [],
+      "bases": [],
+      "payloads": [],
+      "before": []
+    }
+  },
+  "integratedAt": 1791853106.4903479,
+  "scope": "Component checks only. Full Go gate, real provider authentication and installed runtime composition remain separate. Controlled provider TLS reversal is not a prior live vulnerability."
+}

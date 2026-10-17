@@ -1,0 +1,52 @@
+[
+  {
+    "path": "internal/adapters/kubernetes/connector_observation_operation.go",
+    "base": "602d7427c7f457ca8b3cafcb2c423d5d3aa37867db39ca8ede1dccd9df09c9ba",
+    "payload": "d4b66656768369e9e55d72027b8a9b029af645789c9efe1836210ab27e3cd59e"
+  },
+  {
+    "path": "internal/adapters/kubernetes/observation_operation_ports.go",
+    "base": null,
+    "payload": "398849b457833f5c8b5bf5e98f2d13b7836c0d2f1a9dda2affc851ddc2601f8b"
+  },
+  {
+    "path": "internal/adapters/kubernetes/observation_operation_ports_test.go",
+    "base": null,
+    "payload": "be954bddd9b505a66ff960acafb651967342fa48ef2c0f1d6b43d1fcc7814938"
+  },
+  {
+    "path": "internal/adapters/kubernetes/owner_observation_operation.go",
+    "base": "a892cb55d909e0f3cb74d0c27201c1022bc877078178a099d23d2e235ffbc875",
+    "payload": "1127c7d83749ca77dab8be1d7e8795d5c031baa9e885cab3eaf53b0e37ce2eb5"
+  },
+  {
+    "path": "internal/adapters/postgres/connector_observation_operation.go",
+    "base": null,
+    "payload": "6fa72e7c23604c235744f7bc66d525c1372abefeaaf3158af9c6e5fb3babfa95"
+  },
+  {
+    "path": "internal/adapters/postgres/connector_observation_operation_test.go",
+    "base": null,
+    "payload": "32c59b0741d10e07fae7572ee8c62d2d500e6e29a5a180289d53fd98aba2d71d"
+  },
+  {
+    "path": "internal/adapters/postgres/connector_registry.go",
+    "base": "5b3e743d3ba7bf94b362e537c6feb271a8b2faa3244b6b2fe9427d80677ca119",
+    "payload": "570dc43845b8b32821c1094998f8837d0048a333663f611ae89dbe56676b4785"
+  },
+  {
+    "path": "internal/application/fleet/observation_operation.go",
+    "base": null,
+    "payload": "9ac6dea1662dbdb7f63ef33518683301953a0093ed53dc10c556d431cd721bbe"
+  },
+  {
+    "path": "internal/domain/fleet/observation_operation.go",
+    "base": null,
+    "payload": "ea520188b89f3d263eb0f6202fb4df90c71267e622f30ca5f3222690969a4480"
+  },
+  {
+    "path": "internal/domain/fleet/observation_operation_test.go",
+    "base": null,
+    "payload": "70b77fbbd8909073c1fc1248729ee1b59fea78a4cefe01a13495aa206cbf306c"
+  }
+]

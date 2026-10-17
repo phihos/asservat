@@ -1,0 +1,12 @@
+{
+  "previous_handle": 98878,
+  "previous_runner_sha256": "96b9b2e3008037bb510d6441a493c40d6b2a6673efce13b5c7f46005a8086abc",
+  "evidence_path": "/tmp/asservat-owner-bootstrap-selection-3-evidence-jfvdxh4c",
+  "evidence_missing_after_reboot": true,
+  "last_observed_phase": "compile",
+  "terminal_exit": null,
+  "qualification": "unqualified, no terminal evidence survives",
+  "recovery_boot_id": "f94b3da9-2bc1-4d97-b0a2-0389b415717e",
+  "retry_payloads_unchanged": true,
+  "retry_dependencies_unchanged": true
+}

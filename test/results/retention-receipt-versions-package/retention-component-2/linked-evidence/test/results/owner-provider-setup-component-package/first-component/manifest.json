@@ -1,0 +1,22 @@
+[
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_setup.go",
+    "base": null,
+    "sha256": "a81015e576f6b8b971a131ace2c0493cdcd568005cd0e43af283134b7b5cbf82"
+  },
+  {
+    "path": "internal/adapters/providerconfig/owner_provider_setup_test.go",
+    "base": null,
+    "sha256": "3963c25656af8cead1b3e5213801150d71a7c9c1d6cc201c53fe7bd106e06c75"
+  },
+  {
+    "path": "internal/adapters/providerconfig/setup_reader.go",
+    "base": null,
+    "sha256": "ea22c1c582bdc261036d5d05ed7103ceb070257f264c12e9b5243d82ae34f94f"
+  },
+  {
+    "path": "internal/adapters/providerconfig/setup_values.go",
+    "base": null,
+    "sha256": "3e11e9405f3893dc59a8b012aa2f1f9e9d28c923fd96cc71a9d2852ee7acd22b"
+  }
+]

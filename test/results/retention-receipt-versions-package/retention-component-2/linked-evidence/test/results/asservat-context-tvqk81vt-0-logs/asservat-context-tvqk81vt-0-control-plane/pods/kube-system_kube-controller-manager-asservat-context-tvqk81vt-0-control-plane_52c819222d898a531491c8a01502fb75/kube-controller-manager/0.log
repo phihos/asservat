@@ -1,0 +1,10 @@
+2026-10-12T18:13:37.114854942Z stderr F I1012 18:13:37.114764       1 serving.go:411] Generated self-signed cert in-memory
+2026-10-12T18:13:37.117412604Z stderr F E1012 18:13:37.117374       1 options.go:205] The manifest file is empty, ignoring.
+2026-10-12T18:13:37.120288018Z stderr F I1012 18:13:37.119137       1 controllermanager.go:204] "Starting" version="v1.37.0"
+2026-10-12T18:13:37.120305738Z stderr F I1012 18:13:37.119147       1 controllermanager.go:206] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+2026-10-12T18:13:37.121030771Z stderr F I1012 18:13:37.120986       1 dynamic_cafile_content.go:161] "Starting controller" name="request-header::/etc/kubernetes/pki/front-proxy-ca.crt"
+2026-10-12T18:13:37.129579862Z stderr F I1012 18:13:37.120995       1 dynamic_cafile_content.go:161] "Starting controller" name="client-ca-bundle::/etc/kubernetes/pki/ca.crt"
+2026-10-12T18:13:37.129596472Z stderr F I1012 18:13:37.121199       1 tlsconfig.go:243] "Starting DynamicServingCertificateController"
+2026-10-12T18:13:37.129600332Z stderr F I1012 18:13:37.121207       1 secure_serving.go:214] Serving securely on 127.0.0.1:10257
+2026-10-12T18:13:37.129609902Z stderr F I1012 18:13:37.121399       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="kube-system/kube-controller-manager"
+2026-10-12T18:13:37.129613662Z stderr F E1012 18:13:37.121637       1 leaderelection.go:473] "Error retrieving lease lock" err="Get \"https://172.18.0.3:6443/apis/coordination.k8s.io/v1/namespaces/kube-system/leases/kube-controller-manager?timeout=5s\": dial tcp 172.18.0.3:6443: connect: connection refused" lock="kube-system/kube-controller-manager"

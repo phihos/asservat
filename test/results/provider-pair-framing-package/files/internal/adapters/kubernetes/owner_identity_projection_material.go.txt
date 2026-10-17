@@ -1,0 +1,102 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// Implemented by the fixed administrator SQL producer. It performs current
+// recovery/role verification only, never creation or provider effects.
+type OwnerIdentityRoleVerification interface {
+	VerifyOwnerIdentityRoles(context.Context) (contracts.OwnerIdentityRoleSnapshot, error)
+}
+
+// These are independently provisioned credentials for the fixed owner-audit
+// and purpose-separated PKI recipes. Projection does not issue provider tokens
+// or validate their capabilities by interpreting token contents.
+type OwnerIdentityProviderMaterial struct {
+	Audit                                          contracts.OwnerStorageCredential
+	WrapToken, OpenToken, ServerToken, ClientToken string
+}
+
+// Only public input and role provenance enter the digest. No password, provider
+// token or private-payload hash is stored in the resource journal.
+func ownerIdentityProjectionMaterial(input contracts.OwnerDeployment, activation contracts.OwnerIdentityActivation, roles contracts.OwnerIdentityRoleSnapshot, provider OwnerIdentityProviderMaterial, now time.Time) (contracts.OwnerDeployment, contracts.OwnerIdentityCredentialManifest, map[string][]byte, string, error) {
+	var zero contracts.OwnerDeployment
+	var empty contracts.OwnerIdentityCredentialManifest
+	if input.Observation == nil || input.Native != nil || !OwnerIdentityActivationBound(input, activation) || roles.State.Input != activation.Input || roles.UID != activation.RoleRoot.UID || roles.State.OperationID != activation.RoleSetupID || !ownerIdentityRoleStateValid(activation.Input, roles.State, now) || !now.Before(roles.ValidUntil) || providerconfig.ValidateOwner(input.Kubernetes, input.Postgres, input.AuditStore, input.KeyService, now) != nil {
+		return zero, empty, nil, "", cfg.ErrInvalid
+	}
+	// The caller's input is cloned before the generated original activation pin
+	// is inserted. Neither nested guard/peer slices nor caller pointers survive.
+	b, e := json.Marshal(input)
+	var cloned contracts.OwnerDeployment
+	if e != nil || json.Unmarshal(b, &cloned) != nil {
+		return zero, empty, nil, "", cfg.ErrInvalid
+	}
+	input = cloned
+	input.Observation.Activation = &activation
+	if input.ProviderAuthentication != nil {
+		// The v2 immutable Secret carries SQL credentials only. A caller cannot
+		// smuggle static provider tokens or a second storage identity into it.
+		if activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || provider != (OwnerIdentityProviderMaterial{}) {
+			return zero, empty, nil, "", cfg.ErrInvalid
+		}
+	} else {
+		if !identity.Text(provider.Audit.AccessKeyID, 256) || !identity.Text(provider.Audit.SecretAccessKey, 8192) || len(provider.Audit.SessionToken) > 8192 {
+			return zero, empty, nil, "", cfg.ErrInvalid
+		}
+		seen := map[string]bool{}
+		for _, token := range []string{provider.WrapToken, provider.OpenToken, provider.ServerToken, provider.ClientToken} {
+			if !identity.Text(token, 16384) || strings.ContainsAny(token, " \t\r\n") || seen[token] {
+				return zero, empty, nil, "", cfg.ErrInvalid
+			}
+			seen[token] = true
+		}
+	}
+	manifest := contracts.OwnerIdentityCredentialManifest{Format: contracts.OwnerIdentityCredentialManifestFormat, Input: roles.State.Input, RootUID: roles.UID, SetupID: roles.State.OperationID}
+	data := map[string][]byte{}
+	valid := false
+	defer func() {
+		if !valid {
+			clearRuntimeProjection(data)
+		}
+	}()
+	for _, r := range roles.State.Roles {
+		if r.Claim == nil || r.Receipt == nil {
+			return zero, empty, nil, "", cfg.ErrUnavailable
+		}
+		manifest.Roles = append(manifest.Roles, contracts.PublicRuntimeCredentialProof{Purpose: r.Purpose, Claim: *r.Claim, Receipt: *r.Receipt})
+		data["sql-"+r.Purpose+".json"], e = json.Marshal(contracts.OwnerSQLCredential{Username: r.Receipt.RoleName, Password: r.Password})
+		if e != nil {
+			return zero, empty, nil, "", cfg.ErrInvalid
+		}
+	}
+	data[contracts.OwnerIdentityRoleManifestFile], e = json.Marshal(manifest)
+	if e != nil {
+		return zero, empty, nil, "", cfg.ErrInvalid
+	}
+	if input.ProviderAuthentication == nil {
+		data["audit-storage.json"], e = json.Marshal(provider.Audit)
+		if e != nil {
+			return zero, empty, nil, "", cfg.ErrInvalid
+		}
+		data["audit-wrap.token"] = []byte(provider.WrapToken)
+		data["audit-unwrap.token"] = []byte(provider.OpenToken)
+		data["owner-server-sign.token"] = []byte(provider.ServerToken)
+		data["owner-client-sign.token"] = []byte(provider.ClientToken)
+	}
+	digest, e := ownerIdentityPublicDigest(input, manifest)
+	if e != nil {
+		return zero, empty, nil, "", e
+	}
+	valid = true
+	return input, manifest, data, digest, nil
+}

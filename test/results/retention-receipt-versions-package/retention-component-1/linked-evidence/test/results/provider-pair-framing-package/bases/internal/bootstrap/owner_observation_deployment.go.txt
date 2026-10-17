@@ -1,0 +1,257 @@
+package bootstrap
+
+import (
+	"context"
+	"net"
+	"os"
+	"sync"
+	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mounts"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/authorization"
+	configuration "asservat.local/asservat/internal/domain/configuration"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// This loader shares only the original provider/proof constructors with owner
+// identity setup. It opens exactly the four owner-identity SQL facets and never
+// calls the full deployment loader or reads routing/native/worker projections.
+// Optional backend/public projections are neither opened nor activated here.
+type OwnerObservationDeployment struct {
+	Runtime *OwnerObservationRuntime
+	base    *OwnerDeployment
+	once    sync.Once
+}
+
+func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerObservationDeployment, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	in, err := readOwnerInputs(ctx, files)
+	if err != nil {
+		return nil, err
+	}
+	if in.config.Observation == nil || in.config.Native != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	root, cancel := context.WithCancel(ctx)
+	// The base owns provider pools/HTTP clients only. Its Runtime and Router stay
+	// nil; its Run method is never used as an observation-mode fallback.
+	d := &OwnerDeployment{inputs: in, root: root, cancel: cancel}
+	d.closers = append(d.closers, in.closeHTTP)
+	out := &OwnerObservationDeployment{base: d}
+	complete := false
+	defer func() {
+		if !complete {
+			out.Close()
+		}
+	}()
+	startup, end := context.WithTimeout(root, 30*time.Second)
+	defer end()
+	c := in.config
+	activation := *c.Observation.Activation
+	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	actors := make([]configuration.KubernetesActor, len(c.WorkloadGuard.Administrators))
+	for i, a := range c.WorkloadGuard.Administrators {
+		actors[i] = configuration.KubernetesActor{Kind: a.Kind, Name: a.Name}
+	}
+	g := c.WorkloadGuard
+	schedulingLeases := make([]configuration.OwnerSchedulingLease, len(c.SchedulingLeases))
+	for i, l := range c.SchedulingLeases {
+		schedulingLeases[i] = configuration.OwnerSchedulingLease{Lease: l.Lease, ServiceAccount: l.ServiceAccount}
+	}
+	configurationProbes := make([]configuration.OwnerConfigurationProbe, len(c.ConfigurationProbes))
+	for i, p := range c.ConfigurationProbes {
+		configurationProbes[i] = configuration.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
+	}
+	var initialHistory *configuration.OwnerInitialHistoryProbe
+	if p := c.InitialHistoryProbe; p != nil {
+		initialHistory = &configuration.OwnerInitialHistoryProbe{Namespace: configuration.NamespaceRef{Name: p.Namespace.Name, UID: p.Namespace.UID}, ServiceAccount: p.ServiceAccount.Name, ServiceAccountUID: p.ServiceAccount.UID, Configuration: p.Configuration}
+	}
+	starts, err := ownerDeploymentStarts(c.APIContextStarts)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	capacityProbe, err := ownerDeploymentCapacityProbe(c.CapacityProbe)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: activation.Input.Deployment.Name, DeploymentUID: activation.Input.Deployment.UID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+
+	mounted, manifest, err := readOwnerIdentityProviders(startup, files)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	defer func() {
+		for _, b := range mounted {
+			clear(b)
+		}
+	}()
+	identityReader, err := kube.NewInstalledOwnerIdentityReader(observer, guard, c, activation, mountedOwnerPodToken{in}, podUID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	identityUntil, err := identityReader.Verify(startup, manifest, mounted)
+	if err != nil || !time.Now().Before(identityUntil) {
+		return nil, mounts.ErrUnavailable
+	}
+	// SQL credentials are not used until the exact current original projection,
+	// live Pod/token and native guard have been independently established. Every
+	// role check retains that proof's original deadline, never a new interval.
+	verified, stopVerified := context.WithDeadline(startup, identityUntil)
+	defer stopVerified()
+	pools := map[string]*pgxpool.Pool{}
+	users := map[string]bool{}
+	roles := []string{"enrollment", "audit", "activation", "registry"}
+	for _, role := range roles {
+		c, err := in.sqlConfig(verified, "sql-"+role+".json")
+		if err != nil || c == nil || users[c.ConnConfig.User] {
+			return nil, mounts.ErrUnavailable
+		}
+		expected, known := postgres.OwnerIdentityRoleName(in.config.InstallationID, role)
+		if !known || c.ConnConfig.User != expected {
+			return nil, mounts.ErrUnavailable
+		}
+		c.MaxConns, c.MinConns = 1, 0
+		c.ConnConfig.RequireAuth = "scram-sha-256"
+		users[c.ConnConfig.User] = true
+		pool, err := pgxpool.NewWithConfig(verified, c)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		pools[role] = pool
+		d.closers = append(d.closers, pool.Close)
+		if postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role) != nil {
+			return nil, mounts.ErrUnavailable
+		}
+	}
+	configs, err := postgres.NewOwnerConfigurations(verified, pools["registry"], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	current, err := configs.ReadOwnerConfiguration(verified)
+	if err != nil || !current.Valid(time.Now()) || current.Configuration.Suspended || current.Configuration.Pool.Namespace != c.Namespace.Name {
+		return nil, mounts.ErrUnavailable
+	}
+	pool := current.Configuration.Pool
+	if pool.Deployment != activation.Input.Deployment.Name || pool.DeploymentUID != activation.Input.Deployment.UID || pool.ServiceAccount != activation.Input.ServiceAccount.Name || pool.AccountUID != activation.Input.ServiceAccount.UID || verified.Err() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	roots, _, err := mtls.OwnerTrustRoots(current.Configuration.IssuerRoots, time.Now())
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	ledgers := map[string]*postgres.OwnerEnrollments{}
+	for _, role := range []string{"enrollment", "audit", "activation", "registry"} {
+		l, err := postgres.NewOwnerEnrollments(verified, pools[role], c.InstallationID, c.ClusterID, c.Namespace.UID, c.ConfigurationUID, ownerRandomID)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		ledgers[role] = l
+	}
+	proofs, err := kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	routes := &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}
+	h, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, h.CloseIdleConnections)
+	seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-wrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, seal.Close)
+	open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("audit-unwrap.token"), h)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, open.Close)
+	storageHTTP, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+	if err != nil {
+		return nil, err
+	}
+	d.closers = append(d.closers, storageHTTP.CloseIdleConnections)
+	store, err := objectstore.New(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, mountedStorage{in.providerInputs}, storageHTTP)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	d.closers = append(d.closers, store.Close)
+	audits := &objectstore.OwnerEnrollmentAuditObjects{Store: store, Seal: seal, Open: open}
+	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, pool, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	services := map[string]*app.OwnerEnrollmentCoordinator{}
+	for _, usage := range []string{"server", "client"} {
+		role := c.KeyService.ServerRole
+		if usage == "client" {
+			role = c.KeyService.ClientRole
+		}
+		issuer, err := kms.NewOwnerCertificateIssuerForPoolWithTokenSource(c.KeyService.Endpoint, c.KeyService.PKIMount, role, pool, usage, roots, in.token("owner-"+usage+"-sign.token"), h, time.Now)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.closers = append(d.closers, issuer.Close)
+		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuer, Now: time.Now}
+	}
+
+	pin, peers, err := ownerObservationConfig(c, pool)
+	if err != nil {
+		return nil, err
+	}
+	workload, err := kube.NewOwnerObservationWorkload(observer, guard, pin)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.Runtime, err = newOwnerObservationRuntime(root, verified, OwnerObservationRuntimeConfig{Pin: pin, PodUID: podUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Workloads: workload, Peers: peers, Connections: c.Connections, Concurrency: c.Concurrency})
+	if err != nil || verified.Err() != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	complete = true
+	return out, nil
+}
+
+func (d *OwnerObservationDeployment) Close() {
+	if d == nil {
+		return
+	}
+	d.once.Do(func() {
+		if d.Runtime != nil {
+			d.Runtime.Close()
+		}
+		if d.base != nil {
+			d.base.Close()
+		}
+	})
+}
+func (d *OwnerObservationDeployment) Run(listener net.Listener) error {
+	if d == nil || d.Runtime == nil || listener == nil {
+		return mounts.ErrUnavailable
+	}
+	defer d.Close()
+	return d.Runtime.Run(listener)
+}

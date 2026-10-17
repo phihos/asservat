@@ -1,0 +1,11 @@
+{
+  "scope": "component integration, not S-02 release acceptance",
+  "images": {
+    "s3": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+    "kms": "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf",
+    "kubernetes": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+  },
+  "clusters": [],
+  "testExit": 1,
+  "cleanupFailures": []
+}

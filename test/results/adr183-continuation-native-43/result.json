@@ -1,0 +1,20 @@
+{
+  "name": "adr183-continuation-native-43",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 0,
+  "status": "passed",
+  "selectedTests": [
+    "TestInitialBootstrapChainWithRealServices",
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/installer-continuation",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "result": "Native pass of ADR-190 step 7 and ADR-192 steps 1-3. Capacity initialized with identities derived from the public role setup; the observation-mode owner launched with the local capacity observation; after the launch the continuation published the capacity projection (empty download path set) under the ADR-191 bracket; the hub-worker's installed capacity child opened, accepted the capacity source and published the capacity root: capacity_source.root_configuration ReadyAt is set for the permission root. The permission stream stayed fresh. Bootstrap hook replay and the second continuation passed. Subtest 557.9 s.",
+  "scope": "Real kind API, OpenBao, SeaweedFS S3 and PostgreSQL; synthetic operator capacity profile and objects; no labelled application workloads, so no capacity_workload rows. Audit profile reads by a promoted hub-api, SNI dispatch and download paths are not covered. No public workflow.",
+  "testExit": 0,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

@@ -1,0 +1,225 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session
+    native_exchange_test.go:573: native diagnostic worker opening 0
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:96: native context initial session resolved
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.566878ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:96: native context pending metadata read completed
+    native_exchange_test.go:96: native context initial source resolved
+    native_exchange_test.go:573: native diagnostic worker opening 1
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.016529ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 2
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 2.983482695s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 2.936856095s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 485.623676ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 663.628874ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:573: native diagnostic worker opening 3
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 3.900136303s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 3.856425687s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 462.623508ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 622.762182ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 3 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 3 Joined <nil>
+    native_exchange_test.go:573: native diagnostic worker opening 4
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 17.734704ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 5
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.467187ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 6
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.304096ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 7
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.248681ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 8
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.700363ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 9
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.378667ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 10
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 21.997654ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 11
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.007335ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 11 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 12
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 3.349274005s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 3.306168032s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 501.746922ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 661.384014ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 12 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 12 Uncertain native exchange unavailable
+    native_exchange_test.go:288: worker terminal uncertain original native conversation: native exchange unavailable
+    native_admission_trace_test.go:75: native callback trace total 47 omitted 31
+    native_admission_trace_test.go:80: native callback trace {Number:32 Step:current Kind:observe-prepared-context AtMS:7613 ElapsedMS:74 CallerBound:true CallerStartMS:2817 CallerEndMS:2742 OuterEndMS:112311 WorkerEndMS:51775 LeaseBound:true LeaseEndMS:2742 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:33 Step:current Kind:observe-prepared-context AtMS:7688 ElapsedMS:76 CallerBound:true CallerStartMS:2742 CallerEndMS:2665 OuterEndMS:112234 WorkerEndMS:51698 LeaseBound:true LeaseEndMS:2665 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:34 Step:current Kind:observe-prepared-context AtMS:7764 ElapsedMS:74 CallerBound:true CallerStartMS:2665 CallerEndMS:2590 OuterEndMS:112160 WorkerEndMS:51624 LeaseBound:true LeaseEndMS:2590 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:35 Step:complete Kind:observe-prepared-context AtMS:7839 ElapsedMS:6 CallerBound:true CallerStartMS:2590 CallerEndMS:2584 OuterEndMS:112154 WorkerEndMS:51617 LeaseBound:true LeaseEndMS:2584 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:36 Step:http-entry Kind: AtMS:15974 ElapsedMS:0 CallerBound:true CallerStartMS:104024 CallerEndMS:104024 OuterEndMS:104024 WorkerEndMS:43488 LeaseBound:false LeaseEndMS:0 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:37 Step:register Kind:read-context-response AtMS:16675 ElapsedMS:0 CallerBound:true CallerStartMS:3787 CallerEndMS:3786 OuterEndMS:103323 WorkerEndMS:42787 LeaseBound:true LeaseEndMS:3786 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:38 Step:current Kind:read-context-response AtMS:17157 ElapsedMS:74 CallerBound:true CallerStartMS:3306 CallerEndMS:3232 OuterEndMS:102768 WorkerEndMS:42232 LeaseBound:true LeaseEndMS:3232 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:39 Step:before Kind:read-context-response AtMS:17231 ElapsedMS:236 CallerBound:true CallerStartMS:3231 CallerEndMS:2995 OuterEndMS:102531 WorkerEndMS:41995 LeaseBound:true LeaseEndMS:2995 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:40 Step:current Kind:read-context-response AtMS:17467 ElapsedMS:75 CallerBound:true CallerStartMS:2995 CallerEndMS:2919 OuterEndMS:102456 WorkerEndMS:41920 LeaseBound:true LeaseEndMS:2919 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:41 Step:current Kind:read-context-response AtMS:17545 ElapsedMS:77 CallerBound:true CallerStartMS:2917 CallerEndMS:2839 OuterEndMS:102376 WorkerEndMS:41840 LeaseBound:true LeaseEndMS:2839 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:42 Step:current Kind:read-context-response AtMS:17623 ElapsedMS:76 CallerBound:true CallerStartMS:2839 CallerEndMS:2763 OuterEndMS:102299 WorkerEndMS:41763 LeaseBound:true LeaseEndMS:2763 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:43 Step:current Kind:read-context-response AtMS:17700 ElapsedMS:131 CallerBound:true CallerStartMS:2762 CallerEndMS:2631 OuterEndMS:102168 WorkerEndMS:41632 LeaseBound:true LeaseEndMS:2631 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:44 Step:current Kind:read-context-response AtMS:17831 ElapsedMS:134 CallerBound:true CallerStartMS:2631 CallerEndMS:2496 OuterEndMS:102032 WorkerEndMS:41496 LeaseBound:true LeaseEndMS:2496 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:45 Step:current Kind:read-context-response AtMS:17966 ElapsedMS:232 CallerBound:true CallerStartMS:2496 CallerEndMS:2263 OuterEndMS:101800 WorkerEndMS:41264 LeaseBound:true LeaseEndMS:2263 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:46 Step:current Kind:read-context-response AtMS:18255 ElapsedMS:98 CallerBound:true CallerStartMS:2207 CallerEndMS:2108 OuterEndMS:101645 WorkerEndMS:41109 LeaseBound:true LeaseEndMS:2108 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:47 Step:current Kind:read-context-response AtMS:18354 ElapsedMS:75 CallerBound:true CallerStartMS:2108 CallerEndMS:2032 OuterEndMS:101569 WorkerEndMS:41033 LeaseBound:true LeaseEndMS:2032 OK:true Cancelled:false}
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session
+    native_exchange_test.go:573: native diagnostic worker opening 0
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:107: native context initial session resolved
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.650338ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 0 no native command admitted
+    native_exchange_test.go:107: native context pending metadata read completed
+    native_exchange_test.go:107: native context initial source resolved
+    native_exchange_test.go:573: native diagnostic worker opening 1
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 3.142436588s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 3.09610094s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 501.892542ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 670.838129ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 1 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 1 Joined <nil>
+    native_exchange_test.go:573: native diagnostic worker opening 2
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 4.060141279s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 4.016195771s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 480.837214ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 647.629199ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 2 Joined <nil>
+    native_exchange_test.go:573: native diagnostic worker opening 3
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.262496ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 3 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 4
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.170616ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 4 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 5
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 17.545022ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 5 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 6
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.292571ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 6 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 7
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 21.723913ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 7 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 8
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.076915ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 8 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 9
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 17.932485ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 9 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 10
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.531782ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 10 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 11
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 3.444559619s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 3.400961514s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 524.58431ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 687.917598ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 11 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 11 Joined <nil>
+    native_exchange_test.go:107: actual h2 client cancellation retained old uncertainty; explicit fresh audited preparation and new content path reconstructed Range/If-Match bytes with unchanged artifact SHA; synthetic authority/bootstrap inputs remain explicit
+    native_admission_trace_test.go:75: native callback trace total 54 omitted 38
+    native_admission_trace_test.go:80: native callback trace {Number:39 Step:before Kind:read-context-response AtMS:16134 ElapsedMS:252 CallerBound:true CallerStartMS:3324 CallerEndMS:3072 OuterEndMS:82651 WorkerEndMS:41497 LeaseBound:true LeaseEndMS:3072 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:40 Step:current Kind:read-context-response AtMS:16387 ElapsedMS:78 CallerBound:true CallerStartMS:3072 CallerEndMS:2993 OuterEndMS:82572 WorkerEndMS:41419 LeaseBound:true LeaseEndMS:2993 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:41 Step:current Kind:read-context-response AtMS:16467 ElapsedMS:80 CallerBound:true CallerStartMS:2992 CallerEndMS:2912 OuterEndMS:82491 WorkerEndMS:41337 LeaseBound:true LeaseEndMS:2912 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:42 Step:current Kind:read-context-response AtMS:16547 ElapsedMS:76 CallerBound:true CallerStartMS:2911 CallerEndMS:2835 OuterEndMS:82414 WorkerEndMS:41261 LeaseBound:true LeaseEndMS:2835 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:43 Step:current Kind:read-context-response AtMS:16624 ElapsedMS:137 CallerBound:true CallerStartMS:2835 CallerEndMS:2697 OuterEndMS:82276 WorkerEndMS:41122 LeaseBound:true LeaseEndMS:2697 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:44 Step:current Kind:read-context-response AtMS:16762 ElapsedMS:138 CallerBound:true CallerStartMS:2697 CallerEndMS:2558 OuterEndMS:82137 WorkerEndMS:40984 LeaseBound:true LeaseEndMS:2558 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:45 Step:current Kind:read-context-response AtMS:16900 ElapsedMS:238 CallerBound:true CallerStartMS:2558 CallerEndMS:2319 OuterEndMS:81898 WorkerEndMS:40745 LeaseBound:true LeaseEndMS:2319 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:46 Step:current Kind:read-context-response AtMS:17195 ElapsedMS:99 CallerBound:true CallerStartMS:2264 CallerEndMS:2164 OuterEndMS:81743 WorkerEndMS:40589 LeaseBound:true LeaseEndMS:2164 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:47 Step:current Kind:read-context-response AtMS:17295 ElapsedMS:76 CallerBound:true CallerStartMS:2164 CallerEndMS:2088 OuterEndMS:81667 WorkerEndMS:40513 LeaseBound:true LeaseEndMS:2088 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:48 Step:current Kind:read-context-response AtMS:17371 ElapsedMS:76 CallerBound:true CallerStartMS:2087 CallerEndMS:2011 OuterEndMS:81589 WorkerEndMS:40436 LeaseBound:true LeaseEndMS:2011 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:49 Step:current Kind:read-context-response AtMS:17448 ElapsedMS:78 CallerBound:true CallerStartMS:2010 CallerEndMS:1932 OuterEndMS:81511 WorkerEndMS:40357 LeaseBound:true LeaseEndMS:1932 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:50 Step:current Kind:read-context-response AtMS:17527 ElapsedMS:165 CallerBound:true CallerStartMS:1932 CallerEndMS:1766 OuterEndMS:81345 WorkerEndMS:40192 LeaseBound:true LeaseEndMS:1766 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:51 Step:current Kind:read-context-response AtMS:17692 ElapsedMS:133 CallerBound:true CallerStartMS:1766 CallerEndMS:1633 OuterEndMS:81212 WorkerEndMS:40058 LeaseBound:true LeaseEndMS:1633 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:52 Step:current Kind:read-context-response AtMS:17825 ElapsedMS:76 CallerBound:true CallerStartMS:1633 CallerEndMS:1557 OuterEndMS:81136 WorkerEndMS:39982 LeaseBound:true LeaseEndMS:1557 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:53 Step:current Kind:read-context-response AtMS:17902 ElapsedMS:75 CallerBound:true CallerStartMS:1556 CallerEndMS:1480 OuterEndMS:81059 WorkerEndMS:39906 LeaseBound:true LeaseEndMS:1480 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:54 Step:complete Kind:read-context-response AtMS:17978 ElapsedMS:6 CallerBound:true CallerStartMS:1480 CallerEndMS:1474 OuterEndMS:81053 WorkerEndMS:39899 LeaseBound:true LeaseEndMS:1474 OK:true Cancelled:false}
+=== RUN   TestContextAdmissionWithRealServices/download-worker-native-control-races
+    native_exchange_test.go:573: native diagnostic worker opening 0
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    download_sessions_test.go:732: native context initial session resolved
+    native_exchange_test.go:479: native diagnostic connector admission terminal 19.688063ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 0 no native command admitted
+    download_sessions_test.go:732: native context pending metadata read completed
+    download_sessions_test.go:732: native context initial source resolved
+    native_exchange_test.go:573: native diagnostic worker opening 1
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:479: native diagnostic connector admission terminal 18.815179ms no native command admitted
+    native_exchange_test.go:575: native diagnostic worker open terminal 1 no native command admitted
+    native_exchange_test.go:573: native diagnostic worker opening 2
+    native_exchange_test.go:478: native diagnostic connector admission entered
+    native_exchange_test.go:505: native diagnostic connector origin accepted 2.958834856s
+    native_exchange_test.go:478: native diagnostic hub admission entered
+    native_exchange_test.go:494: native diagnostic hub origin accepted 2.909429464s
+    native_exchange_test.go:479: native diagnostic hub admission terminal 488.217148ms <nil>
+    native_exchange_test.go:479: native diagnostic connector admission terminal 658.954343ms <nil>
+    native_exchange_test.go:575: native diagnostic worker open terminal 2 <nil>
+    native_exchange_test.go:582: native diagnostic worker conversation terminal 2 Joined <nil>
+    download_sessions_test.go:732: already-closed exact native operation denied within original current lease, charges unchanged
+    download_sessions_test.go:732: wrong fence/sequence and held-row original-deadline completion denied, owner and charges unchanged
+    download_sessions_test.go:732: status/content race admitted both or neither 0
+    native_admission_trace_test.go:75: native callback trace total 20 omitted 4
+    native_admission_trace_test.go:80: native callback trace {Number:5 Step:before Kind:prepare-context AtMS:3579 ElapsedMS:216 CallerBound:true CallerStartMS:2831 CallerEndMS:2614 OuterEndMS:16203 WorkerEndMS:55658 LeaseBound:true LeaseEndMS:2614 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:6 Step:current Kind:prepare-context AtMS:3796 ElapsedMS:75 CallerBound:true CallerStartMS:2614 CallerEndMS:2539 OuterEndMS:16128 WorkerEndMS:55582 LeaseBound:true LeaseEndMS:2539 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:7 Step:current Kind:prepare-context AtMS:3873 ElapsedMS:74 CallerBound:true CallerStartMS:2537 CallerEndMS:2463 OuterEndMS:16052 WorkerEndMS:55506 LeaseBound:true LeaseEndMS:2463 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:8 Step:current Kind:prepare-context AtMS:3947 ElapsedMS:75 CallerBound:true CallerStartMS:2462 CallerEndMS:2386 OuterEndMS:15976 WorkerEndMS:55430 LeaseBound:true LeaseEndMS:2386 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:9 Step:current Kind:prepare-context AtMS:4024 ElapsedMS:142 CallerBound:true CallerStartMS:2386 CallerEndMS:2243 OuterEndMS:15832 WorkerEndMS:55286 LeaseBound:true LeaseEndMS:2243 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:10 Step:current Kind:prepare-context AtMS:4167 ElapsedMS:162 CallerBound:true CallerStartMS:2243 CallerEndMS:2080 OuterEndMS:15669 WorkerEndMS:55123 LeaseBound:true LeaseEndMS:2080 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:11 Step:current Kind:prepare-context AtMS:4330 ElapsedMS:242 CallerBound:true CallerStartMS:2080 CallerEndMS:1838 OuterEndMS:15427 WorkerEndMS:54881 LeaseBound:true LeaseEndMS:1838 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:12 Step:current Kind:prepare-context AtMS:4597 ElapsedMS:101 CallerBound:true CallerStartMS:1813 CallerEndMS:1711 OuterEndMS:15300 WorkerEndMS:54754 LeaseBound:true LeaseEndMS:1711 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:13 Step:current Kind:prepare-context AtMS:4700 ElapsedMS:75 CallerBound:true CallerStartMS:1710 CallerEndMS:1635 OuterEndMS:15224 WorkerEndMS:54678 LeaseBound:true LeaseEndMS:1635 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:14 Step:current Kind:prepare-context AtMS:4866 ElapsedMS:94 CallerBound:true CallerStartMS:1544 CallerEndMS:1449 OuterEndMS:15039 WorkerEndMS:54493 LeaseBound:true LeaseEndMS:1449 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:15 Step:current Kind:prepare-context AtMS:4961 ElapsedMS:77 CallerBound:true CallerStartMS:1449 CallerEndMS:1372 OuterEndMS:14961 WorkerEndMS:54415 LeaseBound:true LeaseEndMS:1372 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:16 Step:current Kind:prepare-context AtMS:5038 ElapsedMS:140 CallerBound:true CallerStartMS:1372 CallerEndMS:1231 OuterEndMS:14820 WorkerEndMS:54274 LeaseBound:true LeaseEndMS:1231 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:17 Step:current Kind:prepare-context AtMS:5179 ElapsedMS:173 CallerBound:true CallerStartMS:1231 CallerEndMS:1058 OuterEndMS:14647 WorkerEndMS:54101 LeaseBound:true LeaseEndMS:1058 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:18 Step:current Kind:prepare-context AtMS:5352 ElapsedMS:81 CallerBound:true CallerStartMS:1058 CallerEndMS:977 OuterEndMS:14566 WorkerEndMS:54020 LeaseBound:true LeaseEndMS:977 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:19 Step:current Kind:prepare-context AtMS:5433 ElapsedMS:80 CallerBound:true CallerStartMS:976 CallerEndMS:896 OuterEndMS:14485 WorkerEndMS:53939 LeaseBound:true LeaseEndMS:896 OK:true Cancelled:false}
+    native_admission_trace_test.go:80: native callback trace {Number:20 Step:complete Kind:prepare-context AtMS:5514 ElapsedMS:6 CallerBound:true CallerStartMS:896 CallerEndMS:889 OuterEndMS:14478 WorkerEndMS:53933 LeaseBound:true LeaseEndMS:889 OK:true Cancelled:false}
+--- FAIL: TestContextAdmissionWithRealServices (53.70s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted (41.04s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/original-interrupted-session (20.91s)
+        --- PASS: TestContextAdmissionWithRealServices/download-worker-native-content-interrupted/explicit-new-session (18.14s)
+    --- FAIL: TestContextAdmissionWithRealServices/download-worker-native-control-races (12.31s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	53.762s
+FAIL

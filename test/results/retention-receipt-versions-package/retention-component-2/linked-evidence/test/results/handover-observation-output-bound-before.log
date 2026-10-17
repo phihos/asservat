@@ -1,0 +1,11 @@
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/pod
+    initial_preparer_handover_observation_test.go:76: returned history deadline 2026-10-12 05:33:43.754329916 +0200 CEST m=+10.008676337, want original bound 2026-10-12 05:33:35.754329916 +0200 CEST m=+2.008676337: <nil>
+=== RUN   TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/request
+    initial_preparer_handover_observation_test.go:76: returned history deadline 2026-10-12 05:33:43.754454456 +0200 CEST m=+10.008800878, want original bound 2026-10-12 05:33:34.754454456 +0200 CEST m=+1.008800878: <nil>
+--- FAIL: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest (0.00s)
+    --- FAIL: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/pod (0.00s)
+    --- FAIL: TestInitialHandoverHistoryCannotOutliveOriginalPodOrRequest/request (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.011s
+FAIL

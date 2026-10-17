@@ -1,0 +1,766 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/manifest.schema.json",
+  "title": "Asservat manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "artifact/v1"
+    },
+    "artifactID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "caseID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurrenceID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "nodeBootID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "podUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "workloadUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "containerID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "restartCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "hostPID": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        },
+        "processStartTimeTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "scope": {
+          "enum": [
+            "pod",
+            "runtimeSource",
+            "process"
+          ]
+        },
+        "executionClass": {
+          "const": "kubernetesAPI",
+          "description": "Explicit regional Kubernetes API acquisition; omission is the historical node execution profile."
+        }
+      },
+      "required": [
+        "clusterID",
+        "podUID",
+        "namespace",
+        "workloadUID",
+        "scope"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "pod"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "containerID"
+                  ]
+                },
+                {
+                  "required": [
+                    "restartCount"
+                  ]
+                },
+                {
+                  "required": [
+                    "hostPID"
+                  ]
+                },
+                {
+                  "required": [
+                    "processStartTimeTicks"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "containerID",
+              "restartCount"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "process"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hostPID",
+              "processStartTimeTicks"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "hostPID"
+                  ]
+                },
+                {
+                  "required": [
+                    "processStartTimeTicks"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "executionClass"
+            ],
+            "properties": {
+              "executionClass": {
+                "const": "kubernetesAPI"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "nodeUID"
+                  ]
+                },
+                {
+                  "required": [
+                    "nodeBootID"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "nodeUID",
+              "nodeBootID"
+            ]
+          }
+        }
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "kubernetesSnapshot",
+        "logs",
+        "processSnapshot",
+        "fileRead",
+        "packetCapture",
+        "networkSnapshot",
+        "runtimeDiagnostic",
+        "kernelCore",
+        "liveCore",
+        "command",
+        "httpDiagnostic",
+        "artifactCollect",
+        "profile",
+        "syscallTrace"
+      ]
+    },
+    "mediaType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "format": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "dataClass": {
+      "type": "string",
+      "enum": [
+        "metadata",
+        "extract",
+        "raw"
+      ]
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requested": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "resolvedDigest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identityConfidence": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "runtimeReported",
+            "unknown"
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "requested",
+        "resolvedDigest",
+        "identityConfidence",
+        "revision"
+      ]
+    },
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "imageDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "recipeDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policyDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "version",
+        "imageDigest",
+        "recipeDigest"
+      ]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "truncated",
+            "partial",
+            "unknown"
+          ]
+        },
+        "ciphertext": {
+          "type": "string",
+          "enum": [
+            "complete"
+          ]
+        },
+        "analyzable": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false",
+            "unknown"
+          ]
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 32,
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "source",
+        "ciphertext",
+        "analyzable",
+        "gaps"
+      ]
+    },
+    "sizes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plaintextBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "ciphertextBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1108101562368
+        }
+      },
+      "required": [
+        "plaintextBytes",
+        "ciphertextBytes"
+      ]
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plaintextSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "ciphertextSHA256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "plaintextSHA256",
+        "ciphertextSHA256"
+      ]
+    },
+    "encryption": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "const": "tink-streaming-aead/v1"
+            },
+            "keyRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "wrappedKeyset": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            "aadSHA256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "format",
+            "keyRef",
+            "wrappedKeyset",
+            "aadSHA256"
+          ]
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/layout"
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parentArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
+          },
+          "maxItems": 16,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "transform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "toolDigests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "maxItems": 32,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "buildIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 128,
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "projectionDigest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        }
+      },
+      "required": [
+        "parentArtifacts",
+        "toolDigests",
+        "buildIDs"
+      ]
+    },
+    "profile": {
+      "$ref": "https://asservat.io/spec/v1/profile.schema.json"
+    },
+    "accessProvenance": {
+      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/accessProvenance"
+    },
+    "privacy": {
+      "$ref": "https://asservat.io/spec/v1/privacy-common.schema.json#/$defs/privacy"
+    },
+    "retention": {
+      "$ref": "https://asservat.io/spec/v1/privacy-common.schema.json#/$defs/retention"
+    },
+    "collectionProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "captureUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "actionID": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "planDigest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        }
+      },
+      "required": [
+        "captureUID",
+        "actionID",
+        "planDigest"
+      ]
+    },
+    "actionLifecycle": {
+      "$ref": "https://asservat.io/spec/v1/action-lifecycle.schema.json#/$defs/acquisition"
+    },
+    "storageObjects": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/objectIdentity"
+        },
+        "index": {
+          "$ref": "https://asservat.io/spec/v1/framed-storage.schema.json#/$defs/objectIdentity"
+        }
+      },
+      "required": [
+        "data",
+        "index"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "artifactID",
+    "caseID",
+    "occurrenceID",
+    "target",
+    "kind",
+    "mediaType",
+    "format",
+    "dataClass",
+    "collector",
+    "startedAt",
+    "completedAt",
+    "expiresAt",
+    "completeness",
+    "sizes",
+    "hashes",
+    "encryption",
+    "provenance",
+    "accessProvenance",
+    "privacy",
+    "retention"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "profile"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "profile"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "parentArtifacts": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "collectionProvenance"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "target": {
+            "properties": {
+              "scope": {
+                "const": "pod"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "image"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "image"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "liveCore",
+              "kernelCore"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "properties": {
+              "scope": {
+                "const": "process"
+              }
+            }
+          },
+          "privacy": {
+            "properties": {
+              "evidenceType": {
+                "const": "coreDump"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "parentArtifacts": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "actionLifecycle"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "encryption": {
+            "properties": {
+              "format": {
+                "const": "asservat-framed/v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "storageObjects"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "storageObjects"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "required": [
+              "executionClass"
+            ],
+            "properties": {
+              "executionClass": {
+                "const": "kubernetesAPI"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "properties": {
+              "scope": {
+                "const": "pod"
+              }
+            }
+          },
+          "kind": {
+            "const": "kubernetesSnapshot"
+          },
+          "format": {
+            "const": "asservat-pod-status/v1"
+          },
+          "mediaType": {
+            "const": "application/json"
+          },
+          "dataClass": {
+            "const": "metadata"
+          },
+          "collectionProvenance": {
+            "properties": {
+              "actionID": {
+                "const": "pod-status"
+              }
+            }
+          },
+          "sizes": {
+            "properties": {
+              "plaintextBytes": {
+                "maximum": 4096
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

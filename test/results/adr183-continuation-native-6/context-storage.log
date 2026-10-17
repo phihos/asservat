@@ -1,0 +1,26 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 5c9a5653-29c4-4df8-9b52-31b07643ca95 image docker.io/library/asservat-context-worker@sha256:e7839303df12513da994c94ae0e0d425d8ffd5eea35629d8729a21abe76788c4 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-yupux68d-0", namespace "bootstrap-chain-10000000", installation "19c3f7a2-8f93-4334-97a8-c7198f8784fc": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-1719ae823a744a5dcbbbedaaf8945971ee006854404302196362301c32175619-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-1719ae823a744a5dcbbbedaaf8945971ee006854404302196362301c32175619-audit-wrap
+        created: sys/policies/acl/asservat-configuration-1719ae823a744a5dcbbbedaaf8945971ee006854404302196362301c32175619-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-1719ae823a744a5dcbbbedaaf8945971ee006854404302196362301c32175619-audit-unwrap
+        created: sys/policies/acl/asservat-19c3f7a28f93433497a8c7198f8784fc-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: actual continuation failed
+    installer_continuation_native_test.go:299: continuation produce 
+    installer_continuation_native_test.go:299: continuation continue installer continuation stopped at worker/roles-provision (unavailable)
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (400.71s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (21.60s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (92.84s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.79s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	400.768s
+FAIL

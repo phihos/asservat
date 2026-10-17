@@ -1,0 +1,12 @@
+{
+  "name": "adr183-continuation-native-7",
+  "command": "scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "exit": 1,
+  "status": "failed",
+  "selectedTests": ["TestInitialBootstrapChainWithRealServices/installer-continuation"],
+  "result": "Stopped at worker/roles-provision/complete:configuration-fleet (unavailable): the first configuration role was claimed, created and authenticated, and the root receipt update failed or its original window lapsed. SCRAM uses 4096 iterations, so CPU is unlikely. Run 8 reports elapsed and remaining time at the stop step and prints per-step progress durations.",
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "log": "context-storage.log",
+  "environment": "environment.json"
+}

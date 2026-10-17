@@ -1,0 +1,48 @@
+{{- include "asservat.bootstrap.validate" . -}}
+{{- if .Values.bootstrap.enabled }}
+{{- $b := .Values.bootstrap }}
+{{- $role := printf "%s-%s-bootstrap-runner" .Release.Namespace $b.name }}
+# Explicit trusted initial administrator. This is not runtime RBAC, and the
+# namespace/guard creators cannot prove historical cleanliness of their entry.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-bootstrap-runner" $b.name }}
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $role }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, serviceaccounts, serviceaccounts/token, configmaps, secrets, pods]
+    verbs: [get, create, update, delete]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ printf "%s-bootstrap-state" $b.name | quote }}, {{ printf "%s-sql-material" $b.name | quote }}, {{ printf "%s-provider-material" $b.name | quote }}]
+    verbs: [patch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, create, update]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingadmissionpolicies, validatingadmissionpolicybindings]
+    verbs: [get, create, update]
+  - apiGroups: [authentication.k8s.io]
+    resources: [selfsubjectreviews, tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $role }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $role }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-bootstrap-runner" $b.name }}
+{{- end }}

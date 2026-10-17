@@ -1,0 +1,20 @@
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 12 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/tmp/asservat-openapi-validation/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/tmp/asservat-openapi-validation/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/tmp/asservat-openapi-validation/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+go vet ./...
+internal/application/authorization/key_service_test.go:112:31: asservat.local/asservat/internal/domain/authorization.KeyScope struct literal uses unkeyed fields
+internal/adapters/kms/remote.go:103:81: asservat.local/asservat/internal/contracts.KeyScope struct literal uses unkeyed fields
+test/integration/key_service_test.go:348:37: asservat.local/asservat/internal/domain/authorization.KeyScope struct literal uses unkeyed fields
+test/integration/key_service_test.go:435:82: asservat.local/asservat/internal/contracts.KeyScope struct literal uses unkeyed fields
+make: *** [Makefile:38: go-check] Error 1

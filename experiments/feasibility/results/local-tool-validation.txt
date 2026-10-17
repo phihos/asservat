@@ -1,0 +1,4 @@
+Running as user "root" and group "root". This could be dangerous.
+   1012 58888
+00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f  /root/downloaded-gadget.pcapng
+00a762cb5cc6951c4bbcdfd7ed08a6403623c7d8a6f96b4bffa1282921a87b8f  /root/gadget-pods.pcapng

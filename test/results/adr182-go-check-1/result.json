@@ -1,0 +1,11 @@
+{
+  "name": "adr182-go-check-1",
+  "command": "make go-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python (GOMAXPROCS=2 GOFLAGS=-p=2)",
+  "exit": 0,
+  "status": "passed",
+  "scope": "Full Go gate after ADR-182: installed owner promotion (composeOwnerIdentity extraction, promoted NewOwnerDeployment with projection roots and provider supervision), public provider recipe and provider effects public purposes",
+  "results": "55 full packages and 544 Kubernetes tests in 7 sequential groups; 0 failures; 1 pre-existing explicit skip (group 4)",
+  "sourceHashBefore": "d98a578ee8f33a70b4b01213fbcc317369d94d88b99a47a0e909028149773549",
+  "sourceHashAfter": "d98a578ee8f33a70b4b01213fbcc317369d94d88b99a47a0e909028149773549",
+  "log": "go-check.log"
+}
